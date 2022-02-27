@@ -21,6 +21,7 @@ from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import BashBinary, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
@@ -122,25 +123,20 @@ class CoursierSubsystem(TemplatedExternalTool):
         "linux_x86_64": "x86_64-pc-linux",
     }
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--repos",
-            type=list,
-            member_type=str,
-            default=[
-                "https://maven-central.storage-download.googleapis.com/maven2",
-                "https://repo1.maven.org/maven2",
-            ],
-            help=(
-                "Maven style repositories to resolve artifacts from."
-                "\n\n"
-                "Coursier will resolve these repositories in the order in which they are "
-                "specifed, and re-ordering repositories will cause artifacts to be "
-                "re-downloaded. This can result in artifacts in lockfiles becoming invalid."
-            ),
-        )
+    repos = StrListOption(
+        "--repos",
+        default=[
+            "https://maven-central.storage-download.googleapis.com/maven2",
+            "https://repo1.maven.org/maven2",
+        ],
+        help=(
+            "Maven style repositories to resolve artifacts from."
+            "\n\n"
+            "Coursier will resolve these repositories in the order in which they are "
+            "specifed, and re-ordering repositories will cause artifacts to be "
+            "re-downloaded. This can result in artifacts in lockfiles becoming invalid."
+        ),
+    )
 
     def generate_exe(self, plat: Platform) -> str:
         archive_filename = os.path.basename(self.generate_url(plat))

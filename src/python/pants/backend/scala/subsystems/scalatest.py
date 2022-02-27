@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.custom_types import shell_str
+from pants.option.option_types import ArgsListOption
 from pants.util.docutil import git_url
 
 
@@ -18,17 +18,10 @@ class Scalatest(JvmToolBase):
     )
     default_lockfile_url = git_url(default_lockfile_path)
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            passthrough=True,
-            help=(
-                "Arguments to pass directly to Scalatest, e.g. `-t $testname`. See "
-                "https://www.scalatest.org/user_guide/using_the_runner for supported arguments."
-            ),
-        )
+    args = ArgsListOption(
+        passthrough=True,
+        help=(
+            "Arguments to pass directly to Scalatest, e.g. `-t $testname`. See "
+            "https://www.scalatest.org/user_guide/using_the_runner for supported arguments."
+        ),
+    )
