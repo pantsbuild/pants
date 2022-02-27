@@ -26,15 +26,6 @@ dependencies = [
 
 [[package]]
 name = "ansi_term"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee49baf6cb617b853aa8d93bf420db2383fab46d314482ca2803b40d5fde979b"
-dependencies = [
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
@@ -185,7 +176,7 @@ name = "brfs"
 version = "0.0.1"
 dependencies = [
  "bytes",
- "clap",
+ "clap 3.1.2",
  "dirs-next",
  "env_logger",
  "errno",
@@ -304,17 +295,32 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "2.33.3"
+version = "2.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37e58ac78573c40708d45522f0d80fa2f01cc4f9b4e2bf749807255454312002"
+checksum = "a0610544180c38b88101fecf2dd634b174a62eef6946f84dfc6a7127512b381c"
 dependencies = [
- "ansi_term 0.11.0",
+ "ansi_term",
  "atty",
  "bitflags",
- "strsim",
- "textwrap",
+ "strsim 0.8.0",
+ "textwrap 0.11.0",
  "unicode-width",
  "vec_map",
+]
+
+[[package]]
+name = "clap"
+version = "3.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5177fac1ab67102d8989464efd043c6ff44191b1557ec1ddd489b4f7e1447e77"
+dependencies = [
+ "atty",
+ "bitflags",
+ "indexmap",
+ "os_str_bytes",
+ "strsim 0.10.0",
+ "termcolor",
+ "textwrap 0.14.2",
 ]
 
 [[package]]
@@ -352,6 +358,7 @@ dependencies = [
 name = "concrete_time"
 version = "0.0.1"
 dependencies = [
+ "deepsize",
  "log",
  "prost",
  "prost-types",
@@ -413,7 +420,7 @@ checksum = "1604dafd25fba2fe2d5895a9da139f8dc9b319a5fe5354ca137cbbce4e178d10"
 dependencies = [
  "atty",
  "cast",
- "clap",
+ "clap 2.34.0",
  "criterion-plot",
  "csv",
  "itertools",
@@ -512,7 +519,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a700b46e8d365e505990fc24a85c42b8e7d7eb3a4203a0cc922d92f4092e854"
 dependencies = [
- "ansi_term 0.12.1",
+ "ansi_term",
  "termion",
 ]
 
@@ -546,6 +553,26 @@ checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
 dependencies = [
  "cfg-if 1.0.0",
  "num_cpus",
+]
+
+[[package]]
+name = "deepsize"
+version = "0.2.0"
+source = "git+https://github.com/stuhood/deepsize.git?rev=67c6cfc2afa1303c06b19c1b96ebe11fd3217d34#67c6cfc2afa1303c06b19c1b96ebe11fd3217d34"
+dependencies = [
+ "deepsize_derive",
+ "log",
+ "smallvec",
+]
+
+[[package]]
+name = "deepsize_derive"
+version = "0.1.2"
+source = "git+https://github.com/stuhood/deepsize.git?rev=67c6cfc2afa1303c06b19c1b96ebe11fd3217d34#67c6cfc2afa1303c06b19c1b96ebe11fd3217d34"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -622,6 +649,7 @@ dependencies = [
  "cache",
  "concrete_time",
  "crossbeam-channel 0.5.2",
+ "deepsize",
  "derivative",
  "either",
  "env_logger",
@@ -652,7 +680,7 @@ dependencies = [
  "reqwest",
  "rule_graph",
  "serde_json",
- "smallvec 0.6.14",
+ "smallvec",
  "stdio",
  "store",
  "task_executor",
@@ -775,6 +803,7 @@ version = "0.0.1"
 dependencies = [
  "async-trait",
  "bytes",
+ "deepsize",
  "dirs-next",
  "futures",
  "glob",
@@ -796,7 +825,7 @@ name = "fs_util"
 version = "0.0.1"
 dependencies = [
  "bytes",
- "clap",
+ "clap 3.1.2",
  "env_logger",
  "fs",
  "futures",
@@ -867,7 +896,7 @@ dependencies = [
  "memchr",
  "page_size",
  "pkg-config",
- "smallvec 1.7.0",
+ "smallvec",
  "users",
  "zerocopy",
 ]
@@ -1102,6 +1131,7 @@ name = "hashing"
 version = "0.0.1"
 dependencies = [
  "byteorder",
+ "deepsize",
  "digest",
  "generic-array",
  "hex",
@@ -1447,7 +1477,7 @@ dependencies = [
 name = "local_cas"
 version = "0.0.1"
 dependencies = [
- "clap",
+ "clap 3.1.2",
  "env_logger",
  "mock",
 ]
@@ -1456,7 +1486,7 @@ dependencies = [
 name = "local_execution_server"
 version = "0.1.0"
 dependencies = [
- "clap",
+ "clap 3.1.2",
  "mock",
  "protos",
  "structopt",
@@ -1930,6 +1960,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "os_str_bytes"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e22443d1643a904602595ba1cd8f7d896afe56d26712531c5ff73a15b2fbf64"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "page_size"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1970,7 +2009,7 @@ dependencies = [
  "instant",
  "libc",
  "redox_syscall 0.2.10",
- "smallvec 1.7.0",
+ "smallvec",
  "winapi 0.3.9",
 ]
 
@@ -1983,7 +2022,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "redox_syscall 0.2.10",
- "smallvec 1.7.0",
+ "smallvec",
  "windows-sys",
 ]
 
@@ -2211,6 +2250,7 @@ dependencies = [
  "bytes",
  "cache",
  "concrete_time",
+ "deepsize",
  "derivative",
  "fs",
  "futures",
@@ -2256,7 +2296,7 @@ dependencies = [
 name = "process_executor"
 version = "0.0.1"
 dependencies = [
- "clap",
+ "clap 3.1.2",
  "dirs-next",
  "env_logger",
  "fs",
@@ -2665,6 +2705,7 @@ dependencies = [
 name = "rule_graph"
 version = "0.0.1"
 dependencies = [
+ "deepsize",
  "env_logger",
  "indexmap",
  "log",
@@ -2957,15 +2998,6 @@ checksum = "c307a32c1c5c437f38c7fd45d753050587732ba8628319fbdf12a7e289ccc590"
 
 [[package]]
 name = "smallvec"
-version = "0.6.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b97fcaeba89edba30f044a10c6a3cc39df9c3f17d7cd829dd1446cab35f890e0"
-dependencies = [
- "maybe-uninit",
-]
-
-[[package]]
-name = "smallvec"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
@@ -3056,12 +3088,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 
 [[package]]
+name = "strsim"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
+
+[[package]]
 name = "structopt"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c6b5c64445ba8094a6ab0c3cd2ad323e07171012d9c98b0b15651daf1787a10"
 dependencies = [
- "clap",
+ "clap 2.34.0",
  "lazy_static",
  "structopt-derive",
 ]
@@ -3214,6 +3252,12 @@ checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
  "unicode-width",
 ]
+
+[[package]]
+name = "textwrap"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0066c8d12af8b5acd21e00547c3797fde4e8677254a7ee429176ccebbe93dd80"
 
 [[package]]
 name = "thiserror"
@@ -3936,6 +3980,7 @@ version = "0.0.1"
 dependencies = [
  "bytes",
  "concrete_time",
+ "deepsize",
  "hashing",
  "hdrhistogram",
  "log",
