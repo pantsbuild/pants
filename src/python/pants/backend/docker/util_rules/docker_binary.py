@@ -8,18 +8,17 @@ from typing import Mapping
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import Digest
-from pants.engine.process import (
+from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
-    Process,
-    ProcessCacheScope,
     SearchPath,
 )
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.fs import Digest
+from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize

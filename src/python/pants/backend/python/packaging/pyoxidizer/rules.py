@@ -22,6 +22,7 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -32,7 +33,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,

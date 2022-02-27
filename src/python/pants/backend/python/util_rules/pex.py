@@ -41,6 +41,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 )
 from pants.backend.python.util_rules.pex_requirements import maybe_validate_metadata
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -58,7 +59,7 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
 from pants.util.frozendict import FrozenDict

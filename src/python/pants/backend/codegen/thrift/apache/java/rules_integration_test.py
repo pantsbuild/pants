@@ -16,7 +16,6 @@ from pants.backend.codegen.thrift.target_types import (
 )
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files, stripped_source_files
-from pants.engine import process
 from pants.engine.internals import graph
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
@@ -35,7 +34,6 @@ def rule_runner() -> RuleRunner:
             *source_root.rules(),
             *graph.rules(),
             *stripped_source_files.rules(),
-            *process.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromThriftRequest]),
         ],

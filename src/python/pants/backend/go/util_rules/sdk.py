@@ -9,10 +9,11 @@ from typing import Iterable, Mapping
 
 from pants.backend.go.subsystems import golang
 from pants.backend.go.subsystems.golang import GolangSubsystem, GoRoot
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, Process
+from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel

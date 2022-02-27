@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.core.goals.repl import ReplImplementation, ReplRequest
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule

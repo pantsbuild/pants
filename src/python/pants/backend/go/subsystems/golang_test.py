@@ -10,8 +10,8 @@ import pytest
 
 from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.subsystems.golang import rules as golang_rules
+from pants.core.util_rules.system_binaries import BinaryNotFoundError
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import BinaryNotFoundError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import temporary_dir

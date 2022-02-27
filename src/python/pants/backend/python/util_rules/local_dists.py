@@ -18,10 +18,10 @@ from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.source_files import SourceFiles
-from pants.core.util_rules.system_binaries import UnzipBinary
+from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
 from pants.util.dirutil import fast_relpath_optional

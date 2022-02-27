@@ -8,18 +8,16 @@ from dataclasses import dataclass
 from pants.backend.codegen.thrift.apache.subsystem import ApacheThriftSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import (
+from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
-    Process,
-    ProcessCacheScope,
-    ProcessResult,
 )
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult

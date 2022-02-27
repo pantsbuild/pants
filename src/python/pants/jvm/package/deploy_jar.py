@@ -14,10 +14,10 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet
-from pants.core.util_rules.system_binaries import ZipBinary
+from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Dependencies
 from pants.engine.unions import UnionRule

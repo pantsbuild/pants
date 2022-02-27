@@ -26,6 +26,12 @@ from pants.core.goals.test import (
 )
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.system_binaries import (
+    BinaryNotFoundError,
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+)
 from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
@@ -38,10 +44,6 @@ from pants.engine.fs import (
     MergeDigests,
 )
 from pants.engine.process import (
-    BinaryNotFoundError,
-    BinaryPath,
-    BinaryPathRequest,
-    BinaryPaths,
     FallibleProcessResult,
     InteractiveProcess,
     Process,
