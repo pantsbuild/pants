@@ -9,6 +9,8 @@ publish = false
 # Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
 async-trait = "=0.1.42"
 bytes = "1.0"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30 and https://github.com/Aeledfyr/deepsize/pull/31.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "67c6cfc2afa1303c06b19c1b96ebe11fd3217d34" }
 dirs-next = "2"
 futures = "0.3"
 glob = "0.3.0"

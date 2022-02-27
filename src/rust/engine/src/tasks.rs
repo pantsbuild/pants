@@ -7,11 +7,12 @@ use crate::intrinsics::Intrinsics;
 use crate::python::{Function, TypeId};
 use crate::selectors::{DependencyKey, Get, Select};
 
+use deepsize::DeepSizeOf;
 use indexmap::IndexSet;
 use log::Level;
 use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
   // Intrinsic rules are implemented in rust.
   Intrinsic(Intrinsic),
@@ -142,7 +143,7 @@ impl fmt::Display for Rule {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Task {
   pub product: TypeId,
   pub side_effecting: bool,
@@ -157,14 +158,14 @@ pub struct Task {
   pub display_info: DisplayInfo,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct DisplayInfo {
   pub name: String,
   pub desc: Option<String>,
   pub level: Level,
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Intrinsic {
   pub product: TypeId,
   pub inputs: Vec<TypeId>,

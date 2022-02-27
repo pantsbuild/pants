@@ -435,6 +435,10 @@ class SchedulerSession:
         """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
         return native_engine.scheduler_metrics(self.py_scheduler, self.py_session)
 
+    def live_items(self) -> tuple[list[Any], dict[str, tuple[int, int]]]:
+        """Return all Python objects held by the Scheduler."""
+        return native_engine.scheduler_live_items(self.py_scheduler, self.py_session)
+
     def _maybe_visualize(self) -> None:
         if self._scheduler.visualize_to_dir is not None:
             # TODO: This increment-and-get is racey.

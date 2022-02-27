@@ -31,6 +31,7 @@ mod rules;
 use std::collections::{HashMap, HashSet};
 use std::io;
 
+use deepsize::DeepSizeOf;
 use indexmap::IndexSet;
 
 pub use crate::builder::Builder;
@@ -58,7 +59,7 @@ impl<R: Rule> UnreachableError<R> {
   }
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum EntryWithDeps<R: Rule> {
   Root(RootEntry<R>),
   Inner(InnerEntry<R>),
@@ -80,16 +81,16 @@ impl<R: Rule> EntryWithDeps<R> {
   }
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Entry<R: Rule> {
   Param(R::TypeId),
   WithDeps(EntryWithDeps<R>),
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct RootEntry<R: Rule>(Query<R>);
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct InnerEntry<R: Rule> {
   params: ParamTypes<R::TypeId>,
   rule: R,

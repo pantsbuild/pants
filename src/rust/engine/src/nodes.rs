@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use deepsize::DeepSizeOf;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
@@ -127,7 +128,7 @@ pub trait WrappedNode: Into<NodeKey> {
 ///
 /// A Node that selects a product for some Params.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Select {
   pub params: Params,
   pub product: TypeId,
@@ -276,7 +277,7 @@ pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
 
 /// A Node that represents a process to execute.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct ExecuteProcess {
   process: Process,
 }
@@ -474,16 +475,16 @@ impl WrappedNode for ExecuteProcess {
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct ProcessResult(pub process_execution::FallibleProcessResultWithPlatform);
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct ReadLink(Link);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct LinkDest(PathBuf);
 
 #[async_trait]
@@ -515,7 +516,7 @@ impl From<ReadLink> for NodeKey {
 ///
 /// A Node that represents reading a file and fingerprinting its contents.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct DigestFile(pub File);
 
 #[async_trait]
@@ -547,7 +548,7 @@ impl From<DigestFile> for NodeKey {
 /// A Node that represents executing a directory listing that returns a Stat per directory
 /// entry (generally in one syscall). No symlinks are expanded.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Scandir(Dir);
 
 #[async_trait]
@@ -595,7 +596,7 @@ fn unmatched_globs_additional_context() -> Option<String> {
 /// This is similar to the Snapshot node, but avoids digesting the files and writing to LMDB store
 /// as a performance optimization.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Paths {
   path_globs: PathGlobs,
 }
@@ -656,7 +657,7 @@ impl From<Paths> for NodeKey {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct SessionValues;
 
 #[async_trait]
@@ -678,7 +679,7 @@ impl From<SessionValues> for NodeKey {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct RunId;
 
 #[async_trait]
@@ -709,7 +710,7 @@ impl From<RunId> for NodeKey {
 ///
 /// A Node that captures an store::Snapshot for a PathGlobs subject.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Snapshot {
   path_globs: PathGlobs,
 }
@@ -882,7 +883,7 @@ impl From<Snapshot> for NodeKey {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct DownloadedFile(pub Key);
 
 impl DownloadedFile {
@@ -974,11 +975,12 @@ impl From<DownloadedFile> for NodeKey {
   }
 }
 
-#[derive(Derivative, Clone)]
+#[derive(DeepSizeOf, Derivative, Clone)]
 #[derivative(Eq, PartialEq, Hash)]
 pub struct Task {
-  params: Params,
+  pub params: Params,
   product: TypeId,
+  // TODO: This is large, and should probably be in an Arc.
   task: tasks::Task,
   // The Params and the Task struct are sufficient to uniquely identify it.
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
@@ -1235,7 +1237,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
 ///
 /// There is large variance in the sizes of the members of this enum, so a few of them are boxed.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub enum NodeKey {
   DigestFile(DigestFile),
   DownloadedFile(DownloadedFile),
@@ -1307,7 +1309,7 @@ impl NodeKey {
   /// Provides the `name` field in workunits associated with this node. These names
   /// should be friendly to machine-parsing (i.e. "my_node" rather than "My awesome node!").
   ///
-  fn workunit_name(&self) -> String {
+  pub fn workunit_name(&self) -> String {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.name.clone(),
       NodeKey::ExecuteProcess(..) => "process".to_string(),
@@ -1641,7 +1643,7 @@ impl NodeError for Failure {
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum NodeOutput {
   Digest(hashing::Digest),
   DirectoryListing(Arc<DirectoryListing>),

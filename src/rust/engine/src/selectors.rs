@@ -3,9 +3,11 @@
 
 use std::fmt;
 
+use deepsize::DeepSizeOf;
+
 use crate::python::TypeId;
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialOrd, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, Ord, PartialOrd, Hash, PartialEq)]
 pub struct Get {
   pub output: TypeId,
   pub input: TypeId,
@@ -17,7 +19,7 @@ impl fmt::Display for Get {
   }
 }
 
-#[derive(Clone, Copy, Eq, Ord, PartialOrd, Hash, PartialEq)]
+#[derive(Clone, Copy, DeepSizeOf, Eq, Ord, PartialOrd, Hash, PartialEq)]
 pub struct Select {
   pub product: TypeId,
 }

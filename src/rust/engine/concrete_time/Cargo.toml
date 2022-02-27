@@ -6,8 +6,10 @@ name = "concrete_time"
 publish = false
 
 [dependencies]
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30 and https://github.com/Aeledfyr/deepsize/pull/31.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "67c6cfc2afa1303c06b19c1b96ebe11fd3217d34" }
+log = "0.4"
 prost = "0.9"
 prost-types = "0.9"
-serde_derive = "1.0.98"
 serde = "1.0.98"
-log = "0.4"
+serde_derive = "1.0.98"

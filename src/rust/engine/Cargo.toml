@@ -113,6 +113,8 @@ bytes = "1.0"
 cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30 and https://github.com/Aeledfyr/deepsize/pull/31.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "67c6cfc2afa1303c06b19c1b96ebe11fd3217d34", features=["smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
 either = "1.6"
@@ -139,7 +141,7 @@ rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-smallvec = "0.6"
+smallvec = "1"
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
 serde_json = "1.0"
