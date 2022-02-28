@@ -34,6 +34,7 @@ from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.collections import deep_getsizeof
 from pants.util.contextutil import maybe_profiled
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,10 @@ class LocalPantsRunner:
             max_workunit_level=max(
                 global_options.streaming_workunits_level,
                 global_options.level,
-                *global_options.log_levels_by_target.values(),
+                *(
+                    LogLevel[level.upper()]
+                    for level in global_options.log_levels_by_target.values()
+                ),
             ),
             session_values=SessionValues(
                 {
