@@ -79,8 +79,16 @@ type Package struct {
 	Error          string            `json:",omitempty"`
 }
 
-func analyzeFile(fi *fileInfo, filename string) (*fileInfo, error) {
-	err = readGoInfo(f, fi)
+func analyzeFile(fileSet *token.FileSet, filename string) (*fileInfo, error) {
+	fi := fileInfo{filename: filename, fset: fileSet}
+
+	f, err := os.Open(filename)
+	if err != nil {
+		return &fi, err
+	}
+	defer f.Close()
+
+	err = readGoInfo(f, &fi)
 	if err != nil {
 		return &fi, err
 	}
