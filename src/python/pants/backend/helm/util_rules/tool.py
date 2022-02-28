@@ -57,7 +57,7 @@ class HelmBinary:
         description: str,
         level: LogLevel = LogLevel.DEBUG,
         input_digest: Digest = EMPTY_DIGEST,
-        immutable_input_digests: dict[str, Digest] = {},
+        immutable_input_digests: Mapping[str, Digest] = {},
         output_directories: Iterable[str] = (),
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> Process:
