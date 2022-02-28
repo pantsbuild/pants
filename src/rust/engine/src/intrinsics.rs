@@ -703,7 +703,7 @@ fn interactive_process(
         tokio::select! {
           _ = session.cancelled() => {
             // The Session was cancelled: attempt to kill the process group / process, and
-            // then wait for it to exit (to avoid zombies).                        
+            // then wait for it to exit (to avoid zombies).
             if let Err(e) = subprocess.graceful_shutdown() {
               // Failed to kill the PGID: try the non-group form.
               log::warn!("Failed to kill spawned process group ({}). Will try killing only the top process.\n\
