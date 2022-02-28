@@ -128,9 +128,7 @@ async def export_virtualenv(
                 ],
                 {"PEX_MODULE": "pex.tools"},
             ),
-            # Don't fail in the unlikely case that we don't have `rm` on the PATH.
-            # It's better to leave a stray pex.pex in dist/ than to error the entire export.
-            PostProcessingCommand(["rm", "-f", pex_pex_path, "||", "true"]),
+            PostProcessingCommand(["rm", "-f", pex_pex_path]),
         ],
     )
 
