@@ -177,17 +177,8 @@ func saveCgo(filename string, pkg *Package, cg *ast.CommentGroup, buildContext *
 		//	args[i] = arg
 		//}
 
-		// PANTS NOTE: In the original Go code, this code would have expanded paths passed to -I and -L compiler
-		// options to be absolute. Given Pants uses an execution sandbox, this will be done when actually building.
-		//
-		// PANTS TODO: Warn the user if the file referenced by a relative path was not included via
-		// `files` or `resources`?
-		//
-		//switch verb {
-		//case "CFLAGS", "CPPFLAGS", "CXXFLAGS", "FFLAGS", "LDFLAGS":
-		//	// Change relative paths to absolute.
-		//	ctxt.makePathsAbsolute(args, di.Dir)
-		//}
+		// PANTS NOTE: In the original Go code, there was code to expanded paths passed to -I and -L compiler
+		// options to be absolute path. Given Pants uses an execution sandbox, this will be done when actually building.
 
 		switch verb {
 		case "CFLAGS":
@@ -385,8 +376,6 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 		}
 	}
 
-	// TODO: We add `cgo` tag determined earlier by probably should other tags found.
-	// Will probably need to vendor MatchFile (like rules_go does).
 	pkg.AllTags = cleanStringSet(allTags)
 
 	pkg.Imports = cleanStringSet(importsMap)
