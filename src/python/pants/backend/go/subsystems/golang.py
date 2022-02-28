@@ -62,9 +62,6 @@ class GolangSubsystem(Subsystem):
         ),
     ).advanced()
 
-    # TODO: Make this a proper option once cgo is enabled.
-    cgo_enabled: bool = False
-
     def go_search_paths(self, env: Environment) -> tuple[str, ...]:
         def iter_path_entries():
             for entry in self._go_search_paths:

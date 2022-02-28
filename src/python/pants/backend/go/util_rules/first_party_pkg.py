@@ -183,7 +183,7 @@ async def analyze_first_party_package(
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0"},
+            env={"CGO_ENABLED": "0"},
         ),
     )
     if result.exit_code != 0:
