@@ -2,9 +2,10 @@
  * Licensed under the Apache License, Version 2.0 (see LICENSE).
  */
 
-/** Vendored from Go
- *
- */
+// Vendored from Go:
+// - stringCut is vendored from `go` 1.18+ stdlib since not available in earlier releases.
+//   see https://github.com/golang/go/blob/57e3809884dd695d484acaefba8ded720c5a02c1/src/strings/strings.go#L1177-L1186
+// - splitQuoted is from https://github.com/golang/go/blob/57e3809884dd695d484acaefba8ded720c5a02c1/src/go/build/build.go#L1787-L1846
 
 package main
 
@@ -19,7 +20,6 @@ import (
 // The found result reports whether sep appears in s.
 // If sep does not appear in s, cut returns s, "", false.
 //
-// Vendored from `go` 1.18+ since not available in earlier releases.
 func stringsCut(s, sep string) (before, after string, found bool) {
 	if i := strings.Index(s, sep); i >= 0 {
 		return s[:i], s[i+len(sep):], true
