@@ -9,14 +9,12 @@ from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.core.goals.package import OutputPathField
-from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
     FieldSet,
     MultipleSourcesField,
-    OptionalSingleSourceField,
     SingleSourceField,
     Target,
     TriBoolField,
@@ -55,17 +53,6 @@ class HelmChartSourcesField(MultipleSourcesField):
     expected_file_extensions = (".yaml", ".yml", ".tpl")
 
 
-class HelmChartReadmeField(OptionalSingleSourceField):
-    alias = "readme"
-    required = False
-    help = "The README.md documentation file for the Chart"
-
-    expected_file_extensions = (".md",)
-
-    default = "README.md"
-    default_glob_match_error_behavior = GlobMatchErrorBehavior.warn
-
-
 class HelmChartDependenciesField(Dependencies):
     pass
 
@@ -95,7 +82,6 @@ class HelmChartTarget(Target):
         *COMMON_TARGET_FIELDS,
         HelmChartMetaSourceField,
         HelmChartSourcesField,
-        HelmChartReadmeField,
         HelmChartDependenciesField,
         HelmChartOutputPathField,
         HelmChartLintStrictField,
@@ -114,4 +100,3 @@ class HelmChartFieldSet(FieldSet, metaclass=ABCMeta):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
-    readme: HelmChartReadmeField
