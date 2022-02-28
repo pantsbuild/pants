@@ -4,6 +4,9 @@
 
 package main
 
+// PANTS NOTE:
+// Copied verbatim from https://github.com/golang/go/blob/master/src/go/build/syslist.go.
+
 // List of past, present, and future known GOOS and GOARCH values.
 // Do not remove from this list, as these are used for go/build filename matching.
 

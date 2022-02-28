@@ -215,9 +215,6 @@ async def analyze_first_party_package(
             "not yet support. Please open a feature request at "
             "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
             "prioritize adding support.\n\n"
-            "Note: You should only encounter this error if `--golang-experimental-cgo` was set, which "
-            "only Pants developers should have enabled. Pants should have compiled the applicable Go package "
-            'in "pure" mode otherwise.'
         )
 
     analysis = FirstPartyPkgAnalysis(
