@@ -17,6 +17,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"go/ast"
 	"go/build"
 	"go/token"
 	"io/fs"
@@ -28,7 +29,8 @@ import (
 
 // Package represents the results of analyzing a Go package.
 type Package struct {
-	Name string // package name
+	Name    string   // package name
+	AllTags []string `json:",omitempty"` // tags that can influence file selection in this directory
 
 	// Source files
 	GoFiles           []string `json:",omitempty"` // .go source files (excluding CgoFiles, TestGoFiles, XTestGoFiles)
@@ -45,6 +47,14 @@ type Package struct {
 	SwigCXXFiles      []string `json:",omitempty"` // .swigcxx files
 	SysoFiles         []string `json:",omitempty"` // .syso system object files to add to archive
 
+	// Cgo directives
+	CgoCFLAGS    []string `json:",omitempty"` // Cgo CFLAGS directives
+	CgoCPPFLAGS  []string `json:",omitempty"` // Cgo CPPFLAGS directives
+	CgoCXXFLAGS  []string `json:",omitempty"` // Cgo CXXFLAGS directives
+	CgoFFLAGS    []string `json:",omitempty"` // Cgo FFLAGS directives
+	CgoLDFLAGS   []string `json:",omitempty"` // Cgo LDFLAGS directives
+	CgoPkgConfig []string `json:",omitempty"` // Cgo pkg-config directives
+
 	// Test information
 	TestGoFiles  []string `json:",omitempty"`
 	XTestGoFiles []string `json:",omitempty"`
@@ -60,9 +70,9 @@ type Package struct {
 	//	//go:embed a* b.c
 	// then the list will contain those two strings as separate entries.
 	// (See package embed for more details about //go:embed.)
-	EmbedPatterns      []string  `json:",omitempty"` // patterns from GoFiles, CgoFiles
-	TestEmbedPatterns  []string  `json:",omitempty"` // patterns from TestGoFiles
-	XTestEmbedPatterns []string  `json:",omitempty"` // patterns from XTestGoFiles
+	EmbedPatterns      []string `json:",omitempty"` // patterns from GoFiles, CgoFiles
+	TestEmbedPatterns  []string `json:",omitempty"` // patterns from TestGoFiles
+	XTestEmbedPatterns []string `json:",omitempty"` // patterns from XTestGoFiles
 
 	// Error information. This differs from how `go list` reports errors.
 	InvalidGoFiles map[string]string `json:",omitempty"`
@@ -120,6 +130,84 @@ func cleanStringSet(valuesMap map[string]bool) []string {
 	return values
 }
 
+// saveCgo saves the information from the #cgo lines in the import "C" comment.
+// These lines set CFLAGS, CPPFLAGS, CXXFLAGS and LDFLAGS and pkg-config directives
+// that affect the way cgo's C code is built.
+func saveCgo(filename string, pkg *Package, cg *ast.CommentGroup, buildContext *build.Context) error {
+	text := cg.Text()
+	for _, line := range strings.Split(text, "\n") {
+		orig := line
+
+		// Line is
+		//      #cgo [GOOS/GOARCH...] LDFLAGS: stuff
+		//
+		line = strings.TrimSpace(line)
+		if len(line) < 5 || line[:4] != "#cgo" || (line[4] != ' ' && line[4] != '\t') {
+			continue
+		}
+
+		// Split at colon.
+		line, argstr, ok := stringsCut(strings.TrimSpace(line[4:]), ":")
+		if !ok {
+			return fmt.Errorf("%s: invalid #cgo line: %s", filename, orig)
+		}
+
+		// Parse GOOS/GOARCH stuff.
+		f := strings.Fields(line)
+		if len(f) < 1 {
+			return fmt.Errorf("%s: invalid #cgo line: %s", filename, orig)
+		}
+
+		cond, verb := f[:len(f)-1], f[len(f)-1]
+		if len(cond) > 0 {
+			ok := false
+			for _, c := range cond {
+				if matchAuto(buildContext, c, nil) {
+					ok = true
+					break
+				}
+			}
+			if !ok {
+				continue
+			}
+		}
+		args, err := splitQuoted(argstr)
+		if err != nil {
+			return fmt.Errorf("%s: invalid #cgo line: %s", filename, orig)
+		}
+		// PANTS NOTE: In the original Go code, this code would have expanded `${SRCDIR}` in a path
+		// to the absolute directory where the cgo file was located. Given Pants uses an execution sandbox,
+		// this will be done when actually building.
+		//for i, arg := range args {
+		//	if arg, ok = expandSrcDir(arg, di.Dir); !ok {
+		//		return fmt.Errorf("%s: malformed #cgo argument: %s", filename, arg)
+		//	}
+		//	args[i] = arg
+		//}
+
+		// PANTS NOTE: In the original Go code, there was code to expanded paths passed to -I and -L compiler
+		// options to be absolute path. Given Pants uses an execution sandbox, this will be done when actually building.
+
+		switch verb {
+		case "CFLAGS":
+			pkg.CgoCFLAGS = append(pkg.CgoCFLAGS, args...)
+		case "CPPFLAGS":
+			pkg.CgoCPPFLAGS = append(pkg.CgoCPPFLAGS, args...)
+		case "CXXFLAGS":
+			pkg.CgoCXXFLAGS = append(pkg.CgoCXXFLAGS, args...)
+		case "FFLAGS":
+			pkg.CgoFFLAGS = append(pkg.CgoFFLAGS, args...)
+		case "LDFLAGS":
+			pkg.CgoLDFLAGS = append(pkg.CgoLDFLAGS, args...)
+		case "pkg-config":
+			pkg.CgoPkgConfig = append(pkg.CgoPkgConfig, args...)
+		default:
+			return fmt.Errorf("%s: invalid #cgo verb: %s", filename, orig)
+		}
+	}
+	return nil
+}
+
 func analyzePackage(directory string, buildContext *build.Context) (*Package, error) {
 	pkg := &Package{
 		InvalidGoFiles: make(map[string]string),
@@ -142,6 +230,8 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	embedsMap := make(map[string]bool)
 	testEmbedsMap := make(map[string]bool)
 	xtestEmbedsMap := make(map[string]bool)
+
+	allTags := make(map[string]bool)
 
 	var cgoSfiles []string // files with ".S"(capital S)/.sx(capital s equivalent for case insensitive filesystems)
 
@@ -167,11 +257,13 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 
 		// TODO: `MatchFile` will actually parse the imports but does not return the AST. Consider vendoring
 		// the MatchFile logic to avoid double parsing.
-		matches, err := buildContext.MatchFile(directory, name)
+		binaryOnly := false
+		fileInfo, err := matchFile(buildContext, directory, name, allTags, &binaryOnly, fileSet)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check build tags for %s: %s", name, err)
+			pkg.InvalidGoFiles[name] = err.Error()
+			continue
 		}
-		if !matches {
+		if fileInfo == nil {
 			if strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") {
 				// `go` ignores files prefixed with underscore or period. Since this is not due to
 				// build constraints, do not report it as an ignored file. Fall through.
@@ -240,8 +332,10 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 						continue
 					}
 					isCGo = true
-					// TODO: Save the cgo options.
-					// See https://cs.opensource.google/go/go/+/refs/tags/go1.17.2:src/go/build/build.go;drc=refs%2Ftags%2Fgo1.17.2;l=1640.
+					if err := saveCgo(name, pkg, imp.doc, buildContext); err != nil {
+						pkg.InvalidGoFiles[name] = fmt.Sprintf("cgo error: %s", err)
+						continue
+					}
 				}
 			}
 		}
@@ -252,9 +346,15 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 
 		switch {
 		case isCGo:
-			// Ignore imports and embeds from cgo files since Pants does not support cgo.
-			// TODO: When we do handle cgo, add a build tag for it.
-			fileList = &pkg.IgnoredGoFiles
+			allTags["cgo"] = true
+			if buildContext.CgoEnabled {
+				fileList = &pkg.CgoFiles
+				importsMapForFile = importsMap
+				embedsMapForFile = embedsMap
+			} else {
+				// Ignore imports and embeds from cgo files if cgo is disabled.
+				fileList = &pkg.IgnoredGoFiles
+			}
 		case isXTest:
 			fileList = &pkg.XTestGoFiles
 			importsMapForFile = xtestImportsMap
@@ -284,8 +384,7 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 		}
 	}
 
-	// TODO: Add generated build tags (like `cgo` tag) to a field in package analysis?
-	// Will probably need to vendor MatchFile (like rules_go does).
+	pkg.AllTags = cleanStringSet(allTags)
 
 	pkg.Imports = cleanStringSet(importsMap)
 	pkg.TestImports = cleanStringSet(testImportsMap)
