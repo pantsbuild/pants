@@ -36,7 +36,7 @@ pub fn equals(h1: &PyAny, h2: &PyAny) -> bool {
   // between non-equal types to avoid legacy behavior like `assert True == 1`, which is very
   // surprising in interning, and would likely be surprising anywhere else in the engine where we
   // compare things.
-  if h1.get_type().ne(h2.get_type()).unwrap() {
+  if !h1.get_type().is(h2.get_type()) {
     return false;
   }
   h1.eq(h2).unwrap()
