@@ -190,6 +190,7 @@ class RuleRunner:
         bootstrap_args: Iterable[str] = (),
         use_deprecated_python_macros: bool = False,
         extra_session_values: dict[Any, Any] | None = None,
+        max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -272,6 +273,7 @@ class RuleRunner:
                     **(extra_session_values or {}),
                 }
             ),
+            max_workunit_level=max_workunit_verbosity,
         )
         self.scheduler = graph_session.scheduler_session
 

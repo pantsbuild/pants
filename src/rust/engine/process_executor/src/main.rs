@@ -210,7 +210,7 @@ struct Opt {
 #[tokio::main]
 async fn main() {
   env_logger::init();
-  let workunit_store = WorkunitStore::new(false);
+  let workunit_store = WorkunitStore::new(false, log::Level::Debug);
   workunit_store.init_thread_state(None);
 
   let args = Opt::from_args();

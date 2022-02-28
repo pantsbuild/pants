@@ -354,6 +354,7 @@ impl PySession {
     scheduler: &PyScheduler,
     dynamic_ui: bool,
     ui_use_prodash: bool,
+    max_workunit_level: u64,
     build_id: String,
     session_values: PyObject,
     cancellation_latch: &PySessionCancellationLatch,
@@ -361,6 +362,9 @@ impl PySession {
   ) -> PyO3Result<Self> {
     let core = scheduler.0.core.clone();
     let cancellation_latch = cancellation_latch.0.clone();
+    let py_level: PythonLogLevel = max_workunit_level
+      .try_into()
+      .map_err(|e| PyException::new_err(format!("{e}")))?;
     // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
     // held.
     let session = py
@@ -369,6 +373,7 @@ impl PySession {
           core,
           dynamic_ui,
           ui_use_prodash,
+          py_level.into(),
           build_id,
           session_values,
           cancellation_latch,

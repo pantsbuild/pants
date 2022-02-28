@@ -648,7 +648,7 @@ pub struct Context {
 impl Default for Context {
   fn default() -> Self {
     Context {
-      workunit_store: WorkunitStore::new(false),
+      workunit_store: WorkunitStore::new(false, log::Level::Debug),
       build_id: String::default(),
       run_id: RunId(0),
     }

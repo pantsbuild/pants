@@ -231,6 +231,7 @@ enum StoreMsg {
 #[derive(Clone)]
 pub struct WorkunitStore {
   log_starting_workunits: bool,
+  max_level: Level,
   streaming_workunit_data: StreamingWorkunitData,
   heavy_hitters_data: HeavyHittersData,
   metrics_data: Arc<MetricsData>,
@@ -555,9 +556,10 @@ fn first_matched_parent(
 }
 
 impl WorkunitStore {
-  pub fn new(log_starting_workunits: bool) -> WorkunitStore {
+  pub fn new(log_starting_workunits: bool, max_level: Level) -> WorkunitStore {
     WorkunitStore {
       log_starting_workunits,
+      max_level,
       // TODO: Create one `StreamingWorkunitData` per subscriber, and zero if no subscribers are
       // installed.
       streaming_workunit_data: StreamingWorkunitData::new(),
@@ -571,6 +573,10 @@ impl WorkunitStore {
       store: self.clone(),
       parent_id,
     }))
+  }
+
+  pub fn max_level(&self) -> Level {
+    self.max_level
   }
 
   ///
@@ -770,7 +776,7 @@ impl WorkunitStore {
   }
 
   pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
-    let store = WorkunitStore::new(false);
+    let store = WorkunitStore::new(false, Level::Debug);
     store.init_thread_state(None);
     let workunit = store.start_workunit(
       SpanId(0),
@@ -778,7 +784,7 @@ impl WorkunitStore {
       None,
       WorkunitMetadata::default(),
     );
-    (store.clone(), RunningWorkunit::new(store, workunit))
+    (store.clone(), RunningWorkunit::new(store, Some(workunit)))
   }
 }
 
@@ -835,45 +841,53 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
 /// NB: Public for macro usage: use the `in_workunit!` macro.
 ///
 pub fn _start_workunit(
-  workunit_store: WorkunitStore,
+  store_handle: &mut WorkunitStoreHandle,
   name: String,
   initial_metadata: WorkunitMetadata,
-) -> (WorkunitStoreHandle, RunningWorkunit) {
-  let mut store_handle = expect_workunit_store_handle();
+) -> RunningWorkunit {
   let span_id = SpanId::new();
   let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
-  let workunit = workunit_store.start_workunit(span_id, name, parent_id, initial_metadata);
-  (store_handle, RunningWorkunit::new(workunit_store, workunit))
+  let workunit = store_handle
+    .store
+    .start_workunit(span_id, name, parent_id, initial_metadata);
+  RunningWorkunit::new(store_handle.store.clone(), Some(workunit))
 }
 
 #[macro_export]
 macro_rules! in_workunit {
-    ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| async move { $( $body:tt )* $(,)? }) => (
-      {
-        let (store_handle, mut $workunit) = $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
-        $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
-          let result = {
-            let $workunit = &mut $workunit;
-            async move { $( $body )* }
-          }.await;
-          $workunit.complete();
-          result
-        })
-      }
-    );
-  ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| $f: expr $(,)?) => (
-    {
-      let (store_handle, mut $workunit) = $crate::_start_workunit($workunit_store, $workunit_name, $workunit_metadata);
+  ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| $f: expr $(,)?) => {{
+    // TODO: The workunit store argument is unused: remove in separate patch.
+    std::mem::drop($workunit_store);
+
+    use futures::future::FutureExt;
+    let mut store_handle = $crate::expect_workunit_store_handle();
+    // TODO: Move Level out of the metadata to allow skipping construction if disabled.
+    let workunit_metadata = $workunit_metadata;
+    if store_handle.store.max_level() >= workunit_metadata.level {
+      let mut $workunit =
+        $crate::_start_workunit(&mut store_handle, $workunit_name, workunit_metadata);
       $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
-          let result = {
-            let $workunit = &mut $workunit;
-            $f
-          }.await;
-          $workunit.complete();
-          result
-        })
+        let result = {
+          let $workunit = &mut $workunit;
+          $f
+        }
+        .await;
+        $workunit.complete();
+        result
+      })
+      .boxed()
+    } else {
+      async move {
+        let mut $workunit = $crate::RunningWorkunit::new(store_handle.store, None);
+        {
+          let $workunit = &mut $workunit;
+          $f
+        }
+        .await
+      }
+      .boxed()
     }
-  );
+  }};
 }
 
 pub struct RunningWorkunit {
@@ -882,11 +896,8 @@ pub struct RunningWorkunit {
 }
 
 impl RunningWorkunit {
-  fn new(store: WorkunitStore, workunit: Workunit) -> RunningWorkunit {
-    RunningWorkunit {
-      store,
-      workunit: Some(workunit),
-    }
+  pub fn new(store: WorkunitStore, workunit: Option<Workunit>) -> RunningWorkunit {
+    RunningWorkunit { store, workunit }
   }
 
   pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {
