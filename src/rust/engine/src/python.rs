@@ -404,7 +404,7 @@ impl Failure {
 
   pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
     let maybe_ptraceback = py_err
-      .ptraceback(py)
+      .traceback(py)
       .map(|traceback| traceback.to_object(py));
     let val = Value::from(py_err.into_py(py));
     let python_traceback = if let Some(tb) = maybe_ptraceback {
