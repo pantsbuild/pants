@@ -30,9 +30,11 @@ def test_end_to_end() -> None:
         "hellotest/main.py": dedent(
             """\
             import colors
+            import sys
             from hellotest.utils.greeter import GREET
 
             print(GREET)
+            sys.exit(42)
             """
         ),
         "hellotest/BUILD": dedent(
@@ -56,59 +58,31 @@ def test_end_to_end() -> None:
         ),
     }
     with setup_tmpdir(sources) as tmpdir:
-        args = [
+        package_args = [
             "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python.packaging.pyoxidizer']",
             f"--source-root-patterns=['/{tmpdir}']",
             "package",
             f"{tmpdir}/hellotest:bin",
         ]
-        result = run_pants(args)
-        result.assert_success()
+        package_result = run_pants(package_args)
+        package_result.assert_success()
 
         # Check that the binary is executable.
         bin_path = next(Path("dist", f"{tmpdir}.hellotest", "bin").glob("*/debug/install/bin"))
-        bin_stdout = subprocess.run([bin_path], check=True, stdout=subprocess.PIPE).stdout
-        assert bin_stdout == b"Hello world!\n"
+        bin_result = subprocess.run([bin_path], stdout=subprocess.PIPE)
+        assert bin_result.returncode == 42
+        assert bin_result.stdout == b"Hello world!\n"
 
-
-def test_run_binary() -> None:
-    sources = {
-        "hellotest/main.py": dedent(
-            """\
-            import sys
-
-            print('Hello world!')
-            sys.exit(42)
-            """
-        ),
-        "hellotest/BUILD": dedent(
-            """\
-            python_sources(name="lib")
-
-            python_distribution(
-                name="dist",
-                dependencies=[":lib"],
-                provides=python_artifact(name="dist", version="0.0.1"),
-            )
-
-            pyoxidizer_binary(
-                name="bin",
-                entry_point="hellotest.main",
-                dependencies=[":dist"],
-            )
-            """
-        ),
-    }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
+        # Performing `./pants run` check immediately after `./pants package`, in order to re-use package results and save time
+        run_args = [
             "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python.packaging.pyoxidizer']",
             f"--source-root-patterns=['/{tmpdir}']",
             "run",
             f"{tmpdir}/hellotest:bin",
         ]
-        result = run_pants(args)
-        assert result.stdout == "Hello world!\n"
-        assert result.exit_code == 42
+        run_result = run_pants(run_args)
+        assert run_result.exit_code == 42
+        assert run_result.stdout == "Hello world!\n"
 
 
 def test_requires_wheels() -> None:

@@ -190,10 +190,10 @@ async def package_pyoxidizer_binary(
 @rule
 async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
     def is_executable_binary(target_name: str, artifact_relpath: str | None) -> bool:
-        """
-        After packaging, the PyOxidizer plugin will place the executable in a location like this:
+        """After packaging, the PyOxidizer plugin will place the executable in a location like this:
         dist/{project}/{target name}/{platform arch}/{compilation mode}/install/{target name}
-        e.g. dist/helloworld/helloworld-bin/x86_64-apple-darwin/debug/install/helloworld-bin
+
+        e.g. dist/helloworld/helloworld-bin/x86_64-apple-darwin/debug/install/helloworld-bin.
 
         PyOxidizer will place associated libraries in {...}/install/lib
 
@@ -204,9 +204,7 @@ async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
             return False
 
         artifact_path = Path(artifact_relpath)
-        return (
-            artifact_path.name == target_name and artifact_path.parent.name == "install"
-        )
+        return artifact_path.name == target_name and artifact_path.parent.name == "install"
 
     binary = await Get(BuiltPackage, PackageFieldSet, field_set)
     artifact = next(
@@ -215,9 +213,7 @@ async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
         if is_executable_binary(field_set.address.target_name, artifact.relpath)
     )
     assert artifact.relpath is not None
-    return RunRequest(
-        digest=binary.digest, args=(os.path.join("{chroot}", artifact.relpath),)
-    )
+    return RunRequest(digest=binary.digest, args=(os.path.join("{chroot}", artifact.relpath),))
 
 
 def rules():
