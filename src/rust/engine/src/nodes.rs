@@ -1377,11 +1377,10 @@ impl Node for NodeKey {
           .params
           .keys()
           .filter_map(|key| {
-            // TODO: Switch to PyO3's upcoming mechanism for this:
-            // https://github.com/PyO3/pyo3/pull/1985.
-            if engine_aware_param_ty
-              .call_method1("__subclasscheck__", (key.type_id().as_py_type(py),))
-              .map(|res| res.extract::<bool>().unwrap_or(false))
+            if key
+              .type_id()
+              .as_py_type(py)
+              .is_subclass(engine_aware_param_ty)
               .unwrap_or(false)
             {
               Some(key.to_value())
