@@ -85,8 +85,6 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
                 "rm",
                 "-f",
                 os.path.join("{digest_root}", ".", "pex"),
-                "||",
-                "true",
             )
             assert ppc1.extra_env == FrozenDict()
 
