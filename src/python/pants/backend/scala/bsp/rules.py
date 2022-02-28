@@ -11,18 +11,22 @@ from pants.backend.scala.bsp.spec import (
 )
 from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.build_root import BuildRoot
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
+from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.build_graph.address import AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, Target, WrappedTarget
-from pants.engine.unions import UnionRule
+from pants.engine.target import Dependencies, DependenciesRequest, Target, WrappedTarget, CoarsenedTargets
+from pants.engine.unions import UnionRule, UnionMembership
+from pants.jvm.compile import FallibleClasspathEntry, ClasspathEntryRequest
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 
@@ -115,9 +119,10 @@ class HandleScalacOptionsResult:
 async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
+    jvm: JvmSubsystem,
 ) -> HandleScalacOptionsResult:
-    # Verify the target exists by loading it. Exception will be thrown if it does not.
-    _ = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
+    tgt = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
+    resolve = tgt[JvmResolveField].normalized_value(jvm)
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
@@ -125,7 +130,7 @@ async def handle_bsp_scalac_options_request(
             options=(),
             classpath=(),
             # TODO: Figure out how to provide a classfiles output directory
-            class_directory=build_root.pathlib_path.joinpath("dist/bsp").as_uri(),
+            class_directory=build_root.pathlib_path.joinpath(f".pants.d/bsp/resolves/{resolve}/classes").as_uri(),
         )
     )
 
@@ -136,6 +141,42 @@ async def bsp_scalac_options_request(request: ScalacOptionsParams) -> ScalacOpti
         Get(HandleScalacOptionsResult, HandleScalacOptionsRequest(btgt)) for btgt in request.targets
     )
     return ScalacOptionsResult(items=tuple(result.item for result in results))
+
+
+# -----------------------------------------------------------------------------------------------
+# Compile Request
+# -----------------------------------------------------------------------------------------------
+
+class ScalaBSPCompileFieldSet(BSPCompileFieldSet):
+    required_fields = (ScalaSourceField,)
+    sources: ScalaSourceField
+
+
+@rule
+async def bsp_scala_compile_request(request: ScalaBSPCompileFieldSet, union_membership: UnionMembership) -> BSPCompileResult:
+    coarsened_targets = await Get(
+        CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
+    )
+
+    # NB: Each root can have an independent resolve, because there is no inherent relation
+    # between them other than that they were on the commandline together.
+    resolves = await MultiGet(
+        Get(CoursierResolveKey, CoarsenedTargets([t])) for t in coarsened_targets
+    )
+
+    results = await MultiGet(
+        Get(
+            FallibleClasspathEntry,
+            ClasspathEntryRequest,
+            ClasspathEntryRequest.for_targets(union_membership, component=target, resolve=resolve),
+        )
+        for target, resolve in zip(coarsened_targets, resolves)
+    )
+
+    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
+    exit_code = next((result.exit_code for result in results if result.exit_code != 0), 0)
+    return CheckResults([CheckResult(exit_code, "", "")], checker_name=request.name)
+
 
 
 def rules():
