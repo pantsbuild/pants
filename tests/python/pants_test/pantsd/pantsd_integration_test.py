@@ -556,7 +556,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 "waiter cleaning up",
                 "waiter cleanup complete",
             ],
-            cleanup_wait_time=2,
+            cleanup_wait_time=0,
         )
 
     def test_pantsd_graceful_shutdown_deadline(self):
