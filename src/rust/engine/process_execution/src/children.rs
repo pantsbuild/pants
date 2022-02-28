@@ -9,7 +9,7 @@ use tokio::process::{Child, Command};
 
 // We keep this relatively low to start to encourage interactivity. If users end up needing longer graceful
 // shutdown periods, we can expose it as a per-process setting.
-const GRACEFUL_SHUTDOWN_MAX_WAIT_TIME: time::Duration = time::Duration::from_secs(1);
+const GRACEFUL_SHUTDOWN_MAX_WAIT_TIME: time::Duration = time::Duration::from_secs(3);
 const GRACEFUL_SHUTDOWN_POLL_TIME: time::Duration = time::Duration::from_millis(50);
 
 /// A child process running in its own PGID, with a drop implementation that will kill that
