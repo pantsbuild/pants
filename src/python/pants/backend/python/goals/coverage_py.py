@@ -47,8 +47,15 @@ from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure,
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.option.custom_types import file_option
 from pants.option.global_options import ProcessCleanupOption
+from pants.option.option_types import (
+    BoolOption,
+    EnumListOption,
+    FileOption,
+    FloatOption,
+    StrListOption,
+    StrOption,
+)
 from pants.source.source_root import AllSourceRoots
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
@@ -113,104 +120,79 @@ class CoverageSubsystem(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/subsystems/coverage_py_lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--filter",
-            type=list,
-            member_type=str,
-            default=None,
-            help=(
-                "A list of Python modules or filesystem paths to use in the coverage report, e.g. "
-                "`['helloworld_test', 'helloworld/util/dirutil'].\n\nBoth modules and directory "
-                "paths are recursive: any submodules or child paths, respectively, will be "
-                "included.\n\nIf you leave this off, the coverage report will include every file "
-                "in the transitive closure of the address/file arguments; for example, `test ::` "
-                "will include every Python file in your project, whereas "
-                "`test project/app_test.py` will include `app_test.py` and any of its transitive "
-                "dependencies."
-            ),
-        )
-        register(
-            "--report",
-            type=list,
-            member_type=CoverageReportType,
-            default=[CoverageReportType.CONSOLE],
-            help="Which coverage report type(s) to emit.",
-        )
-        register(
-            "--output-dir",
-            type=str,
-            default=str(PurePath("dist", "coverage", "python")),
-            advanced=True,
-            help="Path to write the Pytest Coverage report to. Must be relative to build root.",
-        )
-        register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help=(
-                "Path to an INI or TOML config file understood by coverage.py "
-                "(https://coverage.readthedocs.io/en/stable/config.html).\n\n"
-                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                f"this option if the config is located in a non-standard location."
-            ),
-        )
-        register(
-            "--config-discovery",
-            type=bool,
-            default=True,
-            advanced=True,
-            help=(
-                "If true, Pants will include any relevant config files during runs "
-                "(`.coveragerc`, `setup.cfg`, `tox.ini`, and `pyproject.toml`)."
-                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-                f"non-standard location."
-            ),
-        )
-        register(
-            "--global-report",
-            type=bool,
-            default=False,
-            help=(
-                "If true, Pants will generate a global coverage report.\n\nThe global report will "
-                "include all Python source files in the workspace and not just those depended on "
-                "by the tests that were run."
-            ),
-        )
-        register(
-            "--fail-under",
-            type=float,
-            default=None,
-            help=(
-                "Fail if the total combined coverage percentage for all tests is less than this "
-                "number.\n\nUse this instead of setting fail_under in a coverage.py config file, "
-                "as the config will apply to each test separately, while you typically want this "
-                "to apply to the combined coverage for all tests run."
-                "\n\nNote that you must generate at least one (non-raw) coverage report for this "
-                "check to trigger.\n\nNote also that if you specify a non-integral value, you must "
-                "also set [report] precision properly in the coverage.py config file to make use "
-                "of the decimal places. See https://coverage.readthedocs.io/en/latest/config.html ."
-            ),
-        )
-
-    @property
-    def filter(self) -> tuple[str, ...]:
-        return tuple(self.options.filter)
-
-    @property
-    def reports(self) -> tuple[CoverageReportType, ...]:
-        return tuple(self.options.report)
+    filter = StrListOption(
+        "--filter",
+        help=(
+            "A list of Python modules or filesystem paths to use in the coverage report, e.g. "
+            "`['helloworld_test', 'helloworld/util/dirutil'].\n\nBoth modules and directory "
+            "paths are recursive: any submodules or child paths, respectively, will be "
+            "included.\n\nIf you leave this off, the coverage report will include every file "
+            "in the transitive closure of the address/file arguments; for example, `test ::` "
+            "will include every Python file in your project, whereas "
+            "`test project/app_test.py` will include `app_test.py` and any of its transitive "
+            "dependencies."
+        ),
+    )
+    reports = EnumListOption(
+        "--report",
+        default=[CoverageReportType.CONSOLE],
+        help="Which coverage report type(s) to emit.",
+    )
+    _output_dir = StrOption(
+        "--output-dir",
+        default=str(PurePath("dist", "coverage", "python")),
+        advanced=True,
+        help="Path to write the Pytest Coverage report to. Must be relative to build root.",
+    )
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help=lambda cls: (
+            "Path to an INI or TOML config file understood by coverage.py "
+            "(https://coverage.readthedocs.io/en/stable/config.html).\n\n"
+            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+            f"this option if the config is located in a non-standard location."
+        ),
+    )
+    config_discovery = BoolOption(
+        "--config-discovery",
+        default=True,
+        advanced=True,
+        help=lambda cls: (
+            "If true, Pants will include any relevant config files during runs "
+            "(`.coveragerc`, `setup.cfg`, `tox.ini`, and `pyproject.toml`)."
+            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+            f"non-standard location."
+        ),
+    )
+    global_report = BoolOption(
+        "--global-report",
+        default=False,
+        help=(
+            "If true, Pants will generate a global coverage report.\n\nThe global report will "
+            "include all Python source files in the workspace and not just those depended on "
+            "by the tests that were run."
+        ),
+    )
+    fail_under = FloatOption(
+        "--fail-under",
+        default=None,
+        help=(
+            "Fail if the total combined coverage percentage for all tests is less than this "
+            "number.\n\nUse this instead of setting fail_under in a coverage.py config file, "
+            "as the config will apply to each test separately, while you typically want this "
+            "to apply to the combined coverage for all tests run."
+            "\n\nNote that you must generate at least one (non-raw) coverage report for this "
+            "check to trigger.\n\nNote also that if you specify a non-integral value, you must "
+            "also set [report] precision properly in the coverage.py config file to make use "
+            "of the decimal places. See https://coverage.readthedocs.io/en/latest/config.html ."
+        ),
+    )
 
     @property
     def output_dir(self) -> PurePath:
-        return PurePath(self.options.output_dir)
-
-    @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+        return PurePath(self._output_dir)
 
     @property
     def config_request(self) -> ConfigFilesRequest:
@@ -218,7 +200,7 @@ class CoverageSubsystem(PythonToolBase):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
-            discovery=cast(bool, self.options.config_discovery),
+            discovery=self.config_discovery,
             check_existence=[".coveragerc"],
             check_content={
                 "setup.cfg": b"[coverage:",
@@ -226,14 +208,6 @@ class CoverageSubsystem(PythonToolBase):
                 "pyproject.toml": b"[tool.coverage",
             },
         )
-
-    @property
-    def global_report(self) -> bool:
-        return cast(bool, self.options.global_report)
-
-    @property
-    def fail_under(self) -> int:
-        return cast(int, self.options.fail_under)
 
 
 class CoveragePyLockfileSentinel(GenerateToolLockfileSentinel):

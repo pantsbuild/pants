@@ -5,7 +5,6 @@ import csv
 import logging
 from collections import defaultdict
 from textwrap import fill, indent
-from typing import cast
 
 from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -23,6 +22,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership
+from pants.option.option_types import BoolOption
 from pants.util.docutil import bin_name
 
 logger = logging.getLogger(__name__)
@@ -32,28 +32,20 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
     name = "py-constraints"
     help = "Determine what Python interpreter constraints are used by files/targets."
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--summary",
-            type=bool,
-            default=False,
-            help=(
-                "Output a CSV summary of interpreter constraints for your whole repository. The "
-                "headers are `Target`, `Constraints`, `Transitive Constraints`, `# Dependencies`, "
-                "and `# Dependees`.\n\nThis information can be useful when prioritizing a "
-                "migration from one Python version to another (e.g. to Python 3). Use "
-                "`# Dependencies` and `# Dependees` to help prioritize which targets are easiest "
-                "to port (low # dependencies) and highest impact to port (high # dependees).\n\n"
-                "Use a tool like Pandas or Excel to process the CSV. Use the option "
-                "`--py-constraints-output-file=summary.csv` to write directly to a file."
-            ),
-        )
-
-    @property
-    def summary(self) -> bool:
-        return cast(bool, self.options.summary)
+    summary = BoolOption(
+        "--summary",
+        default=False,
+        help=(
+            "Output a CSV summary of interpreter constraints for your whole repository. The "
+            "headers are `Target`, `Constraints`, `Transitive Constraints`, `# Dependencies`, "
+            "and `# Dependees`.\n\nThis information can be useful when prioritizing a "
+            "migration from one Python version to another (e.g. to Python 3). Use "
+            "`# Dependencies` and `# Dependees` to help prioritize which targets are easiest "
+            "to port (low # dependencies) and highest impact to port (high # dependees).\n\n"
+            "Use a tool like Pandas or Excel to process the CSV. Use the option "
+            "`--py-constraints-output-file=summary.csv` to write directly to a file."
+        ),
+    )
 
 
 class PyConstraintsGoal(Goal):

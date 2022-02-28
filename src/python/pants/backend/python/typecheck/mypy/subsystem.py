@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Iterable, cast
+from typing import Iterable
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -38,7 +38,13 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.option.custom_types import file_option, shell_str, target_option
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    FileOption,
+    StrListOption,
+    TargetListOption,
+)
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -79,98 +85,69 @@ class MyPy(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
     uses_requirements_from_source_plugins = True
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=f"Don't use MyPy when running `{bin_name()} typecheck`.",
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help=(
-                "Arguments to pass directly to mypy, e.g. "
-                f'`--{cls.options_scope}-args="--python-version 3.7 --disallow-any-expr"`'
-            ),
-        )
-        register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help=(
-                "Path to a config file understood by MyPy "
-                "(https://mypy.readthedocs.io/en/stable/config_file.html).\n\n"
-                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                f"this option if the config is located in a non-standard location."
-            ),
-        )
-        register(
-            "--config-discovery",
-            type=bool,
-            default=True,
-            advanced=True,
-            help=(
-                "If true, Pants will include any relevant config files during "
-                "runs (`mypy.ini`, `.mypy.ini`, and `setup.cfg`)."
-                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-                f"non-standard location."
-            ),
-        )
-        register(
-            "--source-plugins",
-            type=list,
-            member_type=target_option,
-            advanced=True,
-            help=(
-                "An optional list of `python_sources` target addresses to load first-party "
-                "plugins.\n\n"
-                "You must also set `plugins = path.to.module` in your `mypy.ini`, and "
-                "set the `[mypy].config` option in your `pants.toml`.\n\n"
-                "To instead load third-party plugins, set the option `[mypy].extra_requirements` "
-                "and set the `plugins` option in `mypy.ini`."
-                "Tip: it's often helpful to define a dedicated 'resolve' via "
-                "`[python].resolves` for your MyPy plugins such as 'mypy-plugins' "
-                "so that the third-party requirements used by your plugin, like `mypy`, do not "
-                "mix with the rest of your project. Read that option's help message for more info "
-                "on resolves."
-            ),
-        )
-        register(
-            "--extra-type-stubs",
-            type=list,
-            member_type=str,
-            advanced=True,
-            help=(
-                "Extra type stub requirements to install when running MyPy.\n\n"
-                "Normally, type stubs can be installed as typical requirements, such as putting "
-                "them in `requirements.txt` or using a `python_requirement` target."
-                "Alternatively, you can use this option so that the dependencies are solely "
-                "used when running MyPy and are not runtime dependencies.\n\n"
-                "Expects a list of pip-style requirement strings, like "
-                "`['types-requests==2.25.9']`."
-            ),
-        )
-
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
-
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def extra_type_stubs(self) -> tuple[str, ...]:
-        return tuple(self.options.extra_type_stubs)
-
-    @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+    skip = BoolOption(
+        "--skip",
+        default=False,
+        help=f"Don't use MyPy when running `{bin_name()} typecheck`.",
+    )
+    args = ArgsListOption(
+        help=lambda cls: (
+            "Arguments to pass directly to mypy, e.g. "
+            f'`--{cls.options_scope}-args="--python-version 3.7 --disallow-any-expr"`'
+        ),
+    )
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help=lambda cls: (
+            "Path to a config file understood by MyPy "
+            "(https://mypy.readthedocs.io/en/stable/config_file.html).\n\n"
+            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+            f"this option if the config is located in a non-standard location."
+        ),
+    )
+    config_discovery = BoolOption(
+        "--config-discovery",
+        default=True,
+        advanced=True,
+        help=lambda cls: (
+            "If true, Pants will include any relevant config files during "
+            "runs (`mypy.ini`, `.mypy.ini`, and `setup.cfg`)."
+            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+            f"non-standard location."
+        ),
+    )
+    _source_plugins = TargetListOption(
+        "--source-plugins",
+        advanced=True,
+        help=(
+            "An optional list of `python_sources` target addresses to load first-party "
+            "plugins.\n\n"
+            "You must also set `plugins = path.to.module` in your `mypy.ini`, and "
+            "set the `[mypy].config` option in your `pants.toml`.\n\n"
+            "To instead load third-party plugins, set the option `[mypy].extra_requirements` "
+            "and set the `plugins` option in `mypy.ini`."
+            "Tip: it's often helpful to define a dedicated 'resolve' via "
+            "`[python].resolves` for your MyPy plugins such as 'mypy-plugins' "
+            "so that the third-party requirements used by your plugin, like `mypy`, do not "
+            "mix with the rest of your project. Read that option's help message for more info "
+            "on resolves."
+        ),
+    )
+    extra_type_stubs = StrListOption(
+        "--extra-type-stubs",
+        advanced=True,
+        help=(
+            "Extra type stub requirements to install when running MyPy.\n\n"
+            "Normally, type stubs can be installed as typical requirements, such as putting "
+            "them in `requirements.txt` or using a `python_requirement` target."
+            "Alternatively, you can use this option so that the dependencies are solely "
+            "used when running MyPy and are not runtime dependencies.\n\n"
+            "Expects a list of pip-style requirement strings, like "
+            "`['types-requests==2.25.9']`."
+        ),
+    )
 
     @property
     def config_request(self) -> ConfigFilesRequest:
@@ -178,14 +155,14 @@ class MyPy(PythonToolBase):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"{self.options_scope}.config",
-            discovery=cast(bool, self.options.config_discovery),
+            discovery=self.config_discovery,
             check_existence=["mypy.ini", ".mypy.ini"],
             check_content={"setup.cfg": b"[mypy", "pyproject.toml": b"[tool.mypy"},
         )
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.options.source_plugins, owning_address=None)
+        return UnparsedAddressInputs(self._source_plugins, owning_address=None)
 
     def check_and_warn_if_python_version_configured(self, config: FileContent | None) -> bool:
         """Determine if we can dynamically set `--python-version` and warn if not."""
