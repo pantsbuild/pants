@@ -704,7 +704,7 @@ fn interactive_process(
           _ = session.cancelled() => {
             // The Session was cancelled: attempt to kill the process group / process, and
             // then wait for it to exit (to avoid zombies).
-            if let Err(e) = subprocess.kill_pgid() {
+            if let Err(e) = subprocess.graceful_shutdown_sync() {
               // Failed to kill the PGID: try the non-group form.
               log::warn!("Failed to kill spawned process group ({}). Will try killing only the top process.\n\
                          This is unexpected: please file an issue about this problem at \
