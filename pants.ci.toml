@@ -34,9 +34,8 @@ restricted_token_matches =  """{
   'GITHUB_REPOSITORY': 'pantsbuild/pants', 
 }"""
 
-#[buildsense]
-# TODO: Re-enable before landing once workunit format is confirmed stable.
-# enable = true
+[buildsense]
+enable = true
 
 [subprocess-environment]
 env_vars.add = [
