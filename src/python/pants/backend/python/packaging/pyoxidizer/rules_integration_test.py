@@ -71,6 +71,46 @@ def test_end_to_end() -> None:
         assert bin_stdout == b"Hello world!\n"
 
 
+def test_run_binary() -> None:
+    sources = {
+        "hellotest/main.py": dedent(
+            """\
+            import sys
+
+            print('Hello world!')
+            sys.exit(42)
+            """
+        ),
+        "hellotest/BUILD": dedent(
+            """\
+            python_sources(name="lib")
+
+            python_distribution(
+                name="dist",
+                dependencies=[":lib"],
+                provides=python_artifact(name="dist", version="0.0.1"),
+            )
+
+            pyoxidizer_binary(
+                name="bin",
+                entry_point="hellotest.main",
+                dependencies=[":dist"],
+            )
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python.packaging.pyoxidizer']",
+            f"--source-root-patterns=['/{tmpdir}']",
+            "run",
+            f"{tmpdir}/hellotest:bin",
+        ]
+        result = run_pants(args)
+        assert result.stdout == "Hello world!\n"
+        assert result.exit_code == 42
+
+
 def test_requires_wheels() -> None:
     sources = {
         "hellotest/BUILD": dedent(

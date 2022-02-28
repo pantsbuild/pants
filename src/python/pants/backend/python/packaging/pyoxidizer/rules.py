@@ -22,6 +22,7 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
+from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import (
     AddPrefix,
@@ -185,8 +186,17 @@ async def package_pyoxidizer_binary(
     )
 
 
+@rule
+async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
+    binary = await Get(BuiltPackage, PackageFieldSet, field_set)
+    artifact_relpath = binary.artifacts[0].relpath
+    assert artifact_relpath is not None
+    return RunRequest(digest=binary.digest, args=(os.path.join("{chroot}", artifact_relpath),))
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(PackageFieldSet, PyOxidizerFieldSet),
+        UnionRule(RunFieldSet, PyOxidizerFieldSet),
     )
