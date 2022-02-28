@@ -19,7 +19,6 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
-from pants.util.dirutil import absolute_symlink
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
@@ -37,20 +36,6 @@ class ExportRequest:
     """
 
     targets: Targets
-
-
-@dataclass(frozen=True)
-class Symlink:
-    """A symlink from link_rel_path pointing to source_path.
-
-    source_path may be absolute, or relative to the repo root.
-
-    link_rel_path is relative to the enclosing ExportResult's reldir, and will be
-    absolutized when a location for that dir is chosen.
-    """
-
-    source_path: str
-    link_rel_path: str
 
 
 @frozen_after_init
@@ -79,15 +64,10 @@ class PostProcessingCommand:
 @dataclass(unsafe_hash=True)
 class ExportResult:
     description: str
-    # Materialize digests and create symlinks under this reldir.
+    # Materialize digests under this reldir.
     reldir: str
     # Materialize this digest.
     digest: Digest
-    # Create these symlinks. Symlinks are created after the digest is materialized,
-    # so may reference files/dirs in the digest.
-    # TODO: Remove this functionality entirely? We introduced symlinks as a too-clever way of
-    #  linking from distdir into named caches. However that is risky, so we don't currently use it.
-    symlinks: tuple[Symlink, ...]
     # Run these commands as local processes after the digest is materialized.
     # Values in each args string tuple can contain the format specifier "{digest_root}", which
     # will be substituted with the (absolute) path to the location under distdir in which the
@@ -102,13 +82,11 @@ class ExportResult:
         reldir: str,
         *,
         digest: Digest = EMPTY_DIGEST,
-        symlinks: Iterable[Symlink] = tuple(),
         post_processing_cmds: Iterable[PostProcessingCommand] = tuple(),
     ):
         self.description = description
         self.reldir = reldir
         self.digest = digest
-        self.symlinks = tuple(symlinks)
         self.post_processing_cmds = tuple(post_processing_cmds)
 
 
@@ -148,14 +126,6 @@ async def export(
     workspace.write_digest(dist_digest)
     environment = await Get(Environment, EnvironmentRequest(["PATH"]))
     for result in flattened_results:
-        for symlink in result.symlinks:
-            # Note that if symlink.source_path is an abspath, join returns it unchanged.
-            source_abspath = os.path.join(build_root.path, symlink.source_path)
-            link_abspath = os.path.abspath(
-                os.path.join(output_dir, result.reldir, symlink.link_rel_path)
-            )
-            absolute_symlink(source_abspath, link_abspath)
-
         digest_root = os.path.join(build_root.path, output_dir, result.reldir)
         for cmd in result.post_processing_cmds:
             argv = tuple(arg.format(digest_root=digest_root) for arg in cmd.argv)

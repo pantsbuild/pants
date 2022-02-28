@@ -15,7 +15,6 @@ from pants.core.goals.export import (
     ExportResult,
     ExportResults,
     PostProcessingCommand,
-    Symlink,
     export,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -52,14 +51,12 @@ class MockExportRequest(ExportRequest):
 def mock_export(
     edr: ExportRequest,
     digest: Digest,
-    symlinks: tuple[Symlink, ...],
     post_processing_cmds: tuple[PostProcessingCommand, ...],
 ) -> ExportResult:
     return ExportResult(
         description=f"mock export for {','.join(t.address.spec for t in edr.targets)}",
         reldir="mock",
         digest=digest,
-        symlinks=symlinks,
         post_processing_cmds=post_processing_cmds,
     )
 
@@ -101,7 +98,6 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                             mock_export(
                                 req,
                                 digest,
-                                (Symlink("somefile", "link_to_somefile"),),
                                 (
                                     PostProcessingCommand(
                                         ["cp", "{digest_root}/foo/bar", "{digest_root}/foo/bar1"]
@@ -160,9 +156,3 @@ def test_run_export_rule() -> None:
         assert os.path.isfile(expected_dist_path)
         with open(expected_dist_path, "rb") as fp:
             assert fp.read() == b"BAR"
-
-    symlink = "dist/export/mock/link_to_somefile"
-    assert os.path.islink(symlink)
-    assert os.readlink(symlink) == os.path.join(rule_runner.build_root, "somefile")
-    with open(symlink, "rb") as fp:
-        assert fp.read() == b"SOMEFILE"
