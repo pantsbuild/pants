@@ -671,17 +671,16 @@ def _get_tool_name(subsystem_cls: type["Subsystem"]):
 class SkipOption(BoolOption[bool]):
     """A --skip option (for an invocable tool)."""
 
-    def __new__(cls, goal: str, *other_goals: str, tool_name: str | None = None):
+    def __new__(cls, goal: str, *other_goals: str):
         goals = (goal,) + other_goals
         invocation_str = " and ".join([f"`{bin_name()} {goal}`" for goal in goals])
         return super().__new__(
             cls,  # type: ignore[arg-type]
             "--skip",
-            default=False,
+            default=False,  # type: ignore[arg-type]
             help=(
                 lambda subsystem_cls: (
-                    f"Don't use {tool_name or _get_tool_name(subsystem_cls)} "
-                    f"when running {invocation_str}."
+                    f"Don't use {_get_tool_name(subsystem_cls)} when running {invocation_str}."
                 )
             ),
         )
@@ -696,7 +695,8 @@ class ArgsListOption(ShellStrListOption):
         example: str,
         extra_help: str = "",
         tool_name: str | None = None,
-        # @TODO: document passthrough (in a docstring?).
+        # This should be set when callers can alternatively use "--" followed by the arguments,
+        # instead of having to provide "--[scope]-args='--arg1 --arg2'".
         passthrough: bool | None = None,
     ):
         if extra_help:
@@ -707,7 +707,7 @@ class ArgsListOption(ShellStrListOption):
             help=(
                 lambda subsystem_cls: (
                     f"Arguments to pass directly to {tool_name or _get_tool_name(subsystem_cls)}, "
-                    f"e.g. `--{subsystem_cls.options_scope}-args='{example}'`.'{extra_help}"
+                    f"e.g. `--{subsystem_cls.options_scope}-args='{example}'`.{extra_help}"
                 )
             ),
         )
