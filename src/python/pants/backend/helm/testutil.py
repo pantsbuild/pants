@@ -3,8 +3,10 @@
 
 from textwrap import dedent
 
+from pants.backend.helm.util_rules.chart import ChartType
 
-def gen_chart_file(name: str, *, version: str) -> str:
+
+def gen_chart_file(name: str, *, version: str, type: ChartType = ChartType.APPLICATION) -> str:
     return dedent(
         f"""\
     apiVersion: v2
@@ -12,7 +14,7 @@ def gen_chart_file(name: str, *, version: str) -> str:
     description: A Helm chart for Kubernetes
     version: {version}
     icon: https://www.example.com/icon.png
-    type: application
+    type: {type.value}
     """
     )
 
