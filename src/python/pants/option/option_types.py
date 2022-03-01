@@ -678,7 +678,12 @@ class SkipOption(BoolOption[bool]):
             cls,  # type: ignore[arg-type]
             "--skip",
             default=False,
-            help=lambda subsystem_cls: f"Don't use {tool_name or _get_tool_name(subsystem_cls)} when running {invocation_str}.",
+            help=(
+                lambda subsystem_cls: (
+                    f"Don't use {tool_name or _get_tool_name(subsystem_cls)} "
+                    f"when running {invocation_str}."
+                )
+            ),
         )
 
 
@@ -699,7 +704,12 @@ class ArgsListOption(ShellStrListOption):
         instance = super().__new__(
             cls,  # type: ignore[arg-type]
             "--args",
-            help=lambda subsystem_cls: f"Arguments to pass directly to {tool_name or _get_tool_name(subsystem_cls)}, e.g. `--{subsystem_cls.options_scope}-args='{example}'`.'{extra_help}",
+            help=(
+                lambda subsystem_cls: (
+                    f"Arguments to pass directly to {tool_name or _get_tool_name(subsystem_cls)}, "
+                    f"e.g. `--{subsystem_cls.options_scope}-args='{example}'`.'{extra_help}"
+                )
+            ),
         )
         if passthrough is not None:
             instance._extra_kwargs["passthrough"] = passthrough
