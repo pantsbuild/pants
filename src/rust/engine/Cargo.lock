@@ -669,7 +669,7 @@ dependencies = [
  "protos",
  "pyo3",
  "pyo3-build-config",
- "rand 0.8.2",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "rule_graph",
@@ -828,7 +828,7 @@ dependencies = [
  "parking_lot 0.12.0",
  "prost",
  "protos",
- "rand 0.8.2",
+ "rand 0.8.5",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1054,7 +1054,7 @@ dependencies = [
  "log",
  "parking_lot 0.12.0",
  "petgraph 0.5.1",
- "rand 0.8.2",
+ "rand 0.8.5",
  "task_executor",
  "tokio",
 ]
@@ -1074,7 +1074,7 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "rand 0.8.2",
+ "rand 0.8.5",
  "rustls 0.19.1",
  "rustls-native-certs",
  "rustls-pemfile",
@@ -2214,7 +2214,7 @@ dependencies = [
  "prost",
  "prost-types",
  "protos",
- "rand 0.8.2",
+ "rand 0.8.5",
  "regex",
  "serde",
  "sha2",
@@ -2438,14 +2438,13 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.8.2"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18519b42a40024d661e1714153e9ad0c3de27cd495760ceb09710920f1098b1e"
+checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
 dependencies = [
  "libc",
  "rand_chacha",
  "rand_core 0.6.2",
- "rand_hc",
 ]
 
 [[package]]
@@ -2480,15 +2479,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34cf66eb183df1c5876e2dcf6b13d57340741e8dc255b48e40a26de954d06ae7"
 dependencies = [
  "getrandom 0.2.1",
-]
-
-[[package]]
-name = "rand_hc"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3190ef7066a446f2e7f42e239d161e905420ccab01eb967c9eb27d21b2322a73"
-dependencies = [
- "rand_core 0.6.2",
 ]
 
 [[package]]
@@ -3430,7 +3420,7 @@ dependencies = [
  "futures-util",
  "indexmap",
  "pin-project 1.0.8",
- "rand 0.8.2",
+ "rand 0.8.5",
  "slab",
  "tokio",
  "tokio-stream",
@@ -3931,7 +3921,7 @@ dependencies = [
  "log",
  "parking_lot 0.12.0",
  "petgraph 0.5.1",
- "rand 0.8.2",
+ "rand 0.8.5",
  "strum",
  "strum_macros",
  "tokio",
