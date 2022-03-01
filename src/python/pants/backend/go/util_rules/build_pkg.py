@@ -396,14 +396,12 @@ async def compute_compile_action_id(
     # TODO: Inject fuzz instrumentation values here.
 
     compile_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("compile"))
-    h.update(
-        f"compile {compile_tool_id.tool_id}\n".encode()
-    )  # TODO: Add compiler flags as per `go`'s algorithm?
+    h.update(f"compile {compile_tool_id.tool_id}\n".encode())
+    # TODO: Add compiler flags as per `go`'s algorithm. Need to figure out
     if bq.s_file_names:
         asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
-        h.update(
-            f"asm {asm_tool_id.tool_id}\n".encode()
-        )  # TODO: Add asm flags as per `go`'s algorithm?
+        h.update(f"asm {asm_tool_id.tool_id}\n".encode())
+        # TODO: Add asm flags as per `go`'s algorithm.
     # TODO: Add micro-architecture into cache key (e.g., GOAMD64 setting).
     if "GOEXPERIMENT" in goroot._raw_metadata:
         h.update(f"GOEXPERIMENT={goroot._raw_metadata['GOEXPERIMENT']}".encode())
