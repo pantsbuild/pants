@@ -10,6 +10,7 @@ use std::sync::Arc;
 use deepsize::{known_deep_size, DeepSizeOf};
 use internment::Intern;
 use itertools::Itertools;
+use lazy_static::lazy_static;
 
 // TODO: Extract protobuf-specific pieces to a new crate.
 use grpc_util::prost::MessageExt;
@@ -18,10 +19,13 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 use crate::PathStat;
 
-pub const EMPTY_DIRECTORY_DIGEST: DirectoryDigest = DirectoryDigest {
-  digest: EMPTY_DIGEST,
-  tree: None,
-};
+lazy_static! {
+  pub static ref EMPTY_DIGEST_TREE: DigestTrie = DigestTrie(vec![].into());
+  pub static ref EMPTY_DIRECTORY_DIGEST: DirectoryDigest = DirectoryDigest {
+    digest: EMPTY_DIGEST,
+    tree: Some(EMPTY_DIGEST_TREE.clone()),
+  };
+}
 
 /// A Digest for a directory, optionally with its content stored as a DigestTrie.
 ///
@@ -62,53 +66,22 @@ impl DirectoryDigest {
     Self { digest, tree: None }
   }
 
-  pub fn from_path_stats(
-    path_stats: Vec<PathStat>,
-    file_digests: &HashMap<PathBuf, Digest>,
-  ) -> Result<Self, String> {
-    let path_stats = PathStat::normalize_path_stats(path_stats)?;
-    let digest_tree = DigestTrie::from_sorted_paths(
-      PathBuf::new(),
-      path_stats.iter().map(|p| p.into()).collect(),
-      file_digests,
-    );
-    Ok(Self {
-      digest: digest_tree.compute_root_digest(),
-      tree: Some(digest_tree),
-    })
-  }
-
   /// Returns the digests reachable from this DirectoryDigest.
   ///
   /// If this DirectoryDigest has been persisted to disk (i.e., does not have a DigestTrie) then
   /// this will only include the root.
   pub fn digests(&self) -> Vec<Digest> {
-    let tree = if let Some(tree) = &self.tree {
-      tree
+    if let Some(tree) = &self.tree {
+      let mut digests = tree.digests();
+      digests.push(self.digest);
+      digests
     } else {
-      return vec![self.digest];
-    };
-
-    // Walk the tree and collect Digests.
-    let mut digests = Vec::new();
-    digests.push(self.digest);
-    let mut stack = tree.0.iter().collect::<Vec<_>>();
-    while let Some(entry) = stack.pop() {
-      match entry {
-        Entry::Directory(d) => {
-          digests.push(d.digest);
-          stack.extend(d.tree.0.iter());
-        }
-        Entry::File(f) => {
-          digests.push(f.digest);
-        }
-      }
+      vec![self.digest]
     }
-    digests
   }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct Name(Intern<String>);
 known_deep_size!(0; Name);
 
@@ -120,14 +93,23 @@ impl Deref for Name {
   }
 }
 
-#[derive(Clone, DeepSizeOf)]
-enum Entry {
+#[derive(DeepSizeOf)]
+pub enum Entry {
   Directory(Directory),
   File(File),
 }
 
-#[derive(Clone, DeepSizeOf)]
-struct Directory {
+impl Entry {
+  fn name(&self) -> Name {
+    match self {
+      Entry::Directory(d) => d.name,
+      Entry::File(f) => f.name,
+    }
+  }
+}
+
+#[derive(DeepSizeOf)]
+pub struct Directory {
   name: Name,
   digest: Digest,
   tree: DigestTrie,
@@ -145,13 +127,35 @@ impl Directory {
       tree,
     }
   }
+
+  pub fn as_directory(&self) -> remexec::Directory {
+    self.tree.as_directory()
+  }
+
+  pub fn as_directory_node(&self) -> remexec::DirectoryNode {
+    remexec::DirectoryNode {
+      name: self.name.as_ref().to_owned(),
+      digest: Some((&self.digest).into()),
+    }
+  }
 }
 
-#[derive(Clone, DeepSizeOf)]
-struct File {
+#[derive(DeepSizeOf)]
+pub struct File {
   name: Name,
   digest: Digest,
   is_executable: bool,
+}
+
+impl File {
+  pub fn as_file_node(&self) -> remexec::FileNode {
+    remexec::FileNode {
+      name: self.name.as_ref().to_owned(),
+      digest: Some(self.digest.into()),
+      is_executable: self.is_executable,
+      ..remexec::FileNode::default()
+    }
+  }
 }
 
 // TODO: `PathStat` owns its path, which means it can't be used via recursive slicing. See
@@ -187,7 +191,22 @@ impl<'a> From<&'a PathStat> for TypedPath<'a> {
 #[derive(Clone, DeepSizeOf)]
 pub struct DigestTrie(Arc<[Entry]>);
 
+// TODO: This avoids a `rustc` crasher (repro on 7f319ee84ad41bc0aea3cb01fb2f32dcd51be704).
+unsafe impl Sync for DigestTrie {}
+
 impl DigestTrie {
+  pub fn from_path_stats(
+    path_stats: Vec<PathStat>,
+    file_digests: &HashMap<PathBuf, Digest>,
+  ) -> Result<Self, String> {
+    let path_stats = PathStat::normalize_path_stats(path_stats)?;
+    Ok(Self::from_sorted_paths(
+      PathBuf::new(),
+      path_stats.iter().map(|p| p.into()).collect(),
+      file_digests,
+    ))
+  }
+
   fn from_sorted_paths(
     prefix: PathBuf,
     paths: Vec<TypedPath>,
@@ -211,10 +230,7 @@ impl DigestTrie {
             path,
             is_executable,
           } => {
-            let digest = file_digests
-              .get(prefix.join(path).as_path())
-              .unwrap()
-              .clone();
+            let digest = *file_digests.get(prefix.join(path).as_path()).unwrap();
 
             entries.push(Entry::File(File {
               name,
@@ -243,35 +259,98 @@ impl DigestTrie {
     Self(entries.into())
   }
 
-  fn compute_root_digest(&self) -> Digest {
+  pub fn as_directory(&self) -> remexec::Directory {
+    let mut files = Vec::new();
+    let mut directories = Vec::new();
+
+    for entry in &*self.0 {
+      match entry {
+        Entry::File(f) => files.push(f.as_file_node()),
+        Entry::Directory(d) => directories.push(d.as_directory_node()),
+      }
+    }
+
+    remexec::Directory {
+      directories,
+      files,
+      ..remexec::Directory::default()
+    }
+  }
+
+  pub fn compute_root_digest(&self) -> Digest {
     if self.0.is_empty() {
       return EMPTY_DIGEST;
     }
 
-    let mut files = Vec::new();
-    let mut directories = Vec::new();
-    for entry in &*self.0 {
+    Digest::of_bytes(&self.as_directory().to_bytes())
+  }
+
+  pub fn entries(&self) -> &[Entry] {
+    &*self.0
+  }
+
+  /// Returns the digests reachable from this DigestTrie.
+  pub fn digests(&self) -> Vec<Digest> {
+    // Walk the tree and collect Digests.
+    let mut digests = Vec::new();
+    let mut stack = self.0.iter().collect::<Vec<_>>();
+    while let Some(entry) = stack.pop() {
       match entry {
-        Entry::File(f) => files.push(remexec::FileNode {
-          name: f.name.as_ref().to_owned(),
-          digest: Some(f.digest.into()),
-          is_executable: f.is_executable,
-          ..remexec::FileNode::default()
-        }),
-        Entry::Directory(d) => directories.push(remexec::DirectoryNode {
-          name: d.name.as_ref().to_owned(),
-          digest: Some((&d.digest).into()),
-        }),
+        Entry::Directory(d) => {
+          digests.push(d.digest);
+          stack.extend(d.tree.0.iter());
+        }
+        Entry::File(f) => {
+          digests.push(f.digest);
+        }
       }
     }
-    Digest::of_bytes(
-      &remexec::Directory {
-        directories,
-        files,
-        ..remexec::Directory::default()
+    digests
+  }
+
+  /// Return a pair of Vecs of the file paths and directory paths in this DigestTrie, each in
+  /// sorted order.
+  ///
+  /// TODO: This should probably be implemented directly by consumers via `walk`, since they
+  /// can directly allocate the collections that they need.
+  pub fn files_and_directories(&self) -> (Vec<PathBuf>, Vec<PathBuf>) {
+    let mut files = Vec::new();
+    let mut directories = Vec::new();
+    self.walk(&mut |path, entry| {
+      match entry {
+        Entry::File(_) => files.push(path.to_owned()),
+        Entry::Directory(d) if d.name.is_empty() => {
+          // Is the root directory, which is not emitted here.
+        }
+        Entry::Directory(_) => directories.push(path.to_owned()),
       }
-      .to_bytes(),
-    )
+    });
+    (files, directories)
+  }
+
+  /// Visit every node in the tree, calling the given function with the path to the Node, and its
+  /// entries.
+  pub fn walk(&self, f: &mut impl FnMut(&Path, &Entry)) {
+    {
+      // TODO: It's likely that a DigestTrie should hold its own Digest, to avoid re-computing it
+      // here.
+      let root = Entry::Directory(Directory::from_digest_tree(
+        Name(Intern::from("")),
+        self.clone(),
+      ));
+      f(&PathBuf::new(), &root);
+    }
+    self.walk_helper(PathBuf::new(), f)
+  }
+
+  fn walk_helper(&self, path_so_far: PathBuf, f: &mut impl FnMut(&Path, &Entry)) {
+    for entry in &*self.0 {
+      let path = path_so_far.join(entry.name().as_ref());
+      f(&path, entry);
+      if let Entry::Directory(d) = entry {
+        d.tree.walk_helper(path, f);
+      }
+    }
   }
 }
 

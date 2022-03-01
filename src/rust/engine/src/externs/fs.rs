@@ -6,16 +6,15 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use either::Either;
 use itertools::Itertools;
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::{PyException, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
 use fs::{
-  DirectoryDigest, GlobExpansionConjunction, PathGlobs, PathStat, PreparedPathGlobs,
-  StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
+  DirectoryDigest, GlobExpansionConjunction, PathGlobs, PreparedPathGlobs, StrictGlobMatching,
+  EMPTY_DIRECTORY_DIGEST,
 };
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use store::Snapshot;
@@ -28,7 +27,7 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyAddPrefix>()?;
   m.add_class::<PyRemovePrefix>()?;
 
-  m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIRECTORY_DIGEST))?;
+  m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIRECTORY_DIGEST.clone()))?;
   m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;
   m.add("EMPTY_SNAPSHOT", PySnapshot(Snapshot::empty()))?;
 
@@ -146,9 +145,9 @@ impl PySnapshot {
     py_digest: PyDigest,
     files: Vec<String>,
     dirs: Vec<String>,
-  ) -> Self {
+  ) -> PyResult<Self> {
     let snapshot = unsafe { Snapshot::create_for_testing_ffi(py_digest.0.digest, files, dirs) };
-    Self(snapshot)
+    Ok(Self(snapshot.map_err(PyException::new_err)?))
   }
 
   fn __hash__(&self) -> u64 {
@@ -156,17 +155,22 @@ impl PySnapshot {
   }
 
   fn __repr__(&self) -> PyResult<String> {
-    let (dirs, files): (Vec<_>, Vec<_>) = self.0.path_stats.iter().partition_map(|ps| match ps {
-      PathStat::Dir { path, .. } => Either::Left(path.to_string_lossy()),
-      PathStat::File { path, .. } => Either::Right(path.to_string_lossy()),
-    });
+    let (dirs, files): (Vec<_>, Vec<_>) = self.0.tree.files_and_directories();
 
     Ok(format!(
       "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
       self.0.digest.hash.to_hex(),
       self.0.digest.size_bytes,
-      dirs.join(","),
-      files.join(",")
+      dirs
+        .into_iter()
+        .map(|d| d.display().to_string())
+        .collect::<Vec<_>>()
+        .join(","),
+      files
+        .into_iter()
+        .map(|d| d.display().to_string())
+        .collect::<Vec<_>>()
+        .join(","),
     ))
   }
 
@@ -185,32 +189,26 @@ impl PySnapshot {
 
   #[getter]
   fn files<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-    let files = self
-      .0
-      .path_stats
-      .iter()
-      .filter_map(|ps| match ps {
-        PathStat::File { path, .. } => path.to_str(),
-        _ => None,
-      })
-      .map(|ps| PyString::new(py, ps))
-      .collect::<Vec<_>>();
-    PyTuple::new(py, files)
+    let (files, _) = self.0.tree.files_and_directories();
+    PyTuple::new(
+      py,
+      files
+        .into_iter()
+        .map(|path| PyString::new(py, &path.to_string_lossy()))
+        .collect::<Vec<_>>(),
+    )
   }
 
   #[getter]
   fn dirs<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-    let dirs = self
-      .0
-      .path_stats
-      .iter()
-      .filter_map(|ps| match ps {
-        PathStat::Dir { path, .. } => path.to_str(),
-        _ => None,
-      })
-      .map(|ps| PyString::new(py, ps))
-      .collect::<Vec<_>>();
-    PyTuple::new(py, dirs)
+    let (_, dirs) = self.0.tree.files_and_directories();
+    PyTuple::new(
+      py,
+      dirs
+        .into_iter()
+        .map(|path| PyString::new(py, &path.to_string_lossy()))
+        .collect::<Vec<_>>(),
+    )
   }
 }
 

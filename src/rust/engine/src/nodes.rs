@@ -860,13 +860,13 @@ impl Snapshot {
 
 #[async_trait]
 impl WrappedNode for Snapshot {
-  type Item = DirectoryDigest;
+  type Item = store::Snapshot;
 
   async fn run_wrapped_node(
     self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<DirectoryDigest> {
+  ) -> NodeResult<store::Snapshot> {
     let path_globs = self.path_globs.parse().map_err(throw)?;
 
     // We rely on Context::expand_globs to track dependencies for scandirs,
@@ -876,30 +876,9 @@ impl WrappedNode for Snapshot {
       .map_err(|e| throw(format!("{}", e)))
       .await?;
 
-    let (paths, files): (Vec<_>, Vec<_>) = path_stats
-      .iter()
-      .filter_map(|ps| match ps {
-        PathStat::File { path, stat } => Some((path.clone(), stat.clone())),
-        _ => None,
-      })
-      .unzip();
-    let file_digests = future::try_join_all(
-      files
-        .into_iter()
-        .map(|file| context.get(DigestFile(file)))
-        .collect::<Vec<_>>(),
-    )
-    .await?;
-
-    let file_digests_map = paths
-      .into_iter()
-      .zip(file_digests)
-      .collect::<HashMap<_, _>>();
-
-    Ok(DirectoryDigest::from_path_stats(
-      path_stats,
-      &file_digests_map,
-    )?)
+    store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
+      .map_err(|e| throw(format!("Snapshot failed: {}", e)))
+      .await
   }
 }
 
@@ -1485,7 +1464,7 @@ impl Node for NodeKey {
           }
           NodeKey::Snapshot(n) => {
             n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::DirectoryDigest)
+              .map_ok(NodeOutput::Snapshot)
               .await
           }
           NodeKey::Paths(n) => {
@@ -1666,7 +1645,7 @@ impl NodeError for Failure {
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum NodeOutput {
   FileDigest(hashing::Digest),
-  DirectoryDigest(DirectoryDigest),
+  Snapshot(store::Snapshot),
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
@@ -1681,7 +1660,10 @@ impl NodeOutput {
   pub fn digests(&self) -> Vec<hashing::Digest> {
     match self {
       NodeOutput::FileDigest(d) => vec![*d],
-      NodeOutput::DirectoryDigest(dd) => dd.digests(),
+      NodeOutput::Snapshot(s) => {
+        let dd: DirectoryDigest = s.clone().into();
+        dd.digests()
+      }
       NodeOutput::ProcessResult(p) => {
         vec![p.0.stdout_digest, p.0.stderr_digest, p.0.output_directory]
       }
@@ -1715,12 +1697,12 @@ impl TryFrom<NodeOutput> for hashing::Digest {
   }
 }
 
-impl TryFrom<NodeOutput> for DirectoryDigest {
+impl TryFrom<NodeOutput> for store::Snapshot {
   type Error = ();
 
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeOutput::DirectoryDigest(v) => Ok(v),
+      NodeOutput::Snapshot(v) => Ok(v),
       _ => Err(()),
     }
   }

@@ -356,7 +356,7 @@ fn digest_to_snapshot(context: Context, args: Vec<Value>) -> BoxFuture<'static, 
       let py_digest = (*args[0]).as_ref(py);
       lift_directory_digest(py_digest)
     })?;
-    let snapshot = store::Snapshot::from_digest(store, digest.digest).await?;
+    let snapshot = store::Snapshot::from_digest(store, digest).await?;
     let gil = Python::acquire_gil();
     Snapshot::store_snapshot(gil.python(), snapshot)
   }
@@ -411,9 +411,9 @@ fn path_globs_to_digest(
       Snapshot::lift_path_globs(py_path_globs)
     })
     .map_err(|e| throw(format!("Failed to parse PathGlobs: {}", e)))?;
-    let digest = context.get(Snapshot::from_path_globs(path_globs)).await?;
+    let snapshot = context.get(Snapshot::from_path_globs(path_globs)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), snapshot.into()).map_err(throw)
   }
   .boxed()
 }

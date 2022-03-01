@@ -10,8 +10,8 @@ use testutil::make_file;
 
 use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store};
 use fs::{
-  Dir, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStat,
-  PosixFS, StrictGlobMatching,
+  Dir, DirectoryDigest, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
+  PathGlobs, PathStat, PosixFS, StrictGlobMatching,
 };
 
 pub const STR: &str = "European Burmese";
@@ -48,21 +48,22 @@ async fn snapshot_one_file() {
   make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let snapshot = Snapshot::from_path_stats(store, digester, path_stats.clone())
+  let snapshot = Snapshot::from_path_stats(store, digester, path_stats)
     .await
     .unwrap();
   assert_eq!(
-    snapshot,
-    Snapshot {
-      digest: Digest::new(
-        Fingerprint::from_hex_string(
-          "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
-        )
-        .unwrap(),
-        80,
-      ),
-      path_stats: path_stats,
-    }
+    snapshot.digest,
+    Digest::new(
+      Fingerprint::from_hex_string(
+        "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
+      )
+      .unwrap(),
+      80,
+    )
+  );
+  assert_eq!(
+    snapshot.tree.files_and_directories(),
+    (vec![PathBuf::from("roland")], vec![])
   );
 }
 
@@ -76,21 +77,25 @@ async fn snapshot_recursive_directories() {
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let snapshot = Snapshot::from_path_stats(store, digester, path_stats.clone())
+  let snapshot = Snapshot::from_path_stats(store, digester, path_stats)
     .await
     .unwrap();
   assert_eq!(
-    snapshot,
-    Snapshot {
-      digest: Digest::new(
-        Fingerprint::from_hex_string(
-          "8b1a7ea04eaa2527b35683edac088bc826117b53b7ec6601740b55e20bce3deb",
-        )
-        .unwrap(),
-        78,
-      ),
-      path_stats: path_stats,
-    }
+    snapshot.digest,
+    Digest::new(
+      Fingerprint::from_hex_string(
+        "8b1a7ea04eaa2527b35683edac088bc826117b53b7ec6601740b55e20bce3deb",
+      )
+      .unwrap(),
+      78,
+    )
+  );
+  assert_eq!(
+    snapshot.tree.files_and_directories(),
+    (
+      vec![PathBuf::from("cats/roland")],
+      vec![PathBuf::from("cats")]
+    )
   );
 }
 
@@ -104,12 +109,26 @@ async fn snapshot_from_digest() {
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let expected_snapshot = Snapshot::from_path_stats(store.clone(), digester, path_stats.clone())
+  let expected_snapshot = Snapshot::from_path_stats(store.clone(), digester, path_stats)
     .await
     .unwrap();
+
+  // Confirm that the digest can be loaded either from memory (using a DirectoryDigest with a
+  // tree attached), or from disk (using one without.)
   assert_eq!(
     expected_snapshot,
-    Snapshot::from_digest(store, expected_snapshot.digest,)
+    // From disk.
+    Snapshot::from_digest(
+      store.clone(),
+      DirectoryDigest::new(expected_snapshot.digest)
+    )
+    .await
+    .unwrap()
+  );
+  assert_eq!(
+    expected_snapshot,
+    // From memory.
+    Snapshot::from_digest(store, expected_snapshot.clone().into())
       .await
       .unwrap()
   );
@@ -131,20 +150,29 @@ async fn snapshot_recursive_directories_including_empty() {
   let sorted_path_stats = expand_all_sorted(posix_fs).await;
   let mut unsorted_path_stats = sorted_path_stats.clone();
   unsorted_path_stats.reverse();
+  let snapshot = Snapshot::from_path_stats(store, digester, unsorted_path_stats)
+    .await
+    .unwrap();
   assert_eq!(
-    Snapshot::from_path_stats(store, digester, unsorted_path_stats.clone(),)
-      .await
+    snapshot.digest,
+    Digest::new(
+      Fingerprint::from_hex_string(
+        "fbff703bdaac62accf2ea5083bcfed89292073bf710ef9ad14d9298c637e777b",
+      )
       .unwrap(),
-    Snapshot {
-      digest: Digest::new(
-        Fingerprint::from_hex_string(
-          "fbff703bdaac62accf2ea5083bcfed89292073bf710ef9ad14d9298c637e777b",
-        )
-        .unwrap(),
-        232,
-      ),
-      path_stats: sorted_path_stats,
-    }
+      232,
+    ),
+  );
+  assert_eq!(
+    snapshot.tree.files_and_directories(),
+    (
+      vec![PathBuf::from("cats/roland")],
+      vec![
+        PathBuf::from("cats"),
+        PathBuf::from("dogs"),
+        PathBuf::from("llamas")
+      ]
+    )
   );
 }
 

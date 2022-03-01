@@ -21,8 +21,8 @@ use std::time::Duration;
 
 use async_latch::AsyncLatch;
 use fnv::FnvHasher;
-use futures::future;
-use futures::future::FutureExt;
+use fs::DirectoryDigest;
+use futures::future::{self, FutureExt};
 use futures::Future;
 use hashing::Digest;
 use log::{self, debug, error, warn, Log};
@@ -750,7 +750,7 @@ async fn workunit_to_py_value(
           .map_err(PyException::new_err)?
       }
       ArtifactOutput::Snapshot(digest) => {
-        let snapshot = store::Snapshot::from_digest(store, *digest)
+        let snapshot = store::Snapshot::from_digest(store, DirectoryDigest::new(*digest))
           .await
           .map_err(PyException::new_err)?;
         let gil = Python::acquire_gil();
@@ -1423,7 +1423,7 @@ fn capture_snapshots(
             core.executor.clone(),
             root,
             path_globs,
-            digest_hint.map(|dd| dd.digest),
+            digest_hint,
           )
         })
         .collect::<Vec<_>>();

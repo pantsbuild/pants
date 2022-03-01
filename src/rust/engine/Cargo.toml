@@ -117,7 +117,6 @@ crossbeam-channel = "0.5"
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
-either = "1.6"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.3"
