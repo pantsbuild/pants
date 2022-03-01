@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list
@@ -85,6 +87,8 @@ class GoRoot:
     path: str
     version: str
 
+    raw_metadata: FrozenDict[str, str]
+
     def is_compatible_version(self, version: str) -> bool:
         """Can this Go compiler handle the target version?
 
@@ -101,6 +105,46 @@ class GoRoot:
             return int(major), int(minor)
 
         return parse(version) <= parse(self.version)
+
+    @property
+    def full_version(self) -> str:
+        return self.raw_metadata["GOVERSION"]
+
+    @property
+    def goos(self) -> str:
+        return self.raw_metadata["GOOS"]
+
+    @property
+    def goarch(self) -> str:
+        return self.raw_metadata["GOARCH"]
+
+    def arch_env(self) -> tuple[str, str] | None:
+        """Returns the name and setting of the GOARCH-specific architecture environment variable.
+
+        If the current architecture has no GOARCH-specific variable, returns empty key and value.
+        """
+
+        # See https://github.com/golang/go/blob/21998413ad82655fef1f31316db31e23e0684b21/src/cmd/go/internal/cfg/cfg.go#L261-L312
+        # for the original algorithm.
+        # TODO: It is not clear whether these would ever show up in `go env` output. The Go tool sources actually
+        # have some involved logic for determining the default. Maybe we need to vendor that logic as well?
+        # (although it looks like that code would need to be in Go)
+        if self.goarch == "arm":
+            return "GOARM", self.raw_metadata.get("GOARM", "")
+        elif self.goarch == "386":
+            return "GO386", self.raw_metadata.get("GO386", "")
+        elif self.goarch == "amd64":
+            return "GOAMD64", self.raw_metadata.get("GOAMD64", "")
+        elif self.goarch in ("mips", "mipsle"):
+            return "GOMIPS", self.raw_metadata.get("GOMIPS", "")
+        elif self.goarch in ("mips64", "mips64le"):
+            return "GOMIPS64", self.raw_metadata.get("GOMIPS64", "")
+        elif self.goarch in ("ppc64", "ppc64le"):
+            return "GOPPC64", self.raw_metadata.get("GOPPC64", "")
+        elif self.goarch == "wasm":
+            return "GOWASM", self.raw_metadata.get("GOWASM", "")
+        else:
+            return None
 
 
 @rule(desc="Find Go binary", level=LogLevel.DEBUG)
@@ -159,15 +203,17 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
             env_result = await Get(
                 ProcessResult,
                 Process(
-                    (binary_path.path, "env", "GOROOT"),
-                    description=f"Determine Go version and GOROOT for {binary_path.path}",
+                    (binary_path.path, "env", "-json"),
+                    description=f"Determine Go SDK metadata for {binary_path.path}",
                     level=LogLevel.DEBUG,
                     cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
                     env={"GOPATH": "/does/not/matter"},
                 ),
             )
-            goroot = env_result.stdout.decode("utf-8").strip()
-            return GoRoot(goroot, version)
+            sdk_metadata = json.loads(env_result.stdout.decode())
+            return GoRoot(
+                path=sdk_metadata["GOROOT"], version=version, raw_metadata=FrozenDict(sdk_metadata)
+            )
 
         logger.debug(
             f"Go binary at {binary_path.path} has version {version}, but this "

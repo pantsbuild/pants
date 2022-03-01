@@ -13,7 +13,7 @@ from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -113,6 +113,29 @@ async def setup_go_sdk_process(
         output_directories=request.output_directories,
         level=LogLevel.DEBUG,
     )
+
+
+@dataclass(frozen=True)
+class GoSdkToolIDRequest:
+    tool_name: str
+
+
+@dataclass(frozen=True)
+class GoSdkToolIDResult:
+    tool_name: str
+    tool_id: str
+
+
+@rule
+async def compute_go_tool_id(request: GoSdkToolIDRequest) -> GoSdkToolIDResult:
+    result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            ["tool", request.tool_name, "-V=full"],
+            description=f"Obtain tool ID for Go tool `{request.tool_name}`.",
+        ),
+    )
+    return GoSdkToolIDResult(tool_name=request.tool_name, tool_id=result.stdout.decode().strip())
 
 
 def rules():
