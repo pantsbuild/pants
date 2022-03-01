@@ -388,8 +388,7 @@ fn merge_digests_request_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -478,6 +477,9 @@ fn create_digest_to_digest(
       .collect()
   };
 
+  // TODO: Rather than creating independent Digests and then merging them, this should use
+  // `DigestTrie::from_path_stats`.
+  //   see https://github.com/pantsbuild/pants/pull/14569#issuecomment-1057286943
   let digest_futures: Vec<_> = items
     .into_iter()
     .map(|item| {
@@ -489,20 +491,23 @@ fn create_digest_to_digest(
             let snapshot = store
               .snapshot_of_one_file(path, digest, is_executable)
               .await?;
-            let res: Result<_, String> = Ok(snapshot.digest);
+            let res: Result<DirectoryDigest, String> = Ok(snapshot.into());
             res
           }
           CreateDigestItem::FileEntry(path, digest, is_executable) => {
             let snapshot = store
               .snapshot_of_one_file(path, digest, is_executable)
               .await?;
-            let res: Result<_, String> = Ok(snapshot.digest);
+            let res: Result<_, String> = Ok(snapshot.into());
             res
           }
-          CreateDigestItem::Dir(path) => store
-            .create_empty_dir(&path)
-            .await
-            .map_err(|e| format!("{:?}", e)),
+          CreateDigestItem::Dir(path) => {
+            let digest = store
+              .create_empty_dir(&path)
+              .await
+              .map_err(|e| format!("{:?}", e))?;
+            Ok(DirectoryDigest::todo_from_digest(digest))
+          }
         }
       }
     })
@@ -516,8 +521,7 @@ fn create_digest_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }

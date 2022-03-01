@@ -1,23 +1,22 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashSet;
 use std::convert::From;
 use std::iter::Iterator;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::BytesMut;
 use fs::{
-  DigestTrie, DirectoryDigest, ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob,
+  directory, DigestTrie, DirectoryDigest, ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob,
   PreparedPathGlobs, RelativePath, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
-use futures::future::{self, FutureExt, TryFutureExt};
+use futures::future::{self, FutureExt};
 use glob::Pattern;
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use log::log_enabled;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
@@ -54,129 +53,51 @@ pub struct SubsetParams {
 ///
 async fn merge_directories<T: SnapshotOps + 'static>(
   store: T,
-  dir_digests: Vec<Digest>,
-) -> Result<Digest, String> {
-  merge_directories_recursive(store, PathBuf::new(), dir_digests).await
-}
+  dir_digests: Vec<DirectoryDigest>,
+) -> Result<DirectoryDigest, String> {
+  let trees = future::try_join_all(
+    dir_digests
+      .into_iter()
+      .map(|dd| store.load_digest_trie(dd))
+      .collect::<Vec<_>>(),
+  )
+  .await?;
 
-// NB: This function is recursive, and so cannot be directly marked async:
-//   https://rust-lang.github.io/async-book/07_workarounds/05_recursion.html
-fn merge_directories_recursive<T: SnapshotOps + 'static>(
-  store: T,
-  parent_path: PathBuf,
-  dir_digests: Vec<Digest>,
-) -> future::BoxFuture<'static, Result<Digest, String>> {
-  async move {
-    if dir_digests.is_empty() {
-      return Ok(EMPTY_DIGEST);
-    } else if dir_digests.len() == 1 {
-      let mut dir_digests = dir_digests;
-      return Ok(dir_digests.pop().unwrap());
+  let tree = match DigestTrie::merge(trees) {
+    Ok(tree) => tree,
+    Err(merge_error) => {
+      // TODO: Use https://doc.rust-lang.org/nightly/std/result/enum.Result.html#method.into_ok_or_err
+      // once it is stable.
+      let err_string = match render_merge_error(&store, merge_error).await {
+        Ok(e) | Err(e) => e,
+      };
+      return Err(err_string);
     }
+  };
 
-    let directories = future::try_join_all(
-      dir_digests
-        .into_iter()
-        .map(|digest| {
-          store
-            .load_directory(digest)
-            .and_then(move |maybe_directory| {
-              future::ready(
-                maybe_directory
-                  .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest)),
-              )
-            })
-        })
-        .collect::<Vec<_>>(),
-    )
-    .await?;
+  // TODO: Remove persistence as the final step of #13112.
+  let directory_digest = store.record_digest_trie(tree.clone()).await?;
 
-    let mut out_dir = remexec::Directory::default();
-
-    // Merge FileNodes.
-    let file_nodes = Iterator::flatten(directories.iter().map(|directory| directory.files.iter()))
-      .sorted_by(|a, b| a.name.cmp(&b.name));
-
-    out_dir.files = file_nodes.into_iter().dedup().cloned().collect();
-
-    // Group and recurse for DirectoryNodes.
-    let child_directory_futures = {
-      let store = store.clone();
-      let parent_path = parent_path.clone();
-      let mut directories_to_merge = Iterator::flatten(
-        directories
-          .iter()
-          .map(|directory| directory.directories.iter()),
-      )
-      .collect::<Vec<_>>();
-      directories_to_merge.sort_by(|a, b| a.name.cmp(&b.name));
-      directories_to_merge
-        .into_iter()
-        .group_by(|d| d.name.clone())
-        .into_iter()
-        .map(move |(child_name, group)| {
-          let store = store.clone();
-          let (digests, errors): (Vec<Digest>, Vec<String>) =
-            group.partition_map(|d| match require_digest(d.digest.as_ref()) {
-              Ok(digest) => Either::Left(digest),
-              Err(err) => Either::Right(err),
-            });
-          let child_path = parent_path.join(&child_name);
-          async move {
-            if !errors.is_empty() {
-              return Err(format!(
-                "Errors while parsing digests: {}",
-                errors.join(", ")
-              ));
-            }
-
-            let merged_digest = merge_directories_recursive(store, child_path, digests).await?;
-            let child_dir = remexec::DirectoryNode {
-              name: child_name,
-              digest: Some(merged_digest.into()),
-            };
-            let res: Result<_, String> = Ok(child_dir);
-            res
-          }
-        })
-        .collect::<Vec<_>>()
-    };
-
-    let child_directories = future::try_join_all(child_directory_futures).await?;
-
-    out_dir.directories = child_directories;
-
-    error_for_collisions(&store, &parent_path, &out_dir).await?;
-    store.record_directory(&out_dir).await
-  }
-  .boxed()
+  Ok(directory_digest)
 }
 
 ///
-/// Ensure merge is unique and fail with debugging info if not.
+/// Render a directory::MergeError (or fail with a less specific error if some content cannot be
+/// loaded).
 ///
-async fn error_for_collisions<T: SnapshotOps + 'static>(
+async fn render_merge_error<T: SnapshotOps + 'static>(
   store: &T,
-  parent_path: &Path,
-  dir: &remexec::Directory,
-) -> Result<(), String> {
-  // Attempt to cheaply check for collisions to bail out early if there aren't any.
-  let unique_count = dir
-    .files
+  err: directory::MergeError,
+) -> Result<String, String> {
+  let directory::MergeError::Duplicates {
+    parent_path,
+    files,
+    directories,
+  } = err;
+  let file_details_by_name = files
     .iter()
-    .map(|n| n.name.clone())
-    .chain(dir.directories.iter().map(|n| n.name.clone()))
-    .collect::<HashSet<_>>()
-    .len();
-  if unique_count == (dir.files.len() + dir.directories.len()) {
-    return Ok(());
-  }
-
-  let file_details_by_name = dir
-    .files
-    .iter()
-    .map(|file_node| async move {
-      let digest: Digest = require_digest(file_node.digest.as_ref())?;
+    .map(|file| async move {
+      let digest: Digest = file.digest();
       let header = format!(
         "file digest={} size={}:\n\n",
         digest.hash, digest.size_bytes
@@ -202,18 +123,16 @@ async fn error_for_collisions<T: SnapshotOps + 'static>(
         .await?
         .unwrap_or_else(|| "<could not load contents>".to_string());
       let detail = format!("{}{}", header, contents);
-      let res: Result<_, String> = Ok((file_node.name.clone(), detail));
+      let res: Result<_, String> = Ok((file.name().to_owned(), detail));
       res
     })
     .map(|f| f.boxed());
-  let dir_details_by_name = dir
-    .directories
+  let dir_details_by_name = directories
     .iter()
-    .map(|dir_node| async move {
-      // TODO(tonic): Avoid using .unwrap here!
-      let digest = require_digest(dir_node.digest.as_ref())?;
+    .map(|dir| async move {
+      let digest = dir.digest();
       let detail = format!("dir digest={} size={}:\n\n", digest.hash, digest.size_bytes);
-      let res: Result<_, String> = Ok((dir_node.name.clone(), detail));
+      let res: Result<_, String> = Ok((dir.name().to_owned(), detail));
       res
     })
     .map(|f| f.boxed());
@@ -249,7 +168,7 @@ async fn error_for_collisions<T: SnapshotOps + 'static>(
   .await
   .unwrap_or_else(|err| vec![format!("Failed to load contents for comparison: {}", err)]);
 
-  Err(format!(
+  Ok(format!(
     "Can only merge Directories with no duplicates, but found {} duplicate entries in {}:\
       \n\n{}",
     duplicate_details.len(),
@@ -660,10 +579,14 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
   ///
   /// Given N Snapshots, returns a new Snapshot that merges them.
   ///
-  async fn merge(&self, digests: Vec<Digest>) -> Result<Digest, SnapshotOpsError> {
-    merge_directories(self.clone(), digests)
-      .await
-      .map_err(|e| e.into())
+  async fn merge(
+    &self,
+    digests: Vec<DirectoryDigest>,
+  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+    merge_directories(self.clone(), digests).await.map_err(|e| {
+      let e: SnapshotOpsError = e.into();
+      e
+    })
   }
 
   async fn add_prefix(

@@ -34,7 +34,7 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
 use deepsize::DeepSizeOf;
-use fs::RelativePath;
+use fs::{DirectoryDigest, RelativePath};
 use futures::future::try_join_all;
 use futures::try_join;
 use hashing::Digest;
@@ -261,14 +261,22 @@ impl InputDigests {
           None
         }
       })
+      .map(DirectoryDigest::todo_from_digest)
       .collect::<Vec<_>>();
     complete_digests.push(input_files);
 
-    let (complete, nailgun) =
-      try_join!(store.merge(complete_digests), store.merge(nailgun_digests),)?;
+    let (complete, nailgun) = try_join!(
+      store.merge(
+        complete_digests
+          .into_iter()
+          .map(DirectoryDigest::todo_from_digest)
+          .collect()
+      ),
+      store.merge(nailgun_digests),
+    )?;
     Ok(Self {
-      complete,
-      nailgun,
+      complete: complete.todo_as_digest(),
+      nailgun: nailgun.todo_as_digest(),
       input_files,
       immutable_inputs,
       use_nailgun,

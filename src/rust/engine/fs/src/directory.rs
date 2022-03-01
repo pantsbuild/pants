@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
+use std::hash::{self, Hash};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -46,6 +47,12 @@ impl Eq for DirectoryDigest {}
 impl PartialEq for DirectoryDigest {
   fn eq(&self, other: &Self) -> bool {
     self.digest == other.digest
+  }
+}
+
+impl Hash for DirectoryDigest {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    self.digest.hash(state);
   }
 }
 
@@ -94,6 +101,13 @@ impl DirectoryDigest {
   /// before closing #13112.
   pub fn todo_from_digest(digest: Digest) -> Self {
     Self { digest, tree: None }
+  }
+
+  pub fn from_tree(tree: DigestTrie) -> Self {
+    Self {
+      digest: tree.compute_root_digest(),
+      tree: Some(tree),
+    }
   }
 
   /// Returns the `Digest` for this `DirectoryDigest`.
@@ -145,7 +159,7 @@ impl Deref for Name {
   }
 }
 
-#[derive(DeepSizeOf)]
+#[derive(Clone, DeepSizeOf)]
 pub enum Entry {
   Directory(Directory),
   File(File),
@@ -160,7 +174,7 @@ impl Entry {
   }
 }
 
-#[derive(DeepSizeOf)]
+#[derive(Clone, DeepSizeOf)]
 pub struct Directory {
   name: Name,
   digest: Digest,
@@ -180,6 +194,10 @@ impl Directory {
     }
   }
 
+  pub fn name(&self) -> &str {
+    self.name.as_ref()
+  }
+
   pub fn digest(&self) -> Digest {
     self.digest
   }
@@ -196,7 +214,7 @@ impl Directory {
   }
 }
 
-#[derive(DeepSizeOf)]
+#[derive(Clone, DeepSizeOf)]
 pub struct File {
   name: Name,
   digest: Digest,
@@ -204,6 +222,14 @@ pub struct File {
 }
 
 impl File {
+  pub fn name(&self) -> &str {
+    self.name.as_ref()
+  }
+
+  pub fn digest(&self) -> Digest {
+    self.digest
+  }
+
   pub fn as_remexec_file_node(&self) -> remexec::FileNode {
     remexec::FileNode {
       name: self.name.as_ref().to_owned(),
@@ -425,6 +451,113 @@ impl DigestTrie {
       }
     }
   }
+
+  /// Given DigestTries, merge them recursively into a single DigestTrie.
+  ///
+  /// If a file is present with the same name and contents multiple times, it will appear once.
+  /// If a file is present with the same name, but different contents, an error will be returned.
+  pub fn merge(trees: Vec<DigestTrie>) -> Result<DigestTrie, MergeError> {
+    Self::merge_helper(PathBuf::new(), trees)
+  }
+
+  fn merge_helper(parent_path: PathBuf, trees: Vec<DigestTrie>) -> Result<DigestTrie, MergeError> {
+    if trees.is_empty() {
+      return Ok(EMPTY_DIGEST_TREE.clone());
+    } else if trees.len() == 1 {
+      let mut trees = trees;
+      return Ok(trees.pop().unwrap());
+    }
+
+    // Merge and sort Entries.
+    let input_entries = trees
+      .iter()
+      .map(|tree| tree.entries())
+      .flatten()
+      .sorted_by(|a, b| a.name().cmp(&b.name()));
+
+    // Then group by name, and merge into an output list.
+    let mut entries: Vec<Entry> = Vec::new();
+    for (name, group) in &input_entries.into_iter().group_by(|e| e.name()) {
+      let mut group = group.peekable();
+      let first = group.next().unwrap();
+      if group.peek().is_none() {
+        // There was only one Entry: emit it.
+        entries.push(first.clone());
+        continue;
+      }
+
+      match first {
+        Entry::File(f) => {
+          // If any Entry is a File, then they must all be identical.
+          let (mut mismatched_files, mismatched_dirs) = collisions(f.digest, group);
+          if !mismatched_files.is_empty() || !mismatched_dirs.is_empty() {
+            mismatched_files.push(f);
+            return Err(MergeError::duplicates(
+              parent_path,
+              mismatched_files,
+              mismatched_dirs,
+            ));
+          }
+
+          // All entries matched: emit one copy.
+          entries.push(first.clone());
+        }
+        Entry::Directory(d) => {
+          // If any Entry is a Directory, then they must all be Directories which will be merged.
+          let (mismatched_files, mut mismatched_dirs) = collisions(d.digest, group);
+
+          // If there were any Files, error.
+          if !mismatched_files.is_empty() {
+            mismatched_dirs.push(d);
+            return Err(MergeError::duplicates(
+              parent_path,
+              mismatched_files,
+              mismatched_dirs,
+            ));
+          }
+
+          if mismatched_dirs.is_empty() {
+            // All directories matched: emit one copy.
+            entries.push(first.clone());
+          } else {
+            // Some directories mismatched, so merge all of them into a new entry and emit that.
+            mismatched_dirs.push(d);
+            let merged_tree = Self::merge_helper(
+              parent_path.join(name.as_ref()),
+              mismatched_dirs
+                .into_iter()
+                .map(|d| d.tree.clone())
+                .collect(),
+            )?;
+            entries.push(Entry::Directory(Directory::from_digest_tree(
+              name,
+              merged_tree,
+            )));
+          }
+        }
+      }
+    }
+
+    Ok(DigestTrie(entries.into()))
+  }
+}
+
+pub enum MergeError {
+  Duplicates {
+    parent_path: PathBuf,
+    files: Vec<File>,
+    directories: Vec<Directory>,
+  },
+}
+
+impl MergeError {
+  fn duplicates(parent_path: PathBuf, files: Vec<&File>, directories: Vec<&Directory>) -> Self {
+    MergeError::Duplicates {
+      parent_path,
+      files: files.into_iter().cloned().collect(),
+      directories: directories.into_iter().cloned().collect(),
+    }
+  }
 }
 
 fn paths_of_child_dir(name: Name, paths: Vec<TypedPath>) -> Vec<TypedPath> {
@@ -458,4 +591,21 @@ fn first_path_component_to_name(path: &Path) -> Result<Name, String> {
     .to_str()
     .ok_or_else(|| format!("{:?} is not representable in UTF8", first_path_component))?;
   Ok(Name(Intern::from(name)))
+}
+
+/// Return any entries which did not have the same Digest as the given Entry.
+fn collisions<'a>(
+  digest: Digest,
+  entries: impl Iterator<Item = &'a Entry>,
+) -> (Vec<&'a File>, Vec<&'a Directory>) {
+  let mut mismatched_files = Vec::new();
+  let mut mismatched_dirs = Vec::new();
+  for entry in entries {
+    match entry {
+      Entry::File(other) if other.digest != digest => mismatched_files.push(other),
+      Entry::Directory(other) if other.digest != digest => mismatched_dirs.push(other),
+      _ => (),
+    }
+  }
+  (mismatched_files, mismatched_dirs)
 }
