@@ -40,7 +40,7 @@ class DebianSources(MultipleSourcesField):
                 f"were found: {files_outside_dirs}"
             )
 
-        directory_prefixes = set([PurePath(f).parts[0] for f in files])
+        directory_prefixes = {PurePath(f).parts[0] for f in files}
         if len(directory_prefixes) > 1:
             raise InvalidFieldException(
                 f"The `{self.alias}` field in target `{self.address}` must be paths to "

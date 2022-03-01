@@ -14,19 +14,11 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.engine.fs import CreateDigest, Digest
-from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
-from pants.core.util_rules.archive import TarBinary
+from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths, TarBinary
 from pants.engine.fs import CreateDigest, DigestEntries, FileEntry
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get
-from pants.engine.process import (
-    BinaryPathRequest,
-    BinaryPaths,
-    Process,
-    ProcessCacheScope,
-    ProcessResult,
-)
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
