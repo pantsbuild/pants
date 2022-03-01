@@ -1,15 +1,14 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
-from abc import ABCMeta
-
 import time
 import uuid
+from abc import ABCMeta
 from dataclasses import dataclass
 
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode, TaskId
+from pants.bsp.spec.base import StatusCode, TaskId
 from pants.bsp.spec.compile import CompileParams, CompileReport, CompileResult, CompileTask
 from pants.bsp.spec.task import TaskFinishParams, TaskStartParams
 from pants.build_graph.address import AddressInput
@@ -19,7 +18,6 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import _bsp_rule, collect_rules
 from pants.engine.target import FieldSet, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule, union
-
 
 _logger = logging.getLogger(__name__)
 
@@ -33,6 +31,7 @@ class BSPCompileFieldSet(FieldSet, metaclass=ABCMeta):
 @dataclass(frozen=True)
 class BSPCompileResult:
     """Result of compilation of a target capable of target compilation."""
+
     status: StatusCode
     output_digest: Digest
 
@@ -88,7 +87,9 @@ async def bsp_compile_request(
                 task_id=task_id,
                 event_time=int(time.time() * 1000),
                 status=compile_result.status,
-                data=CompileReport(target=bsp_target_id, origin_id=request.origin_id, errors=0, warnings=0),
+                data=CompileReport(
+                    target=bsp_target_id, origin_id=request.origin_id, errors=0, warnings=0
+                ),
             )
         )
 

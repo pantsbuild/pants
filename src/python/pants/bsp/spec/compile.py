@@ -123,7 +123,11 @@ class CompileReport:
         )
 
     def to_json_dict(self) -> dict[str, Any]:
-        result = {"target": self.target.to_json_dict(), "errors": self.errors, "warnings": self.warnings}
+        result = {
+            "target": self.target.to_json_dict(),
+            "errors": self.errors,
+            "warnings": self.warnings,
+        }
         if self.origin_id is not None:
             result["originId"] = self.origin_id
         if self.time is not None:

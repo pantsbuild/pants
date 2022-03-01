@@ -1,6 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import logging
+import textwrap
 from dataclasses import dataclass
 
 from pants.backend.scala.bsp.spec import (
@@ -26,9 +27,20 @@ from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.build_graph.address import AddressInput
+from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.addresses import Addresses
-from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    Directory,
+    FileContent,
+    MergeDigests,
+    RemovePrefix,
+)
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     CoarsenedTargets,
@@ -170,6 +182,8 @@ class ScalaBSPCompileFieldSet(BSPCompileFieldSet):
 async def bsp_scala_compile_request(
     request: ScalaBSPCompileFieldSet,
     union_membership: UnionMembership,
+    unzip: UnzipBinary,
+    bash: BashBinary,
 ) -> BSPCompileResult:
     coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
 
@@ -193,11 +207,45 @@ async def bsp_scala_compile_request(
     _logger.info(f"exit code = {exit_code}")
     output_digest = EMPTY_DIGEST
     if exit_code == 0:
-        digests = []
+        digests: list[Digest] = []
+        filenames: list[str] = []
         for result in results:
             if result.output:
                 digests.append(result.output.digest)
-        output_digest = await Get(Digest, MergeDigests(digests))
+                filenames.extend(result.output.filenames)
+        jars_digest = await Get(Digest, MergeDigests(digests))
+        input_digest = await Get(Digest, CreateDigest([Directory("__classpath__")]))
+        script_digest = await Get(
+            Digest,
+            CreateDigest(
+                [
+                    FileContent(
+                        "__unpack_jars.sh",
+                        textwrap.dedent(
+                            f"""\
+                for filename in {' '.join(filenames)} ; do
+                  {unzip.path} $filename -d __classpath__
+                done
+                """
+                        ).encode(),
+                        is_executable=True,
+                    )
+                ]
+            ),
+        )
+        input_digest = await Get(Digest, MergeDigests([input_digest, script_digest, jars_digest]))
+        unpack_result = await Get(
+            ProcessResult,
+            Process(
+                argv=[bash.path, "./__unpack_jars.sh"],
+                description="Unpack classpath",
+                input_digest=input_digest,
+                output_directories=["__classpath__"],
+            ),
+        )
+        output_digest = await Get(
+            Digest, RemovePrefix(unpack_result.output_digest, "__classpath__")
+        )
         output_digest = await Get(Digest, AddPrefix(output_digest, "scala/classes"))
 
     return BSPCompileResult(
