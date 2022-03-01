@@ -363,6 +363,10 @@ def test_property_types() -> None:
         dict_opt7 = DictOption("--opt", default=dict(key1=1, key2="str"), help="")
         dyn_dict_opt = DictOption[str]("--opt", lambda cls: cls.default, help="")
 
+        # Specialized Opts
+        skip_opt = SkipOption("fmt")
+        args_opt = ArgsListOption(example="--whatever")
+
     my_subsystem = MySubsystem()
     if TYPE_CHECKING:
         assert_type["str"](my_subsystem.str_opt)
@@ -412,3 +416,6 @@ def test_property_types() -> None:
         assert_type["dict[str, int]"](my_subsystem.dict_opt6)
         assert_type["dict[str, object]"](my_subsystem.dict_opt7)
         assert_type["dict[str, str]"](my_subsystem.dyn_dict_opt)
+
+        assert_type["bool"](my_subsystem.skip_opt)
+        assert_type["tuple[str, ...]"](my_subsystem.args_opt)
