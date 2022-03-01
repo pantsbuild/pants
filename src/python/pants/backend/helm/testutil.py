@@ -1,22 +1,33 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 
 from pants.backend.helm.util_rules.chart import ChartType
 
 
-def gen_chart_file(name: str, *, version: str, type: ChartType = ChartType.APPLICATION) -> str:
-    return dedent(
+def gen_chart_file(
+    name: str,
+    *,
+    version: str,
+    type: ChartType = ChartType.APPLICATION,
+    api_version: str = "v2",
+    icon: str | None = None,
+) -> str:
+    metadata_yaml = dedent(
         f"""\
-    apiVersion: v2
+    apiVersion: {api_version}
     name: {name}
     description: A Helm chart for Kubernetes
     version: {version}
-    icon: https://www.example.com/icon.png
     type: {type.value}
     """
     )
+    if icon:
+        metadata_yaml += f"icon: {icon}\n"
+    return metadata_yaml
 
 
 HELM_CHART_FILE = gen_chart_file("mychart", version="0.1.0")

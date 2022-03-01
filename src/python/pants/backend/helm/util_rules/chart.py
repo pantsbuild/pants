@@ -140,6 +140,8 @@ class HelmChart:
     metadata: HelmChartMetadata
     snapshot: Snapshot
 
+    lint_strict: bool | None
+
     @property
     def path(self) -> str:
         return self.metadata.name
@@ -239,7 +241,12 @@ async def compile_chart_struct(field_set: HelmChartFieldSet) -> HelmChart:
     )
 
     chart_snapshot = await Get(Snapshot, AddPrefix(all_sources, metadata.name))
-    return HelmChart(address=field_set.address, metadata=metadata, snapshot=chart_snapshot)
+    return HelmChart(
+        address=field_set.address,
+        metadata=metadata,
+        snapshot=chart_snapshot,
+        lint_strict=field_set.lint_strict.value,
+    )
 
 
 def rules():

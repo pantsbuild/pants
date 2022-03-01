@@ -50,6 +50,13 @@ class HelmBinary:
             {**local_env, **_build_helm_env(self.cache_dir, self.config_dir, self.data_dir)}
         )
 
+    def lint(self, *, name: str, path: str, digest: Digest, strict: bool | None) -> Process:
+        args = ["lint", path]
+        if strict:
+            args.append("--strict")
+
+        return self._cmd(args, input_digest=digest, description=f"Linting Helm chart: {name}")
+
     def _cmd(
         self,
         args: Iterable[str],

@@ -100,3 +100,4 @@ class HelmChartFieldSet(FieldSet, metaclass=ABCMeta):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
+    lint_strict: HelmChartLintStrictField

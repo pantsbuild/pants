@@ -44,19 +44,24 @@ def rule_runner() -> RuleRunner:
 
 
 chart_type_parameters = [
-    ("foo", "0.1.0", ChartType.APPLICATION),
-    ("bar", "0.2.0", ChartType.LIBRARY),
+    ("foo", "0.1.0", ChartType.APPLICATION, "https://www.example.com/icon.png", False),
+    ("bar", "0.2.0", ChartType.LIBRARY, None, True),
 ]
 
 
-@pytest.mark.parametrize("name, version, type", chart_type_parameters)
+@pytest.mark.parametrize("name, version, type, icon, lint_strict", chart_type_parameters)
 def test_compiles_single_chart_sources(
-    rule_runner: RuleRunner, name: str, version: str, type: ChartType
+    rule_runner: RuleRunner,
+    name: str,
+    version: str,
+    type: ChartType,
+    icon: str | None,
+    lint_strict: bool,
 ) -> None:
     rule_runner.write_files(
         {
-            "BUILD": f"helm_chart(name='{name}')",
-            "Chart.yaml": gen_chart_file(name, version=version, type=type),
+            "BUILD": f"helm_chart(name='{name}', lint_strict={lint_strict})",
+            "Chart.yaml": gen_chart_file(name, version=version, type=type, icon=icon),
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "templates/service.yaml": K8S_SERVICE_FILE,
@@ -71,7 +76,7 @@ def test_compiles_single_chart_sources(
         name=name,
         version=version,
         api_version="v2",
-        icon="https://www.example.com/icon.png",
+        icon=icon,
         description="A Helm chart for Kubernetes",
         type=type,
     )
@@ -80,6 +85,7 @@ def test_compiles_single_chart_sources(
     assert helm_chart.metadata == expected_metadata
     assert len(helm_chart.snapshot.files) == 4
     assert helm_chart.address == address
+    assert helm_chart.lint_strict == lint_strict
 
 
 def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: RuleRunner) -> None:
