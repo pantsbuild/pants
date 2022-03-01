@@ -2,10 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
+use std::fmt::{self, Debug};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use deepsize::{known_deep_size, DeepSizeOf};
 use internment::Intern;
 use itertools::Itertools;
 
@@ -16,17 +18,118 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 use crate::PathStat;
 
-type Name = Intern<String>;
+pub const EMPTY_DIRECTORY_DIGEST: DirectoryDigest = DirectoryDigest {
+  digest: EMPTY_DIGEST,
+  tree: None,
+};
 
+/// A Digest for a directory, optionally with its content stored as a DigestTrie.
+///
+/// If a DirectoryDigest has a DigestTrie reference, then its Digest _might not_ be persisted to
+/// the Store. If the DirectoryDigest does not hold a DigestTrie, then that Digest _must_ have been
+/// persisted to the Store (either locally or remotely). The field thus acts likes a cache in some
+/// cases, but in other cases is an indication that the tree must first be persisted (or loaded)
+/// before the Digest may be operated on.
+#[derive(Clone, DeepSizeOf)]
+pub struct DirectoryDigest {
+  pub digest: Digest,
+  pub tree: Option<DigestTrie>,
+}
+
+impl Eq for DirectoryDigest {}
+
+impl PartialEq for DirectoryDigest {
+  fn eq(&self, other: &Self) -> bool {
+    self.digest == other.digest
+  }
+}
+
+impl Debug for DirectoryDigest {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let tree = if self.tree.is_some() {
+      "Some(..)"
+    } else {
+      "None"
+    };
+    write!(f, "DirectoryDigest({:?}, tree: {})", self.digest, tree)
+  }
+}
+
+impl DirectoryDigest {
+  /// Creates a DirectoryDigest which asserts that the given Digest represents a Directory structure
+  /// which is persisted in a Store.
+  pub fn new(digest: Digest) -> Self {
+    Self { digest, tree: None }
+  }
+
+  pub fn from_path_stats(
+    path_stats: Vec<PathStat>,
+    file_digests: &HashMap<PathBuf, Digest>,
+  ) -> Result<Self, String> {
+    let path_stats = PathStat::normalize_path_stats(path_stats)?;
+    let digest_tree = DigestTrie::from_sorted_paths(
+      PathBuf::new(),
+      path_stats.iter().map(|p| p.into()).collect(),
+      file_digests,
+    );
+    Ok(Self {
+      digest: digest_tree.compute_root_digest(),
+      tree: Some(digest_tree),
+    })
+  }
+
+  /// Returns the digests reachable from this DirectoryDigest.
+  ///
+  /// If this DirectoryDigest has been persisted to disk (i.e., does not have a DigestTrie) then
+  /// this will only include the root.
+  pub fn digests(&self) -> Vec<Digest> {
+    let tree = if let Some(tree) = &self.tree {
+      tree
+    } else {
+      return vec![self.digest];
+    };
+
+    // Walk the tree and collect Digests.
+    let mut digests = Vec::new();
+    digests.push(self.digest);
+    let mut stack = tree.0.iter().collect::<Vec<_>>();
+    while let Some(entry) = stack.pop() {
+      match entry {
+        Entry::Directory(d) => {
+          digests.push(d.digest);
+          stack.extend(d.tree.0.iter());
+        }
+        Entry::File(f) => {
+          digests.push(f.digest);
+        }
+      }
+    }
+    digests
+  }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct Name(Intern<String>);
+known_deep_size!(0; Name);
+
+impl Deref for Name {
+  type Target = Intern<String>;
+
+  fn deref(&self) -> &Intern<String> {
+    &self.0
+  }
+}
+
+#[derive(Clone, DeepSizeOf)]
 enum Entry {
   Directory(Directory),
   File(File),
 }
 
+#[derive(Clone, DeepSizeOf)]
 struct Directory {
   name: Name,
   digest: Digest,
-  #[allow(dead_code)]
   tree: DigestTrie,
 }
 
@@ -36,43 +139,15 @@ impl Directory {
   }
 
   fn from_digest_tree(name: Name, tree: DigestTrie) -> Self {
-    if tree.0.is_empty() {
-      return Self {
-        name,
-        digest: EMPTY_DIGEST,
-        tree,
-      };
+    Self {
+      name,
+      digest: tree.compute_root_digest(),
+      tree,
     }
-
-    let mut files = Vec::new();
-    let mut directories = Vec::new();
-    for entry in &*tree.0 {
-      match entry {
-        Entry::File(f) => files.push(remexec::FileNode {
-          name: f.name.as_ref().to_owned(),
-          digest: Some(f.digest.into()),
-          is_executable: f.is_executable,
-          ..remexec::FileNode::default()
-        }),
-        Entry::Directory(d) => directories.push(remexec::DirectoryNode {
-          name: d.name.as_ref().to_owned(),
-          digest: Some((&d.digest).into()),
-        }),
-      }
-    }
-    let digest = Digest::of_bytes(
-      &remexec::Directory {
-        directories,
-        files,
-        ..remexec::Directory::default()
-      }
-      .to_bytes(),
-    );
-
-    Self { name, digest, tree }
   }
 }
 
+#[derive(Clone, DeepSizeOf)]
 struct File {
   name: Name,
   digest: Digest,
@@ -109,25 +184,14 @@ impl<'a> From<&'a PathStat> for TypedPath<'a> {
   }
 }
 
+#[derive(Clone, DeepSizeOf)]
 pub struct DigestTrie(Arc<[Entry]>);
 
 impl DigestTrie {
-  #[allow(dead_code)]
-  pub fn from_sorted_path_stats(
-    path_stats: &[PathStat],
-    file_digests: &HashMap<&Path, Digest>,
-  ) -> Self {
-    Self::from_sorted_paths(
-      PathBuf::new(),
-      path_stats.iter().map(|p| p.into()).collect(),
-      file_digests,
-    )
-  }
-
   fn from_sorted_paths(
     prefix: PathBuf,
     paths: Vec<TypedPath>,
-    file_digests: &HashMap<&Path, Digest>,
+    file_digests: &HashMap<PathBuf, Digest>,
   ) -> Self {
     let mut entries = Vec::new();
 
@@ -178,6 +242,37 @@ impl DigestTrie {
 
     Self(entries.into())
   }
+
+  fn compute_root_digest(&self) -> Digest {
+    if self.0.is_empty() {
+      return EMPTY_DIGEST;
+    }
+
+    let mut files = Vec::new();
+    let mut directories = Vec::new();
+    for entry in &*self.0 {
+      match entry {
+        Entry::File(f) => files.push(remexec::FileNode {
+          name: f.name.as_ref().to_owned(),
+          digest: Some(f.digest.into()),
+          is_executable: f.is_executable,
+          ..remexec::FileNode::default()
+        }),
+        Entry::Directory(d) => directories.push(remexec::DirectoryNode {
+          name: d.name.as_ref().to_owned(),
+          digest: Some((&d.digest).into()),
+        }),
+      }
+    }
+    Digest::of_bytes(
+      &remexec::Directory {
+        directories,
+        files,
+        ..remexec::Directory::default()
+      }
+      .to_bytes(),
+    )
+  }
 }
 
 fn paths_of_child_dir<'a>(name: &str, paths: Vec<TypedPath<'a>>) -> Vec<TypedPath<'a>> {
@@ -210,5 +305,5 @@ fn path_name_to_name(path: &Path) -> Result<Name, String> {
     .as_os_str()
     .to_str()
     .ok_or_else(|| format!("{:?} is not representable in UTF8", path_name))?;
-  Ok(Intern::from(name))
+  Ok(Name(Intern::from(name)))
 }

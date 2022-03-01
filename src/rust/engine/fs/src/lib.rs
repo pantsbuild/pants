@@ -25,13 +25,14 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+mod directory;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
 #[cfg(test)]
 mod posixfs_tests;
-mod tree;
 
+pub use crate::directory::{DigestTrie, DirectoryDigest, EMPTY_DIRECTORY_DIGEST};
 pub use crate::glob_matching::{
   ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
   SINGLE_STAR_GLOB,

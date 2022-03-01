@@ -1423,7 +1423,7 @@ fn capture_snapshots(
             core.executor.clone(),
             root,
             path_globs,
-            digest_hint,
+            digest_hint.map(|dd| dd.digest),
           )
         })
         .collect::<Vec<_>>();
@@ -1454,6 +1454,7 @@ fn ensure_remote_has_recursive(
       .iter()
       .map(|value| {
         crate::nodes::lift_directory_digest(value)
+          .map(|dd| dd.digest)
           .or_else(|_| crate::nodes::lift_file_digest(value))
       })
       .collect::<Result<Vec<Digest>, _>>()
@@ -1527,7 +1528,7 @@ fn write_digest(
     block_in_place_and_wait(py, || {
       core.store().materialize_directory(
         destination.clone(),
-        lifted_digest,
+        lifted_digest.digest,
         fs::Permissions::Writable,
       )
     })
