@@ -67,6 +67,29 @@ K8S_SERVICE_FILE = dedent(
   """
 )
 
+K8S_INGRESS_FILE_WITH_LINT_WARNINGS = dedent(
+    """\
+  apiVersion: extensions/v1beta1
+  kind: Ingress
+  metadata:
+    name: {{ template "fullname" . }}
+    labels:
+      chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+  spec:
+    rules:
+    - host: example.com
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ template "fullname" . }}
+              port:
+                name: http
+  """
+)
+
 K8S_POD_FILE = dedent(
     """\
   apiVersion: v1
