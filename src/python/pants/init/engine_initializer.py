@@ -291,7 +291,7 @@ class EngineInitializer:
                 # Note: These are necessary because the BSP support is a built-in goal that makes
                 # synchronous requests into the engine.
                 *(
-                    QueryRule(impl.response_type, (impl.request_type,))
+                    QueryRule(impl.response_type, (impl.request_type, Workspace))
                     for impl in union_membership.get(BSPHandlerMapping)
                 ),
                 QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.

@@ -1,37 +1,39 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from dataclasses import dataclass
+import logging
+from abc import ABCMeta
 
 import time
+import uuid
+from dataclasses import dataclass
 
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import StatusCode, TaskId, BuildTargetIdentifier
+from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode, TaskId
 from pants.bsp.spec.compile import CompileParams, CompileReport, CompileResult, CompileTask
-
-# -----------------------------------------------------------------------------------------------
-# Compile Request
-# See https://build-server-protocol.github.io/docs/specification.html#compile-request
-# -----------------------------------------------------------------------------------------------
 from pants.bsp.spec.task import TaskFinishParams, TaskStartParams
-from pants.engine.internals.native_engine import Digest
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import FieldSet
-from pants.engine.unions import UnionRule, union
+from pants.build_graph.address import AddressInput
+from pants.engine.fs import Workspace
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import _bsp_rule, collect_rules
+from pants.engine.target import FieldSet, WrappedTarget
+from pants.engine.unions import UnionMembership, UnionRule, union
+
+
+_logger = logging.getLogger(__name__)
 
 
 @union
 @dataclass(frozen=True)
-class BSPCompileFieldSet(FieldSet):
+class BSPCompileFieldSet(FieldSet, metaclass=ABCMeta):
     """FieldSet used to hook BSP compilation."""
-    bsp_target_id: BuildTargetIdentifier
 
 
 @dataclass(frozen=True)
 class BSPCompileResult:
     """Result of compilation of a target capable of target compilation."""
-
-    bsp_target_id: BuildTargetIdentifier
+    status: StatusCode
     output_digest: Digest
 
 
@@ -41,32 +43,66 @@ class CompileRequestHandlerMapping(BSPHandlerMapping):
     response_type = CompileResult
 
 
-@rule
-async def bsp_compile_request(request: CompileParams, bsp_context: BSPContext) -> CompileResult:
-    origin_id = request.origin_id or "compile-task"
-    for i, target in enumerate(request.targets):
-        task_id = TaskId(id=f"{origin_id}-{i}")
+@_bsp_rule
+async def bsp_compile_request(
+    request: CompileParams,
+    bsp_context: BSPContext,
+    union_membership: UnionMembership,
+    workspace: Workspace,
+) -> CompileResult:
+    compile_field_sets = union_membership.get(BSPCompileFieldSet)
+    compile_results = []
+    for bsp_target_id in request.targets:
+        # TODO: MultiGet these all.
+
+        wrapped_tgt = await Get(WrappedTarget, AddressInput, bsp_target_id.address_input)
+        tgt = wrapped_tgt.target
+        _logger.info(f"tgt = {tgt}")
+        applicable_field_set_impls = []
+        for impl in compile_field_sets:
+            if impl.is_applicable(tgt):
+                applicable_field_set_impls.append(impl)
+        _logger.info(f"applicable_field_sets = {applicable_field_set_impls}")
+        if len(applicable_field_set_impls) == 0:
+            raise ValueError(f"no applicable field set for: {tgt.address}")
+        elif len(applicable_field_set_impls) > 1:
+            raise ValueError(f"ambiguous field set mapping, >1 for: {tgt.address}")
+
+        field_set = applicable_field_set_impls[0].create(tgt)
+
+        task_id = TaskId(id=request.origin_id or uuid.uuid4().hex)
+
         bsp_context.notify_client(
             TaskStartParams(
                 task_id=task_id,
                 event_time=int(time.time() * 1000),
-                data=CompileTask(target=target),
+                data=CompileTask(target=bsp_target_id),
             )
         )
 
-    for i, target in enumerate(request.targets):
-        task_id = TaskId(id=f"{origin_id}-{i}")
+        compile_result = await Get(BSPCompileResult, BSPCompileFieldSet, field_set)
+        compile_results.append(compile_result)
+
         bsp_context.notify_client(
             TaskFinishParams(
                 task_id=task_id,
-                status=StatusCode.ERROR,
-                data=CompileReport(target=target, origin_id=origin_id),
+                event_time=int(time.time() * 1000),
+                status=compile_result.status,
+                data=CompileReport(target=bsp_target_id, origin_id=request.origin_id, errors=0, warnings=0),
             )
         )
 
+    output_digest = await Get(Digest, MergeDigests([r.output_digest for r in compile_results]))
+    if output_digest != EMPTY_DIGEST:
+        workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
+
+    status_code = StatusCode.OK
+    if any(r.status != StatusCode.OK for r in compile_results):
+        status_code = StatusCode.ERROR
+
     return CompileResult(
         origin_id=request.origin_id,
-        status_code=1,
+        status_code=status_code.value,
     )
 
 

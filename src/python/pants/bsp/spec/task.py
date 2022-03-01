@@ -142,7 +142,7 @@ class TaskFinishParams(BSPNotification):
     def to_json_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
             "taskId": self.task_id.to_json_dict(),
-            "statusCode": self.status.value,
+            "status": self.status.value,
         }
         if self.event_time is not None:
             result["eventTime"] = self.event_time

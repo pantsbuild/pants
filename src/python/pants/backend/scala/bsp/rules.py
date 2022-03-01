@@ -1,5 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import logging
 from dataclasses import dataclass
 
 from pants.backend.scala.bsp.spec import (
@@ -15,22 +16,36 @@ from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.build_root import BuildRoot
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
+from pants.bsp.spec.base import (
+    BuildTarget,
+    BuildTargetCapabilities,
+    BuildTargetIdentifier,
+    StatusCode,
+)
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.build_graph.address import AddressInput
 from pants.engine.addresses import Addresses
+from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, Target, WrappedTarget, CoarsenedTargets
-from pants.engine.unions import UnionRule, UnionMembership
-from pants.jvm.compile import FallibleClasspathEntry, ClasspathEntryRequest
+from pants.engine.target import (
+    CoarsenedTargets,
+    Dependencies,
+    DependenciesRequest,
+    Target,
+    WrappedTarget,
+)
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 
 LANGUAGE_ID = "scala"
+
+_logger = logging.getLogger(__name__)
 
 
 class ScalaBSPLanguageSupport(BSPLanguageSupport):
@@ -119,18 +134,15 @@ class HandleScalacOptionsResult:
 async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
-    jvm: JvmSubsystem,
 ) -> HandleScalacOptionsResult:
-    tgt = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
-    resolve = tgt[JvmResolveField].normalized_value(jvm)
+    _ = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
             options=(),
             classpath=(),
-            # TODO: Figure out how to provide a classfiles output directory
-            class_directory=build_root.pathlib_path.joinpath(f".pants.d/bsp/resolves/{resolve}/classes").as_uri(),
+            class_directory=build_root.pathlib_path.joinpath(".pants.d/bsp/scala/classes").as_uri(),
         )
     )
 
@@ -147,16 +159,19 @@ async def bsp_scalac_options_request(request: ScalacOptionsParams) -> ScalacOpti
 # Compile Request
 # -----------------------------------------------------------------------------------------------
 
+
+@dataclass(frozen=True)
 class ScalaBSPCompileFieldSet(BSPCompileFieldSet):
     required_fields = (ScalaSourceField,)
-    sources: ScalaSourceField
+    source: ScalaSourceField
 
 
 @rule
-async def bsp_scala_compile_request(request: ScalaBSPCompileFieldSet, union_membership: UnionMembership) -> BSPCompileResult:
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
-    )
+async def bsp_scala_compile_request(
+    request: ScalaBSPCompileFieldSet,
+    union_membership: UnionMembership,
+) -> BSPCompileResult:
+    coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
 
     # NB: Each root can have an independent resolve, because there is no inherent relation
     # between them other than that they were on the commandline together.
@@ -172,11 +187,23 @@ async def bsp_scala_compile_request(request: ScalaBSPCompileFieldSet, union_memb
         )
         for target, resolve in zip(coarsened_targets, resolves)
     )
+    _logger.info(f"results = {results}")
 
-    # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.
     exit_code = next((result.exit_code for result in results if result.exit_code != 0), 0)
-    return CheckResults([CheckResult(exit_code, "", "")], checker_name=request.name)
+    _logger.info(f"exit code = {exit_code}")
+    output_digest = EMPTY_DIGEST
+    if exit_code == 0:
+        digests = []
+        for result in results:
+            if result.output:
+                digests.append(result.output.digest)
+        output_digest = await Get(Digest, MergeDigests(digests))
+        output_digest = await Get(Digest, AddPrefix(output_digest, "scala/classes"))
 
+    return BSPCompileResult(
+        status=StatusCode.ERROR if exit_code != 0 else StatusCode.OK,
+        output_digest=output_digest,
+    )
 
 
 def rules():
@@ -185,4 +212,5 @@ def rules():
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
         UnionRule(BSPBuildTargetsRequest, ScalaBSPBuildTargetsRequest),
         UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
+        UnionRule(BSPCompileFieldSet, ScalaBSPCompileFieldSet),
     )

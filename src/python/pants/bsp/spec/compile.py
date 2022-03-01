@@ -97,13 +97,13 @@ class CompileReport:
     target: BuildTargetIdentifier
 
     # An optional request id to know the origin of this report.
-    origin_id: str | None = None
+    origin_id: str | None
 
     # The total number of reported errors compiling this target.
-    errors: int | None = None
+    errors: int
 
     # The total number of reported warnings compiling the target.
-    warnings: int | None = None
+    warnings: int
 
     # The total number of milliseconds it took to compile the target.
     time: int | None = None
@@ -116,20 +116,16 @@ class CompileReport:
         return cls(
             target=BuildTargetIdentifier.from_json_dict(d["target"]),
             origin_id=d.get("originId"),
-            errors=d.get("errors"),
-            warnings=d.get("warnings"),
+            errors=d["errors"],
+            warnings=d["warnings"],
             time=d.get("time"),
             no_op=d.get("noOp"),
         )
 
     def to_json_dict(self) -> dict[str, Any]:
-        result = {"target": self.target.to_json_dict()}
+        result = {"target": self.target.to_json_dict(), "errors": self.errors, "warnings": self.warnings}
         if self.origin_id is not None:
             result["originId"] = self.origin_id
-        if self.errors is not None:
-            result["errors"] = self.errors
-        if self.warnings is not None:
-            result["warnings"] = self.warnings
         if self.time is not None:
             result["time"] = self.time
         if self.no_op is not None:
