@@ -77,16 +77,6 @@ class ResolveScalaBSPBuildTargetRequest:
     target: Target
 
 
-@dataclass(frozen=True)
-class ScalacSDKRequest:
-    scala_version: str
-
-
-@dataclass(frozen=True)
-class ScalacSDKResult:
-    scala_build_target: ScalaBuildTarget
-
-
 @rule
 async def bsp_resolve_one_scala_build_target(
     request: ResolveScalaBSPBuildTargetRequest,
@@ -96,10 +86,7 @@ async def bsp_resolve_one_scala_build_target(
     resolve = request.target[JvmResolveField].normalized_value(jvm)
     scala_version = scala.version_for_resolve(resolve)
 
-    dep_addrs, scalac_sdk = await MultiGet(
-        Get(Addresses, DependenciesRequest(request.target[Dependencies])),
-        Get(ScalacSDKResult, ScalacSDKRequest(scala_version)),
-    )
+    dep_addrs = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
 
     return BuildTarget(
         id=BuildTargetIdentifier.from_address(request.target.address),
@@ -112,7 +99,14 @@ async def bsp_resolve_one_scala_build_target(
         language_ids=(LANGUAGE_ID,),
         dependencies=tuple(BuildTargetIdentifier.from_address(dep_addr) for dep_addr in dep_addrs),
         data_kind="scala",
-        data=scalac_sdk.scala_build_target,
+        data=ScalaBuildTarget(
+            scala_organization="unknown",
+            scala_version=".".join(scala_version.split(".")[0:2]),
+            scala_binary_version=scala_version,
+            platform=ScalaPlatform.JVM,
+            # TODO: These are the jars for the scalac tool.
+            jars=(),
+        ),
     )
 
 
@@ -128,38 +122,6 @@ async def bsp_resolve_all_scala_build_targets(
         Get(BuildTarget, ResolveScalaBSPBuildTargetRequest(tgt)) for tgt in all_scala_targets
     )
     return BSPBuildTargets(targets=tuple(build_targets))
-
-
-@rule
-async def resolve_scalac_sdk(request: ScalacSDKRequest) -> ScalacSDKResult:
-    scalac_resolution = await Get(
-        CoursierResolvedLockfile,
-        ArtifactRequirements,
-        ArtifactRequirements.from_coordinates(
-            [
-                Coordinate(
-                    group="org.scala-lang",
-                    artifact="scala-compiler",
-                    version=request.scala_version,
-                ),
-                Coordinate(
-                    group="org.scala-lang",
-                    artifact="scala-library",
-                    version=request.scala_version,
-                ),
-            ]
-        ),
-    )
-
-    scala_build_target = ScalaBuildTarget(
-        scala_organization="unknown",
-        scala_version=".".join(request.scala_version.split(".")[0:2]),
-        scala_binary_version=request.scala_version,
-        platform=ScalaPlatform.JVM,
-        jars=tuple(PurePath(path).as_uri() for path in scalac_resolution.artifact_cache_uris),
-    )
-
-    return ScalacSDKResult(scala_build_target)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -189,6 +151,7 @@ async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
 ) -> HandleScalacOptionsResult:
+    # Verify the target exists by loading it. Exception will be thrown if it does not.
     _ = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
 
     return HandleScalacOptionsResult(
