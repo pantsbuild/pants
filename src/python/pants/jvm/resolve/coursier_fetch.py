@@ -196,6 +196,9 @@ class CoursierResolvedLockfile:
     entries: tuple[CoursierLockfileEntry, ...]
     metadata: JVMLockfileMetadata | None = None
 
+    # File URI paths to Coursier cache for all jars in this resolution.
+    artifact_cache_uris: tuple[str, ...] = ()
+
     @classmethod
     def _coordinate_not_found(cls, key: CoursierResolveKey, coord: Coordinate) -> CoursierError:
         # TODO: After fixing https://github.com/pantsbuild/pants/issues/13496, coordinate matches
@@ -406,6 +409,8 @@ async def coursier_resolve_lockfile(
         )
     )
 
+    artifact_cache_uris = tuple(dep["file"] for dep in report["dependencies"])
+
     first_pass_lockfile = CoursierResolvedLockfile(
         entries=tuple(
             CoursierLockfileEntry(
@@ -420,7 +425,8 @@ async def coursier_resolve_lockfile(
             for dep, file_name, artifact_file_digest in zip(
                 report["dependencies"], artifact_file_names, artifact_file_digests
             )
-        )
+        ),
+        artifact_cache_uris=artifact_cache_uris,
     )
 
     inverted_artifacts = {req.coordinate: req for req in artifact_requirements}
@@ -433,7 +439,7 @@ async def coursier_resolve_lockfile(
             entry = dataclasses.replace(entry, remote_url=req.url, pants_address=address_spec)
         new_entries.append(entry)
 
-    return CoursierResolvedLockfile(entries=tuple(new_entries))
+    return CoursierResolvedLockfile(entries=tuple(new_entries), artifact_cache_uris=first_pass_lockfile.artifact_cache_uris)
 
 
 @rule(desc="Fetch with coursier")

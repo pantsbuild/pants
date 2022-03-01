@@ -3,6 +3,7 @@
 import logging
 import textwrap
 from dataclasses import dataclass
+from pathlib import PurePath
 
 from pants.backend.scala.bsp.spec import (
     ScalaBuildTarget,
@@ -51,6 +52,8 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
+from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -74,6 +77,16 @@ class ResolveScalaBSPBuildTargetRequest:
     target: Target
 
 
+@dataclass(frozen=True)
+class ScalacSDKRequest:
+    scala_version: str
+
+
+@dataclass(frozen=True)
+class ScalacSDKResult:
+    scala_build_target: ScalaBuildTarget
+
+
 @rule
 async def bsp_resolve_one_scala_build_target(
     request: ResolveScalaBSPBuildTargetRequest,
@@ -83,7 +96,10 @@ async def bsp_resolve_one_scala_build_target(
     resolve = request.target[JvmResolveField].normalized_value(jvm)
     scala_version = scala.version_for_resolve(resolve)
 
-    dep_addrs = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
+    dep_addrs, scalac_sdk = await MultiGet(
+        Get(Addresses, DependenciesRequest(request.target[Dependencies])),
+        Get(ScalacSDKResult, ScalacSDKRequest(scala_version)),
+    )
 
     return BuildTarget(
         id=BuildTargetIdentifier.from_address(request.target.address),
@@ -96,13 +112,7 @@ async def bsp_resolve_one_scala_build_target(
         language_ids=(LANGUAGE_ID,),
         dependencies=tuple(BuildTargetIdentifier.from_address(dep_addr) for dep_addr in dep_addrs),
         data_kind="scala",
-        data=ScalaBuildTarget(
-            scala_organization="unknown",
-            scala_version=".".join(scala_version.split(".")[0:2]),
-            scala_binary_version=scala_version,
-            platform=ScalaPlatform.JVM,
-            jars=(),
-        ),
+        data=scalac_sdk.scala_build_target,
     )
 
 
@@ -118,6 +128,38 @@ async def bsp_resolve_all_scala_build_targets(
         Get(BuildTarget, ResolveScalaBSPBuildTargetRequest(tgt)) for tgt in all_scala_targets
     )
     return BSPBuildTargets(targets=tuple(build_targets))
+
+
+@rule
+async def resolve_scalac_sdk(request: ScalacSDKRequest) -> ScalacSDKResult:
+    scalac_resolution = await Get(
+        CoursierResolvedLockfile,
+        ArtifactRequirements,
+        ArtifactRequirements.from_coordinates(
+            [
+                Coordinate(
+                    group="org.scala-lang",
+                    artifact="scala-compiler",
+                    version=request.scala_version,
+                ),
+                Coordinate(
+                    group="org.scala-lang",
+                    artifact="scala-library",
+                    version=request.scala_version,
+                ),
+            ]
+        ),
+    )
+
+    scala_build_target = ScalaBuildTarget(
+        scala_organization="unknown",
+        scala_version=".".join(request.scala_version.split(".")[0:2]),
+        scala_binary_version=request.scala_version,
+        platform=ScalaPlatform.JVM,
+        jars=tuple(PurePath(path).as_uri() for path in scalac_resolution.artifact_cache_uris),
+    )
+
+    return ScalacSDKResult(scala_build_target)
 
 
 # -----------------------------------------------------------------------------------------------
