@@ -218,6 +218,8 @@ class HelmChart:
     metadata: HelmChartMetadata
     snapshot: Snapshot
 
+    lint_strict: bool | None
+
     @property
     def path(self) -> str:
         return self.metadata.name
