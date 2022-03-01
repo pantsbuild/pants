@@ -87,7 +87,6 @@ class RuleType(Enum):
     rule = "rule"
     goal_rule = "goal_rule"
     uncacheable_rule = "_uncacheable_rule"
-    side_effecting_rule = "side_effecting_rule"
 
 
 def _make_rule(
@@ -349,10 +348,6 @@ def goal_rule(*args, **kwargs) -> Callable:
 # until we figure out the implications, and have a handle on the semantics and use-cases.
 def _uncacheable_rule(*args, **kwargs) -> Callable:
     return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
-
-
-def _bsp_rule(*args, **kwargs) -> Callable:
-    return inner_rule(*args, **kwargs, rule_type=RuleType.side_effecting_rule, cacheable=False)
 
 
 class Rule(ABC):

@@ -15,7 +15,7 @@ from pants.build_graph.address import AddressInput
 from pants.engine.fs import Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import _bsp_rule, collect_rules
+from pants.engine.rules import _uncacheable_rule, collect_rules
 from pants.engine.target import FieldSet, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule, union
 
@@ -42,7 +42,7 @@ class CompileRequestHandlerMapping(BSPHandlerMapping):
     response_type = CompileResult
 
 
-@_bsp_rule
+@_uncacheable_rule
 async def bsp_compile_request(
     request: CompileParams,
     bsp_context: BSPContext,
