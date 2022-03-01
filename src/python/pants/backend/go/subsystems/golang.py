@@ -118,34 +118,6 @@ class GoRoot:
     def goarch(self) -> str:
         return self._raw_metadata["GOARCH"]
 
-    def arch_env(self) -> tuple[str, str] | None:
-        """Returns the name and setting of the GOARCH-specific architecture environment variable.
-
-        If the current architecture has no GOARCH-specific variable, returns empty key and value.
-        """
-
-        # See https://github.com/golang/go/blob/21998413ad82655fef1f31316db31e23e0684b21/src/cmd/go/internal/cfg/cfg.go#L261-L312
-        # for the original algorithm.
-        # TODO: It is not clear whether these would ever show up in `go env` output. The Go tool sources actually
-        # have some involved logic for determining the default. Maybe we need to vendor that logic as well?
-        # (although it looks like that code would need to be in Go)
-        if self.goarch == "arm":
-            return "GOARM", self._raw_metadata.get("GOARM", "")
-        elif self.goarch == "386":
-            return "GO386", self._raw_metadata.get("GO386", "")
-        elif self.goarch == "amd64":
-            return "GOAMD64", self._raw_metadata.get("GOAMD64", "")
-        elif self.goarch in ("mips", "mipsle"):
-            return "GOMIPS", self._raw_metadata.get("GOMIPS", "")
-        elif self.goarch in ("mips64", "mips64le"):
-            return "GOMIPS64", self._raw_metadata.get("GOMIPS64", "")
-        elif self.goarch in ("ppc64", "ppc64le"):
-            return "GOPPC64", self._raw_metadata.get("GOPPC64", "")
-        elif self.goarch == "wasm":
-            return "GOWASM", self._raw_metadata.get("GOWASM", "")
-        else:
-            return None
-
 
 @rule(desc="Find Go binary", level=LogLevel.DEBUG)
 async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:

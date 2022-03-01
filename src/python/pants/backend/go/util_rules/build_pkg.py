@@ -404,9 +404,7 @@ async def compute_compile_action_id(
         h.update(
             f"asm {asm_tool_id.tool_id}\n".encode()
         )  # TODO: Add asm flags as per `go`'s algorithm?
-    go_arch_env = goroot.arch_env()
-    if go_arch_env:
-        h.update(f"{go_arch_env[0]}={go_arch_env[1]}\n".encode())
+    # TODO: Add micro-architecture into cache key (e.g., GOAMD64 setting).
     if "GOEXPERIMENT" in goroot._raw_metadata:
         h.update(f"GOEXPERIMENT={goroot._raw_metadata['GOEXPERIMENT']}".encode())
     # TODO: Maybe handle go "magic" env vars: "GOCLOBBERDEADHASH", "GOSSAFUNC", "GOSSADIR", "GOSSAHASH" ?
