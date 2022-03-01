@@ -9,8 +9,7 @@ from typing import Iterable
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import ArgsListOption, BoolOption
-from pants.util.docutil import bin_name
+from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
 
 
 class Shfmt(TemplatedExternalTool):
@@ -35,14 +34,8 @@ class Shfmt(TemplatedExternalTool):
         "linux_x86_64": "linux_amd64",
     }
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use shfmt when running `{bin_name()} fmt` and `{bin_name()} lint`.",
-    )
-    args = ArgsListOption(
-        help="Arguments to pass directly to shfmt, e.g. `--shfmt-args='-i 2'`.'",
-    )
+    skip = SkipOption("fmt", "lint")
+    args = ArgsListOption(example="-i 2")
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,

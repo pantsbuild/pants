@@ -14,8 +14,8 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption
-from pants.util.docutil import bin_name, git_url
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.util.docutil import git_url
 
 
 class Yapf(PythonToolBase):
@@ -34,19 +34,12 @@ class Yapf(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/yapf/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use yapf when running `{bin_name()} fmt` and `{bin_name()} lint`.",
-    )
+    skip = SkipOption("fmt", "lint")
     args = ArgsListOption(
-        help=lambda cls: (
-            "Arguments to pass directly to yapf, e.g. "
-            f'`--{cls.options_scope}-args="--no-local-style"`.\n\n'
-            "Certain arguments, specifically `--recursive`, `--in-place`, and "
-            "`--parallel`, will be ignored because Pants takes care of finding "
-            "all the relevant files and running the formatting in parallel."
-        ),
+        example="--no-local-style",
+        extra_help="Certain arguments, specifically `--recursive`, `--in-place`, and "
+        "`--parallel`, will be ignored because Pants takes care of finding "
+        "all the relevant files and running the formatting in parallel.",
     )
     config = FileOption(
         "--config",

@@ -19,9 +19,7 @@ class Scalatest(JvmToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(
+        example="-t $testname",
         passthrough=True,
-        help=(
-            "Arguments to pass directly to Scalatest, e.g. `-t $testname`. See "
-            "https://www.scalatest.org/user_guide/using_the_runner for supported arguments."
-        ),
+        extra_help="See https://www.scalatest.org/user_guide/using_the_runner for supported arguments.",
     )

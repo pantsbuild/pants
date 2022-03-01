@@ -18,13 +18,14 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption
-from pants.util.docutil import bin_name, git_url
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
 
 class Black(PythonToolBase):
     options_scope = "black"
+    name = "Black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
     default_version = "black==22.1.0"
@@ -39,17 +40,8 @@ class Black(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
     default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use Black when running `{bin_name()} fmt` and `{bin_name()} lint`",
-    )
-    args = ArgsListOption(
-        help=lambda cls: (
-            "Arguments to pass directly to Black, e.g. "
-            f'`--{cls.options_scope}-args="--target-version=py37 --quiet"`'
-        ),
-    )
+    skip = SkipOption("fmt", "lint")
+    args = ArgsListOption(example="--target-version=py37 --quiet")
     config = FileOption(
         "--config",
         default=None,

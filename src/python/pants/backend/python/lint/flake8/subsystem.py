@@ -39,8 +39,14 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, TargetListOption
-from pants.util.docutil import bin_name, doc_url, git_url
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    FileOption,
+    SkipOption,
+    TargetListOption,
+)
+from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -69,17 +75,8 @@ class Flake8(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/flake8/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use Flake8 when running `{bin_name()} lint`",
-    )
-    args = ArgsListOption(
-        help=lambda cls: (
-            "Arguments to pass directly to Flake8, e.g. "
-            f'`--{cls.options_scope}-args="--ignore E123,W456 --enable-extensions H111"`'
-        ),
-    )
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="--ignore E123,W456 --enable-extensions H111")
     config = FileOption(
         "--config",
         default=None,

@@ -5,13 +5,12 @@ from __future__ import annotations
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption
-from pants.util.docutil import bin_name
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 
 
 class Hadolint(TemplatedExternalTool):
     options_scope = "hadolint"
-    name = "hadolint"
+    name = "Hadolint"
     help = "A linter for Dockerfiles."
 
     default_version = "v2.8.0"
@@ -31,14 +30,8 @@ class Hadolint(TemplatedExternalTool):
         "linux_x86_64": "Linux-x86_64",
     }
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use Hadolint when running `{bin_name()} lint`.",
-    )
-    args = ArgsListOption(
-        help=("Arguments to pass directly to Hadolint, e.g. `--hadolint-args='--format json'`.'"),
-    )
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="--format json")
     config = FileOption(
         "--config",
         default=None,

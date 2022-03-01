@@ -14,8 +14,8 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileListOption
-from pants.util.docutil import bin_name, git_url
+from pants.option.option_types import ArgsListOption, BoolOption, FileListOption, SkipOption
+from pants.util.docutil import git_url
 
 
 class Isort(PythonToolBase):
@@ -33,17 +33,8 @@ class Isort(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/isort/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use isort when running `{bin_name()} fmt` and `{bin_name()} lint`.",
-    )
-    args = ArgsListOption(
-        help=lambda cls: (
-            "Arguments to pass directly to isort, e.g. "
-            f'`--{cls.options_scope}-args="--case-sensitive --trailing-comma"`.'
-        ),
-    )
+    skip = SkipOption("fmt", "lint")
+    args = ArgsListOption(example="--case-sensitive --trailing-comma")
     config = FileListOption(
         "--config",
         # TODO: Figure out how to deprecate this being a list in favor of a single string.
