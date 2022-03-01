@@ -195,7 +195,7 @@ async def handle_bsp_scalac_options_request(
         ScalacOptionsItem(
             target=request.bsp_target_id,
             options=(),
-            classpath=(),
+            classpath=(build_root.pathlib_path.joinpath(".pants.d/bsp/scala/classes").as_uri(),),
             class_directory=build_root.pathlib_path.joinpath(".pants.d/bsp/scala/classes").as_uri(),
         )
     )
