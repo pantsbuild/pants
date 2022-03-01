@@ -215,7 +215,7 @@ async def lint(
     file_requests = tuple(
         request_type(specs_snapshot.snapshot.files)
         for request_type in file_request_types
-        if request_type.name in specified_names
+        if request_type.name in specified_names and specs_snapshot.snapshot.files
     )
 
     def address_str(fs: FieldSet) -> str:
