@@ -407,8 +407,8 @@ async def compute_compile_action_id(
     go_arch_env = goroot.arch_env()
     if go_arch_env:
         h.update(f"{go_arch_env[0]}={go_arch_env[1]}\n".encode())
-    if "GOEXPERIMENT" in goroot.raw_metadata:
-        h.update(f"GOEXPERIMENT={goroot.raw_metadata['GOEXPERIMENT']}".encode())
+    if "GOEXPERIMENT" in goroot._raw_metadata:
+        h.update(f"GOEXPERIMENT={goroot._raw_metadata['GOEXPERIMENT']}".encode())
     # TODO: Maybe handle go "magic" env vars: "GOCLOBBERDEADHASH", "GOSSAFUNC", "GOSSADIR", "GOSSAHASH" ?
     # TODO: Handle GSHS_LOGFILE compiler debug option by breaking cache?
 

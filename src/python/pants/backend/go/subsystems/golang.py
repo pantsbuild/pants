@@ -87,7 +87,7 @@ class GoRoot:
     path: str
     version: str
 
-    raw_metadata: FrozenDict[str, str]
+    _raw_metadata: FrozenDict[str, str]
 
     def is_compatible_version(self, version: str) -> bool:
         """Can this Go compiler handle the target version?
@@ -108,15 +108,15 @@ class GoRoot:
 
     @property
     def full_version(self) -> str:
-        return self.raw_metadata["GOVERSION"]
+        return self._raw_metadata["GOVERSION"]
 
     @property
     def goos(self) -> str:
-        return self.raw_metadata["GOOS"]
+        return self._raw_metadata["GOOS"]
 
     @property
     def goarch(self) -> str:
-        return self.raw_metadata["GOARCH"]
+        return self._raw_metadata["GOARCH"]
 
     def arch_env(self) -> tuple[str, str] | None:
         """Returns the name and setting of the GOARCH-specific architecture environment variable.
@@ -130,19 +130,19 @@ class GoRoot:
         # have some involved logic for determining the default. Maybe we need to vendor that logic as well?
         # (although it looks like that code would need to be in Go)
         if self.goarch == "arm":
-            return "GOARM", self.raw_metadata.get("GOARM", "")
+            return "GOARM", self._raw_metadata.get("GOARM", "")
         elif self.goarch == "386":
-            return "GO386", self.raw_metadata.get("GO386", "")
+            return "GO386", self._raw_metadata.get("GO386", "")
         elif self.goarch == "amd64":
-            return "GOAMD64", self.raw_metadata.get("GOAMD64", "")
+            return "GOAMD64", self._raw_metadata.get("GOAMD64", "")
         elif self.goarch in ("mips", "mipsle"):
-            return "GOMIPS", self.raw_metadata.get("GOMIPS", "")
+            return "GOMIPS", self._raw_metadata.get("GOMIPS", "")
         elif self.goarch in ("mips64", "mips64le"):
-            return "GOMIPS64", self.raw_metadata.get("GOMIPS64", "")
+            return "GOMIPS64", self._raw_metadata.get("GOMIPS64", "")
         elif self.goarch in ("ppc64", "ppc64le"):
-            return "GOPPC64", self.raw_metadata.get("GOPPC64", "")
+            return "GOPPC64", self._raw_metadata.get("GOPPC64", "")
         elif self.goarch == "wasm":
-            return "GOWASM", self.raw_metadata.get("GOWASM", "")
+            return "GOWASM", self._raw_metadata.get("GOWASM", "")
         else:
             return None
 
@@ -212,7 +212,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
             )
             sdk_metadata = json.loads(env_result.stdout.decode())
             return GoRoot(
-                path=sdk_metadata["GOROOT"], version=version, raw_metadata=FrozenDict(sdk_metadata)
+                path=sdk_metadata["GOROOT"], version=version, _raw_metadata=FrozenDict(sdk_metadata)
             )
 
         logger.debug(
