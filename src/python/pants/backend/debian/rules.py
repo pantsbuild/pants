@@ -79,15 +79,17 @@ async def package_debian_package(
             cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
-    files = await Get(DigestEntries, Digest, result.output_digest)
-
     # the output Debian package file needs to be renamed to match the name field in the
     # debian_package target declaration
     output_filename = field_set.output_path.value_or_default(
         file_ending="deb",
     )
-    file_of_interest = [f for f in files if isinstance(f, FileEntry)][0]
-    new_file = FileEntry(path=output_filename, file_digest=file_of_interest.file_digest)
+    digest_entries = await Get(DigestEntries, Digest, result.output_digest)
+    assert len(digest_entries) == 1
+    result_file_entry = digest_entries[0]
+    assert isinstance(result_file_entry, FileEntry)
+    new_file = FileEntry(output_filename, result_file_entry.file_digest)
+
     final_result = await Get(Digest, CreateDigest([new_file]))
     return BuiltPackage(final_result, artifacts=(BuiltPackageArtifact(output_filename),))
 
