@@ -59,3 +59,23 @@ def test_collects_resource_sources_dependencies(rule_runner: RuleRunner) -> None
     )
 
     assert "xml_file.xml" in source_files.snapshot.files
+
+
+def test_skip_collecting_metadata_file(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": """helm_chart(name='mychart')""",
+            "Chart.yaml": HELM_CHART_FILE,
+            "values.yaml": HELM_VALUES_FILE,
+            "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "templates/service.yaml": K8S_SERVICE_FILE,
+        }
+    )
+
+    address = Address("", target_name="mychart")
+    tgt = rule_runner.get_target(address)
+    source_files = rule_runner.request(
+        HelmChartSourceFiles, [HelmChartSourceFilesRequest.create(tgt, include_metadata=False)]
+    )
+
+    assert "Chart.yaml" not in source_files.snapshot.files
