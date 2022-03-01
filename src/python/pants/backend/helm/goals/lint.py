@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartLintStrictField
 from pants.backend.helm.util_rules.chart import HelmChart
-from pants.backend.helm.util_rules.tool import HelmBinary
+from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.build_graph.address import Address
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
@@ -33,9 +33,7 @@ class HelmLintRequest(LintTargetsRequest):
 
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
-async def run_helm_lint(
-    request: HelmLintRequest, helm_subsystem: HelmSubsystem, helm_binary: HelmBinary
-) -> LintResults:
+async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem) -> LintResults:
     chart_targets = await MultiGet(
         Get(WrappedTarget, Address, field_set.address) for field_set in request.field_sets
     )
@@ -45,16 +43,24 @@ async def run_helm_lint(
     )
     logger.debug(f"Linting {pluralize(len(charts), 'chart')}...")
 
+    def create_process(chart: HelmChart) -> HelmProcess:
+        argv = ["lint", chart.path]
+
+        strict = chart.lint_strict or helm_subsystem.lint_strict
+        if strict:
+            argv.append("--strict")
+
+        return HelmProcess(
+            argv,
+            input_digest=chart.snapshot.digest,
+            description=f"Linting chart: {chart.metadata.name}",
+        )
+
     process_results = await MultiGet(
         Get(
             FallibleProcessResult,
-            Process,
-            helm_binary.lint(
-                name=chart.metadata.name,
-                path=chart.path,
-                digest=chart.snapshot.digest,
-                strict=chart.lint_strict or helm_subsystem.lint_strict,
-            ),
+            HelmProcess,
+            create_process(chart),
         )
         for chart in charts
     )

@@ -3,13 +3,14 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, RemovePrefix
+from pants.engine.fs import CreateDigest, Digest, Directory, RemovePrefix
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -24,60 +25,53 @@ class HelmBinary:
     path: str
 
     env: FrozenDict[str, str]
-
-    cache_dir: str
-    config_dir: str
-    data_dir: str
-
-    _setup_digests: FrozenDict[str, Digest]
+    immutable_input_digests: FrozenDict[str, Digest]
 
     def __init__(
         self,
         path: str,
         *,
-        cache_dir: str,
-        config_dir: str,
-        data_dir: str,
+        helm_env: Mapping[str, str],
         local_env: Mapping[str, str],
-        setup_digests: Mapping[str, Digest],
+        immutable_input_digests: Mapping[str, Digest],
     ) -> None:
         self.path = path
-        self.cache_dir = cache_dir
-        self.config_dir = config_dir
-        self.data_dir = data_dir
-        self._setup_digests = FrozenDict(setup_digests)
-        self.env = FrozenDict(
-            {**local_env, **_build_helm_env(self.cache_dir, self.config_dir, self.data_dir)}
-        )
+        self.immutable_input_digests = FrozenDict(immutable_input_digests)
+        self.env = FrozenDict({**helm_env, **local_env})
 
-    def lint(self, *, name: str, path: str, digest: Digest, strict: bool | None) -> Process:
-        args = ["lint", path]
-        if strict:
-            args.append("--strict")
 
-        return self._cmd(args, input_digest=digest, description=f"Linting Helm chart: {name}")
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class HelmProcess:
+    argv: tuple[str, ...]
+    input_digest: Digest
+    description: str = dataclasses.field(compare=False)
+    level: LogLevel
+    extra_env: FrozenDict[str, str]
+    extra_immutable_input_digests: FrozenDict[str, Digest]
+    cache_scope: ProcessCacheScope | None
+    output_directories: tuple[str, ...]
 
-    def _cmd(
+    def __init__(
         self,
-        args: Iterable[str],
+        argv: Iterable[str],
         *,
+        input_digest: Digest,
         description: str,
-        level: LogLevel = LogLevel.DEBUG,
-        input_digest: Digest = EMPTY_DIGEST,
-        immutable_input_digests: Mapping[str, Digest] = {},
-        output_directories: Iterable[str] = (),
-        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
-    ) -> Process:
-        return Process(
-            [self.path, *args],
-            env=self.env,
-            description=description,
-            level=level,
-            input_digest=input_digest,
-            output_directories=output_directories,
-            immutable_input_digests={**self._setup_digests, **immutable_input_digests},
-            cache_scope=cache_scope,
-        )
+        level: LogLevel = LogLevel.INFO,
+        output_directories: Iterable[str] | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        extra_immutable_input_digests: Mapping[str, Digest] | None = None,
+        cache_scope: ProcessCacheScope | None = None,
+    ):
+        self.argv = tuple(argv)
+        self.input_digest = input_digest
+        self.description = description
+        self.level = level
+        self.output_directories = tuple(output_directories or ())
+        self.extra_env = FrozenDict(extra_env or {})
+        self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
+        self.cache_scope = cache_scope
 
 
 def _build_helm_env(cache_dir: str, config_dir: str, data_dir: str) -> FrozenDict[str, str]:
@@ -90,8 +84,8 @@ def _build_helm_env(cache_dir: str, config_dir: str, data_dir: str) -> FrozenDic
     )
 
 
-@rule(desc="Setup Helm binary", level=LogLevel.DEBUG)
-async def setup_helm_binary(helm_subsytem: HelmSubsystem) -> HelmBinary:
+@rule(desc="Download and configure Helm", level=LogLevel.DEBUG)
+async def setup_helm(helm_subsytem: HelmSubsystem) -> HelmBinary:
     cache_dir = "__cache"
     config_dir = "__config"
     data_dir = "__data"
@@ -108,6 +102,7 @@ async def setup_helm_binary(helm_subsytem: HelmSubsystem) -> HelmBinary:
     tool_relpath = "__helm"
     immutable_input_digests = {tool_relpath: downloaded_binary.digest}
     helm_path = f"{tool_relpath}/{downloaded_binary.exe}"
+    helm_env = _build_helm_env(cache_dir, config_dir, data_dir)
 
     # TODO Install Global Helm plugins
     # TODO Configure Helm classic repositories
@@ -128,11 +123,30 @@ async def setup_helm_binary(helm_subsytem: HelmSubsystem) -> HelmBinary:
     local_env = await Get(Environment, EnvironmentRequest(["HOME", "PATH"]))
     return HelmBinary(
         path=helm_path,
-        cache_dir=cache_dir,
-        config_dir=config_dir,
-        data_dir=data_dir,
+        helm_env=helm_env,
         local_env=local_env,
-        setup_digests=setup_immutable_digests,
+        immutable_input_digests=setup_immutable_digests,
+    )
+
+
+@rule
+def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
+    env = {**helm_binary.env, **request.extra_env}
+
+    immutable_input_digests = {
+        **helm_binary.immutable_input_digests,
+        **request.extra_immutable_input_digests,
+    }
+
+    return Process(
+        [helm_binary.path, *request.argv],
+        input_digest=request.input_digest,
+        immutable_input_digests=immutable_input_digests,
+        env=env,
+        description=request.description,
+        level=request.level,
+        output_directories=request.output_directories,
+        cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 
 
