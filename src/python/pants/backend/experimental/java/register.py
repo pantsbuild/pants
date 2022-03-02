@@ -17,8 +17,9 @@ from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.goals import lockfile
 from pants.jvm.package import deploy_jar
+from pants.jvm.package.war import rules as war_rules
 from pants.jvm.resolve import coursier_fetch, jvm_tool
-from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget
+from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
 from pants.jvm.test import junit
 
 
@@ -30,6 +31,7 @@ def target_types():
         JunitTestTarget,
         JunitTestsGeneratorTarget,
         JvmArtifactTarget,
+        JvmWarTarget,
     ]
 
 
@@ -53,4 +55,5 @@ def rules():
         *target_types_rules(),
         *jvm_tool.rules(),
         *run_deploy_jar.rules(),
+        *war_rules(),
     ]
