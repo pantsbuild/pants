@@ -18,7 +18,6 @@ backend_packages.add = [
   "pants.backend.docker",
   "pants.backend.docker.lint.hadolint",
   "pants.backend.experimental.go",
-  "pants.backend.experimental.codegen.protobuf.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.java.lint.google_java_format",
   "pants.backend.experimental.java.debug_goals",
