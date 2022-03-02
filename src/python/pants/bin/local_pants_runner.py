@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 import sys
-from collections import Counter
 from dataclasses import dataclass
 
 from pants.base.build_environment import get_buildroot
@@ -37,7 +36,6 @@ from pants.option.global_options import (
 )
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.util.collections import deep_getsizeof
 from pants.util.contextutil import maybe_profiled
 
 logger = logging.getLogger(__name__)
@@ -206,32 +204,6 @@ class LocalPantsRunner:
     def _finish_run(self, code: ExitCode) -> None:
         """Cleans up the run tracker."""
 
-    def _maybe_report_memory_summary(self) -> None:
-        global_options = self.options.for_global_scope()
-        if not global_options.memory_summary:
-            return
-
-        ids: set[int] = set()
-        count_by_type: Counter[type] = Counter()
-        sizes_by_type: Counter[type] = Counter()
-
-        items, rust_sizes = self.graph_session.scheduler_session.live_items()
-        for item in items:
-            count_by_type[type(item)] += 1
-            sizes_by_type[type(item)] += deep_getsizeof(item, ids)
-
-        entries = [
-            (size, count_by_type[typ], f"{typ.__module__}.{typ.__qualname__}")
-            for typ, size in sizes_by_type.items()
-        ]
-        entries.extend(
-            (size, count, f"(native) {name}") for name, (count, size) in rust_sizes.items()
-        )
-
-        print("Memory summary:", file=sys.stderr)
-        for size, count, name in sorted(entries):
-            print(f"{size}\t\t{count}\t\t{name}", file=sys.stderr)
-
     def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
         # a per-run instance of each WorkunitsCallback.
@@ -294,7 +266,6 @@ class LocalPantsRunner:
                 try:
                     engine_result = self._run_inner()
                 finally:
-                    self._maybe_report_memory_summary()
                     metrics = self.graph_session.scheduler_session.metrics()
                     self.run_tracker.set_pantsd_scheduler_metrics(metrics)
                     self.run_tracker.end_run(engine_result)
