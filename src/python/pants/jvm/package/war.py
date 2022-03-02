@@ -16,6 +16,7 @@ from pants.core.goals.package import (
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
@@ -28,7 +29,7 @@ from pants.engine.fs import (
     MergeDigests,
 )
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
