@@ -18,7 +18,7 @@ from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
 from pants.engine.fs import CreateDigest, DigestEntries, FileEntry
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get
-from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
@@ -51,8 +51,8 @@ async def package_debian_package(
 
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.sources_dir))
 
-    # since all the sources are coming only from a single directory, it is
-    # safe to pick an arbitrary file and get its root directory name
+    # Since all the sources are coming only from a single directory, it is
+    # safe to pick an arbitrary file and get its root directory name.
     sources_directory_name = PurePath(hydrated_sources.snapshot.files[0]).parts[0]
 
     result = await Get(
@@ -68,11 +68,9 @@ async def package_debian_package(
             # dpkg-deb produces a file with the same name as the input directory
             output_files=(f"{sources_directory_name}.deb",),
             env={"PATH": str(PurePath(tar_binary_path.path).parent)},
-            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
-    # the output Debian package file needs to be renamed to match the name field in the
-    # debian_package target declaration
+    # The output Debian package file needs to be renamed to match the output_path field.
     output_filename = field_set.output_path.value_or_default(
         file_ending="deb",
     )

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
 import subprocess
+import sys
 from textwrap import dedent
 
 import pytest
@@ -12,8 +13,6 @@ from pants.backend.debian.target_types import DebianPackage
 from pants.backend.python import target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.util_rules import source_files
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
@@ -24,9 +23,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *debian_rules(),
-            *source_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(SourceFiles, (SourceFilesRequest,)),
             QueryRule(BuiltPackage, (DebianPackageFieldSet,)),
         ],
         target_types=[DebianPackage],
@@ -40,6 +37,7 @@ def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackag
     return result
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="Test requires dpkg so only works on Linux")
 def test_create_debian_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -66,11 +64,7 @@ def test_create_debian_package(rule_runner: RuleRunner) -> None:
             Description: A sample Debian package built with Pants.
             """
             ),
-            "project/opt/company/platform.conf": dedent(
-                """
-            Some configuration.
-            """
-            ),
+            "project/opt/company/platform.conf": "Some configuration.",
         }
     )
 
@@ -79,11 +73,10 @@ def test_create_debian_package(rule_runner: RuleRunner) -> None:
     assert len(built_package.artifacts) == 1
     assert built_package.artifacts[0].relpath == "sample-debian-package.deb"
 
-    # list the contents of a Debian package to see that a file was included
+    # List the contents of a Debian package to see that a file was included.
     result = subprocess.run(
         ["dpkg", "-c", os.path.join(rule_runner.build_root, "sample-debian-package.deb")],
         stdout=subprocess.PIPE,
     )
     assert result.returncode == 0
     assert b"opt/company/platform.conf" in result.stdout
-    return

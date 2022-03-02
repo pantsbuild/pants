@@ -19,9 +19,11 @@ from pants.util.docutil import bin_name, doc_url
 class DebianSources(MultipleSourcesField):
     required = True
     help = (
-        "Paths that will be included in the package to be produced."
-        "It is required to include a Debian control file.\n\n"
-        "Paths are relative to the BUILD file's directory."
+        "Paths that will be included in the package to be produced such as Debian metadata files. "
+        "You must include a DEBIAN/control file.\n\n"
+        "Paths are relative to the BUILD file's directory and all paths must belong to the same parent directory. "
+        "For example, `sources=['dir/**']` is valid, but `sources=['top_level_file.txt']` "
+        "and `sources=['dir1/*', 'dir2/*']` are not."
     )
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
