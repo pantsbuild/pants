@@ -77,7 +77,7 @@ jobs:
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''pants/3rdparty/python/**'',
+        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
           ''pants.toml'') }}
 
           '
@@ -232,7 +232,7 @@ jobs:
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''pants/3rdparty/python/**'',
+        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
           ''pants.toml'') }}
 
           '
@@ -331,7 +331,7 @@ jobs:
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''pants/3rdparty/python/**'',
+        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
           ''pants.toml'') }}
 
           '
@@ -420,7 +420,7 @@ jobs:
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''pants/3rdparty/python/**'',
+        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
           ''pants.toml'') }}
 
           '
@@ -503,7 +503,7 @@ jobs:
     - name: Cache Pants Virtualenv
       uses: actions/cache@v2
       with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''pants/3rdparty/python/**'',
+        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
           ''pants.toml'') }}
 
           '
