@@ -19,6 +19,7 @@ from pants.engine.target import (
     InvalidTargetException,
     OptionalSingleSourceField,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -258,4 +259,43 @@ class DeployJarTarget(Target):
         "A `jar` file with first and third-party code bundled for deploys.\n\n"
         "The JAR will contain class files for both first-party code and "
         "third-party dependencies, all in a common directory structure."
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `jvm_war` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class JvmWarDependenciesField(Dependencies):
+    pass
+
+
+class JvmWarDescriptorAddressField(SingleSourceField):
+    alias = "descriptor"
+    default = "web.xml"
+    help = "Path to a file containing the descriptor (i.e., web.xml) for this WAR file. Defaults to `web.xml`."
+
+
+class JvmWarContentField(SpecialCasedDependencies):
+    alias = "content"
+    help = (
+        "A list of addresses to `resources` and `files` targets with content to place in the "
+        "document root of this WAR file."
+    )
+
+
+class JvmWarTarget(Target):
+    alias = "jvm_war"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JvmResolveField,
+        JvmWarContentField,
+        JvmWarDependenciesField,
+        JvmWarDescriptorAddressField,
+        OutputPathField,
+    )
+    help = (
+        'A JSR 154 "web application archive" (or "war") with first-party and third-party code bundled for '
+        "deploys in Java Servlet containers."
     )
