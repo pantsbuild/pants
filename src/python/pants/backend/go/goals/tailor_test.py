@@ -76,9 +76,12 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
             "unowned/f1.go": "",
             "owned/f.go": "",
             "owned/BUILD": "go_package()",
-            # Any `.go` files under a `testdata` folder should be ignored.
+            # Any `.go` files under a `testdata` or `vendor` folder should be ignored.
             "unowned/testdata/f.go": "",
             "unowned/testdata/subdir/f.go": "",
+            "unowned/vendor/example.com/foo/bar.go": "",
+            # Except if `vendor` is the last directory.
+            "unowned/cmd/vendor/main.go": "",
         }
     )
     putative_targets = rule_runner.request(
@@ -95,7 +98,13 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
                 path="unowned",
                 name=None,
                 triggering_sources=["f.go", "f1.go"],
-            )
+            ),
+            PutativeTarget.for_target_type(
+                GoPackageTarget,
+                path="unowned/cmd/vendor",
+                name=None,
+                triggering_sources=["main.go"],
+            ),
         ]
     )
 

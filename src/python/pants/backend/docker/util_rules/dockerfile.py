@@ -35,8 +35,8 @@ async def hydrate_dockerfile(request: GenerateDockerfileRequest) -> GeneratedSou
     if not (instructions or request.protocol_sources.files):
         raise InvalidFieldException(
             f"The `{target.alias}` {address} does not specify any Dockerfile.\n\n"
-            "Provide either the filename to a Dockerfile in your project workspace as the "
-            "`source` field value, or the Dockerfile content to the `instructions` field."
+            "Provide either the filename to a Dockerfile in your workspace as the `source` field "
+            "value, or the Dockerfile content to the `instructions` field."
         )
 
     def dockerfile_path():

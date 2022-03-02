@@ -9,14 +9,14 @@
 #     "CPython>=3.7"
 #   ],
 #   "generated_with_requirements": [
-#     "pyupgrade<2.30,>=2.29.0"
+#     "pyupgrade<2.32,>=2.31.0"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
 
-pyupgrade==2.29.1; python_full_version >= "3.6.1" \
-    --hash=sha256:1d3f03d14652caacd6f3d464696e103ef33578531a5c1b995be3821b14b811b7 \
-    --hash=sha256:737e02bed0de70247df5d2a0c3edba6b4529adf44f5ef588ecda4a69f14bf694
+pyupgrade==2.31.0; python_full_version >= "3.6.1" \
+    --hash=sha256:0a62c5055f854d7f36e155b7ee8920561bf0399c53edd975cf02436eef8937fc \
+    --hash=sha256:80e2308cae2b11c3fdd091137495d99abf7e0cd98b501aa5758974991497c24c
 tokenize-rt==4.2.1; python_full_version >= "3.6.1" \
     --hash=sha256:08a27fa032a81cf45e8858d0ac706004fcd523e8463415ddf1442be38e204ea8 \
     --hash=sha256:0d4f69026fed520f8a1e0103aa36c406ef4661417f20ca643f913e33531b3b94

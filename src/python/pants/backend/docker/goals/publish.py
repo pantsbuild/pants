@@ -10,7 +10,7 @@ from typing import cast
 
 from pants.backend.docker.goals.package_image import BuiltDockerImage
 from pants.backend.docker.subsystems.docker_options import DockerOptions
-from pants.backend.docker.target_types import DockerRegistriesField, DockerSkipPushField
+from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSkipPushField
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.publish import (
     PublishFieldSet,
@@ -33,10 +33,10 @@ class PublishDockerImageRequest(PublishRequest):
 @dataclass(frozen=True)
 class PublishDockerImageFieldSet(PublishFieldSet):
     publish_request_type = PublishDockerImageRequest
-    required_fields = (DockerRegistriesField,)
+    required_fields = (DockerImageRegistriesField,)
 
-    registries: DockerRegistriesField
-    skip_push: DockerSkipPushField
+    registries: DockerImageRegistriesField
+    skip_push: DockerImageSkipPushField
 
     def get_output_data(self) -> PublishOutputData:
         return PublishOutputData(

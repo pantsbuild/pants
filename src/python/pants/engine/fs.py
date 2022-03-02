@@ -16,29 +16,17 @@ from pants.engine.internals.native_engine import (  # noqa: F401
     EMPTY_FILE_DIGEST as EMPTY_FILE_DIGEST,
 )
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT as EMPTY_SNAPSHOT  # noqa: F401
-from pants.engine.internals.native_engine import (
-    PyAddPrefix,
-    PyDigest,
-    PyFileDigest,
-    PyMergeDigests,
-    PyRemovePrefix,
-    PySnapshot,
-)
+from pants.engine.internals.native_engine import AddPrefix as AddPrefix
+from pants.engine.internals.native_engine import Digest as Digest
+from pants.engine.internals.native_engine import FileDigest as FileDigest
+from pants.engine.internals.native_engine import MergeDigests as MergeDigests
+from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
+from pants.engine.internals.native_engine import Snapshot as Snapshot
 from pants.engine.rules import QueryRule
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
-
-
-# Re-export. Note that because we rename the symbol, MyPy requires defining an alias like this,
-# rather than simply using `from mod import Bar as Baz`.
-Digest = PyDigest
-FileDigest = PyFileDigest
-Snapshot = PySnapshot
-MergeDigests = PyMergeDigests
-AddPrefix = PyAddPrefix
-RemovePrefix = PyRemovePrefix
 
 
 @dataclass(frozen=True)
@@ -99,7 +87,13 @@ class Directory:
 
 
 class DigestContents(Collection[FileContent]):
-    """The file contents of a Digest."""
+    """The file contents of a Digest.
+
+    Although the contents of the Digest are not memoized across `@rules` or across runs (each
+    request for `DigestContents` will load the file content from disk), this API should still
+    generally only be used for small inputs, since concurrency might mean that very many `@rule`s
+    are holding `DigestContents` simultaneously.
+    """
 
 
 class DigestEntries(Collection[Union[FileEntry, Directory]]):

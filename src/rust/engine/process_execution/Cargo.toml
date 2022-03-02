@@ -10,11 +10,12 @@ publish = false
 async-trait = "=0.1.42"
 async-lock = "2.4"
 walkdir = "2"
-async_semaphore = { path = "../async_semaphore" }
 protos = { path = "../protos" }
 bytes = "1.0"
 cache = { path = "../cache" }
 derivative = "2.2"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30 and https://github.com/Aeledfyr/deepsize/pull/31.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "67c6cfc2afa1303c06b19c1b96ebe11fd3217d34", features=["log"] }
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 futures = "0.3"
@@ -22,14 +23,14 @@ hashing = { path = "../hashing" }
 libc = "0.2.112"
 log = "0.4"
 nails = "0.12"
-nix = "0.20"
+nix = "0.23"
 sha2 = "0.9"
 shell-quote = "0.1.0"
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
-tokio = { version = "1.4", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.16", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = "0.23"
 tokio-util = { version = "0.6", features = ["codec"] }
 uname = "0.1.1"
@@ -37,7 +38,7 @@ uuid = { version = "0.8", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }
 regex = "1"
 lazy_static = "1"
-parking_lot = "0.11"
+parking_lot = "0.12"
 itertools = "0.10"
 serde = "1.0.104"
 bincode = "1.2.1"
@@ -53,9 +54,9 @@ tryfuture = { path = "../tryfuture" }
 [dev-dependencies]
 maplit = "1.0.1"
 mock = { path = "../testutil/mock" }
-parking_lot = "0.11"
+parking_lot = "0.12"
 sharded_lmdb = { path = "../sharded_lmdb" }
 spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
-tokio = { version = "1.4", features = ["macros"] }
+tokio = { version = "1.16", features = ["macros"] }

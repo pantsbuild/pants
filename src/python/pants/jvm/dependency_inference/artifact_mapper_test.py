@@ -15,9 +15,9 @@ from pants.backend.java.target_types import (
     JunitTestsGeneratorTarget,
 )
 from pants.backend.java.target_types import rules as java_target_rules
-from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import Dependencies, DependenciesRequest
 from pants.jvm.dependency_inference.artifact_mapper import (
     FrozenTrieNode,
@@ -25,8 +25,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 )
 from pants.jvm.dependency_inference.symbol_mapper import JvmFirstPartyPackageMappingException
 from pants.jvm.jdk_rules import rules as java_util_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -44,18 +43,18 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
+            *jvm_tool.rules(),
             *dep_inference_rules(),
-            *external_tool_rules(),
             *java_target_rules(),
             *java_util_rules(),
             *javac_rules(),
             *source_files.rules(),
+            *system_binaries.rules(),
             *util_rules(),
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(ThirdPartyPackageToArtifactMapping, []),
         ],
+        objects={"parametrize": Parametrize},
         target_types=[
             JavaSourceTarget,
             JavaSourcesGeneratorTarget,
@@ -162,16 +161,18 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                artifact_args = {"group": "joda-time", "artifact": "joda-time", "version": "2.10.10"}
-
-                jvm_artifact(name="artifact_a", **artifact_args, compatible_resolves=["a"])
-                jvm_artifact(name="artifact_b", **artifact_args, compatible_resolves=["b"])
-                jvm_artifact(name="artifact_c", **artifact_args, compatible_resolves=["c"])
-
-                java_source(name='lib_a', source='PrintDate.java', compatible_resolves=['a'])
-                java_source(name='lib_b', source='PrintDate.java', compatible_resolves=['b'])
-                java_source(name='lib_c', source='PrintDate.java', compatible_resolves=['c'])
-                java_source(name='lib_ambiguous', source='PrintDate.java', compatible_resolves=['a', 'b'])
+                jvm_artifact(
+                    name="artifact",
+                    group="joda-time",
+                    artifact="joda-time",
+                    version="2.10.10",
+                    resolve=parametrize("a", "b", "c"),
+                )
+                java_source(
+                    name="lib",
+                    source="PrintDate.java",
+                    resolve=parametrize("a", "b", "c"),
+                )
                 """
             ),
             "PrintDate.java": dedent(
@@ -184,16 +185,16 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def assert_inferred(lib_name: str, expected: list[str]) -> None:
-        lib = rule_runner.get_target(Address("", target_name=lib_name))
+    def assert_inferred(resolve: str) -> None:
+        lib = rule_runner.get_target(
+            Address("", target_name="lib", parameters={"resolve": resolve})
+        )
         assert rule_runner.request(
             Addresses, [DependenciesRequest(lib[Dependencies])]
-        ) == Addresses(Address("", target_name=name) for name in expected)
+        ) == Addresses([Address("", target_name="artifact", parameters={"resolve": resolve})])
 
-    assert_inferred("lib_a", ["artifact_a"])
-    assert_inferred("lib_b", ["artifact_b"])
-    assert_inferred("lib_c", ["artifact_c"])
-    assert_inferred("lib_ambiguous", [])
+    for r in ("a", "b", "c"):
+        assert_inferred(r)
 
 
 @maybe_skip_jdk_test

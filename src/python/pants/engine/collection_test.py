@@ -23,7 +23,7 @@ def test_collection_contains() -> None:
 def test_collection_iteration() -> None:
     c1 = Collection([1, 2])
     assert list(iter(c1)) == [1, 2]
-    assert [x for x in c1] == [1, 2]
+    assert list(c1) == [1, 2]
 
 
 def test_collection_length() -> None:

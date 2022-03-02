@@ -28,16 +28,10 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgImportPath,
     FirstPartyPkgImportPathRequest,
 )
-from pants.core.target_types import (
-    GenerateTargetsFromResources,
-    ResourcesGeneratorTarget,
-    generate_targets_from_resources,
-)
+from pants.core.target_types import ResourcesGeneratorTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
-from pants.engine.target import GenerateTargetsRequest
-from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
 
 
@@ -53,8 +47,6 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
-            generate_targets_from_resources,
-            UnionRule(GenerateTargetsRequest, GenerateTargetsFromResources),
             QueryRule(FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest]),
             QueryRule(FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest]),
             QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),

@@ -7,13 +7,14 @@ import os
 import re
 from abc import ABC, abstractmethod
 from textwrap import dedent
-from typing import Callable, ClassVar, Iterator, cast
+from typing import Callable, ClassVar, Iterator, Optional, cast
 
 from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.base.build_environment import get_buildroot
 from pants.core.goals.run import RestartableField
+from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -21,12 +22,13 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     DictStringToStringField,
+    InvalidFieldException,
     OptionalSingleSourceField,
     StringField,
     StringSequenceField,
     Target,
 )
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 
 # Common help text to be applied to each field that supports value interpolation.
 _interpolation_help = (
@@ -35,7 +37,7 @@ _interpolation_help = (
 )
 
 
-class DockerBuildArgsField(StringSequenceField):
+class DockerImageBuildArgsField(StringSequenceField):
     alias = "extra_build_args"
     default = ()
     help = (
@@ -44,6 +46,32 @@ class DockerBuildArgsField(StringSequenceField):
         "or just `ARG_NAME` to copy the value from Pants's own environment.\n\n"
         "Use `[docker].build_args` to set default build args for all images."
     )
+
+
+class DockerImageContextRootField(StringField):
+    alias = "context_root"
+    help = (
+        "Specify which directory to use as the Docker build context root. This affects the file "
+        "paths to use for the `COPY` and `ADD` instructions. For example, whether "
+        "`COPY files/f.txt` should look for the file relative to the build root: "
+        "`<build root>/files/f.txt` vs relative to the BUILD file: "
+        "`<build root>/path_to_build_file/files/f.txt`.\n\n"
+        "Specify the `context_root` path as `files` for relative to build root, or as `./files` "
+        "for relative to the BUILD file.\n\n"
+        "If `context_root` is not specified, it defaults to `[docker].default_context_root`."
+    )
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if isinstance(value_or_default, str) and value_or_default.startswith("/"):
+            val = value_or_default.strip("/")
+            raise InvalidFieldException(
+                f"The `{cls.alias}` field in target {address} must be a relative path, but was "
+                f"{value_or_default!r}. Use {val!r} for a path relative to the build root, or "
+                f"{'./' + val!r} for a path relative to the BUILD file (i.e. {os.path.join(address.spec_path, val)!r})."
+            )
+        return value_or_default
 
 
 class DockerImageSourceField(OptionalSingleSourceField):
@@ -59,7 +87,7 @@ class DockerImageSourceField(OptionalSingleSourceField):
     help = (
         "The Dockerfile to use when building the Docker image.\n\n"
         "Use the `instructions` field instead if you prefer not having the Dockerfile in your "
-        "project source tree."
+        "source tree."
     )
 
 
@@ -68,8 +96,8 @@ class DockerImageInstructionsField(StringSequenceField):
     required = False
     help = (
         "The `Dockerfile` content, typically one instruction per list item.\n\n"
-        "Use the `source` field instead if you prefer having the Dockerfile in your project "
-        "source tree.\n\n"
+        "Use the `source` field instead if you prefer having the Dockerfile in your source tree."
+        "\n\n"
         + dedent(
             """\
             Example:
@@ -108,11 +136,11 @@ class DockerImageTargetStageField(StringField):
     )
 
 
-class DockerDependenciesField(Dependencies):
+class DockerImageDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
 
-class DockerRegistriesField(StringSequenceField):
+class DockerImageRegistriesField(StringSequenceField):
     alias = "registries"
     default = (ALL_DEFAULT_REGISTRIES,)
     help = (
@@ -148,7 +176,7 @@ class DockerRegistriesField(StringSequenceField):
     )
 
 
-class DockerRepositoryField(StringField):
+class DockerImageRepositoryField(StringField):
     alias = "repository"
     help = (
         'The repository name for the Docker image. e.g. "<repository>/<name>".\n\n'
@@ -160,10 +188,12 @@ class DockerRepositoryField(StringField):
     )
 
 
-class DockerSkipPushField(BoolField):
+class DockerImageSkipPushField(BoolField):
     alias = "skip_push"
     default = False
-    help = "If set to true, do not push this image to registries when running `./pants publish`."
+    help = (
+        f"If set to true, do not push this image to registries when running `{bin_name()} publish`."
+    )
 
 
 OptionValueFormatter = Callable[[str], str]
@@ -185,7 +215,7 @@ class DockerBuildOptionFieldMixin(ABC):
             yield from (self.docker_build_option, value)
 
 
-class DockerBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringToStringField):
+class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringToStringField):
     alias = "image_labels"
     help = (
         "Provide image metadata.\n\n"
@@ -200,16 +230,16 @@ class DockerBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringT
             yield f"{label}={value_formatter(value)}"
 
 
-class DockerBuildSecretsOptionField(
+class DockerImageBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
     alias = "secrets"
     help = (
         "Secret files to expose to the build (only if BuildKit enabled).\n\n"
-        "Secrets may use absolute paths, or paths relative to your project build root, or the "
-        "BUILD file if prefixed with `./`. The id should be valid as used by the Docker build "
-        "`--secret` option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) "
-        "for more information.\n\n"
+        "Secrets may use absolute paths, or paths relative to your build root, or the BUILD file "
+        "if prefixed with `./`. The id should be valid as used by the Docker build `--secret` "
+        "option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more "
+        "information.\n\n"
         + dedent(
             """\
             Example:
@@ -240,7 +270,7 @@ class DockerBuildSecretsOptionField(
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
 
-class DockerBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
+class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
     alias = "ssh"
     default = ()
     help = (
@@ -263,17 +293,18 @@ class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        DockerBuildArgsField,
-        DockerDependenciesField,
+        DockerImageBuildArgsField,
+        DockerImageDependenciesField,
         DockerImageSourceField,
         DockerImageInstructionsField,
+        DockerImageContextRootField,
         DockerImageTagsField,
-        DockerRegistriesField,
-        DockerRepositoryField,
-        DockerBuildImageLabelsOptionField,
-        DockerBuildSecretsOptionField,
-        DockerBuildSSHOptionField,
-        DockerSkipPushField,
+        DockerImageRegistriesField,
+        DockerImageRepositoryField,
+        DockerImageBuildImageLabelsOptionField,
+        DockerImageBuildSecretsOptionField,
+        DockerImageBuildSSHOptionField,
+        DockerImageSkipPushField,
         DockerImageTargetStageField,
         RestartableField,
     )

@@ -33,7 +33,7 @@ use process_execution::RemoteCacheWarningsBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
-  PyResult as PyO3Result, Python,
+  PyResult as PyO3Result, Python, ToPyObject,
 };
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny};
@@ -41,7 +41,7 @@ use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{
-  ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState,
+  ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
 };
 
 use crate::externs::fs::PyFileDigest;
@@ -53,6 +53,7 @@ use crate::{
 
 #[pymodule]
 fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
+  externs::address::register(py, m)?;
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
   externs::scheduler::register(m)?;
@@ -126,6 +127,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_function(wrap_pyfunction!(session_new_run_id, m)?)?;
   m.add_function(wrap_pyfunction!(session_poll_workunits, m)?)?;
   m.add_function(wrap_pyfunction!(session_run_interactive_process, m)?)?;
+  m.add_function(wrap_pyfunction!(session_get_metrics, m)?)?;
   m.add_function(wrap_pyfunction!(session_get_observation_histograms, m)?)?;
   m.add_function(wrap_pyfunction!(session_record_test_observation, m)?)?;
   m.add_function(wrap_pyfunction!(session_isolated_shallow_clone, m)?)?;
@@ -135,6 +137,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(scheduler_execute, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_metrics, m)?)?;
+  m.add_function(wrap_pyfunction!(scheduler_live_items, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_create, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_shutdown, m)?)?;
 
@@ -349,7 +352,9 @@ impl PySession {
   #[new]
   fn __new__(
     scheduler: &PyScheduler,
-    should_render_ui: bool,
+    dynamic_ui: bool,
+    ui_use_prodash: bool,
+    max_workunit_level: u64,
     build_id: String,
     session_values: PyObject,
     cancellation_latch: &PySessionCancellationLatch,
@@ -357,13 +362,18 @@ impl PySession {
   ) -> PyO3Result<Self> {
     let core = scheduler.0.core.clone();
     let cancellation_latch = cancellation_latch.0.clone();
+    let py_level: PythonLogLevel = max_workunit_level
+      .try_into()
+      .map_err(|e| PyException::new_err(format!("{e}")))?;
     // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
     // held.
     let session = py
       .allow_threads(|| {
         Session::new(
           core,
-          should_render_ui,
+          dynamic_ui,
+          ui_use_prodash,
+          py_level.into(),
           build_id,
           session_values,
           cancellation_latch,
@@ -379,6 +389,11 @@ impl PySession {
 
   fn is_cancelled(&self) -> bool {
     self.0.is_cancelled()
+  }
+
+  #[getter]
+  fn session_values(&self) -> PyObject {
+    self.0.session_values()
   }
 }
 
@@ -647,6 +662,7 @@ fn scheduler_create(
 }
 
 async fn workunit_to_py_value(
+  workunit_store: &WorkunitStore,
   workunit: &Workunit,
   core: &Arc<Core>,
   session: &Session,
@@ -801,14 +817,19 @@ async fn workunit_to_py_value(
     externs::store_dict(py, artifact_entries)?,
   ));
 
-  if !workunit.counters.is_empty() {
-    let counters_entries = workunit
-      .counters
-      .iter()
+  // TODO: Temporarily attaching the global counters to the "root" workunit. Callers should
+  // switch to consuming `StreamingWorkunitContext.get_metrics`.
+  // Remove this deprecation after 2.14.0.dev0.
+  if workunit.parent_id.is_none() {
+    let mut metrics = workunit_store.get_metrics();
+
+    metrics.insert("DEPRECATED_ConsumeGlobalCountersInstead", 0);
+    let counters_entries = metrics
+      .into_iter()
       .map(|(counter_name, counter_value)| {
         (
-          externs::store_utf8(py, counter_name.as_ref()),
-          externs::store_u64(py, *counter_value),
+          externs::store_utf8(py, counter_name),
+          externs::store_u64(py, counter_value),
         )
       })
       .collect();
@@ -824,13 +845,14 @@ async fn workunit_to_py_value(
 
 async fn workunits_to_py_tuple_value(
   py: Python<'_>,
+  workunit_store: &WorkunitStore,
   workunits: Vec<Workunit>,
   core: &Arc<Core>,
   session: &Session,
 ) -> PyO3Result<Value> {
   let mut workunit_values = Vec::new();
   for workunit in workunits {
-    let py_value = workunit_to_py_value(&workunit, core, session).await?;
+    let py_value = workunit_to_py_value(workunit_store, &workunit, core, session).await?;
     workunit_values.push(py_value);
   }
 
@@ -849,21 +871,20 @@ fn session_poll_workunits(
     .map_err(|e| PyException::new_err(format!("{}", e)))?;
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
-    let (started, completed) = py.allow_threads(|| {
-      py_session
-        .0
-        .workunit_store()
-        .latest_workunits(py_level.into())
-    });
+    let mut workunit_store = py_session.0.workunit_store();
+    let (started, completed) =
+      py.allow_threads(|| workunit_store.latest_workunits(py_level.into()));
 
     let started_val = core.executor.block_on(workunits_to_py_tuple_value(
       py,
+      &workunit_store,
       started,
       core,
       &py_session.0,
     ))?;
     let completed_val = core.executor.block_on(workunits_to_py_tuple_value(
       py,
+      &workunit_store,
       completed,
       core,
       &py_session.0,
@@ -910,6 +931,21 @@ fn scheduler_metrics<'py>(
     .core
     .executor
     .enter(|| py.allow_threads(|| py_scheduler.0.metrics(&py_session.0)))
+}
+
+#[pyfunction]
+fn scheduler_live_items<'py>(
+  py: Python<'py>,
+  py_scheduler: &'py PyScheduler,
+  py_session: &'py PySession,
+) -> (Vec<PyObject>, HashMap<String, (usize, usize)>) {
+  let (items, sizes) = py_scheduler
+    .0
+    .core
+    .executor
+    .enter(|| py.allow_threads(|| py_scheduler.0.live_items(&py_session.0)));
+  let py_items = items.into_iter().map(|value| value.to_object(py)).collect();
+  (py_items, sizes)
 }
 
 #[pyfunction]
@@ -1112,6 +1148,11 @@ fn graph_visualize(
 #[pyfunction]
 fn session_new_run_id(py_session: &PySession) {
   py_session.0.new_run_id();
+}
+
+#[pyfunction]
+fn session_get_metrics<'py>(py: Python<'py>, py_session: &PySession) -> HashMap<&'static str, u64> {
+  py.allow_threads(|| py_session.0.workunit_store().get_metrics())
 }
 
 #[pyfunction]

@@ -16,7 +16,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -39,14 +39,15 @@ class GoVetFieldSet(FieldSet):
         return tgt.get(SkipGoVetField).value
 
 
-class GoVetRequest(LintRequest):
+class GoVetRequest(LintTargetsRequest):
     field_set_type = GoVetFieldSet
+    name = GoVetSubsystem.options_scope
 
 
 @rule(level=LogLevel.DEBUG)
 async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) -> LintResults:
     if go_vet_subsystem.skip:
-        return LintResults([], linter_name="go vet")
+        return LintResults([], linter_name=request.name)
 
     source_files = await Get(
         SourceFiles,
@@ -80,11 +81,11 @@ async def run_go_vet(request: GoVetRequest, go_vet_subsystem: GoVetSubsystem) ->
     )
 
     result = LintResult.from_fallible_process_result(process_result)
-    return LintResults([result], linter_name="go vet")
+    return LintResults([result], linter_name=request.name)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(LintRequest, GoVetRequest),
+        UnionRule(LintTargetsRequest, GoVetRequest),
     ]

@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import cast
 
 from pants.backend.codegen.protobuf.target_types import ProtobufDependenciesField
 from pants.backend.python.goals import lockfile
@@ -12,7 +11,7 @@ from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
 from pants.engine.unions import UnionRule
-from pants.option.custom_types import target_option
+from pants.option.option_types import BoolOption, TargetListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url, git_url
 
@@ -21,44 +20,35 @@ class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"
     help = f"Options related to the Protobuf Python backend.\n\nSee {doc_url('protobuf')}."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--runtime-dependencies",
-            type=list,
-            member_type=target_option,
-            help=(
-                "A list of addresses to `python_requirement` targets for the runtime "
-                "dependencies needed for generated Python code to work. For example, "
-                "`['3rdparty/python:protobuf', '3rdparty/python:grpcio']`. These dependencies will "
-                "be automatically added to every `protobuf_sources` target"
-            ),
-        )
-        register(
-            "--mypy-plugin",
-            type=bool,
-            default=False,
-            help=(
-                "Use the `mypy-protobuf` plugin (https://github.com/dropbox/mypy-protobuf) to "
-                "also generate .pyi type stubs."
-            ),
-        )
+    _runtime_dependencies = TargetListOption(
+        "--runtime-dependencies",
+        help=(
+            "A list of addresses to `python_requirement` targets for the runtime "
+            "dependencies needed for generated Python code to work. For example, "
+            "`['3rdparty/python:protobuf', '3rdparty/python:grpcio']`. These dependencies will "
+            "be automatically added to every `protobuf_sources` target"
+        ),
+    )
+
+    mypy_plugin = BoolOption(
+        "--mypy-plugin",
+        default=False,
+        help=(
+            "Use the `mypy-protobuf` plugin (https://github.com/dropbox/mypy-protobuf) to "
+            "also generate .pyi type stubs."
+        ),
+    )
 
     @property
     def runtime_dependencies(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.options.runtime_dependencies, owning_address=None)
-
-    @property
-    def mypy_plugin(self) -> bool:
-        return cast(bool, self.options.mypy_plugin)
+        return UnparsedAddressInputs(self._runtime_dependencies, owning_address=None)
 
 
 class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     options_scope = "mypy-protobuf"
     help = "Configuration of the mypy-protobuf type stub generation plugin."
 
-    default_version = "mypy-protobuf==2.4"
+    default_version = "mypy-protobuf==2.10"
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6"]
@@ -75,7 +65,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
 
 
 class MypyProtobufLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = PythonProtobufMypyPlugin.options_scope
+    resolve_name = PythonProtobufMypyPlugin.options_scope
 
 
 @rule

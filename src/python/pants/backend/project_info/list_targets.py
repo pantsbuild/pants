@@ -9,6 +9,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import DescriptionField, UnexpandedTargets
+from pants.option.option_types import BoolOption
 
 logger = logging.getLogger(__name__)
 
@@ -17,19 +18,11 @@ class ListSubsystem(LineOriented, GoalSubsystem):
     name = "list"
     help = "Lists all targets matching the file or target arguments."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--documented",
-            type=bool,
-            default=False,
-            help="Print only targets that are documented with a description.",
-        )
-
-    @property
-    def documented(self) -> bool:
-        return cast(bool, self.options.documented)
+    documented = BoolOption(
+        "--documented",
+        default=False,
+        help="Print only targets that are documented with a description.",
+    )
 
 
 class List(Goal):

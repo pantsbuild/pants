@@ -25,6 +25,7 @@ NUM_RUST_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
 
 NUM_RELEASE_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^pants.toml" \
+  -e "^src/python/pants/__init__" \
   -e "^src/python/pants/VERSION" \
   -e "^src/python/pants/notes" \
   -e "^src/python/pants/init/BUILD" \

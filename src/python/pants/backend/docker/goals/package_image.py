@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
+import re
 from dataclasses import dataclass
 from functools import partial
-from os import path
-from textwrap import dedent
 from typing import Iterator
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
@@ -16,11 +16,12 @@ from pants.backend.docker.registries import DockerRegistries
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
+    DockerImageContextRootField,
+    DockerImageRegistriesField,
+    DockerImageRepositoryField,
     DockerImageSourceField,
     DockerImageTagsField,
     DockerImageTargetStageField,
-    DockerRegistriesField,
-    DockerRepositoryField,
 )
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_context import (
@@ -65,8 +66,9 @@ class DockerImageOptionValueError(ValueError):
 class DockerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (DockerImageSourceField,)
 
-    registries: DockerRegistriesField
-    repository: DockerRepositoryField
+    context_root: DockerImageContextRootField
+    registries: DockerImageRegistriesField
+    repository: DockerImageRepositoryField
     source: DockerImageSourceField
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField
@@ -84,9 +86,9 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     ) -> str:
         repository_context = DockerInterpolationContext.from_dict(
             {
-                "directory": path.basename(self.address.spec_path),
+                "directory": os.path.basename(self.address.spec_path),
                 "name": self.address.target_name,
-                "parent_directory": path.basename(path.dirname(self.address.spec_path)),
+                "parent_directory": os.path.basename(os.path.dirname(self.address.spec_path)),
                 **interpolation_context,
             }
         )
@@ -143,6 +145,24 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             for image_name in image_names
             for registry in registries_options
         )
+
+    def get_context_root(self, default_context_root: str) -> str:
+        """Examines `default_context_root` and `self.context_root.value` and translates that to a
+        context root for the Docker build operation.
+
+        That is, in the configuration/field value, the context root is relative to build root when
+        in the form `path/..` (implies semantics as `//path/..` for target addresses) or the BUILD
+        file when `./path/..`.
+
+        The returned path is always relative to the build root.
+        """
+        if self.context_root.value is not None:
+            context_root = self.context_root.value
+        else:
+            context_root = default_context_root
+        if context_root.startswith("./"):
+            context_root = os.path.join(self.address.spec_path, context_root)
+        return os.path.normpath(context_root)
 
 
 def get_build_options(
@@ -211,10 +231,12 @@ async def build_docker_image(
         interpolation_context=context.interpolation_context,
     )
 
+    context_root = field_set.get_context_root(options.default_context_root)
     process = docker.build_image(
         build_args=context.build_args,
         digest=context.digest,
         dockerfile=context.dockerfile,
+        context_root=context_root,
         env=context.build_env.environment,
         tags=tags,
         extra_args=tuple(
@@ -229,10 +251,11 @@ async def build_docker_image(
     result = await Get(FallibleProcessResult, Process, process)
 
     if result.exit_code != 0:
-        maybe_msg = docker_build_failed(
-            field_set.address,
-            context,
-            global_options.options.colors,
+        maybe_msg = format_docker_build_context_help_message(
+            address=field_set.address,
+            context_root=context_root,
+            context=context,
+            colors=global_options.options.colors,
         )
         if maybe_msg:
             logger.warning(maybe_msg)
@@ -245,27 +268,84 @@ async def build_docker_image(
             process_cleanup=process_cleanup.val,
         )
 
-    logger.debug(
-        dedent(
-            f"""\
-            Docker build output for {tags[0]}:
-            stdout:
-            {result.stdout.decode()}
-
-            stderr:
-            {result.stderr.decode()}
-            """
+    image_id = parse_image_id_from_docker_build_output(result.stdout, result.stderr)
+    docker_build_output_msg = "\n".join(
+        (
+            f"Docker build output for {tags[0]}:",
+            "stdout:",
+            result.stdout.decode(),
+            "stderr:",
+            result.stderr.decode(),
         )
     )
 
+    if options.build_verbose:
+        logger.info(docker_build_output_msg)
+    else:
+        logger.debug(docker_build_output_msg)
+
     return BuiltPackage(
         result.output_digest,
-        (BuiltDockerImage.create(tags),),
+        (BuiltDockerImage.create(image_id, tags),),
     )
 
 
-def docker_build_failed(address: Address, context: DockerBuildContext, colors: bool) -> str | None:
-    if not context.copy_source_vs_context_source:
+def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
+    """Outputs are typically the stdout/stderr pair from the `docker build` process."""
+    image_id_regexp = re.compile(
+        "|".join(
+            (
+                # BuildKit output.
+                r"(writing image (?P<digest>sha256:\S+) done)",
+                # Docker output.
+                r"(Successfully built (?P<short_id>\S+))",
+            ),
+        )
+    )
+    for output in outputs:
+        image_id_match = next(
+            (
+                match
+                for match in (
+                    re.search(image_id_regexp, line)
+                    for line in reversed(output.decode().split("\n"))
+                )
+                if match
+            ),
+            None,
+        )
+        if image_id_match:
+            image_id = image_id_match.group("digest") or image_id_match.group("short_id")
+            return image_id
+
+    return "<unknown>"
+
+
+def format_docker_build_context_help_message(
+    address: Address, context_root: str, context: DockerBuildContext, colors: bool
+) -> str | None:
+    paths_outside_context_root: list[str] = []
+
+    def _chroot_context_paths(paths: tuple[str, str]) -> tuple[str, str]:
+        """Adjust the context paths in `copy_source_vs_context_source` for `context_root`."""
+        instruction_path, context_path = paths
+        if not context_path:
+            return paths
+        dst = os.path.relpath(context_path, context_root)
+        if dst.startswith("../"):
+            paths_outside_context_root.append(context_path)
+            return ("", "")
+        if instruction_path == dst:
+            return ("", "")
+        return instruction_path, dst
+
+    # Adjust context paths based on `context_root`.
+    copy_source_vs_context_source: tuple[tuple[str, str], ...] = tuple(
+        filter(any, map(_chroot_context_paths, context.copy_source_vs_context_source))
+    )
+
+    if not (copy_source_vs_context_source or paths_outside_context_root):
+        # No issues found.
         return None
 
     msg = (
@@ -274,31 +354,41 @@ def docker_build_failed(address: Address, context: DockerBuildContext, colors: b
         "\n\n"
     )
 
-    renames = [
+    renames = sorted(
         format_rename_suggestion(src, dst, colors=colors)
-        for src, dst in context.copy_source_vs_context_source
+        for src, dst in copy_source_vs_context_source
         if src and dst
-    ]
+    )
     if renames:
         msg += (
             f"However there are possible matches. Please review the following list of suggested "
             f"renames:\n\n{bullet_list(renames)}\n\n"
         )
 
-    unknown = [src for src, dst in context.copy_source_vs_context_source if not dst]
+    unknown = sorted(src for src, dst in copy_source_vs_context_source if src and not dst)
     if unknown:
         msg += (
             f"The following files were not found in the Docker build context:\n\n"
             f"{bullet_list(unknown)}\n\n"
         )
 
-    unreferenced = [dst for src, dst in context.copy_source_vs_context_source if not src]
+    unreferenced = sorted(dst for src, dst in copy_source_vs_context_source if dst and not src)
     if unreferenced:
-        if len(unreferenced) > 10:
-            unreferenced = unreferenced[:9] + [f"... and {len(unreferenced)-9} more"]
         msg += (
             f"There are additional files in the Docker build context that were not referenced by "
-            f"any `COPY` instruction (this is not an error):\n\n{bullet_list(unreferenced)}\n\n"
+            f"any `COPY` instruction (this is not an error):\n\n{bullet_list(unreferenced, 10)}\n\n"
+        )
+
+    if paths_outside_context_root:
+        unreachable = sorted({os.path.dirname(pth) for pth in paths_outside_context_root})
+        context_paths = tuple(dst for src, dst in context.copy_source_vs_context_source if dst)
+        new_context_root = os.path.commonpath(context_paths)
+        msg += (
+            "There are unreachable files in these directories, excluded from the build context "
+            f"due to `context_root` being {context_root!r}:\n\n{bullet_list(unreachable, 10)}\n\n"
+            f"Suggested `context_root` setting is {new_context_root!r} in order to include all files "
+            "in the build context, otherwise relocate the files to be part of the current "
+            f"`context_root` {context_root!r}."
         )
 
     return msg

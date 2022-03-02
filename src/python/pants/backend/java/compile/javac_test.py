@@ -16,8 +16,7 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResult, CheckResults
-from pants.core.util_rules import archive, config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
@@ -25,10 +24,9 @@ from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
@@ -45,11 +43,9 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *archive.rules(),
+            *system_binaries.rules(),
             *config_files.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
+            *jvm_tool.rules(),
             *source_files.rules(),
             *javac_rules(),
             *javac_check_rules(),
@@ -83,6 +79,20 @@ JAVA_LIB_SOURCE = dedent(
     }
     """
 )
+
+
+JAVA_LIB_JDK12_SOURCE = dedent(
+    """
+    package org.pantsbuild.example.lib;
+
+    public class ExampleLib {
+        public static String hello() {
+            return "Hello!".indent(4);
+        }
+    }
+    """
+)
+
 
 JAVA_LIB_MAIN_SOURCE = dedent(
     """
@@ -168,6 +178,62 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_compile_jdk_specified_in_build_file(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 'lib',
+                    jdk = 'adopt:1.12',
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
+        }
+    )
+
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="lib")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    classpath = rule_runner.request(RenderedClasspath, [request])
+    assert classpath.content == {
+        ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
+    }
+
+
+@maybe_skip_jdk_test
+def test_compile_jdk_12_file_fails_with_jdk_11(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                java_sources(
+                    name = 'lib',
+                    jdk = 'adopt:1.11',
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
+        }
+    )
+
+    request = CompileJavaSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="", target_name="lib")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    with pytest.raises(ExecutionError):
+        rule_runner.request(RenderedClasspath, [request])
+
+
+@maybe_skip_jdk_test
 def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -210,7 +276,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
     assert all(len(ctgt.members) == 1 for ctgt in coarsened_targets)
 
     coarsened_targets_sorted = sorted(
-        list(coarsened_targets), key=lambda ctgt: str(list(ctgt.members)[0].address)
+        coarsened_targets, key=lambda ctgt: str(list(ctgt.members)[0].address)
     )
 
     request0 = CompileJavaSourceRequest(

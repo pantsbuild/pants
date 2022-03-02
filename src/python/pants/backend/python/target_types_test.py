@@ -9,7 +9,6 @@ from textwrap import dedent
 from typing import Iterable
 
 import pytest
-from _pytest.logging import LogCaptureFixture
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import import_rules
@@ -41,10 +40,6 @@ from pants.backend.python.target_types import (
     parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
-    GenerateTargetsFromPexBinaries,
-    GenerateTargetsFromPythonSources,
-    GenerateTargetsFromPythonTests,
-    GenerateTargetsFromPythonTestUtils,
     InjectPexBinaryEntryPointDependency,
     InjectPythonDistributionDependencies,
     resolve_pex_entry_point,
@@ -52,9 +47,9 @@ from pants.backend.python.target_types_rules import (
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.engine.addresses import Address
+from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
-    GeneratedTargets,
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -120,7 +115,7 @@ def test_entry_point_filespec(entry_point: str | None, expected: list[str]) -> N
     assert field.filespec == {"includes": expected}
 
 
-def test_entry_point_validation(caplog: LogCaptureFixture) -> None:
+def test_entry_point_validation(caplog) -> None:
     addr = Address("src/python/project")
 
     with pytest.raises(InvalidFieldException):
@@ -564,10 +559,7 @@ def test_generate_source_and_test_targets() -> None:
             *target_types_rules.rules(),
             *import_rules(),
             *python_sources.rules(),
-            QueryRule(GeneratedTargets, [GenerateTargetsFromPythonTests]),
-            QueryRule(GeneratedTargets, [GenerateTargetsFromPythonSources]),
-            QueryRule(GeneratedTargets, [GenerateTargetsFromPythonTestUtils]),
-            QueryRule(GeneratedTargets, [GenerateTargetsFromPexBinaries]),
+            QueryRule(_TargetParametrizations, [Address]),
         ],
         target_types=[
             PythonTestsGeneratorTarget,
@@ -624,11 +616,6 @@ def test_generate_source_and_test_targets() -> None:
         }
     )
 
-    sources_generator = rule_runner.get_target(Address("src/py", target_name="lib"))
-    tests_generator = rule_runner.get_target(Address("src/py", target_name="tests"))
-    test_utils_generator = rule_runner.get_target(Address("src/py", target_name="test_utils"))
-    pex_binaries_generator = rule_runner.get_target(Address("src/py", target_name="pexes"))
-
     def gen_source_tgt(
         rel_fp: str, tags: list[str] | None = None, *, tgt_name: str
     ) -> PythonSourceTarget:
@@ -653,49 +640,36 @@ def test_generate_source_and_test_targets() -> None:
         )
 
     sources_generated = rule_runner.request(
-        GeneratedTargets, [GenerateTargetsFromPythonSources(sources_generator)]
-    )
+        _TargetParametrizations, [Address("src/py", target_name="lib")]
+    ).parametrizations
     tests_generated = rule_runner.request(
-        GeneratedTargets, [GenerateTargetsFromPythonTests(tests_generator)]
-    )
+        _TargetParametrizations, [Address("src/py", target_name="tests")]
+    ).parametrizations
     test_utils_generated = rule_runner.request(
-        GeneratedTargets, [GenerateTargetsFromPythonTestUtils(test_utils_generator)]
-    )
+        _TargetParametrizations, [Address("src/py", target_name="test_utils")]
+    ).parametrizations
     pex_binaries_generated = rule_runner.request(
-        GeneratedTargets, [GenerateTargetsFromPexBinaries(pex_binaries_generator)]
-    )
+        _TargetParametrizations, [Address("src/py", target_name="pexes")]
+    ).parametrizations
 
-    assert sources_generated == GeneratedTargets(
-        sources_generator,
-        {
-            gen_source_tgt("f1.py", tags=["overridden"], tgt_name="lib"),
-            gen_source_tgt("f2.py", tgt_name="lib"),
-            gen_source_tgt("subdir/f.py", tgt_name="lib"),
-        },
-    )
-    assert tests_generated == GeneratedTargets(
-        tests_generator,
-        {
-            gen_test_tgt("f1_test.py", tags=["overridden"]),
-            gen_test_tgt("f2_test.py"),
-            gen_test_tgt("subdir/f_test.py"),
-        },
-    )
+    assert set(sources_generated.values()) == {
+        gen_source_tgt("f1.py", tags=["overridden"], tgt_name="lib"),
+        gen_source_tgt("f2.py", tgt_name="lib"),
+        gen_source_tgt("subdir/f.py", tgt_name="lib"),
+    }
+    assert set(tests_generated.values()) == {
+        gen_test_tgt("f1_test.py", tags=["overridden"]),
+        gen_test_tgt("f2_test.py"),
+        gen_test_tgt("subdir/f_test.py"),
+    }
 
-    assert test_utils_generated == GeneratedTargets(
-        test_utils_generator,
-        {
-            gen_source_tgt("conftest.py", tags=["overridden"], tgt_name="test_utils"),
-            gen_source_tgt("subdir/conftest.py", tgt_name="test_utils"),
-        },
-    )
-
-    assert pex_binaries_generated == GeneratedTargets(
-        pex_binaries_generator,
-        {
-            gen_pex_binary_tgt("f1.py"),
-            gen_pex_binary_tgt("f2:foo", tags=["overridden"]),
-            gen_pex_binary_tgt("subdir.f.py", tags=["overridden"]),
-            gen_pex_binary_tgt("subdir.f:main"),
-        },
-    )
+    assert set(test_utils_generated.values()) == {
+        gen_source_tgt("conftest.py", tags=["overridden"], tgt_name="test_utils"),
+        gen_source_tgt("subdir/conftest.py", tgt_name="test_utils"),
+    }
+    assert set(pex_binaries_generated.values()) == {
+        gen_pex_binary_tgt("f1.py"),
+        gen_pex_binary_tgt("f2:foo", tags=["overridden"]),
+        gen_pex_binary_tgt("subdir.f.py", tags=["overridden"]),
+        gen_pex_binary_tgt("subdir.f:main"),
+    }

@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from typing import cast
-
-from pants.option.custom_types import shell_str
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.option.option_types import ArgsListOption, DictOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 
 
@@ -13,46 +12,55 @@ class Scalac(Subsystem):
     options_scope = "scalac"
     help = "The Scala compiler."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            default=[],
-            help=(
-                "Global `scalac` compiler flags, e.g. "
-                f"`--{cls.options_scope}-args='-encoding UTF-8'`."
-            ),
-        )
-        register(
-            "--plugins-global",
-            type=list,
-            member_type=str,
-            advanced=True,
-            default=[],
-            help=(
-                "A list of addresses of `scalac_plugin` targets which should be used for "
-                "compilation of all Scala targets in a build."
-            ),
-        )
-        register(
-            "--plugins-global-lockfile",
-            type=str,
-            default="3rdparty/jvm/global_scalac_plugins.lock",
-            advanced=True,
-            help=("The filename of a lockfile for global plugins."),
-        )
+    default_plugins_lockfile_path = (
+        "src/python/pants/backend/scala/subsystems/scalac_plugins.default.lockfile.txt"
+    )
+    default_plugins_lockfile_resource = (
+        "pants.backend.scala.subsystems",
+        "scalac_plugins.default.lockfile.txt",
+    )
 
-    @property
-    def args(self) -> list[str]:
-        return cast("list[str]", self.options.args)
+    args = ArgsListOption(
+        help=f"Global `scalac` compiler flags, e.g. `--{options_scope}-args='-encoding UTF-8'`."
+    )
+    plugins_global = StrListOption(
+        "--plugins-global",
+        help=(
+            "A list of addresses of `scalac_plugin` targets which should be used for "
+            "compilation of all Scala targets in a build.\n\nIf you set this, you must also "
+            "set `[scalac].plugins_global_lockfile`."
+        ),
+        advanced=True,
+        removal_version="2.12.0.dev0",
+        removal_hint="Use `--scalac-plugins-for-resolve` instead to use user resolves",
+    )
 
-    @property
-    def plugins_global(self) -> list[str]:
-        return cast("list[str]", self.options.plugins_global)
+    # TODO: see if we can use an actual list mechanism? If not, this seems like an OK option
+    default_plugins = DictOption[str](
+        "--plugins-for-resolve",
+        help=(
+            "A dictionary, whose keys are the names of each JVM resolve that requires default "
+            "`scalac` plugins, and the value is a comma-separated string consisting of scalac plugin "
+            "names. Each specified plugin must have a corresponding `scalac_plugin` target that specifies "
+            "that name in either its `plugin_name` field or is the same as its target name."
+        ),
+    )
 
-    @property
-    def plugins_global_lockfile(self) -> str:
-        return cast(str, self.options.plugins_global_lockfile)
+    plugins_global_lockfile = StrOption(
+        "--plugins-global-lockfile",
+        default=DEFAULT_TOOL_LOCKFILE,
+        help=(
+            "The filename of the lockfile for global plugins. You must set this option to a "
+            "file path, e.g. '3rdparty/jvm/global_scalac_plugins.lock', if you set "
+            "`[scalac].plugins_global`."
+        ),
+        advanced=True,
+        removal_version="2.12.0.dev0",
+        removal_hint="Use `--scalac-plugins-for-resolve` instead, which will add plugin dependencies to JVM user resolves.",
+    )
+
+    def parsed_default_plugins(self) -> dict[str, list[str]]:
+        return {
+            key: [i.strip() for i in value.split(",")]
+            for key, value in self.default_plugins.items()
+        }

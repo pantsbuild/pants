@@ -21,9 +21,10 @@ from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonModuleMapping,
     ModuleProvider,
     ModuleProviderType,
-    PythonModule,
     PythonModuleOwners,
+    PythonModuleOwnersRequest,
     ThirdPartyPythonModuleMapping,
+    module_from_stripped_path,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import (
@@ -59,8 +60,8 @@ def test_default_module_mapping_is_normalized() -> None:
         ("src/python/project/not_stripped.py", "src.python.project.not_stripped"),
     ],
 )
-def test_create_module_from_path(stripped_path: str, expected: str) -> None:
-    assert PythonModule.create_from_stripped_path(PurePath(stripped_path)) == PythonModule(expected)
+def test_module_from_stripped_path(stripped_path: str, expected: str) -> None:
+    assert module_from_stripped_path(PurePath(stripped_path)) == expected
 
 
 def test_first_party_modules_mapping() -> None:
@@ -139,9 +140,9 @@ def test_third_party_modules_mapping() -> None:
     )
 
     def assert_addresses(
-        mod: str, expected: tuple[ModuleProvider, ...], *, resolves: list[str] | None = None
+        mod: str, expected: tuple[ModuleProvider, ...], *, resolve: str | None = None
     ) -> None:
-        assert mapping.providers_for_module(mod, resolves) == expected
+        assert mapping.providers_for_module(mod, resolve) == expected
 
     assert_addresses("colors", (colors_provider, colors_stubs_provider))
     assert_addresses("colors.red", (colors_provider, colors_stubs_provider))
@@ -162,20 +163,19 @@ def test_third_party_modules_mapping() -> None:
     assert_addresses("unknown", ())
     assert_addresses("unknown.pants", ())
 
-    assert_addresses("two_resolves", (colors_provider, pants_provider), resolves=None)
-    assert_addresses("two_resolves.foo", (colors_provider, pants_provider), resolves=None)
-    assert_addresses("two_resolves.foo.bar", (colors_provider, pants_provider), resolves=None)
-    assert_addresses("two_resolves", (colors_provider,), resolves=["default-resolve"])
-    assert_addresses("two_resolves", (pants_provider,), resolves=["another-resolve"])
+    assert_addresses("two_resolves", (colors_provider, pants_provider), resolve=None)
+    assert_addresses("two_resolves.foo", (colors_provider, pants_provider), resolve=None)
+    assert_addresses("two_resolves.foo.bar", (colors_provider, pants_provider), resolve=None)
+    assert_addresses("two_resolves", (colors_provider,), resolve="default-resolve")
+    assert_addresses("two_resolves", (pants_provider,), resolve="another-resolve")
     assert_addresses(
         "two_resolves",
         (
             colors_provider,
             pants_provider,
         ),
-        resolves=["default-resolve", "another-resolve"],
+        resolve=None,
     )
-    assert_addresses("two_resolves", (), resolves=[])
 
 
 @pytest.fixture
@@ -189,7 +189,7 @@ def rule_runner() -> RuleRunner:
             *protobuf_target_type_rules(),
             QueryRule(FirstPartyPythonModuleMapping, []),
             QueryRule(ThirdPartyPythonModuleMapping, []),
-            QueryRule(PythonModuleOwners, [PythonModule]),
+            QueryRule(PythonModuleOwners, [PythonModuleOwnersRequest]),
         ],
         target_types=[
             PythonSourceTarget,
@@ -299,13 +299,13 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         *,
         modules: list[str] | None = None,
         stub_modules: list[str] | None = None,
-        resolves: list[str] | None = None,
+        resolve: str = "default",
     ) -> str:
         return (
             f"python_requirement(name='{tgt_name}', requirements=['{req_str}'], "
             f"modules={modules or []},"
             f"type_stub_modules={stub_modules or []},"
-            f"experimental_compatible_resolves={resolves or ['default']})"
+            f"resolve={repr(resolve)})"
         )
 
     build_file = "\n\n".join(
@@ -323,14 +323,16 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("typed-dep5", "typed-dep5-foo", stub_modules=["typed_dep5"]),
             # A 3rd-party dependency can have both a type stub and implementation.
             req("multiple_owners1", "multiple_owners==1"),
-            req("multiple_owners2", "multiple_owners==2", resolves=["another"]),
-            req("multiple_owners_types", "types-multiple_owners==1", resolves=["another"]),
+            req("multiple_owners2", "multiple_owners==2", resolve="another"),
+            req("multiple_owners_types", "types-multiple_owners==1", resolve="another"),
             # Only assume it's a type stubs dep if we are certain it's not an implementation.
             req("looks_like_stubs", "looks-like-stubs-types", modules=["looks_like_stubs"]),
         ]
     )
     rule_runner.write_files({"BUILD": build_file})
-    rule_runner.set_options(["--python-experimental-resolves={'default': '', 'another': ''}"])
+    rule_runner.set_options(
+        ["--python-resolves={'default': '', 'another': ''}", "--python-enable-resolves"]
+    )
     result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
     assert result == ThirdPartyPythonModuleMapping(
         {
@@ -415,17 +417,20 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     def assert_owners(
         module: str, expected: list[Address], expected_ambiguous: list[Address] | None = None
     ) -> None:
-        owners = rule_runner.request(PythonModuleOwners, [PythonModule(module)])
+        owners = rule_runner.request(
+            PythonModuleOwners, [PythonModuleOwnersRequest(module, resolve="python-default")]
+        )
         assert list(owners.unambiguous) == expected
         assert list(owners.ambiguous) == (expected_ambiguous or [])
 
         from_import_owners = rule_runner.request(
-            PythonModuleOwners, [PythonModule(f"{module}.Class")]
+            PythonModuleOwners,
+            [PythonModuleOwnersRequest(f"{module}.Class", resolve="python-default")],
         )
         assert list(from_import_owners.unambiguous) == expected
         assert list(from_import_owners.ambiguous) == (expected_ambiguous or [])
 
-    rule_runner.set_options(["--source-root-patterns=['root', '/']"])
+    rule_runner.set_options(["--source-root-patterns=['root', '/']", "--python-enable-resolves"])
     rule_runner.write_files(
         {
             # A root-level module.
@@ -577,4 +582,39 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
             Address("root/ambiguous", target_name="ambiguous-stub-types"),
             Address("root/ambiguous", target_name="ambiguous-stub-1stparty"),
         ],
+    )
+
+
+def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                # Note that both `python_requirements` have the same `dep`, which would normally
+                # result in ambiguity.
+                python_requirement(
+                    name="dep1",
+                    resolve="a",
+                    requirements=["dep"],
+                )
+
+                python_requirement(
+                    name="dep2",
+                    resolve="b",
+                    requirements=["dep"],
+                )
+                """
+            )
+        }
+    )
+    rule_runner.set_options(["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"])
+
+    def get_owners(resolve: str | None) -> PythonModuleOwners:
+        return rule_runner.request(PythonModuleOwners, [PythonModuleOwnersRequest("dep", resolve)])
+
+    assert get_owners("a").unambiguous == (Address("", target_name="dep1"),)
+    assert get_owners("b").unambiguous == (Address("", target_name="dep2"),)
+    assert get_owners(None).ambiguous == (
+        Address("", target_name="dep1"),
+        Address("", target_name="dep2"),
     )

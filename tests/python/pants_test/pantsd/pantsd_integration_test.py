@@ -499,15 +499,23 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             rm_rf(test_path)
 
     def _assert_pantsd_keyboardinterrupt_signal(
-        self, signum: int, regexps: list[str] | None = None
+        self,
+        signum: int,
+        regexps: list[str] | None = None,
+        not_regexps: list[str] | None = None,
+        cleanup_wait_time: int = 0,
     ):
         """Send a signal to the thin pailgun client and observe the error messaging.
 
         :param signum: The signal to send.
         :param regexps: Assert that all of these regexps match somewhere in stderr.
+        :param not_regexps: Assert that all of these regexps do not match somewhere in stderr.
+        :param cleanup_wait_time: passed throught to waiter, dictated how long simulated cleanup will take
         """
         with self.pantsd_test_context() as (workdir, config, checker):
-            client_handle, waiter_pid, child_pid, _ = launch_waiter(workdir=workdir, config=config)
+            client_handle, waiter_pid, child_pid, _ = launch_waiter(
+                workdir=workdir, config=config, cleanup_wait_time=cleanup_wait_time
+            )
             client_pid = client_handle.process.pid
             waiter_process = psutil.Process(waiter_pid)
             child_process = psutil.Process(waiter_pid)
@@ -515,6 +523,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             assert waiter_process.is_running()
             assert child_process.is_running()
             checker.assert_started()
+
+            # give time to enter the try/finally block in the child process
+            time.sleep(5)
 
             # This should kill the client, which will cancel the run on the server, which will
             # kill the waiting process and its child.
@@ -525,6 +536,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             for regexp in regexps or []:
                 self.assertRegex(client_run.stderr, regexp)
 
+            for regexp in not_regexps or []:
+                self.assertNotRegex(client_run.stderr, regexp)
+
             # pantsd should still be running, but the waiter process and child should have been
             # killed.
             time.sleep(5)
@@ -532,10 +546,33 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             assert not child_process.is_running()
             checker.assert_running()
 
-    def test_pantsd_sigint(self):
+    def test_pantsd_graceful_shutdown(self):
+        """Test that SIGINT is propgated to child processes and they are given time to shutdown."""
         self._assert_pantsd_keyboardinterrupt_signal(
             signal.SIGINT,
-            regexps=["Interrupted by user."],
+            regexps=[
+                "Interrupted by user.",
+                "keyboard int received",
+                "waiter cleaning up",
+                "waiter cleanup complete",
+            ],
+            cleanup_wait_time=0,
+        )
+
+    def test_pantsd_graceful_shutdown_deadline(self):
+        """Test that a child process that does not respond to SIGINT within 5 seconds, is forcibly
+        cleaned up with a SIGKILL."""
+        self._assert_pantsd_keyboardinterrupt_signal(
+            signal.SIGINT,
+            regexps=[
+                "Interrupted by user.",
+                "keyboard int received",
+                "waiter cleaning up",
+            ],
+            not_regexps=[
+                "waiter cleanup complete",
+            ],
+            cleanup_wait_time=6,
         )
 
     def test_sigint_kills_request_waiting_for_lock(self):
@@ -596,28 +633,23 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             )
             """
         )
-        with self.pantsd_successful_run_context() as ctx:
-            with temporary_dir(".") as directory:
-                safe_file_dump(os.path.join(directory, "A.py"), mode="w")
-                safe_file_dump(os.path.join(directory, "B.py"), mode="w")
+        with self.pantsd_successful_run_context() as ctx, temporary_dir(".") as directory:
+            safe_file_dump(os.path.join(directory, "A.py"), mode="w")
+            safe_file_dump(os.path.join(directory, "B.py"), mode="w")
 
-                if directory.startswith("./"):
-                    directory = directory[2:]
+            if directory.startswith("./"):
+                directory = directory[2:]
 
-                def list_and_verify():
-                    result = ctx.runner(["list", f"{directory}:"])
-                    ctx.checker.assert_started()
-                    result.assert_success()
-                    expected_targets = {f"{directory}:{target}" for target in ("A", "B")}
-                    self.assertEqual(expected_targets, set(result.stdout.strip().split("\n")))
+            def list_and_verify(a_deps: str, b_deps: str) -> None:
+                Path(directory, "BUILD").write_text(template.format(a_deps=a_deps, b_deps=b_deps))
+                result = ctx.runner(["list", f"{directory}:"])
+                ctx.checker.assert_started()
+                result.assert_success()
+                expected_targets = {f"{directory}:{target}" for target in ("A", "B")}
+                assert expected_targets == set(result.stdout.strip().split("\n"))
 
-                with open(os.path.join(directory, "BUILD"), "w") as f:
-                    f.write(template.format(a_deps='dependencies = [":B"],', b_deps=""))
-                list_and_verify()
-
-                with open(os.path.join(directory, "BUILD"), "w") as f:
-                    f.write(template.format(a_deps="", b_deps='dependencies = [":A"],'))
-                list_and_verify()
+            list_and_verify(a_deps='dependencies = [":B"],', b_deps="")
+            list_and_verify(a_deps="", b_deps='dependencies = [":A"],')
 
     def test_concurrent_overrides_pantsd(self):
         """Tests that the --concurrent flag overrides the --pantsd flag, because we don't allow
@@ -638,18 +670,26 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
         This is a regression test for the most glaring case of https://github.com/pantsbuild/pants/issues/7597.
         """
-        with self.pantsd_run_context(success=False) as ctx:
-            result = ctx.runner(["run", "testprojects/src/python/bad_requirements:use_badreq"])
+        with self.pantsd_run_context(success=False) as ctx, temporary_dir(".") as directory:
+            Path(directory, "BUILD").write_text(
+                dedent(
+                    """\
+                    python_requirement(name="badreq", requirements=["badreq==99.99.99"])
+                    pex_binary(name="pex", dependencies=[":badreq"])
+                    """
+                )
+            )
+            result = ctx.runner(["package", f"{directory}:pex"])
             ctx.checker.assert_running()
             result.assert_failure()
             # Assert that the desired exception has been triggered once.
             self.assertRegex(result.stderr, r"ERROR:.*badreq==99.99.99")
             # Assert that it has only been triggered once.
-            self.assertNotIn(
-                "During handling of the above exception, another exception occurred:",
-                result.stderr,
+            assert (
+                "During handling of the above exception, another exception occurred:"
+                not in result.stderr
             )
-            self.assertNotIn(
-                "pants.bin.daemon_pants_runner._PantsRunFinishedWithFailureException: Terminated with 1",
-                result.stderr,
+            assert (
+                "pants.bin.daemon_pants_runner._PantsRunFinishedWithFailureException: Terminated with 1"
+                not in result.stderr
             )

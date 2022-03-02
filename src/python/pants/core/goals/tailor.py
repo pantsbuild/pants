@@ -9,12 +9,10 @@ import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Iterator, Mapping, Optional, cast
+from typing import Iterable, Iterator, Mapping, cast
 
 from pants.base.specs import AddressSpecs, AscendantAddresses, Spec, Specs
 from pants.build_graph.address import Address
-from pants.core.util_rules import pants_bin
-from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -39,8 +37,9 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import BoolOption, DictOption, StrListOption, StrOption
 from pants.source.filespec import Filespec, matches_filespec
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -245,114 +244,83 @@ class TailorSubsystem(GoalSubsystem):
     name = "tailor"
     help = "Auto-generate BUILD file targets for new source files."
 
-    required_union_implementations = (PutativeTargetsRequest,)
-
     @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--check",
-            type=bool,
-            default=False,
-            help=(
-                "Do not write changes to disk, only write back what would change. Return code "
-                "0 means there would be no changes, and 1 means that there would be. "
-            ),
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PutativeTargetsRequest in union_membership
 
-        register(
-            "--build-file-name",
-            advanced=True,
-            type=str,
-            default="BUILD",
-            help=(
-                "The name to use for generated BUILD files.\n\n"
-                "This must be compatible with `[GLOBAL].build_patterns`."
-            ),
-        )
-        register(
-            "--build-file-header",
-            advanced=True,
-            type=str,
-            default=None,
-            help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
-        )
-        register(
-            "--build-file-indent",
-            advanced=True,
-            type=str,
-            default="    ",
-            help="The indent to use when auto-editing BUILD files.",
-        )
-
-        register(
-            "--alias-mapping",
-            advanced=True,
-            type=dict,
-            help="A mapping from standard target type to custom type to use instead. The custom "
+    check = BoolOption(
+        "--check",
+        default=False,
+        help=(
+            "Do not write changes to disk, only write back what would change. Return code "
+            "0 means there would be no changes, and 1 means that there would be. "
+        ),
+    )
+    build_file_name = StrOption(
+        "--build-file-name",
+        default="BUILD",
+        help=(
+            "The name to use for generated BUILD files.\n\n"
+            "This must be compatible with `[GLOBAL].build_patterns`."
+        ),
+        advanced=True,
+    )
+    build_file_header = StrOption(
+        "--build-file-header",
+        default=None,
+        help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
+        advanced=True,
+    )
+    build_file_indent = StrOption(
+        "--build-file-indent",
+        default="    ",
+        help="The indent to use when auto-editing BUILD files.",
+        advanced=True,
+    )
+    _alias_mapping = DictOption[str](
+        "--alias-mapping",
+        help=(
+            "A mapping from standard target type to custom type to use instead. The custom "
             "type can be a custom target type or a macro that offers compatible functionality "
-            f"to the one it replaces (see {doc_url('macros')}).",
-        )
-
-        register(
-            "--ignore-paths",
-            advanced=True,
-            type=list,
-            member_type=str,
-            help=(
-                "Do not edit or create BUILD files at these paths.\n\n"
-                "Can use literal file names and/or globs, e.g. "
-                "`['project/BUILD, 'ignore_me/**']`.\n\n"
-                "This augments the option `[GLOBAL].build_ignore`, which tells Pants to also not "
-                "_read_ BUILD files at certain paths. In contrast, this option only tells Pants to "
-                "not edit/create BUILD files at the specified paths."
-            ),
-        )
-        register(
-            "--ignore-adding-targets",
-            advanced=True,
-            type=list,
-            member_type=str,
-            help=(
-                "Do not add these target definitions.\n\n"
-                "Expects a list of target addresses that would normally be added by `tailor`, "
-                "e.g. `['project:tgt']`. To find these names, you can run `tailor --check`, then "
-                "combine the BUILD file path with the target's name. For example, if `tailor` "
-                "would add the target `bin` to `project/BUILD`, then the address would be "
-                "`project:bin`. If the BUILD file is at the root of your repository, use `//` for "
-                "the path, e.g. `//:bin`.\n\n"
-                "Does not work with macros."
-            ),
-        )
-
-    @property
-    def check(self) -> bool:
-        return cast(bool, self.options.check)
-
-    @property
-    def build_file_name(self) -> str:
-        return cast(str, self.options.build_file_name)
-
-    @property
-    def build_file_header(self) -> str | None:
-        return cast(Optional[str], self.options.build_file_header)
-
-    @property
-    def build_file_indent(self) -> str:
-        return cast(str, self.options.build_file_indent)
-
-    @property
-    def ignore_paths(self) -> tuple[str, ...]:
-        return tuple(self.options.ignore_paths)
+            f"to the one it replaces (see {doc_url('macros')})."
+        ),
+        advanced=True,
+    )
+    ignore_paths = StrListOption(
+        "--ignore-paths",
+        help=(
+            "Do not edit or create BUILD files at these paths.\n\n"
+            "Can use literal file names and/or globs, e.g. "
+            "`['project/BUILD, 'ignore_me/**']`.\n\n"
+            "This augments the option `[GLOBAL].build_ignore`, which tells Pants to also not "
+            "_read_ BUILD files at certain paths. In contrast, this option only tells Pants to "
+            "not edit/create BUILD files at the specified paths."
+        ),
+        advanced=True,
+    )
+    _ignore_adding_targets = StrListOption(
+        "--ignore-adding-targets",
+        help=(
+            "Do not add these target definitions.\n\n"
+            "Expects a list of target addresses that would normally be added by `tailor`, "
+            "e.g. `['project:tgt']`. To find these names, you can run `tailor --check`, then "
+            "combine the BUILD file path with the target's name. For example, if `tailor` "
+            "would add the target `bin` to `project/BUILD`, then the address would be "
+            "`project:bin`. If the BUILD file is at the root of your repository, use `//` for "
+            "the path, e.g. `//:bin`.\n\n"
+            "Does not work with macros."
+        ),
+        advanced=True,
+    )
 
     @property
     def ignore_adding_targets(self) -> set[str]:
-        return set(self.options.ignore_adding_targets)
+        return set(self._ignore_adding_targets)
 
     def alias_for(self, standard_type: str) -> str | None:
         # The get() could return None, but casting to str | None errors.
         # This cast suffices to avoid typecheck errors.
-        return cast(str, self.options.alias_mapping.get(standard_type))
+        return cast(str, self._alias_mapping.get(standard_type))
 
     def validate_build_file_name(self, build_file_patterns: tuple[str, ...]) -> None:
         """Check that the specified BUILD file name works with the repository's BUILD file
@@ -604,7 +572,6 @@ async def tailor(
     union_membership: UnionMembership,
     specs: Specs,
     build_file_options: BuildFileOptions,
-    pants_bin: PantsBin,
 ) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
 
@@ -658,10 +625,10 @@ async def tailor(
         console.print_stdout(f"{verb} {console.blue(build_file_path)}:\n{formatted_changes}")
 
     if tailor_subsystem.check:
-        console.print_stdout(f"\nTo fix `tailor` failures, run `{pants_bin.name} tailor`.")
+        console.print_stdout(f"\nTo fix `tailor` failures, run `{bin_name()} tailor`.")
 
     return TailorGoal(exit_code=1 if tailor_subsystem.check else 0)
 
 
 def rules():
-    return (*collect_rules(), *pants_bin.rules())
+    return collect_rules()

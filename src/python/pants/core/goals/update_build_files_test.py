@@ -9,9 +9,11 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.util_rules import pex
 from pants.core.goals.update_build_files import (
     FormatWithBlackRequest,
+    FormatWithYapfRequest,
     RenameDeprecatedFieldsRequest,
     RenameDeprecatedTargetsRequest,
     RenamedFieldTypes,
@@ -21,14 +23,15 @@ from pants.core.goals.update_build_files import (
     UpdateBuildFilesGoal,
     UpdateBuildFilesSubsystem,
     format_build_file_with_black,
+    format_build_file_with_yapf,
     maybe_rename_deprecated_fields,
     maybe_rename_deprecated_targets,
     update_build_files,
 )
-from pants.core.util_rules import config_files, pants_bin
+from pants.core.util_rules import config_files
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.unions import UnionRule
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 
 # ------------------------------------------------------------------------------------------
 # Generic goal
@@ -64,7 +67,6 @@ def generic_goal_rule_runner() -> RuleRunner:
             update_build_files,
             add_line,
             reverse_lines,
-            *pants_bin.rules(),
             SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, MockRewriteAddLine),
             UnionRule(RewrittenBuildFileRequest, MockRewriteReverseLines),
@@ -131,7 +133,6 @@ def black_rule_runner() -> RuleRunner:
         rules=(
             format_build_file_with_black,
             update_build_files,
-            *pants_bin.rules(),
             *config_files.rules(),
             *pex.rules(),
             SubsystemRule(Black),
@@ -182,6 +183,56 @@ def test_black_config(black_rule_runner: RuleRunner) -> None:
     result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
     assert result.exit_code == 0
     assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
+
+
+# ------------------------------------------------------------------------------------------
+# Yapf formatter fixer
+# ------------------------------------------------------------------------------------------
+
+
+def run_yapf(
+    build_content: str, *, extra_args: list[str] | None = None
+) -> tuple[GoalRuleResult, str]:
+    """Returns the Goal's result and contents of the BUILD file after execution."""
+    rule_runner = RuleRunner(
+        rules=(
+            format_build_file_with_yapf,
+            update_build_files,
+            *config_files.rules(),
+            *pex.rules(),
+            SubsystemRule(Yapf),
+            SubsystemRule(UpdateBuildFilesSubsystem),
+            UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
+        )
+    )
+    rule_runner.write_files({"BUILD": build_content})
+    goal_result = rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal,
+        args=["--update-build-files-formatter=yapf"],
+        global_args=extra_args or (),
+        env_inherit=BLACK_ENV_INHERIT,
+    )
+    rewritten_build = Path(rule_runner.build_root, "BUILD").read_text()
+    return goal_result, rewritten_build
+
+
+def test_yapf_fixer_fixes() -> None:
+    result, build = run_yapf("tgt( name =  't' )")
+    assert result.exit_code == 0
+    assert result.stdout == dedent(
+        """\
+        Updated BUILD:
+          - Format with Yapf
+        """
+    )
+    assert build == "tgt(name='t')\n"
+
+
+def test_yapf_fixer_noops() -> None:
+    result, build = run_yapf('tgt(name="t")\n')
+    assert result.exit_code == 0
+    assert not result.stdout
+    assert build == 'tgt(name="t")\n'
 
 
 # ------------------------------------------------------------------------------------------

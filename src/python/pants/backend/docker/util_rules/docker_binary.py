@@ -6,18 +6,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
-from pants.engine.fs import Digest
-from pants.engine.process import (
+from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
-    Process,
-    ProcessCacheScope,
     SearchPath,
 )
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.fs import Digest
+from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -32,9 +33,10 @@ class DockerBinary(BinaryPath):
         self,
         tags: tuple[str, ...],
         digest: Digest,
-        dockerfile: str | None = None,
-        build_args: DockerBuildArgs | None = None,
-        env: Mapping[str, str] | None = None,
+        dockerfile: str,
+        build_args: DockerBuildArgs,
+        context_root: str,
+        env: Mapping[str, str],
         extra_args: tuple[str, ...] = (),
     ) -> Process:
         args = [self.path, "build", *extra_args]
@@ -42,15 +44,13 @@ class DockerBinary(BinaryPath):
         for tag in tags:
             args.extend(["--tag", tag])
 
-        if build_args:
-            for build_arg in build_args:
-                args.extend(["--build-arg", build_arg])
+        for build_arg in build_args:
+            args.extend(["--build-arg", build_arg])
 
-        if dockerfile:
-            args.extend(["--file", dockerfile])
+        args.extend(["--file", dockerfile])
 
-        # Add build context root.
-        args.append(".")
+        # Docker context root.
+        args.append(context_root)
 
         return Process(
             argv=tuple(args),
@@ -98,10 +98,14 @@ class DockerBinaryRequest:
 
 
 @rule(desc="Finding the `docker` binary", level=LogLevel.DEBUG)
-async def find_docker(docker_request: DockerBinaryRequest) -> DockerBinary:
+async def find_docker(
+    docker_request: DockerBinaryRequest, docker_options: DockerOptions
+) -> DockerBinary:
+    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    search_path = docker_options.executable_search_path(env)
     request = BinaryPathRequest(
         binary_name="docker",
-        search_path=docker_request.search_path,
+        search_path=search_path or docker_request.search_path,
         test=BinaryPathTest(args=["-v"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)

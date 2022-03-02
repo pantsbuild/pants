@@ -144,13 +144,19 @@ impl<N: Node> InnerGraph<N> {
       let (running_candidate, should_terminate) = if let Some(dirty_candidate) = running_scc
         .iter()
         .filter(|&id| self.pg[running_graph[*id]].is_cleaning())
-        .max()
+        .max_by_key(|&id| running_graph[*id])
       {
         // Nodes are being cleaned: clear the highest id entry.
         (dirty_candidate, false)
       } else {
         // There are no nodes being cleaned: terminate the Running node with the highest id.
-        (running_scc.iter().max().unwrap(), true)
+        (
+          running_scc
+            .iter()
+            .max_by_key(|&id| running_graph[*id])
+            .unwrap(),
+          true,
+        )
       };
 
       test_trace_log!(
@@ -168,7 +174,7 @@ impl<N: Node> InnerGraph<N> {
       // predecessor (which as a fellow member of the SCC, must also be reachable).
       let running_predecessor = running_graph
         .neighbors_directed(*running_candidate, Direction::Incoming)
-        .next()
+        .find(|id| running_scc.contains(id))
         .unwrap();
       let running_path: Vec<_> = petgraph::algo::all_simple_paths(
         &running_graph,
@@ -184,11 +190,12 @@ impl<N: Node> InnerGraph<N> {
       let candidate = running_graph[*running_candidate];
       if should_terminate {
         // Render the error, and terminate the Node with it.
-        let path_strs = running_path
+        let path = running_path
           .into_iter()
-          .map(|rni| self.pg[rni].node().to_string())
-          .collect();
-        self.pg[candidate].terminate(N::Error::cyclic(path_strs));
+          .map(|rni| self.pg[running_graph[rni]].node())
+          .collect::<Vec<_>>();
+        let error = N::cyclic_error(&path);
+        self.pg[candidate].terminate(error);
       } else {
         // Else, clear.
         let node = self.pg[candidate].node().clone();
@@ -765,18 +772,6 @@ impl<N: Node> Graph<N> {
     for (n, v) in inner.live(context) {
       f(n, v);
     }
-  }
-
-  ///
-  /// Executes an operation while all access to the Graph is prevented (by acquiring the Graph's
-  /// lock).
-  ///
-  pub fn with_exclusive<F, T>(&self, f: F) -> T
-  where
-    F: FnOnce() -> T,
-  {
-    let _inner = self.inner.lock();
-    f()
   }
 }
 

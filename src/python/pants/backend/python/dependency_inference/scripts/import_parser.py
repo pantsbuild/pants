@@ -48,9 +48,13 @@ class AstVisitor(ast.NodeVisitor):
         imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
         imports.setdefault(name, lineno)
 
-    @staticmethod
-    def _is_pragma_ignored(line):
-        return "# pants: no-infer-dep" in line
+    def _is_pragma_ignored(self, line_index):
+        """Return if the line at `line_index` (0-based) is pragma ignored."""
+        line_iter = itertools.dropwhile(
+            lambda line: line.endswith("\\"),
+            itertools.islice(self._contents_lines, line_index, None),
+        )
+        return "# pants: no-infer-dep" in next(line_iter)
 
     def _visit_import_stmt(self, node, import_prefix):
         # N.B. We only add imports whose line doesn't contain "# pants: no-infer-dep"
@@ -60,26 +64,20 @@ class AstVisitor(ast.NodeVisitor):
         node_lines_iter = itertools.islice(self._contents_lines, node.lineno - 1, None)
         token_iter = tokenize.generate_tokens(lambda: next(node_lines_iter))
 
-        def consume_until(string):
-            for token in token_iter:
-                if token[1] == string:
-                    return token
+        def find_token(string):
+            return next(itertools.dropwhile(lambda token: token[1] != string, token_iter))
 
-        consume_until("import")
+        find_token("import")
 
         # N.B. The names in this list are in the same order as the import statement
         for alias in node.names:
-            token = consume_until(alias.name.split(".")[-1])
+            token = find_token(alias.name.split(".")[-1])
+            lineno = token[3][0] + node.lineno - 1
 
-            # N.B. Keep consuming lines while they end in a line-continuation
-            #   (unfortunately `tokenize` doesn't capture this)
-            while token[4].endswith("\\"):
-                token = next(token_iter)
-
-            if not self._is_pragma_ignored(token[4]):
-                self.add_strong_import(import_prefix + alias.name, token[3][0] + node.lineno - 1)
+            if not self._is_pragma_ignored(lineno - 1):
+                self.add_strong_import(import_prefix + alias.name, lineno)
             if alias.asname and token[1] != alias.asname:
-                consume_until(alias.asname)
+                find_token(alias.asname)
 
     def visit_Import(self, node):
         self._visit_import_stmt(node, "")
@@ -132,15 +130,14 @@ class AstVisitor(ast.NodeVisitor):
         # to explicitly mark namespace packages.  Note that we don't handle more complex
         # uses, such as those that set `level`.
         if isinstance(node.func, ast.Name) and node.func.id == "__import__" and len(node.args) == 1:
-            name = None
-            if sys.version_info[0:2] < (3, 8) and isinstance(node.args[0], ast.Str):
-                name = node.args[0].s
-            elif isinstance(node.args[0], ast.Constant):
-                name = str(node.args[0].value)
+            if sys.version_info[0:2] < (3, 8):
+                name = node.args[0].s if isinstance(node.args[0], ast.Str) else None
+            else:
+                name = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
 
             if name is not None:
                 lineno = node.args[0].lineno
-                if not self._is_pragma_ignored(self._contents_lines[lineno - 1]):
+                if not self._is_pragma_ignored(lineno - 1):
                     self.add_strong_import(name, lineno)
                 return
 

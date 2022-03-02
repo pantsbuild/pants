@@ -3,7 +3,7 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Set, cast
+from typing import Iterable, Set
 
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
@@ -11,6 +11,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import AllUnexpandedTargets, Dependencies, DependenciesRequest
+from pants.option.option_types import BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -85,29 +86,16 @@ class DependeesSubsystem(LineOriented, GoalSubsystem):
     name = "dependees"
     help = "List all targets that depend on any of the input files/targets."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--transitive",
-            default=False,
-            type=bool,
-            help="List all transitive dependees. If unspecified, list direct dependees only.",
-        )
-        register(
-            "--closed",
-            type=bool,
-            default=False,
-            help="Include the input targets in the output, along with the dependees.",
-        )
-
-    @property
-    def transitive(self) -> bool:
-        return cast(bool, self.options.transitive)
-
-    @property
-    def closed(self) -> bool:
-        return cast(bool, self.options.closed)
+    transitive = BoolOption(
+        "--transitive",
+        default=False,
+        help="List all transitive dependees. If unspecified, list direct dependees only.",
+    )
+    closed = BoolOption(
+        "--closed",
+        default=False,
+        help="Include the input targets in the output, along with the dependees.",
+    )
 
 
 class DependeesGoal(Goal):

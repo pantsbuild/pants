@@ -6,7 +6,6 @@ from __future__ import annotations
 import base64
 import logging
 from collections import Counter
-from typing import cast
 
 from pants.engine.internals.scheduler import Workunit
 from pants.engine.rules import collect_rules, rule
@@ -17,7 +16,9 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallbackFactoryRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
+from pants.util.collections import deep_getsizeof
 
 logger = logging.getLogger(__name__)
 
@@ -26,31 +27,36 @@ class StatsAggregatorSubsystem(Subsystem):
     options_scope = "stats"
     help = "An aggregator for Pants stats, such as cache metrics."
 
-    @classmethod
-    def register_options(cls, register):
-        register(
-            "--log",
-            advanced=True,
-            type=bool,
-            default=False,
-            help=(
-                "At the end of the Pants run, log all counter metrics and summaries of "
-                "observation histograms, e.g. the number of cache hits and the time saved by "
-                "caching.\n\nFor histogram summaries to work, you must add `hdrhistogram` to "
-                "`[GLOBAL].plugins`."
-            ),
-        )
-
-    @property
-    def log(self) -> bool:
-        return cast(bool, self.options.log)
+    log = BoolOption(
+        "--log",
+        default=False,
+        help=(
+            "At the end of the Pants run, log all counter metrics and summaries of "
+            "observation histograms, e.g. the number of cache hits and the time saved by "
+            "caching.\n\n"
+            "For histogram summaries to work, you must add `hdrhistogram` to `[GLOBAL].plugins`."
+        ),
+        advanced=True,
+    )
+    memory_summary = BoolOption(
+        "--memory-summary",
+        default=False,
+        help=(
+            "At the end of the Pants run, report a summary of memory usage.\n\n"
+            "Keys are the total size in bytes, the count, and the name. Note that the total size "
+            "is for all instances added together, so you can use total_size // count to get the "
+            "average size."
+        ),
+        advanced=True,
+    )
 
 
 class StatsAggregatorCallback(WorkunitsCallback):
-    def __init__(self, *, has_histogram_module: bool) -> None:
+    def __init__(self, *, log: bool, memory: bool, has_histogram_module: bool) -> None:
         super().__init__()
+        self.log = log
+        self.memory = memory
         self.has_histogram_module = has_histogram_module
-        self.counters: Counter = Counter()
 
     @property
     def can_finish_async(self) -> bool:
@@ -65,27 +71,47 @@ class StatsAggregatorCallback(WorkunitsCallback):
         finished: bool,
         context: StreamingWorkunitContext,
     ) -> None:
-        # Aggregate counters on completed workunits.
-        for workunit in completed_workunits:
-            if "counters" in workunit:
-                for name, value in workunit["counters"].items():
-                    self.counters[name] += value
-
         if not finished:
             return
 
-        # Add any counters with a count of 0.
-        for counter in context.run_tracker.counter_names:
-            if counter not in self.counters:
-                self.counters[counter] = 0
+        if self.log:
+            # Capture global counters.
+            counters = Counter(context.get_metrics())
 
-        # Log aggregated counters.
-        counter_lines = "\n".join(
-            f"  {name}: {count}" for name, count in sorted(self.counters.items())
-        )
-        logger.info(f"Counters:\n{counter_lines}")
+            # Add any counters with a count of 0.
+            for counter in context.run_tracker.counter_names:
+                if counter not in counters:
+                    counters[counter] = 0
 
-        if not self.has_histogram_module:
+            # Log aggregated counters.
+            counter_lines = "\n".join(
+                f"  {name}: {count}" for name, count in sorted(counters.items())
+            )
+            logger.info(f"Counters:\n{counter_lines}")
+
+        if self.memory:
+            ids: set[int] = set()
+            count_by_type: Counter[type] = Counter()
+            sizes_by_type: Counter[type] = Counter()
+
+            items, rust_sizes = context._scheduler.live_items()
+            for item in items:
+                count_by_type[type(item)] += 1
+                sizes_by_type[type(item)] += deep_getsizeof(item, ids)
+
+            entries = [
+                (size, count_by_type[typ], f"{typ.__module__}.{typ.__qualname__}")
+                for typ, size in sizes_by_type.items()
+            ]
+            entries.extend(
+                (size, count, f"(native) {name}") for name, (count, size) in rust_sizes.items()
+            )
+            memory_lines = "\n".join(
+                f"  {size}\t\t{count}\t\t{name}" for size, count, name in sorted(entries)
+            )
+            logger.info(f"Memory summary (total size in bytes, count, name):\n{memory_lines}")
+
+        if not (self.log and self.has_histogram_module):
             return
         from hdrh.histogram import HdrHistogram
 
@@ -125,9 +151,8 @@ class StatsAggregatorCallbackFactoryRequest:
 def construct_callback(
     _: StatsAggregatorCallbackFactoryRequest, subsystem: StatsAggregatorSubsystem
 ) -> WorkunitsCallbackFactory:
-    enabled = subsystem.log
     has_histogram_module = False
-    if enabled:
+    if subsystem.log:
         try:
             import hdrh.histogram  # noqa: F401
         except ImportError:
@@ -141,9 +166,15 @@ def construct_callback(
             has_histogram_module = True
 
     return WorkunitsCallbackFactory(
-        lambda: StatsAggregatorCallback(has_histogram_module=has_histogram_module)
-        if enabled
-        else None
+        lambda: (
+            StatsAggregatorCallback(
+                log=subsystem.log,
+                memory=subsystem.memory_summary,
+                has_histogram_module=has_histogram_module,
+            )
+            if subsystem.log or subsystem.memory_summary
+            else None
+        )
     )
 
 

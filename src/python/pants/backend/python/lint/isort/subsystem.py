@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os.path
-from typing import Iterable, cast
+from typing import Iterable
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -14,8 +14,8 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.custom_types import file_option, shell_str
-from pants.util.docutil import git_url
+from pants.option.option_types import ArgsListOption, BoolOption, FileListOption
+from pants.util.docutil import bin_name, git_url
 
 
 class Isort(PythonToolBase):
@@ -33,74 +33,49 @@ class Isort(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/isort/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=(
-                f"Don't use isort when running `{register.bootstrap.pants_bin_name} fmt` and "
-                f"`{register.bootstrap.pants_bin_name} lint`."
-            ),
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help=(
-                "Arguments to pass directly to isort, e.g. "
-                f'`--{cls.options_scope}-args="--case-sensitive --trailing-comma"`.'
-            ),
-        )
-        register(
-            "--config",
-            # TODO: Figure out how to deprecate this being a list in favor of a single string.
-            #  Thanks to config autodiscovery, this option should only be used because you want
-            #  Pants to explicitly set `--settings`, which only works w/ 1 config file.
-            #  isort 4 users should instead use autodiscovery to support multiple config files.
-            #  Deprecating this could be tricky, but should be possible thanks to the implicit
-            #  add syntax.
-            #
-            #  When deprecating, also deprecate the user manually setting `--settings` with
-            #  `[isort].args`.
-            type=list,
-            member_type=file_option,
-            advanced=True,
-            help=(
-                "Path to config file understood by isort "
-                "(https://pycqa.github.io/isort/docs/configuration/config_files/).\n\n"
-                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                f"this option if the config is located in a non-standard location.\n\n"
-                "If using isort 5+ and you specify only 1 config file, Pants will configure "
-                "isort's argv to point to your config file."
-            ),
-        )
-        register(
-            "--config-discovery",
-            type=bool,
-            default=True,
-            advanced=True,
-            help=(
-                "If true, Pants will include any relevant config files during "
-                "runs (`.isort.cfg`, `pyproject.toml`, `setup.cfg`, `tox.ini` and `.editorconfig`)."
-                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-                f"non-standard location."
-            ),
-        )
-
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
-
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def config(self) -> tuple[str, ...]:
-        return tuple(self.options.config)
+    skip = BoolOption(
+        "--skip",
+        default=False,
+        help=f"Don't use isort when running `{bin_name()} fmt` and `{bin_name()} lint`.",
+    )
+    args = ArgsListOption(
+        help=lambda cls: (
+            "Arguments to pass directly to isort, e.g. "
+            f'`--{cls.options_scope}-args="--case-sensitive --trailing-comma"`.'
+        ),
+    )
+    config = FileListOption(
+        "--config",
+        # TODO: Figure out how to deprecate this being a list in favor of a single string.
+        #  Thanks to config autodiscovery, this option should only be used because you want
+        #  Pants to explicitly set `--settings`, which only works w/ 1 config file.
+        #  isort 4 users should instead use autodiscovery to support multiple config files.
+        #  Deprecating this could be tricky, but should be possible thanks to the implicit
+        #  add syntax.
+        #
+        #  When deprecating, also deprecate the user manually setting `--settings` with
+        #  `[isort].args`.
+        advanced=True,
+        help=lambda cls: (
+            "Path to config file understood by isort "
+            "(https://pycqa.github.io/isort/docs/configuration/config_files/).\n\n"
+            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+            f"this option if the config is located in a non-standard location.\n\n"
+            "If using isort 5+ and you specify only 1 config file, Pants will configure "
+            "isort's argv to point to your config file."
+        ),
+    )
+    config_discovery = BoolOption(
+        "--config-discovery",
+        default=True,
+        advanced=True,
+        help=lambda cls: (
+            "If true, Pants will include any relevant config files during "
+            "runs (`.isort.cfg`, `pyproject.toml`, `setup.cfg`, `tox.ini` and `.editorconfig`)."
+            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+            f"non-standard location."
+        ),
+    )
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         # Refer to https://pycqa.github.io/isort/docs/configuration/config_files/.
@@ -120,14 +95,14 @@ class Isort(PythonToolBase):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
-            discovery=cast(bool, self.options.config_discovery),
+            discovery=self.config_discovery,
             check_existence=check_existence,
             check_content=check_content,
         )
 
 
 class IsortLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Isort.options_scope
+    resolve_name = Isort.options_scope
 
 
 @rule

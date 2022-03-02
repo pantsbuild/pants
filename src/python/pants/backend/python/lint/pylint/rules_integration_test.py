@@ -9,11 +9,16 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.pylint import subsystem
-from pants.backend.python.lint.pylint.rules import PylintRequest
+from pants.backend.python.lint.pylint.rules import PylintPartition, PylintPartitions, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.lint.pylint.subsystem import PylintFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
+from pants.backend.python.target_types import (
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+)
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files
 from pants.engine.addresses import Address
@@ -36,8 +41,9 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(LintResults, [PylintRequest]),
+            QueryRule(PylintPartitions, [PylintRequest]),
         ],
-        target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
+        target_types=[PythonSourceTarget, PythonSourcesGeneratorTarget, PythonRequirementTarget],
     )
 
 
@@ -222,12 +228,14 @@ def test_includes_transitive_dependencies(rule_runner: RuleRunner) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement(name='transitive_req', requirements=['fake'])
+                python_requirement(name='transitive_req', requirements=['freezegun'])
                 python_requirement(name='direct_req', requirements=['ansicolors'])
                 """
             ),
             f"{PACKAGE}/transitive_dep.py": dedent(
                 """\
+                import freezegun
+
                 A = NotImplemented
                 """
             ),
@@ -254,18 +262,26 @@ def test_includes_transitive_dependencies(rule_runner: RuleRunner) -> None:
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_sources(name='transitive_dep', sources=['transitive_dep.py'])
-                python_sources(
-                    name='direct_dep',
-                    sources=['direct_dep.py'],
-                    dependencies=['//:transitive_req', ':transitive_dep']
+                python_source(
+                    name='transitive_dep',
+                    source='transitive_dep.py',
+                    dependencies=['//:transitive_req'],
                 )
-                python_sources(sources=['f.py'], dependencies=['//:direct_req', ':direct_dep'])
+                python_source(
+                    name='direct_dep',
+                    source='direct_dep.py',
+                    dependencies=[':transitive_dep']
+                )
+                python_source(
+                    name="f",
+                    source='f.py',
+                    dependencies=['//:direct_req', ':direct_dep'],
+                )
                 """
             ),
         }
     )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    tgt = rule_runner.get_target(Address(PACKAGE, target_name="f"))
     result = run_pylint(rule_runner, [tgt])
     assert len(result) == 1
     assert result[0].exit_code == PYLINT_ERROR_FAILURE_RETURN_CODE
@@ -441,3 +457,78 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     assert "Your code has been rated at 10.00/10" in result.stdout
     assert result.report == EMPTY_DIGEST
+
+
+def test_partition_targets(rule_runner: RuleRunner) -> None:
+    def create_folder(folder: str, resolve: str, interpreter: str) -> dict[str, str]:
+        return {
+            f"{folder}/dep.py": "",
+            f"{folder}/root.py": "",
+            f"{folder}/BUILD": dedent(
+                f"""\
+                python_source(
+                    name='dep',
+                    source='dep.py',
+                    resolve='{resolve}',
+                    interpreter_constraints=['=={interpreter}.*'],
+                )
+                python_source(
+                    name='root',
+                    source='root.py',
+                    resolve='{resolve}',
+                    interpreter_constraints=['=={interpreter}.*'],
+                    dependencies=[':dep'],
+                )
+                """
+            ),
+        }
+
+    files = {
+        **create_folder("resolveA_py38", "a", "3.8"),
+        **create_folder("resolveA_py39", "a", "3.9"),
+        **create_folder("resolveB_1", "b", "3.9"),
+        **create_folder("resolveB_2", "b", "3.9"),
+    }
+    rule_runner.write_files(files)  # type: ignore[arg-type]
+    rule_runner.set_options(
+        ["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+
+    resolve_a_py38_dep = rule_runner.get_target(Address("resolveA_py38", target_name="dep"))
+    resolve_a_py38_root = rule_runner.get_target(Address("resolveA_py38", target_name="root"))
+    resolve_a_py39_dep = rule_runner.get_target(Address("resolveA_py39", target_name="dep"))
+    resolve_a_py39_root = rule_runner.get_target(Address("resolveA_py39", target_name="root"))
+    resolve_b_dep1 = rule_runner.get_target(Address("resolveB_1", target_name="dep"))
+    resolve_b_root1 = rule_runner.get_target(Address("resolveB_1", target_name="root"))
+    resolve_b_dep2 = rule_runner.get_target(Address("resolveB_2", target_name="dep"))
+    resolve_b_root2 = rule_runner.get_target(Address("resolveB_2", target_name="root"))
+    request = PylintRequest(
+        PylintFieldSet.create(t)
+        for t in (
+            resolve_a_py38_root,
+            resolve_a_py39_root,
+            resolve_b_root1,
+            resolve_b_root2,
+        )
+    )
+
+    partitions = rule_runner.request(PylintPartitions, [request])
+    assert len(partitions) == 3
+
+    def assert_partition(
+        partition: PylintPartition, roots: list[Target], deps: list[Target], interpreter: str
+    ) -> None:
+        root_addresses = {t.address for t in roots}
+        assert {t.address for t in partition.root_targets} == root_addresses
+        assert {t.address for t in partition.closure} == {
+            *root_addresses,
+            *(t.address for t in deps),
+        }
+        assert partition.interpreter_constraints == InterpreterConstraints([f"=={interpreter}.*"])
+
+    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8")
+    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9")
+    assert_partition(
+        partitions[2], [resolve_b_root1, resolve_b_root2], [resolve_b_dep1, resolve_b_dep2], "3.9"
+    )

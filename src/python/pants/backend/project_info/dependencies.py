@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-from typing import cast
 
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
@@ -16,37 +15,23 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
     UnexpandedTargets,
 )
+from pants.option.option_types import BoolOption
 
 
 class DependenciesSubsystem(LineOriented, GoalSubsystem):
     name = "dependencies"
     help = "List the dependencies of the input files/targets."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--transitive",
-            default=False,
-            type=bool,
-            help=(
-                "List all transitive dependencies. If unspecified, list direct dependencies only."
-            ),
-        )
-        register(
-            "--closed",
-            type=bool,
-            default=False,
-            help="Include the input targets in the output, along with the dependencies.",
-        )
-
-    @property
-    def transitive(self) -> bool:
-        return cast(bool, self.options.transitive)
-
-    @property
-    def closed(self) -> bool:
-        return cast(bool, self.options.closed)
+    transitive = BoolOption(
+        "--transitive",
+        default=False,
+        help=("List all transitive dependencies. If unspecified, list direct dependencies only."),
+    )
+    closed = BoolOption(
+        "--closed",
+        default=False,
+        help="Include the input targets in the output, along with the dependencies.",
+    )
 
 
 class Dependencies(Goal):

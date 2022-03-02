@@ -25,6 +25,12 @@ from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.system_binaries import (
+    BashBinary,
+    BinaryNotFoundError,
+    BinaryPathRequest,
+    BinaryPaths,
+)
 from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
@@ -36,14 +42,7 @@ from pants.engine.fs import (
     MergeDigests,
     Snapshot,
 )
-from pants.engine.process import (
-    BashBinary,
-    BinaryNotFoundError,
-    BinaryPathRequest,
-    BinaryPaths,
-    Process,
-    ProcessResult,
-)
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -51,6 +50,7 @@ from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
     SourcesField,
+    Target,
     TransitiveTargets,
     TransitiveTargetsRequest,
     WrappedTarget,
@@ -67,8 +67,8 @@ class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
 
 
 @dataclass(frozen=True)
-class ShellCommandProcessRequest(WrappedTarget):
-    pass
+class ShellCommandProcessRequest:
+    target: Target
 
 
 class RunShellCommand(RunFieldSet):

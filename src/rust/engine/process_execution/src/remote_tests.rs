@@ -89,6 +89,7 @@ async fn make_execute_request() {
     jdk_home: None,
     platform_constraint: None,
     execution_slot_variable: None,
+    concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -165,6 +166,7 @@ async fn make_execute_request_with_instance_name() {
     jdk_home: None,
     platform_constraint: None,
     execution_slot_variable: None,
+    concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -254,6 +256,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     jdk_home: None,
     platform_constraint: None,
     execution_slot_variable: None,
+    concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -490,6 +493,7 @@ async fn make_execute_request_with_timeout() {
     jdk_home: None,
     platform_constraint: None,
     execution_slot_variable: None,
+    concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -590,6 +594,7 @@ async fn make_execute_request_using_immutable_inputs() {
     jdk_home: None,
     platform_constraint: None,
     execution_slot_variable: None,
+    concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -994,7 +999,7 @@ async fn sends_headers() {
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkunitStore::new(false),
+    workunit_store: WorkunitStore::new(false, log::Level::Debug),
     build_id: String::from("marmosets"),
     run_id: RunId(0),
   };

@@ -98,7 +98,8 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             ignored3 as  # pants: no-infer-dep
                 alias3,
             ignored4 as alias4, ignored4,  # pants: no-infer-dep
-            not_ignored2,
+            not_ignored2, \\
+            not_ignored3
         )
         from multiline_import2 import (ignored1,  # pants: no-infer-dep
             not_ignored)
@@ -121,8 +122,9 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "project.demo.OriginalName": ImpInfo(lineno=12, weak=False),
             "multiline_import1.not_ignored1": ImpInfo(lineno=16, weak=False),
             "multiline_import1.not_ignored2": ImpInfo(lineno=23, weak=False),
-            "multiline_import2.not_ignored": ImpInfo(lineno=26, weak=False),
-            "project.circular_dep.CircularDep": ImpInfo(lineno=29, weak=False),
+            "multiline_import1.not_ignored3": ImpInfo(lineno=24, weak=False),
+            "multiline_import2.not_ignored": ImpInfo(lineno=27, weak=False),
+            "project.circular_dep.CircularDep": ImpInfo(lineno=30, weak=False),
         },
     )
 
@@ -140,6 +142,13 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
         )
         __import__(
             "also_not_ignored_but_looks_like_it_could_be"
+        )  # pants: no-infer-dep
+        __import__(
+            "ignored_too" \\
+            # pants: no-infer-dep
+        )
+        __import__(
+            "ignored_as_well" \\
         )  # pants: no-infer-dep
         """
     )
@@ -353,6 +362,7 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
 
         __import__(u"pkg_resources")
         __import__(b"treat.as.a.regular.import.not.a.string.import")
+        __import__(u"{}".format("interpolation"))
 
         importlib.import_module(b"dep.from.bytes")
         importlib.import_module(u"dep.from.str")
@@ -375,13 +385,13 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
             "project.demo.Demo": ImpInfo(lineno=5, weak=False),
             "pkg_resources": ImpInfo(lineno=7, weak=False),
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=8, weak=False),
-            "dep.from.bytes": ImpInfo(lineno=10, weak=True),
-            "dep.from.str": ImpInfo(lineno=11, weak=True),
-            "dep.from.str_狗": ImpInfo(lineno=12, weak=True),
-            "weak1": ImpInfo(lineno=16, weak=True),
-            "strong1": ImpInfo(lineno=17, weak=False),
-            "strong2": ImpInfo(lineno=18, weak=False),
-            "strong3": ImpInfo(lineno=19, weak=False),
+            "dep.from.bytes": ImpInfo(lineno=11, weak=True),
+            "dep.from.str": ImpInfo(lineno=12, weak=True),
+            "dep.from.str_狗": ImpInfo(lineno=13, weak=True),
+            "weak1": ImpInfo(lineno=17, weak=True),
+            "strong1": ImpInfo(lineno=18, weak=False),
+            "strong2": ImpInfo(lineno=19, weak=False),
+            "strong3": ImpInfo(lineno=20, weak=False),
         },
     )
 

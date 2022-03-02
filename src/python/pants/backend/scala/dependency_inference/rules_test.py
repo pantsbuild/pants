@@ -12,8 +12,8 @@ from pants.backend.scala.dependency_inference.rules import rules as dep_inferenc
 from pants.backend.scala.target_types import ScalaSourceField, ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_rules
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -21,8 +21,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.jvm.jdk_rules import rules as jdk_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve import jvm_tool
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -33,10 +32,8 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *config_files.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
+            *jvm_tool.rules(),
             *dep_inference_rules(),
-            *external_tool_rules(),
             *scala_parser.rules(),
             *symbol_mapper.rules(),
             *scala_target_rules(),
@@ -49,6 +46,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Targets, [UnparsedAddressInputs]),
         ],
         target_types=[ScalaSourcesGeneratorTarget],
+        objects={"parametrize": Parametrize},
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -86,21 +84,15 @@ def test_infer_scala_imports_same_target(rule_runner: RuleRunner) -> None:
     target_a = rule_runner.get_target(Address("", target_name="t", relative_file_path="A.scala"))
     target_b = rule_runner.get_target(Address("", target_name="t", relative_file_path="B.scala"))
 
-    assert (
-        rule_runner.request(
-            InferredDependencies,
-            [InferScalaSourceDependencies(target_a[ScalaSourceField])],
-        )
-        == InferredDependencies(dependencies=[])
-    )
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferScalaSourceDependencies(target_a[ScalaSourceField])],
+    ) == InferredDependencies(dependencies=[])
 
-    assert (
-        rule_runner.request(
-            InferredDependencies,
-            [InferScalaSourceDependencies(target_b[ScalaSourceField])],
-        )
-        == InferredDependencies(dependencies=[])
-    )
+    assert rule_runner.request(
+        InferredDependencies,
+        [InferScalaSourceDependencies(target_b[ScalaSourceField])],
+    ) == InferredDependencies(dependencies=[])
 
 
 @maybe_skip_jdk_test
@@ -243,3 +235,71 @@ def test_infer_unqualified_symbol_from_intermediate_scope(rule_runner: RuleRunne
         InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
     )
     assert deps == InferredDependencies([Address("bar", relative_file_path="B.scala")])
+
+
+@maybe_skip_jdk_test
+def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "lib/BUILD": dedent(
+                """\
+            scala_sources(resolve=parametrize("scala-2.13", "scala-2.12"))
+            """
+            ),
+            "lib/Library.scala": dedent(
+                """\
+            package org.pantsbuild.lib
+
+            object Library {
+              def grok(): Unit = {
+                println("Hello world!")
+              }
+            }
+            """
+            ),
+            "user/BUILD": dedent(
+                """\
+            scala_sources(resolve=parametrize("scala-2.13", "scala-2.12"))
+            """
+            ),
+            "user/Main.scala": dedent(
+                """\
+            package org.pantsbuild.user
+
+            import org.pantsbuild.lib.Library
+
+            object Main {
+              def main(args: Array[String]): Unit = {
+                Library.grok()
+              }
+            }
+            """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            '--jvm-resolves={"scala-2.13":"3rdparty/jvm/scala-2.13.lock", "scala-2.12":"3rdparty/jvm/scala-2.12.lock"}'
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    tgt = rule_runner.get_target(
+        Address("user", relative_file_path="Main.scala", parameters={"resolve": "scala-2.13"})
+    )
+    deps = rule_runner.request(
+        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+    )
+    assert deps == InferredDependencies(
+        [Address("lib", relative_file_path="Library.scala", parameters={"resolve": "scala-2.13"})]
+    )
+
+    tgt = rule_runner.get_target(
+        Address("user", relative_file_path="Main.scala", parameters={"resolve": "scala-2.12"})
+    )
+    deps = rule_runner.request(
+        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+    )
+    assert deps == InferredDependencies(
+        [Address("lib", relative_file_path="Library.scala", parameters={"resolve": "scala-2.12"})]
+    )

@@ -8,11 +8,10 @@ import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
-from pants.build_graph.build_configuration import BuildConfiguration
 from pants.option.alias import CliAlias
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
@@ -24,6 +23,9 @@ from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
+
+if TYPE_CHECKING:
+    from pants.build_graph.build_configuration import BuildConfiguration
 
 
 @dataclass(frozen=True)
@@ -167,6 +169,13 @@ class OptionsBootstrapper:
             args = alias.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
 
+            # We need to set this env var to allow various static help strings to reference the
+            # right name (via `pants.util.docutil`), and we need to do it as early as possible to
+            # avoid needing to lazily import code to avoid chicken-and-egg-problems. This is the
+            # earliest place it makes sense to do so and is generically used by both the local and
+            # remote pants runners.
+            os.environ["PANTS_BIN_NAME"] = bootstrap_option_values.pants_bin_name
+
             return cls(
                 env_tuples=env_tuples,
                 bootstrap_args=bargs,
@@ -192,7 +201,7 @@ class OptionsBootstrapper:
         # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
         # Stop before '--' since args after that are pass-through and may have duplicate names to our
         # bootstrap options.
-        bargs = ("./pants",) + tuple(
+        bargs = ("<ignored>",) + tuple(
             filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
         )
         return bargs

@@ -14,8 +14,9 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
+from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
 from pants.engine.internals.selectors import Get
-from pants.engine.process import BinaryPathRequest, BinaryPaths, Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel

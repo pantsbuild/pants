@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from typing import ClassVar
 
 from pants.base.exiter import ExitCode
 from pants.base.specs import Specs
@@ -45,7 +46,6 @@ class HelpBuiltinGoalBase(BuiltinGoal):
         )
         global_options = options.for_global_scope()
         help_printer = HelpPrinter(
-            bin_name=global_options.pants_bin_name,
             help_request=self.create_help_request(options),
             all_help_info=all_help_info,
             color=global_options.colors,
@@ -73,31 +73,30 @@ class NoGoalHelpBuiltinGoal(HelpBuiltinGoalBase):
         return NoGoalHelp()
 
 
-class ThingHelpBuiltinGoal(HelpBuiltinGoalBase):
-    name = "help"
-    help = "Display usage message."
-    aliases = (
-        "-h",
-        "--help",
-    )
+class ThingHelpBuiltinGoalBase(HelpBuiltinGoalBase):
+    _advanced: ClassVar[bool]
 
     def create_help_request(self, options: Options) -> HelpRequest:
+        # Include the `options.specs` for things to give help on, as args with any . : * or # in
+        # them is deemed "likely a spec" by `pants.option.arg_splitter:ArgSplitter.likely_a_spec()`.
         return ThingHelp(
-            advanced=False,
-            things=tuple(options.goals) + tuple(options.unknown_goals),
+            advanced=self._advanced,
+            things=tuple(options.goals) + tuple(options.unknown_goals) + tuple(options.specs),
         )
 
 
-class ThingHelpAdvancedBuiltinGoal(HelpBuiltinGoalBase):
+class ThingHelpBuiltinGoal(ThingHelpBuiltinGoalBase):
+    name = "help"
+    help = "Display usage message."
+    aliases = ("-h", "--help")
+    _advanced = False
+
+
+class ThingHelpAdvancedBuiltinGoal(ThingHelpBuiltinGoalBase):
     name = "help-advanced"
     help = "Help for advanced options."
     aliases = ("--help-advanced",)
-
-    def create_help_request(self, options: Options) -> HelpRequest:
-        return ThingHelp(
-            advanced=True,
-            things=tuple(options.goals) + tuple(options.unknown_goals),
-        )
+    _advanced = True
 
 
 class UnknownGoalHelpBuiltinGoal(HelpBuiltinGoalBase):

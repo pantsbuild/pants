@@ -25,7 +25,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
@@ -34,15 +34,11 @@ from pants.engine.target import (
     HydrateSourcesRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
-from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
+from pants.jvm import jdk_rules
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
+from pants.jvm.resolve import jvm_tool
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
@@ -53,7 +49,7 @@ class GenerateJavaFromAvroRequest(GenerateSourcesRequest):
 
 
 class AvroToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = AvroSubsystem.options_scope
+    resolve_name = AvroSubsystem.options_scope
 
 
 @dataclass(frozen=True)
@@ -96,22 +92,15 @@ async def generate_java_from_avro(
 @rule
 async def compile_avro_source(
     request: CompileAvroSourceRequest,
+    jdk: InternalJdk,
     avro_tools: AvroSubsystem,
-    jdk_setup: JdkSetup,
-    bash: BashBinary,
 ) -> CompiledAvroSource:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(avro_tools))
-
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, AvroToolLockfileSentinel())
     tool_classpath, subsetted_input_digest, empty_output_dir = await MultiGet(
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                lockfiles=(lockfile,),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(
             Digest,
             DigestSubset(
@@ -137,8 +126,7 @@ async def compile_avro_source(
         ),
     )
 
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
     }
 
@@ -147,36 +135,36 @@ async def compile_avro_source(
         *,
         overridden_input_digest: Digest | None = None,
         overridden_output_dir: str | None = None,
-    ) -> Process:
-        return Process(
-            [
-                *jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath)),
+    ) -> JvmProcess:
+
+        return JvmProcess(
+            jdk=jdk,
+            argv=(
                 "org.apache.avro.tool.Main",
                 *args,
-            ],
-            input_digest=overridden_input_digest
-            if overridden_input_digest is not None
-            else input_digest,
-            immutable_input_digests=immutable_input_digests,
-            use_nailgun=immutable_input_digests,
+            ),
+            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
+            input_digest=(
+                overridden_input_digest if overridden_input_digest is not None else input_digest
+            ),
+            extra_immutable_input_digests=extra_immutable_input_digests,
+            extra_nailgun_keys=extra_immutable_input_digests,
             description="Generating Java sources from Avro source.",
             level=LogLevel.DEBUG,
             output_directories=(overridden_output_dir if overridden_output_dir else output_dir,),
-            env=jdk_setup.env,
-            append_only_caches=jdk_setup.append_only_caches,
         )
 
     path = PurePath(request.path)
     if path.suffix == ".avsc":
         result = await Get(
             ProcessResult,
-            Process,
+            JvmProcess,
             make_avro_process(["compile", "schema", request.path, output_dir]),
         )
     elif path.suffix == ".avpr":
         result = await Get(
             ProcessResult,
-            Process,
+            JvmProcess,
             make_avro_process(["compile", "protocol", request.path, output_dir]),
         )
     elif path.suffix == ".avdl":
@@ -188,7 +176,7 @@ async def compile_avro_source(
         idl_input_digest = await Get(Digest, MergeDigests([input_digest, idl_output_dir_digest]))
         idl_result = await Get(
             ProcessResult,
-            Process,
+            JvmProcess,
             make_avro_process(
                 ["idl", request.path, avpr_path],
                 overridden_input_digest=idl_input_digest,
@@ -201,7 +189,7 @@ async def compile_avro_source(
         )
         result = await Get(
             ProcessResult,
-            Process,
+            JvmProcess,
             make_avro_process(
                 ["compile", "protocol", avpr_path, output_dir],
                 overridden_input_digest=protocol_input_digest,
@@ -217,16 +205,17 @@ async def compile_avro_source(
 
 
 @rule
-async def generate_avro_tools_lockfile_request(
+def generate_avro_tools_lockfile_request(
     _: AvroToolLockfileSentinel, tool: AvroSubsystem
-) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
+        *jvm_tool.rules(),
+        *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromAvroRequest),
         UnionRule(GenerateToolLockfileSentinel, AvroToolLockfileSentinel),
     )

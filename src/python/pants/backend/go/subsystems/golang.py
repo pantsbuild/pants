@@ -3,23 +3,23 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import cast
 
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.process import (
+from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
-    Process,
-    ProcessCacheScope,
-    ProcessResult,
 )
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list
@@ -31,49 +31,41 @@ class GolangSubsystem(Subsystem):
     options_scope = "golang"
     help = "Options for Golang support."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--go-search-paths",
-            type=list,
-            member_type=str,
-            default=["<PATH>"],
-            help=(
-                "A list of paths to search for Go.\n\n"
-                "Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`. "
-                "Earlier entries will be searched first.\n\n"
-                "The special string '<PATH>' will expand to the contents of the PATH env var."
-            ),
-        )
-        # TODO(#13005): Support multiple Go versions in a project?
-        register(
-            "--expected-version",
-            type=str,
-            default="1.17",
-            help=(
-                "The Go version you are using, such as `1.17`.\n\n"
-                "Pants will only use Go distributions from `--go-search-paths` that have the "
-                "expected version, and it will error if none are found.\n\n"
-                "Do not include the patch version."
-            ),
-        )
-        register(
-            "--subprocess-env-vars",
-            type=list,
-            member_type=str,
-            default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
-            advanced=True,
-            help=(
-                "Environment variables to set when invoking the `go` tool. "
-                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-                "or just `ENV_VAR` to copy the value from Pants's own environment."
-            ),
-        )
+    _go_search_paths = StrListOption(
+        "--go-search-paths",
+        default=["<PATH>"],
+        help=(
+            "A list of paths to search for Go.\n\n"
+            "Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`. "
+            "Earlier entries will be searched first.\n\n"
+            "The special string '<PATH>' will expand to the contents of the PATH env var."
+        ),
+    )
+    # TODO(#13005): Support multiple Go versions in a project?
+    expected_version = StrOption(
+        "--expected-version",
+        default="1.17",
+        help=(
+            "The Go version you are using, such as `1.17`.\n\n"
+            "Pants will only use Go distributions from `--go-search-paths` that have the "
+            "expected version, and it will error if none are found.\n\n"
+            "Do not include the patch version."
+        ),
+    )
+    _subprocess_env_vars = StrListOption(
+        "--subprocess-env-vars",
+        default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
+        help=(
+            "Environment variables to set when invoking the `go` tool. "
+            "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
+            "or just `ENV_VAR` to copy the value from Pants's own environment."
+        ),
+        advanced=True,
+    )
 
     def go_search_paths(self, env: Environment) -> tuple[str, ...]:
         def iter_path_entries():
-            for entry in self.options.go_search_paths:
+            for entry in self._go_search_paths:
                 if entry == "<PATH>":
                     path = env.get("PATH")
                     if path:
@@ -84,12 +76,8 @@ class GolangSubsystem(Subsystem):
         return tuple(OrderedSet(iter_path_entries()))
 
     @property
-    def expected_version(self) -> str:
-        return cast(str, self.options.expected_version)
-
-    @property
     def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
-        return tuple(sorted(set(self.options.subprocess_env_vars)))
+        return tuple(sorted(set(self._subprocess_env_vars)))
 
 
 @dataclass(frozen=True)
@@ -97,6 +85,38 @@ class GoRoot:
     """Path to the Go installation (the `GOROOT`)."""
 
     path: str
+    version: str
+
+    _raw_metadata: FrozenDict[str, str]
+
+    def is_compatible_version(self, version: str) -> bool:
+        """Can this Go compiler handle the target version?
+
+        Inspired by
+        https://github.com/golang/go/blob/30501bbef9fcfc9d53e611aaec4d20bb3cdb8ada/src/cmd/go/internal/work/exec.go#L429-L445.
+
+        Input expected in the form `1.17`.
+        """
+        if version == "1.0":
+            return True
+
+        def parse(v: str) -> tuple[int, int]:
+            major, minor = v.split(".", maxsplit=1)
+            return int(major), int(minor)
+
+        return parse(version) <= parse(self.version)
+
+    @property
+    def full_version(self) -> str:
+        return self._raw_metadata["GOVERSION"]
+
+    @property
+    def goos(self) -> str:
+        return self._raw_metadata["GOOS"]
+
+    @property
+    def goarch(self) -> str:
+        return self._raw_metadata["GOARCH"]
 
 
 @rule(desc="Find Go binary", level=LogLevel.DEBUG)
@@ -155,15 +175,17 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
             env_result = await Get(
                 ProcessResult,
                 Process(
-                    (binary_path.path, "env", "GOROOT"),
-                    description=f"Determine Go version and GOROOT for {binary_path.path}",
+                    (binary_path.path, "env", "-json"),
+                    description=f"Determine Go SDK metadata for {binary_path.path}",
                     level=LogLevel.DEBUG,
                     cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
                     env={"GOPATH": "/does/not/matter"},
                 ),
             )
-            goroot = env_result.stdout.decode("utf-8").strip()
-            return GoRoot(goroot)
+            sdk_metadata = json.loads(env_result.stdout.decode())
+            return GoRoot(
+                path=sdk_metadata["GOROOT"], version=version, _raw_metadata=FrozenDict(sdk_metadata)
+            )
 
         logger.debug(
             f"Go binary at {binary_path.path} has version {version}, but this "

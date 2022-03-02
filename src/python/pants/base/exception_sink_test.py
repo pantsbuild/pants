@@ -123,8 +123,8 @@ def test_backup_logging_on_fatal_error(caplog):
     def assert_log(log_file_type: str, log):
         assert bool(
             re.search(
-                fr"Error logging the message 'XXX' to the {log_file_type} file handle for .* at "
-                fr"pid {os.getpid()}",
+                rf"Error logging the message 'XXX' to the {log_file_type} file handle for .* at "
+                rf"pid {os.getpid()}",
                 log.msg,
             )
         )

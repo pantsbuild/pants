@@ -34,9 +34,11 @@ async def find_putative_targets(
         Get(Paths, PathGlobs, req.search_paths.path_globs("*.avpr")),
         Get(Paths, PathGlobs, req.search_paths.path_globs("*.avdl")),
     )
-    unowned_avro_files = set(
-        [*all_avsc_files.files, *all_avpr_files.files, *all_avdl_files.files]
-    ) - set(all_owned_sources)
+    unowned_avro_files = {
+        *all_avsc_files.files,
+        *all_avpr_files.files,
+        *all_avdl_files.files,
+    } - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(
             AvroSourcesGeneratorTarget,

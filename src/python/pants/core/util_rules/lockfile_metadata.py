@@ -7,8 +7,9 @@ import hashlib
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, Type, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Iterable, Tuple, Type, TypeVar, cast
 
+from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
 
 BEGIN_LOCKFILE_HEADER = b"# --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---"
@@ -95,10 +96,10 @@ class LockfileMetadata:
 
         error_suffix = (
             "To resolve this error, you will need to regenerate the lockfile by running "
-            "`./pants generate-lockfiles"
+            f"`{bin_name()} generate-lockfiles"
         )
         if resolve_name:
-            error_suffix += " --resolve={tool_name}"
+            error_suffix += f" --resolve={resolve_name}"
         error_suffix += "`."
 
         if lockfile_path is not None and resolve_name is not None:
@@ -151,7 +152,7 @@ class LockfileMetadata:
         )
 
     def add_header_to_lockfile(self, lockfile: bytes, *, regenerate_command: str) -> bytes:
-        metadata_dict = self._header_dict()
+        metadata_dict = self.__render_header_dict()
         metadata_json = json.dumps(metadata_dict, ensure_ascii=True, indent=2).splitlines()
         metadata_as_a_comment = "\n".join(f"# {l}" for l in metadata_json).encode("ascii")
         header = b"%b\n%b\n%b" % (BEGIN_LOCKFILE_HEADER, metadata_as_a_comment, END_LOCKFILE_HEADER)
@@ -163,23 +164,42 @@ class LockfileMetadata:
 
         return b"%b\n#\n%b\n\n%b" % (regenerate_command_bytes, header, lockfile)
 
-    def _header_dict(self) -> dict[Any, Any]:
+    def __render_header_dict(self) -> dict[Any, Any]:
         """Produce a dictionary to be serialized into the lockfile header.
 
-        Subclasses should call `super` and update the resulting dictionary.
+        Each class should implement a class method called `additional_header_attrs`, which returns a
+        `dict` containing the metadata attributes that should be stored in the lockfile.
         """
 
-        version: int
+        attrs: dict[Any, Tuple[Any, Type]] = {}  # attr name -> (value, where we first saw it)
+        for cls in reversed(self.__class__.__mro__[:-1]):
+            new_attrs = cast(LockfileMetadata, cls).additional_header_attrs(self)
+            for attr in new_attrs:
+                if attr in attrs and attrs[attr][0] != new_attrs[attr]:
+                    raise AssertionError(
+                        f"Lockfile header attribute `{attr}` was returned by both "
+                        f"`{attrs[attr][1]}` and `{cls}`, returning different values. If these "
+                        "classes return the same attribute, they must also return the same "
+                        "value."
+                    )
+                attrs[attr] = new_attrs[attr], cls
+
+        return {key: val[0] for key, val in attrs.items()}
+
+    @classmethod
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        return {"version": instance.metadata_version()}
+
+    def metadata_version(self):
+        """Returns the version number for this metadata class, or raises an exception.
+
+        To avoid raising an exception, ensure the subclass is decorated with
+        `lockfile_metadata_version`
+        """
         for (scope, ver), cls in _concrete_metadata_classes.items():
             if isinstance(self, cls):
-                version = ver
-                break
-        else:
-            raise ValueError("Trying to serialize an unregistered `LockfileMetadata` subclass.")
-
-        return {
-            "version": version,
-        }
+                return ver
+        raise ValueError("Trying to serialize an unregistered `LockfileMetadata` subclass.")
 
 
 def calculate_invalidation_digest(requirements: Iterable[str]) -> str:

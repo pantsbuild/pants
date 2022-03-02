@@ -15,6 +15,7 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallbackFactoryRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.option.option_types import StrOption
 from pants.option.subsystem import Subsystem
 
 logger = logging.getLogger(__name__)
@@ -27,9 +28,7 @@ class WorkunitsLoggerOptions(Subsystem):
     options_scope = "workunit-logger"
     help = """Example plugin that logs workunits to a file."""
 
-    @classmethod
-    def register_options(cls, register):
-        register("--dest", type=str, help="A filename to log workunits to.")
+    dest = StrOption("--dest", default=None, help="A filename to log workunits to.")
 
 
 class WorkunitsLoggerRequest:
