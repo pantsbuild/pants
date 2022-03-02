@@ -103,23 +103,23 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
     assets = BoolOption(
-            "--assets",
-            default=False,
-            help=(
-                "Infer a target's asset dependencies based on strings that look like Posix "
-                "filepaths, such as those given to `open` or `pkgutil.get_data`. To ignore any "
-                "false positives, put `!{bad_address}` in the `dependencies` field of your target."
-            ),
-        )
+        "--assets",
+        default=False,
+        help=(
+            "Infer a target's asset dependencies based on strings that look like Posix "
+            "filepaths, such as those given to `open` or `pkgutil.get_data`. To ignore any "
+            "false positives, put `!{bad_address}` in the `dependencies` field of your target."
+        ),
+    )
     asset_min_slashes = IntOption(
-            "--asset-min-slashes",
-            default=1,
-            help=(
-                "If --assets is True, treat valid-looking strings with at least this many forward "
-                "slash characters as potential assets. E.g. `'data/databases/prod.db'` will be "
-                "treated as a potential candidate if this option is set to 2 but not to 3."
-            ),
-        )
+        "--asset-min-slashes",
+        default=1,
+        help=(
+            "If --assets is True, treat valid-looking strings with at least this many forward "
+            "slash characters as potential assets. E.g. `'data/databases/prod.db'` will be "
+            "treated as a potential candidate if this option is set to 2 but not to 3."
+        ),
+    )
     inits = BoolOption(
         "--inits",
         default=False,
