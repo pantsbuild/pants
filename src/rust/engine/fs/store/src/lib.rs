@@ -387,7 +387,7 @@ impl Store {
     // TODO: Use the Directory entry's recorded Digest, and execute a batch store rather than
     // recomputing it via `record_directory`.
     tree.walk(&mut |_, entry| match entry {
-      directory::Entry::Directory(d) => directories.push(d.as_directory()),
+      directory::Entry::Directory(d) => directories.push(d.as_remexec_directory()),
       directory::Entry::File(_) => (),
     });
 
@@ -398,10 +398,7 @@ impl Store {
         .collect::<Vec<_>>(),
     )
     .await?;
-    Ok(DirectoryDigest {
-      digest: digests[0],
-      tree: Some(tree),
-    })
+    Ok(DirectoryDigest::new(digests[0], tree))
   }
 
   ///

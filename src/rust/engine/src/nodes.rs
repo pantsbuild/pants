@@ -292,14 +292,15 @@ impl ExecuteProcess {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
       let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
-        .map_err(|err| format!("Error parsing input_digest {}", err))?;
+        .map_err(|err| format!("Error parsing input_digest {}", err))?
+        .todo_as_digest();
       let immutable_inputs =
         externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
           .into_iter()
           .map(|(path, digest)| {
             Ok((
               RelativePath::new(path)?,
-              lift_directory_digest(digest)?.digest,
+              lift_directory_digest(digest)?.todo_as_digest(),
             ))
           })
           .collect::<Result<BTreeMap<_, _>, String>>()?;
@@ -311,7 +312,7 @@ impl ExecuteProcess {
 
       Ok(InputDigests::new(
         store,
-        input_files.digest,
+        input_files,
         immutable_inputs,
         use_nailgun,
       ))

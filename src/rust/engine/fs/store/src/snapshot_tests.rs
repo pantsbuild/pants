@@ -120,7 +120,7 @@ async fn snapshot_from_digest() {
     // From disk.
     Snapshot::from_digest(
       store.clone(),
-      DirectoryDigest::new(expected_snapshot.digest)
+      DirectoryDigest::from_persisted_digest(expected_snapshot.digest)
     )
     .await
     .unwrap()

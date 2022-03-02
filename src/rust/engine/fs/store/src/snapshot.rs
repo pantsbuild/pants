@@ -89,17 +89,17 @@ impl Snapshot {
     // only (as allowed by the DirectoryDigest contract).
     let directory_digest = store.record_digest_tree(tree.clone(), true).await?;
     Ok(Self {
-      digest: directory_digest.digest,
+      digest: directory_digest.as_digest(),
       tree,
     })
   }
 
   pub async fn from_digest(store: Store, digest: DirectoryDigest) -> Result<Snapshot, String> {
-    if let Some(tree) = digest.tree {
+    if let Some(ref tree) = digest.tree {
       // The DigestTrie is already loaded.
       return Ok(Self {
-        digest: digest.digest,
-        tree,
+        digest: digest.as_digest(),
+        tree: tree.clone(),
       });
     }
 
@@ -107,7 +107,7 @@ impl Snapshot {
     // TODO: Add a native implementation that skips creating PathStats and directly produces
     // a DigestTrie.
     let path_stats_per_directory = store
-      .walk(digest.digest, |_, path_so_far, _, directory| {
+      .walk(digest.as_digest(), |_, path_so_far, _, directory| {
         let mut path_stats = Vec::new();
         path_stats.extend(directory.directories.iter().map(move |dir_node| {
           let path = path_so_far.join(dir_node.name.clone());
@@ -136,14 +136,15 @@ impl Snapshot {
 
     let tree = DigestTrie::from_path_stats(path_stats, &file_digests)?;
     let computed_digest = tree.compute_root_digest();
-    if digest.digest != computed_digest {
+    if digest.as_digest() != computed_digest {
       return Err(format!(
         "Computed digest for Snapshot loaded from store mismatched: {:?} vs {:?}",
-        digest.digest, computed_digest
+        digest.as_digest(),
+        computed_digest
       ));
     }
     Ok(Self {
-      digest: digest.digest,
+      digest: digest.as_digest(),
       tree,
     })
   }
@@ -289,10 +290,7 @@ impl fmt::Debug for Snapshot {
 
 impl From<Snapshot> for DirectoryDigest {
   fn from(s: Snapshot) -> Self {
-    DirectoryDigest {
-      digest: s.digest,
-      tree: Some(s.tree),
-    }
+    Self::new(s.digest, s.tree)
   }
 }
 

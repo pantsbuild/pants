@@ -77,7 +77,7 @@ impl EngineAwareReturnType {
         lift_file_digest(value).map(ArtifactOutput::FileDigest)
       } else {
         let digest_value = value.getattr("digest").ok()?;
-        lift_directory_digest(digest_value).map(|dd| ArtifactOutput::Snapshot(dd.digest))
+        lift_directory_digest(digest_value).map(|dd| ArtifactOutput::Snapshot(dd.todo_as_digest()))
       }
       .ok()?;
       output.push((key, artifact_output));

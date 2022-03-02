@@ -42,29 +42,32 @@ pub struct PyDigest(pub DirectoryDigest);
 
 impl fmt::Display for PyDigest {
   fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+    let digest = self.0.as_digest();
     write!(
       f,
       "Digest('{}', {})",
-      self.0.digest.hash.to_hex(),
-      self.0.digest.size_bytes
+      digest.hash.to_hex(),
+      digest.size_bytes,
     )
   }
 }
 
 #[pymethods]
 impl PyDigest {
+  /// NB: This constructor is only safe for use in testing, or when there is some other guarantee
+  /// that the Digest has been persisted.
   #[new]
   fn __new__(fingerprint: &str, serialized_bytes_length: usize) -> PyResult<Self> {
     let fingerprint = Fingerprint::from_hex_string(fingerprint)
       .map_err(|e| PyValueError::new_err(format!("Invalid digest hex: {}", e)))?;
-    Ok(Self(DirectoryDigest::new(Digest::new(
+    Ok(Self(DirectoryDigest::from_persisted_digest(Digest::new(
       fingerprint,
       serialized_bytes_length,
     ))))
   }
 
   fn __hash__(&self) -> u64 {
-    self.0.digest.hash.prefix_hash()
+    self.0.as_digest().hash.prefix_hash()
   }
 
   fn __repr__(&self) -> String {
@@ -81,12 +84,12 @@ impl PyDigest {
 
   #[getter]
   fn fingerprint(&self) -> String {
-    self.0.digest.hash.to_hex()
+    self.0.as_digest().hash.to_hex()
   }
 
   #[getter]
   fn serialized_bytes_length(&self) -> usize {
-    self.0.digest.size_bytes
+    self.0.as_digest().size_bytes
   }
 }
 
@@ -146,7 +149,8 @@ impl PySnapshot {
     files: Vec<String>,
     dirs: Vec<String>,
   ) -> PyResult<Self> {
-    let snapshot = unsafe { Snapshot::create_for_testing_ffi(py_digest.0.digest, files, dirs) };
+    let snapshot =
+      unsafe { Snapshot::create_for_testing_ffi(py_digest.0.as_digest(), files, dirs) };
     Ok(Self(snapshot.map_err(PyException::new_err)?))
   }
 
@@ -184,7 +188,7 @@ impl PySnapshot {
 
   #[getter]
   fn digest(&self) -> PyDigest {
-    PyDigest(DirectoryDigest::new(self.0.digest))
+    PyDigest(self.0.clone().into())
   }
 
   #[getter]
@@ -223,7 +227,7 @@ impl PyMergeDigests {
     let digests: PyResult<Vec<Digest>> = PyIterator::from_object(py, digests)?
       .map(|v| {
         let py_digest = v?.extract::<PyDigest>()?;
-        Ok(py_digest.0.digest)
+        Ok(py_digest.0.todo_as_digest())
       })
       .collect();
     Ok(Self(digests?))
@@ -239,7 +243,7 @@ impl PyMergeDigests {
     let digests = self
       .0
       .iter()
-      .map(|d| format!("{}", PyDigest(DirectoryDigest::new(*d))))
+      .map(|d| format!("{}", PyDigest(DirectoryDigest::todo_from_digest(*d))))
       .join(", ");
     format!("MergeDigests([{}])", digests)
   }
@@ -265,7 +269,7 @@ impl PyAddPrefix {
   #[new]
   fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
     Self {
-      digest: digest.0.digest,
+      digest: digest.0.todo_as_digest(),
       prefix,
     }
   }
@@ -280,7 +284,7 @@ impl PyAddPrefix {
   fn __repr__(&self) -> String {
     format!(
       "AddPrefix('{}', {})",
-      PyDigest(DirectoryDigest::new(self.digest)),
+      PyDigest(DirectoryDigest::todo_from_digest(self.digest)),
       self.prefix.display()
     )
   }
@@ -306,7 +310,7 @@ impl PyRemovePrefix {
   #[new]
   fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
     Self {
-      digest: digest.0.digest,
+      digest: digest.0.todo_as_digest(),
       prefix,
     }
   }
@@ -321,7 +325,7 @@ impl PyRemovePrefix {
   fn __repr__(&self) -> String {
     format!(
       "RemovePrefix('{}', {})",
-      PyDigest(DirectoryDigest::new(self.digest)),
+      PyDigest(DirectoryDigest::todo_from_digest(self.digest)),
       self.prefix.display()
     )
   }
