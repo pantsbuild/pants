@@ -252,10 +252,14 @@ async def lint(
         )
         for request_type in target_request_types
     )
-    file_requests = tuple(
-        request_type(specs_snapshot.snapshot.files)
-        for request_type in file_request_types
-        if request_type.name in specified_names
+    file_requests = (
+        tuple(
+            request_type(specs_snapshot.snapshot.files)
+            for request_type in file_request_types
+            if request_type.name in specified_names
+        )
+        if specs_snapshot.snapshot.files
+        else ()
     )
 
     if lint_subsystem.per_file_caching:
