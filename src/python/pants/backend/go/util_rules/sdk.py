@@ -44,7 +44,7 @@ class GoSdkProcess:
         output_files: Iterable[str] = (),
         output_directories: Iterable[str] = (),
         allow_downloads: bool = False,
-        platform: Platform | None = None
+        platform: Platform | None = None,
     ) -> None:
         self.command = tuple(command)
         self.description = description
