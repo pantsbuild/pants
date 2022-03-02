@@ -13,6 +13,7 @@ from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -26,10 +27,11 @@ class GoSdkProcess:
     command: tuple[str, ...]
     description: str
     env: FrozenDict[str, str]
-    input_digest: Digest = EMPTY_DIGEST
-    working_dir: str | None = None
-    output_files: tuple[str, ...] = ()
-    output_directories: tuple[str, ...] = ()
+    input_digest: Digest
+    working_dir: str | None
+    output_files: tuple[str, ...]
+    output_directories: tuple[str, ...]
+    platform: Platform | None
 
     def __init__(
         self,
@@ -42,6 +44,7 @@ class GoSdkProcess:
         output_files: Iterable[str] = (),
         output_directories: Iterable[str] = (),
         allow_downloads: bool = False,
+        platform: Platform | None = None
     ) -> None:
         self.command = tuple(command)
         self.description = description
@@ -112,6 +115,7 @@ async def setup_go_sdk_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         level=LogLevel.DEBUG,
+        platform=request.platform,
     )
 
 
