@@ -12,7 +12,7 @@ from pants.util.docutil import bin_name
 
 
 class BufSubsystem(TemplatedExternalTool):
-    options_scope = "buf-linter"
+    options_scope = "buf-lint"
     help = "A linter for Protocol Buffers (https://github.com/bufbuild/buf)."
 
     default_version = "v1.0.0"
