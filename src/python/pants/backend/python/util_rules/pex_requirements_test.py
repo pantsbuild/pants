@@ -48,10 +48,13 @@ def create_tool_lock(
     )
 
 
-def create_python_setup(behavior: InvalidLockfileBehavior) -> PythonSetup:
+def create_python_setup(
+    behavior: InvalidLockfileBehavior, *, enable_resolves: bool = True
+) -> PythonSetup:
     return create_subsystem(
         PythonSetup,
         invalid_lockfile_behavior=behavior,
+        resolves_generate_lockfiles=enable_resolves,
         interpreter_versions_universe=PythonSetup.default_interpreter_universe,
     )
 
@@ -177,6 +180,16 @@ def test_validate_user_lockfiles(
             ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements]
         ),
     )
+
+    # Ignore validation if resolves are manually managed.
+    maybe_validate_metadata(
+        lambda: METADATA,
+        runtime_interpreter_constraints,
+        lockfile,
+        create_python_setup(InvalidLockfileBehavior.warn, enable_resolves=False),
+    )
+    assert not caplog.text
+
     maybe_validate_metadata(
         lambda: METADATA,
         runtime_interpreter_constraints,
