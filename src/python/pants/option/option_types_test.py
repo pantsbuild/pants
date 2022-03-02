@@ -230,6 +230,61 @@ def test_subsystem_option_ordering() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    "cls",
+    [
+        StrOption,
+        IntOption,
+        FloatOption,
+        BoolOption,
+        TargetOption,
+        DirOption,
+        FileOption,
+        ShellStrOption,
+        MemorySizeOption,
+        StrListOption,
+        IntListOption,
+        FloatListOption,
+        BoolListOption,
+        TargetListOption,
+        DirListOption,
+        FileListOption,
+        ShellStrListOption,
+        MemorySizeListOption,
+        EnumOption,
+        EnumListOption,
+        DictOption,
+    ],
+)
+def test_register_if(cls) -> None:
+    extra_kwargs = {"enum_type": MyEnum} if cls in {EnumOption, EnumListOption} else {}
+
+    class MySubsystemBase(Subsystem):
+        registered_prop = cls(
+            "--registered",
+            register_if=lambda cls: cls.truthy,
+            default=None,
+            **extra_kwargs,
+            help="",
+        )
+        not_registered_prop = cls(
+            "--not-registered",
+            register_if=lambda cls: cls.falsey,
+            default=None,
+            **extra_kwargs,
+            help="",
+        )
+
+    class MySubsystem(MySubsystemBase):
+        truthy = True
+        falsey = False
+
+    register = Mock()
+    MySubsystem.register_options(register)
+    assert len(register.call_args_list) == 1
+    assert register.call_args_list[0].args == ("--registered",)
+
+
 def test_property_types() -> None:
     # NB: This test has no runtime assertions
 
