@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import json
+import typing
 from pathlib import Path
 from textwrap import dedent
 
@@ -15,6 +17,7 @@ from pants.engine.process import BinaryNotFoundError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import temporary_dir
+from pants.util.frozendict import FrozenDict
 
 EXPECTED_VERSION = "1.17"
 
@@ -46,7 +49,7 @@ def get_goroot(rule_runner: RuleRunner, binary_names_to_scripts: list[tuple[str,
         return rule_runner.request(GoRoot, [])
 
 
-def mock_go_binary(*, version_output: str, env_output: str) -> str:
+def mock_go_binary(*, version_output: str, env_output: typing.Mapping[str, str]) -> str:
     """Return a bash script that emulates `go version` and `go env`."""
     return dedent(
         f"""\
@@ -55,7 +58,7 @@ def mock_go_binary(*, version_output: str, env_output: str) -> str:
         if [[ "$1" == version ]]; then
             echo '{version_output}'
         else
-            echo '{env_output}'
+            echo '{json.dumps(env_output)}'
         fi
         """
     )
@@ -64,19 +67,19 @@ def mock_go_binary(*, version_output: str, env_output: str) -> str:
 def test_find_valid_binary(rule_runner: RuleRunner) -> None:
     valid_without_patch = mock_go_binary(
         version_output=f"go version go{EXPECTED_VERSION} darwin/arm64",
-        env_output="/valid/binary",
+        env_output={"GOROOT": "/valid/binary"},
     )
     assert get_goroot(rule_runner, [("go", valid_without_patch)]).path == "/valid/binary"
 
     valid_with_patch = mock_go_binary(
         version_output=f"go version go{EXPECTED_VERSION}.1 darwin/arm64",
-        env_output="/valid/patch_binary",
+        env_output={"GOROOT": "/valid/patch_binary"},
     )
     assert get_goroot(rule_runner, [("go", valid_with_patch)]).path == "/valid/patch_binary"
 
     # Should still work even if there are other Go versions with an invalid version.
     invalid_version = mock_go_binary(
-        version_output="go version go1.8 darwin/arm64", env_output="/not/valid"
+        version_output="go version go1.8 darwin/arm64", env_output={"GOROOT": "/not/valid"}
     )
     assert (
         get_goroot(rule_runner, [("go", valid_without_patch), ("go", invalid_version)]).path
@@ -104,10 +107,10 @@ def test_no_binaries(rule_runner: RuleRunner) -> None:
 
 def test_no_valid_versions(rule_runner: RuleRunner) -> None:
     invalid1 = mock_go_binary(
-        version_output="go version go1.8 darwin/arm64", env_output="/not/valid1"
+        version_output="go version go1.8 darwin/arm64", env_output={"GOROOT": "/not/valid1"}
     )
     invalid2 = mock_go_binary(
-        version_output="go version go1.8 darwin/arm64", env_output="/not/valid2"
+        version_output="go version go1.8 darwin/arm64", env_output={"GOROOT": "/not/valid2"}
     )
     with pytest.raises(ExecutionError) as e:
         get_goroot(rule_runner, [("go", invalid1), ("go", invalid2)])
@@ -117,7 +120,7 @@ def test_no_valid_versions(rule_runner: RuleRunner) -> None:
 
 
 def test_valid_go_version() -> None:
-    go_root = GoRoot("", "1.15")
+    go_root = GoRoot("", "1.15", FrozenDict())
     for v in range(16):
         assert go_root.is_compatible_version(f"1.{v}") is True
     for v in range(17, 40):
