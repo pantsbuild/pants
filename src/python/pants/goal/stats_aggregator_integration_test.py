@@ -33,6 +33,13 @@ def test_counters_and_histograms() -> None:
     assert re.search(r"p99: \d", result.stderr)
 
 
+def test_memory_summary() -> None:
+    result = run_pants(["--stats-memory-summary", "--version"])
+    result.assert_success()
+    assert "Memory summary" in result.stderr
+    assert "pants.engine.unions.UnionMembership" in result.stderr
+
+
 def test_warn_if_no_histograms() -> None:
     result = run_pants(["--stats-log", "roots"])
     result.assert_success()
