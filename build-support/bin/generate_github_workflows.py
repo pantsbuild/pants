@@ -348,7 +348,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "runs-on": LINUX_VERSION,
             "needs": "bootstrap_pants_linux",
             "strategy": {"matrix": {"python-version": python_versions}},
-            "timeout-minutes": 60,
+            "timeout-minutes": 90,
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),
@@ -380,9 +380,9 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 {
                     "name": "Lint",
                     "run": (
-                        "./pants validate '**'\n"
                         "./pants update-build-files --check\n"
-                        "./pants lint check ::\n"
+                        # Note: we use `**` rather than `::` because regex-lint.
+                        "./pants lint check '**'\n"
                     ),
                 },
                 upload_log_artifacts(name="lint"),
@@ -419,7 +419,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": MACOS_ENV,
-            "timeout-minutes": 40,
+            "timeout-minutes": 60,
             "if": IS_PANTS_OWNER,
             "steps": [
                 *checkout(),

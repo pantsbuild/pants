@@ -8,18 +8,18 @@ from typing import ClassVar, Iterable, Sequence, cast
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import (
-    Lockfile,
-    LockfileContent,
+from pants.backend.python.util_rules.pex import PexRequest
+from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     ToolCustomLockfile,
     ToolDefaultLockfile,
 )
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import FileContent
+from pants.engine.fs import Digest, FileContent
 from pants.option.errors import OptionsError
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -107,7 +107,7 @@ class PythonToolRequirementsBase(Subsystem):
                     f"do not recommend this, though, as lockfiles are essential for reproducible "
                     f"builds.\n\n"
                     "To use a custom lockfile, set this option to a file path relative to the "
-                    f"build root, then run `./pants generate-lockfiles "
+                    f"build root, then run `{bin_name()} generate-lockfiles "
                     f"--resolve={cls.options_scope}`.\n\n"
                     "Lockfile generation currently does not wire up the `[python-repos]` options. "
                     "If lockfile generation fails, you can manually generate a lockfile, such as "
@@ -137,7 +137,7 @@ class PythonToolRequirementsBase(Subsystem):
         self,
         *,
         extra_requirements: Iterable[str] = (),
-    ) -> PexRequirements | Lockfile | LockfileContent:
+    ) -> PexRequirements | ToolDefaultLockfile | ToolCustomLockfile:
         """The requirements to be used when installing the tool.
 
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
@@ -160,7 +160,7 @@ class PythonToolRequirementsBase(Subsystem):
                 ),
                 lockfile_hex_digest=hex_digest,
                 req_strings=FrozenOrderedSet(requirements),
-                options_scope_name=self.options_scope,
+                resolve_name=self.options_scope,
                 uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
                 uses_source_plugins=self.uses_requirements_from_source_plugins,
             )
@@ -169,7 +169,7 @@ class PythonToolRequirementsBase(Subsystem):
             file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
             lockfile_hex_digest=hex_digest,
             req_strings=FrozenOrderedSet(requirements),
-            options_scope_name=self.options_scope,
+            resolve_name=self.options_scope,
             uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
             uses_source_plugins=self.uses_requirements_from_source_plugins,
         )
@@ -193,6 +193,23 @@ class PythonToolRequirementsBase(Subsystem):
         This assumes you have set the class property `register_interpreter_constraints = True`.
         """
         return InterpreterConstraints(self.options.interpreter_constraints)
+
+    def to_pex_request(
+        self,
+        *,
+        interpreter_constraints: InterpreterConstraints | None = None,
+        extra_requirements: Iterable[str] = (),
+        main: MainSpecification | None = None,
+        sources: Digest | None = None,
+    ) -> PexRequest:
+        return PexRequest(
+            output_filename=f"{self.options_scope.replace('-', '_')}.pex",
+            internal_only=True,
+            requirements=self.pex_requirements(extra_requirements=extra_requirements),
+            interpreter_constraints=interpreter_constraints or self.interpreter_constraints,
+            main=main,
+            sources=sources,
+        )
 
 
 class PythonToolBase(PythonToolRequirementsBase):
@@ -243,3 +260,18 @@ class PythonToolBase(PythonToolRequirementsBase):
         if not is_default_entry_point:
             return EntryPoint.parse(cast(str, self.options.entry_point))
         return self.default_main
+
+    def to_pex_request(
+        self,
+        *,
+        interpreter_constraints: InterpreterConstraints | None = None,
+        extra_requirements: Iterable[str] = (),
+        main: MainSpecification | None = None,
+        sources: Digest | None = None,
+    ) -> PexRequest:
+        return super().to_pex_request(
+            interpreter_constraints=interpreter_constraints,
+            extra_requirements=extra_requirements,
+            main=main or self.main,
+            sources=sources,
+        )

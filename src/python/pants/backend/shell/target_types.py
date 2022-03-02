@@ -9,30 +9,26 @@ from textwrap import dedent
 
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.process import BinaryPathTest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.core.util_rules.system_binaries import BinaryPathTest
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
-    GeneratedTargets,
-    GenerateTargetsRequest,
     IntField,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
-    SourcesPaths,
-    SourcesPathsRequest,
     StringField,
     StringSequenceField,
     Target,
+    TargetFilesGenerator,
+    TargetFilesGeneratorSettings,
+    TargetFilesGeneratorSettingsRequest,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
-    generate_file_level_targets,
 )
-from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
+from pants.engine.unions import UnionRule
 from pants.util.enums import match
 
 
@@ -44,6 +40,20 @@ class ShellSourceField(SingleSourceField):
 
 class ShellGeneratingSourcesBase(MultipleSourcesField):
     uses_source_roots = False
+
+
+class ShellGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
+    pass
+
+
+@rule
+def generator_settings(
+    _: ShellGeneratorSettingsRequest,
+    shell_setup: ShellSetup,
+) -> TargetFilesGeneratorSettings:
+    return TargetFilesGeneratorSettings(
+        add_dependencies_on_all_siblings=not shell_setup.dependency_inference
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -167,55 +177,26 @@ class Shunit2TestsOverrideField(OverridesField):
     )
 
 
-class Shunit2TestsGeneratorTarget(Target):
+class Shunit2TestsGeneratorTarget(TargetFilesGenerator):
     alias = "shunit2_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Shunit2TestsGeneratorSourcesField,
         Shunit2TestDependenciesField,
+        Shunit2TestsOverrideField,
+    )
+    generated_target_cls = Shunit2TestTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Shunit2TestDependenciesField,
+    )
+    moved_fields = (
         Shunit2TestTimeoutField,
         SkipShunit2TestsField,
         Shunit2ShellField,
         RuntimePackageDependenciesField,
-        Shunit2TestsOverrideField,
     )
     help = "Generate a `shunit2_test` target for each file in the `sources` field."
-
-
-class GenerateTargetsFromShunit2Tests(GenerateTargetsRequest):
-    generate_from = Shunit2TestsGeneratorTarget
-
-
-@rule
-async def generate_targets_from_shunit2_tests(
-    request: GenerateTargetsFromShunit2Tests,
-    files_not_found_behavior: FilesNotFoundBehavior,
-    shell_setup: ShellSetup,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[Shunit2TestsGeneratorSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        Shunit2TestTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=not shell_setup.dependency_inference,
-        overrides=all_overrides,
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -246,7 +227,7 @@ class ShellSourcesOverridesField(OverridesField):
     )
 
 
-class ShellSourcesGeneratorTarget(Target):
+class ShellSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "shell_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -254,43 +235,13 @@ class ShellSourcesGeneratorTarget(Target):
         ShellSourcesGeneratingSourcesField,
         ShellSourcesOverridesField,
     )
+    generated_target_cls = ShellSourceTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+    )
+    moved_fields = ()
     help = "Generate a `shell_source` target for each file in the `sources` field."
-
-
-class GenerateTargetsFromShellSources(GenerateTargetsRequest):
-    generate_from = ShellSourcesGeneratorTarget
-
-
-@rule
-async def generate_targets_from_shell_sources(
-    request: GenerateTargetsFromShellSources,
-    files_not_found_behavior: FilesNotFoundBehavior,
-    shell_setup: ShellSetup,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[ShellSourcesGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        ShellSourceTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=not shell_setup.dependency_inference,
-        overrides=all_overrides,
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -418,8 +369,7 @@ class ShellCommandRunTarget(Target):
 
 
 def rules():
-    return (
+    return [
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromShunit2Tests),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromShellSources),
-    )
+        UnionRule(TargetFilesGeneratorSettingsRequest, ShellGeneratorSettingsRequest),
+    ]

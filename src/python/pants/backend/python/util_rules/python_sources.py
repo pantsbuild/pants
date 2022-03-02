@@ -65,7 +65,7 @@ class PythonSourceFilesRequest:
         targets: Iterable[Target],
         *,
         include_resources: bool = True,
-        include_files: bool = False
+        include_files: bool = False,
     ) -> None:
         self.targets = tuple(targets)
         self.include_resources = include_resources

@@ -108,7 +108,8 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             ignored3 as  # pants: no-infer-dep
                 alias3,
             ignored4 as alias4, ignored4,  # pants: no-infer-dep
-            not_ignored2,
+            not_ignored2, \\
+            not_ignored3
         )
         from multiline_import2 import (ignored1,  # pants: no-infer-dep
             not_ignored)
@@ -131,8 +132,9 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "project.demo.OriginalName": ImpInfo(lineno=12, weak=False),
             "multiline_import1.not_ignored1": ImpInfo(lineno=16, weak=False),
             "multiline_import1.not_ignored2": ImpInfo(lineno=23, weak=False),
-            "multiline_import2.not_ignored": ImpInfo(lineno=26, weak=False),
-            "project.circular_dep.CircularDep": ImpInfo(lineno=29, weak=False),
+            "multiline_import1.not_ignored3": ImpInfo(lineno=24, weak=False),
+            "multiline_import2.not_ignored": ImpInfo(lineno=27, weak=False),
+            "project.circular_dep.CircularDep": ImpInfo(lineno=30, weak=False),
         },
     )
 
@@ -150,6 +152,13 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
         )
         __import__(
             "also_not_ignored_but_looks_like_it_could_be"
+        )  # pants: no-infer-dep
+        __import__(
+            "ignored_too" \\
+            # pants: no-infer-dep
+        )
+        __import__(
+            "ignored_as_well" \\
         )  # pants: no-infer-dep
         """
     )

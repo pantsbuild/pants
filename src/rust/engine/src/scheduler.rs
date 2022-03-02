@@ -8,15 +8,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use deepsize::DeepSizeOf;
+use futures::{future, FutureExt};
+use log::debug;
+use tokio::time;
+
 use crate::context::{Context, Core};
-use crate::nodes::{Select, Visualizer};
+use crate::nodes::{NodeKey, Select, Visualizer};
 use crate::python::{Failure, Params, TypeId, Value};
 use crate::session::{ObservedValueResult, Root, Session};
 
-use futures::{future, FutureExt};
 use graph::LastObserved;
-use log::debug;
-use tokio::time;
 use ui::ConsoleUI;
 use watch::Invalidatable;
 
@@ -138,6 +140,33 @@ impl Scheduler {
     );
     m.insert("resulting_graph_size", self.core.graph.len() as i64);
     m
+  }
+
+  ///
+  /// Returns references to all Python objects held alive by the graph, and a summary of sizes of
+  /// Rust structs as a count and total size.
+  ///
+  pub fn live_items(&self, session: &Session) -> (Vec<Value>, HashMap<String, (usize, usize)>) {
+    let context = Context::new(self.core.clone(), session.clone());
+    let mut items = vec![];
+    let mut sizes: HashMap<String, (usize, usize)> = HashMap::new();
+    // TODO: Creation of a Context is exposed in https://github.com/Aeledfyr/deepsize/pull/31.
+    let mut deep_context = deepsize::Context::new();
+    self.core.graph.visit_live(&context, |k, v| {
+      if let NodeKey::Task(ref t) = k {
+        items.extend(t.params.keys().map(|k| k.to_value()));
+        items.push(v.clone().try_into().unwrap());
+      }
+      let mut entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
+      entry.0 += 1;
+      entry.1 += {
+        std::mem::size_of_val(&k)
+          + k.deep_size_of_children(&mut deep_context)
+          + std::mem::size_of_val(&v)
+          + v.deep_size_of_children(&mut deep_context)
+      };
+    });
+    (items, sizes)
   }
 
   ///

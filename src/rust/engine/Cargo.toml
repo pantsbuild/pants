@@ -20,6 +20,7 @@ resolver = "2"
 # (e.g. fs_util) won't be included when we build/test things.
 members = [
   ".",
+  "address",
   "async_latch",
   "async_value",
   "cache",
@@ -60,6 +61,7 @@ members = [
 # On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
 default-members = [
   ".",
+  "address",
   "async_latch",
   "async_value",
   "cache",
@@ -102,6 +104,7 @@ extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
+address = { path = "address" }
 async_latch = { path = "async_latch" }
 # Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
 async-trait = "=0.1.42"
@@ -110,6 +113,8 @@ bytes = "1.0"
 cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30 and https://github.com/Aeledfyr/deepsize/pull/31.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "67c6cfc2afa1303c06b19c1b96ebe11fd3217d34", features=["smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
 either = "1.6"
@@ -128,15 +133,15 @@ log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
 num_enum = "0.5"
-parking_lot = "0.11"
+parking_lot = "0.12"
 petgraph = "0.5"
 process_execution = { path = "process_execution" }
-pyo3 = "0.15.1"
+pyo3 = "0.16"
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-smallvec = "0.6"
+smallvec = "1"
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
 serde_json = "1.0"
@@ -144,7 +149,7 @@ task_executor = { path = "task_executor" }
 tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.3"
-tokio = { version = "1.4", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
 tokio-util = { version = "0.6", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
@@ -158,4 +163,4 @@ fs = { path = "./fs" }
 env_logger = "0.5.4"
 
 [build-dependencies]
-pyo3-build-config = "0.15.1"
+pyo3-build-config = "0.16"

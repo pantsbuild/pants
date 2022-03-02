@@ -18,8 +18,9 @@ from pkg_resources import Distribution, Requirement, WorkingSet
 
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, PexRequirements
-from pants.core.util_rules import archive, external_tool
+from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.core.util_rules import external_tool
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -46,7 +47,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex.rules(),
             *external_tool.rules(),
-            *archive.rules(),
             QueryRule(Pex, [PexRequest]),
             QueryRule(ProcessResult, [PexProcess]),
         ]

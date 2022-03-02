@@ -166,16 +166,7 @@ async def twine_upload(
         )
 
     twine_pex, packages_digest, config_files = await MultiGet(
-        Get(
-            VenvPex,
-            PexRequest(
-                output_filename="twine.pex",
-                internal_only=True,
-                requirements=twine_subsystem.pex_requirements(),
-                interpreter_constraints=twine_subsystem.interpreter_constraints,
-                main=twine_subsystem.main,
-            ),
-        ),
+        Get(VenvPex, PexRequest, twine_subsystem.to_pex_request()),
         Get(Digest, MergeDigests(pkg.digest for pkg in request.packages)),
         Get(ConfigFiles, ConfigFilesRequest, twine_subsystem.config_request()),
     )

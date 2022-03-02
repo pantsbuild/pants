@@ -8,18 +8,16 @@ from dataclasses import dataclass
 from pants.backend.codegen.thrift.apache.subsystem import ApacheThriftSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import (
+from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
-    Process,
-    ProcessCacheScope,
-    ProcessResult,
 )
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
@@ -137,10 +135,10 @@ async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThrif
     if not all_thrift_binary_paths.paths:
         raise BinaryNotFoundError(
             "Cannot find any `thrift` binaries using the option "
-            f"`[thrift].thrift_search_paths`: {list(search_paths)}\n\n"
+            f"`[apache-thrift].thrift_search_paths`: {list(search_paths)}\n\n"
             "To fix, please install Apache Thrift (https://thrift.apache.org/) with the version "
-            f"{apache_thrift.expected_version} (set by `[thrift].expected_version`) and ensure "
-            "that it is discoverable via `[thrift].thrift_search_paths`."
+            f"{apache_thrift.expected_version} (set by `[apache-thrift].expected_version`) and ensure "
+            "that it is discoverable via `[apache-thrift].thrift_search_paths`."
         )
 
     version_results = await MultiGet(

@@ -16,7 +16,6 @@ from pants.backend.codegen.thrift.target_types import (
 )
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files, stripped_source_files
-from pants.engine import process
 from pants.engine.internals import graph
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
@@ -35,7 +34,6 @@ def rule_runner() -> RuleRunner:
             *source_root.rules(),
             *graph.rules(),
             *stripped_source_files.rules(),
-            *process.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GeneratePythonFromThriftRequest]),
         ],
@@ -66,42 +64,26 @@ def assert_files_generated(
 
 def test_generates_python(rule_runner: RuleRunner) -> None:
     # This tests a few things:
-    #  * We generate the correct file names.
+    #  * We generate the correct file names, keeping into account `namespace`. Note that if
+    #    `namespace` is not set, then Thrift will drop all parent directories, all we do is
+    #    restore the source root.
     #  * Thrift files can import other thrift files, and those can import others
     #    (transitive dependencies). We'll only generate the requested target, though.
     #  * We can handle multiple source roots, which need to be preserved in the final output.
     rule_runner.write_files(
         {
-            "src/thrift/dir1/f.thrift": dedent(
-                """\
-                struct Person {
-                  1: string name
-                  2: i32 id
-                  3: string email
-                }
-                """
-            ),
-            "src/thrift/dir1/f2.thrift": dedent(
-                """\
-                """
-            ),
+            "src/thrift/dir1/f.thrift": "",
             "src/thrift/dir1/BUILD": "thrift_sources()",
             "src/thrift/dir2/f.thrift": dedent(
                 """\
                 include "dir1/f.thrift"
+                namespace py custom_namespace.module
                 """
             ),
-            "src/thrift/dir2/BUILD": (
-                "thrift_sources(dependencies=['src/thrift/dir1'], "
-                "python_source_root='src/python')"
-            ),
+            "src/thrift/dir2/BUILD": "thrift_sources(dependencies=['src/thrift/dir1'])",
             # Test another source root.
-            "tests/thrift/test_thrifts/f.thrift": dedent(
-                """\
-                include "dir2/f.thrift"
-                """
-            ),
-            "tests/thrift/test_thrifts/BUILD": ("thrift_sources(dependencies=['src/thrift/dir2'])"),
+            "tests/thrift/test_thrifts/f.thrift": 'include "dir2/f.thrift"',
+            "tests/thrift/test_thrifts/BUILD": "thrift_sources(dependencies=['src/thrift/dir2'])",
         }
     )
 
@@ -109,7 +91,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         assert_files_generated(
             rule_runner,
             addr,
-            source_roots=["src/python", "/src/thrift", "/tests/thrift"],
+            source_roots=["/src/thrift", "/tests/thrift"],
             expected_files=expected,
         )
 
@@ -123,25 +105,15 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
         ],
     )
     assert_gen(
-        Address("src/thrift/dir1", relative_file_path="f2.thrift"),
-        [
-            "src/thrift/__init__.py",
-            "src/thrift/f2/__init__.py",
-            "src/thrift/f2/constants.py",
-            "src/thrift/f2/ttypes.py",
-        ],
-    )
-    # TODO: Fix package namespacing?
-    assert_gen(
         Address("src/thrift/dir2", relative_file_path="f.thrift"),
         [
-            "src/python/__init__.py",
-            "src/python/f/__init__.py",
-            "src/python/f/constants.py",
-            "src/python/f/ttypes.py",
+            "src/thrift/__init__.py",
+            "src/thrift/custom_namespace/__init__.py",
+            "src/thrift/custom_namespace/module/__init__.py",
+            "src/thrift/custom_namespace/module/constants.py",
+            "src/thrift/custom_namespace/module/ttypes.py",
         ],
     )
-    # TODO: Fix namespacing.
     assert_gen(
         Address("tests/thrift/test_thrifts", relative_file_path="f.thrift"),
         [
@@ -149,5 +121,38 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
             "tests/thrift/f/__init__.py",
             "tests/thrift/f/constants.py",
             "tests/thrift/f/ttypes.py",
+        ],
+    )
+
+
+def test_top_level_source_root(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "codegen/dir/f.thrift": "",
+            "codegen/dir/f2.thrift": "namespace py custom_namespace.module",
+            "codegen/dir/BUILD": "thrift_sources()",
+        }
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("codegen/dir", relative_file_path="f.thrift"),
+        source_roots=["/"],
+        expected_files=[
+            "__init__.py",
+            "f/__init__.py",
+            "f/constants.py",
+            "f/ttypes.py",
+        ],
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("codegen/dir", relative_file_path="f2.thrift"),
+        source_roots=["/"],
+        expected_files=[
+            "__init__.py",
+            "custom_namespace/__init__.py",
+            "custom_namespace/module/__init__.py",
+            "custom_namespace/module/constants.py",
+            "custom_namespace/module/ttypes.py",
         ],
     )

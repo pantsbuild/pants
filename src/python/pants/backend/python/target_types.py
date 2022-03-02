@@ -50,16 +50,20 @@ from pants.engine.target import (
     ScalarField,
     SecondaryOwnerMixin,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
+    TargetFilesGenerator,
+    TargetFilesGeneratorSettingsRequest,
     TriBoolField,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
 )
+from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.source.filespec import Filespec
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -104,20 +108,18 @@ class InterpreterConstraintsField(StringSequenceField):
 
 
 class PythonResolveField(StringField, AsyncFieldMixin):
-    alias = "experimental_resolve"
+    alias = "resolve"
     required = False
     help = (
-        "The resolve from `[python].experimental_resolves` to use.\n\n"
+        "The resolve from `[python].resolves` to use.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
-        "All dependencies must share the same resolve. This means that you can only depend on "
-        "first-party targets like `python_source` that set their `experimental_resolve` field "
-        "to the same value, and on `python_requirement` targets that include the resolve in "
-        "their `experimental_compatible_resolves` field.\n\n"
-        "This field is experimental and may change without the normal deprecation policy."
+        "All dependencies must share the same value for their `resolve` field."
     )
 
     def normalized_value(self, python_setup: PythonSetup) -> str:
         """Get the value after applying the default and validating that the key is recognized."""
+        if not python_setup.enable_resolves:
+            return "<ignore>"
         resolve = self.value or python_setup.default_resolve
         if resolve not in python_setup.resolves:
             raise UnrecognizedResolveNamesError(
@@ -127,63 +129,19 @@ class PythonResolveField(StringField, AsyncFieldMixin):
             )
         return resolve
 
-    def resolve_and_lockfile(self, python_setup: PythonSetup) -> tuple[str, str] | None:
-        """If configured, return the resolve name with its lockfile.
 
-        Error if the resolve name is invalid.
-        """
-        if not python_setup.enable_resolves:
-            return None
-        resolve = self.normalized_value(python_setup)
-        return (resolve, python_setup.resolves[resolve])
+# -----------------------------------------------------------------------------------------------
+# Target generation support
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonFilesGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
+    pass
 
 
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` and `pex_binaries` target
 # -----------------------------------------------------------------------------------------------
-
-
-class PexBinaryDefaults(Subsystem):
-    options_scope = "pex-binary-defaults"
-    help = "Default settings for creating PEX executables."
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--emit-warnings",
-            advanced=True,
-            type=bool,
-            default=True,
-            help=(
-                "Whether built PEX binaries should emit PEX warnings at runtime by default."
-                "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
-                "`pex_binary` targets"
-            ),
-        )
-        register(
-            "--resolve-local-platforms",
-            advanced=True,
-            type=bool,
-            default=False,
-            help=(
-                f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
-                "target, attempt to find a local interpreter that matches.\n\nIf a matching "
-                "interpreter is found, use the interpreter to resolve distributions and build any "
-                "that are only available in source distribution form. If no matching interpreter "
-                "is found (or if this option is `False`), resolve for the platform by accepting "
-                "only pre-built binary distributions (wheels)."
-            ),
-        )
-
-    @property
-    def emit_warnings(self) -> bool:
-        return cast(bool, self.options.emit_warnings)
-
-    @property
-    def resolve_local_platforms(self) -> bool:
-        return cast(bool, self.options.resolve_local_platforms)
-
 
 # See `target_types_rules.py` for a dependency injection rule.
 class PexBinaryDependenciesField(Dependencies):
@@ -339,20 +297,39 @@ class PexScriptField(Field):
 class PexPlatformsField(StringSequenceField):
     alias = "platforms"
     help = (
-        "The platforms the built PEX should be compatible with.\n\nThis defaults to the current "
-        "platform, but can be overridden to different platforms. There must be built wheels "
-        "available for all of the foreign platforms, rather than sdists.\n\n"
+        "The abbreviated platforms the built PEX should be compatible with.\n\nThere must be built "
+        "wheels available for all of the foreign platforms, rather than sdists.\n\n"
         "You can give a list of multiple platforms to create a multiplatform PEX, "
         "meaning that the PEX will be executable in all of the supported environments.\n\n"
         "Platforms should be in the format defined by Pex "
         "(https://pex.readthedocs.io/en/latest/buildingpex.html#platform), i.e. "
-        'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-27-cp27mu", '
-        '"macosx_10.12_x86_64-cp-36-cp36m"):\n\n'
+        'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-37-cp37m", '
+        '"macosx_10.12_x86_64-cp-310-cp310"):\n\n'
         "  - PLATFORM: the host platform, e.g. "
-        '"linux-x86_64", "macosx-10.12-x86_64".\n  - IMPL: the Python implementation '
-        'abbreviation, e.g. "cp", "pp", "jp".\n  - PYVER: a two-digit string representing '
-        'the Python version, e.g. "27", "36".\n  - ABI: the ABI tag, e.g. "cp36m", '
-        '"cp27mu", "abi3", "none".'
+        '"linux-x86_64", "macosx-10.12-x86_64".\n  - IMPL: the Python implementation abbreviation, '
+        'e.g. "cp" or "pp".\n  - PYVER: a two or more digit string representing the python '
+        'major/minor version (e.g., "37" or "310") or else a component dotted version string (e.g.,'
+        '"3.7" or "3.10.1").\n  - ABI: the ABI tag, e.g. "cp37m", "cp310", "abi3", "none".\n\nNote '
+        "that using an abbreviated platform means that certain resolves will fail when they "
+        "encounter environment markers that cannot be deduced from the abbreviated platform "
+        "string. A common example of this is 'python_full_version' which requires knowing the "
+        "patch level version of the foreign Python interpreter. To remedy this you should use a "
+        "3-component dotted version for PYVER. If your resolves fail due to more esoteric "
+        "undefined environment markers, you should switch to specifying `complete_platforms` "
+        "instead."
+    )
+
+
+class PexCompletePlatformsField(SpecialCasedDependencies):
+    alias = "complete_platforms"
+    help = (
+        "The platforms the built PEX should be compatible with.\n\nThere must be built wheels "
+        "available for all of the foreign platforms, rather than sdists.\n\n"
+        "You can give a list of multiple complete platforms to create a multiplatform PEX, "
+        "meaning that the PEX will be executable in all of the supported environments.\n\n"
+        "Complete platforms should be addresses of `file` targets that point to files that contain "
+        "complete platform JSON as described by Pex "
+        "(https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform)."
     )
 
 
@@ -511,6 +488,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PythonResolveField,
     PexBinaryDependenciesField,
     PexPlatformsField,
+    PexCompletePlatformsField,
     PexResolveLocalPlatformsField,
     PexInheritPathField,
     PexStripEnvField,
@@ -607,6 +585,35 @@ class PexBinariesGeneratorTarget(Target):
     )
 
 
+class PexBinaryDefaults(Subsystem):
+    options_scope = "pex-binary-defaults"
+    help = "Default settings for creating PEX executables."
+
+    emit_warnings = BoolOption(
+        "--emit-warnings",
+        default=True,
+        help=(
+            "Whether built PEX binaries should emit PEX warnings at runtime by default."
+            "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
+            "`pex_binary` targets"
+        ),
+        advanced=True,
+    )
+    resolve_local_platforms = BoolOption(
+        "--resolve-local-platforms",
+        default=False,
+        help=(
+            f"For each of the `{PexPlatformsField.alias}` specified for a `{PexBinary.alias}` "
+            "target, attempt to find a local interpreter that matches.\n\nIf a matching "
+            "interpreter is found, use the interpreter to resolve distributions and build any "
+            "that are only available in source distribution form. If no matching interpreter "
+            "is found (or if this option is `False`), resolve for the platform by accepting "
+            "only pre-built binary distributions (wheels)."
+        ),
+        advanced=True,
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `python_test` and `python_tests` targets
 # -----------------------------------------------------------------------------------------------
@@ -624,7 +631,7 @@ class PythonTestSourceField(PythonSourceField):
                 f"The {repr(self.alias)} field in target {self.address} should not be set to the "
                 f"file 'conftest.py', but was set to {repr(self.value)}.\n\nInstead, use a "
                 "`python_source` target or the target generator `python_test_utils`. You can run "
-                f"`./pants tailor` after removing this target ({self.address}) to autogenerate a "
+                f"`{bin_name()} tailor` after removing this target ({self.address}) to autogenerate a "
                 "`python_test_utils` target."
             )
 
@@ -674,11 +681,9 @@ class SkipPythonTestsField(BoolField):
     help = "If true, don't run this target's tests."
 
 
-_PYTHON_TEST_COMMON_FIELDS = (
+_PYTHON_TEST_MOVED_FIELDS = (
     *COMMON_TARGET_FIELDS,
-    InterpreterConstraintsField,
     PythonResolveField,
-    PythonTestsDependenciesField,
     PythonTestsTimeoutField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
@@ -688,7 +693,12 @@ _PYTHON_TEST_COMMON_FIELDS = (
 
 class PythonTestTarget(Target):
     alias = "python_test"
-    core_fields = (*_PYTHON_TEST_COMMON_FIELDS, PythonTestSourceField)
+    core_fields = (
+        *_PYTHON_TEST_MOVED_FIELDS,
+        PythonTestsDependenciesField,
+        PythonTestSourceField,
+        InterpreterConstraintsField,
+    )
     help = (
         "A single Python test file, written in either Pytest style or unittest style.\n\n"
         "All test util code, including `conftest.py`, should go into a dedicated `python_source` "
@@ -713,7 +723,7 @@ class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
                 f"The {repr(self.alias)} field in target {self.address} should not include the "
                 f"file 'conftest.py', but included these: {conftest_files}.\n\nInstead, use a "
                 "`python_source` target or the target generator `python_test_utils`. You can run "
-                f"`./pants tailor` after removing the files from the {repr(self.alias)} field of "
+                f"`{bin_name()} tailor` after removing the files from the {repr(self.alias)} field of "
                 f"this target ({self.address}) to autogenerate a `python_test_utils` target."
             )
 
@@ -731,13 +741,21 @@ class PythonTestsOverrideField(OverridesField):
     )
 
 
-class PythonTestsGeneratorTarget(Target):
+class PythonTestsGeneratorTarget(TargetFilesGenerator):
     alias = "python_tests"
     core_fields = (
-        *_PYTHON_TEST_COMMON_FIELDS,
+        PythonTestsDependenciesField,
         PythonTestsGeneratingSourcesField,
+        InterpreterConstraintsField,
         PythonTestsOverrideField,
     )
+    generated_target_cls = PythonTestTarget
+    copied_fields = (
+        PythonTestsDependenciesField,
+        InterpreterConstraintsField,
+    )
+    moved_fields = _PYTHON_TEST_MOVED_FIELDS
+    settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = "Generate a `python_test` target for each file in the `sources` field."
 
 
@@ -783,17 +801,23 @@ class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
     )
 
 
-class PythonTestUtilsGeneratorTarget(Target):
+class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     alias = "python_test_utils"
     # Keep in sync with `PythonSourcesGeneratorTarget`, outside of the `sources` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
         Dependencies,
-        PythonResolveField,
         PythonTestUtilsGeneratingSourcesField,
         PythonSourcesOverridesField,
     )
+    generated_target_cls = PythonSourceTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        InterpreterConstraintsField,
+    )
+    moved_fields = (PythonResolveField,)
+    settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
         "This target generator is intended for test utility files like `conftest.py`, although it "
@@ -803,17 +827,24 @@ class PythonTestUtilsGeneratorTarget(Target):
     )
 
 
-class PythonSourcesGeneratorTarget(Target):
+class PythonSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "python_sources"
     # Keep in sync with `PythonTestUtilsGeneratorTarget`, outside of the `sources` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
         Dependencies,
-        PythonResolveField,
         PythonSourcesGeneratingSourcesField,
+        InterpreterConstraintsField,
         PythonSourcesOverridesField,
     )
+    generated_target_cls = PythonSourceTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        InterpreterConstraintsField,
+    )
+    moved_fields = (PythonResolveField,)
+    settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
         "You can either use this target generator or `python_test_utils` for test utility files "
@@ -955,32 +986,19 @@ def normalize_module_mapping(
     return FrozenDict({canonicalize_project_name(k): tuple(v) for k, v in (mapping or {}).items()})
 
 
-class PythonRequirementCompatibleResolvesField(StringSequenceField, AsyncFieldMixin):
-    alias = "experimental_compatible_resolves"
+class PythonRequirementResolveField(PythonResolveField):
+    alias = "resolve"
     required = False
     help = (
-        "The resolves from `[python].experimental_resolves` that this requirement should be "
-        "included in.\n\n"
+        "The resolve from `[python].resolves` that this requirement is included in.\n\n"
         "If not defined, will default to `[python].default_resolve`.\n\n"
         "When generating a lockfile for a particular resolve via the `generate-lockfiles` goal, "
-        "it will include all requirements that are declared compatible with that resolve. "
+        "it will include all requirements that are declared with that resolve. "
         "First-party targets like `python_source` and `pex_binary` then declare which resolve "
-        "they use via the `experimental_resolve` field; so, for your first-party code to use a "
+        "they use via their `resolve` field; so, for your first-party code to use a "
         "particular `python_requirement` target, that requirement must be included in the resolve "
         "used by that code."
     )
-
-    def normalized_value(self, python_setup: PythonSetup) -> tuple[str, ...]:
-        """Get the value after applying the default and validating every key is recognized."""
-        value_or_default = self.value or (python_setup.default_resolve,)
-        invalid_resolves = set(value_or_default) - set(python_setup.resolves)
-        if invalid_resolves:
-            raise UnrecognizedResolveNamesError(
-                sorted(invalid_resolves),
-                python_setup.resolves.keys(),
-                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
-            )
-        return value_or_default
 
 
 class PythonRequirementTarget(Target):
@@ -991,16 +1009,15 @@ class PythonRequirementTarget(Target):
         PythonRequirementsField,
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
-        PythonRequirementCompatibleResolvesField,
+        PythonRequirementResolveField,
     )
     help = (
         "A Python requirement installable by pip.\n\n"
         "This target is useful when you want to declare Python requirements inline in a "
         "BUILD file. If you have a `requirements.txt` file already, you can instead use "
-        "the macro `python_requirements()` to convert each "
-        "requirement into a `python_requirement()` target automatically. For Poetry, use "
-        "`poetry_requirements()`."
-        "\n\n"
+        "the target generator `python_requirements` to convert each "
+        "requirement into a `python_requirement` target automatically. For Poetry, use "
+        "`poetry_requirements`.\n\n"
         f"See {doc_url('python-third-party-dependencies')}."
     )
 
@@ -1116,10 +1133,10 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
         "https://packaging.python.org/specifications/entry-points/#entry-points-specification. Use "
         "`//` as a prefix for target addresses if you need to disambiguate.\n\n"
         + dedent(
-            """\
+            f"""\
             Pants will attempt to infer dependencies, which you can confirm by running:
 
-                ./pants dependencies <python_distribution target address>
+                {bin_name()} dependencies <python_distribution target address>
 
             """
         )
@@ -1250,6 +1267,19 @@ class GenerateSetupField(TriBoolField):
     )
 
 
+class LongDescriptionPathField(StringField):
+    alias = "long_description_path"
+    required = False
+
+    help = (
+        "Path to a file that will be used to fill the long_description field in setup.py.\n\n"
+        "Path is relative to the build root.\n\n"
+        "Alternatively, you can set the `long_description` in the `provides` field, but not both.\n\n"
+        "This field won't automatically set `long_description_content_type` field for you. "
+        "You have to specify this field yourself in the `provides` field."
+    )
+
+
 class PythonDistribution(Target):
     alias = "python_distribution"
     core_fields = (
@@ -1262,6 +1292,7 @@ class PythonDistribution(Target):
         SDistField,
         WheelConfigSettingsField,
         SDistConfigSettingsField,
+        LongDescriptionPathField,
     )
     help = (
         "A publishable Python setuptools distribution (e.g. an sdist or wheel).\n\nSee "

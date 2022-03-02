@@ -51,6 +51,23 @@ def valid_address(value: str) -> bool:
     return bool(re.match(_address_regexp, value))
 
 
+_image_ref_regexp = re.compile(
+    r"""
+    ^
+    # Optional registry.
+    ((?P<registry>[^/:_ ]+:?[^/:_ ]*)/)?
+    # Repository.
+    (?P<repository>[^:@ \t\n\r\f\v]+)
+    # Optionally with `:tag`.
+    (:(?P<tag>[^@ ]+))?
+    # Optionally with `@digest`.
+    (@(?P<digest>\S+))?
+    $
+    """,
+    re.VERBOSE,
+)
+
+
 def main(cmd: str, args: list[str]) -> None:
     # import here to allow the rest of the file to be tested without a dependency on dockerfile
     from dockerfile import Command, parse_file, parse_string
@@ -128,16 +145,25 @@ def main(cmd: str, args: list[str]) -> None:
                 stage1 latest
                 out latest
             """
+
+            def _get_tag(image_ref: str) -> str | None:
+                """The image ref is in the form `registry/repo/name[/...][:tag][@digest]` and where
+                `digest` is `sha256:hex value`."""
+                parsed = re.match(_image_ref_regexp, image_ref)
+                if not parsed:
+                    return None
+                tag = parsed.group("tag")
+                if tag:
+                    return tag
+                if not parsed.group("digest"):
+                    return "latest"
+                return None
+
             return tuple(
-                " ".join(
-                    [
-                        stage,
-                        name_parts[-1].rsplit(":", maxsplit=1)[-1]
-                        if ":" in name_parts[-1]
-                        else "latest",
-                    ]
-                )
+                f"{stage} {tag}"
                 for stage, name_parts in self.from_baseimages()
+                for tag in [_get_tag(name_parts[-1])]
+                if tag
             )
 
         def build_args(self) -> tuple[str, ...]:

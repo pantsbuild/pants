@@ -10,10 +10,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
-from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
-from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
@@ -109,18 +106,13 @@ AllTools = (
     DefaultTool.python(PyTest),
     DefaultTool.python(CoverageSubsystem),
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
-    DefaultTool.python(DockerfileParser, backend="pants.backend.experimental.docker"),
+    DefaultTool.python(DockerfileParser, backend="pants.backend.docker"),
     DefaultTool.python(TwineSubsystem),
     # JVM
     DefaultTool.jvm(JUnit),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),
     DefaultTool.jvm(ScalafmtSubsystem),
-    DefaultTool.jvm(ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"),
     DefaultTool.jvm(Scalatest),
-    DefaultTool.jvm(
-        ScroogeSubsystem, backend="pants.backend.experimental.codegen.thrift.scrooge.scala"
-    ),
-    DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
     DefaultTool(
         "scalac-plugins",
         (f"--scalac-plugins-global-lockfile={Scalac.default_plugins_lockfile_path}",),

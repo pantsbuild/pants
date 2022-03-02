@@ -47,6 +47,7 @@ use std::{fmt, fs};
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use async_trait::async_trait;
 use bytes::Bytes;
+use deepsize::DeepSizeOf;
 use futures::future::{self, TryFutureExt};
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -80,7 +81,7 @@ pub enum Permissions {
   Writable,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize)]
+#[derive(Clone, Debug, DeepSizeOf, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize)]
 pub struct RelativePath(PathBuf);
 
 impl RelativePath {
@@ -143,7 +144,7 @@ impl From<RelativePath> for PathBuf {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub enum Stat {
   Link(Link),
   Dir(Dir),
@@ -171,19 +172,19 @@ impl Stat {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Link(pub PathBuf);
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Dir(pub PathBuf);
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct File {
   pub path: PathBuf,
   pub is_executable: bool,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub enum PathStat {
   Dir {
     // The symbolic name of some filesystem Path, which is context specific.
@@ -241,7 +242,7 @@ impl PathStat {
   }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct DirectoryListing(pub Vec<Stat>);
 
 #[derive(Debug)]
@@ -340,7 +341,7 @@ impl GitignoreStyleExcludes {
   }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum StrictGlobMatching {
   // NB: the Error and Warn variants store a description of the origin of the PathGlob
   // request so that we can make the error message more helpful to users when globs fail to match.
@@ -378,7 +379,7 @@ impl StrictGlobMatching {
   }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum GlobExpansionConjunction {
   AllMatch,
   AnyMatch,
@@ -400,7 +401,7 @@ pub enum SymlinkBehavior {
   Oblivious,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, DeepSizeOf, Clone, Eq, PartialEq, Hash)]
 pub struct PathGlobs {
   globs: Vec<String>,
   strict_match_behavior: StrictGlobMatching,
@@ -566,15 +567,15 @@ impl PosixFS {
             if path_buf.is_absolute() {
               Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Absolute symlink: {:?}", link_abs),
+                format!("Absolute symlink: {:?}", path_buf),
               ))
             } else {
               link_parent
-                .map(|parent| parent.join(path_buf))
+                .map(|parent| parent.join(&path_buf))
                 .ok_or_else(|| {
                   io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Symlink without a parent?: {:?}", link_abs),
+                    format!("Symlink without a parent?: {:?}", path_buf),
                   )
                 })
             }

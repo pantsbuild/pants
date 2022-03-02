@@ -9,5 +9,5 @@ publish = false
 protos = { path = "../../protos" }
 mock = { path = "../mock" }
 clap = "2"
-structopt = "0.2.18"
+structopt = "0.3.26"
 

@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
 from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
@@ -13,6 +12,7 @@ from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
+from pants.option.option_types import IntOption
 from pants.option.options import Options
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
@@ -229,9 +229,7 @@ def test_get_all_help_info():
         options_scope = GLOBAL_SCOPE
         help = "Global options."
 
-        @classmethod
-        def register_options(cls, register):
-            register("-o", "--opt1", type=int, default=42, help="Option 1")
+        opt1 = IntOption("-o", "--opt1", default=42, help="Option 1")
 
     class Foo(Subsystem):
         options_scope = "foo"
@@ -245,6 +243,8 @@ def test_get_all_help_info():
     class Bar(GoalSubsystem):
         name = "bar"
         help = "The bar goal."
+        deprecated_options_scope = "bar-old"
+        deprecated_options_scope_removal_version = "9.9.999"
 
     class QuxField(StringField):
         alias = "qux"
@@ -292,7 +292,8 @@ def test_get_all_help_info():
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
         bc_builder.create(),
     )
-    all_help_info_dict = dataclasses.asdict(all_help_info)
+
+    all_help_info_dict = all_help_info.asdict()
     expected_all_help_info_dict = {
         "scope_to_help_info": {
             GLOBAL_SCOPE: {
@@ -300,6 +301,7 @@ def test_get_all_help_info():
                 "description": "Global options.",
                 "provider": "",
                 "is_goal": False,
+                "deprecated_scope": None,
                 "basic": (
                     {
                         "display_args": ("-o=<int>", "--opt1=<int>"),
@@ -333,6 +335,7 @@ def test_get_all_help_info():
                 "provider": "help_info_extracter_test",
                 "description": "A foo.",
                 "is_goal": False,
+                "deprecated_scope": None,
                 "basic": (
                     {
                         "display_args": ("--[no-]foo-opt2",),
@@ -387,6 +390,17 @@ def test_get_all_help_info():
                 "provider": "help_info_extracter_test",
                 "description": "The bar goal.",
                 "is_goal": True,
+                "deprecated_scope": "bar-old",
+                "basic": tuple(),
+                "advanced": tuple(),
+                "deprecated": tuple(),
+            },
+            "bar-old": {
+                "scope": "bar-old",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "is_goal": True,
+                "deprecated_scope": "bar-old",
                 "basic": tuple(),
                 "advanced": tuple(),
                 "deprecated": tuple(),
@@ -431,7 +445,14 @@ def test_get_all_help_info():
                 "description": "The bar goal.",
                 "consumed_scopes": ("somescope", "used_by_bar"),
                 "is_implemented": True,
-            }
+            },
+            "bar-old": {
+                "name": "bar",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "consumed_scopes": ("somescope", "used_by_bar-old"),
+                "is_implemented": True,
+            },
         },
         "name_to_target_type_info": {
             "baz_library": {

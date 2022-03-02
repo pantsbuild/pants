@@ -9,12 +9,12 @@
 #     "CPython>=3.6"
 #   ],
 #   "generated_with_requirements": [
-#     "python-hcl2==3.0.1"
+#     "python-hcl2==3.0.3"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
 
 lark-parser==0.10.1; python_full_version >= "3.6.0" \
     --hash=sha256:42f367612a1bbc4cf9d8c8eb1b209d8a9b397d55af75620c9e6f53e502235996
-python-hcl2==3.0.1; python_full_version >= "3.6.0" \
-    --hash=sha256:f6c178d216e9d8ef1ef9fceeb16792cbabfb69d2ae1a73e263974ab6f74489ab
+python-hcl2==3.0.3; python_full_version >= "3.6.0" \
+    --hash=sha256:31b8135f474aa2dbd2325d7924f5ffe0b8a713669ca2d043511d8ed5a91798e5

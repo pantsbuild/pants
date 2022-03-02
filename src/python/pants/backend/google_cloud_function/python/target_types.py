@@ -13,7 +13,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField
+from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.core.goals.package import OutputPathField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
@@ -27,6 +27,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
+    InvalidTargetException,
     SecondaryOwnerMixin,
     StringField,
     Target,
@@ -189,7 +190,7 @@ class PythonGoogleCloudFunctionRuntime(StringField):
     PYTHON_RUNTIME_REGEX = r"^python(?P<major>\d)(?P<minor>\d+)$"
 
     alias = "runtime"
-    required = True
+    default = None
     valid_choices = PythonGoogleCloudFunctionRuntimes
     help = (
         "The identifier of the Google Cloud Function runtime to target (pythonXY). See "
@@ -197,8 +198,10 @@ class PythonGoogleCloudFunctionRuntime(StringField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address))
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        value = super().compute_value(raw_value, address)
+        if value is None:
+            return None
         if not re.match(cls.PYTHON_RUNTIME_REGEX, value):
             raise InvalidFieldException(
                 f"The `{cls.alias}` field in target at {address} must be of the form pythonXY, "
@@ -206,8 +209,10 @@ class PythonGoogleCloudFunctionRuntime(StringField):
             )
         return value
 
-    def to_interpreter_version(self) -> Tuple[int, int]:
+    def to_interpreter_version(self) -> Optional[Tuple[int, int]]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
+        if self.value is None:
+            return None
         mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
 
@@ -236,6 +241,7 @@ class PythonGoogleCloudFunction(Target):
         PythonGoogleCloudFunctionDependencies,
         PythonGoogleCloudFunctionHandlerField,
         PythonGoogleCloudFunctionRuntime,
+        PexCompletePlatformsField,
         PythonGoogleCloudFunctionType,
         PythonResolveField,
     )
@@ -243,6 +249,17 @@ class PythonGoogleCloudFunction(Target):
         "A self-contained Python function suitable for uploading to Google Cloud Function.\n\n"
         f"See {doc_url('python-google-cloud-function')}."
     )
+
+    def validate(self) -> None:
+        if (
+            self[PythonGoogleCloudFunctionRuntime].value is None
+            and not self[PexCompletePlatformsField].value
+        ):
+            raise InvalidTargetException(
+                f"The `{self.alias}` target {self.address} must specify either a "
+                f"`{self[PythonGoogleCloudFunctionRuntime].alias}` or "
+                f"`{self[PexCompletePlatformsField].alias}` or both."
+            )
 
 
 def rules():

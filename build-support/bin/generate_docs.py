@@ -34,6 +34,7 @@ import requests
 from common import die
 from readme_api import DocRef, ReadmeAPI
 
+from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.help.help_info_extracter import to_help_str
 from pants.version import MAJOR_MINOR
 
@@ -203,15 +204,16 @@ def run_pants_help_all() -> dict[str, Any]:
     backends = [
         "pants.backend.awslambda.python",
         "pants.backend.codegen.protobuf.python",
-        "pants.backend.experimental.codegen.thrift.apache.python",
-        "pants.backend.experimental.docker",
-        "pants.backend.experimental.docker.lint.hadolint",
+        "pants.backend.codegen.thrift.apache.python",
+        "pants.backend.docker",
+        "pants.backend.docker.lint.hadolint",
         "pants.backend.experimental.go",
         "pants.backend.experimental.java",
         "pants.backend.experimental.java.lint.google_java_format",
         "pants.backend.experimental.python",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
+        "pants.backend.experimental.python.packaging.pyoxidizer",
         "pants.backend.experimental.scala",
         "pants.backend.experimental.scala.lint.scalafmt",
         "pants.backend.google_cloud_function.python",
@@ -347,6 +349,16 @@ class ReferenceGenerator:
             else:
                 # It should already be a string, but might as well be safe.
                 default_str = to_help_str(default_help_repr)
+            # Some option defaults are paths under the buildroot, and we don't want the paths
+            # of the environment in which we happened to run the doc generator to leak into the
+            # published docs. So we replace with a placeholder string.
+            default_str = default_str.replace(get_buildroot(), "<buildroot>")
+            # Similarly, some option defaults are paths under the user's cache dir, so we replace
+            # with a placeholder for the same reason.  Using $XDG_CACHE_HOME as the placeholder is
+            # a useful hint to how the cache dir may be set, even though in practice the user may
+            # not have this env var set. But googling XDG_CACHE_HOME will bring up documentation
+            # of the ~/.cache fallback, so this seems like a sensible placeholder.
+            default_str = default_str.replace(get_pants_cachedir(), "$XDG_CACHE_HOME")
             escaped_default_str = (
                 html.escape(default_str, quote=False).replace("*", "&ast;").replace("_", "&lowbar;")
             )

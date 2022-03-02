@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 from itertools import chain
 
@@ -13,22 +14,25 @@ from pants.backend.java.dependency_inference.rules import (
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inference_rules
 from pants.backend.java.subsystems.javac import JavacSubsystem
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
-from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
-from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
+    ClasspathDependenciesRequest,
     ClasspathEntry,
     ClasspathEntryRequest,
+    ClasspathEntryRequests,
     CompileResult,
+    FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -41,28 +45,20 @@ class CompileJavaSourceRequest(ClasspathEntryRequest):
 @rule(desc="Compile with javac")
 async def compile_java_source(
     bash: BashBinary,
-    jdk_setup: JdkSetup,
     javac: JavacSubsystem,
     zip_binary: ZipBinary,
-    union_membership: UnionMembership,
     request: CompileJavaSourceRequest,
 ) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath, and additionally any prerequisite.
-    classpath_entry_requests = [
-        *((request.prerequisite,) if request.prerequisite else ()),
-        *(
-            ClasspathEntryRequest.for_targets(
-                union_membership, component=coarsened_dep, resolve=request.resolve
-            )
-            for coarsened_dep in request.component.dependencies
-        ),
-    ]
-    direct_dependency_classpath_entries = FallibleClasspathEntry.if_all_succeeded(
-        await MultiGet(
-            Get(FallibleClasspathEntry, ClasspathEntryRequest, cpe)
-            for cpe in classpath_entry_requests
-        )
+    optional_prereq_request = [*((request.prerequisite,) if request.prerequisite else ())]
+    fallibles = await MultiGet(
+        Get(FallibleClasspathEntries, ClasspathEntryRequests(optional_prereq_request)),
+        Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request)),
     )
+
+    direct_dependency_classpath_entries = FallibleClasspathEntries(
+        itertools.chain(*fallibles)
+    ).if_all_succeeded()
 
     if direct_dependency_classpath_entries is None:
         return FallibleClasspathEntry(
@@ -130,9 +126,12 @@ async def compile_java_source(
         )
 
     dest_dir = "classfiles"
-    dest_dir_digest = await Get(
-        Digest,
-        CreateDigest([Directory(dest_dir)]),
+    dest_dir_digest, jdk = await MultiGet(
+        Get(
+            Digest,
+            CreateDigest([Directory(dest_dir)]),
+        ),
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
     )
     merged_digest = await Get(
         Digest,
@@ -148,7 +147,7 @@ async def compile_java_source(
     )
 
     usercp = "__cp"
-    user_classpath = Classpath(direct_dependency_classpath_entries)
+    user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
     classpath_arg = ":".join(user_classpath.root_immutable_inputs_args(prefix=usercp))
     immutable_input_digests = dict(user_classpath.root_immutable_inputs(prefix=usercp))
 
@@ -156,7 +155,8 @@ async def compile_java_source(
     compile_result = await Get(
         FallibleProcessResult,
         JvmProcess(
-            classpath_entries=[f"{jdk_setup.java_home}/lib/tools.jar"],
+            jdk=jdk,
+            classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
             argv=[
                 "com.sun.tools.javac.Main",
                 *(("-cp", classpath_arg) if classpath_arg else ()),

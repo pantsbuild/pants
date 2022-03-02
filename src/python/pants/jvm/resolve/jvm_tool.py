@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar, cast
+from typing import ClassVar
 
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
@@ -20,7 +20,9 @@ from pants.jvm.resolve.common import (
     GatherJvmCoordinatesRequest,
 )
 from pants.jvm.target_types import JvmArtifactFieldSet
+from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -39,61 +41,45 @@ class JvmToolBase(Subsystem):
 
     default_lockfile_url: ClassVar[str | None] = None
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--version",
-            type=str,
-            advanced=True,
-            default=cls.default_version,
-            help=(
-                "Version string for the tool. This is available for substitution in the "
-                f"`[{cls.options_scope}].artifacts` option by including the string "
-                "`{version}`."
-            ),
-        )
-        register(
-            "--artifacts",
-            type=list,
-            member_type=str,
-            advanced=True,
-            default=list(cls.default_artifacts),
-            help=(
-                "Artifact requirements for this tool using specified as either the address of a `jvm_artifact` "
-                "target or, alternatively, as a colon-separated Maven coordinates (e.g., group:name:version). "
-                "For Maven coordinates, the string `{version}` version will be substituted with the value of the "
-                f"`[{cls.options_scope}].version` option."
-            ),
-        )
-        register(
-            "--lockfile",
-            type=str,
-            default=DEFAULT_TOOL_LOCKFILE,
-            advanced=True,
-            help=(
-                "Path to a lockfile used for installing the tool.\n\n"
-                f"Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by "
-                "Pants, so long as you have not changed the `--version` option. "
-                f"See {cls.default_lockfile_url} for the default lockfile contents.\n\n"
-                "To use a custom lockfile, set this option to a file path relative to the "
-                f"build root, then run `./pants jvm-generate-lockfiles "
-                f"--resolve={cls.options_scope}`.\n\n"
-            ),
-        )
-
-    @property
-    def version(self) -> str:
-        return cast(str, self.options.version)
+    version = StrOption(
+        "--version",
+        advanced=True,
+        default=lambda cls: cls.default_version,
+        help=lambda cls: (
+            "Version string for the tool. This is available for substitution in the "
+            f"`[{cls.options_scope}].artifacts` option by including the string "
+            "`{version}`."
+        ),
+    )
+    artifacts = StrListOption(
+        "--artifacts",
+        advanced=True,
+        default=lambda cls: list(cls.default_artifacts),
+        help=lambda cls: (
+            "Artifact requirements for this tool using specified as either the address of a `jvm_artifact` "
+            "target or, alternatively, as a colon-separated Maven coordinates (e.g., group:name:version). "
+            "For Maven coordinates, the string `{version}` version will be substituted with the value of the "
+            f"`[{cls.options_scope}].version` option."
+        ),
+    )
+    lockfile = StrOption(
+        "--lockfile",
+        default=DEFAULT_TOOL_LOCKFILE,
+        advanced=True,
+        help=lambda cls: (
+            "Path to a lockfile used for installing the tool.\n\n"
+            f"Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by "
+            "Pants, so long as you have not changed the `--version` option. "
+            f"See {cls.default_lockfile_url} for the default lockfile contents.\n\n"
+            "To use a custom lockfile, set this option to a file path relative to the "
+            f"build root, then run `{bin_name()} jvm-generate-lockfiles "
+            f"--resolve={cls.options_scope}`.\n\n"
+        ),
+    )
 
     @property
     def artifact_inputs(self) -> tuple[str, ...]:
-        return tuple(s.format(version=self.version) for s in self.options.artifacts)
-
-    @property
-    def lockfile(self) -> str:
-        f"""The path to a lockfile or special string '{DEFAULT_TOOL_LOCKFILE}'."""
-        return cast(str, self.options.lockfile)
+        return tuple(s.format(version=self.version) for s in self.artifacts)
 
 
 @rule

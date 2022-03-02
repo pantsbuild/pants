@@ -390,8 +390,8 @@ MINIMUM_STALE_AGE = timedelta(days=180)
 PANTS_PKG = Package(
     "pantsbuild.pants",
     "src/python/pants:pants-packaged",
-    # TODO: See https://github.com/pypa/pypi-support/issues/1376.
-    20000,
+    # Increased from the default limit of 20GB via https://github.com/pypa/pypi-support/issues/1376.
+    40000,
     validate_pants_pkg,
 )
 TESTUTIL_PKG = Package(

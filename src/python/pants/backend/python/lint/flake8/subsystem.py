@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -20,7 +19,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequirements
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
@@ -40,8 +39,8 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.option.custom_types import file_option, shell_str, target_option
-from pants.util.docutil import doc_url, git_url
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, TargetListOption
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -70,85 +69,68 @@ class Flake8(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/flake8/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=f"Don't use Flake8 when running `{register.bootstrap.pants_bin_name} lint`",
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help=(
-                "Arguments to pass directly to Flake8, e.g. "
-                f'`--{cls.options_scope}-args="--ignore E123,W456 --enable-extensions H111"`'
-            ),
-        )
-        register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help=(
-                "Path to an INI config file understood by Flake8 "
-                "(https://flake8.pycqa.org/en/latest/user/configuration.html).\n\n"
-                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                f"this option if the config is located in a non-standard location."
-            ),
-        )
-        register(
-            "--config-discovery",
-            type=bool,
-            default=True,
-            advanced=True,
-            help=(
-                "If true, Pants will include any relevant config files during "
-                "runs (`.flake8`, `flake8`, `setup.cfg`, and `tox.ini`)."
-                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-                f"non-standard location."
-            ),
-        )
-        register(
-            "--source-plugins",
-            type=list,
-            member_type=target_option,
-            advanced=True,
-            help=(
-                "An optional list of `python_sources` target addresses to load first-party "
-                "plugins.\n\nYou must set the plugin's parent directory as a source root. For "
-                "example, if your plugin is at `build-support/flake8/custom_plugin.py`, add "
-                "'build-support/flake8' to `[source].root_patterns` in `pants.toml`. This is "
-                "necessary for Pants to know how to tell Flake8 to discover your plugin. See "
-                f"{doc_url('source-roots')}\n\nYou must also set `[flake8:local-plugins]` in "
-                "your Flake8 config file. "
-                "For example:\n\n"
-                "```\n"
-                "[flake8:local-plugins]\n"
-                "    extension =\n"
-                "        CUSTOMCODE = custom_plugin:MyChecker\n"
-                "```\n\n"
-                "While your plugin's code can depend on other first-party code and third-party "
-                "requirements, all first-party dependencies of the plugin must live in the same "
-                "directory or a subdirectory.\n\nTo instead load third-party plugins, set the "
-                "option `[flake8].extra_requirements`."
-            ),
-        )
-
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
-
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+    skip = BoolOption(
+        "--skip",
+        default=False,
+        help=f"Don't use Flake8 when running `{bin_name()} lint`",
+    )
+    args = ArgsListOption(
+        help=lambda cls: (
+            "Arguments to pass directly to Flake8, e.g. "
+            f'`--{cls.options_scope}-args="--ignore E123,W456 --enable-extensions H111"`'
+        ),
+    )
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help=lambda cls: (
+            "Path to an INI config file understood by Flake8 "
+            "(https://flake8.pycqa.org/en/latest/user/configuration.html).\n\n"
+            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+            f"this option if the config is located in a non-standard location."
+        ),
+    )
+    config_discovery = BoolOption(
+        "--config-discovery",
+        default=True,
+        advanced=True,
+        help=lambda cls: (
+            "If true, Pants will include any relevant config files during "
+            "runs (`.flake8`, `flake8`, `setup.cfg`, and `tox.ini`)."
+            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+            f"non-standard location."
+        ),
+    )
+    _source_plugins = TargetListOption(
+        "--source-plugins",
+        advanced=True,
+        help=(
+            "An optional list of `python_sources` target addresses to load first-party "
+            "plugins.\n\nYou must set the plugin's parent directory as a source root. For "
+            "example, if your plugin is at `build-support/flake8/custom_plugin.py`, add "
+            "'build-support/flake8' to `[source].root_patterns` in `pants.toml`. This is "
+            "necessary for Pants to know how to tell Flake8 to discover your plugin. See "
+            f"{doc_url('source-roots')}\n\nYou must also set `[flake8:local-plugins]` in "
+            "your Flake8 config file. "
+            "For example:\n\n"
+            "```\n"
+            "[flake8:local-plugins]\n"
+            "    extension =\n"
+            "        CUSTOMCODE = custom_plugin:MyChecker\n"
+            "```\n\n"
+            "While your plugin's code can depend on other first-party code and third-party "
+            "requirements, all first-party dependencies of the plugin must live in the same "
+            "directory or a subdirectory.\n\n"
+            "To instead load third-party plugins, set the option "
+            "`[flake8].extra_requirements`.\n\n"
+            "Tip: it's often helpful to define a dedicated 'resolve' via "
+            "`[python].resolves` for your Flake8 plugins such as 'flake8-plugins' "
+            "so that the third-party requirements used by your plugin, like `flake8`, do not "
+            "mix with the rest of your project. Read that option's help message for more info "
+            "on resolves."
+        ),
+    )
 
     @property
     def config_request(self) -> ConfigFilesRequest:
@@ -157,14 +139,14 @@ class Flake8(PythonToolBase):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
-            discovery=cast(bool, self.options.config_discovery),
+            discovery=self.config_discovery,
             check_existence=["flake8", ".flake8"],
             check_content={"setup.cfg": b"[flake8]", "tox.ini": b"[flake8]"},
         )
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.options.source_plugins, owning_address=None)
+        return UnparsedAddressInputs(self._source_plugins, owning_address=None)
 
 
 # --------------------------------------------------------------------------------------

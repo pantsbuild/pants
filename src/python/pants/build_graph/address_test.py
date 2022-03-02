@@ -5,7 +5,14 @@ from __future__ import annotations
 
 import pytest
 
-from pants.build_graph.address import Address, AddressInput, InvalidSpecPath, InvalidTargetName
+from pants.build_graph.address import (
+    Address,
+    AddressInput,
+    AddressParseException,
+    InvalidSpecPath,
+    InvalidTargetName,
+)
+from pants.util.frozendict import FrozenDict
 
 
 def test_address_input_parse_spec() -> None:
@@ -14,8 +21,9 @@ def test_address_input_parse_spec() -> None:
         *,
         path_component: str,
         target_component: str | None = None,
+        parameters: dict[str, str] | None = None,
         generated_component: str | None = None,
-        relative_to: str | None = None
+        relative_to: str | None = None,
     ) -> None:
         ai = AddressInput.parse(spec, relative_to=relative_to)
         assert ai.path_component == path_component
@@ -23,6 +31,7 @@ def test_address_input_parse_spec() -> None:
             assert ai.target_component is None
         else:
             assert ai.target_component == target_component
+        assert ai.parameters == FrozenDict(parameters or {})
         if generated_component is None:
             assert ai.generated_component is None
         else:
@@ -56,6 +65,10 @@ def test_address_input_parse_spec() -> None:
         target_component="c",
         generated_component="gen",
     )
+
+    # Parameters
+    assert_parsed("a@k=v", path_component="a", parameters={"k": "v"})
+    assert_parsed("a@k1=v1,k2=v2", path_component="a", parameters={"k1": "v1", "k2": "v2"})
 
     # Absolute spec
     assert_parsed("//a/b/c", path_component="a/b/c")
@@ -91,14 +104,29 @@ def test_address_input_parse_bad_path_component(spec: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "spec,expected",
+    [
+        ("a:", "non-empty target name"),
+        ("a@t", "one or more key=value pairs"),
+        ("a@=", "one or more key=value pairs"),
+        ("a@t=", "one or more key=value pairs"),
+        ("a@t,y", "one or more key=value pairs"),
+        ("a@t=,y", "one or more key=value pairs"),
+        ("a#", "non-empty generated target name"),
+    ],
+)
+def test_address_input_parse(spec: str, expected: str) -> None:
+    with pytest.raises(AddressParseException) as e:
+        AddressInput.parse(spec)
+    assert expected in str(e.value)
+
+
+@pytest.mark.parametrize(
     "spec",
     [
         "",
-        "a:",
         "a::",
         "//",
-        "//:",
-        "//:@t",
         "//:!t",
         "//:?",
         "//:=",
@@ -317,6 +345,34 @@ def test_address_spec() -> None:
         expected_path_spec="a.b.subdir.dir2.f.txt@@b",
     )
 
+    assert_spec(
+        Address("", target_name="template", parameters={"k1": "v", "k2": "v"}),
+        expected="//:template@k1=v,k2=v",
+        expected_path_spec=".template@@k1=v,k2=v",
+    )
+    assert_spec(
+        Address("a/b", parameters={"k1": "v", "k2": "v"}),
+        expected="a/b@k1=v,k2=v",
+        expected_path_spec="a.b@@k1=v,k2=v",
+    )
+    assert_spec(
+        Address("a/b", generated_name="gen", parameters={"k": "v"}),
+        expected="a/b@k=v#gen",
+        expected_path_spec="a.b@@k=v@gen",
+    )
+    assert_spec(
+        Address("a/b", relative_file_path="f.ext", parameters={"k": "v"}),
+        expected="a/b/f.ext@k=v",
+        expected_path_spec="a.b.f.ext@@k=v",
+    )
+
+
+@pytest.mark.parametrize(
+    "params,expected", (({}, ""), ({"k": "v"}, "@k=v"), ({"k1": "v", "k2": "v"}, "@k1=v,k2=v"))
+)
+def test_address_parameters_repr(params: dict[str, str], expected: str) -> None:
+    assert Address("", target_name="foo", parameters=params).parameters_repr == expected
+
 
 def test_address_maybe_convert_to_target_generator() -> None:
     def assert_converts(addr: Address, *, expected: Address) -> None:
@@ -349,34 +405,6 @@ def test_address_maybe_convert_to_target_generator() -> None:
 
     assert_noops(Address("a/b", target_name="c"))
     assert_noops(Address("a/b"))
-
-
-def test_address_maybe_convert_to_generated_target() -> None:
-    def assert_converts(file_addr: Address, *, expected: Address) -> None:
-        assert file_addr.maybe_convert_to_generated_target() == expected
-
-    assert_converts(
-        Address("a/b", relative_file_path="c.txt", target_name="c"),
-        expected=Address("a/b", target_name="c", generated_name="c.txt"),
-    )
-    assert_converts(
-        Address("a/b", relative_file_path="c.txt"), expected=Address("a/b", generated_name="c.txt")
-    )
-    assert_converts(
-        Address("a/b", relative_file_path="subdir/f.txt"),
-        expected=Address("a/b", generated_name="subdir/f.txt"),
-    )
-    assert_converts(
-        Address("a/b", relative_file_path="subdir/f.txt", target_name="original"),
-        expected=Address("a/b", target_name="original", generated_name="subdir/f.txt"),
-    )
-
-    def assert_noops(addr: Address) -> None:
-        assert addr.maybe_convert_to_generated_target() is addr
-
-    assert_noops(Address("a/b", target_name="c"))
-    assert_noops(Address("a/b"))
-    assert_noops(Address("a/b", generated_name="generated"))
 
 
 def test_address_create_generated() -> None:
@@ -420,6 +448,14 @@ def test_address_create_generated() -> None:
         (
             Address("a/b/c", relative_file_path="subdir/f.txt", target_name="tgt"),
             AddressInput("a/b/c/subdir/f.txt", "../tgt"),
+        ),
+        (
+            Address("", target_name="t", parameters={"k": "v"}),
+            AddressInput("", "t", parameters=FrozenDict({"k": "v"})),
+        ),
+        (
+            Address("", target_name="t", parameters={"k1": "v1", "k2": "v2"}),
+            AddressInput("", "t", parameters=FrozenDict({"k1": "v1", "k2": "v2"})),
         ),
     ],
 )

@@ -6,6 +6,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
 
+use deepsize::{known_deep_size, DeepSizeOf};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use pyo3::{FromPyObject, ToPyObject};
@@ -18,7 +19,7 @@ use crate::externs;
 ///
 /// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds).
 ///
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Params(SmallVec<[Key; 4]>);
 
 impl<'x> Params {
@@ -114,6 +115,7 @@ pub type Id = u64;
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(*mut pyo3::ffi::PyTypeObject);
 
+known_deep_size!(8; TypeId);
 unsafe impl Send for TypeId {}
 unsafe impl Sync for TypeId {}
 
@@ -174,7 +176,7 @@ impl rule_graph::TypeId for TypeId {
 }
 
 /// An identifier for a Python function.
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Function(pub Key);
 
 impl Function {
@@ -207,7 +209,7 @@ impl fmt::Display for Function {
 }
 
 /// An interned key for a Value for use as a key in HashMaps and sets.
-#[derive(Clone)]
+#[derive(Clone, DeepSizeOf)]
 pub struct Key {
   id: Id,
   type_id: TypeId,
@@ -269,6 +271,10 @@ impl Key {
 // and `Drop`.
 #[derive(Clone)]
 pub struct Value(Arc<PyObject>);
+
+// NB: The size of objects held by a Graph is tracked independently, so we assert that each Value
+// is only as large as its pointers.
+known_deep_size!(8 * 3; Value);
 
 impl Value {
   pub fn new(obj: PyObject) -> Value {
@@ -398,7 +404,7 @@ impl Failure {
 
   pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
     let maybe_ptraceback = py_err
-      .ptraceback(py)
+      .traceback(py)
       .map(|traceback| traceback.to_object(py));
     let val = Value::from(py_err.into_py(py));
     let python_traceback = if let Some(tb) = maybe_ptraceback {

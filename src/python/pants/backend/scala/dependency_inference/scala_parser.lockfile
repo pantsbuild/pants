@@ -7,6 +7,7 @@
 #   "version": 1,
 #   "generated_with_requirements": [
 #     "io.circe:circe-generic_2.13:0.14.1,url=not_provided,jar=not_provided",
+#     "org.scala-lang:scala-library:2.13.7,url=not_provided,jar=not_provided",
 #     "org.scalameta:scalameta_2.13:4.4.30,url=not_provided,jar=not_provided"
 #   ]
 # }

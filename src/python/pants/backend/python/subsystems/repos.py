@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Iterator, cast
+from typing import Iterator
 
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 
 
@@ -17,38 +18,24 @@ class PythonRepos(Subsystem):
 
     pypi_index = "https://pypi.org/simple/"
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--repos",
-            advanced=True,
-            type=list,
-            default=[],
-            help=(
-                "URLs of code repositories to look for requirements. In Pip and Pex, this option "
-                "corresponds to the `--find-links` option."
-            ),
-        )
-        register(
-            "--indexes",
-            advanced=True,
-            type=list,
-            default=[cls.pypi_index],
-            help=(
-                "URLs of code repository indexes to look for requirements. If set to an empty "
-                "list, then Pex will use no indices (meaning it will not use PyPI). The values "
-                "should be compliant with PEP 503."
-            ),
-        )
-
-    @property
-    def repos(self) -> list[str]:
-        return cast("list[str]", self.options.repos)
-
-    @property
-    def indexes(self) -> list[str]:
-        return cast("list[str]", self.options.indexes)
+    repos = StrListOption(
+        "--repos",
+        help=(
+            "URLs of code repositories to look for requirements. In Pip and Pex, this option "
+            "corresponds to the `--find-links` option."
+        ),
+        advanced=True,
+    )
+    indexes = StrListOption(
+        "--indexes",
+        default=[pypi_index],
+        help=(
+            "URLs of code repository indexes to look for requirements. If set to an empty "
+            "list, then Pex will use no indices (meaning it will not use PyPI). The values "
+            "should be compliant with PEP 503."
+        ),
+        advanced=True,
+    )
 
     @property
     def pex_args(self) -> Iterator[str]:

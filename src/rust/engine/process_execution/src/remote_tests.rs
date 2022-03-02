@@ -999,7 +999,7 @@ async fn sends_headers() {
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkunitStore::new(false),
+    workunit_store: WorkunitStore::new(false, log::Level::Debug),
     build_id: String::from("marmosets"),
     run_id: RunId(0),
   };

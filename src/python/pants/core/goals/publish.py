@@ -25,7 +25,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar, cast
+from typing import ClassVar, Generic, Type, TypeVar
 
 from typing_extensions import final
 
@@ -43,7 +43,8 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.option.option_types import StrOption
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -166,23 +167,15 @@ class PublishSubsystem(GoalSubsystem):
     name = "publish"
     help = "Publish deliverables (assets, distributions, images, etc)."
 
-    required_union_implementations = (
-        PackageFieldSet,
-        PublishFieldSet,
-    )
-
     @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--output",
-            type=str,
-            help="Filename for JSON structured publish information.",
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PackageFieldSet in union_membership and PublishFieldSet in union_membership
 
-    @property
-    def output(self) -> str | None:
-        return cast("str|None", self.options.output)
+    output = StrOption(
+        "--output",
+        default=None,
+        help="Filename for JSON structured publish information.",
+    )
 
 
 class Publish(Goal):

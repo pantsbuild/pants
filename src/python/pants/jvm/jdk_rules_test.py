@@ -7,13 +7,13 @@ import textwrap
 
 import pytest
 
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import BashBinary, ProcessResult
-from pants.engine.process import rules as process_rules
-from pants.jvm.jdk_rules import JdkSetup, JvmProcess, parse_jre_major_version
+from pants.engine.process import ProcessResult
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess, parse_jre_major_version
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -33,9 +33,9 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *util_rules(),
             *jdk_rules(),
-            *process_rules(),
+            *system_binaries.rules(),
             QueryRule(BashBinary, ()),
-            QueryRule(JdkSetup, ()),
+            QueryRule(InternalJdk, ()),
             QueryRule(ProcessResult, (JvmProcess,)),
         ],
     )
@@ -44,10 +44,12 @@ def rule_runner() -> RuleRunner:
 
 
 def run_javac_version(rule_runner: RuleRunner) -> str:
+    jdk = rule_runner.request(InternalJdk, [])
     process_result = rule_runner.request(
         ProcessResult,
         [
             JvmProcess(
+                jdk=jdk,
                 classpath_entries=(),
                 argv=[
                     "-version",
@@ -71,7 +73,7 @@ def test_java_binary_system_version(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_java_binary_bogus_version_fails(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--jvm-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(["--jvm-tool-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         run_javac_version(rule_runner)
@@ -83,10 +85,10 @@ def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     # default version is 1.11
     assert "javac 11.0" in run_javac_version(rule_runner)
 
-    rule_runner.set_options(["--jvm-jdk=adopt:1.8"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(["--jvm-tool-jdk=adopt:1.8"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     assert "javac 1.8" in run_javac_version(rule_runner)
 
-    rule_runner.set_options(["--jvm-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(["--jvm-tool-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         assert "javac 16.0" in run_javac_version(rule_runner)
