@@ -6,8 +6,7 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
-from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -20,40 +19,39 @@ from pants.engine.fs import (
     FileContent,
     MergeDigests,
     RemovePrefix,
-    Snapshot,
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    GeneratedSources,
-    GenerateSourcesRequest,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
-from pants.engine.unions import UnionRule
+from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
 
-class GenerateGoFromProtobufRequest(GenerateSourcesRequest):
-    input = ProtobufSourceField
-    output = GoPackageSourcesField
+@dataclass(frozen=True)
+class _GeneratedGoFilesRequest:
+    source: ProtobufSourceField
+    grpc: bool
 
 
 @dataclass(frozen=True)
-class SetupGoProtocPlugin:
+class _GeneratedGoFiles:
     digest: Digest
 
 
-@rule(desc="Generate Go from Protobuf", level=LogLevel.DEBUG)
+@dataclass(frozen=True)
+class _SetupGoProtocPlugin:
+    digest: Digest
+
+
+@rule(desc="Generate Go source files from Protobuf", level=LogLevel.DEBUG)
 async def generate_go_from_protobuf(
-    request: GenerateGoFromProtobufRequest,
+    request: _GeneratedGoFilesRequest,
     protoc: Protoc,
-    go_protoc_plugin: SetupGoProtocPlugin,
-) -> GeneratedSources:
+    go_protoc_plugin: _SetupGoProtocPlugin,
+) -> _GeneratedGoFiles:
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
     protoc_go_plugin_relpath = "__protoc_gen_go"
@@ -61,7 +59,7 @@ async def generate_go_from_protobuf(
     downloaded_protoc_binary, empty_output_dir, transitive_targets = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
-        Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
+        Get(TransitiveTargets, TransitiveTargetsRequest([request.source.address])),
     )
 
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
@@ -75,23 +73,15 @@ async def generate_go_from_protobuf(
                 if tgt.has_field(ProtobufSourceField)
             ),
         ),
-        Get(
-            StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSourceField]])
-        ),
+        Get(StrippedSourceFiles, SourceFilesRequest([request.source])),
     )
 
     input_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                all_sources_stripped.snapshot.digest,
-                empty_output_dir,
-            ]
-        ),
+        Digest, MergeDigests([all_sources_stripped.snapshot.digest, empty_output_dir])
     )
 
     maybe_grpc_plugin_args = []
-    if request.protocol_target.get(ProtobufGrpcToggleField).value:
+    if request.grpc:
         maybe_grpc_plugin_args = [
             f"--go-grpc_out={output_dir}",
             "--go-grpc_opt=paths=source_relative",
@@ -116,7 +106,7 @@ async def generate_go_from_protobuf(
                 protoc_relpath: downloaded_protoc_binary.digest,
                 protoc_go_plugin_relpath: go_protoc_plugin.digest,
             },
-            description=f"Generating Go sources from {request.protocol_target.address}.",
+            description=f"Generating Go sources from {request.source.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
         ),
@@ -124,15 +114,15 @@ async def generate_go_from_protobuf(
 
     normalized_digest, source_root = await MultiGet(
         Get(Digest, RemovePrefix(result.output_digest, output_dir)),
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
+        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.source.address)),
     )
 
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))
+        await Get(Digest, AddPrefix(normalized_digest, source_root.path))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, normalized_digest)
+        else normalized_digest
     )
-    return GeneratedSources(source_root_restored)
+    return _GeneratedGoFiles(source_root_restored)
 
 
 # Note: The versions of the Go protoc and gRPC plugins are hard coded in the following go.mod. To update,
@@ -174,7 +164,7 @@ google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQ
 
 
 @rule
-async def setup_go_protoc_plugin(platform: Platform) -> SetupGoProtocPlugin:
+async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
     go_mod_digest = await Get(
         Digest,
         CreateDigest(
@@ -241,11 +231,8 @@ async def setup_go_protoc_plugin(platform: Platform) -> SetupGoProtocPlugin:
         ),
     )
     plugin_digest = await Get(Digest, RemovePrefix(merged_output_digests, "gopath/bin"))
-    return SetupGoProtocPlugin(plugin_digest)
+    return _SetupGoProtocPlugin(plugin_digest)
 
 
 def rules():
-    return (
-        *collect_rules(),
-        UnionRule(GenerateSourcesRequest, GenerateGoFromProtobufRequest),
-    )
+    return (*collect_rules(),)

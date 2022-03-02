@@ -121,6 +121,10 @@ async def setup_build_go_package_target_request(
         go_file_names = _third_party_pkg_info.go_files
         s_file_names = _third_party_pkg_info.s_files
 
+    # TODO(codegen): If the target can generate code, then apply it here.
+    elif False:
+        pass
+
     else:
         raise AssertionError(
             f"Unknown how to build `{target.alias}` target at address {request.address} with Go."
@@ -137,6 +141,7 @@ async def setup_build_go_package_target_request(
         if (
             tgt.has_field(GoPackageSourcesField)
             or tgt.has_field(GoThirdPartyPackageDependenciesField)
+            # TODO(codegen): or can generate
         )
     )
     direct_dependencies = []
