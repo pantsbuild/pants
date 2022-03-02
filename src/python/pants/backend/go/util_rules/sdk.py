@@ -57,6 +57,7 @@ class GoSdkProcess:
         self.working_dir = working_dir
         self.output_files = tuple(output_files)
         self.output_directories = tuple(output_directories)
+        self.platform = platform
 
 
 @dataclass(frozen=True)
