@@ -278,7 +278,6 @@ impl ByteStore {
   ///
   /// See also: `Self::store_bytes`.
   ///
-  #[allow(dead_code)]
   pub async fn store_bytes_batch(
     &self,
     entry_type: EntryType,
