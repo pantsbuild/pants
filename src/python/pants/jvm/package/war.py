@@ -14,9 +14,8 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.archive import ZipBinary
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.system_binaries import BashBinary
+from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
