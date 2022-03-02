@@ -45,7 +45,7 @@ class BufSubsystem(TemplatedExternalTool):
             "--args",
             type=list,
             member_type=shell_str,
-            help="Arguments to pass directly to Buf, e.g. `--buf-args='--error-format json'`.'",
+            help="Arguments to pass directly to Buf, e.g. `--buf-lint-args='--error-format json'`.'",
         )
 
     @property
