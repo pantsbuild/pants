@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from itertools import product
 from textwrap import dedent
 
 import pytest
@@ -65,48 +66,24 @@ def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert "Chart.yaml" not in source_files.snapshot.files
-    assert "values.yaml" in source_files.snapshot.files
-    assert "templates/_helpers.tpl" in source_files.snapshot.files
-    assert "templates/service.yaml" in source_files.snapshot.files
-    assert "included.xml" not in source_files.snapshot.files
-    assert "ignored.txt" not in source_files.snapshot.files
-
-
-def test_resource_sources_dependencies(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": dedent(
-                """\
-                helm_chart(name='mychart', dependencies=[':resources', ':files'])
-                resources(name="resources", sources=['*.xml'])
-                files(name="files", sources=['*.txt'])
-                """
-            ),
-            "Chart.yaml": HELM_CHART_FILE,
-            "values.yaml": HELM_VALUES_FILE,
-            "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_FILE,
-            "included.xml": "",
-            "ignored.txt": "",
-        }
+    assert source_files.snapshot.files == (
+        "templates/_helpers.tpl",
+        "templates/service.yaml",
+        "values.yaml",
     )
 
-    address = Address("", target_name="mychart")
-    tgt = rule_runner.get_target(address)
-    source_files = rule_runner.request(
-        HelmChartSourceFiles,
-        [
-            HelmChartSourceFilesRequest.create(
-                tgt, include_metadata=False, include_resources=True, include_files=False
-            )
-        ],
-    )
 
-    assert "included.xml" in source_files.snapshot.files
+_TEST_INCLUDE_SOURCES_PARAMETERS = [
+    tuple(params) for params in [p for p in product((True, False), repeat=3)]
+]
 
 
-def test_collects_files_sources_dependencies(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "include_metadata, include_resources, include_files", _TEST_INCLUDE_SOURCES_PARAMETERS
+)
+def test_source_templates_includes(
+    rule_runner: RuleRunner, include_metadata: bool, include_resources: bool, include_files: bool
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -131,34 +108,17 @@ def test_collects_files_sources_dependencies(rule_runner: RuleRunner) -> None:
         HelmChartSourceFiles,
         [
             HelmChartSourceFilesRequest.create(
-                tgt, include_metadata=False, include_resources=False, include_files=True
+                tgt,
+                include_metadata=include_metadata,
+                include_resources=include_resources,
+                include_files=include_files,
             )
         ],
     )
 
-    assert "file.txt" in source_files.snapshot.files
-
-
-def test_include_metadata_file(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": """helm_chart(name='mychart')""",
-            "Chart.yaml": HELM_CHART_FILE,
-            "values.yaml": HELM_VALUES_FILE,
-            "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_FILE,
-        }
-    )
-
-    address = Address("", target_name="mychart")
-    tgt = rule_runner.get_target(address)
-    source_files = rule_runner.request(
-        HelmChartSourceFiles,
-        [
-            HelmChartSourceFilesRequest.create(
-                tgt, include_metadata=True, include_files=False, include_resources=False
-            )
-        ],
-    )
-
-    assert "Chart.yaml" in source_files.snapshot.files
+    if include_metadata:
+        assert "Chart.yaml" in source_files.snapshot.files
+    if include_resources:
+        assert "resource.xml" in source_files.snapshot.files
+    if include_files:
+        assert "file.txt" in source_files.snapshot.files

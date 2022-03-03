@@ -43,13 +43,13 @@ def rule_runner() -> RuleRunner:
     )
 
 
-chart_type_parameters = [
+_TEST_CHART_PARAMETERS = [
     ("foo", "0.1.0", ChartType.APPLICATION, "https://www.example.com/icon.png", False),
     ("bar", "0.2.0", ChartType.LIBRARY, None, True),
 ]
 
 
-@pytest.mark.parametrize("name, version, type, icon, lint_strict", chart_type_parameters)
+@pytest.mark.parametrize("name, version, type, icon, lint_strict", _TEST_CHART_PARAMETERS)
 def test_compiles_single_chart_sources(
     rule_runner: RuleRunner,
     name: str,
