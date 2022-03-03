@@ -20,6 +20,8 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceTarget,
 )
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_rules
+from pants.backend.python.dependency_inference import module_mapper
+from pants.core.util_rules import stripped_source_files
 
 
 def rules():
@@ -32,6 +34,8 @@ def rules():
         *protobuf_tailor.rules(),
         *export_codegen_goal.rules(),
         *protobuf_target_rules(),
+        *module_mapper.rules(),
+        *stripped_source_files.rules(),
     ]
 
 

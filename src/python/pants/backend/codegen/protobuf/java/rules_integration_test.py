@@ -9,9 +9,6 @@ import pytest
 
 from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
 from pants.backend.codegen.protobuf.java.rules import rules as protobuf_rules
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
-    rules as protobuf_subsystem_rules,
-)
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
@@ -50,7 +47,6 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *protobuf_rules(),
-            *protobuf_subsystem_rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
