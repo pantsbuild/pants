@@ -5,12 +5,16 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
 )
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.engine.target import StringField
 
 
-class ProtobufPythonInterpreterConstraints(InterpreterConstraintsField):
+class ProtobufPythonInterpreterConstraintsField(InterpreterConstraintsField):
     alias = "python_interpreter_constraints"
+
+
+class ProtobufPythonResolveField(PythonResolveField):
+    alias = "python_resolve"
 
 
 class PythonSourceRootField(StringField):
@@ -23,8 +27,12 @@ class PythonSourceRootField(StringField):
 
 def rules():
     return [
-        ProtobufSourceTarget.register_plugin_field(ProtobufPythonInterpreterConstraints),
-        ProtobufSourcesGeneratorTarget.register_plugin_field(ProtobufPythonInterpreterConstraints),
+        ProtobufSourceTarget.register_plugin_field(ProtobufPythonInterpreterConstraintsField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(
+            ProtobufPythonInterpreterConstraintsField
+        ),
+        ProtobufSourceTarget.register_plugin_field(ProtobufPythonResolveField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(ProtobufPythonResolveField),
         ProtobufSourceTarget.register_plugin_field(PythonSourceRootField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PythonSourceRootField),
     ]
