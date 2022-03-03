@@ -33,6 +33,9 @@ def test_find_protobuf_python_requirement() -> None:
     rule_runner.write_files(
         {"codegen/dir/f.proto": "", "codegen/dir/BUILD": "protobuf_sources(grpc=True)"}
     )
+    rule_runner.set_options(
+        ["--python-resolves={'python-default': '', 'another': ''}", "--python-enable-resolves"]
+    )
     proto_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.proto"))
     request = InjectPythonProtobufDependencies(proto_tgt[Dependencies])
 
@@ -49,7 +52,20 @@ def test_find_protobuf_python_requirement() -> None:
         [Address("proto1"), Address("grpc1")]
     )
 
-    # If multiple, error.
+    # Multiple is fine if from other resolve.
+    rule_runner.write_files(
+        {
+            "another_resolve/BUILD": (
+                "python_requirement(name='r1', requirements=['protobuf'], resolve='another')\n"
+                "python_requirement(name='r2', requirements=['grpc'], resolve='another')\n"
+            )
+        }
+    )
+    assert rule_runner.request(InjectedDependencies, [request]) == InjectedDependencies(
+        [Address("proto1"), Address("grpc1")]
+    )
+
+    # If multiple from the same resolve, error.
     rule_runner.write_files({"grpc2/BUILD": "python_requirement(requirements=['grpc'])"})
     with engine_error(
         AmbiguousPythonCodegenRuntimeLibrary, contains="['grpc1:grpc1', 'grpc2:grpc2']"

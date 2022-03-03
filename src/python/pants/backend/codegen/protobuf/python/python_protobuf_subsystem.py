@@ -11,6 +11,8 @@ from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPy
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, collect_rules, rule
@@ -42,6 +44,10 @@ class PythonProtobufSubsystem(Subsystem):
             "`protobuf` module (usually from the `protobuf` requirement). If the `protobuf_source` "
             "target sets `grpc=True`, will also add a dependency on the `python_requirement` "
             "target exposing the `grpcio` module.\n\n"
+            "If `[python].enable_resolves` is set, Pants will only infer dependencies on "
+            "`python_requirement` targets that use the same resolve as the particular "
+            "`protobuf_source` / `protobuf_sources` target uses, which is set via its "
+            "`python_resolve` field.\n\n"
             "Unless this option is disabled, Pants will error if no relevant target is found or "
             "if more than one is found which causes ambiguity."
         ),
@@ -88,24 +94,30 @@ class InjectPythonProtobufDependencies(InjectDependenciesRequest):
 async def inject_dependencies(
     request: InjectPythonProtobufDependencies,
     python_protobuf: PythonProtobufSubsystem,
+    python_setup: PythonSetup,
     # TODO(#12946): Make this a lazy Get once possible.
     module_mapping: ThirdPartyPythonModuleMapping,
 ) -> InjectedDependencies:
     if not python_protobuf.infer_runtime_dependency:
         return InjectedDependencies()
 
+    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    tgt = wrapped_tgt.target
+    resolve = tgt.get(PythonResolveField).normalized_value(python_setup)
+
     result = [
         find_python_runtime_library_or_raise_error(
             module_mapping,
             request.dependencies_field.address,
             "google.protobuf",
+            resolve=resolve,
+            resolves_enabled=python_setup.enable_resolves,
             recommended_requirement_name="protobuf",
             recommended_requirement_url="https://pypi.org/project/protobuf/",
             disable_inference_option=f"[{python_protobuf.options_scope}].infer_runtime_dependency",
         )
     ]
 
-    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
     if wrapped_tgt.target.get(ProtobufGrpcToggleField).value:
         result.append(
             find_python_runtime_library_or_raise_error(
@@ -113,6 +125,8 @@ async def inject_dependencies(
                 request.dependencies_field.address,
                 # Note that the library is called `grpcio`, but the module is `grpc`.
                 "grpc",
+                resolve=resolve,
+                resolves_enabled=python_setup.enable_resolves,
                 recommended_requirement_name="grpcio",
                 recommended_requirement_url="https://pypi.org/project/grpcio/",
                 disable_inference_option=f"[{python_protobuf.options_scope}].infer_runtime_dependency",
