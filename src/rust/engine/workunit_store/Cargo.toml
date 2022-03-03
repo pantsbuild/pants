@@ -8,8 +8,8 @@ publish = false
 [dependencies]
 bytes = "1.0"
 concrete_time = { path = "../concrete_time" }
-# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/30 and https://github.com/Aeledfyr/deepsize/pull/31.
-deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "67c6cfc2afa1303c06b19c1b96ebe11fd3217d34" }
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
 hashing = { path = "../hashing" }
 hdrhistogram = "7.4"
 log = "0.4"

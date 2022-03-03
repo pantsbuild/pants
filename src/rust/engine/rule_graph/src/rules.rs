@@ -12,7 +12,7 @@ use super::{params_str, Palette};
 pub type ParamTypes<T> = BTreeSet<T>;
 
 pub trait TypeId:
-  Clone + Copy + Debug + DeepSizeOf + Display + Hash + Eq + Ord + Sized + 'static
+  Clone + Copy + Debug + DeepSizeOf + Display + Hash + Eq + Ord + Sized + Send + Sync + 'static
 {
   ///
   /// Render a string for a collection of TypeIds.
@@ -77,7 +77,9 @@ impl DisplayForGraphArgs {
   }
 }
 
-pub trait Rule: Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + 'static {
+pub trait Rule:
+  Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + Send + Sync + 'static
+{
   type TypeId: TypeId;
   type DependencyKey: DependencyKey<TypeId = Self::TypeId>;
 
