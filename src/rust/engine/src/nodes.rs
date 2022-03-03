@@ -15,6 +15,7 @@ use bytes::Bytes;
 use deepsize::DeepSizeOf;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
+use internment::Intern;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
 use pyo3::prelude::{Py, PyAny, Python};
 use pyo3::IntoPy;
@@ -132,12 +133,16 @@ pub trait WrappedNode: Into<NodeKey> {
 pub struct Select {
   pub params: Params,
   pub product: TypeId,
-  entry: rule_graph::Entry<Rule>,
+  entry: Intern<rule_graph::Entry<Rule>>,
 }
 
 impl Select {
-  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry<Rule>) -> Select {
-    params.retain(|k| match &entry {
+  pub fn new(
+    mut params: Params,
+    product: TypeId,
+    entry: Intern<rule_graph::Entry<Rule>>,
+  ) -> Select {
+    params.retain(|k| match entry.as_ref() {
       &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
       &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
     });
@@ -157,8 +162,7 @@ impl Select {
     // TODO: Is it worth propagating an error here?
     let entry = edges
       .entry_for(&dependency_key)
-      .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product))
-      .clone();
+      .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product));
     Select::new(params, product, entry)
   }
 
@@ -190,22 +194,20 @@ impl Select {
   }
 
   async fn run(self, context: Context) -> NodeResult<Value> {
-    match &self.entry {
-      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
-        match inner.rule() {
+    match self.entry.as_ref() {
+      &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
+        rule_graph::EntryWithDeps::Inner(ref inner) => match inner.rule() {
           &tasks::Rule::Task(ref task) => {
             context
               .get(Task {
                 params: self.params.clone(),
-                product: self.product,
-                task: task.clone(),
-                entry: Arc::new(self.entry.clone()),
+                task: *task,
+                entry: self.entry,
                 side_effected: Arc::new(AtomicBool::new(false)),
               })
               .await
           }
           &Rule::Intrinsic(ref intrinsic) => {
-            let intrinsic = intrinsic.clone();
             let values = future::try_join_all(
               intrinsic
                 .inputs
@@ -220,8 +222,11 @@ impl Select {
               .run(intrinsic, context.clone(), values)
               .await
           }
+        },
+        &rule_graph::EntryWithDeps::Root(_) => {
+          panic!("Not a runtime-executable entry! {:?}", self.entry)
         }
-      }
+      },
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
           Ok(key.to_value())
@@ -231,9 +236,6 @@ impl Select {
             type_id
           )))
         }
-      }
-      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_)) => {
-        panic!("Not a runtime-executable entry! {:?}", self.entry)
       }
     }
   }
@@ -979,12 +981,10 @@ impl From<DownloadedFile> for NodeKey {
 #[derivative(Eq, PartialEq, Hash)]
 pub struct Task {
   pub params: Params,
-  product: TypeId,
-  // TODO: This is large, and should probably be in an Arc.
-  task: tasks::Task,
+  task: Intern<tasks::Task>,
   // The Params and the Task struct are sufficient to uniquely identify it.
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
-  entry: Arc<rule_graph::Entry<Rule>>,
+  entry: Intern<rule_graph::Entry<Rule>>,
   // Does not affect the identity of the Task.
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   side_effected: Arc<AtomicBool>,
@@ -995,7 +995,7 @@ impl Task {
     context: &Context,
     workunit: &mut RunningWorkunit,
     params: &Params,
-    entry: &Arc<rule_graph::Entry<Rule>>,
+    entry: Intern<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
   ) -> NodeResult<Vec<Value>> {
     // While waiting for dependencies, mark the workunit for this Task blocked.
@@ -1005,7 +1005,6 @@ impl Task {
       .map(|get| {
         let context = context.clone();
         let mut params = params.clone();
-        let entry = entry.clone();
         async move {
           let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
             output: get.output,
@@ -1023,7 +1022,6 @@ impl Task {
           // See #12934 for further cleanup of this API.
           let select = edges
             .entry_for(&dependency_key)
-            .cloned()
             .map(|entry| {
               // The subject of the get is a new parameter that replaces an existing param of the same
               // type.
@@ -1082,7 +1080,7 @@ impl Task {
     context: &Context,
     workunit: &mut RunningWorkunit,
     params: Params,
-    entry: Arc<rule_graph::Entry<Rule>>,
+    entry: Intern<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
     let mut input = {
@@ -1092,15 +1090,14 @@ impl Task {
     loop {
       let context = context.clone();
       let params = params.clone();
-      let entry = entry.clone();
       let response = Python::with_gil(|py| externs::generator_send(py, &generator, &input))?;
       match response {
         externs::GeneratorResponse::Get(get) => {
-          let values = Self::gen_get(&context, workunit, &params, &entry, vec![get]).await?;
+          let values = Self::gen_get(&context, workunit, &params, entry, vec![get]).await?;
           input = values.into_iter().next().unwrap();
         }
         externs::GeneratorResponse::GetMulti(gets) => {
-          let values = Self::gen_get(&context, workunit, &params, &entry, gets).await?;
+          let values = Self::gen_get(&context, workunit, &params, entry, gets).await?;
           let gil = Python::acquire_gil();
           input = externs::store_tuple(gil.python(), values);
         }
@@ -1117,7 +1114,7 @@ impl fmt::Debug for Task {
     write!(
       f,
       "Task {{ func: {}, params: {}, product: {}, cacheable: {} }}",
-      self.task.func, self.params, self.product, self.task.cacheable,
+      self.task.func, self.params, self.task.product, self.task.cacheable,
     )
   }
 }
@@ -1144,9 +1141,9 @@ impl WrappedNode for Task {
         self
           .task
           .clause
-          .into_iter()
+          .iter()
           .map(|type_id| {
-            Select::new_from_edges(params.clone(), type_id, edges).run(context.clone())
+            Select::new_from_edges(params.clone(), *type_id, edges).run(context.clone())
           })
           .collect::<Vec<_>>(),
       )
@@ -1182,7 +1179,7 @@ impl WrappedNode for Task {
       result_type = new_type;
     }
 
-    if result_type != self.product {
+    if result_type != self.task.product {
       return Err(throw(format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
         self.task.func, result_val
@@ -1260,7 +1257,7 @@ impl NodeKey {
       &NodeKey::Select(ref s) => format!("{}", s.product),
       &NodeKey::SessionValues(_) => "SessionValues".to_string(),
       &NodeKey::RunId(_) => "RunId".to_string(),
-      &NodeKey::Task(ref s) => format!("{}", s.product),
+      &NodeKey::Task(ref t) => format!("{}", t.task.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::Paths(..) => "Paths".to_string(),
       &NodeKey::DigestFile(..) => "DigestFile".to_string(),
