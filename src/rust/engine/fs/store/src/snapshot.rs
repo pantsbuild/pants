@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
-use std::ffi::OsString;
 use std::fmt;
 use std::hash;
 use std::iter::Iterator;
@@ -244,12 +243,6 @@ impl From<Snapshot> for DirectoryDigest {
   fn from(s: Snapshot) -> Self {
     Self::new(s.digest, s.tree)
   }
-}
-
-pub fn osstring_as_utf8(path: OsString) -> Result<String, String> {
-  path
-    .into_string()
-    .map_err(|p| format!("{:?}'s file_name is not representable in UTF8", p))
 }
 
 // StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be

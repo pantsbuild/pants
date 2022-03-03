@@ -246,7 +246,7 @@ impl InputDigests {
     let mut complete_digests = try_join_all(
       immutable_inputs
         .iter()
-        .map(|(path, digest)| store.add_prefix(*digest, path))
+        .map(|(path, digest)| store.add_prefix(DirectoryDigest::todo_from_digest(*digest), path))
         .collect::<Vec<_>>(),
     )
     .await?;
@@ -256,24 +256,16 @@ impl InputDigests {
       .zip(complete_digests.iter())
       .filter_map(|(path, digest)| {
         if use_nailgun.contains(path) {
-          Some(*digest)
+          Some(digest.clone())
         } else {
           None
         }
       })
-      .map(DirectoryDigest::todo_from_digest)
       .collect::<Vec<_>>();
-    complete_digests.push(input_files);
+    complete_digests.push(DirectoryDigest::todo_from_digest(input_files));
 
-    let (complete, nailgun) = try_join!(
-      store.merge(
-        complete_digests
-          .into_iter()
-          .map(DirectoryDigest::todo_from_digest)
-          .collect()
-      ),
-      store.merge(nailgun_digests),
-    )?;
+    let (complete, nailgun) =
+      try_join!(store.merge(complete_digests), store.merge(nailgun_digests),)?;
     Ok(Self {
       complete: complete.todo_as_digest(),
       nailgun: nailgun.todo_as_digest(),

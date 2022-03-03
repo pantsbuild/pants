@@ -18,7 +18,7 @@ use grpc_util::prost::MessageExt;
 use hashing::{Digest, EMPTY_DIGEST};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
-use crate::PathStat;
+use crate::{PathStat, RelativePath};
 
 lazy_static! {
   pub static ref EMPTY_DIGEST_TREE: DigestTrie = DigestTrie(vec![].into());
@@ -450,6 +450,23 @@ impl DigestTrie {
         d.tree.walk_helper(path, f);
       }
     }
+  }
+
+  /// Add the given path as a prefix for this trie, returning the resulting trie.
+  pub fn add_prefix(self, prefix: &RelativePath) -> Result<DigestTrie, String> {
+    let mut prefix_iter = prefix.iter();
+    let mut tree = self;
+    while let Some(parent) = prefix_iter.next_back() {
+      let directory = Directory {
+        name: first_path_component_to_name(parent.as_ref())?,
+        digest: tree.compute_root_digest(),
+        tree,
+      };
+
+      tree = DigestTrie(vec![Entry::Directory(directory)].into());
+    }
+
+    Ok(tree)
   }
 
   /// Given DigestTries, merge them recursively into a single DigestTrie.

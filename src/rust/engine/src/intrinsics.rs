@@ -338,7 +338,8 @@ fn add_prefix_request_to_digest(
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_add_prefix.prefix)
         .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-      let res: NodeResult<(Digest, RelativePath)> = Ok((py_add_prefix.digest, prefix));
+      let res: NodeResult<(DirectoryDigest, RelativePath)> =
+        Ok((py_add_prefix.digest.clone(), prefix));
       res
     })?;
     let digest = context
@@ -348,8 +349,7 @@ fn add_prefix_request_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -501,13 +501,10 @@ fn create_digest_to_digest(
             let res: Result<_, String> = Ok(snapshot.into());
             res
           }
-          CreateDigestItem::Dir(path) => {
-            let digest = store
-              .create_empty_dir(&path)
-              .await
-              .map_err(|e| format!("{:?}", e))?;
-            Ok(DirectoryDigest::todo_from_digest(digest))
-          }
+          CreateDigestItem::Dir(path) => store
+            .create_empty_dir(&path)
+            .await
+            .map_err(|e| format!("{:?}", e)),
         }
       }
     })

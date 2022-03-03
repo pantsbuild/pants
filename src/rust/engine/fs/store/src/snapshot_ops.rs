@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use fs::{
   directory, DigestTrie, DirectoryDigest, ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob,
-  PreparedPathGlobs, RelativePath, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
+  PreparedPathGlobs, RelativePath, DOUBLE_STAR_GLOB, EMPTY_DIRECTORY_DIGEST, SINGLE_STAR_GLOB,
 };
 use futures::future::{self, FutureExt};
 use glob::Pattern;
@@ -21,7 +21,7 @@ use log::log_enabled;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 
-use crate::{snapshot::osstring_as_utf8, Snapshot};
+use crate::Snapshot;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum SnapshotOpsError {
@@ -591,25 +591,12 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
 
   async fn add_prefix(
     &self,
-    mut digest: Digest,
+    digest: DirectoryDigest,
     prefix: &RelativePath,
-  ) -> Result<Digest, SnapshotOpsError> {
-    let mut prefix_iter = prefix.iter();
-    while let Some(parent) = prefix_iter.next_back() {
-      let dir_node = remexec::DirectoryNode {
-        name: osstring_as_utf8(parent.to_os_string())?,
-        digest: Some((&digest).into()),
-      };
-
-      let out_dir = remexec::Directory {
-        directories: vec![dir_node],
-        ..remexec::Directory::default()
-      };
-
-      digest = self.record_directory(&out_dir).await?;
-    }
-
-    Ok(digest)
+  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+    let tree = self.load_digest_trie(digest).await?.add_prefix(prefix)?;
+    // TODO: Remove persistence as the final step of #13112.
+    Ok(self.record_digest_trie(tree).await?)
   }
 
   async fn strip_prefix(
@@ -697,8 +684,11 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     snapshot_glob_match(self.clone(), digest, globs).await
   }
 
-  async fn create_empty_dir(&self, path: &RelativePath) -> Result<Digest, SnapshotOpsError> {
-    self.add_prefix(EMPTY_DIGEST, path).await
+  async fn create_empty_dir(
+    &self,
+    path: &RelativePath,
+  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+    self.add_prefix(EMPTY_DIRECTORY_DIGEST.clone(), path).await
   }
 }
 

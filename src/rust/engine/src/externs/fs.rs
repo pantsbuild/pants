@@ -260,7 +260,7 @@ impl PyMergeDigests {
 #[pyclass(name = "AddPrefix")]
 #[derive(Debug, PartialEq)]
 pub struct PyAddPrefix {
-  pub digest: Digest,
+  pub digest: DirectoryDigest,
   pub prefix: PathBuf,
 }
 
@@ -269,14 +269,14 @@ impl PyAddPrefix {
   #[new]
   fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
     Self {
-      digest: digest.0.todo_as_digest(),
+      digest: digest.0,
       prefix,
     }
   }
 
   fn __hash__(&self) -> u64 {
     let mut s = DefaultHasher::new();
-    self.digest.hash.prefix_hash().hash(&mut s);
+    self.digest.as_digest().hash.prefix_hash().hash(&mut s);
     self.prefix.hash(&mut s);
     s.finish()
   }
@@ -284,7 +284,7 @@ impl PyAddPrefix {
   fn __repr__(&self) -> String {
     format!(
       "AddPrefix('{}', {})",
-      PyDigest(DirectoryDigest::todo_from_digest(self.digest)),
+      PyDigest(self.digest.clone()),
       self.prefix.display()
     )
   }
