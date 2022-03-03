@@ -271,7 +271,7 @@ impl Store {
   }
 
   ///
-  /// A convenience method for storing a file.
+  /// A convenience method for storing small files.
   ///
   /// NB: This method should not be used for large blobs: prefer to stream them from their source
   /// using `store_file`.
@@ -283,7 +283,7 @@ impl Store {
   ) -> Result<Digest, String> {
     self
       .local
-      .store_bytes(EntryType::File, bytes, initial_lease)
+      .store_bytes(EntryType::File, None, bytes, initial_lease)
       .await
   }
 
@@ -413,7 +413,12 @@ impl Store {
   ) -> Result<Digest, String> {
     let local = self.local.clone();
     local
-      .store_bytes(EntryType::Directory, directory.to_bytes(), initial_lease)
+      .store_bytes(
+        EntryType::Directory,
+        None,
+        directory.to_bytes(),
+        initial_lease,
+      )
       .await
   }
 
@@ -504,7 +509,7 @@ impl Store {
         match maybe_bytes {
           Some(bytes) => {
             let value = f_remote(bytes.clone())?;
-            let stored_digest = local.store_bytes(entry_type, bytes, true).await?;
+            let stored_digest = local.store_bytes(entry_type, None, bytes, true).await?;
             if digest == stored_digest {
               Ok(Some(value))
             } else {
