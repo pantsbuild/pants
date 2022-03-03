@@ -15,6 +15,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 )
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
+from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -46,6 +47,7 @@ def rule_runner() -> RuleRunner:
             *additional_fields.rules(),
             *protobuf_rules(),
             *protobuf_subsystem_rules(),
+            *module_mapper.rules(),
             QueryRule(PythonSourceFiles, [PythonSourceFilesRequest]),
             QueryRule(StrippedPythonSourceFiles, [PythonSourceFilesRequest]),
         ],
@@ -74,7 +76,11 @@ def get_stripped_sources(
     extra_args: list[str] | None = None,
 ) -> StrippedPythonSourceFiles:
     rule_runner.set_options(
-        [f"--source-root-patterns={source_roots or ['src/python']}", *(extra_args or [])],
+        [
+            f"--source-root-patterns={source_roots or ['src/python']}",
+            "--no-python-protobuf-infer-runtime-dependency",
+            *(extra_args or []),
+        ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     return rule_runner.request(
@@ -99,6 +105,7 @@ def get_unstripped_sources(
     rule_runner.set_options(
         [
             f"--source-root-patterns={source_roots or ['src/python']}",
+            "--no-python-protobuf-infer-runtime-dependency",
             *(extra_args or []),
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
