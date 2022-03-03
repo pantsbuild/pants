@@ -16,6 +16,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee2a4ec343196209d6594e19543ae87a39f96d5534d7174822a3ad825dd6ed7e"
 
 [[package]]
+name = "ahash"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43bb833f0bf979d8475d38fbf09ed3b8a55e1885fe93ad3f93239fc6a4f17b98"
+dependencies = [
+ "getrandom 0.2.1",
+ "once_cell",
+ "version_check",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -564,9 +575,10 @@ dependencies = [
 [[package]]
 name = "deepsize"
 version = "0.2.0"
-source = "git+https://github.com/stuhood/deepsize.git?rev=67c6cfc2afa1303c06b19c1b96ebe11fd3217d34#67c6cfc2afa1303c06b19c1b96ebe11fd3217d34"
+source = "git+https://github.com/stuhood/deepsize.git?rev=5c8bee5443fcafe4aaa9274490d354412d0955c1#5c8bee5443fcafe4aaa9274490d354412d0955c1"
 dependencies = [
  "deepsize_derive",
+ "internment",
  "log",
  "smallvec",
 ]
@@ -574,7 +586,7 @@ dependencies = [
 [[package]]
 name = "deepsize_derive"
 version = "0.1.2"
-source = "git+https://github.com/stuhood/deepsize.git?rev=67c6cfc2afa1303c06b19c1b96ebe11fd3217d34#67c6cfc2afa1303c06b19c1b96ebe11fd3217d34"
+source = "git+https://github.com/stuhood/deepsize.git?rev=5c8bee5443fcafe4aaa9274490d354412d0955c1#5c8bee5443fcafe4aaa9274490d354412d0955c1"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
@@ -667,6 +679,7 @@ dependencies = [
  "grpc_util",
  "hashing",
  "indexmap",
+ "internment",
  "itertools",
  "lazy_static",
  "libc",
@@ -1139,6 +1152,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
+name = "hashbrown"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c21d40587b92fa6a6c6e3c1bdbf87d75511db5672f9c93175574b3a00df1758"
+dependencies = [
+ "ahash",
+]
+
+[[package]]
 name = "hashing"
 version = "0.0.1"
 dependencies = [
@@ -1324,7 +1346,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282a6247722caba404c065016bbfa522806e51714c34f5dfc3e4a3a46fcb4223"
 dependencies = [
  "autocfg",
- "hashbrown",
+ "hashbrown 0.11.2",
 ]
 
 [[package]]
@@ -1389,6 +1411,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
 dependencies = [
  "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "internment"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73bd1419c48e9f496d5830cc2f7fff35cab112193f289fd7266ab0679bb97237"
+dependencies = [
+ "hashbrown 0.12.0",
+ "parking_lot 0.12.0",
 ]
 
 [[package]]
@@ -2734,6 +2766,7 @@ dependencies = [
  "deepsize",
  "env_logger",
  "indexmap",
+ "internment",
  "log",
  "petgraph 0.5.1",
 ]
