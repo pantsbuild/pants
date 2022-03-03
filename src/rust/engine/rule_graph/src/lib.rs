@@ -509,8 +509,6 @@ impl<R: Rule> RuleGraph<R> {
 ///
 /// Records the dependency rules for a rule.
 ///
-/// TODO: No longer needs a Vec<Entry>.
-///
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct RuleEdges<R: Rule> {
   dependencies: HashMap<R::DependencyKey, Intern<Entry<R>>>,
