@@ -268,14 +268,12 @@ def test_update_macro_references(rule_runner: RuleRunner) -> None:
 def test_check_options(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.write_files({"requirements.txt": "req", "BUILD": "python_requirements()"})
     rule_runner.set_options(
-        ["--python-protobuf-runtime-dependencies=//:req", "--flake8-source-plugins=//:req"]
+        ["--pylint-source-plugins=//:req", "--flake8-source-plugins=//:req"]
     )
     rule_runner.request(OptionsChecker, [OptionsCheckerRequest()])
     assert "* [flake8].source_plugins: ['//:req -> //:reqs#req']" in caplog.text
-    assert "* [python-protobuf].runtime_dependencies: ['//:req -> //:reqs#req']" in caplog.text
-    assert "pylint" not in caplog.text
+    assert "* [pylint].source_plugins: ['//:req -> //:reqs#req']" in caplog.text
     assert "mypy" not in caplog.text
-    assert "python-thrift" not in caplog.text
 
 
 def test_invalid_address() -> None:
