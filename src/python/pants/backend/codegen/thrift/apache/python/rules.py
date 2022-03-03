@@ -12,15 +12,17 @@ from pants.backend.codegen.thrift.apache.rules import (
 from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
-from pants.backend.python.target_types import PythonSourceField
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField, PythonSourceField
+from pants.engine.addresses import Address
 from pants.engine.fs import AddPrefix, Digest, Snapshot
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
     InjectDependenciesRequest,
     InjectedDependencies,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -69,16 +71,22 @@ class InjectApacheThriftPythonDependencies(InjectDependenciesRequest):
 async def find_apache_thrift_python_requirement(
     request: InjectApacheThriftPythonDependencies,
     thrift_python: ThriftPythonSubsystem,
+    python_setup: PythonSetup,
     # TODO(#12946): Make this a lazy Get once possible.
     module_mapping: ThirdPartyPythonModuleMapping,
 ) -> InjectedDependencies:
     if not thrift_python.infer_runtime_dependency:
         return InjectedDependencies()
 
+    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    resolve = wrapped_tgt.target.get(PythonResolveField).normalized_value(python_setup)
+
     addr = find_python_runtime_library_or_raise_error(
         module_mapping,
         request.dependencies_field.address,
         "thrift",
+        resolve=resolve,
+        resolves_enabled=python_setup.enable_resolves,
         recommended_requirement_name="thrift",
         recommended_requirement_url="https://pypi.org/project/thrift/",
         disable_inference_option=f"[{thrift_python.options_scope}].infer_runtime_dependency",

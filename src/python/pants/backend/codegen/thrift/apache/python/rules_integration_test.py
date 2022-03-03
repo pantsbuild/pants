@@ -182,6 +182,9 @@ def test_top_level_source_root(rule_runner: RuleRunner) -> None:
 
 def test_find_thrift_python_requirement(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"codegen/dir/f.thrift": "", "codegen/dir/BUILD": "thrift_sources()"})
+    rule_runner.set_options(
+        ["--python-resolves={'python-default': '', 'another': ''}", "--python-enable-resolves"]
+    )
     thrift_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.thrift"))
     request = InjectApacheThriftPythonDependencies(thrift_tgt[Dependencies])
 
@@ -195,7 +198,15 @@ def test_find_thrift_python_requirement(rule_runner: RuleRunner) -> None:
         [Address("reqs1")]
     )
 
-    # If multiple, error.
+    # Multiple is fine if from other resolve.
+    rule_runner.write_files(
+        {"another_resolve/BUILD": "python_requirement(requirements=['thrift'], resolve='another')"}
+    )
+    assert rule_runner.request(InjectedDependencies, [request]) == InjectedDependencies(
+        [Address("reqs1")]
+    )
+
+    # If multiple from the same resolve, error.
     rule_runner.write_files({"reqs2/BUILD": "python_requirement(requirements=['thrift'])"})
     with engine_error(
         AmbiguousPythonCodegenRuntimeLibrary, contains="['reqs1:reqs1', 'reqs2:reqs2']"
