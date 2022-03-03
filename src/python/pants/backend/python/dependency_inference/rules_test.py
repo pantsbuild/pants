@@ -173,7 +173,6 @@ def test_infer_python_assets() -> None:
             ResourcesGeneratorTarget,
         ],
     )
-    # @TODO: Add file assets as well
     rule_runner.write_files(
         {
             "src/python/data/BUILD": "resources(name='jsonfiles', sources=['*.json'])",
