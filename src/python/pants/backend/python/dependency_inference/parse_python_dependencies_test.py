@@ -142,7 +142,7 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
 def test_dunder_import_call(rule_runner: RuleRunner) -> None:
     content = dedent(
         """\
-        __import__("pkg_assets")
+        __import__("pkg_resources")
         __import__("dunder_import_ignored")  # pants: no-infer-dep
         __import__(  # pants: no-infer-dep
             "not_ignored_but_looks_like_it_could_be"
@@ -166,7 +166,7 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         expected_imports={
-            "pkg_assets": ImpInfo(lineno=1, weak=False),
+            "pkg_resources": ImpInfo(lineno=1, weak=False),
             "not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=4, weak=False),
             "also_not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=10, weak=False),
         },
@@ -372,7 +372,7 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
-        __import__(u"pkg_assets")
+        __import__(u"pkg_resources")
         __import__(b"treat.as.a.regular.import.not.a.string.import")
         __import__(u"{}".format("interpolation"))
 
@@ -395,7 +395,7 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
         expected_imports={
             "demo": ImpInfo(lineno=4, weak=False),
             "project.demo.Demo": ImpInfo(lineno=5, weak=False),
-            "pkg_assets": ImpInfo(lineno=7, weak=False),
+            "pkg_resources": ImpInfo(lineno=7, weak=False),
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=8, weak=False),
             "dep.from.bytes": ImpInfo(lineno=11, weak=True),
             "dep.from.str": ImpInfo(lineno=12, weak=True),
@@ -419,7 +419,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
-        __import__("pkg_assets")
+        __import__("pkg_resources")
         __import__("treat.as.a.regular.import.not.a.string.import")
 
         importlib.import_module("dep.from.str")
@@ -432,7 +432,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         expected_imports={
             "demo": ImpInfo(lineno=5, weak=False),
             "project.demo.Demo": ImpInfo(lineno=6, weak=False),
-            "pkg_assets": ImpInfo(lineno=8, weak=False),
+            "pkg_resources": ImpInfo(lineno=8, weak=False),
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=9, weak=False),
             "dep.from.str": ImpInfo(lineno=11, weak=True),
         },
@@ -452,7 +452,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         import demo
         from project.demo import Demo
 
-        __import__("pkg_assets")
+        __import__("pkg_resources")
         __import__("treat.as.a.regular.import.not.a.string.import")
 
         importlib.import_module("dep.from.str")
@@ -465,7 +465,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         expected_imports={
             "demo": ImpInfo(lineno=7, weak=False),
             "project.demo.Demo": ImpInfo(lineno=8, weak=False),
-            "pkg_assets": ImpInfo(lineno=10, weak=False),
+            "pkg_resources": ImpInfo(lineno=10, weak=False),
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=11, weak=False),
             "dep.from.str": ImpInfo(lineno=13, weak=True),
         },

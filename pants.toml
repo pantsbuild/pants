@@ -116,8 +116,6 @@ resolves = { python-default = "3rdparty/python/lockfiles/user_reqs.txt" }
 enable_resolves = true
 
 [python-infer]
-# @TODO: Add the python-infer flags at the BUILD level and move this down into
-# the relevant BUILD files
 assets = true
 
 [docformatter]
