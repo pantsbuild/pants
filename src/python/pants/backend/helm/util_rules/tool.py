@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
@@ -101,7 +102,7 @@ async def setup_helm(helm_subsytem: HelmSubsystem) -> HelmBinary:
 
     tool_relpath = "__helm"
     immutable_input_digests = {tool_relpath: downloaded_binary.digest}
-    helm_path = f"{tool_relpath}/{downloaded_binary.exe}"
+    helm_path = os.path.join(tool_relpath, downloaded_binary.exe)
     helm_env = _build_helm_env(cache_dir, config_dir, data_dir)
 
     # TODO Install Global Helm plugins

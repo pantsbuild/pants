@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import cast
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
@@ -37,7 +38,8 @@ class HelmSubsystem(TemplatedExternalTool):
 
     def generate_exe(self, plat: Platform) -> str:
         mapped_plat = self.default_url_platform_mapping[plat.value]
-        return f"./{mapped_plat}/helm"
+        bin_path = os.path.join(mapped_plat, "helm")
+        return bin_path
 
     @property
     def lint_strict(self) -> bool:
