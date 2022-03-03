@@ -282,7 +282,7 @@ def test_register_if(cls) -> None:
     register = Mock()
     MySubsystem.register_options(register)
     assert len(register.call_args_list) == 1
-    assert register.call_args_list[0].args == ("--registered",)
+    assert register.call_args_list[0][0] == ("--registered",)
 
 
 def test_property_types() -> None:
