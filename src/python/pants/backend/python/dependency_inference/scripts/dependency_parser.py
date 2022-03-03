@@ -203,7 +203,7 @@ def main(filename):
         json.dumps(
             {
                 "imports": imports_result,
-                "assets": list(sorted(visitor.assets)),
+                "assets": sorted(visitor.assets),
             }
         ).encode("utf8")
     )
