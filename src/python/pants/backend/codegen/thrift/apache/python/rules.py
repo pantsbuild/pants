@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from pants.backend.codegen.thrift.apache.python import subsystem
 from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.codegen.thrift.apache.rules import (
@@ -8,8 +10,9 @@ from pants.backend.codegen.thrift.apache.rules import (
     GenerateThriftSourcesRequest,
 )
 from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
+from pants.backend.codegen.utils import find_python_runtime_library_or_error
+from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
 from pants.backend.python.target_types import PythonSourceField
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
@@ -63,11 +66,24 @@ class InjectApacheThriftPythonDependencies(InjectDependenciesRequest):
 
 
 @rule
-async def inject_apache_thrift_java_dependencies(
-    _: InjectApacheThriftPythonDependencies, thrift_python: ThriftPythonSubsystem
+async def find_apache_thrift_python_requirement(
+    request: InjectApacheThriftPythonDependencies,
+    thrift_python: ThriftPythonSubsystem,
+    # TODO(#12946): Make this a lazy Get once possible.
+    module_mapping: ThirdPartyPythonModuleMapping,
 ) -> InjectedDependencies:
-    addresses = await Get(Addresses, UnparsedAddressInputs, thrift_python.runtime_dependencies)
-    return InjectedDependencies(addresses)
+    if not thrift_python.infer_runtime_dependency:
+        return InjectedDependencies()
+
+    addr = find_python_runtime_library_or_error(
+        module_mapping,
+        request.dependencies_field.address,
+        "thrift",
+        recommended_requirement_name="thrift",
+        recommended_requirement_url="https://pypi.org/project/thrift/",
+        disable_inference_option=f"[{thrift_python.options_scope}].infer_runtime_dependency",
+    )
+    return InjectedDependencies([addr])
 
 
 def rules():
