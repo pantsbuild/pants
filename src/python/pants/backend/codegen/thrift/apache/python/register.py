@@ -9,6 +9,8 @@ from pants.backend.codegen.thrift.target_types import (
     ThriftSourcesGeneratorTarget,
     ThriftSourceTarget,
 )
+from pants.backend.python.dependency_inference import module_mapper
+from pants.core.util_rules import stripped_source_files
 
 
 def target_types():
@@ -21,4 +23,6 @@ def rules():
         *apache_thrift_rules(),
         *apache_thrift_python_rules(),
         *python_thrift_module_mapper.rules(),
+        *module_mapper.rules(),
+        *stripped_source_files.rules(),
     ]

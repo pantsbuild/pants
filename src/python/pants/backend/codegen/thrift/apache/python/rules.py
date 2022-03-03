@@ -10,7 +10,7 @@ from pants.backend.codegen.thrift.apache.rules import (
     GenerateThriftSourcesRequest,
 )
 from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
-from pants.backend.codegen.utils import find_python_runtime_library_or_error
+from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
 from pants.backend.python.target_types import PythonSourceField
 from pants.engine.fs import AddPrefix, Digest, Snapshot
@@ -75,7 +75,7 @@ async def find_apache_thrift_python_requirement(
     if not thrift_python.infer_runtime_dependency:
         return InjectedDependencies()
 
-    addr = find_python_runtime_library_or_error(
+    addr = find_python_runtime_library_or_raise_error(
         module_mapping,
         request.dependencies_field.address,
         "thrift",

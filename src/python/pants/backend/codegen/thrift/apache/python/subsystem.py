@@ -26,8 +26,8 @@ class ThriftPythonSubsystem(Subsystem):
         help=(
             "If True, will add a dependency on a `python_requirement` target exposing the `thrift` "
             "module (usually from the `thrift` requirement).\n\n"
-            "Unless this option is disabled, will error if no relevant target is found or if >2 "
-            "is found which causes ambiguity."
+            "Unless this option is disabled, Pants will error if no relevant target is found or "
+            "more than one is found which causes ambiguity."
         ),
     ).advanced()
 

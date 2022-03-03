@@ -219,7 +219,6 @@ async def maybe_warn_options_macro_references(
                 opt_to_renames[option].add((runtime_dep, new_addr))
 
     check(python_protobuf.runtime_dependencies, "[python-protobuf].runtime_dependencies")
-    check(python_thrift.runtime_dependencies, "[python-thrift].runtime_dependencies")
     check(flake8.source_plugins, "[flake8].source_plugins")
     check(pylint.source_plugins, "[pylint].source_plugins")
     check(mypy.source_plugins, "[mypy].source_plugins")

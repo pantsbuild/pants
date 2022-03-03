@@ -6,7 +6,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufGrpcToggleField,
 )
-from pants.backend.codegen.utils import find_python_runtime_library_or_error
+from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -63,8 +63,8 @@ class PythonProtobufSubsystem(Subsystem):
             "`protobuf` module (usually from the `protobuf` requirement). If the `protobuf_source` "
             "target sets `grpc=True`, will also add a dependency on the `python_requirement` "
             "target exposing the `grpcio` module.\n\n"
-            "Unless this option is disabled, will error if no relevant target is found or if >2 "
-            "is found which causes ambiguity."
+            "Unless this option is disabled, Pants will error if no relevant target is found or "
+            "if more than one is found which causes ambiguity."
         ),
     ).advanced()
 
@@ -125,7 +125,7 @@ async def inject_dependencies(
         return InjectedDependencies()
 
     result = [
-        find_python_runtime_library_or_error(
+        find_python_runtime_library_or_raise_error(
             module_mapping,
             request.dependencies_field.address,
             "google.protobuf",
@@ -138,9 +138,10 @@ async def inject_dependencies(
     wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
     if wrapped_tgt.target.get(ProtobufGrpcToggleField).value:
         result.append(
-            find_python_runtime_library_or_error(
+            find_python_runtime_library_or_raise_error(
                 module_mapping,
                 request.dependencies_field.address,
+                # Note that the library is called `grpcio`, but the module is `grpc`.
                 "grpc",
                 recommended_requirement_name="grpcio",
                 recommended_requirement_url="https://pypi.org/project/grpcio/",

@@ -19,7 +19,7 @@ class AmbiguousPythonCodegenRuntimeLibrary(Exception):
     pass
 
 
-def find_python_runtime_library_or_error(
+def find_python_runtime_library_or_raise_error(
     module_mapping: ThirdPartyPythonModuleMapping,
     codegen_address: Address,
     runtime_library_module: str,
@@ -38,8 +38,8 @@ def find_python_runtime_library_or_error(
 
     if not addresses:
         raise MissingPythonCodegenRuntimeLibrary(
-            f"No `python_requirement` found with the module `{runtime_library_module}` in your "
-            f"project, so the Python code generated from the target {codegen_address} will "
+            f"No `python_requirement` target was found with the module `{runtime_library_module}` "
+            f"in your project, so the Python code generated from the target {codegen_address} will "
             f"not work properly. See {doc_url('python-third-party-dependencies')} for how to "
             "add a requirement, such as adding to requirements.txt. Usually you will want to use "
             f"the `{recommended_requirement_name}` project at {recommended_requirement_url}.\n\n"
@@ -48,7 +48,7 @@ def find_python_runtime_library_or_error(
 
     if len(addresses) > 1:
         raise AmbiguousPythonCodegenRuntimeLibrary(
-            "Multiple `python_requirement` targets found with the module "
+            "Multiple `python_requirement` targets were found with the module "
             f"`{runtime_library_module}` in your project, so it is ambiguous which to use for the "
             f"runtime library for the Python code generated from the the target {codegen_address}: "
             f"{sorted(addr.spec for addr in addresses)}\n\n"
