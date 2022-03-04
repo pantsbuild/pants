@@ -102,4 +102,3 @@ class HelmChartFieldSet(FieldSet):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
-    lint_strict: HelmChartLintStrictField
