@@ -114,13 +114,6 @@ impl DirectoryDigest {
     Self { digest, tree: None }
   }
 
-  pub fn from_tree(tree: DigestTrie) -> Self {
-    Self {
-      digest: tree.compute_root_digest(),
-      tree: Some(tree),
-    }
-  }
-
   /// Returns the `Digest` for this `DirectoryDigest`.
   ///
   /// TODO: If a callsite needs to convert to `Digest` as a convenience (i.e. in a location where
@@ -312,6 +305,15 @@ pub struct DigestTrie(Arc<[Entry]>);
 
 // TODO: This avoids a `rustc` crasher (repro on 7f319ee84ad41bc0aea3cb01fb2f32dcd51be704).
 unsafe impl Sync for DigestTrie {}
+
+impl From<DigestTrie> for DirectoryDigest {
+  fn from(tree: DigestTrie) -> Self {
+    Self {
+      digest: tree.compute_root_digest(),
+      tree: Some(tree),
+    }
+  }
+}
 
 impl DigestTrie {
   /// Create a DigestTrie from unique PathStats. Fails for duplicate items.

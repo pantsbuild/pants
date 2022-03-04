@@ -73,10 +73,7 @@ async fn merge_directories<T: SnapshotOps + 'static>(
     }
   };
 
-  // TODO: Remove persistence as the final step of #13112.
-  let directory_digest = store.record_digest_trie(tree.clone()).await?;
-
-  Ok(directory_digest)
+  Ok(tree.into())
 }
 
 ///
@@ -592,9 +589,13 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     digest: DirectoryDigest,
     prefix: &RelativePath,
   ) -> Result<DirectoryDigest, SnapshotOpsError> {
-    let tree = self.load_digest_trie(digest).await?.add_prefix(prefix)?;
-    // TODO: Remove persistence as the final step of #13112.
-    Ok(self.record_digest_trie(tree).await?)
+    Ok(
+      self
+        .load_digest_trie(digest)
+        .await?
+        .add_prefix(prefix)?
+        .into(),
+    )
   }
 
   async fn strip_prefix(
@@ -602,9 +603,13 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     digest: DirectoryDigest,
     prefix: &RelativePath,
   ) -> Result<DirectoryDigest, SnapshotOpsError> {
-    let tree = self.load_digest_trie(digest).await?.remove_prefix(prefix)?;
-    // TODO: Remove persistence as the final step of #13112.
-    Ok(self.record_digest_trie(tree).await?)
+    Ok(
+      self
+        .load_digest_trie(digest)
+        .await?
+        .remove_prefix(prefix)?
+        .into(),
+    )
   }
 
   async fn subset(
