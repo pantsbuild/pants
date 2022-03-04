@@ -169,7 +169,7 @@ async def compile_wsdl_source(
 
 
 @rule
-async def generate_scalameter_lockfile_request(
+async def generate_jaxws_lockfile_request(
     _: JaxWsToolsLockfileSentinel, jaxws: JaxWsTools
 ) -> GenerateJvmLockfileFromTool:
     return GenerateJvmLockfileFromTool.create(jaxws)
