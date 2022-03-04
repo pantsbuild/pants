@@ -3,7 +3,6 @@
 import logging
 import textwrap
 from dataclasses import dataclass
-from pathlib import PurePath
 
 from pants.backend.scala.bsp.spec import (
     ScalaBuildTarget,
@@ -52,8 +51,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -150,16 +147,20 @@ class HandleScalacOptionsResult:
 async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
+    jvm: JvmSubsystem,
 ) -> HandleScalacOptionsResult:
-    # Verify the target exists by loading it. Exception will be thrown if it does not.
-    _ = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
+    wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
+    resolve = wrapped_target.target[JvmResolveField].normalized_value(jvm)
+    classfiles_dir_uri = build_root.pathlib_path.joinpath(
+        f".pants.d/bsp/jvm/resolves/{resolve}/scala/classes"
+    ).as_uri()
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
             options=(),
-            classpath=(build_root.pathlib_path.joinpath(".pants.d/bsp/scala/classes").as_uri(),),
-            class_directory=build_root.pathlib_path.joinpath(".pants.d/bsp/scala/classes").as_uri(),
+            classpath=(classfiles_dir_uri,),
+            class_directory=classfiles_dir_uri,
         )
     )
 
@@ -191,70 +192,69 @@ async def bsp_scala_compile_request(
     bash: BashBinary,
 ) -> BSPCompileResult:
     coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
+    assert len(coarsened_targets) == 1
+    coarsened_target = coarsened_targets[0]
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
 
-    # NB: Each root can have an independent resolve, because there is no inherent relation
-    # between them other than that they were on the commandline together.
-    resolves = await MultiGet(
-        Get(CoursierResolveKey, CoarsenedTargets([t])) for t in coarsened_targets
+    result = await Get(
+        FallibleClasspathEntry,
+        ClasspathEntryRequest,
+        ClasspathEntryRequest.for_targets(
+            union_membership, component=coarsened_target, resolve=resolve
+        ),
     )
-
-    results = await MultiGet(
-        Get(
-            FallibleClasspathEntry,
-            ClasspathEntryRequest,
-            ClasspathEntryRequest.for_targets(union_membership, component=target, resolve=resolve),
-        )
-        for target, resolve in zip(coarsened_targets, resolves)
-    )
-    _logger.info(f"results = {results}")
-
-    exit_code = next((result.exit_code for result in results if result.exit_code != 0), 0)
-    _logger.info(f"exit code = {exit_code}")
+    _logger.info(f"scala compile result = {result}")
     output_digest = EMPTY_DIGEST
-    if exit_code == 0:
+    if result.exit_code == 0 and result.output:
         digests: list[Digest] = []
         filenames: list[str] = []
-        for result in results:
-            if result.output:
-                digests.append(result.output.digest)
-                filenames.extend(result.output.filenames)
-        jars_digest = await Get(Digest, MergeDigests(digests))
-        input_digest = await Get(Digest, CreateDigest([Directory("__classpath__")]))
-        script_digest = await Get(
-            Digest,
-            CreateDigest(
-                [
-                    FileContent(
-                        "__unpack_jars.sh",
-                        textwrap.dedent(
-                            f"""\
-                for filename in {' '.join(filenames)} ; do
-                  {unzip.path} $filename -d __classpath__
-                done
-                """
-                        ).encode(),
-                        is_executable=True,
-                    )
-                ]
+        if result.output:
+            digests.append(result.output.digest)
+            filenames.extend(result.output.filenames)
+        empty_output_dir_digest, script_digest = await MultiGet(
+            Get(Digest, CreateDigest([Directory("__classpath__")])),
+            Get(
+                Digest,
+                CreateDigest(
+                    [
+                        FileContent(
+                            "__unpack_jars.sh",
+                            textwrap.dedent(
+                                f"""\
+                            {unzip.path} "$1" -d __classpath__
+                            """
+                            ).encode(),
+                            is_executable=True,
+                        )
+                    ]
+                ),
             ),
         )
-        input_digest = await Get(Digest, MergeDigests([input_digest, script_digest, jars_digest]))
-        unpack_result = await Get(
-            ProcessResult,
-            Process(
-                argv=[bash.path, "./__unpack_jars.sh"],
-                description="Unpack classpath",
-                input_digest=input_digest,
-                output_directories=["__classpath__"],
-            ),
+        input_digest = await Get(
+            Digest, MergeDigests([result.output.digest, empty_output_dir_digest, script_digest])
         )
+        unpack_results = await MultiGet(
+            Get(
+                ProcessResult,
+                Process(
+                    argv=[bash.path, "./__unpack_jars.sh", filename],
+                    description="Unpack classpath",
+                    input_digest=input_digest,
+                    output_directories=["__classpath__"],
+                ),
+            )
+            for filename in result.output.filenames
+        )
+        merged_output_digest = await Get(
+            Digest, MergeDigests(r.output_digest for r in unpack_results)
+        )
+        output_digest = await Get(Digest, RemovePrefix(merged_output_digest, "__classpath__"))
         output_digest = await Get(
-            Digest, RemovePrefix(unpack_result.output_digest, "__classpath__")
+            Digest, AddPrefix(output_digest, f"bsp/jvm/resolves/{resolve}/scala/classes")
         )
-        output_digest = await Get(Digest, AddPrefix(output_digest, "scala/classes"))
 
     return BSPCompileResult(
-        status=StatusCode.ERROR if exit_code != 0 else StatusCode.OK,
+        status=StatusCode.ERROR if result.exit_code != 0 else StatusCode.OK,
         output_digest=output_digest,
     )
 

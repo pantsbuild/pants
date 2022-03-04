@@ -3,7 +3,6 @@
 import logging
 import time
 import uuid
-from abc import ABCMeta
 from dataclasses import dataclass
 
 from pants.bsp.context import BSPContext
@@ -24,7 +23,7 @@ _logger = logging.getLogger(__name__)
 
 @union
 @dataclass(frozen=True)
-class BSPCompileFieldSet(FieldSet, metaclass=ABCMeta):
+class BSPCompileFieldSet(FieldSet):
     """FieldSet used to hook BSP compilation."""
 
 
