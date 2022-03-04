@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from pants.backend.go.target_types import (
     GoImportPathField,
@@ -43,6 +43,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
 
 
@@ -73,15 +74,17 @@ class GoCodegenRequest:
 
     target: Target
 
-    generate_from: ClassVar[SourcesField]
+    generate_from: ClassVar[type[SourcesField]]
 
 
 def maybe_get_codegen_request_type(
     tgt: Target, union_membership: UnionMembership
 ) -> GoCodegenRequest | None:
-    generate_request_types = union_membership.get(GoCodegenRequest)
     if not tgt.has_field(SourcesField):
         return None
+    generate_request_types = cast(
+        FrozenOrderedSet[type[GoCodegenRequest]], union_membership.get(GoCodegenRequest)
+    )
     sources_field = tgt[SourcesField]
     relevant_requests = [
         req for req in generate_request_types if isinstance(sources_field, req.generate_from)
