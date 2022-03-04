@@ -69,8 +69,7 @@ def assert_files_generated(
         HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSourceField])]
     )
     generated_sources = rule_runner.request(
-        GeneratedSources,
-        [GenerateGoFromProtobufRequest(protocol_sources.snapshot, tgt)],
+        GeneratedSources, [GenerateGoFromProtobufRequest(protocol_sources.snapshot, tgt)]
     )
     assert set(generated_sources.snapshot.files) == set(expected_files)
 

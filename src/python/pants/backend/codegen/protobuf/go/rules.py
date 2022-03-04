@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
 from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest
+from pants.backend.go.util_rules.build_pkg_target import GoCodegenBuildRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -38,21 +40,32 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
 
+class GoCodegenBuildProtobufRequest(GoCodegenBuildRequest):
+    generate_from = ProtobufSourceField
+
+
 class GenerateGoFromProtobufRequest(GenerateSourcesRequest):
     input = ProtobufSourceField
     output = GoPackageSourcesField
 
 
 @dataclass(frozen=True)
-class SetupGoProtocPlugin:
+class _SetupGoProtocPlugin:
     digest: Digest
 
 
-@rule(desc="Generate Go from Protobuf", level=LogLevel.DEBUG)
+@rule
+async def setup_build_go_package_request_for_protobuf(
+    _: GoCodegenBuildProtobufRequest,
+) -> BuildGoPackageRequest:
+    raise NotImplementedError()
+
+
+@rule(desc="Generate Go source files from Protobuf", level=LogLevel.DEBUG)
 async def generate_go_from_protobuf(
     request: GenerateGoFromProtobufRequest,
     protoc: Protoc,
-    go_protoc_plugin: SetupGoProtocPlugin,
+    go_protoc_plugin: _SetupGoProtocPlugin,
 ) -> GeneratedSources:
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
@@ -81,13 +94,7 @@ async def generate_go_from_protobuf(
     )
 
     input_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                all_sources_stripped.snapshot.digest,
-                empty_output_dir,
-            ]
-        ),
+        Digest, MergeDigests([all_sources_stripped.snapshot.digest, empty_output_dir])
     )
 
     maybe_grpc_plugin_args = []
@@ -174,7 +181,7 @@ google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQ
 
 
 @rule
-async def setup_go_protoc_plugin(platform: Platform) -> SetupGoProtocPlugin:
+async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
     go_mod_digest = await Get(
         Digest,
         CreateDigest(
@@ -241,11 +248,12 @@ async def setup_go_protoc_plugin(platform: Platform) -> SetupGoProtocPlugin:
         ),
     )
     plugin_digest = await Get(Digest, RemovePrefix(merged_output_digests, "gopath/bin"))
-    return SetupGoProtocPlugin(plugin_digest)
+    return _SetupGoProtocPlugin(plugin_digest)
 
 
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateGoFromProtobufRequest),
+        UnionRule(GoCodegenBuildRequest, GoCodegenBuildProtobufRequest),
     )
