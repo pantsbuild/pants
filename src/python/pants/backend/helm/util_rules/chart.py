@@ -36,7 +36,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,14 @@ class InvalidChartTypeValueError(ValueError):
         super().__init__(
             f"Invalid value '{value}' for Helm Chart `type`. Valid values are: {[t.value for t in list(ChartType)]}"
         )
+
+
+class MissingChartMetadataException(Exception):
+    pass
+
+
+class AmbiguousChartMetadataException(Exception):
+    pass
 
 
 @dataclass(frozen=True)
@@ -183,6 +191,16 @@ async def parse_chart_metadata_from_field(field: HelmChartMetaSourceField) -> He
     )
     subset = await Get(Digest, DigestSubset, _chart_metadata_subset(source_files.snapshot.digest))
     file_contents = await Get(DigestContents, Digest, subset)
+
+    if len(file_contents) == 0:
+        raise MissingChartMetadataException(
+            f"Could not find any file that matched with either {_HELM_CHART_METADATA_FILENAMES} in target at: {field.address}"
+        )
+    if len(file_contents) > 1:
+        raise AmbiguousChartMetadataException(
+            f"Found more than one Helm chart metadata file at address '{field.address}':\n{bullet_list([f.path for f in file_contents])}"
+        )
+
     return HelmChartMetadata.from_bytes(file_contents[0].content)
 
 
