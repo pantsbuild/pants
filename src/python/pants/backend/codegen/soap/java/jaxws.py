@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.custom_types import shell_str
 from pants.util.docutil import git_url
 
 
@@ -22,11 +21,3 @@ class JaxWsTools(JvmToolBase):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            passthrough=True,
-            help="Arguments to pass directly to wsimport, e.g. `-p $package_name`.",
-        )
