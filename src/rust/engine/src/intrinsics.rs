@@ -154,13 +154,13 @@ impl Intrinsics {
 
   pub async fn run(
     &self,
-    intrinsic: Intrinsic,
+    intrinsic: &Intrinsic,
     context: Context,
     args: Vec<Value>,
   ) -> NodeResult<Value> {
     let function = self
       .intrinsics
-      .get(&intrinsic)
+      .get(intrinsic)
       .unwrap_or_else(|| panic!("Unrecognized intrinsic: {:?}", intrinsic));
     function(context, args).await
   }

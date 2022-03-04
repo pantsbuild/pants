@@ -7,6 +7,7 @@ use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use indexmap::IndexSet;
+use internment::Intern;
 use petgraph::graph::{DiGraph, EdgeReference, NodeIndex};
 use petgraph::visit::{DfsPostOrder, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable};
 use petgraph::Direction;
@@ -1156,11 +1157,11 @@ impl<R: Rule> Builder<R> {
     let entry_for = |node_id| -> Entry<R> {
       let (node, in_set): &(Node<R>, ParamTypes<_>) = &graph[node_id];
       match node {
-        Node::Rule(rule) => Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
+        Node::Rule(rule) => Entry::WithDeps(Intern::new(EntryWithDeps::Inner(InnerEntry {
           params: in_set.clone(),
           rule: rule.clone(),
-        })),
-        Node::Query(q) => Entry::WithDeps(EntryWithDeps::Root(RootEntry(q.clone()))),
+        }))),
+        Node::Query(q) => Entry::WithDeps(Intern::new(EntryWithDeps::Root(RootEntry(q.clone())))),
         Node::Param(p) => Entry::Param(*p),
       }
     };
@@ -1182,8 +1183,13 @@ impl<R: Rule> Builder<R> {
       // there was one dependency per DependencyKey.
       let dependencies = graph
         .edges_directed(node_id, Direction::Outgoing)
-        .map(|edge_ref| (*edge_ref.weight(), vec![entry_for(edge_ref.target())]))
-        .collect::<HashMap<_, _>>();
+        .map(|edge_ref| {
+          (
+            *edge_ref.weight(),
+            Intern::new(entry_for(edge_ref.target())),
+          )
+        })
+        .collect::<HashMap<_, Intern<Entry<R>>>>();
 
       match entry {
         Entry::WithDeps(wd) => {

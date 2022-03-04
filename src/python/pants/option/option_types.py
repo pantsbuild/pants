@@ -55,6 +55,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     _flag_names: tuple[str, ...]
     _default: _MaybeDynamicT[_DefaultT]
     _help: _HelpT
+    _register_if: Callable[[_SubsystemType], bool]
     _extra_kwargs: dict[str, Any]
 
     # NB: We define `__new__` rather than `__init__` because some subclasses need to define
@@ -64,6 +65,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         *flag_names: str,
         default: _MaybeDynamicT[_DefaultT],
         help: _HelpT,
+        register_if: Callable[[_SubsystemType], bool] | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -79,6 +81,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         self._flag_names = flag_names
         self._default = default
         self._help = help
+        self._register_if = register_if or (lambda cls: True)
         self._extra_kwargs = {
             k: v
             for k, v in {
@@ -113,7 +116,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         )
 
     @overload
-    def __get__(self, obj: None, objtype: Any) -> OptionsInfo:
+    def __get__(self, obj: None, objtype: Any) -> OptionsInfo | None:
         ...
 
     @overload
@@ -122,7 +125,9 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
 
     def __get__(self, obj, objtype):
         if obj is None:
-            return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
+            if self._register_if(objtype):
+                return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
+            return None
         long_name = self._flag_names[-1]
         option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
         if option_value is None:
@@ -154,6 +159,7 @@ class _ListOptionBase(
         *flag_names: str,
         default: _MaybeDynamicT[list[_ListMemberT]] = [],
         help: _HelpT,
+        register_if: Callable[[_SubsystemType], bool] | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -171,6 +177,7 @@ class _ListOptionBase(
             *flag_names,
             default=default,  # type: ignore[arg-type]
             help=help,
+            register_if=register_if,
             advanced=advanced,
             daemon=daemon,
             default_help_repr=default_help_repr,
@@ -365,6 +372,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         *flag_names: str,
         default: _EnumT,
         help: _HelpT,
+        register_if: Callable[[_SubsystemType], bool] | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -386,6 +394,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
+        register_if: Callable[[_SubsystemType], bool] | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -407,6 +416,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type: type[_EnumT],
         default: None,
         help: _HelpT,
+        register_if: Callable[[_SubsystemType], bool] | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -426,6 +436,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type=None,
         default,
         help,
+        register_if=None,
         # Additional bells/whistles
         advanced=None,
         daemon=None,
@@ -442,6 +453,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
             *flag_names,
             default=default,
             help=help,
+            register_if=register_if,
             advanced=advanced,
             daemon=daemon,
             default_help_repr=default_help_repr,
@@ -490,6 +502,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         *flag_names: str,
         default: list[_EnumT],
         help: _HelpT,
+        register_if: Callable[[_SubsystemType], bool] | None = None,
         # Additional bells/whistles
         advanced: bool | None = ...,
         daemon: bool | None = ...,
@@ -511,6 +524,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
+        register_if: Callable[[_SubsystemType], bool] | None = None,
         # Additional bells/whistles
         advanced: bool | None = ...,
         daemon: bool | None = ...,
@@ -531,6 +545,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         *flag_names: str,
         enum_type: type[_EnumT],
         help: _HelpT,
+        register_if: Callable[[_SubsystemType], bool] | None = None,
         # Additional bells/whistles
         advanced: bool | None = ...,
         daemon: bool | None = ...,
@@ -550,6 +565,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         enum_type=None,
         default=[],
         help,
+        register_if=None,
         # Additional bells/whistles
         advanced=None,
         daemon=None,
@@ -566,6 +582,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
             *flag_names,
             default=default,
             help=help,
+            register_if=register_if,
             advanced=advanced,
             daemon=daemon,
             default_help_repr=default_help_repr,
@@ -627,6 +644,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         *flag_names,
         default: _MaybeDynamicT[dict[str, _ValueT]] = {},
         help,
+        register_if: Callable[[_SubsystemType], bool] | None = None,
         advanced: bool | None = None,
         daemon: bool | None = None,
         default_help_repr: str | None = None,
@@ -642,6 +660,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
             *flag_names,
             default=default,  # type: ignore[arg-type]
             help=help,
+            register_if=register_if,
             advanced=advanced,
             daemon=daemon,
             default_help_repr=default_help_repr,
