@@ -826,12 +826,13 @@ class AmbiguousCodegenImplementationsException(Exception):
     """Exception for when there are multiple codegen implementations and it is ambiguous which to
     use."""
 
-    def __init__(
-        self,
+    @classmethod
+    def create(
+        cls,
         generators: Iterable[type[GenerateSourcesRequest]],
         *,
         for_sources_types: Iterable[type[SourcesField]],
-    ) -> None:
+    ) -> AmbiguousCodegenImplementationsException:
         all_same_generator_paths = (
             len({(generator.input, generator.output) for generator in generators}) == 1
         )
@@ -839,29 +840,28 @@ class AmbiguousCodegenImplementationsException(Exception):
         input = example_generator.input.__name__
         if all_same_generator_paths:
             output = example_generator.output.__name__
-            super().__init__(
+            return cls(
                 f"Multiple of the registered code generators can generate {output} from {input}. "
                 "It is ambiguous which implementation to use.\n\nPossible implementations:\n\n"
                 f"{bullet_list(sorted(generator.__name__ for generator in generators))}"
             )
-        else:
-            possible_output_types = sorted(
-                generator.output.__name__
-                for generator in generators
-                if issubclass(generator.output, tuple(for_sources_types))
-            )
-            possible_generators_with_output = [
-                f"{generator.__name__} -> {generator.output.__name__}"
-                for generator in sorted(generators, key=lambda generator: generator.output.__name__)
-            ]
-            super().__init__(
-                f"Multiple of the registered code generators can generate one of "
-                f"{possible_output_types} from {input}. It is ambiguous which implementation to "
-                f"use. This can happen when the call site requests too many different output types "
-                f"from the same original protocol sources.\n\nPossible implementations with their "
-                f"output type:\n\n"
-                f"{bullet_list(possible_generators_with_output)}"
-            )
+        possible_output_types = sorted(
+            generator.output.__name__
+            for generator in generators
+            if issubclass(generator.output, tuple(for_sources_types))
+        )
+        possible_generators_with_output = [
+            f"{generator.__name__} -> {generator.output.__name__}"
+            for generator in sorted(generators, key=lambda generator: generator.output.__name__)
+        ]
+        return cls(
+            f"Multiple of the registered code generators can generate one of "
+            f"{possible_output_types} from {input}. It is ambiguous which implementation to "
+            f"use. This can happen when the call site requests too many different output types "
+            f"from the same original protocol sources.\n\nPossible implementations with their "
+            f"output type:\n\n"
+            f"{bullet_list(possible_generators_with_output)}"
+        )
 
 
 @rule(desc="Hydrate the `sources` field")
@@ -884,7 +884,7 @@ async def hydrate_sources(
         and issubclass(generate_request_type.output, request.for_sources_types)
     ]
     if request.enable_codegen and len(relevant_generate_request_types) > 1:
-        raise AmbiguousCodegenImplementationsException(
+        raise AmbiguousCodegenImplementationsException.create(
             relevant_generate_request_types, for_sources_types=request.for_sources_types
         )
     generate_request_type = next(iter(relevant_generate_request_types), None)

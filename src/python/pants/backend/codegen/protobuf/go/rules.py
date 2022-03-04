@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest
+from pants.backend.go.util_rules.build_pkg_target import GoCodegenRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -26,8 +28,13 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
+
+
+class GoCodegenProtobufRequest(GoCodegenRequest):
+    generate_from = ProtobufSourceField
 
 
 @dataclass(frozen=True)
@@ -44,6 +51,13 @@ class _GeneratedGoFiles:
 @dataclass(frozen=True)
 class _SetupGoProtocPlugin:
     digest: Digest
+
+
+@rule
+async def setup_build_go_package_request_for_protobuf(
+    _: GoCodegenProtobufRequest,
+) -> BuildGoPackageRequest:
+    raise NotImplementedError()
 
 
 @rule(desc="Generate Go source files from Protobuf", level=LogLevel.DEBUG)
@@ -235,4 +249,4 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
 
 
 def rules():
-    return (*collect_rules(),)
+    return (*collect_rules(), UnionRule(GoCodegenRequest, GoCodegenProtobufRequest))

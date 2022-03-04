@@ -27,12 +27,47 @@ from pants.backend.go.util_rules.build_pkg import (
     FallibleBuildGoPackageRequest,
     FallibleBuiltGoPackage,
 )
-from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
+from pants.backend.go.util_rules.build_pkg_target import (
+    BuildGoPackageTargetRequest,
+    GoCodegenRequest,
+)
+from pants.core.target_types import FileSourceField, FileTarget
 from pants.engine.addresses import Address
-from pants.engine.fs import Snapshot
-from pants.engine.rules import QueryRule
+from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
+from pants.engine.rules import Get, QueryRule, rule
+from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.strutil import path_safe
+
+
+# Set up a trivial codegen plugin.
+class GoCodegenFilesRequest(GoCodegenRequest):
+    generate_from = FileSourceField
+
+
+@rule
+async def generate_from_file(_: GoCodegenFilesRequest) -> BuildGoPackageRequest:
+    content = dedent(
+        """\
+        package gen
+
+        import "fmt"
+
+        func Quote(s string) string {
+            return fmt.Sprintf(">> %s <<", s)
+        }
+        """
+    )
+    digest = await Get(Digest, CreateDigest([FileContent("codegen/f.go", content.encode())]))
+    return BuildGoPackageRequest(
+        import_path="codegen.com/gen",
+        digest=digest,
+        dir_path="codegen",
+        go_file_names=("f.go",),
+        s_file_names=(),
+        direct_dependencies=(),
+        minimum_go_version=None,
+    )
 
 
 @pytest.fixture
@@ -49,12 +84,14 @@ def rule_runner() -> RuleRunner:
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
+            generate_from_file,
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(FallibleBuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
+            UnionRule(GoCodegenRequest, GoCodegenFilesRequest),
         ],
-        target_types=[GoModTarget, GoPackageTarget],
+        target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -353,3 +390,58 @@ def test_build_invalid_target(rule_runner: RuleRunner) -> None:
     assert dep_build_request.request is None
     assert dep_build_request.exit_code == 1
     assert "dep/f.go:1:1: expected 'package', found invalid\n" in (dep_build_request.stderr or "")
+
+
+def test_build_codegen_target(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/greeter
+                go 1.17
+                """
+            ),
+            "generate_from_me.txt": "",
+            "greeter.go": dedent(
+                """\
+                package greeter
+
+                import "fmt"
+                import "codegen.com/gen"
+
+                func Hello() {
+                    fmt.Println(gen.Quote("Hello world!"))
+                }
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                go_mod(name='mod')
+                go_package(name='pkg', dependencies=[":gen"])
+                file(name='gen', source='generate_from_me.txt')
+                """
+            ),
+        }
+    )
+
+    # Running directly on a codegen target should work.
+    assert_pkg_target_built(
+        rule_runner,
+        Address("", target_name="gen"),
+        expected_import_path="codegen.com/gen",
+        expected_dir_path="codegen",
+        expected_go_file_names=["f.go"],
+        expected_direct_dependency_import_paths=[],
+        expected_transitive_dependency_import_paths=[],
+    )
+
+    # Direct dependencies on codegen targets must be propagated.
+    assert_pkg_target_built(
+        rule_runner,
+        Address("", target_name="pkg"),
+        expected_import_path="example.com/greeter",
+        expected_dir_path="",
+        expected_go_file_names=["greeter.go"],
+        expected_direct_dependency_import_paths=["codegen.com/gen"],
+        expected_transitive_dependency_import_paths=[],
+    )
