@@ -7,10 +7,9 @@ from typing import Iterable
 
 import pytest
 
-from pants.backend.codegen.protobuf.go.rules import _GeneratedGoFiles, _GeneratedGoFilesRequest
+from pants.backend.codegen.protobuf.go.rules import GenerateGoFromProtobufRequest
 from pants.backend.codegen.protobuf.go.rules import rules as go_protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
-    ProtobufGrpcToggleField,
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
 )
@@ -20,9 +19,9 @@ from pants.backend.go.util_rules import sdk
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.engine.fs import Digest, DigestContents, Snapshot
+from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import QueryRule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -40,7 +39,7 @@ def rule_runner() -> RuleRunner:
             *go_protobuf_rules(),
             *sdk.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
-            QueryRule(_GeneratedGoFiles, [_GeneratedGoFilesRequest]),
+            QueryRule(GeneratedSources, [GenerateGoFromProtobufRequest]),
             QueryRule(DigestContents, (Digest,)),
         ],
         target_types=[
@@ -66,16 +65,13 @@ def assert_files_generated(
     args = [f"--source-root-patterns={repr(source_roots)}", *extra_args]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
     tgt = rule_runner.get_target(address)
-    generated_sources = rule_runner.request(
-        _GeneratedGoFiles,
-        [
-            _GeneratedGoFilesRequest(
-                tgt[ProtobufSourceField], grpc=tgt[ProtobufGrpcToggleField].value
-            )
-        ],
+    protocol_sources = rule_runner.request(
+        HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSourceField])]
     )
-    snapshot = rule_runner.request(Snapshot, [generated_sources.digest])
-    assert set(snapshot.files) == set(expected_files)
+    generated_sources = rule_runner.request(
+        GeneratedSources, [GenerateGoFromProtobufRequest(protocol_sources.snapshot, tgt)]
+    )
+    assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
 def test_generates_go(rule_runner: RuleRunner) -> None:

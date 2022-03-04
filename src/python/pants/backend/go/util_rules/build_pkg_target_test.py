@@ -29,7 +29,7 @@ from pants.backend.go.util_rules.build_pkg import (
 )
 from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
-    GoCodegenRequest,
+    GoCodegenBuildRequest,
 )
 from pants.core.target_types import FileSourceField, FileTarget
 from pants.engine.addresses import Address
@@ -41,12 +41,12 @@ from pants.util.strutil import path_safe
 
 
 # Set up a trivial codegen plugin.
-class GoCodegenFilesRequest(GoCodegenRequest):
+class GoCodegenBuildFilesRequest(GoCodegenBuildRequest):
     generate_from = FileSourceField
 
 
 @rule
-async def generate_from_file(_: GoCodegenFilesRequest) -> BuildGoPackageRequest:
+async def generate_from_file(_: GoCodegenBuildFilesRequest) -> BuildGoPackageRequest:
     content = dedent(
         """\
         package gen
@@ -89,7 +89,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleBuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
-            UnionRule(GoCodegenRequest, GoCodegenFilesRequest),
+            UnionRule(GoCodegenBuildRequest, GoCodegenBuildFilesRequest),
         ],
         target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )

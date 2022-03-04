@@ -62,14 +62,19 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
 
 @union
 @dataclass(frozen=True)
-class GoCodegenRequest:
-    """The plugin hook to generate Go code.
+class GoCodegenBuildRequest:
+    """The plugin hook to build/compile Go code.
+
+    Note that you should still use the normal `GenerateSourcesRequest` plugin hook from
+    `pants.engine.target` too, which is necessary for integrations like the `export-codegen` goal.
+    However, that is only helpful to generate the raw `.go` files; you also need to use this
+    plugin hook so that Pants knows how to compile those generated `.go` files.
 
     Subclass this and set the class property `generate_from`. Define a rule that goes from your
     subclass to `BuildGoPackageRequest` - the request must result in valid compilation, which you
     should test for by using `rule_runner.request(BuiltGoPackage, BuildGoPackageRequest)` in your
     tests. For example, make sure to set up any third-party packages needed by the generated code.
-    Finally, register `UnionRule(GoCodegenRequest, MySubclass)`.
+    Finally, register `UnionRule(GoCodegenBuildRequest, MySubclass)`.
     """
 
     target: Target
@@ -79,11 +84,11 @@ class GoCodegenRequest:
 
 def maybe_get_codegen_request_type(
     tgt: Target, union_membership: UnionMembership
-) -> GoCodegenRequest | None:
+) -> GoCodegenBuildRequest | None:
     if not tgt.has_field(SourcesField):
         return None
     generate_request_types = cast(
-        FrozenOrderedSet[type[GoCodegenRequest]], union_membership.get(GoCodegenRequest)
+        FrozenOrderedSet[type[GoCodegenBuildRequest]], union_membership.get(GoCodegenBuildRequest)
     )
     sources_field = tgt[SourcesField]
     relevant_requests = [
@@ -92,7 +97,7 @@ def maybe_get_codegen_request_type(
     if len(relevant_requests) > 1:
         generate_from_sources = relevant_requests[0].generate_from.__name__
         raise AmbiguousCodegenImplementationsException(
-            f"Multiple of the registered code generators from {GoCodegenRequest.__name__} can "
+            f"Multiple of the registered code generators from {GoCodegenBuildRequest.__name__} can "
             f"generate from {generate_from_sources}. It is ambiguous which implementation to "
             f"use.\n\n"
             f"Possible implementations:\n\n"
@@ -112,7 +117,7 @@ async def setup_build_go_package_target_request(
 
     codegen_request = maybe_get_codegen_request_type(target, union_membership)
     if codegen_request:
-        codegen_result = await Get(BuildGoPackageRequest, GoCodegenRequest, codegen_request)
+        codegen_result = await Get(BuildGoPackageRequest, GoCodegenBuildRequest, codegen_request)
         return FallibleBuildGoPackageRequest(codegen_result, codegen_result.import_path)
 
     embed_config: EmbedConfig | None = None
