@@ -10,8 +10,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict
 
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
-from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
@@ -201,8 +199,6 @@ class OptionsCheckerRequest:
 @rule(desc="Check option values for Python macro syntax vs. target generator", level=LogLevel.DEBUG)
 async def maybe_warn_options_macro_references(
     _: OptionsCheckerRequest,
-    python_protobuf: PythonProtobufSubsystem,
-    python_thrift: ThriftPythonSubsystem,
     flake8: Flake8,
     pylint: Pylint,
     mypy: MyPy,
@@ -218,8 +214,6 @@ async def maybe_warn_options_macro_references(
                 new_addr = new_addr_spec(runtime_dep, renames.generated[addr][0])
                 opt_to_renames[option].add((runtime_dep, new_addr))
 
-    check(python_protobuf.runtime_dependencies, "[python-protobuf].runtime_dependencies")
-    check(python_thrift.runtime_dependencies, "[python-thrift].runtime_dependencies")
     check(flake8.source_plugins, "[flake8].source_plugins")
     check(pylint.source_plugins, "[pylint].source_plugins")
     check(mypy.source_plugins, "[mypy].source_plugins")

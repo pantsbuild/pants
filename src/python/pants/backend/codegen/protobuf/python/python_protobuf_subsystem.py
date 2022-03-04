@@ -2,16 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.backend.codegen.protobuf.target_types import ProtobufDependenciesField
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufDependenciesField,
+    ProtobufGrpcToggleField,
+)
+from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
+from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.addresses import Address
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
+from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, WrappedTarget
 from pants.engine.unions import UnionRule
-from pants.option.option_types import BoolOption, TargetListOption
+from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url, git_url
 
@@ -19,16 +24,6 @@ from pants.util.docutil import doc_url, git_url
 class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"
     help = f"Options related to the Protobuf Python backend.\n\nSee {doc_url('protobuf')}."
-
-    _runtime_dependencies = TargetListOption(
-        "--runtime-dependencies",
-        help=(
-            "A list of addresses to `python_requirement` targets for the runtime "
-            "dependencies needed for generated Python code to work. For example, "
-            "`['3rdparty/python:protobuf', '3rdparty/python:grpcio']`. These dependencies will "
-            "be automatically added to every `protobuf_sources` target"
-        ),
-    )
 
     mypy_plugin = BoolOption(
         "--mypy-plugin",
@@ -39,9 +34,19 @@ class PythonProtobufSubsystem(Subsystem):
         ),
     )
 
-    @property
-    def runtime_dependencies(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self._runtime_dependencies, owning_address=None)
+    infer_runtime_dependency = BoolOption(
+        "--infer-runtime-dependency",
+        default=True,
+        help=(
+            "If True, will add a dependency on a `python_requirement` target exposing the "
+            "`protobuf` module (usually from the `protobuf` requirement). If the `protobuf_source` "
+            "target sets `grpc=True`, will also add a dependency on the `python_requirement` "
+            "target exposing the `grpcio` module.\n\n"
+            "Unless this option is disabled, Pants will error if no relevant target is found or "
+            "if more than one is found which causes ambiguity."
+        ),
+        advanced=True,
+    )
 
 
 class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
@@ -81,10 +86,40 @@ class InjectPythonProtobufDependencies(InjectDependenciesRequest):
 
 @rule
 async def inject_dependencies(
-    _: InjectPythonProtobufDependencies, python_protobuf: PythonProtobufSubsystem
+    request: InjectPythonProtobufDependencies,
+    python_protobuf: PythonProtobufSubsystem,
+    # TODO(#12946): Make this a lazy Get once possible.
+    module_mapping: ThirdPartyPythonModuleMapping,
 ) -> InjectedDependencies:
-    addresses = await Get(Addresses, UnparsedAddressInputs, python_protobuf.runtime_dependencies)
-    return InjectedDependencies(addresses)
+    if not python_protobuf.infer_runtime_dependency:
+        return InjectedDependencies()
+
+    result = [
+        find_python_runtime_library_or_raise_error(
+            module_mapping,
+            request.dependencies_field.address,
+            "google.protobuf",
+            recommended_requirement_name="protobuf",
+            recommended_requirement_url="https://pypi.org/project/protobuf/",
+            disable_inference_option=f"[{python_protobuf.options_scope}].infer_runtime_dependency",
+        )
+    ]
+
+    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    if wrapped_tgt.target.get(ProtobufGrpcToggleField).value:
+        result.append(
+            find_python_runtime_library_or_raise_error(
+                module_mapping,
+                request.dependencies_field.address,
+                # Note that the library is called `grpcio`, but the module is `grpc`.
+                "grpc",
+                recommended_requirement_name="grpcio",
+                recommended_requirement_url="https://pypi.org/project/grpcio/",
+                disable_inference_option=f"[{python_protobuf.options_scope}].infer_runtime_dependency",
+            )
+        )
+
+    return InjectedDependencies(result)
 
 
 def rules():
