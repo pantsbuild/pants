@@ -23,7 +23,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField
+from pants.engine.target import SourcesField, CoarsenedTarget
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
@@ -51,6 +51,11 @@ class CompileScalaSourceRequest(ClasspathEntryRequest):
 @dataclass(frozen=True)
 class ScalaLibraryRequest:
     version: str
+
+
+# TODO: This code is duplicated in the scalac and BSP rules.
+def compute_output_jar_filename(ctgt: CoarsenedTarget) -> str:
+    return f"{ctgt.representative.address.path_safe_spec}.scalac.jar"
 
 
 @rule(desc="Compile with scalac")
@@ -168,7 +173,7 @@ async def compile_scala_source(
 
     classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
 
-    output_file = f"{request.component.representative.address.path_safe_spec}.scalac.jar"
+    output_file = compute_output_jar_filename(request.component)
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(

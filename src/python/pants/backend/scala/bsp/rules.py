@@ -12,6 +12,7 @@ from pants.backend.scala.bsp.spec import (
     ScalacOptionsResult,
     ScalaPlatform,
 )
+from pants.backend.scala.compile.scalac import compute_output_jar_filename
 from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
@@ -138,16 +139,13 @@ class HandleScalacOptionsResult:
 async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
-    jvm: JvmSubsystem,
 ) -> HandleScalacOptionsResult:
     wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
     coarsened_targets = await Get(CoarsenedTargets, Addresses([wrapped_target.target.address]))
     assert len(coarsened_targets) == 1
     coarsened_target = coarsened_targets[0]
     resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
-
-    # TODO: This duplicates code in the scalac rules. Find a way to merge!
-    output_file = f"{coarsened_target.representative.address.path_safe_spec}.scalac.jar"
+    output_file = compute_output_jar_filename(coarsened_target)
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
