@@ -230,6 +230,10 @@ impl File {
     self.digest
   }
 
+  pub fn is_executable(&self) -> bool {
+    self.is_executable
+  }
+
   pub fn as_remexec_file_node(&self) -> remexec::FileNode {
     remexec::FileNode {
       name: self.name.as_ref().to_owned(),

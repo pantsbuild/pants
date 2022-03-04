@@ -258,17 +258,16 @@ fn directory_digest_to_digest_contents(
       lift_directory_digest(py_digest)
     })
     .map_err(throw)?;
-    let snapshot = context
+
+    let digest_contents = context
       .core
       .store()
-      .contents_for_directory(digest.todo_as_digest())
+      .contents_for_directory(digest)
       .await
-      .and_then(move |digest_contents| {
-        let gil = Python::acquire_gil();
-        Snapshot::store_digest_contents(gil.python(), &context, &digest_contents)
-      })
       .map_err(throw)?;
-    Ok(snapshot)
+
+    let gil = Python::acquire_gil();
+    Snapshot::store_digest_contents(gil.python(), &context, &digest_contents).map_err(throw)
   }
   .boxed()
 }

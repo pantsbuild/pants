@@ -1147,50 +1147,35 @@ impl Store {
   ///
   /// Returns files sorted by their path.
   ///
-  pub fn contents_for_directory(
+  pub async fn contents_for_directory(
     &self,
-    digest: Digest,
-  ) -> BoxFuture<'static, Result<Vec<FileContent>, String>> {
+    digest: DirectoryDigest,
+  ) -> Result<Vec<FileContent>, String> {
+    let mut files = Vec::new();
     self
-      .walk(digest, move |store, path_so_far, _, directory| {
-        future::try_join_all(
-          directory
-            .files
-            .iter()
-            .map(|file_node| {
-              let path = path_so_far.join(file_node.name.clone());
-              let is_executable = file_node.is_executable;
-              let file_node_digest = try_future!(require_digest(file_node.digest.as_ref()));
-              let store = store.clone();
-              let res = async move {
-                let maybe_bytes = store
-                  .load_file_bytes_with(file_node_digest, Bytes::copy_from_slice)
-                  .await?;
-                maybe_bytes
-                  .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                  .map(|content| FileContent {
-                    path,
-                    content,
-                    is_executable,
-                  })
-              };
-              res.boxed()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .boxed()
-      })
-      .map(|file_contents_per_directory| {
-        file_contents_per_directory.map(|xs| {
-          let mut vec = xs
-            .into_iter()
-            .flat_map(|x| x.into_iter())
-            .collect::<Vec<_>>();
-          vec.sort_by(|l, r| l.path.cmp(&r.path));
-          vec
-        })
-      })
-      .boxed()
+      .load_digest_trie(digest)
+      .await?
+      .walk(&mut |path, entry| match entry {
+        directory::Entry::File(f) => files.push((path.to_owned(), f.digest(), f.is_executable())),
+        directory::Entry::Directory(_) => (),
+      });
+
+    future::try_join_all(files.into_iter().map(|(path, digest, is_executable)| {
+      let store = self.clone();
+      async move {
+        let maybe_bytes = store
+          .load_file_bytes_with(digest, Bytes::copy_from_slice)
+          .await?;
+        maybe_bytes
+          .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
+          .map(|content| FileContent {
+            path,
+            content,
+            is_executable,
+          })
+      }
+    }))
+    .await
   }
 
   ///
