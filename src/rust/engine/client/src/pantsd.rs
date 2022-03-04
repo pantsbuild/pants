@@ -6,6 +6,7 @@ use std::{fmt, fs};
 
 use libc::pid_t;
 use log::debug;
+use sha2::digest::Update;
 use sha2::{Digest, Sha256};
 use sysinfo::{ProcessExt, ProcessStatus, System, SystemExt};
 
