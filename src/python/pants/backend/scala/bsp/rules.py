@@ -141,14 +141,22 @@ async def handle_bsp_scalac_options_request(
     jvm: JvmSubsystem,
 ) -> HandleScalacOptionsResult:
     wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
-    resolve = wrapped_target.target[JvmResolveField].normalized_value(jvm)
+    coarsened_targets = await Get(CoarsenedTargets, Addresses([wrapped_target.target.address]))
+    assert len(coarsened_targets) == 1
+    coarsened_target = coarsened_targets[0]
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
+
+    # TODO: This duplicates code in the scalac rules. Find a way to merge!
+    output_file = f"{coarsened_target.representative.address.path_safe_spec}.scalac.jar"
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
             options=(),
             classpath=(
-                build_root.pathlib_path.joinpath(f"bsp/jvm/resolves/{resolve}/lib").as_uri(),
+                build_root.pathlib_path.joinpath(
+                    f"bsp/jvm/resolves/{resolve.name}/lib/{output_file}"
+                ).as_uri(),
             ),
             class_directory=build_root.pathlib_path.joinpath(
                 f"bsp/jvm/resolves/{resolve}/classes"
@@ -203,7 +211,9 @@ async def bsp_scala_compile_request(
             dataclasses.replace(entry, path=os.path.basename(entry.path)) for entry in entries
         ]
         flat_digest = await Get(Digest, CreateDigest(new_entires))
-        output_digest = await Get(Digest, AddPrefix(flat_digest, f"bsp/jvm/resolves/{resolve.name}/lib"))
+        output_digest = await Get(
+            Digest, AddPrefix(flat_digest, f"bsp/jvm/resolves/{resolve.name}/lib")
+        )
 
     return BSPCompileResult(
         status=StatusCode.ERROR if result.exit_code != 0 else StatusCode.OK,
