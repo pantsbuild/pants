@@ -6,9 +6,13 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Generic, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
+from pants.util.docutil import bin_name
+
+if TYPE_CHECKING:
+    pass
 
 
 @dataclass(frozen=True)
@@ -681,17 +685,48 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 # -----------------------------------------------------------------------------------------------
 
 
+class SkipOption(BoolOption[bool]):
+    """A --skip option (for an invocable tool)."""
+
+    def __new__(cls, goal: str, *other_goals: str):
+        goals = (goal,) + other_goals
+        invocation_str = " and ".join([f"`{bin_name()} {goal}`" for goal in goals])
+        return super().__new__(
+            cls,  # type: ignore[arg-type]
+            "--skip",
+            default=False,  # type: ignore[arg-type]
+            help=(
+                lambda subsystem_cls: (
+                    f"Don't use {subsystem_cls.name} when running {invocation_str}."
+                )
+            ),
+        )
+
+
 class ArgsListOption(ShellStrListOption):
-    """A homogenous list of shell str options, to be used as arguments passed to some other tool.
+    """An option for arguments passed to some other tool."""
 
-    Clients can call `passthrough()` to set the "passthrough" flag. See `passthrough` for more info.
-    """
-
-    def __new__(cls, help: _HelpT, *, passthrough: bool | None = None):
+    def __new__(
+        cls,
+        *,
+        example: str,
+        extra_help: str = "",
+        tool_name: str | None = None,
+        # This should be set when callers can alternatively use "--" followed by the arguments,
+        # instead of having to provide "--[scope]-args='--arg1 --arg2'".
+        passthrough: bool | None = None,
+    ):
+        if extra_help:
+            extra_help = "\n\n" + extra_help
         instance = super().__new__(
             cls,  # type: ignore[arg-type]
             "--args",
-            help=help,
+            help=(
+                lambda subsystem_cls: (
+                    f"Arguments to pass directly to {tool_name or subsystem_cls.name}, "
+                    f"e.g. `--{subsystem_cls.options_scope}-args='{example}'`.{extra_help}"
+                )
+            ),
         )
         if passthrough is not None:
             instance._extra_kwargs["passthrough"] = passthrough

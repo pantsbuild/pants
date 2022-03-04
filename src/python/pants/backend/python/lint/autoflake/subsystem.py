@@ -10,12 +10,13 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption
-from pants.util.docutil import bin_name, git_url
+from pants.option.option_types import ArgsListOption, SkipOption
+from pants.util.docutil import git_url
 
 
 class Autoflake(PythonToolBase):
     options_scope = "autoflake"
+    name = "Autoflake"
     help = "The Autoflake Python code formatter (https://github.com/myint/autoflake)."
 
     default_version = "autoflake==1.4"
@@ -29,17 +30,8 @@ class Autoflake(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/autoflake/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use Autoflake when running `{bin_name()} fmt` and `{bin_name()} lint`",
-    )
-    args = ArgsListOption(
-        help=lambda cls: (
-            "Arguments to pass directly to Autoflake, e.g. "
-            f'`--{cls.options_scope}-args="--target-version=py37 --quiet"`'
-        ),
-    )
+    skip = SkipOption("fmt", "lint")
+    args = ArgsListOption(example="--target-version=py37 --quiet")
 
 
 class AutoflakeLockfileSentinel(GenerateToolLockfileSentinel):

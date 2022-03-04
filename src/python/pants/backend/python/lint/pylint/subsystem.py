@@ -42,8 +42,14 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption, TargetListOption
-from pants.util.docutil import bin_name, doc_url, git_url
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    FileOption,
+    SkipOption,
+    TargetListOption,
+)
+from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -67,6 +73,7 @@ class PylintFieldSet(FieldSet):
 
 class Pylint(PythonToolBase):
     options_scope = "pylint"
+    name = "Pylint"
     help = "The Pylint linter for Python code (https://www.pylint.org/)."
 
     default_version = "pylint>=2.11.0,<2.12"
@@ -78,17 +85,8 @@ class Pylint(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
     uses_requirements_from_source_plugins = True
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use Pylint when running `{bin_name()} lint`",
-    )
-    args = ArgsListOption(
-        help=lambda cls: (
-            "Arguments to pass directly to Pylint, e.g. "
-            f'`--{cls.options_scope}-args="--ignore=foo.py,bar.py --disable=C0330,W0311"`'
-        ),
-    )
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="--ignore=foo.py,bar.py --disable=C0330,W0311")
     config = FileOption(
         "--config",
         default=None,

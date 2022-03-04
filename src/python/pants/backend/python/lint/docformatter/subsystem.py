@@ -9,12 +9,13 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption
-from pants.util.docutil import bin_name, git_url
+from pants.option.option_types import ArgsListOption, SkipOption
+from pants.util.docutil import git_url
 
 
 class Docformatter(PythonToolBase):
     options_scope = "docformatter"
+    name = "docformatter"
     help = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
     default_version = "docformatter>=1.4,<1.5"
@@ -28,17 +29,8 @@ class Docformatter(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/docformatter/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use docformatter when running `{bin_name()} fmt` and `{bin_name()} lint`.",
-    )
-    args = ArgsListOption(
-        help=lambda cls: (
-            "Arguments to pass directly to docformatter, e.g. "
-            f'`--{cls.options_scope}-args="--wrap-summaries=100 --pre-summary-newline"`.'
-        ),
-    )
+    skip = SkipOption("fmt", "lint")
+    args = ArgsListOption(example="--wrap-summaries=100 --pre-summary-newline")
 
 
 class DocformatterLockfileSentinel(GenerateToolLockfileSentinel):

@@ -10,12 +10,13 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption
-from pants.util.docutil import bin_name, git_url
+from pants.option.option_types import ArgsListOption, SkipOption
+from pants.util.docutil import git_url
 
 
 class PyUpgrade(PythonToolBase):
     options_scope = "pyupgrade"
+    name = "pyupgrade"
     help = (
         "Upgrade syntax for newer versions of the language (https://github.com/asottile/pyupgrade)."
     )
@@ -31,17 +32,8 @@ class PyUpgrade(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/pyupgrade/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use pyupgrade when running `{bin_name()} fmt` and `{bin_name()} lint`.",
-    )
-    args = ArgsListOption(
-        help=lambda cls: (
-            f"Arguments to pass directly to pyupgrade, e.g. "
-            f'`--{cls.options_scope}-args="--py39-plus --keep-runtime-typing"`'
-        ),
-    )
+    skip = SkipOption("fmt", "lint")
+    args = ArgsListOption(example="--py39-plus --keep-runtime-typing")
 
 
 class PyUpgradeLockfileSentinel(GenerateToolLockfileSentinel):

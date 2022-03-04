@@ -20,6 +20,7 @@ from pants.util.strutil import pluralize
 
 class SuccinctCodeCounter(TemplatedExternalTool):
     options_scope = "scc"
+    name = "SCC"
     help = "The Succinct Code Counter, aka `scc` (https://github.com/boyter/scc)."
 
     default_version = "3.0.0"
@@ -40,11 +41,9 @@ class SuccinctCodeCounter(TemplatedExternalTool):
     }
 
     args = ArgsListOption(
+        example="--no-cocomo",
         passthrough=True,
-        help=(
-            'Arguments to pass directly to SCC, e.g. `--count-loc-args="--no-cocomo"`. Refer '
-            "to https://github.com/boyter/scc."
-        ),
+        extra_help="Refer to to https://github.com/boyter/scc.",
     )
 
     def generate_exe(self, _: Platform) -> str:
