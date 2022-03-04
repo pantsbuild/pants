@@ -21,8 +21,8 @@ use std::time::Duration;
 
 use async_latch::AsyncLatch;
 use fnv::FnvHasher;
-use futures::future;
-use futures::future::FutureExt;
+use fs::DirectoryDigest;
+use futures::future::{self, FutureExt};
 use futures::Future;
 use hashing::Digest;
 use log::{self, debug, error, warn, Log};
@@ -750,9 +750,10 @@ async fn workunit_to_py_value(
           .map_err(PyException::new_err)?
       }
       ArtifactOutput::Snapshot(digest) => {
-        let snapshot = store::Snapshot::from_digest(store, *digest)
-          .await
-          .map_err(PyException::new_err)?;
+        let snapshot =
+          store::Snapshot::from_digest(store, DirectoryDigest::todo_from_digest(*digest))
+            .await
+            .map_err(PyException::new_err)?;
         let gil = Python::acquire_gil();
         let py = gil.python();
         crate::nodes::Snapshot::store_snapshot(py, snapshot).map_err(PyException::new_err)?
@@ -1454,6 +1455,7 @@ fn ensure_remote_has_recursive(
       .iter()
       .map(|value| {
         crate::nodes::lift_directory_digest(value)
+          .map(|dd| dd.todo_as_digest())
           .or_else(|_| crate::nodes::lift_file_digest(value))
       })
       .collect::<Result<Vec<Digest>, _>>()
@@ -1527,7 +1529,7 @@ fn write_digest(
     block_in_place_and_wait(py, || {
       core.store().materialize_directory(
         destination.clone(),
-        lifted_digest,
+        lifted_digest.todo_as_digest(),
         fs::Permissions::Writable,
       )
     })

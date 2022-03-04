@@ -47,7 +47,10 @@ use std::time::{Duration, Instant};
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
-use fs::{default_cache_path, DigestEntry, FileContent, FileEntry, Permissions, RelativePath};
+use fs::{
+  default_cache_path, directory, DigestEntry, DigestTrie, DirectoryDigest, FileContent, FileEntry,
+  Permissions, RelativePath,
+};
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -369,6 +372,33 @@ impl Store {
         move |v: Bytes| Ok(f_remote(&v)),
       )
       .await
+  }
+
+  ///
+  /// Ensure that the recursive contents of the given DigestTrie are persisted in the local Store.
+  ///
+  pub async fn record_digest_tree(
+    &self,
+    tree: DigestTrie,
+    initial_lease: bool,
+  ) -> Result<DirectoryDigest, String> {
+    let mut directories = Vec::new();
+
+    // TODO: Use the Directory entry's recorded Digest, and execute a batch store rather than
+    // recomputing it via `record_directory`.
+    tree.walk(&mut |_, entry| match entry {
+      directory::Entry::Directory(d) => directories.push(d.as_remexec_directory()),
+      directory::Entry::File(_) => (),
+    });
+
+    let digests = future::try_join_all(
+      directories
+        .into_iter()
+        .map(|d| async move { self.record_directory(&d, initial_lease).await })
+        .collect::<Vec<_>>(),
+    )
+    .await?;
+    Ok(DirectoryDigest::new(digests[0], tree))
   }
 
   ///

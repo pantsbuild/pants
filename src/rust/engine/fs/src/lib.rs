@@ -25,12 +25,16 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+pub mod directory;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
 #[cfg(test)]
 mod posixfs_tests;
 
+pub use crate::directory::{
+  DigestTrie, DirectoryDigest, EMPTY_DIGEST_TREE, EMPTY_DIRECTORY_DIGEST,
+};
 pub use crate::glob_matching::{
   ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
   SINGLE_STAR_GLOB,
@@ -214,31 +218,6 @@ impl PathStat {
       &PathStat::Dir { ref path, .. } => path.as_path(),
       &PathStat::File { ref path, .. } => path.as_path(),
     }
-  }
-
-  ///
-  /// Sort and ensure that there were no duplicate entries.
-  ///
-  /// TODO: audit if this is even necessary? expand_globs() already sorts and dedupes, but, are
-  /// there other callers of this where we can't be confident the sorting happened? Maybe, we
-  /// should add a light wrapper around `Vec<PathStat>` that ensures it's sorted and deduped, as
-  /// we're now using the type a lot.
-  pub fn normalize_path_stats(mut path_stats: Vec<PathStat>) -> Result<Vec<PathStat>, String> {
-    #[allow(clippy::unnecessary_sort_by)]
-    path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-
-    // The helper assumes that if a Path has multiple children, it must be a directory.
-    // Proactively error if we run into identically named files, because otherwise we will treat
-    // them like empty directories.
-    let pre_dedupe_len = path_stats.len();
-    path_stats.dedup_by(|a, b| a.path() == b.path());
-    if path_stats.len() != pre_dedupe_len {
-      return Err(format!(
-        "Snapshots must be constructed from unique path stats; got duplicates in {:?}",
-        path_stats
-      ));
-    }
-    Ok(path_stats)
   }
 }
 

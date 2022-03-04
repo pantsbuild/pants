@@ -28,9 +28,9 @@ use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeI
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use fs::{
-  self, DigestEntry, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
-  GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching,
-  Vfs,
+  self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
+  GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs,
+  RelativePath, StrictGlobMatching, Vfs,
 };
 use process_execution::{
   self, CacheName, InputDigests, Platform, Process, ProcessCacheScope, ProcessResultSource,
@@ -267,7 +267,7 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_directory_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
+pub fn lift_directory_digest(digest: &PyAny) -> Result<DirectoryDigest, String> {
   let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{}", e))?;
   Ok(py_digest.0)
 }
@@ -292,11 +292,17 @@ impl ExecuteProcess {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
       let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
-        .map_err(|err| format!("Error parsing input_digest {}", err))?;
+        .map_err(|err| format!("Error parsing input_digest {}", err))?
+        .todo_as_digest();
       let immutable_inputs =
         externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
           .into_iter()
-          .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
+          .map(|(path, digest)| {
+            Ok((
+              RelativePath::new(path)?,
+              lift_directory_digest(digest)?.todo_as_digest(),
+            ))
+          })
           .collect::<Result<BTreeMap<_, _>, String>>()?;
       let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")
         .unwrap()
@@ -607,6 +613,7 @@ impl Paths {
   pub fn from_path_globs(path_globs: PathGlobs) -> Paths {
     Paths { path_globs }
   }
+
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
     context
       .expand_globs(path_globs, unmatched_globs_additional_context())
@@ -722,18 +729,6 @@ impl Snapshot {
     Snapshot { path_globs }
   }
 
-  async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<store::Snapshot> {
-    // We rely on Context::expand_globs tracking dependencies for scandirs,
-    // and store::Snapshot::from_path_stats tracking dependencies for file digests.
-    let path_stats = context
-      .expand_globs(path_globs, unmatched_globs_additional_context())
-      .map_err(|e| throw(format!("{}", e)))
-      .await?;
-    store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
-      .map_err(|e| throw(format!("Snapshot failed: {}", e)))
-      .await
-  }
-
   pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
     let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
     let description_of_origin = externs::getattr_as_optional_string(item, "description_of_origin");
@@ -756,7 +751,7 @@ impl Snapshot {
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
   }
 
-  pub fn store_directory_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
+  pub fn store_directory_digest(py: Python, item: DirectoryDigest) -> Result<Value, String> {
     let py_digest = Py::new(py, externs::fs::PyDigest(item)).map_err(|e| format!("{}", e))?;
     Ok(Value::new(py_digest.into_py(py)))
   }
@@ -866,16 +861,25 @@ impl Snapshot {
 
 #[async_trait]
 impl WrappedNode for Snapshot {
-  type Item = Digest;
+  type Item = store::Snapshot;
 
   async fn run_wrapped_node(
     self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Digest> {
+  ) -> NodeResult<store::Snapshot> {
     let path_globs = self.path_globs.parse().map_err(throw)?;
-    let snapshot = Self::create(context, path_globs).await?;
-    Ok(snapshot.digest)
+
+    // We rely on Context::expand_globs to track dependencies for scandirs,
+    // and `context.get(DigestFile)` to track dependencies for file digests.
+    let path_stats = context
+      .expand_globs(path_globs, unmatched_globs_additional_context())
+      .map_err(|e| throw(format!("{}", e)))
+      .await?;
+
+    store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
+      .map_err(|e| throw(format!("Snapshot failed: {}", e)))
+      .await
   }
 }
 
@@ -1431,12 +1435,12 @@ impl Node for NodeKey {
         let mut result = match self {
           NodeKey::DigestFile(n) => {
             n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Digest)
+              .map_ok(NodeOutput::FileDigest)
               .await
           }
           NodeKey::DownloadedFile(n) => {
             n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Digest)
+              .map_ok(NodeOutput::FileDigest)
               .await
           }
           NodeKey::ExecuteProcess(n) => {
@@ -1461,7 +1465,7 @@ impl Node for NodeKey {
           }
           NodeKey::Snapshot(n) => {
             n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Digest)
+              .map_ok(NodeOutput::Snapshot)
               .await
           }
           NodeKey::Paths(n) => {
@@ -1641,7 +1645,8 @@ impl NodeError for Failure {
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum NodeOutput {
-  Digest(hashing::Digest),
+  FileDigest(hashing::Digest),
+  Snapshot(store::Snapshot),
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
@@ -1655,7 +1660,11 @@ pub enum NodeOutput {
 impl NodeOutput {
   pub fn digests(&self) -> Vec<hashing::Digest> {
     match self {
-      NodeOutput::Digest(d) => vec![*d],
+      NodeOutput::FileDigest(d) => vec![*d],
+      NodeOutput::Snapshot(s) => {
+        let dd: DirectoryDigest = s.clone().into();
+        dd.digests()
+      }
       NodeOutput::ProcessResult(p) => {
         vec![p.0.stdout_digest, p.0.stderr_digest, p.0.output_directory]
       }
@@ -1683,7 +1692,18 @@ impl TryFrom<NodeOutput> for hashing::Digest {
 
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeOutput::Digest(v) => Ok(v),
+      NodeOutput::FileDigest(v) => Ok(v),
+      _ => Err(()),
+    }
+  }
+}
+
+impl TryFrom<NodeOutput> for store::Snapshot {
+  type Error = ();
+
+  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
+    match nr {
+      NodeOutput::Snapshot(v) => Ok(v),
       _ => Err(()),
     }
   }

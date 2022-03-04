@@ -1284,7 +1284,7 @@ pub fn extract_output_files(
   }
 
   async move {
-    let files_digest = Snapshot::digest_from_path_stats(
+    let files_snapshot = Snapshot::from_path_stats(
       store.clone(),
       StoreOneOffRemoteDigest::new(path_map),
       path_stats,
@@ -1296,10 +1296,10 @@ pub fn extract_output_files(
       )
     });
 
-    let (files_digest, mut directory_digests) =
-      future::try_join(files_digest, future::try_join_all(directory_digests)).await?;
+    let (files_snapshot, mut directory_digests) =
+      future::try_join(files_snapshot, future::try_join_all(directory_digests)).await?;
 
-    directory_digests.push(files_digest);
+    directory_digests.push(files_snapshot.digest);
 
     store
       .merge(directory_digests)
