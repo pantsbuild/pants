@@ -6,12 +6,12 @@ from pants.engine.target import StringField
 
 
 class JavaPackageField(StringField):
-    alias = "package"
+    alias = "java_package"
     help = "Override destination package for generated sources"
 
 
 class JavaModuleField(StringField):
-    alias = "module"
+    alias = "java_module"
     help = "Java module name"
 
 

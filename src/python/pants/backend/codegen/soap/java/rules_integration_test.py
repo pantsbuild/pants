@@ -153,7 +153,7 @@ def test_generate_java_from_wsdl(rule_runner: RuleRunner) -> None:
 def test_generate_java_module_from_wsdl(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/wsdl/BUILD": "wsdl_sources(module='foo')",
+            "src/wsdl/BUILD": "wsdl_sources(java_module='foo')",
             "src/wsdl/FooService.wsdl": _FOO_SERVICE_WSDL,
         }
     )
@@ -176,7 +176,7 @@ def test_generate_java_module_from_wsdl(rule_runner: RuleRunner) -> None:
 def test_generate_java_from_wsdl_using_custom_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/wsdl/BUILD": "wsdl_sources(package='fooservice')",
+            "src/wsdl/BUILD": "wsdl_sources(java_package='fooservice')",
             "src/wsdl/FooService.wsdl": _FOO_SERVICE_WSDL,
         }
     )
