@@ -50,8 +50,6 @@ class HelmChart:
     snapshot: Snapshot
     artifact: ResolvedHelmArtifact | None = None
 
-    lint_strict: bool | None
-
     @property
     def path(self) -> str:
         return self.metadata.name
