@@ -18,7 +18,7 @@
 #     "ijson==3.1.4",
 #     "mypy-typing-asserts==0.1.1",
 #     "packaging==21.3",
-#     "pex==2.1.67",
+#     "pex==2.1.70",
 #     "psutil==5.9.0",
 #     "pydevd-pycharm==203.5419.8",
 #     "pytest<8,>=6.2.4",
@@ -133,9 +133,9 @@ ijson==3.1.4 \
     --hash=sha256:97e4df67235fae40d6195711223520d2c5bf1f7f5087c2963fcde44d72ebf448 \
     --hash=sha256:3d10eee52428f43f7da28763bb79f3d90bbbeea1accb15de01e40a00885b6e89 \
     --hash=sha256:1d1003ae3c6115ec9b587d29dd136860a81a23c7626b682e2b5b12c9fd30e4ea
-importlib-metadata==4.11.1; python_version < "3.8" and python_version >= "3.7" \
-    --hash=sha256:e0bc84ff355328a4adfc5240c4f211e0ab386f80aa640d1b11f0618a1d282094 \
-    --hash=sha256:175f4ee440a0317f6e8d81b7f8d4869f93316170a65ad2b007d2929186c8052c
+importlib-metadata==4.11.2; python_version < "3.8" and python_version >= "3.7" \
+    --hash=sha256:d16e8c1deb60de41b8e8ed21c1a7b947b0bc62fab7e1d470bcdf331cea2e6735 \
+    --hash=sha256:b36ffa925fe3139b2f6ff11d6925ffd4fa7bc47870165e3ac260ac7b4f91e6ac
 iniconfig==1.1.1; python_version >= "3.6" \
     --hash=sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3 \
     --hash=sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32
@@ -145,9 +145,9 @@ mypy-typing-asserts==0.1.1; python_version >= "3.7" and python_version < "4.0" \
 packaging==21.3; python_version >= "3.6" \
     --hash=sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522 \
     --hash=sha256:dd47c42927d89ab911e606518907cc2d3a1f38bbd026385970643f9c5b8ecfeb
-pex==2.1.67; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0" and python_version < "3.11") \
-    --hash=sha256:9ebd76d04f1b9f576c38639197b0c93d41d7b1359f2917663951f8fda89d9436 \
-    --hash=sha256:aedc4746e677d12f35a5d594bd09d22267045fafef098fe9bca14d63bb09681c
+pex==2.1.70; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0" and python_version < "3.11") \
+    --hash=sha256:83801a1006b7f42bef9abf5b96dbbd676cc739fcffc7f604f80cc6f9d0d9c703 \
+    --hash=sha256:bddf329765bfe1db7d2ce8336de2f99b73bacb789fcc1c78882fa52183cc5bfd
 pluggy==1.0.0; python_version >= "3.6" \
     --hash=sha256:74134bbf457f031a36d68416e1509f34bd5ccc019f0bcc952c7b909d06b37bd3 \
     --hash=sha256:4224373bacce55f955a878bf9cfa763c1e360858e330072059e10bad68531159
@@ -287,9 +287,9 @@ types-setuptools==57.4.7 \
 types-toml==0.10.3 \
     --hash=sha256:215a7a79198651ec5bdfd66193c1e71eb681a42f3ef7226c9af3123ced62564a \
     --hash=sha256:988457744d9774d194e3539388772e3a685d8057b7c4a89407afeb0a6cbd1b14
-types-urllib3==1.26.9 \
-    --hash=sha256:abd2d4857837482b1834b4817f0587678dcc531dbc9abe4cde4da28cef3f522c \
-    --hash=sha256:4a54f6274ab1c80968115634a55fb9341a699492b95e32104a7c513db9fe02e9
+types-urllib3==1.26.10 \
+    --hash=sha256:a26898f530e6c3f43f25b907f2b884486868ffd56a9faa94cbf9b3eb6e165d6a \
+    --hash=sha256:d755278d5ecd7a7a6479a190e54230f241f1a99c19b81518b756b19dc69e518c
 typing-extensions==4.0.1; python_version >= "3.6" \
     --hash=sha256:7f001e5ac290a0c0401508864c7ec868be4e701886d5b573a9528ed3973d9d3b \
     --hash=sha256:4ca091dea149f945ec56afb48dae714f21e8692ef22a395223bcd328961b6a0e
