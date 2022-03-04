@@ -17,7 +17,7 @@ log = "0.4"
 nailgun = { path = "../nailgun" }
 nix = "0.23"
 options = { path = "../options" }
-sha2 = "0.9"
+sha2 = "0.10"
 strum = "0.20"
 strum_macros = "0.23"
 sysinfo = "0.20.0"
