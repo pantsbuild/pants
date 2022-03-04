@@ -100,35 +100,6 @@ impl Snapshot {
     })
   }
 
-  pub fn directories_and_files(directories: &[String], files: &[String]) -> String {
-    format!(
-      "{}{}{}",
-      if directories.is_empty() {
-        String::new()
-      } else {
-        format!(
-          "director{} named: {}",
-          if directories.len() == 1 { "y" } else { "ies" },
-          directories.join(", ")
-        )
-      },
-      if !directories.is_empty() && !files.is_empty() {
-        " and "
-      } else {
-        ""
-      },
-      if files.is_empty() {
-        String::new()
-      } else {
-        format!(
-          "file{} named: {}",
-          if files.len() == 1 { "" } else { "s" },
-          files.join(", ")
-        )
-      },
-    )
-  }
-
   pub async fn get_directory_or_err(
     store: Store,
     digest: Digest,

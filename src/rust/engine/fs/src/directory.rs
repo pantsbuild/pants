@@ -469,6 +469,92 @@ impl DigestTrie {
     Ok(tree)
   }
 
+  /// Remove the given prefix from this trie, returning the resulting trie.
+  pub fn remove_prefix(self, prefix: &RelativePath) -> Result<DigestTrie, String> {
+    let root = self.clone();
+    let mut tree = self;
+    let mut already_stripped = PathBuf::new();
+    for component_to_strip in prefix.components() {
+      let component_to_strip = component_to_strip.as_os_str();
+      let mut matching_dir = None;
+      let mut extra_directories = Vec::new();
+      let mut files = Vec::new();
+      for entry in tree.entries() {
+        match entry {
+          Entry::Directory(d) if Path::new(d.name.as_ref()).as_os_str() == component_to_strip => {
+            matching_dir = Some(d)
+          }
+          Entry::Directory(d) => extra_directories.push(d.name.as_ref().to_owned()),
+          Entry::File(f) => files.push(f.name.as_ref().to_owned()),
+        }
+      }
+
+      let has_already_stripped_any = already_stripped.components().next().is_some();
+      match (
+        matching_dir,
+        extra_directories.is_empty() && files.is_empty(),
+      ) {
+        (None, true) => {
+          tree = EMPTY_DIGEST_TREE.clone();
+          break;
+        }
+        (None, false) => {
+          // Prefer "No subdirectory found" error to "had extra files" error.
+          return Err(format!(
+            "Cannot strip prefix {} from root directory (Digest with hash {:?}) - \
+             {}directory{} didn't contain a directory named {}{}",
+            prefix.display(),
+            root.compute_root_digest().hash,
+            if has_already_stripped_any {
+              "sub"
+            } else {
+              "root "
+            },
+            if has_already_stripped_any {
+              format!(" {}", already_stripped.display())
+            } else {
+              String::new()
+            },
+            Path::new(component_to_strip).display(),
+            if !extra_directories.is_empty() || !files.is_empty() {
+              format!(
+                " but did contain {}",
+                format_directories_and_files(&extra_directories, &files)
+              )
+            } else {
+              String::new()
+            },
+          ));
+        }
+        (Some(_), false) => {
+          return Err(format!(
+            "Cannot strip prefix {} from root directory (Digest with hash {:?}) - \
+             {}directory{} contained non-matching {}",
+            prefix.display(),
+            root.compute_root_digest().hash,
+            if has_already_stripped_any {
+              "sub"
+            } else {
+              "root "
+            },
+            if has_already_stripped_any {
+              format!(" {}", already_stripped.display())
+            } else {
+              String::new()
+            },
+            format_directories_and_files(&extra_directories, &files),
+          ))
+        }
+        (Some(d), true) => {
+          already_stripped = already_stripped.join(component_to_strip);
+          tree = d.tree.clone();
+        }
+      }
+    }
+
+    Ok(tree)
+  }
+
   /// Given DigestTries, merge them recursively into a single DigestTrie.
   ///
   /// If a file is present with the same name and contents multiple times, it will appear once.
@@ -625,4 +711,34 @@ fn collisions<'a>(
     }
   }
   (mismatched_files, mismatched_dirs)
+}
+
+/// Format directories and files as a human readable string.
+fn format_directories_and_files(directories: &[String], files: &[String]) -> String {
+  format!(
+    "{}{}{}",
+    if directories.is_empty() {
+      String::new()
+    } else {
+      format!(
+        "director{} named: {}",
+        if directories.len() == 1 { "y" } else { "ies" },
+        directories.join(", ")
+      )
+    },
+    if !directories.is_empty() && !files.is_empty() {
+      " and "
+    } else {
+      ""
+    },
+    if files.is_empty() {
+      String::new()
+    } else {
+      format!(
+        "file{} named: {}",
+        if files.len() == 1 { "" } else { "s" },
+        files.join(", ")
+      )
+    },
+  )
 }

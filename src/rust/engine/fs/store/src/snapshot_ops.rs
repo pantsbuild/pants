@@ -21,8 +21,6 @@ use log::log_enabled;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 
-use crate::Snapshot;
-
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum SnapshotOpsError {
   String(String),
@@ -601,82 +599,12 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
 
   async fn strip_prefix(
     &self,
-    root_digest: Digest,
-    prefix: RelativePath,
-  ) -> Result<Digest, SnapshotOpsError> {
-    let mut dir = self.load_directory_or_err(root_digest).await?;
-    let mut already_stripped = PathBuf::new();
-    let mut prefix: PathBuf = prefix.into();
-    loop {
-      let has_already_stripped_any = already_stripped.components().next().is_some();
-
-      let mut components = prefix.components();
-      let component_to_strip = components.next();
-      if let Some(component_to_strip) = component_to_strip {
-        let remaining_prefix = components.collect();
-        let component_to_strip_str = component_to_strip.as_os_str().to_string_lossy();
-
-        let mut saw_matching_dir = false;
-        let extra_directories: Vec<_> = dir
-          .directories
-          .iter()
-          .filter_map(|subdir| {
-            if subdir.name == component_to_strip_str {
-              saw_matching_dir = true;
-              None
-            } else {
-              Some(subdir.name.to_owned())
-            }
-          })
-          .collect();
-        let files: Vec<_> = dir.files.iter().map(|file| file.name.to_owned()).collect();
-
-        match (saw_matching_dir, extra_directories.is_empty() && files.is_empty()) {
-          (false, true) => {
-            dir = remexec::Directory::default();
-            break;
-          },
-          (false, false) => {
-            // Prefer "No subdirectory found" error to "had extra files" error.
-            return Err(format!(
-              "Cannot strip prefix {} from root directory (Digest with hash {:?}) - {}directory{} didn't contain a directory named {}{}",
-              already_stripped.join(&prefix).display(),
-              root_digest.hash,
-              if has_already_stripped_any { "sub" } else { "root " },
-              if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
-              component_to_strip_str,
-              if !extra_directories.is_empty() || !files.is_empty() { format!(" but did contain {}", Snapshot::directories_and_files(&extra_directories, &files)) } else { String::new() },
-            ).into())
-          },
-          (true, false) => {
-            return Err(format!(
-              "Cannot strip prefix {} from root directory (Digest with hash {:?}) - {}directory{} contained non-matching {}",
-              already_stripped.join(&prefix).display(),
-              root_digest.hash,
-              if has_already_stripped_any { "sub" } else { "root " },
-              if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
-              Snapshot::directories_and_files(&extra_directories, &files),
-            ).into())
-          },
-          (true, true) => {
-            // Must be 0th index, because we've checked that we saw a matching directory, and no
-            // others.
-            // TODO(tonic): Match safely to access first directory?
-            let digest = require_digest(
-              dir.directories[0]
-                .digest
-                .as_ref())?;
-            already_stripped = already_stripped.join(component_to_strip);
-            dir = self.load_directory_or_err(digest).await?;
-            prefix = remaining_prefix;
-          }
-        }
-      } else {
-        break;
-      }
-    }
-
-    Ok(self.record_directory(&dir).await?)
+    digest: DirectoryDigest,
+    prefix: &RelativePath,
+  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+    let tree = self.load_digest_trie(digest).await?.remove_prefix(prefix)?;
+    // TODO: Remove persistence as the final step of #13112.
+    Ok(self.record_digest_trie(tree).await?)
   }
 
   async fn subset(&self, digest: Digest, params: SubsetParams) -> Result<Digest, SnapshotOpsError> {

@@ -310,18 +310,17 @@ fn remove_prefix_request_to_digest(
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_remove_prefix.prefix)
         .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-      let res: NodeResult<(Digest, RelativePath)> = Ok((py_remove_prefix.digest, prefix));
+      let res: NodeResult<_> = Ok((py_remove_prefix.digest.clone(), prefix));
       res
     })?;
     let digest = context
       .core
       .store()
-      .strip_prefix(digest, prefix)
+      .strip_prefix(digest, &prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
