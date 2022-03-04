@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartTarget
+from pants.backend.helm.target_types import HelmChartTarget
 from pants.backend.helm.testutil import (
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
@@ -16,9 +16,13 @@ from pants.backend.helm.testutil import (
     gen_chart_file,
 )
 from pants.backend.helm.util_rules import chart, sources, tool
-from pants.backend.helm.util_rules.chart import ChartType, HelmChart, HelmChartMetadata
+from pants.backend.helm.util_rules.chart import (
+    ChartType,
+    HelmChart,
+    HelmChartMetadata,
+    HelmChartRequest,
+)
 from pants.build_graph.address import Address
-from pants.core.target_types import FileTarget
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine import process
 from pants.engine.rules import QueryRule, SubsystemRule
@@ -28,7 +32,7 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[HelmChartTarget, FileTarget],
+        target_types=[HelmChartTarget],
         rules=[
             *config_files.rules(),
             *external_tool.rules(),
@@ -38,7 +42,7 @@ def rule_runner() -> RuleRunner:
             *process.rules(),
             *stripped_source_files.rules(),
             SubsystemRule(HelmSubsystem),
-            QueryRule(HelmChart, (HelmChartFieldSet,)),
+            QueryRule(HelmChart, (HelmChartRequest,)),
         ],
     )
 
@@ -70,7 +74,6 @@ def test_compiles_single_chart_sources(
 
     address = Address("", target_name=name)
     tgt = rule_runner.get_target(address)
-    field_set = HelmChartFieldSet.create(tgt)
 
     expected_metadata = HelmChartMetadata(
         name=name,
@@ -81,11 +84,10 @@ def test_compiles_single_chart_sources(
         type=type,
     )
 
-    helm_chart = rule_runner.request(HelmChart, [field_set])
+    helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(tgt)])
     assert helm_chart.metadata == expected_metadata
     assert len(helm_chart.snapshot.files) == 4
     assert helm_chart.address == address
-    assert helm_chart.lint_strict == lint_strict
 
 
 def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: RuleRunner) -> None:
@@ -119,8 +121,7 @@ def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: R
     rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
 
     target = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
-    field_set = HelmChartFieldSet.create(target)
+    helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
 
-    helm_chart = rule_runner.request(HelmChart, [field_set])
     assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
     assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files

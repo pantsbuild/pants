@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-from abc import ABCMeta
 from dataclasses import dataclass
 from textwrap import dedent
 
@@ -91,7 +90,7 @@ class HelmChartTarget(Target):
 
 
 @dataclass(frozen=True)
-class HelmChartFieldSet(FieldSet, metaclass=ABCMeta):
+class HelmChartFieldSet(FieldSet):
     required_fields = (
         HelmChartMetaSourceField,
         HelmChartSourcesField,
@@ -100,4 +99,3 @@ class HelmChartFieldSet(FieldSet, metaclass=ABCMeta):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
-    lint_strict: HelmChartLintStrictField

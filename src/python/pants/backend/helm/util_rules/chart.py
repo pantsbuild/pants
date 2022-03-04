@@ -28,7 +28,13 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, HydratedSources, HydrateSourcesRequest, Targets
+from pants.engine.target import (
+    DependenciesRequest,
+    HydratedSources,
+    HydrateSourcesRequest,
+    Target,
+    Targets,
+)
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -140,11 +146,18 @@ class HelmChart:
     metadata: HelmChartMetadata
     snapshot: Snapshot
 
-    lint_strict: bool | None
-
     @property
     def path(self) -> str:
         return self.metadata.name
+
+
+@dataclass(frozen=True)
+class HelmChartRequest:
+    field_set: HelmChartFieldSet
+
+    @classmethod
+    def from_target(cls, target: Target) -> HelmChartRequest:
+        return cls(HelmChartFieldSet.create(target))
 
 
 _HELM_CHART_METADATA_FILENAMES = ["Chart.yaml", "Chart.yml"]
@@ -185,29 +198,29 @@ async def render_chart_metadata(metadata: HelmChartMetadata) -> Digest:
 
 
 @rule(desc="Collect all source code and subcharts of a Helm Chart", level=LogLevel.DEBUG)
-async def compile_chart_struct(field_set: HelmChartFieldSet) -> HelmChart:
+async def get_helm_chart(request: HelmChartRequest) -> HelmChart:
     dependencies, source_files, metadata = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.dependencies)),
+        Get(Targets, DependenciesRequest(request.field_set.dependencies)),
         Get(
             HelmChartSourceFiles,
             HelmChartSourceFilesRequest,
             HelmChartSourceFilesRequest.for_field_set(
-                field_set,
+                request.field_set,
                 include_metadata=False,
                 include_resources=True,
                 include_files=True,
             ),
         ),
-        Get(HelmChartMetadata, HelmChartMetaSourceField, field_set.chart),
+        Get(HelmChartMetadata, HelmChartMetaSourceField, request.field_set.chart),
     )
 
     first_party_subcharts = await MultiGet(
-        Get(HelmChart, HelmChartFieldSet, HelmChartFieldSet.create(target))
+        Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(target))
         for target in dependencies
         if HelmChartFieldSet.is_applicable(target)
     )
     logger.debug(
-        f"Found {pluralize(len(first_party_subcharts), 'subchart')} as direct dependencies on Helm chart at: {field_set.address}"
+        f"Found {pluralize(len(first_party_subcharts), 'subchart')} as direct dependencies on Helm chart at: {request.field_set.address}"
     )
 
     # TODO Collect 3rd party chart dependencies (subcharts)
@@ -242,10 +255,9 @@ async def compile_chart_struct(field_set: HelmChartFieldSet) -> HelmChart:
 
     chart_snapshot = await Get(Snapshot, AddPrefix(all_sources, metadata.name))
     return HelmChart(
-        address=field_set.address,
+        address=request.field_set.address,
         metadata=metadata,
         snapshot=chart_snapshot,
-        lint_strict=field_set.lint_strict.value,
     )
 
 

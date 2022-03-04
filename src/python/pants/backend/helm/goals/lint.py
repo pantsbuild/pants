@@ -8,13 +8,11 @@ from dataclasses import dataclass
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartLintStrictField
-from pants.backend.helm.util_rules.chart import HelmChart
+from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.build_graph.address import Address
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -34,19 +32,15 @@ class HelmLintRequest(LintTargetsRequest):
 
 @rule(desc="Lint Helm charts", level=LogLevel.DEBUG)
 async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem) -> LintResults:
-    chart_targets = await MultiGet(
-        Get(WrappedTarget, Address, field_set.address) for field_set in request.field_sets
-    )
     charts = await MultiGet(
-        Get(HelmChart, HelmChartFieldSet, HelmChartFieldSet.create(wrapped.target))
-        for wrapped in chart_targets
+        Get(HelmChart, HelmChartRequest(field_set)) for field_set in request.field_sets
     )
     logger.debug(f"Linting {pluralize(len(charts), 'chart')}...")
 
-    def create_process(chart: HelmChart) -> HelmProcess:
+    def create_process(chart: HelmChart, field_set: HelmLintFieldSet) -> HelmProcess:
         argv = ["lint", chart.path]
 
-        strict = chart.lint_strict or helm_subsystem.lint_strict
+        strict = field_set.lint_strict or helm_subsystem.lint_strict
         if strict:
             argv.append("--strict")
 
@@ -60,9 +54,9 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
         Get(
             FallibleProcessResult,
             HelmProcess,
-            create_process(chart),
+            create_process(chart, field_set),
         )
-        for chart in charts
+        for chart, field_set in zip(charts, request.field_sets)
     )
     results = [
         LintResult.from_fallible_process_result(process_result)

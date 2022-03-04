@@ -73,9 +73,7 @@ def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:
     )
 
 
-_TEST_INCLUDE_SOURCES_PARAMETERS = [
-    tuple(params) for params in [p for p in product((True, False), repeat=3)]
-]
+_TEST_INCLUDE_SOURCES_PARAMETERS = [tuple(params) for params in product((True, False), repeat=3)]
 
 
 @pytest.mark.parametrize(
