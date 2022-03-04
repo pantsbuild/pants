@@ -7,7 +7,7 @@ from pants.option.subsystem import Subsystem
 
 class GofmtSubsystem(Subsystem):
     options_scope = "gofmt"
-    display_name = "gofmt"
+    name = "gofmt"
     help = "Gofmt-specific options."
 
     skip = SkipOption("fmt", "lint")

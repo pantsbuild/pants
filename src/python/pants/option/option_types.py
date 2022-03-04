@@ -678,7 +678,7 @@ class SkipOption(BoolOption[bool]):
             default=False,  # type: ignore[arg-type]
             help=(
                 lambda subsystem_cls: (
-                    f"Don't use {subsystem_cls.display_name} when running {invocation_str}."
+                    f"Don't use {subsystem_cls.name} when running {invocation_str}."
                 )
             ),
         )
@@ -704,7 +704,7 @@ class ArgsListOption(ShellStrListOption):
             "--args",
             help=(
                 lambda subsystem_cls: (
-                    f"Arguments to pass directly to {tool_name or subsystem_cls.display_name}, "
+                    f"Arguments to pass directly to {tool_name or subsystem_cls.name}, "
                     f"e.g. `--{subsystem_cls.options_scope}-args='{example}'`.{extra_help}"
                 )
             ),

@@ -14,7 +14,7 @@ from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
 
 class Shellcheck(TemplatedExternalTool):
     options_scope = "shellcheck"
-    display_name = "Shellcheck"
+    name = "Shellcheck"
     help = "A linter for shell scripts."
 
     default_version = "v0.8.0"

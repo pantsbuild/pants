@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class JavacSubsystem(Subsystem):
     options_scope = "javac"
-    display_name = "javac"
+    name = "javac"
     help = "The javac Java source compiler."
 
     args = ArgsListOption(example="-g -deprecation")

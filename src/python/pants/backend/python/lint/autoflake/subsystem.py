@@ -16,7 +16,7 @@ from pants.util.docutil import git_url
 
 class Autoflake(PythonToolBase):
     options_scope = "autoflake"
-    display_name = "Autoflake"
+    name = "Autoflake"
     help = "The Autoflake Python code formatter (https://github.com/myint/autoflake)."
 
     default_version = "autoflake==1.4"

@@ -8,7 +8,7 @@ from pants.util.docutil import git_url
 
 class JUnit(JvmToolBase):
     options_scope = "junit"
-    display_name = "JUnit"
+    name = "JUnit"
     help = "The JUnit test framework (https://junit.org)"
 
     default_version = "5.7.2"

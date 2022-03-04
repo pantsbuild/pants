@@ -25,7 +25,7 @@ from pants.util.logging import LogLevel
 
 class Black(PythonToolBase):
     options_scope = "black"
-    display_name = "Black"
+    name = "Black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
     default_version = "black==22.1.0"

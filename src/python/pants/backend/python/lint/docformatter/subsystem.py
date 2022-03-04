@@ -15,7 +15,7 @@ from pants.util.docutil import git_url
 
 class Docformatter(PythonToolBase):
     options_scope = "docformatter"
-    display_name = "docformatter"
+    name = "docformatter"
     help = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
     default_version = "docformatter>=1.4,<1.5"

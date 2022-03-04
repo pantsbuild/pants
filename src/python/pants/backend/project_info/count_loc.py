@@ -20,7 +20,7 @@ from pants.util.strutil import pluralize
 
 class SuccinctCodeCounter(TemplatedExternalTool):
     options_scope = "scc"
-    display_name = "SCC"
+    name = "SCC"
     help = "The Succinct Code Counter, aka `scc` (https://github.com/boyter/scc)."
 
     default_version = "3.0.0"

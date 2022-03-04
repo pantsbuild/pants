@@ -16,7 +16,7 @@ from pants.util.docutil import git_url
 
 class PyUpgrade(PythonToolBase):
     options_scope = "pyupgrade"
-    display_name = "pyupgrade"
+    name = "pyupgrade"
     help = (
         "Upgrade syntax for newer versions of the language (https://github.com/asottile/pyupgrade)."
     )

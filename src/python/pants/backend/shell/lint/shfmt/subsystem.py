@@ -14,7 +14,7 @@ from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
 
 class Shfmt(TemplatedExternalTool):
     options_scope = "shfmt"
-    display_name = "shfmt"
+    name = "shfmt"
     help = "An autoformatter for shell scripts (https://github.com/mvdan/sh)."
 
     default_version = "v3.2.4"

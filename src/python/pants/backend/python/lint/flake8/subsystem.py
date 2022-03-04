@@ -65,7 +65,7 @@ class Flake8FieldSet(FieldSet):
 
 class Flake8(PythonToolBase):
     options_scope = "flake8"
-    display_name = "Flake8"
+    name = "Flake8"
     help = "The Flake8 Python linter (https://flake8.pycqa.org/)."
 
     default_version = "flake8>=3.9.2,<4.0"

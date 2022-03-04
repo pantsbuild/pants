@@ -8,7 +8,7 @@ from pants.util.docutil import git_url
 
 class GoogleJavaFormatSubsystem(JvmToolBase):
     options_scope = "google-java-format"
-    display_name = "Google Java Format"
+    name = "Google Java Format"
     help = "Google Java Format (https://github.com/google/google-java-format)"
 
     default_version = "1.13.0"

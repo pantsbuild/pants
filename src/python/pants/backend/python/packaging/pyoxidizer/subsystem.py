@@ -8,7 +8,7 @@ from pants.option.option_types import ArgsListOption
 
 class PyOxidizer(PythonToolBase):
     options_scope = "pyoxidizer"
-    display_name = "PyOxidizer"
+    name = "PyOxidizer"
     help = (
         "The PyOxidizer utility for packaging Python code in a Rust binary "
         "(https://pyoxidizer.readthedocs.io/en/stable/pyoxidizer.html).\n\n"

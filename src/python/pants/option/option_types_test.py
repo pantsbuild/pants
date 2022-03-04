@@ -178,7 +178,7 @@ def test_other_options() -> None:
 def test_specialized_options() -> None:
     class MySubsystem(Subsystem):
         options_scope = "my-subsystem"
-        display_name = "Wrench"
+        name = "Wrench"
 
         def __init__(self):
             self.options = SimpleNamespace()
@@ -193,7 +193,7 @@ def test_specialized_options() -> None:
 
     class SubsystemWithName(Subsystem):
         options_scope = "other-subsystem"
-        display_name = "Hammer"
+        name = "Hammer"
         skip_prop1 = SkipOption("fmt")
         args_prop1 = ArgsListOption(example="--nail")
         args_prop2 = ArgsListOption(example="--screw", tool_name="Screwdriver")
