@@ -1218,9 +1218,9 @@ dependencies = [
 
 [[package]]
 name = "httparse"
-version = "1.5.1"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acd94fdbe1d4ff688b67b04eee2e17bd50995534a61539e45adfefb45e5e5503"
+checksum = "9100414882e15fb7feccb4897e5f0ff0ff1ca7d1a86a23208ada4d7a18e6c6c4"
 
 [[package]]
 name = "httpdate"
@@ -1245,9 +1245,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
-version = "0.14.14"
+version = "0.14.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b91bb1f221b6ea1f1e4371216b70f40748774c2fb5971b450c07773fb92d26b"
+checksum = "043f0e083e9901b6cc658a77d1eb86f4fc650bbb977a4337dd63192826aa85dd"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1258,7 +1258,7 @@ dependencies = [
  "http-body",
  "httparse",
  "httpdate",
- "itoa 0.4.7",
+ "itoa 1.0.1",
  "pin-project-lite",
  "socket2",
  "tokio",
@@ -2957,9 +2957,9 @@ dependencies = [
 
 [[package]]
 name = "shlex"
-version = "0.1.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"
+checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 
 [[package]]
 name = "signal-hook-registry"
