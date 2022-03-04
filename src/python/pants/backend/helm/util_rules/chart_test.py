@@ -86,7 +86,6 @@ def test_collects_single_chart_sources(
     assert helm_chart.metadata == expected_metadata
     assert len(helm_chart.snapshot.files) == 4
     assert helm_chart.address == address
-    assert helm_chart.lint_strict == lint_strict
 
 
 def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: RuleRunner) -> None:
