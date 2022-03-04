@@ -211,7 +211,11 @@ class PythonSetup(Subsystem):
         help=(
             "The behavior when a lockfile has requirements or interpreter constraints that are "
             "not compatible with what the current build is using.\n\n"
-            "We recommend keeping the default of `error` for CI builds."
+            "We recommend keeping the default of `error` for CI builds.\n\n"
+            "Note that `warn` will still expect a Pants lockfile header, it only won't error if "
+            "the lockfile is stale and should be regenerated. Use `ignore` to avoid needing a "
+            "lockfile header at all, e.g. if you are manually managing lockfiles rather than "
+            "using the `generate-lockfiles` goal."
         ),
         advanced=True,
     )
