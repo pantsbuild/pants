@@ -841,7 +841,7 @@ class AmbiguousCodegenImplementationsException(Exception):
         if all_same_generator_paths:
             output = example_generator.output.__name__
             return cls(
-                f"Multiple of the registered code generators can generate {output} from {input}. "
+                f"Multiple registered code generators can generate {output} from {input}. "
                 "It is ambiguous which implementation to use.\n\nPossible implementations:\n\n"
                 f"{bullet_list(sorted(generator.__name__ for generator in generators))}"
             )
@@ -855,7 +855,7 @@ class AmbiguousCodegenImplementationsException(Exception):
             for generator in sorted(generators, key=lambda generator: generator.output.__name__)
         ]
         return cls(
-            f"Multiple of the registered code generators can generate one of "
+            f"Multiple registered code generators can generate one of "
             f"{possible_output_types} from {input}. It is ambiguous which implementation to "
             f"use. This can happen when the call site requests too many different output types "
             f"from the same original protocol sources.\n\nPossible implementations with their "

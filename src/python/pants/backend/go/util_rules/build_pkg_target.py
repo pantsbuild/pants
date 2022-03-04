@@ -97,7 +97,7 @@ def maybe_get_codegen_request_type(
     if len(relevant_requests) > 1:
         generate_from_sources = relevant_requests[0].generate_from.__name__
         raise AmbiguousCodegenImplementationsException(
-            f"Multiple of the registered code generators from {GoCodegenBuildRequest.__name__} can "
+            f"Multiple registered code generators from {GoCodegenBuildRequest.__name__} can "
             f"generate from {generate_from_sources}. It is ambiguous which implementation to "
             f"use.\n\n"
             f"Possible implementations:\n\n"
