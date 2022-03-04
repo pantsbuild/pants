@@ -1655,11 +1655,17 @@ impl NodeOutput {
     match self {
       NodeOutput::FileDigest(d) => vec![*d],
       NodeOutput::Snapshot(s) => {
+        // TODO: Callers should maybe be adapted for the fact that these nodes will now return
+        // transitive lists of digests (since lease extension might be operating recursively
+        // too). #13112.
         let dd: DirectoryDigest = s.clone().into();
         dd.digests()
       }
       NodeOutput::ProcessResult(p) => {
-        vec![p.0.stdout_digest, p.0.stderr_digest, p.0.output_directory]
+        let mut digests = p.0.output_directory.digests();
+        digests.push(p.0.stdout_digest);
+        digests.push(p.0.stderr_digest);
+        digests
       }
       NodeOutput::DirectoryListing(_)
       | NodeOutput::LinkDest(_)

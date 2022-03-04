@@ -758,57 +758,29 @@ impl Store {
 
   ///
   /// Ensure that a directory is locally loadable, which will download it from the Remote store as
-  /// a sideeffect (if one is configured). Called only with the Digest of a Directory.
+  /// a sideeffect (if one is configured).
   ///
-  pub fn ensure_local_has_recursive_directory(
+  pub async fn ensure_local_has_recursive_directory(
     &self,
-    dir_digest: Digest,
-  ) -> BoxFuture<'static, Result<(), String>> {
-    let loaded_directory = {
-      let store = self.clone();
-      let res = async move { store.load_directory(dir_digest).await };
-      res.boxed()
-    };
+    dir_digest: DirectoryDigest,
+  ) -> Result<(), String> {
+    let mut file_digests = Vec::new();
+    self
+      .load_digest_trie(dir_digest)
+      .await?
+      .walk(&mut |_, entry| match entry {
+        directory::Entry::File(f) => file_digests.push(f.digest()),
+        directory::Entry::Directory(_) => (),
+      });
 
-    let store = self.clone();
-    loaded_directory
-      .and_then(move |directory_opt| {
-        future::ready(
-          directory_opt.ok_or_else(|| format!("Could not read dir with digest {:?}", dir_digest)),
-        )
-      })
-      .and_then(move |directory| {
-        // Traverse the files within directory
-        let file_futures = directory
-          .files
-          .iter()
-          .map(|file_node| {
-            // TODO(tonic): Find better idiom for these conversions.
-            let file_digest = try_future!(require_digest(file_node.digest.as_ref()));
-            let store = store.clone();
-            async move { store.ensure_local_has_file(file_digest).await }.boxed()
-          })
-          .collect::<Vec<_>>();
-
-        // Recursively call with sub-directories
-        let directory_futures = directory
-          .directories
-          .iter()
-          .map(move |child_dir| {
-            // TODO(tonic): Find better idiom for these conversions.
-            let child_digest = try_future!(require_digest(child_dir.digest.as_ref()));
-            store.ensure_local_has_recursive_directory(child_digest)
-          })
-          .collect::<Vec<_>>();
-
-        future::try_join(
-          future::try_join_all(file_futures),
-          future::try_join_all(directory_futures),
-        )
-        .map(|r| r.map(|_| ()))
-        .boxed()
-      })
-      .boxed()
+    let _ = future::try_join_all(
+      file_digests
+        .into_iter()
+        .map(|file_digest| self.ensure_local_has_file(file_digest))
+        .collect::<Vec<_>>(),
+    )
+    .await?;
+    Ok(())
   }
 
   /// Ensure that a file is locally loadable, which will download it from the Remote store as
@@ -1055,8 +1027,9 @@ impl Store {
     perms: Permissions,
   ) -> Result<(), String> {
     // TODO: Remove persistence after porting `materialize_directory`.
-    let tree = self.load_digest_trie(digest.clone()).await?;
-    let _ = self.record_digest_trie(tree, true).await?;
+    self
+      .ensure_directory_digest_persisted(digest.clone())
+      .await?;
 
     self
       .materialize_directory_helper(destination, true, digest.todo_as_digest(), perms)
@@ -1329,7 +1302,9 @@ impl Store {
           .await?;
           Ok(())
         }
-        None => Err(format!("Could not walk unknown directory: {:?}", digest)),
+        None => Err(format!(
+          "Could not walk unknown directory at {path_so_far:?}: {digest:?}"
+        )),
       }
     };
     res.boxed()

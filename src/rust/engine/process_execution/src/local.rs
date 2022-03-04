@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
   self, safe_create_dir_all_ioerror, DirectoryDigest, GlobExpansionConjunction, GlobMatching,
-  PathGlobs, Permissions, RelativePath, StrictGlobMatching,
+  PathGlobs, Permissions, RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
@@ -549,7 +549,7 @@ pub trait CapturedWorkdir {
           stdout_digest,
           stderr_digest,
           exit_code: child_results.exit_code,
-          output_directory: output_snapshot.digest,
+          output_directory: output_snapshot.into(),
           platform,
           metadata: result_metadata,
         })
@@ -566,7 +566,7 @@ pub trait CapturedWorkdir {
           stdout_digest,
           stderr_digest: hashing::EMPTY_DIGEST,
           exit_code: -libc::SIGTERM,
-          output_directory: hashing::EMPTY_DIGEST,
+          output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
           platform,
           metadata: result_metadata,
         })

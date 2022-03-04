@@ -220,11 +220,7 @@ fn process_request_to_process_result(
         externs::store_bytes(py, &stderr_bytes),
         Snapshot::store_file_digest(py, result.stderr_digest).map_err(throw)?,
         externs::store_i64(py, result.exit_code.into()),
-        Snapshot::store_directory_digest(
-          py,
-          DirectoryDigest::todo_from_digest(result.output_directory),
-        )
-        .map_err(throw)?,
+        Snapshot::store_directory_digest(py, result.output_directory).map_err(throw)?,
         externs::unsafe_call(
           py,
           context.core.types.platform,

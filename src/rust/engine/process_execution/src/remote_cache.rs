@@ -295,6 +295,12 @@ impl CommandRunner {
     result: &FallibleProcessResultWithPlatform,
     store: &Store,
   ) -> Result<(ActionResult, Vec<Digest>), String> {
+    // TODO: Port to #13112. For now, we just ensure that the digest is persisted so that it can be
+    // used in `make_tree_for_output_directory` and `extract_output_file`.
+    store
+      .ensure_directory_digest_persisted(result.output_directory.clone())
+      .await?;
+
     // Keep track of digests that need to be uploaded.
     let mut digests = HashSet::new();
 
@@ -311,7 +317,7 @@ impl CommandRunner {
 
     for output_directory in &command.output_directories {
       let (tree, file_digests) = match Self::make_tree_for_output_directory(
-        result.output_directory,
+        result.output_directory.todo_as_digest(),
         RelativePath::new(output_directory).unwrap(),
         store,
       )
@@ -335,7 +341,7 @@ impl CommandRunner {
 
     for output_file in &command.output_files {
       let file_node = match Self::extract_output_file(
-        result.output_directory,
+        result.output_directory.todo_as_digest(),
         RelativePath::new(output_file).unwrap(),
         store,
       )

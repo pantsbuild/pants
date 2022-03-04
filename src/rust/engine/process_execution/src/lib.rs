@@ -511,7 +511,7 @@ pub struct FallibleProcessResultWithPlatform {
   pub stdout_digest: Digest,
   pub stderr_digest: Digest,
   pub exit_code: i32,
-  pub output_directory: hashing::Digest,
+  pub output_directory: DirectoryDigest,
   pub platform: Platform,
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub metadata: ProcessResultMetadata,
