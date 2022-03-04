@@ -10,7 +10,7 @@ from pants.option.option_types import ArgsListOption, BoolOption, FileOption, Sk
 
 class Hadolint(TemplatedExternalTool):
     options_scope = "hadolint"
-    name = "Hadolint"
+    display_name = "Hadolint"
     help = "A linter for Dockerfiles."
 
     default_version = "v2.8.0"

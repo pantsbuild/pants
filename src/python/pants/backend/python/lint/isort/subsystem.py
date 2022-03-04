@@ -20,6 +20,7 @@ from pants.util.docutil import git_url
 
 class Isort(PythonToolBase):
     options_scope = "isort"
+    display_name = "isort"
     help = "The Python import sorter tool (https://pycqa.github.io/isort/)."
 
     default_version = "isort[pyproject,colors]>=5.9.3,<6.0"

@@ -12,7 +12,7 @@ from pants.option import custom_types
 from pants.util.docutil import bin_name
 
 if TYPE_CHECKING:
-    from pants.option.subsystem import Subsystem
+    pass
 
 
 @dataclass(frozen=True)
@@ -664,8 +664,6 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 # -----------------------------------------------------------------------------------------------
 # "Specialized" Concrete Option Classes
 # -----------------------------------------------------------------------------------------------
-def _get_tool_name(subsystem_cls: type["Subsystem"]):
-    return getattr(subsystem_cls, "name", subsystem_cls.options_scope)
 
 
 class SkipOption(BoolOption[bool]):
@@ -680,7 +678,7 @@ class SkipOption(BoolOption[bool]):
             default=False,  # type: ignore[arg-type]
             help=(
                 lambda subsystem_cls: (
-                    f"Don't use {_get_tool_name(subsystem_cls)} when running {invocation_str}."
+                    f"Don't use {subsystem_cls.display_name} when running {invocation_str}."
                 )
             ),
         )
@@ -706,7 +704,7 @@ class ArgsListOption(ShellStrListOption):
             "--args",
             help=(
                 lambda subsystem_cls: (
-                    f"Arguments to pass directly to {tool_name or _get_tool_name(subsystem_cls)}, "
+                    f"Arguments to pass directly to {tool_name or subsystem_cls.display_name}, "
                     f"e.g. `--{subsystem_cls.options_scope}-args='{example}'`.{extra_help}"
                 )
             ),

@@ -41,7 +41,7 @@ class BanditFieldSet(FieldSet):
 
 class Bandit(PythonToolBase):
     options_scope = "bandit"
-    name = "Bandit"
+    display_name = "Bandit"
     help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
 
     # When upgrading, check if Bandit has started using PEP 517 (a `pyproject.toml` file). If so,

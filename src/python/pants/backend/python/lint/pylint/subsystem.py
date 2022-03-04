@@ -73,7 +73,7 @@ class PylintFieldSet(FieldSet):
 
 class Pylint(PythonToolBase):
     options_scope = "pylint"
-    name = "Pylint"
+    display_name = "Pylint"
     help = "The Pylint linter for Python code (https://www.pylint.org/)."
 
     default_version = "pylint>=2.11.0,<2.12"

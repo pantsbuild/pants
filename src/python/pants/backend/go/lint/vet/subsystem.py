@@ -8,7 +8,7 @@ from pants.option.subsystem import Subsystem
 
 class GoVetSubsystem(Subsystem):
     options_scope = "go-vet"
-    name = "`go vet`"
+    display_name = "`go vet`"
     help = "`go vet`-specific options."
 
     skip = SkipOption("lint")

@@ -21,7 +21,7 @@ from pants.util.docutil import git_url
 
 class TwineSubsystem(PythonToolBase):
     options_scope = "twine"
-    name = "Twine"
+    display_name = "Twine"
     help = "The utility for publishing Python distributions to PyPi and other Python repositories."
 
     default_version = "twine>=3.7.1,<3.8"

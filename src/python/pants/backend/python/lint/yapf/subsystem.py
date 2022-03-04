@@ -20,6 +20,7 @@ from pants.util.docutil import git_url
 
 class Yapf(PythonToolBase):
     options_scope = "yapf"
+    display_name = "yapf"
     help = "A formatter for Python files (https://github.com/google/yapf)."
 
     default_version = "yapf==0.32.0"

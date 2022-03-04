@@ -8,6 +8,7 @@ from pants.util.docutil import git_url
 
 class ScalafmtSubsystem(JvmToolBase):
     options_scope = "scalafmt"
+    display_name = "scalafmt"
     help = "scalafmt (https://scalameta.org/scalafmt/)"
 
     default_version = "3.2.1"

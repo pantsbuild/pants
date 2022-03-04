@@ -71,7 +71,7 @@ class MyPyFieldSet(FieldSet):
 
 class MyPy(PythonToolBase):
     options_scope = "mypy"
-    name = "MyPy"
+    display_name = "MyPy"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
     default_version = "mypy==0.910"

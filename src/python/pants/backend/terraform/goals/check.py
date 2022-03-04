@@ -16,7 +16,7 @@ from pants.option.subsystem import Subsystem
 
 class TerraformValidateSubsystem(Subsystem):
     options_scope = "terraform-validate"
-    name = "`terraform validate`"
+    display_name = "`terraform validate`"
     help = """Terraform validate options."""
 
     skip = SkipOption("check")

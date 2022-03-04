@@ -10,6 +10,7 @@ from pants.option.subsystem import Subsystem
 
 class Scalac(Subsystem):
     options_scope = "scalac"
+    display_name = "scalac"
     help = "The Scala compiler."
 
     default_plugins_lockfile_path = (

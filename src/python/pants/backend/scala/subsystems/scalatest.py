@@ -8,7 +8,7 @@ from pants.util.docutil import git_url
 
 class Scalatest(JvmToolBase):
     options_scope = "scalatest"
-    name = "Scalatest"
+    display_name = "Scalatest"
     help = "The Scalatest test framework (https://www.scalatest.org/)"
 
     default_version = "3.2.10"

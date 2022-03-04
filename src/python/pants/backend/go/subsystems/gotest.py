@@ -9,7 +9,7 @@ from pants.option.subsystem import Subsystem
 
 class GoTestSubsystem(Subsystem):
     options_scope = "go-test"
-    name = "Go test binary"
+    display_name = "Go test binary"
     help = "Options for Go tests."
 
     args = ArgsListOption(

@@ -58,7 +58,7 @@ class PythonTestFieldSet(TestFieldSet):
 
 class PyTest(PythonToolBase):
     options_scope = "pytest"
-    name = "Pytest"
+    display_name = "Pytest"
     help = "The pytest Python test framework (https://docs.pytest.org/)."
 
     # This should be compatible with requirements.txt, although it can be more precise.

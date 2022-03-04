@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class TfFmtSubsystem(Subsystem):
     options_scope = "terraform-fmt"
-    name = "`terraform fmt`"
+    display_name = "`terraform fmt`"
     help = "Terraform fmt options."
 
     skip = SkipOption("fmt", "lint")
