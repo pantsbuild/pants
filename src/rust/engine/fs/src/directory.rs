@@ -180,6 +180,10 @@ impl Directory {
     }
   }
 
+  pub fn digest(&self) -> Digest {
+    self.digest
+  }
+
   pub fn as_remexec_directory(&self) -> remexec::Directory {
     self.tree.as_remexec_directory()
   }

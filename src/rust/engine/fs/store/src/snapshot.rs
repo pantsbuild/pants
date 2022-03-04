@@ -86,8 +86,8 @@ impl Snapshot {
     let tree = DigestTrie::from_path_stats(path_stats, &file_digests_map)?;
     // TODO: When "enough" intrinsics are ported to directly producing/consuming DirectoryDigests
     // this call to persist the tree to the store should be removed, and the tree will be in-memory
-    // only (as allowed by the DirectoryDigest contract).
-    let directory_digest = store.record_digest_tree(tree.clone(), true).await?;
+    // only (as allowed by the DirectoryDigest contract). See #13112.
+    let directory_digest = store.record_digest_trie(tree.clone(), true).await?;
     Ok(Self {
       digest: directory_digest.as_digest(),
       tree,
@@ -95,57 +95,9 @@ impl Snapshot {
   }
 
   pub async fn from_digest(store: Store, digest: DirectoryDigest) -> Result<Snapshot, String> {
-    if let Some(ref tree) = digest.tree {
-      // The DigestTrie is already loaded.
-      return Ok(Self {
-        digest: digest.as_digest(),
-        tree: tree.clone(),
-      });
-    }
-
-    // The DigestTrie needs to be loaded from the Store.
-    // TODO: Add a native implementation that skips creating PathStats and directly produces
-    // a DigestTrie.
-    let path_stats_per_directory = store
-      .walk(digest.as_digest(), |_, path_so_far, _, directory| {
-        let mut path_stats = Vec::new();
-        path_stats.extend(directory.directories.iter().map(move |dir_node| {
-          let path = path_so_far.join(dir_node.name.clone());
-          (PathStat::dir(path.clone(), Dir(path)), None)
-        }));
-        path_stats.extend(directory.files.iter().map(move |file_node| {
-          let path = path_so_far.join(file_node.name.clone());
-          (
-            PathStat::file(
-              path.clone(),
-              File {
-                path: path.clone(),
-                is_executable: file_node.is_executable,
-              },
-            ),
-            Some((path, file_node.digest.as_ref().unwrap().try_into().unwrap())),
-          )
-        }));
-        future::ok(path_stats).boxed()
-      })
-      .await?;
-
-    let (path_stats, maybe_digests): (Vec<_>, Vec<_>) =
-      Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter)).unzip();
-    let file_digests = maybe_digests.into_iter().flatten().collect();
-
-    let tree = DigestTrie::from_path_stats(path_stats, &file_digests)?;
-    let computed_digest = tree.compute_root_digest();
-    if digest.as_digest() != computed_digest {
-      return Err(format!(
-        "Computed digest for Snapshot loaded from store mismatched: {:?} vs {:?}",
-        digest.as_digest(),
-        computed_digest
-      ));
-    }
     Ok(Self {
       digest: digest.as_digest(),
-      tree,
+      tree: store.load_digest_trie(digest).await?,
     })
   }
 
