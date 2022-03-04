@@ -17,7 +17,7 @@ from typing import Any
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.engine.internals import native_engine
-from pants.option.config import Config
+from pants.option.errors import ConfigValidationError
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
@@ -231,7 +231,7 @@ class RunTracker:
                 return value
             else:
                 return value[option]
-        except (Config.ConfigValidationError, AttributeError) as e:
+        except (ConfigValidationError, AttributeError) as e:
             option_str = "" if option is None else f" option {option}"
             raise ValueError(
                 f"Couldn't find option scope {scope}{option_str} for recording ({e!r})"
