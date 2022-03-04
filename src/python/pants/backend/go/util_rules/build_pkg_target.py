@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import ClassVar, cast
+from typing import ClassVar, Type, cast
 
 from pants.backend.go.target_types import (
     GoImportPathField,
@@ -88,7 +88,7 @@ def maybe_get_codegen_request_type(
     if not tgt.has_field(SourcesField):
         return None
     generate_request_types = cast(
-        FrozenOrderedSet[type[GoCodegenBuildRequest]], union_membership.get(GoCodegenBuildRequest)
+        FrozenOrderedSet[Type[GoCodegenBuildRequest]], union_membership.get(GoCodegenBuildRequest)
     )
     sources_field = tgt[SourcesField]
     relevant_requests = [
