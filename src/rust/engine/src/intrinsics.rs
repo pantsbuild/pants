@@ -20,8 +20,7 @@ use crate::types::Types;
 use crate::Failure;
 
 use fs::{
-  safe_create_dir_all_ioerror, DirectoryDigest, Permissions, PreparedPathGlobs, RelativePath,
-  EMPTY_DIRECTORY_DIGEST,
+  safe_create_dir_all_ioerror, DirectoryDigest, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::Digest;
@@ -527,11 +526,9 @@ fn digest_subset_to_digest(
       let py_digest_subset = (*args[0]).as_ref(py);
       let py_path_globs = externs::getattr(py_digest_subset, "globs").unwrap();
       let py_digest = externs::getattr(py_digest_subset, "digest").unwrap();
-      let res: NodeResult<(PreparedPathGlobs, Digest)> = Ok((
+      let res: NodeResult<_> = Ok((
         Snapshot::lift_prepared_path_globs(py_path_globs).map_err(throw)?,
-        lift_directory_digest(py_digest)
-          .map_err(throw)?
-          .todo_as_digest(),
+        lift_directory_digest(py_digest).map_err(throw)?,
       ));
       res
     })?;
@@ -541,8 +538,7 @@ fn digest_subset_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }

@@ -130,7 +130,7 @@ impl DirectoryDigest {
   /// Marks a callsite that is discarding the `DigestTrie` held by this `DirectoryDigest` as a
   /// temporary convenience, rather than updating its signature to return a `DirectoryDigest`. All
   /// usages of this method should be removed before closing #13112.
-  pub fn todo_as_digest(self) -> Digest {
+  pub fn todo_as_digest(&self) -> Digest {
     self.digest
   }
 
