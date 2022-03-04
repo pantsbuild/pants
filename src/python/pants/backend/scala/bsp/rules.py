@@ -1,7 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import dataclasses
 import logging
-import textwrap
+import os
 from dataclasses import dataclass
 
 from pants.backend.scala.bsp.spec import (
@@ -29,18 +30,8 @@ from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.build_graph.address import AddressInput
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    Directory,
-    FileContent,
-    MergeDigests,
-    RemovePrefix,
-)
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     CoarsenedTargets,
@@ -151,16 +142,17 @@ async def handle_bsp_scalac_options_request(
 ) -> HandleScalacOptionsResult:
     wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
     resolve = wrapped_target.target[JvmResolveField].normalized_value(jvm)
-    classfiles_dir_uri = build_root.pathlib_path.joinpath(
-        f".pants.d/bsp/jvm/resolves/{resolve}/scala/classes"
-    ).as_uri()
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
             options=(),
-            classpath=(classfiles_dir_uri,),
-            class_directory=classfiles_dir_uri,
+            classpath=(
+                build_root.pathlib_path.joinpath(f"bsp/jvm/resolves/{resolve}/lib").as_uri(),
+            ),
+            class_directory=build_root.pathlib_path.joinpath(
+                f"bsp/jvm/resolves/{resolve}/classes"
+            ).as_uri(),
         )
     )
 
@@ -206,52 +198,12 @@ async def bsp_scala_compile_request(
     _logger.info(f"scala compile result = {result}")
     output_digest = EMPTY_DIGEST
     if result.exit_code == 0 and result.output:
-        digests: list[Digest] = []
-        filenames: list[str] = []
-        if result.output:
-            digests.append(result.output.digest)
-            filenames.extend(result.output.filenames)
-        empty_output_dir_digest, script_digest = await MultiGet(
-            Get(Digest, CreateDigest([Directory("__classpath__")])),
-            Get(
-                Digest,
-                CreateDigest(
-                    [
-                        FileContent(
-                            "__unpack_jars.sh",
-                            textwrap.dedent(
-                                f"""\
-                            {unzip.path} "$1" -d __classpath__
-                            """
-                            ).encode(),
-                            is_executable=True,
-                        )
-                    ]
-                ),
-            ),
-        )
-        input_digest = await Get(
-            Digest, MergeDigests([result.output.digest, empty_output_dir_digest, script_digest])
-        )
-        unpack_results = await MultiGet(
-            Get(
-                ProcessResult,
-                Process(
-                    argv=[bash.path, "./__unpack_jars.sh", filename],
-                    description="Unpack classpath",
-                    input_digest=input_digest,
-                    output_directories=["__classpath__"],
-                ),
-            )
-            for filename in result.output.filenames
-        )
-        merged_output_digest = await Get(
-            Digest, MergeDigests(r.output_digest for r in unpack_results)
-        )
-        output_digest = await Get(Digest, RemovePrefix(merged_output_digest, "__classpath__"))
-        output_digest = await Get(
-            Digest, AddPrefix(output_digest, f"bsp/jvm/resolves/{resolve}/scala/classes")
-        )
+        entries = await Get(DigestEntries, Digest, result.output.digest)
+        new_entires = [
+            dataclasses.replace(entry, path=os.path.basename(entry.path)) for entry in entries
+        ]
+        flat_digest = await Get(Digest, CreateDigest(new_entires))
+        output_digest = await Get(Digest, AddPrefix(flat_digest, f"bsp/jvm/resolves/{resolve.name}/lib"))
 
     return BSPCompileResult(
         status=StatusCode.ERROR if result.exit_code != 0 else StatusCode.OK,
