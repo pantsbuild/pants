@@ -4,7 +4,6 @@
 from collections import defaultdict
 from typing import DefaultDict
 
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
     ProtobufGrpcToggleField,
@@ -15,13 +14,11 @@ from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImplMarker,
     ModuleProvider,
     ModuleProviderType,
+    ResolveName,
 )
-from pants.backend.python.util_rules.pex_from_targets import (
-    ChosenPythonResolve,
-    ChosenPythonResolveRequest,
-)
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -39,33 +36,35 @@ class PythonProtobufMappingMarker(FirstPartyPythonMappingImplMarker):
 @rule(desc="Creating map of Protobuf targets to generated Python modules", level=LogLevel.DEBUG)
 async def map_protobuf_to_python_modules(
     protobuf_targets: AllProtobufTargets,
-    python_protobuf: PythonProtobufSubsystem,
+    python_setup: PythonSetup,
     _: PythonProtobufMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
-    runtime_deps = await Get(Addresses, UnparsedAddressInputs, python_protobuf.runtime_dependencies)
-    # TODO: better error message. Mention `runtime_dependencies` option.
-    resolve = await Get(ChosenPythonResolve, ChosenPythonResolveRequest(runtime_deps))
 
     stripped_file_per_target = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(tgt[ProtobufSourceField].file_path))
         for tgt in protobuf_targets
     )
 
-    modules_to_providers: DefaultDict[str, list[ModuleProvider]] = defaultdict(list)
+    resolves_to_modules_to_providers: dict[ResolveName, DefaultDict[str, list[ModuleProvider]]] = {}
     for tgt, stripped_file in zip(protobuf_targets, stripped_file_per_target):
+        resolve = tgt[PythonResolveField].normalized_value(python_setup)
+        if resolve not in resolves_to_modules_to_providers:
+            resolves_to_modules_to_providers[resolve] = defaultdict(list)
+
         # NB: We don't consider the MyPy plugin, which generates `_pb2.pyi`. The stubs end up
         # sharing the same module as the implementation `_pb2.py`. Because both generated files
         # come from the same original Protobuf target, we're covered.
-        modules_to_providers[proto_path_to_py_module(stripped_file.value, suffix="_pb2")].append(
+        module = proto_path_to_py_module(stripped_file.value, suffix="_pb2")
+        resolves_to_modules_to_providers[resolve][module].append(
             ModuleProvider(tgt.address, ModuleProviderType.IMPL)
         )
         if tgt.get(ProtobufGrpcToggleField).value:
-            modules_to_providers[
-                proto_path_to_py_module(stripped_file.value, suffix="_pb2_grpc")
-            ].append(ModuleProvider(tgt.address, ModuleProviderType.IMPL))
+            module = proto_path_to_py_module(stripped_file.value, suffix="_pb2_grpc")
+            resolves_to_modules_to_providers[resolve][module].append(
+                ModuleProvider(tgt.address, ModuleProviderType.IMPL)
+            )
 
-    mapping = ((k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items()))
-    return FirstPartyPythonMappingImpl({resolve.name: mapping})
+    return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
 
 
 def rules():

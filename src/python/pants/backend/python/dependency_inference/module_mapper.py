@@ -9,7 +9,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Iterable, Tuple
+from typing import DefaultDict, Iterable, Mapping, Tuple
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -36,7 +36,7 @@ from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
-_ResolveName = str
+ResolveName = str
 
 
 class ModuleProviderType(enum.Enum):
@@ -81,7 +81,7 @@ def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
 
 
 class FirstPartyPythonMappingImpl(
-    FrozenDict[_ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
+    FrozenDict[ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
 ):
     """A mapping of each resolve name to the first-party module names contained and their owning
     addresses.
@@ -89,6 +89,23 @@ class FirstPartyPythonMappingImpl(
     This contains the modules from a specific implementation, e.g. a codegen backend. All
     implementations then get merged.
     """
+
+    @classmethod
+    def create(
+        cls,
+        resolves_to_modules_to_providers: Mapping[
+            ResolveName, Mapping[str, Iterable[ModuleProvider]]
+        ],
+    ) -> FirstPartyPythonMappingImpl:
+        return FirstPartyPythonMappingImpl(
+            (
+                resolve,
+                FrozenDict(
+                    (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
+                ),
+            )
+            for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
+        )
 
 
 @union
@@ -102,7 +119,7 @@ class FirstPartyPythonMappingImplMarker:
 
 
 class FirstPartyPythonModuleMapping(
-    FrozenDict[_ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
+    FrozenDict[ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
 ):
     """A merged mapping of each resolve name to the first-party module names contained and their
     owning addresses.
@@ -186,33 +203,22 @@ async def map_first_party_python_targets_to_modules(
         for tgt in all_python_targets.first_party
     )
 
-    resolves_to_modules_to_providers: dict[
-        _ResolveName, DefaultDict[str, list[ModuleProvider]]
-    ] = {}
+    resolves_to_modules_to_providers: dict[ResolveName, DefaultDict[str, list[ModuleProvider]]] = {}
     for tgt, stripped_file in zip(all_python_targets.first_party, stripped_file_per_target):
         resolve = tgt[PythonResolveField].normalized_value(python_setup)
+        if resolve not in resolves_to_modules_to_providers:
+            resolves_to_modules_to_providers[resolve] = defaultdict(list)
 
         stripped_f = PurePath(stripped_file.value)
         provider_type = (
             ModuleProviderType.TYPE_STUB if stripped_f.suffix == ".pyi" else ModuleProviderType.IMPL
         )
         module = module_from_stripped_path(stripped_f)
-
-        if resolve not in resolves_to_modules_to_providers:
-            resolves_to_modules_to_providers[resolve] = defaultdict(list)
         resolves_to_modules_to_providers[resolve][module].append(
             ModuleProvider(tgt.address, provider_type)
         )
 
-    return FirstPartyPythonMappingImpl(
-        (
-            resolve,
-            FrozenDict(
-                (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
-            ),
-        )
-        for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
-    )
+    return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -221,7 +227,7 @@ async def map_first_party_python_targets_to_modules(
 
 
 class ThirdPartyPythonModuleMapping(
-    FrozenDict[_ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
+    FrozenDict[ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
 ):
     """A mapping of each resolve to the modules they contain and the addresses providing those
     modules."""
@@ -262,9 +268,7 @@ async def map_third_party_modules_to_addresses(
     all_python_tgts: AllPythonTargets,
     python_setup: PythonSetup,
 ) -> ThirdPartyPythonModuleMapping:
-    resolves_to_modules_to_providers: dict[
-        _ResolveName, DefaultDict[str, list[ModuleProvider]]
-    ] = {}
+    resolves_to_modules_to_providers: dict[ResolveName, DefaultDict[str, list[ModuleProvider]]] = {}
 
     for tgt in all_python_tgts.third_party:
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
