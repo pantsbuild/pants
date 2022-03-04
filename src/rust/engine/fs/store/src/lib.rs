@@ -534,6 +534,21 @@ impl Store {
   }
 
   ///
+  /// Ensures that the directory entries of the given DirectoryDigest is persisted to disk.
+  ///
+  /// TODO: By the end of #13112, usage of this method should be limited to the writing of cache
+  /// entries.
+  ///
+  pub async fn ensure_directory_digest_persisted(
+    &self,
+    digest: DirectoryDigest,
+  ) -> Result<(), String> {
+    let tree = self.load_digest_trie(digest).await?;
+    let _ = self.record_digest_trie(tree, true).await?;
+    Ok(())
+  }
+
+  ///
   /// Loads bytes from remote cas if required and possible (i.e. if remote is configured). Takes
   /// two functions f_local and f_remote. These functions are any validation or transformations you
   /// want to perform on the bytes received from the local and remote cas (if remote is configured).
@@ -1033,13 +1048,19 @@ impl Store {
   /// an existing destination directory, meaning that directory and file creation must be
   /// idempotent.
   ///
-  pub fn materialize_directory(
+  pub async fn materialize_directory(
     &self,
     destination: PathBuf,
-    digest: Digest,
+    digest: DirectoryDigest,
     perms: Permissions,
-  ) -> BoxFuture<'static, Result<(), String>> {
-    self.materialize_directory_helper(destination, true, digest, perms)
+  ) -> Result<(), String> {
+    // TODO: Remove persistence after porting `materialize_directory`.
+    let tree = self.load_digest_trie(digest.clone()).await?;
+    let _ = self.record_digest_trie(tree, true).await?;
+
+    self
+      .materialize_directory_helper(destination, true, digest.todo_as_digest(), perms)
+      .await
   }
 
   fn materialize_directory_helper(

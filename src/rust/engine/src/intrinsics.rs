@@ -21,9 +21,10 @@ use crate::Failure;
 
 use fs::{
   safe_create_dir_all_ioerror, DirectoryDigest, Permissions, PreparedPathGlobs, RelativePath,
+  EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use indexmap::IndexMap;
 use process_execution::{CacheName, ManagedChild, NamedCaches};
 use pyo3::{PyRef, Python};
@@ -575,7 +576,7 @@ fn interactive_process(
       let run_in_workspace: bool = externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
       let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
       let py_input_digest = externs::getattr(py_interactive_process, "input_digest").unwrap();
-      let input_digest: Digest = lift_directory_digest(py_input_digest)?.todo_as_digest();
+      let input_digest = lift_directory_digest(py_input_digest)?;
       let env: BTreeMap<String, String> = externs::getattr_from_str_frozendict(py_interactive_process, "env");
 
       let append_only_caches = externs::getattr_from_str_frozendict::<&str>(py_interactive_process, "append_only_caches")
@@ -601,7 +602,7 @@ fn interactive_process(
       Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
     };
 
-    if input_digest != EMPTY_DIGEST {
+    if input_digest != *EMPTY_DIRECTORY_DIGEST {
       if run_in_workspace {
         return Err(
           "Local interactive process should not attempt to materialize files when run in workspace.".to_owned().into()

@@ -356,7 +356,7 @@ impl NailgunProcess {
     prepare_workdir(
       workdir.path().to_owned(),
       &startup_options,
-      startup_options.input_digests.input_files,
+      startup_options.input_digests.input_files.clone(),
       context.clone(),
       store.clone(),
       executor.clone(),

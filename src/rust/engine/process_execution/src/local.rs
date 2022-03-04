@@ -16,8 +16,8 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
-  self, safe_create_dir_all_ioerror, GlobExpansionConjunction, GlobMatching, PathGlobs,
-  Permissions, RelativePath, StrictGlobMatching,
+  self, safe_create_dir_all_ioerror, DirectoryDigest, GlobExpansionConjunction, GlobMatching,
+  PathGlobs, Permissions, RelativePath, StrictGlobMatching,
 };
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
@@ -297,7 +297,7 @@ impl super::CommandRunner for CommandRunner {
         let exclusive_spawn = prepare_workdir(
           workdir_path.clone(),
           &req,
-          req.input_digests.input_files,
+          req.input_digests.input_files.clone(),
           context.clone(),
           self.store.clone(),
           self.executor.clone(),
@@ -617,7 +617,7 @@ pub trait CapturedWorkdir {
 pub async fn prepare_workdir(
   workdir_path: PathBuf,
   req: &Process,
-  materialized_input_digest: hashing::Digest,
+  materialized_input_digest: DirectoryDigest,
   context: Context,
   store: Store,
   executor: task_executor::Executor,

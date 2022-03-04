@@ -792,7 +792,7 @@ impl crate::CommandRunner for CommandRunner {
       &self.store,
       command_digest,
       action_digest,
-      Some(request.input_digests.complete),
+      Some(request.input_digests.complete.clone()),
     )
     .await?;
 
@@ -1031,7 +1031,7 @@ pub fn make_execute_request(
 
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
-    input_root_digest: Some((&req.input_digests.complete).into()),
+    input_root_digest: Some((&req.input_digests.complete.as_digest()).into()),
     ..remexec::Action::default()
   };
 
@@ -1475,7 +1475,7 @@ pub async fn ensure_action_uploaded(
   store: &Store,
   command_digest: Digest,
   action_digest: Digest,
-  input_files: Option<Digest>,
+  input_files: Option<DirectoryDigest>,
 ) -> Result<(), String> {
   in_workunit!(
     context.workunit_store.clone(),
@@ -1487,7 +1487,11 @@ pub async fn ensure_action_uploaded(
     },
     |_workunit| async move {
       let mut digests = vec![command_digest, action_digest];
-      digests.extend(input_files);
+      if let Some(input_files) = input_files {
+        // TODO: Port ensure_remote_has_recursive. See #13112.
+        store.ensure_directory_digest_persisted(input_files.clone()).await?;
+        digests.push(input_files.todo_as_digest());
+      }
       let _ = store.ensure_remote_has_recursive(digests).await?;
       Ok(())
     },

@@ -12,6 +12,7 @@ use deepsize::{known_deep_size, DeepSizeOf};
 use internment::Intern;
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use serde::Serialize;
 
 // TODO: Extract protobuf-specific pieces to a new crate.
 use grpc_util::prost::MessageExt;
@@ -35,10 +36,11 @@ lazy_static! {
 /// persisted to the Store (either locally or remotely). The field thus acts likes a cache in some
 /// cases, but in other cases is an indication that the tree must first be persisted (or loaded)
 /// before the Digest may be operated on.
-#[derive(Clone, DeepSizeOf)]
+#[derive(Clone, DeepSizeOf, Serialize)]
 pub struct DirectoryDigest {
   // NB: Private in order to force a choice between `todo_as_digest` and `as_digest`.
   digest: Digest,
+  #[serde(skip_serializing)]
   pub tree: Option<DigestTrie>,
 }
 

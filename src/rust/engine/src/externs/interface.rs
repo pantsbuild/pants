@@ -1524,12 +1524,15 @@ fn write_digest(
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
 
-    block_in_place_and_wait(py, || {
-      core.store().materialize_directory(
-        destination.clone(),
-        lifted_digest.todo_as_digest(),
-        fs::Permissions::Writable,
-      )
+    block_in_place_and_wait(py, || async move {
+      core
+        .store()
+        .materialize_directory(
+          destination.clone(),
+          lifted_digest,
+          fs::Permissions::Writable,
+        )
+        .await
     })
     .map_err(PyValueError::new_err)
   })
