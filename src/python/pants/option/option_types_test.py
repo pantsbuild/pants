@@ -178,6 +178,7 @@ def test_other_options() -> None:
 def test_specialized_options() -> None:
     class MySubsystem(Subsystem):
         options_scope = "my-subsystem"
+        display_name = "Wrench"
 
         def __init__(self):
             self.options = SimpleNamespace()
@@ -187,12 +188,12 @@ def test_specialized_options() -> None:
         skip_prop1 = SkipOption("fmt", "lint")
         skip_prop2 = SkipOption("fmt")
         args_prop1 = ArgsListOption(example="--foo")
-        args_prop2 = ArgsListOption(example="--bar", tool_name="Hammer")
+        args_prop2 = ArgsListOption(example="--bar", tool_name="Drill")
         args_prop3 = ArgsListOption(example="--baz", extra_help="Swing it!")
 
     class SubsystemWithName(Subsystem):
         options_scope = "other-subsystem"
-        name = "Hammer"
+        display_name = "Hammer"
         skip_prop1 = SkipOption("fmt")
         args_prop1 = ArgsListOption(example="--nail")
         args_prop2 = ArgsListOption(example="--screw", tool_name="Screwdriver")
@@ -219,16 +220,16 @@ def test_specialized_options() -> None:
         )
 
     assert register.call_args_list == [
-        expected_skip_call("Don't use my-subsystem when running `./pants fmt` and `./pants lint`."),
-        expected_skip_call("Don't use my-subsystem when running `./pants fmt`."),
+        expected_skip_call("Don't use Wrench when running `./pants fmt` and `./pants lint`."),
+        expected_skip_call("Don't use Wrench when running `./pants fmt`."),
         expected_args_call(
-            "Arguments to pass directly to my-subsystem, e.g. `--my-subsystem-args='--foo'`."
+            "Arguments to pass directly to Wrench, e.g. `--my-subsystem-args='--foo'`."
         ),
         expected_args_call(
-            "Arguments to pass directly to Hammer, e.g. `--my-subsystem-args='--bar'`."
+            "Arguments to pass directly to Drill, e.g. `--my-subsystem-args='--bar'`."
         ),
         expected_args_call(
-            "Arguments to pass directly to my-subsystem, e.g. `--my-subsystem-args='--baz'`.\n\nSwing it!"
+            "Arguments to pass directly to Wrench, e.g. `--my-subsystem-args='--baz'`.\n\nSwing it!"
         ),
         expected_skip_call("Don't use Hammer when running `./pants fmt`."),
         expected_args_call(
