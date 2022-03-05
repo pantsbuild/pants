@@ -23,7 +23,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField, CoarsenedTarget
+from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
