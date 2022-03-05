@@ -7,7 +7,7 @@ import dataclasses
 import logging
 import os
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import PurePath
 from textwrap import dedent
 
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
@@ -189,29 +189,38 @@ async def package_pyoxidizer_binary(
 
 @rule
 async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
-    def is_executable_binary(target_name: str, artifact_relpath: str | None) -> bool:
+    def is_executable_binary(artifact_relpath: str | None) -> bool:
         """After packaging, the PyOxidizer plugin will place the executable in a location like this:
-        dist/{project}/{target name}/{platform arch}/{compilation mode}/install/{target name}
+        dist/{project}/{target_name}/{platform arch}/{compilation mode}/install/{binary name}
+
+        {binary name} will default to `target_name`, but can be modified with a custom PyOxidizer template.
 
         e.g. dist/helloworld/helloworld-bin/x86_64-apple-darwin/debug/install/helloworld-bin.
 
         PyOxidizer will place associated libraries in {...}/install/lib
 
         To determine if the artifact we iterate over is the one we want to execute, we check that
-        the file's parent dir is "install" and that the filename matches the field_set.target_name
+        the file's parent dir is "install". There should only be one of these files.
         """
         if not artifact_relpath:
             return False
 
-        artifact_path = Path(artifact_relpath)
-        return artifact_path.name == target_name and artifact_path.parent.name == "install"
+        artifact_path = PurePath(artifact_relpath)
+        return artifact_path.parent.name == "install"
 
     binary = await Get(BuiltPackage, PackageFieldSet, field_set)
-    artifact = next(
-        artifact
-        for artifact in binary.artifacts
-        if is_executable_binary(field_set.address.target_name, artifact.relpath)
+    executable_binaries = [
+        artifact for artifact in binary.artifacts if is_executable_binary(artifact.relpath)
+    ]
+
+    assert len(executable_binaries) == 1, (
+        "More than one executable binary discovered in the `install` directory, "
+        "which is a bug in the PyOxidizer plugin. "
+        "Please file a bug report at https://github.com/pantsbuild/pants/issues/new. "
+        f"Enumerated executable binaries: {executable_binaries}"
     )
+
+    artifact = executable_binaries[0]
     assert artifact.relpath is not None
     return RunRequest(digest=binary.digest, args=(os.path.join("{chroot}", artifact.relpath),))
 

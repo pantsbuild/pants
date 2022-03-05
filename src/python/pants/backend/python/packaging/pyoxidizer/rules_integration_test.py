@@ -13,6 +13,7 @@ def test_end_to_end() -> None:
 
     * Third-party dependencies can be used.
     * A `python_distribution` (implicitly) depending on another `python_distribution`.
+    * `package` vs `run`
     """
     sources = {
         "hellotest/utils/greeter.py": "GREET = 'Hello world!'",
@@ -73,7 +74,7 @@ def test_end_to_end() -> None:
         assert bin_result.returncode == 42
         assert bin_result.stdout == b"Hello world!\n"
 
-        # Performing `./pants run` check immediately after `./pants package`, in order to re-use package results and save time
+        # Check that the binary runs.
         run_args = [
             "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python.packaging.pyoxidizer']",
             f"--source-root-patterns=['/{tmpdir}']",
