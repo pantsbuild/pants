@@ -210,9 +210,9 @@ class PythonToolBase(PythonToolRequirementsBase):
     console_script = StrOption(
         "--console-script",
         advanced=True,
-        default=lambda cls: cls.default_main.spec
-        if isinstance(cls.default_main, ConsoleScript)
-        else None,
+        default=lambda cls: (
+            cls.default_main.spec if isinstance(cls.default_main, ConsoleScript) else None
+        ),
         help=(
             "The console script for the tool. Using this option is generally preferable to "
             "(and mutually exclusive with) specifying an --entry-point since console script "
@@ -223,9 +223,9 @@ class PythonToolBase(PythonToolRequirementsBase):
     entry_point = StrOption(
         "--entry-point",
         advanced=True,
-        default=lambda cls: cls.default_main.spec
-        if isinstance(cls.default_main, EntryPoint)
-        else None,
+        default=lambda cls: (
+            cls.default_main.spec if isinstance(cls.default_main, EntryPoint) else None
+        ),
         help=(
             "The entry point for the tool. Generally you only want to use this option if the "
             "tool does not offer a --console-script (which this option is mutually exclusive "
