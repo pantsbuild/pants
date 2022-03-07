@@ -487,7 +487,9 @@ DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
 
 
 class BootstrapOptions:
-    """This are the set of options necessary to create a Scheduler. If an option is not consumed
+    """The set of options necessary to create a Scheduler.
+    
+    If an option is not consumed...
     during creation of a Scheduler, it should be in `register_options` instead.
 
     Bootstrap option values can be interpolated into the config file, and can be referenced
