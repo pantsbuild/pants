@@ -179,7 +179,7 @@ class ArtifactRequirement:
     def exclude(self, *excludes: str) -> ArtifactRequirement:
         """Creates a copy of this `ArtifactRequirement` with `excludes` provided.
 
-        Mostly useful for testing (`Coordinate(...).as_requirement().exclude(...)`.
+        Mostly useful for testing (`Coordinate(...).as_requirement().exclude(...)`).
         """
 
         return dataclasses.replace(
