@@ -476,6 +476,22 @@ impl Store {
   }
 
   ///
+  /// Loads the given directory Digest as a DirectoryDigest, eagerly fetching its tree from
+  /// storage. To convert non-eagerly, use `DirectoryDigest::from_persisted_digest`.
+  ///
+  /// In general, DirectoryDigests should be consumed lazily to avoid fetching from a remote
+  /// store unnecessarily, so this method is primarily useful for tests and benchmarks.
+  ///
+  pub async fn load_directory_digest(&self, digest: Digest) -> Result<DirectoryDigest, String> {
+    Ok(DirectoryDigest::new(
+      digest,
+      self
+        .load_digest_trie(DirectoryDigest::from_persisted_digest(digest))
+        .await?,
+    ))
+  }
+
+  ///
   /// Loads a directory proto from the local store, back-filling from remote if necessary.
   ///
   /// Guarantees that if an Ok Some value is returned, it is valid, and canonical, and its
