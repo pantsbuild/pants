@@ -78,7 +78,7 @@ async def bsp_build_initialize(
             debug_provider=DebugProvider(language_ids=tuple(sorted(debug_provider_language_ids))),
             inverse_sources_provider=None,
             dependency_sources_provider=True,
-            dependency_modules_provider=None,
+            dependency_modules_provider=True,
             resources_provider=None,
             can_reload=None,
             build_target_changed_provider=None,

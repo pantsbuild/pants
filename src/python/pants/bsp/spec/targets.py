@@ -152,3 +152,71 @@ class DependencySourcesResult:
 
     def to_json_dict(self):
         return {"items": [item.to_json_dict() for item in self.items]}
+
+
+# -----------------------------------------------------------------------------------------------
+# Dependency Modules Request
+# See https://build-server-protocol.github.io/docs/specification.html#dependency-modules-request
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DependencyModulesParams:
+    targets: tuple[BuildTargetIdentifier, ...]
+
+    @classmethod
+    def from_json_dict(cls, d):
+        return cls(
+            targets=tuple(BuildTargetIdentifier.from_json_dict(x) for x in d["targets"]),
+        )
+
+    def to_json_dict(self):
+        return {
+            "targets": [tgt.to_json_dict() for tgt in self.targets],
+        }
+
+
+class DependencyModule:
+    # Module name
+    name: str
+
+    # Module version
+    version: str
+
+    # Kind of data to expect in the `data` field. If this field is not set, the kind of data is not specified.
+    data_kind: str | None
+
+    # Language-specific metadata about this module.
+    # See MavenDependencyModule as an example.
+    data: Any | None
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result = {
+            "name": self.name,
+            "version": self.version,
+        }
+        if self.data_kind is not None:
+            result["dataKind"] = self.data_kind
+        if self.data is not None:
+            result["data"] = self.data.to_json_dict()
+        return result
+
+
+@dataclass(frozen=True)
+class DependencyModulesItem:
+    target: BuildTargetIdentifier
+    modules: tuple[DependencyModule, ...]
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "target": self.target.to_json_dict(),
+            "modules": [m.to_json_dict() for m in self.modules],
+        }
+
+
+@dataclass(frozen=True)
+class DependencyModulesResult:
+    items: tuple[DependencyModulesItem, ...]
+
+    def to_json_dict(self):
+        return {"items": [item.to_json_dict() for item in self.items]}

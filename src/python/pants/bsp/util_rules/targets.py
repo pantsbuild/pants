@@ -8,6 +8,9 @@ from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier
 from pants.bsp.spec.targets import (
+    DependencyModulesItem,
+    DependencyModulesParams,
+    DependencyModulesResult,
     DependencySourcesItem,
     DependencySourcesParams,
     DependencySourcesResult,
@@ -153,10 +156,30 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# Dependency Modules Request
+# See https://build-server-protocol.github.io/docs/specification.html#dependency-modules-request
+# -----------------------------------------------------------------------------------------------
+
+
+class DependencyModulesHandlerMapping(BSPHandlerMapping):
+    method_name = "buildTarget/dependencyModules"
+    request_type = DependencyModulesParams
+    response_type = DependencyModulesResult
+
+
+@rule
+async def bsp_dependency_modules(request: DependencyModulesParams) -> DependencyModulesResult:
+    return DependencyModulesResult(
+        tuple(DependencyModulesItem(target=tgt, modules=()) for tgt in request.targets)
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(BSPHandlerMapping, WorkspaceBuildTargetsHandlerMapping),
         UnionRule(BSPHandlerMapping, BuildTargetSourcesHandlerMapping),
         UnionRule(BSPHandlerMapping, DependencySourcesHandlerMapping),
+        UnionRule(BSPHandlerMapping, DependencyModulesHandlerMapping),
     )
