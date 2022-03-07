@@ -6,7 +6,7 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
 from pants.util.docutil import bin_name
@@ -19,6 +19,18 @@ if TYPE_CHECKING:
 class OptionsInfo:
     flag_names: tuple[str, ...]
     flag_options: dict[str, Any]
+
+
+def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
+    """Returns an ordered sequence of options info from the MRO of the provided class."""
+    # NB: Since registration ordering matters (it impacts `help` output), we register these in
+    # class attribute order, starting from the base class down.
+    for class_ in reversed(inspect.getmro(cls)):
+        for attrname in class_.__dict__.keys():
+            # NB: We use attrname and getattr to trigger descriptors
+            attr = getattr(cls, attrname)
+            if isinstance(attr, OptionsInfo):
+                yield attr
 
 
 # The type of the option.
