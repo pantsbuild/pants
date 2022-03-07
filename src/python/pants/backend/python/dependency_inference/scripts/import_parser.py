@@ -39,9 +39,10 @@ class AstVisitor(ast.NodeVisitor):
         self.strong_imports = {}
         self.weak_imports = {}
         self._weaken_strong_imports = False
+        self._parse_string_imports = os.environ["STRING_IMPORTS"] == "y"
 
     def maybe_add_string_import(self, node, s):
-        if os.environ["STRING_IMPORTS"] == "y" and STRING_IMPORT_REGEX.match(s):
+        if self._parse_string_imports and STRING_IMPORT_REGEX.match(s):
             self.weak_imports.setdefault(s, node.lineno)
 
     def add_strong_import(self, name, lineno):
