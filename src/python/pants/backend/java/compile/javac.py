@@ -19,7 +19,7 @@ from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField
+from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
@@ -40,6 +40,11 @@ logger = logging.getLogger(__name__)
 
 class CompileJavaSourceRequest(ClasspathEntryRequest):
     field_sets = (JavaFieldSet, JavaGeneratorFieldSet)
+
+
+# TODO: This code is duplicated in the scalac and BSP rules.
+def compute_output_jar_filename(ctgt: CoarsenedTarget) -> str:
+    return f"{ctgt.representative.address.path_safe_spec}.javac.jar"
 
 
 @rule(desc="Compile with javac")
@@ -189,7 +194,7 @@ async def compile_java_source(
     # invoking via a `bash` wrapper (since the trailing portion of the command is executed by
     # the nailgun server). We might be able to resolve this in the future via a Javac wrapper shim.
     output_snapshot = await Get(Snapshot, Digest, compile_result.output_digest)
-    output_file = f"{request.component.representative.address.path_safe_spec}.javac.jar"
+    output_file = compute_output_jar_filename(request.component)
     output_files: tuple[str, ...] = (output_file,)
     if output_snapshot.files:
         jar_result = await Get(

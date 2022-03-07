@@ -6,9 +6,9 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.java.bsp.spec import JavacOptionsItem, JavacOptionsParams, JavacOptionsResult
+from pants.backend.java.compile.javac import compute_output_jar_filename
 from pants.backend.java.dependency_inference.symbol_mapper import AllJavaTargets
 from pants.backend.java.target_types import JavaSourceField
-from pants.backend.scala.compile.scalac import compute_output_jar_filename
 from pants.base.build_root import BuildRoot
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
@@ -137,7 +137,7 @@ async def handle_bsp_scalac_options_request(
                 ).as_uri(),
             ),
             class_directory=build_root.pathlib_path.joinpath(
-                f".pants.d/bsp/jvm/resolves/{resolve}/classes"
+                f".pants.d/bsp/jvm/resolves/{resolve.name}/classes"
             ).as_uri(),
         )
     )

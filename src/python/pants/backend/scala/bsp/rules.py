@@ -157,7 +157,7 @@ async def handle_bsp_scalac_options_request(
                 ).as_uri(),
             ),
             class_directory=build_root.pathlib_path.joinpath(
-                f".pants.d/bsp/jvm/resolves/{resolve}/classes"
+                f".pants.d/bsp/jvm/resolves/{resolve.name}/classes"
             ).as_uri(),
         )
     )

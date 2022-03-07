@@ -21,6 +21,7 @@ from pants.jvm.package.war import rules as war_rules
 from pants.jvm.resolve import coursier_fetch, jvm_tool
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
 from pants.jvm.test import junit
+from pants.backend.java.bsp import rules as java_bsp_rules
 
 
 def target_types():
@@ -56,4 +57,5 @@ def rules():
         *jvm_tool.rules(),
         *run_deploy_jar.rules(),
         *war_rules(),
+        *java_bsp_rules.rules(),
     ]
