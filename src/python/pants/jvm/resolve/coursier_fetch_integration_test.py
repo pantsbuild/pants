@@ -621,7 +621,7 @@ def test_transitive_excludes(rule_runner: RuleRunner) -> None:
                         version="2.12.1",
                     )
                     .as_requirement()
-                    .exclude("com.fasterxml.jackson.core:jackson-core")
+                    .with_extra_excludes("com.fasterxml.jackson.core:jackson-core")
                 ]
             ),
         ],
