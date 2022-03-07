@@ -3,7 +3,6 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use cache::PersistentCache;
-use fs::DirectoryDigest;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 use store::Store;
 use tempfile::TempDir;
@@ -152,8 +151,12 @@ async fn recover_from_missing_store_contents() {
   // than just the root of the output is present when hitting the cache.
   {
     let output_dir_digest = first_result.output_directory;
+    store
+      .ensure_directory_digest_persisted(output_dir_digest.clone())
+      .await
+      .unwrap();
     let output_dir = store
-      .load_directory(output_dir_digest)
+      .load_directory(output_dir_digest.as_digest())
       .await
       .unwrap()
       .unwrap();
@@ -169,7 +172,7 @@ async fn recover_from_missing_store_contents() {
     let removed = store.remove_file(output_child_digest).await.unwrap();
     assert!(removed);
     assert!(store
-      .contents_for_directory(DirectoryDigest::from_persisted_digest(output_dir_digest))
+      .contents_for_directory(output_dir_digest)
       .await
       .err()
       .is_some())
@@ -183,9 +186,7 @@ async fn recover_from_missing_store_contents() {
 
   // And that the entire output directory can be loaded.
   assert!(store
-    .contents_for_directory(DirectoryDigest::from_persisted_digest(
-      second_result.output_directory
-    ))
+    .contents_for_directory(second_result.output_directory)
     .await
     .ok()
     .is_some())

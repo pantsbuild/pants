@@ -114,23 +114,29 @@ async fn snapshot_from_digest() {
     .unwrap();
 
   // Confirm that the digest can be loaded either from memory (using a DirectoryDigest with a
-  // tree attached), or from disk (using one without.)
+  // tree attached), or from disk (using one without).
+
+  // From memory.
   assert_eq!(
     expected_snapshot,
-    // From disk.
+    Snapshot::from_digest(store.clone(), expected_snapshot.clone().into())
+      .await
+      .unwrap()
+  );
+
+  // From disk.
+  store
+    .ensure_directory_digest_persisted(expected_snapshot.clone().into())
+    .await
+    .unwrap();
+  assert_eq!(
+    expected_snapshot,
     Snapshot::from_digest(
-      store.clone(),
+      store,
       DirectoryDigest::from_persisted_digest(expected_snapshot.digest)
     )
     .await
     .unwrap()
-  );
-  assert_eq!(
-    expected_snapshot,
-    // From memory.
-    Snapshot::from_digest(store, expected_snapshot.clone().into())
-      .await
-      .unwrap()
   );
 }
 
@@ -303,6 +309,10 @@ async fn snapshot_merge_two_files() {
     .merge(vec![snapshot1.into(), snapshot2.into()])
     .await
     .unwrap();
+  store
+    .ensure_directory_digest_persisted(merged.clone())
+    .await
+    .unwrap();
   let merged_root_directory = store
     .load_directory(merged.as_digest())
     .await
@@ -445,7 +455,13 @@ async fn strip_dir_not_in_store() {
   let result = store.strip_prefix(digest.clone(), &prefix).await;
   assert_eq!(
     result,
-    Err(format!("Could not walk unknown directory: {:?}", digest.as_digest()).into())
+    Err(
+      format!(
+        "Could not walk unknown directory at \"\": {:?}",
+        digest.as_digest()
+      )
+      .into()
+    )
   );
 }
 

@@ -523,8 +523,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .load_tree_from_remote(digest)
           .await
           .expect("protocol error");
-        let output_digest =
-          output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?;
+        let output_digest = DirectoryDigest::from_persisted_digest(
+          output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?,
+        );
         store
           .materialize_directory(destination, output_digest, Permissions::Writable)
           .await
@@ -547,7 +548,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .unwrap()
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
-        let digest = Digest::new(fingerprint, size_bytes);
+        let digest = DirectoryDigest::from_persisted_digest(Digest::new(fingerprint, size_bytes));
         store
           .materialize_directory(destination, digest, Permissions::Writable)
           .await
@@ -601,7 +602,8 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .unwrap()
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
-        let mut digest = Digest::new(fingerprint, size_bytes);
+        let mut digest =
+          DirectoryDigest::from_persisted_digest(Digest::new(fingerprint, size_bytes));
 
         if let Some(prefix_to_strip) = args.value_of("child-dir") {
           let mut result = store
@@ -619,31 +621,33 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           // It's a shame we can't just .and_then here, because we can't use async closures.
           if let Ok(subset_digest) = result {
             result = store
-              .strip_prefix(
-                DirectoryDigest::todo_from_digest(subset_digest),
-                &RelativePath::new(prefix_to_strip)?,
-              )
-              .await
-              .map(|dd| dd.as_digest());
+              .strip_prefix(subset_digest, &RelativePath::new(prefix_to_strip)?)
+              .await;
           }
           digest = result.map_err(|err| match err {
             SnapshotOpsError::String(string)
             | SnapshotOpsError::DigestMergeFailure(string)
             | SnapshotOpsError::GlobMatchError(string) => string,
-          })?
+          })?;
+
+          // TODO: The below operations don't strictly need persistence: we could render the
+          // relevant `DigestTrie` directly. See #13112.
+          store
+            .ensure_directory_digest_persisted(digest.clone())
+            .await?;
         }
 
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
-            let maybe_directory = store.load_directory(digest).await?;
+            let maybe_directory = store.load_directory(digest.as_digest()).await?;
             maybe_directory.map(|d| d.to_bytes().to_vec())
           }
           "text" => {
-            let maybe_p = store.load_directory(digest).await?;
+            let maybe_p = store.load_directory(digest.as_digest()).await?;
             maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
           }
           "recursive-file-list" => {
-            let maybe_v = expand_files(store, digest).await?;
+            let maybe_v = expand_files(store, digest.as_digest()).await?;
             maybe_v
               .map(|v| {
                 v.into_iter()
@@ -654,7 +658,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               .map(String::into_bytes)
           }
           "recursive-file-list-with-digests" => {
-            let maybe_v = expand_files(store, digest).await?;
+            let maybe_v = expand_files(store, digest.as_digest()).await?;
             maybe_v
               .map(|v| {
                 v.into_iter()

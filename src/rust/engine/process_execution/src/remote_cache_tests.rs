@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use fs::RelativePath;
+use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use maplit::hashset;
@@ -46,7 +46,7 @@ impl MockLocalCommandRunner {
         stdout_digest: EMPTY_DIGEST,
         stderr_digest: EMPTY_DIGEST,
         exit_code,
-        output_directory: EMPTY_DIGEST,
+        output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
         platform: Platform::current().unwrap(),
         metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally, RunId(0)),
       }),
@@ -609,7 +609,7 @@ async fn make_action_result_basic() {
   let process_result = FallibleProcessResultWithPlatform {
     stdout_digest: TestData::roland().digest(),
     stderr_digest: TestData::robin().digest(),
-    output_directory: directory_digest,
+    output_directory: DirectoryDigest::from_persisted_digest(directory_digest),
     exit_code: 102,
     platform: Platform::Linux_x86_64,
     metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally, RunId(0)),

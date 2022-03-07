@@ -607,6 +607,9 @@ class SchedulerSession:
     def ensure_remote_has_recursive(self, digests: Sequence[Digest | FileDigest]) -> None:
         native_engine.ensure_remote_has_recursive(self.py_scheduler, list(digests))
 
+    def ensure_directory_digest_persisted(self, digest: Digest) -> None:
+        native_engine.ensure_directory_digest_persisted(self.py_scheduler, digest)
+
     def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
         """Write a digest to disk, relative to the build root."""
         if path_prefix and PurePath(path_prefix).is_absolute():

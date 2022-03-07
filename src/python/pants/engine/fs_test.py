@@ -81,6 +81,10 @@ def prime_store_with_roland_digest(rule_runner: RuleRunner) -> None:
     assert snapshot.files == ("roland",)
     assert snapshot.digest == ROLAND_DIGEST
 
+    # NB: Capturing a Snapshot avoids persisting directory entries to disk, so we have to ensure
+    # that independently.
+    rule_runner.scheduler.ensure_directory_digest_persisted(snapshot.digest)
+
 
 def setup_fs_test_tar(rule_runner: RuleRunner) -> None:
     """Extract fs_test.tar into the rule_runner's build root.
@@ -1126,7 +1130,7 @@ def test_digest_is_not_file_digest() -> None:
 
 
 def test_snapshot_properties() -> None:
-    digest = Digest("a" * 64, 1000)
+    digest = Digest("691638f4d58abaa8cfdc9af2e00682f13f07f96ad1d177f146216a7341ca4982", 154)
     snapshot = Snapshot._unsafe_create(digest, ["f.ext", "dir/f.ext"], ["dir"])
     assert snapshot.digest == digest
     assert snapshot.files == ("dir/f.ext", "f.ext")

@@ -85,7 +85,8 @@ impl DirectoryDigest {
   /// identifies the DigestTrie).
   pub fn new(digest: Digest, tree: DigestTrie) -> Self {
     if cfg!(debug_assertions) {
-      assert!(digest == tree.compute_root_digest());
+      let actual = tree.compute_root_digest();
+      assert!(digest == actual, "Expected {digest:?} but got {actual:?}");
     }
     Self {
       digest,

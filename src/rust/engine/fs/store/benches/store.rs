@@ -35,10 +35,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fs::{
-  File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat, Permissions, PosixFS,
-  PreparedPathGlobs, StrictGlobMatching,
+  DirectoryDigest, File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat, Permissions,
+  PosixFS, PreparedPathGlobs, StrictGlobMatching,
 };
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::EMPTY_DIGEST;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use task_executor::Executor;
 use tempfile::TempDir;
@@ -70,7 +70,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
               let dest = new_temp.path().to_path_buf();
               std::mem::forget(new_temp);
               let _ = executor
-                .block_on(store.materialize_directory(dest, digest, perms))
+                .block_on(store.materialize_directory(dest, digest.clone(), perms))
                 .unwrap();
             })
           },
@@ -140,7 +140,7 @@ pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
     .bench_function("wildcard", |b| {
       b.iter(|| {
         let get_subset = store.subset(
-          digest,
+          digest.clone(),
           SubsetParams {
             globs: PreparedPathGlobs::create(
               vec!["**/*".to_string()],
@@ -160,12 +160,15 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
   let num_files: usize = 4000;
   let (store, _tempdir, digest) = snapshot(&executor, num_files, 100);
 
-  let directory = executor
-    .block_on(store.load_directory(digest))
-    .unwrap()
-    .unwrap();
   // Modify half of the files in the top-level directory by setting them to have the empty
   // fingerprint (zero content).
+  executor
+    .block_on(store.ensure_directory_digest_persisted(digest.clone()))
+    .unwrap();
+  let directory = executor
+    .block_on(store.load_directory(digest.as_digest()))
+    .unwrap()
+    .unwrap();
   let mut all_file_nodes = directory.files.to_vec();
   let mut file_nodes_to_modify = all_file_nodes.split_off(all_file_nodes.len() / 2);
   for file_node in file_nodes_to_modify.iter_mut() {
@@ -330,7 +333,7 @@ fn snapshot(
   executor: &Executor,
   max_files: usize,
   file_target_size: usize,
-) -> (Store, TempDir, Digest) {
+) -> (Store, TempDir, DirectoryDigest) {
   // NB: We create the files in a tempdir rather than in memory in order to allow for more
   // realistic benchmarking involving large files. The tempdir is dropped at the end of this method
   // (after everything has been captured out of it).
@@ -355,7 +358,7 @@ fn snapshot(
       .await
     })
     .unwrap()
-    .digest;
+    .into();
 
   (store, storedir, digest)
 }
