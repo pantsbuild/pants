@@ -173,7 +173,7 @@ class ArtifactRequirement:
                 if target[JvmArtifactJarSourceField].value
                 else None
             ),
-            excludes=frozenset(target[JvmArtifactExcludeDependenciesField].value or []),
+            excludes=frozenset(target[JvmArtifactExcludeDependenciesField].value or []) or None,
         )
 
     def exclude(self, *excludes: str) -> ArtifactRequirement:
