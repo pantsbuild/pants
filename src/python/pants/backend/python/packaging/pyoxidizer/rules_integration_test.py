@@ -13,6 +13,7 @@ def test_end_to_end() -> None:
 
     * Third-party dependencies can be used.
     * A `python_distribution` (implicitly) depending on another `python_distribution`.
+    * `package` vs `run`
     """
     sources = {
         "hellotest/utils/greeter.py": "GREET = 'Hello world!'",
@@ -30,9 +31,11 @@ def test_end_to_end() -> None:
         "hellotest/main.py": dedent(
             """\
             import colors
+            import sys
             from hellotest.utils.greeter import GREET
 
             print(GREET)
+            sys.exit(42)
             """
         ),
         "hellotest/BUILD": dedent(
@@ -56,19 +59,31 @@ def test_end_to_end() -> None:
         ),
     }
     with setup_tmpdir(sources) as tmpdir:
-        args = [
+        package_args = [
             "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python.packaging.pyoxidizer']",
             f"--source-root-patterns=['/{tmpdir}']",
             "package",
             f"{tmpdir}/hellotest:bin",
         ]
-        result = run_pants(args)
-        result.assert_success()
+        package_result = run_pants(package_args)
+        package_result.assert_success()
 
         # Check that the binary is executable.
         bin_path = next(Path("dist", f"{tmpdir}.hellotest", "bin").glob("*/debug/install/bin"))
-        bin_stdout = subprocess.run([bin_path], check=True, stdout=subprocess.PIPE).stdout
-        assert bin_stdout == b"Hello world!\n"
+        bin_result = subprocess.run([bin_path], stdout=subprocess.PIPE)
+        assert bin_result.returncode == 42
+        assert bin_result.stdout == b"Hello world!\n"
+
+        # Check that the binary runs.
+        run_args = [
+            "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python.packaging.pyoxidizer']",
+            f"--source-root-patterns=['/{tmpdir}']",
+            "run",
+            f"{tmpdir}/hellotest:bin",
+        ]
+        run_result = run_pants(run_args)
+        assert run_result.exit_code == 42
+        assert run_result.stdout == "Hello world!\n"
 
 
 def test_requires_wheels() -> None:
