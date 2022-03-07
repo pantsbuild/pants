@@ -42,7 +42,7 @@ class CompileJavaSourceRequest(ClasspathEntryRequest):
     field_sets = (JavaFieldSet, JavaGeneratorFieldSet)
 
 
-# TODO: This code is duplicated in the scalac and BSP rules.
+# TODO: This code is duplicated in the javac and BSP rules.
 def compute_output_jar_filename(ctgt: CoarsenedTarget) -> str:
     return f"{ctgt.representative.address.path_safe_spec}.javac.jar"
 

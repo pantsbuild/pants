@@ -151,6 +151,7 @@ class DependencySourcesHandlerMapping(BSPHandlerMapping):
 
 @rule
 async def bsp_dependency_sources(request: DependencySourcesParams) -> DependencySourcesResult:
+    # TODO: This is a stub.
     return DependencySourcesResult(
         tuple(DependencySourcesItem(target=tgt, sources=()) for tgt in request.targets)
     )
@@ -170,6 +171,8 @@ class DependencyModulesHandlerMapping(BSPHandlerMapping):
 
 @rule
 async def bsp_dependency_modules(request: DependencyModulesParams) -> DependencyModulesResult:
+    # TODO: This is a stub.
+    # Note: VSCode expects this endpoint to exist even if the capability bit for it is set `false`.
     return DependencyModulesResult(
         tuple(DependencyModulesItem(target=tgt, modules=()) for tgt in request.targets)
     )

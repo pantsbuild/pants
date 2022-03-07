@@ -125,15 +125,15 @@ class HandleJavacOptionsRequest:
 
 
 @dataclass(frozen=True)
-class HandleScalacOptionsResult:
+class HandleJavacOptionsResult:
     item: JavacOptionsItem
 
 
 @rule
-async def handle_bsp_scalac_options_request(
+async def handle_bsp_java_options_request(
     request: HandleJavacOptionsRequest,
     build_root: BuildRoot,
-) -> HandleScalacOptionsResult:
+) -> HandleJavacOptionsResult:
     wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
     coarsened_targets = await Get(CoarsenedTargets, Addresses([wrapped_target.target.address]))
     assert len(coarsened_targets) == 1
@@ -141,7 +141,7 @@ async def handle_bsp_scalac_options_request(
     resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
     output_file = compute_output_jar_filename(coarsened_target)
 
-    return HandleScalacOptionsResult(
+    return HandleJavacOptionsResult(
         JavacOptionsItem(
             target=request.bsp_target_id,
             options=(),
@@ -160,7 +160,7 @@ async def handle_bsp_scalac_options_request(
 @rule
 async def bsp_javac_options_request(request: JavacOptionsParams) -> JavacOptionsResult:
     results = await MultiGet(
-        Get(HandleScalacOptionsResult, HandleJavacOptionsRequest(btgt)) for btgt in request.targets
+        Get(HandleJavacOptionsResult, HandleJavacOptionsRequest(btgt)) for btgt in request.targets
     )
     return JavacOptionsResult(items=tuple(result.item for result in results))
 
