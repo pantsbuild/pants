@@ -77,7 +77,7 @@ async def bsp_build_initialize(
             run_provider=RunProvider(language_ids=tuple(sorted(run_provider_language_ids))),
             debug_provider=DebugProvider(language_ids=tuple(sorted(debug_provider_language_ids))),
             inverse_sources_provider=None,
-            dependency_sources_provider=None,
+            dependency_sources_provider=True,
             dependency_modules_provider=None,
             resources_provider=None,
             can_reload=None,
