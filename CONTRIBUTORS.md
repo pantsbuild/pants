@@ -209,6 +209,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Sameer Arora
 + Sameer Brenn
 + Sara Solano
++ Scott Lessans
 + Senthil Kumaran
 + SergeKireev
 + Sergey Serebryakov
