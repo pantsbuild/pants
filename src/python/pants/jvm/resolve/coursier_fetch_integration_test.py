@@ -628,8 +628,5 @@ def test_transitive_excludes(rule_runner: RuleRunner) -> None:
     )
 
     entries = resolve.entries
-    jackson_databind = [i for i in entries if i.coord.artifact == "jackson-databind"][0]
-    jackson_cores = [i for i in entries if i.coord.artifact == "jackson-core"]
-
-    assert jackson_databind.coord.version == "2.12.1"
-    assert len(jackson_cores) == 0
+    assert any(i for i in entries if i.coord.artifact == "jackson-databind")
+    assert not any(i for i in entries if i.coord.artifact == "jackson-core")
