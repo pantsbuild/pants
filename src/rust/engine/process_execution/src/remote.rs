@@ -1495,7 +1495,9 @@ pub async fn ensure_action_uploaded(
       let mut digests = vec![command_digest, action_digest];
       if let Some(input_files) = input_files {
         // TODO: Port ensure_remote_has_recursive. See #13112.
-        store.ensure_directory_digest_persisted(input_files.clone()).await?;
+        store
+          .ensure_directory_digest_persisted(input_files.clone())
+          .await?;
         digests.push(input_files.todo_as_digest());
       }
       let _ = store.ensure_remote_has_recursive(digests).await?;

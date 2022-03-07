@@ -1026,81 +1026,82 @@ impl Store {
     digest: DirectoryDigest,
     perms: Permissions,
   ) -> Result<(), String> {
-    // TODO: Remove persistence after porting `materialize_directory`.
+    // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
+    // parent path and its children.
+    let mut parent_to_child = HashMap::new();
     self
-      .ensure_directory_digest_persisted(digest.clone())
-      .await?;
-
-    self
-      .materialize_directory_helper(destination, true, digest.todo_as_digest(), perms)
-      .await
-  }
-
-  fn materialize_directory_helper(
-    &self,
-    destination: PathBuf,
-    is_root: bool,
-    digest: Digest,
-    perms: Permissions,
-  ) -> BoxFuture<'static, Result<(), String>> {
-    let store = self.clone();
-    async move {
-      let destination2 = destination.clone();
-      let directory_creation = store.local.executor().spawn_blocking(move || {
-        if is_root {
-          fs::safe_create_dir_all(&destination2)
-        } else {
-          fs::safe_create_dir(&destination2)
+      .load_digest_trie(digest)
+      .await?
+      .walk(&mut |path, entry| {
+        if let Some(parent) = path.parent() {
+          parent_to_child
+            .entry(destination.join(parent))
+            .or_insert_with(Vec::new)
+            .push(entry.clone());
         }
       });
 
-      let (_, load_result) = future::try_join(
-        directory_creation.map_err(|e| {
+    self
+      .materialize_directory_helper(destination, true, &parent_to_child, perms)
+      .await
+  }
+
+  fn materialize_directory_helper<'a>(
+    &self,
+    destination: PathBuf,
+    is_root: bool,
+    parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
+    perms: Permissions,
+  ) -> BoxFuture<'a, Result<(), String>> {
+    let store = self.clone();
+    async move {
+      let destination2 = destination.clone();
+      store
+        .local
+        .executor()
+        .spawn_blocking(move || {
+          if is_root {
+            fs::safe_create_dir_all(&destination2)
+          } else {
+            fs::safe_create_dir(&destination2)
+          }
+        })
+        .map_err(|e| {
           format!(
             "Failed to create directory {}: {}",
             destination.display(),
             e
           )
-        }),
-        store.load_directory(digest),
-      )
-      .await?;
-      let directory =
-        load_result.ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
-
-      let file_futures = directory
-        .files
-        .iter()
-        .map(|file_node| {
-          let store = store.clone();
-          let path = destination.join(file_node.name.clone());
-          let digest = try_future!(require_digest(file_node.digest.as_ref()));
-          let mode = match perms {
-            Permissions::ReadOnly if file_node.is_executable => 0o555,
-            Permissions::ReadOnly => 0o444,
-            Permissions::Writable if file_node.is_executable => 0o755,
-            Permissions::Writable => 0o644,
-          };
-          store.materialize_file(path, digest, mode).boxed()
         })
-        .collect::<Vec<_>>();
-      let directory_futures = directory
-        .directories
-        .iter()
-        .map(|directory_node| {
-          let store = store.clone();
-          let path = destination.join(directory_node.name.clone());
-          let digest = try_future!(require_digest(directory_node.digest.as_ref()));
+        .await?;
 
-          store.materialize_directory_helper(path, false, digest, perms)
-        })
-        .collect::<Vec<_>>();
-      let _ = future::try_join(
-        future::try_join_all(file_futures),
-        future::try_join_all(directory_futures),
-      )
-      .map(|r| r.map(|_| ()))
-      .await?;
+      if let Some(children) = parent_to_child.get(&destination) {
+        let mut child_futures = Vec::new();
+        for child in children {
+          let path = destination.join(child.name().as_ref());
+          let store = store.clone();
+          child_futures.push(async move {
+            match child {
+              directory::Entry::File(f) => {
+                let mode = match perms {
+                  Permissions::ReadOnly if f.is_executable() => 0o555,
+                  Permissions::ReadOnly => 0o444,
+                  Permissions::Writable if f.is_executable() => 0o755,
+                  Permissions::Writable => 0o644,
+                };
+                store.materialize_file(path, f.digest(), mode).await
+              }
+              directory::Entry::Directory(_) => {
+                store
+                  .materialize_directory_helper(path, false, parent_to_child, perms)
+                  .await
+              }
+            }
+          });
+        }
+        let _ = future::try_join_all(child_futures).await?;
+      }
+
       if perms == Permissions::ReadOnly {
         tokio::fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o555))
           .await
@@ -1117,41 +1118,37 @@ impl Store {
     .boxed()
   }
 
-  fn materialize_file(
+  async fn materialize_file(
     &self,
     destination: PathBuf,
     digest: Digest,
     mode: u32,
-  ) -> BoxFuture<'static, Result<(), String>> {
-    let store = self.clone();
-    let res = async move {
-      let write_result = store
-        .load_file_bytes_with(digest, move |bytes| {
-          let mut f = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .mode(mode)
-            .open(&destination)
-            .map_err(|e| {
-              format!(
-                "Error opening file {} for writing: {:?}",
-                destination.display(),
-                e
-              )
-            })?;
-          f.write_all(bytes)
-            .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
-          Ok(())
-        })
-        .await?;
-      match write_result {
-        Some(Ok(())) => Ok(()),
-        Some(Err(e)) => Err(e),
-        None => Err(format!("File with digest {:?} not found", digest)),
-      }
-    };
-    res.boxed()
+  ) -> Result<(), String> {
+    let write_result = self
+      .load_file_bytes_with(digest, move |bytes| {
+        let mut f = OpenOptions::new()
+          .create(true)
+          .write(true)
+          .truncate(true)
+          .mode(mode)
+          .open(&destination)
+          .map_err(|e| {
+            format!(
+              "Error opening file {} for writing: {:?}",
+              destination.display(),
+              e
+            )
+          })?;
+        f.write_all(bytes)
+          .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
+        Ok(())
+      })
+      .await?;
+    match write_result {
+      Some(Ok(())) => Ok(()),
+      Some(Err(e)) => Err(e),
+      None => Err(format!("File with digest {:?} not found", digest)),
+    }
   }
 
   ///

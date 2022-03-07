@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Display};
 use std::hash::{self, Hash};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -73,7 +73,10 @@ impl Debug for DirectoryDigest {
     } else {
       "None"
     };
-    write!(f, "DirectoryDigest({:?}, tree: {})", self.digest, tree)
+    f.debug_struct("DirectoryDigest")
+      .field("digest", &self.digest)
+      .field("tree", &tree)
+      .finish()
   }
 }
 
@@ -152,8 +155,8 @@ impl DirectoryDigest {
 /// A single component of a filesystem path.
 ///
 /// For example: the path `foo/bar` will be broken up into `Name("foo")` and `Name("bar")`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-struct Name(Intern<String>);
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Name(Intern<String>);
 // NB: Calculating the actual deep size of an `Intern` is very challenging, because it does not
 // keep any record of the number of held references, and instead effectively makes its held value
 // static. Switching to `ArcIntern` would get accurate counts at the cost of performance and size.
@@ -167,14 +170,20 @@ impl Deref for Name {
   }
 }
 
-#[derive(Clone, DeepSizeOf)]
+impl Display for Name {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    write!(f, "{}", self.0.as_ref())
+  }
+}
+
+#[derive(Clone, Debug, DeepSizeOf)]
 pub enum Entry {
   Directory(Directory),
   File(File),
 }
 
 impl Entry {
-  fn name(&self) -> Name {
+  pub fn name(&self) -> Name {
     match self {
       Entry::Directory(d) => d.name,
       Entry::File(f) => f.name,
@@ -202,8 +211,8 @@ impl Directory {
     }
   }
 
-  pub fn name(&self) -> &str {
-    self.name.as_ref()
+  pub fn name(&self) -> Name {
+    self.name
   }
 
   pub fn digest(&self) -> Digest {
@@ -226,7 +235,19 @@ impl Directory {
   }
 }
 
-#[derive(Clone, DeepSizeOf)]
+impl Debug for Directory {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    // NB: To avoid over-large output, we don't render the Trie. It would likely be best rendered
+    // as e.g. JSON.
+    f.debug_struct("Directory")
+      .field("name", &self.name)
+      .field("digest", &self.digest)
+      .field("tree", &"..")
+      .finish()
+  }
+}
+
+#[derive(Clone, Debug, DeepSizeOf)]
 pub struct File {
   name: Name,
   digest: Digest,
@@ -234,8 +255,8 @@ pub struct File {
 }
 
 impl File {
-  pub fn name(&self) -> &str {
-    self.name.as_ref()
+  pub fn name(&self) -> Name {
+    self.name
   }
 
   pub fn digest(&self) -> Digest {
