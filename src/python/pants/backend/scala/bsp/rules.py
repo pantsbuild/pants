@@ -153,11 +153,11 @@ async def handle_bsp_scalac_options_request(
             options=(),
             classpath=(
                 build_root.pathlib_path.joinpath(
-                    f"bsp/jvm/resolves/{resolve.name}/lib/{output_file}"
+                    f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{output_file}"
                 ).as_uri(),
             ),
             class_directory=build_root.pathlib_path.joinpath(
-                f"bsp/jvm/resolves/{resolve}/classes"
+                f".pants.d/bsp/jvm/resolves/{resolve}/classes"
             ).as_uri(),
         )
     )
@@ -210,7 +210,7 @@ async def bsp_scala_compile_request(
         ]
         flat_digest = await Get(Digest, CreateDigest(new_entires))
         output_digest = await Get(
-            Digest, AddPrefix(flat_digest, f"bsp/jvm/resolves/{resolve.name}/lib")
+            Digest, AddPrefix(flat_digest, f"jvm/resolves/{resolve.name}/lib")
         )
 
     return BSPCompileResult(
