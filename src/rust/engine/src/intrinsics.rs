@@ -397,10 +397,9 @@ fn download_file_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from_py_err)?;
-    let digest = context.get(DownloadedFile(key)).await?;
+    let snapshot = context.get(DownloadedFile(key)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), snapshot.into()).map_err(throw)
   }
   .boxed()
 }
