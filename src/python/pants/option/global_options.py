@@ -487,19 +487,18 @@ DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
 
 
 class BootstrapOptions:
-    """This are the set of options necessary to create a Scheduler. If an option is not consumed
-    during creation of a Scheduler, it should be in `register_options` instead.
+    """The set of options necessary to create a Scheduler.
 
-    Bootstrap option values can be interpolated into the config file, and can be referenced
-    programmatically in registration code, e.g., as register.bootstrap.pants_workdir.
+    If an option is not consumed during creation of a Scheduler, it should be a property of
+    GlobalOptions instead. Either way these options are injected into the GlobalOptions, which is
+    how they should be accessed (as normal global-scope options).
 
-    Note that regular code can also access these options as normal global-scope options. Their
-    status as "bootstrap options" is only pertinent during option registration.
+    Their status as "bootstrap options" is only pertinent during option registration.
     """
 
-    buildroot = get_buildroot()
-    default_distdir_name = "dist"
-    default_rel_distdir = f"/{default_distdir_name}/"
+    _buildroot = get_buildroot()
+    _default_distdir_name = "dist"
+    _default_rel_distdir = f"/{_default_distdir_name}/"
 
     backend_packages = StrListOption(
         "--backend-packages",
@@ -598,7 +597,7 @@ class BootstrapOptions:
         "--pants-workdir",
         advanced=True,
         metavar="<dir>",
-        default=os.path.join(buildroot, ".pants.d"),
+        default=os.path.join(_buildroot, ".pants.d"),
         daemon=True,
         help="Write intermediate logs and output files to this dir.",
     )
@@ -616,13 +615,13 @@ class BootstrapOptions:
         "--pants-distdir",
         advanced=True,
         metavar="<dir>",
-        default=os.path.join(buildroot, "dist"),
+        default=os.path.join(_buildroot, "dist"),
         help="Write end products, such as the results of `./pants package`, to this dir.",  # noqa: PANTSBIN
     )
     pants_subprocessdir = StrOption(
         "--pants-subprocessdir",
         advanced=True,
-        default=os.path.join(buildroot, ".pids"),
+        default=os.path.join(_buildroot, ".pids"),
         daemon=True,
         help="The directory to use for tracking subprocess metadata. This should "
         "live outside of the dir used by `pants_workdir` to allow for tracking "
@@ -702,7 +701,7 @@ class BootstrapOptions:
     pants_ignore = StrListOption(
         "--pants-ignore",
         advanced=True,
-        default=[".*/", default_rel_distdir],
+        default=[".*/", _default_rel_distdir],
         help="Paths to ignore for all filesystem operations performed by pants "
         "(e.g. BUILD file scanning, glob matching, etc). "
         "Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). "
@@ -813,29 +812,29 @@ class BootstrapOptions:
         "Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.",
     )
 
-    rule_threads_core_flag = "--rule-threads-core"
-    process_execution_local_parallelism_flag = "--process-execution-local-parallelism"
-    rule_threads_max_flag = "--rule-threads-max"
+    _rule_threads_core_flag = "--rule-threads-core"
+    _process_execution_local_parallelism_flag = "--process-execution-local-parallelism"
+    _rule_threads_max_flag = "--rule-threads-max"
 
     rule_threads_core = IntOption(
-        rule_threads_core_flag,
+        _rule_threads_core_flag,
         default=max(2, CPU_COUNT // 2),
         default_help_repr="max(2, #cores/2)",
         advanced=True,
         help=(
             "The number of threads to keep active and ready to execute `@rule` logic (see "
-            f"also: `{rule_threads_max_flag}`).\n\nValues less than 2 are not currently supported. "
+            f"also: `{_rule_threads_max_flag}`).\n\nValues less than 2 are not currently supported. "
             "\n\nThis value is independent of the number of processes that may be spawned in "
-            f"parallel locally (controlled by `{process_execution_local_parallelism_flag}`)."
+            f"parallel locally (controlled by `{_process_execution_local_parallelism_flag}`)."
         ),
     )
     rule_threads_max = IntOption(
-        rule_threads_max_flag,
+        _rule_threads_max_flag,
         default=None,
         advanced=True,
         help=(
             "The maximum number of threads to use to execute `@rule` logic. Defaults to "
-            f"a small multiple of `{rule_threads_core_flag}`."
+            f"a small multiple of `{_rule_threads_core_flag}`."
         ),
     )
 
@@ -954,14 +953,14 @@ class BootstrapOptions:
         "connections when downloading files required by a build.",
     )
     process_execution_local_parallelism = IntOption(
-        process_execution_local_parallelism_flag,
+        _process_execution_local_parallelism_flag,
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
         default_help_repr="#cores",
         advanced=True,
         help=(
             "Number of concurrent processes that may be executed locally.\n\n"
             "This value is independent of the number of threads that may be used to "
-            f"execute the logic in `@rules` (controlled by `{rule_threads_core_flag}`)."
+            f"execute the logic in `@rules` (controlled by `{_rule_threads_core_flag}`)."
         ),
     )
     process_execution_remote_parallelism = IntOption(
@@ -1241,6 +1240,8 @@ class BootstrapOptions:
     )
 
 
+# N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend
+# it with non-bootstrap options too.
 class GlobalOptions(BootstrapOptions, Subsystem):
     options_scope = GLOBAL_SCOPE
     help = "Options to control the overall behavior of Pants."
