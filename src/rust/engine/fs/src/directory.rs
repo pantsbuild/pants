@@ -202,6 +202,10 @@ impl Directory {
     self.digest
   }
 
+  pub fn tree(&self) -> &DigestTrie {
+    &self.tree
+  }
+
   pub fn as_remexec_directory(&self) -> remexec::Directory {
     self.tree.as_remexec_directory()
   }

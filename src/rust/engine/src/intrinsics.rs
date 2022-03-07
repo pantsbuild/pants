@@ -285,7 +285,7 @@ fn directory_digest_to_digest_entries(
     let snapshot = context
       .core
       .store()
-      .entries_for_directory(digest.todo_as_digest())
+      .entries_for_directory(digest)
       .await
       .and_then(move |digest_entries| {
         let gil = Python::acquire_gil();

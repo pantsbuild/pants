@@ -49,13 +49,13 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
   default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
-  FileEntry, PathStat, Permissions, RelativePath,
+  FileEntry, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::status_to_str;
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -1181,56 +1181,36 @@ impl Store {
   ///
   /// Returns indirect references to files in a Digest sorted by their path.
   ///
-  pub fn entries_for_directory(
+  pub async fn entries_for_directory(
     &self,
-    digest: Digest,
-  ) -> BoxFuture<'static, Result<Vec<DigestEntry>, String>> {
-    if digest == EMPTY_DIGEST {
-      return future::ready(Ok(vec![])).boxed();
+    digest: DirectoryDigest,
+  ) -> Result<Vec<DigestEntry>, String> {
+    if digest == *EMPTY_DIRECTORY_DIGEST {
+      return Ok(vec![]);
     }
 
+    let mut entries = Vec::new();
     self
-      .walk(digest, move |_, path_so_far, _, directory| {
-        if directory.files.is_empty() {
-          // Only report an empty directory if the directory is a leaf node. (The caller is
-          // expected to create parent directories for both files and empty leaf
-          // directories.)
-          if directory.directories.is_empty() {
-            future::ready(Ok(vec![DigestEntry::EmptyDirectory(path_so_far.into())])).boxed()
-          } else {
-            future::ready(Ok(vec![])).boxed()
-          }
-        } else {
-          future::ready(
-            directory
-              .files
-              .iter()
-              .map(|file_node| {
-                let path = path_so_far.join(file_node.name.clone());
-                let is_executable = file_node.is_executable;
-                let digest = require_digest(file_node.digest.as_ref())?;
-                Ok(DigestEntry::File(FileEntry {
-                  path,
-                  digest,
-                  is_executable,
-                }))
-              })
-              .collect::<Result<Vec<_>, String>>(),
-          )
-          .boxed()
+      .load_digest_trie(digest)
+      .await?
+      .walk(&mut |path, entry| match entry {
+        directory::Entry::File(f) => {
+          entries.push(DigestEntry::File(FileEntry {
+            path: path.to_owned(),
+            digest: f.digest(),
+            is_executable: f.is_executable(),
+          }));
         }
-      })
-      .map(|file_contents_per_directory| {
-        file_contents_per_directory.map(|xs| {
-          let mut vec = xs
-            .into_iter()
-            .flat_map(|x| x.into_iter())
-            .collect::<Vec<_>>();
-          vec.sort_by(|l, r| l.path().cmp(r.path()));
-          vec
-        })
-      })
-      .boxed()
+        directory::Entry::Directory(d) => {
+          // Only report a directory if it is a leaf node. (The caller is expected to create parent
+          // directories for both files and empty leaf directories.)
+          if d.tree().entries().is_empty() {
+            entries.push(DigestEntry::EmptyDirectory(path.to_owned()));
+          }
+        }
+      });
+
+    Ok(entries)
   }
 
   ///
