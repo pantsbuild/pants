@@ -21,7 +21,7 @@ from pants.bsp.spec.base import (
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
-from pants.build_graph.address import AddressInput
+from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, DigestEntries
 from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest
@@ -61,8 +61,22 @@ class ResolveJavaBSPBuildTargetRequest:
 @rule
 async def bsp_resolve_one_java_build_target(
     request: ResolveJavaBSPBuildTargetRequest,
+    union_membership: UnionMembership,
 ) -> BuildTarget:
     dep_addrs = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
+    impls = union_membership.get(BSPCompileFieldSet)
+
+    reported_deps = []
+    for dep_addr in dep_addrs:
+        if dep_addr == request.target.address:
+            continue
+
+        wrapped_dep_tgt = await Get(WrappedTarget, Address, dep_addr)
+        dep_tgt = wrapped_dep_tgt.target
+        for impl in impls:
+            if impl.is_applicable(dep_tgt):
+                reported_deps.append(BuildTargetIdentifier.from_address(dep_tgt.address))
+                break
 
     return BuildTarget(
         id=BuildTargetIdentifier.from_address(request.target.address),
@@ -73,7 +87,7 @@ async def bsp_resolve_one_java_build_target(
             can_compile=True,
         ),
         language_ids=(LANGUAGE_ID,),
-        dependencies=tuple(BuildTargetIdentifier.from_address(dep_addr) for dep_addr in dep_addrs),
+        dependencies=tuple(reported_deps),
         data_kind="jvm",
         data=JvmBuildTarget(),
     )

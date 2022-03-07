@@ -28,7 +28,7 @@ from pants.bsp.spec.base import (
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
-from pants.build_graph.address import AddressInput
+from pants.build_graph.address import AddressInput, Address
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries
@@ -71,11 +71,25 @@ async def bsp_resolve_one_scala_build_target(
     request: ResolveScalaBSPBuildTargetRequest,
     jvm: JvmSubsystem,
     scala: ScalaSubsystem,
+    union_membership: UnionMembership,
 ) -> BuildTarget:
     resolve = request.target[JvmResolveField].normalized_value(jvm)
     scala_version = scala.version_for_resolve(resolve)
 
     dep_addrs = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
+    impls = union_membership.get(BSPCompileFieldSet)
+
+    reported_deps = []
+    for dep_addr in dep_addrs:
+        if dep_addr == request.target.address:
+            continue
+
+        wrapped_dep_tgt = await Get(WrappedTarget, Address, dep_addr)
+        dep_tgt = wrapped_dep_tgt.target
+        for impl in impls:
+            if impl.is_applicable(dep_tgt):
+                reported_deps.append(BuildTargetIdentifier.from_address(dep_tgt.address))
+                break
 
     return BuildTarget(
         id=BuildTargetIdentifier.from_address(request.target.address),
@@ -86,7 +100,7 @@ async def bsp_resolve_one_scala_build_target(
             can_compile=True,
         ),
         language_ids=(LANGUAGE_ID,),
-        dependencies=tuple(BuildTargetIdentifier.from_address(dep_addr) for dep_addr in dep_addrs),
+        dependencies=tuple(reported_deps),
         data_kind="scala",
         data=ScalaBuildTarget(
             scala_organization="unknown",
