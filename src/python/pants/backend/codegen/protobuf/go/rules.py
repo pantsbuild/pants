@@ -2,15 +2,25 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import json
 import os
+import re
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
+from pants.backend.go.target_type_rules import ImportPathToPackages
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest
-from pants.backend.go.util_rules.build_pkg_target import GoCodegenBuildRequest
+from pants.backend.go.util_rules.build_pkg_target import (
+    BuildGoPackageTargetRequest,
+    GoCodegenBuildRequest,
+)
+from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgAnalysis
+from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.build_graph.address import Address
+from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -18,6 +28,7 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
+    DigestContents,
     Directory,
     FileContent,
     MergeDigests,
@@ -27,11 +38,13 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
+    HydratedSources,
+    HydrateSourcesRequest,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -54,11 +67,117 @@ class _SetupGoProtocPlugin:
     digest: Digest
 
 
+_QUOTE_CHAR = r"(?:'|\")"
+_IMPORT_PATH_RE = re.compile(rf"^\s*option\s+go_package\s+=\s+{_QUOTE_CHAR}(.*){_QUOTE_CHAR};")
+
+
+def parse_go_package_option(content_raw: bytes) -> str | None:
+    content = content_raw.decode()
+    for line in content.splitlines():
+        m = _IMPORT_PATH_RE.match(line)
+        if m:
+            return m.group(1)
+    return None
+
+
 @rule
 async def setup_build_go_package_request_for_protobuf(
-    _: GoCodegenBuildProtobufRequest,
+    request: GoCodegenBuildProtobufRequest,
+    analyzer: PackageAnalyzerSetup,
+    package_mapping: ImportPathToPackages,
 ) -> BuildGoPackageRequest:
-    raise NotImplementedError()
+    # Hydrate the protobuf sources and parse the Go import path.
+    sources = await Get(HydratedSources, HydrateSourcesRequest(request.target[ProtobufSourceField]))
+    sources_content = await Get(DigestContents, Digest, sources.snapshot.digest)
+    assert len(sources_content) == 1
+    import_path = parse_go_package_option(sources_content[0].content)
+    if not import_path:
+        raise ValueError(
+            f"No import path set via `option go_package` for {request.target.address}."
+        )
+
+    # Generate Go sources from the protobuf source.
+    generated_sources = await Get(
+        GeneratedSources, GenerateGoFromProtobufRequest(sources.snapshot, request.target)
+    )
+
+    # Ensure that the generated files are in a single package directory.
+    files_by_dir = group_by_dir(generated_sources.snapshot.files)
+    assert len(files_by_dir) == 1
+    gen_dir = list(files_by_dir.keys())[0]
+
+    # Analyze the generated sources.
+    input_digest = await Get(
+        Digest, MergeDigests([generated_sources.snapshot.digest, analyzer.digest])
+    )
+    result = await Get(
+        FallibleProcessResult,
+        Process(
+            (analyzer.path, gen_dir),
+            input_digest=input_digest,
+            description=f"Determine metadata for generated Go package for {request.target.address}",
+            level=LogLevel.DEBUG,
+            env={"CGO_ENABLED": "0"},
+        ),
+    )
+    if result.exit_code != 0:
+        raise ValueError(
+            f"Failed to analyze Go sources generated from {request.target.address}.\n\n"
+            f"stdout:\n{result.stdout.decode()}\n\n"
+            f"stderr:\n{result.stderr.decode()}"
+        )
+
+    # Handle `Error` key in analysis.
+    metadata = json.loads(result.stdout)
+
+    # TODO: Refactor out a helper for this and `first_party_pkg` that just takes sources and not a target as
+    # `first_party_pkg` does.
+    analysis = FirstPartyPkgAnalysis(
+        dir_path=gen_dir,
+        import_path=import_path,
+        imports=tuple(metadata.get("Imports", [])),
+        test_imports=tuple(metadata.get("TestImports", [])),
+        xtest_imports=tuple(metadata.get("XTestImports", [])),
+        go_files=tuple(metadata.get("GoFiles", [])),
+        test_files=tuple(metadata.get("TestGoFiles", [])),
+        xtest_files=tuple(metadata.get("XTestGoFiles", [])),
+        s_files=tuple(metadata.get("SFiles", [])),
+        minimum_go_version="",  # TODO: Get this from go.mod or elsewhere?
+        embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
+        test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
+        xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
+    )
+
+    # Obtain build requests for third-party dependencies.
+    # TODO: Figure out how to handle dependencies on other protobuf sources.
+    build_request_addrs: list[Address] = []
+    for dep_import_path in (*analysis.imports, *analysis.test_imports, *analysis.xtest_imports):
+        candidate_addresses = package_mapping.mapping.get(dep_import_path)
+        # TODO: This triggers on stdlib packages, but would still like to fail with a nice error message
+        # if the protobuf runtime library cannot be found.
+        # if not candidate_addresses:
+        #     raise ValueError(
+        #         f"Generated Go code depends on {dep_import_path}, but the dependency was not found."
+        #     )
+        if candidate_addresses:
+            if len(candidate_addresses) > 1:
+                raise ValueError(f"Multiple addresses match `{dep_import_path}")
+            build_request_addrs.extend(candidate_addresses)
+
+    dep_build_requests = await MultiGet(
+        Get(BuildGoPackageRequest, BuildGoPackageTargetRequest(addr))
+        for addr in build_request_addrs
+    )
+
+    return BuildGoPackageRequest(
+        import_path=import_path,
+        digest=generated_sources.snapshot.digest,
+        dir_path=analysis.dir_path,
+        go_file_names=analysis.go_files,
+        s_file_names=analysis.s_files,
+        direct_dependencies=dep_build_requests,
+        minimum_go_version=analysis.minimum_go_version,
+    )
 
 
 @rule(desc="Generate Go source files from Protobuf", level=LogLevel.DEBUG)
