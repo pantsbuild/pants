@@ -169,7 +169,7 @@ class JvmProvidesTypesField(StringSequenceField):
 
 
 class JvmArtifactExcludeDependenciesField(StringSequenceField):
-    alias = "exclude_dependencies"
+    alias = "excludes"
     help = (
         "A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded "
         "as dependencies when this artifact is resolved.\n\n"
