@@ -168,6 +168,19 @@ class JvmProvidesTypesField(StringSequenceField):
     )
 
 
+class JvmArtifactExcludeDependenciesField(StringSequenceField):
+    alias = "exclude_dependencies"
+    help = (
+        "A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded "
+        "as dependencies when this artifact is resolved.\n\n"
+        "This does not prevent this artifact from being included in the resolve as a dependency "
+        "of other artifacts that depend on it, and is currently intended as a way to resolve "
+        "version conflicts in complex resolves.\n\n"
+        "These values are passed directly to Coursier, and if specified incorrectly will show a "
+        "parse error from Coursier."
+    )
+
+
 class JvmArtifactResolveField(JvmResolveField):
     help = (
         "The resolve from `[jvm].resolves` that this artifact should be included in.\n\n"
@@ -204,6 +217,7 @@ class JvmArtifactTarget(Target):
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
         JvmArtifactJarSourceField,
         JvmArtifactResolveField,
+        JvmArtifactExcludeDependenciesField,
     )
     help = (
         "A third-party JVM artifact, as identified by its Maven-compatible coordinate.\n\n"
