@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+from dataclasses import dataclass
 from itertools import chain
 
 from pants.backend.java.dependency_inference.rules import (
@@ -33,6 +34,7 @@ from pants.jvm.compile import (
 )
 from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -42,16 +44,25 @@ class CompileJavaSourceRequest(ClasspathEntryRequest):
     field_sets = (JavaFieldSet, JavaGeneratorFieldSet)
 
 
+@dataclass(frozen=True)
+class JavacRequest:
+    jdk: JdkEnvironment
+    direct_dependencies: tuple[ClasspathEntry, ...]
+    input_digest: Digest
+    files: tuple[str, ...]
+    output_filename: str
+    exports: tuple[ClasspathEntry, ...]
+    resolve: CoursierResolveKey  # Can we get rid of this
+    description: str
+
+
 # TODO: This code is duplicated in the javac and BSP rules.
 def compute_output_jar_filename(ctgt: CoarsenedTarget) -> str:
     return f"{ctgt.representative.address.path_safe_spec}.javac.jar"
 
 
-@rule(desc="Compile with javac")
+@rule(desc="Prepare `javac` compilation request")
 async def compile_java_source(
-    bash: BashBinary,
-    javac: JavacSubsystem,
-    zip_binary: ZipBinary,
     request: CompileJavaSourceRequest,
 ) -> FallibleClasspathEntry:
     # Request the component's direct dependency classpath, and additionally any prerequisite.
@@ -130,31 +141,67 @@ async def compile_java_source(
             exit_code=0,
         )
 
-    dest_dir = "classfiles"
-    dest_dir_digest, jdk = await MultiGet(
-        Get(
-            Digest,
-            CreateDigest([Directory(dest_dir)]),
-        ),
-        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
-    )
+    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component))
+
     merged_digest = await Get(
         Digest,
         MergeDigests(
-            (
-                dest_dir_digest,
-                *(
-                    sources.snapshot.digest
-                    for _, sources in component_members_and_java_source_files
-                ),
-            )
+            (sources.snapshot.digest for _, sources in component_members_and_java_source_files)
         ),
     )
 
+    filenames = tuple(
+        sorted(
+            chain.from_iterable(
+                sources.snapshot.files for _, sources in component_members_and_java_source_files
+            )
+        )
+    )
+
+    return await Get(
+        FallibleClasspathEntry,
+        JavacRequest(
+            jdk=jdk,
+            direct_dependencies=direct_dependency_classpath_entries,
+            input_digest=merged_digest,
+            files=filenames,
+            output_filename=compute_output_jar_filename(request.component),
+            exports=tuple(export_classpath_entries),
+            resolve=request.resolve,
+            description=repr(request.component),
+        ),
+    )
+
+
+@rule
+async def compile_javac_request(
+    bash: BashBinary,
+    javac: JavacSubsystem,
+    zip_binary: ZipBinary,
+    request: JavacRequest,
+) -> FallibleClasspathEntry:
+    jdk = request.jdk
+
     usercp = "__cp"
-    user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
+    user_classpath = Classpath(request.direct_dependencies, request.resolve)
     classpath_arg = ":".join(user_classpath.root_immutable_inputs_args(prefix=usercp))
     immutable_input_digests = dict(user_classpath.root_immutable_inputs(prefix=usercp))
+
+    dest_dir = "classfiles"
+    dest_dir_digest = await Get(
+        Digest,
+        CreateDigest([Directory(dest_dir)]),
+    )
+
+    input_digest = await Get(
+        Digest,
+        MergeDigests(
+            (
+                request.input_digest,
+                dest_dir_digest,
+            )
+        ),
+    )
 
     # Compile.
     compile_result = await Get(
@@ -168,23 +215,18 @@ async def compile_java_source(
                 *javac.args,
                 "-d",
                 dest_dir,
-                *sorted(
-                    chain.from_iterable(
-                        sources.snapshot.files
-                        for _, sources in component_members_and_java_source_files
-                    )
-                ),
+                *request.files,
             ],
-            input_digest=merged_digest,
+            input_digest=input_digest,
             extra_immutable_input_digests=immutable_input_digests,
             output_directories=(dest_dir,),
-            description=f"Compile {request.component} with javac",
+            description=f"Compile {request.description} with javac",
             level=LogLevel.DEBUG,
         ),
     )
     if compile_result.exit_code != 0:
         return FallibleClasspathEntry.from_fallible_process_result(
-            str(request.component),
+            request.description,
             compile_result,
             None,
         )
@@ -194,7 +236,7 @@ async def compile_java_source(
     # invoking via a `bash` wrapper (since the trailing portion of the command is executed by
     # the nailgun server). We might be able to resolve this in the future via a Javac wrapper shim.
     output_snapshot = await Get(Snapshot, Digest, compile_result.output_digest)
-    output_file = compute_output_jar_filename(request.component)
+    output_file = request.output_filename
     output_files: tuple[str, ...] = (output_file,)
     if output_snapshot.files:
         jar_result = await Get(
@@ -209,7 +251,7 @@ async def compile_java_source(
                 ],
                 input_digest=compile_result.output_digest,
                 output_files=output_files,
-                description=f"Capture outputs of {request.component} for javac",
+                description=f"Capture outputs of {request.description} for javac",
                 level=LogLevel.TRACE,
             ),
         )
@@ -220,22 +262,20 @@ async def compile_java_source(
         output_files = ()
         jar_output_digest = EMPTY_DIGEST
 
-    output_classpath = ClasspathEntry(
-        jar_output_digest, output_files, direct_dependency_classpath_entries
-    )
+    output_classpath = ClasspathEntry(jar_output_digest, output_files, request.direct_dependencies)
 
-    if export_classpath_entries:
+    if request.exports:
         merged_export_digest = await Get(
             Digest,
-            MergeDigests((output_classpath.digest, *(i.digest for i in export_classpath_entries))),
+            MergeDigests((output_classpath.digest, *(i.digest for i in request.exports))),
         )
         merged_classpath = ClasspathEntry.merge(
-            merged_export_digest, (output_classpath, *export_classpath_entries)
+            merged_export_digest, (output_classpath, *request.exports)
         )
         output_classpath = merged_classpath
 
     return FallibleClasspathEntry.from_fallible_process_result(
-        str(request.component),
+        request.description,
         compile_result,
         output_classpath,
     )
