@@ -69,6 +69,8 @@ def _make_error_future(exc: Exception) -> Future:
 
 class BSPConnection:
     _INITIALIZE_METHOD_NAME = "build/initialize"
+    _SHUTDOWN_METHOD_NAME = "build/shutdown"
+    _EXIT_NOTIFCATION_NAME = "build/exit"
 
     def __init__(
         self,
@@ -123,6 +125,20 @@ class BSPConnection:
                     code=-32002, message=f"Client must first call `{self._INITIALIZE_METHOD_NAME}`."
                 )
             )
+
+        # Handle the `build/shutdown` method and `build/exit` notification.
+        if method_name == self._SHUTDOWN_METHOD_NAME:
+            # Return no-op success for the `build/shutdown` method. This doesn't actually cause the server to
+            # exit. That will occur once the client sends the `build/exit` notification.
+            return None
+        elif method_name == self._EXIT_NOTIFCATION_NAME:
+            # The `build/exit` notification directs the BSP server to immediately exit.
+            # The read-dispatch loop will exit once it notices that the inbound handle is closed. So close the
+            # inbound handle (and outbound handle for completeness) and then return to the dispatch loop
+            # to trigger the exit.
+            self._inbound.close()
+            self._outbound.close()
+            return None
 
         method_mapping = self._handler_mappings.get(method_name)
         if not method_mapping:
