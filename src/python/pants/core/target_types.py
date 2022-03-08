@@ -1,5 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from dataclasses import dataclass
 from textwrap import dedent
@@ -304,6 +305,34 @@ class GenericTarget(Target):
         'A generic target with no specific type.\n\nThis can be used as a generic "bag of '
         'dependencies", i.e. you can group several different targets into one single target so '
         "that your other targets only need to depend on one thing."
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `_target_generator_sources_helper` target
+# -----------------------------------------------------------------------------------------------
+
+
+class TargetGeneratorSourcesHelperSourcesField(MultipleSourcesField):
+    uses_source_roots = False
+    required = True
+
+
+class TargetGeneratorSourcesHelperTarget(Target):
+    """Target generators that work by reading in some source file(s) should also generate this
+    target and add it as a dependency to every generated target so that `--changed-since` works
+    properly.
+
+    See https://github.com/pantsbuild/pants/issues/13118 for discussion of why this is necessary and
+    alternatives considered.
+    """
+
+    alias = "_target_generator_sources_helper"
+    core_fields = (*COMMON_TARGET_FIELDS, TargetGeneratorSourcesHelperSourcesField)
+    help = (
+        "A private helper target type used by some target generators.\n\n"
+        "This tracks their `sources` field so that `--changed-since --changed-dependees` works "
+        "properly for generated targets."
     )
 
 

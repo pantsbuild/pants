@@ -37,7 +37,6 @@ from pants.backend.python.target_types import (
     PexBinariesGeneratorTarget,
     PexBinary,
     PythonDistribution,
-    PythonRequirementsFileTarget,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
@@ -55,6 +54,7 @@ from pants.backend.python.util_rules import (
     python_sources,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 
 
 def build_file_aliases():
@@ -105,7 +105,7 @@ def target_types():
         PexBinary,
         PexBinariesGeneratorTarget,
         PythonDistribution,
-        PythonRequirementsFileTarget,
+        TargetGeneratorSourcesHelperTarget,
         PythonRequirementTarget,
         PythonSourcesGeneratorTarget,
         PythonSourceTarget,

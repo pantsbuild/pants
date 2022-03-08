@@ -9,7 +9,8 @@ import pytest
 
 from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
 from pants.engine.target import AllTargets
 from pants.testutil.rule_runner import RuleRunner
@@ -18,7 +19,7 @@ from pants.testutil.rule_runner import RuleRunner
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[PythonRequirementTarget, PythonRequirementsFileTarget],
+        target_types=[PythonRequirementTarget, TargetGeneratorSourcesHelperTarget],
         context_aware_object_factories={"pipenv_requirements": PipenvRequirementsCAOF},
         use_deprecated_python_macros=True,
     )
@@ -29,7 +30,7 @@ def assert_pipenv_requirements(
     build_file_entry: str,
     pipfile_lock: dict,
     *,
-    expected_file_dep: PythonRequirementsFileTarget,
+    expected_file_dep: TargetGeneratorSourcesHelperTarget,
     expected_targets: Iterable[PythonRequirementTarget],
     pipfile_lock_relpath: str = "Pipfile.lock",
 ) -> None:
@@ -54,8 +55,8 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
             "default": {"ansicolors": {"version": ">=1.18.0"}},
             "develop": {"cachetools": {"markers": "python_version ~= '3.5'", "version": "==4.1.1"}},
         },
-        expected_file_dep=PythonRequirementsFileTarget(
-            {"source": "Pipfile.lock"}, Address("", target_name="Pipfile.lock")
+        expected_file_dep=TargetGeneratorSourcesHelperTarget(
+            {"sources": ["Pipfile.lock"]}, Address("", target_name="Pipfile.lock")
         ),
         expected_targets=[
             PythonRequirementTarget(
@@ -94,8 +95,8 @@ def test_properly_creates_extras_requirements(rule_runner: RuleRunner) -> None:
                 }
             },
         },
-        expected_file_dep=PythonRequirementsFileTarget(
-            {"source": "Pipfile.lock"}, Address("", target_name="Pipfile.lock")
+        expected_file_dep=TargetGeneratorSourcesHelperTarget(
+            {"sources": ["Pipfile.lock"]}, Address("", target_name="Pipfile.lock")
         ),
         expected_targets=[
             PythonRequirementTarget(
@@ -131,15 +132,15 @@ def test_supply_python_requirements_file(rule_runner: RuleRunner) -> None:
                 pipfile_target='//:custom_pipfile_target'
             )
 
-            _python_requirements_file(
+            _target_generator_sources_helper(
                 name='custom_pipfile_target',
-                source='custom/pipfile/Pipfile.lock'
+                sources=['custom/pipfile/Pipfile.lock']
             )
             """
         ),
         {"default": {"ansicolors": {"version": ">=1.18.0"}}},
-        expected_file_dep=PythonRequirementsFileTarget(
-            {"source": "custom/pipfile/Pipfile.lock"},
+        expected_file_dep=TargetGeneratorSourcesHelperTarget(
+            {"sources": ["custom/pipfile/Pipfile.lock"]},
             Address("", target_name="custom_pipfile_target"),
         ),
         expected_targets=[
