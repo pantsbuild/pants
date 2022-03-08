@@ -49,7 +49,7 @@ class JavacRequest:
     jdk: JdkEnvironment
     direct_dependencies: tuple[ClasspathEntry, ...]
     input_digest: Digest
-    files: tuple[str, ...]
+    input_filenames: tuple[str, ...]
     output_filename: str
     exports: tuple[ClasspathEntry, ...]
     resolve: CoursierResolveKey  # Can we get rid of this
@@ -164,7 +164,7 @@ async def compile_java_source(
             jdk=jdk,
             direct_dependencies=direct_dependency_classpath_entries,
             input_digest=merged_digest,
-            files=filenames,
+            input_filenames=filenames,
             output_filename=compute_output_jar_filename(request.component),
             exports=tuple(export_classpath_entries),
             resolve=request.resolve,
@@ -215,7 +215,7 @@ async def compile_javac_request(
                 *javac.args,
                 "-d",
                 dest_dir,
-                *request.files,
+                *request.input_filenames,
             ],
             input_digest=input_digest,
             extra_immutable_input_digests=immutable_input_digests,

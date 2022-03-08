@@ -38,6 +38,7 @@ from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,20 @@ logger = logging.getLogger(__name__)
 class CompileScalaSourceRequest(ClasspathEntryRequest):
     field_sets = (ScalaFieldSet, ScalaGeneratorFieldSet)
     field_sets_consume_only = (JavaFieldSet, JavaGeneratorFieldSet)
+
+
+@dataclass(frozen=True)
+class ScalacRequest:
+    jdk: JdkEnvironment
+    tool_classpath: ToolClasspath
+    global_plugins: GlobalScalacPlugins
+    local_plugins: ScalaPlugins
+    direct_dependencies: tuple[ClasspathEntry, ...]
+    resolve: CoursierResolveKey
+    input_digest: Digest
+    input_filenames: tuple[str, ...]
+    output_filename: str
+    description: str
 
 
 @dataclass(frozen=True)
@@ -58,10 +73,9 @@ def compute_output_jar_filename(ctgt: CoarsenedTarget) -> str:
     return f"{ctgt.representative.address.path_safe_spec}.scalac.jar"
 
 
-@rule(desc="Compile with scalac")
+@rule(desc="Prepare `scalac` compilation request")
 async def compile_scala_source(
     scala: ScalaSubsystem,
-    scalac: Scalac,
     scalac_plugins: GlobalScalacPlugins,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
@@ -127,13 +141,6 @@ async def compile_scala_source(
             exit_code=0,
         )
 
-    toolcp_relpath = "__toolcp"
-    scalac_plugins_relpath = "__plugincp"
-    local_scalac_plugins_relpath = "__localplugincp"
-    usercp = "__cp"
-
-    user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
-
     tool_classpath, sources_digest, jdk = await MultiGet(
         Get(
             ToolClasspath,
@@ -163,55 +170,84 @@ async def compile_scala_source(
         Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
     )
 
+    output_file = compute_output_jar_filename(request.component)
+
+    return await Get(
+        FallibleClasspathEntry,
+        ScalacRequest(
+            jdk=jdk,
+            tool_classpath=tool_classpath,
+            global_plugins=scalac_plugins,
+            local_plugins=local_plugins,
+            direct_dependencies=direct_dependency_classpath_entries,
+            resolve=request.resolve,
+            input_digest=sources_digest,
+            input_filenames=tuple(
+                sorted(
+                    chain.from_iterable(
+                        sources.snapshot.files
+                        for _, sources in component_members_and_scala_source_files
+                    )
+                )
+            ),
+            output_filename=output_file,
+            description=repr(request.component),
+        ),
+    )
+
+
+@rule(desc="Compile with scalac")
+async def compile_scalac_request(scalac: Scalac, request: ScalacRequest) -> FallibleClasspathEntry:
+
+    toolcp_relpath = "__toolcp"
+    scalac_plugins_relpath = "__plugincp"
+    local_scalac_plugins_relpath = "__localplugincp"
+    usercp = "__cp"
+
+    user_classpath = Classpath(request.direct_dependencies, request.resolve)
     extra_immutable_input_digests = {
-        toolcp_relpath: tool_classpath.digest,
-        scalac_plugins_relpath: scalac_plugins.classpath.digest,
-        local_scalac_plugins_relpath: local_plugins.classpath.digest,
+        toolcp_relpath: request.tool_classpath.digest,
+        scalac_plugins_relpath: request.global_plugins.classpath.digest,
+        local_scalac_plugins_relpath: request.local_plugins.classpath.digest,
     }
     extra_nailgun_keys = tuple(extra_immutable_input_digests)
     extra_immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
 
     classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
 
-    output_file = compute_output_jar_filename(request.component)
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(
-            jdk=jdk,
-            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
+            jdk=request.jdk,
+            classpath_entries=request.tool_classpath.classpath_entries(toolcp_relpath),
             argv=[
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
-                ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
-                *scalac_plugins.args(scalac_plugins_relpath),
-                *local_plugins.args(local_scalac_plugins_relpath),
+                ":".join(request.tool_classpath.classpath_entries(toolcp_relpath)),
+                *request.global_plugins.args(scalac_plugins_relpath),
+                *request.local_plugins.args(local_scalac_plugins_relpath),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 *scalac.args,
                 "-d",
-                output_file,
-                *sorted(
-                    chain.from_iterable(
-                        sources.snapshot.files
-                        for _, sources in component_members_and_scala_source_files
-                    )
-                ),
+                request.output_filename,
+                *request.input_filenames,
             ],
-            input_digest=sources_digest,
+            input_digest=request.input_digest,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_nailgun_keys,
-            output_files=(output_file,),
-            description=f"Compile {request.component} with scalac",
+            output_files=(request.output_filename,),
+            description=f"Compile {request.description} with scalac",
             level=LogLevel.DEBUG,
         ),
     )
     output: ClasspathEntry | None = None
     if process_result.exit_code == 0:
         output = ClasspathEntry(
-            process_result.output_digest, (output_file,), direct_dependency_classpath_entries
+            process_result.output_digest, (request.output_filename,), request.direct_dependencies
         )
 
     return FallibleClasspathEntry.from_fallible_process_result(
-        str(request.component),
+        request.description,
         process_result,
         output,
     )
