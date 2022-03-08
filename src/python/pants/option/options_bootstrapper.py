@@ -15,7 +15,8 @@ from pants.base.exceptions import BuildConfigurationError
 from pants.option.alias import CliAlias
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import BootstrapOptions, GlobalOptions
+from pants.option.option_types import collect_options_info
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
@@ -98,11 +99,12 @@ class OptionsBootstrapper:
             args=args,
         )
 
-        def register_global(*args, **kwargs):
+        for options_info in collect_options_info(BootstrapOptions):
             # Only use of Options.register?
-            bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
+            bootstrap_options.register(
+                GLOBAL_SCOPE, *options_info.flag_names, **options_info.flag_options
+            )
 
-        GlobalOptions.register_bootstrap_options(register_global)
         return bootstrap_options
 
     @classmethod
