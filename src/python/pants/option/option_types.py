@@ -37,7 +37,7 @@ _DynamicDefaultT = Callable[[_SubsystemType], Any]
 _MaybeDynamicT = Union[_DynamicDefaultT, _DefaultT]
 # The type of the `help` parameter for each option.
 _HelpT = _MaybeDynamicT[str]
-# NB: Ideally this would be `_RegisterIfFuncT`, however where this type is used is
+# NB: Ideally this would be `Callable[[_SubsystemType], bool]`, however where this type is used is
 # generally provided untyped lambdas.
 _RegisterIfFuncT = Callable[[_SubsystemType], Any]
 
