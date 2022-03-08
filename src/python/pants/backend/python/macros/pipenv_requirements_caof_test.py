@@ -132,7 +132,7 @@ def test_supply_python_requirements_file(rule_runner: RuleRunner) -> None:
                 pipfile_target='//:custom_pipfile_target'
             )
 
-            _target_generator_sources_helper(
+            _generator_sources_helper(
                 name='custom_pipfile_target',
                 sources=['custom/pipfile/Pipfile.lock']
             )

@@ -327,7 +327,7 @@ class TargetGeneratorSourcesHelperTarget(Target):
     alternatives considered.
     """
 
-    alias = "_target_generator_sources_helper"
+    alias = "_generator_sources_helper"
     core_fields = (*COMMON_TARGET_FIELDS, TargetGeneratorSourcesHelperSourcesField)
     help = (
         "A private helper target type used by some target generators.\n\n"
