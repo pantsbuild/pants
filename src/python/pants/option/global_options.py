@@ -596,7 +596,7 @@ class BootstrapOptions:
         "--pants-workdir",
         advanced=True,
         metavar="<dir>",
-        default=lambda cls: os.path.join(get_buildroot(), ".pants.d"),
+        default=lambda _: os.path.join(get_buildroot(), ".pants.d"),
         daemon=True,
         help="Write intermediate logs and output files to this dir.",
     )
@@ -614,13 +614,13 @@ class BootstrapOptions:
         "--pants-distdir",
         advanced=True,
         metavar="<dir>",
-        default=lambda cls: os.path.join(get_buildroot(), "dist"),
+        default=lambda _: os.path.join(get_buildroot(), "dist"),
         help="Write end products, such as the results of `./pants package`, to this dir.",  # noqa: PANTSBIN
     )
     pants_subprocessdir = StrOption(
         "--pants-subprocessdir",
         advanced=True,
-        default=lambda cls: os.path.join(get_buildroot(), ".pids"),
+        default=lambda _: os.path.join(get_buildroot(), ".pids"),
         daemon=True,
         help="The directory to use for tracking subprocess metadata. This should "
         "live outside of the dir used by `pants_workdir` to allow for tracking "
@@ -632,7 +632,7 @@ class BootstrapOptions:
         # NB: We don't fingerprint the list of config files, because the content of the config
         # files independently affects fingerprints.
         fingerprint=False,
-        default=lambda cls: [get_default_pants_config_file()],
+        default=lambda _: [get_default_pants_config_file()],
         help=(
             "Paths to Pants config files. This may only be set through the environment variable "
             "`PANTS_CONFIG_FILES` and the command line argument `--pants-config-files`; it will "
