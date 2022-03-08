@@ -38,7 +38,7 @@ from pants.engine.target import (
     DependenciesRequest,
     SourcesField,
     Target,
-    UnexpandedTargets,
+    Targets,
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, union
@@ -186,14 +186,12 @@ async def setup_build_go_package_target_request(
 
     else:
         raise AssertionError(
-            f"Unknown how to build `{target.alias}` target at address {request.address} with Go."
+            f"Unknown how to build `{target.alias}` target at address {request.address} with Go. "
             "Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose with this "
             "message!"
         )
 
-    # TODO: If you use `Targets` here, then we replace the direct dep on the `go_mod` with all
-    #  of its generated targets...Figure this out.
-    all_deps = await Get(UnexpandedTargets, DependenciesRequest(target[Dependencies]))
+    all_deps = await Get(Targets, DependenciesRequest(target[Dependencies]))
     maybe_direct_dependencies = await MultiGet(
         Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
         for tgt in all_deps
