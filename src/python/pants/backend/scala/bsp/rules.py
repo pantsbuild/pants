@@ -104,8 +104,8 @@ async def bsp_resolve_one_scala_build_target(
         data_kind="scala",
         data=ScalaBuildTarget(
             scala_organization="unknown",
-            scala_version=".".join(scala_version.split(".")[0:2]),
-            scala_binary_version=scala_version,
+            scala_version=scala_version,
+            scala_binary_version=".".join(scala_version.split(".")[0:2]),
             platform=ScalaPlatform.JVM,
             # TODO: These are the jars for the scalac tool.
             jars=(),
