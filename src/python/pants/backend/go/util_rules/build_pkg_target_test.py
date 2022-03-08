@@ -31,7 +31,7 @@ from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
 )
-from pants.core.target_types import FileSourceField, FileTarget
+from pants.core.target_types import FilesGeneratorTarget, FileSourceField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
 from pants.engine.rules import Get, QueryRule, rule
@@ -103,7 +103,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             UnionRule(GoCodegenBuildRequest, GoCodegenBuildFilesRequest),
         ],
-        target_types=[GoModTarget, GoPackageTarget, FileTarget],
+        target_types=[GoModTarget, GoPackageTarget, FilesGeneratorTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -437,9 +437,9 @@ def test_build_codegen_target(rule_runner: RuleRunner) -> None:
                 """\
                 go_mod(name='mod')
                 go_package(name='pkg', dependencies=[":gen"])
-                file(
+                files(
                     name='gen',
-                    source='generate_from_me.txt',
+                    sources=['generate_from_me.txt'],
                     dependencies=[':mod#github.com/google/uuid'],
                 )
                 """
@@ -450,7 +450,7 @@ def test_build_codegen_target(rule_runner: RuleRunner) -> None:
     # Running directly on a codegen target should work.
     assert_pkg_target_built(
         rule_runner,
-        Address("", target_name="gen"),
+        Address("", target_name="gen", relative_file_path="generate_from_me.txt"),
         expected_import_path="codegen.com/gen",
         expected_dir_path="codegen",
         expected_go_file_names=["f.go"],
@@ -459,6 +459,9 @@ def test_build_codegen_target(rule_runner: RuleRunner) -> None:
     )
 
     # Direct dependencies on codegen targets must be propagated.
+    #
+    # Note that the `go_package` depends on the `files` generator target. This should work, even
+    # though `files` itself cannot generate, because it's an alias for all generated `file` targets.
     assert_pkg_target_built(
         rule_runner,
         Address("", target_name="pkg"),
