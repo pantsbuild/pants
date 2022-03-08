@@ -5,17 +5,10 @@ import logging
 import os
 from dataclasses import dataclass
 
-from pants.backend.scala.bsp.spec import (
-    ScalaBuildTarget,
-    ScalacOptionsItem,
-    ScalacOptionsParams,
-    ScalacOptionsResult,
-    ScalaPlatform,
-)
-from pants.backend.scala.compile.scalac import compute_output_jar_filename
-from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
-from pants.backend.scala.subsystems.scala import ScalaSubsystem
-from pants.backend.scala.target_types import ScalaSourceField
+from pants.backend.java.bsp.spec import JavacOptionsItem, JavacOptionsParams, JavacOptionsResult
+from pants.backend.java.compile.javac import compute_output_jar_filename
+from pants.backend.java.dependency_inference.symbol_mapper import AllJavaTargets
+from pants.backend.java.target_types import JavaSourceField
 from pants.base.build_root import BuildRoot
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
@@ -29,9 +22,9 @@ from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.build_graph.address import Address, AddressInput
-from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.addresses import Addresses
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries
+from pants.engine.fs import CreateDigest, DigestEntries
+from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -42,40 +35,34 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.jvm.bsp.spec import JvmBuildTarget
 from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
 from pants.jvm.resolve.key import CoursierResolveKey
-from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmResolveField
 
-LANGUAGE_ID = "scala"
+LANGUAGE_ID = "java"
 
 _logger = logging.getLogger(__name__)
 
 
-class ScalaBSPLanguageSupport(BSPLanguageSupport):
+class JavaBSPLanguageSupport(BSPLanguageSupport):
     language_id = LANGUAGE_ID
     can_compile = True
 
 
-class ScalaBSPBuildTargetsRequest(BSPBuildTargetsRequest):
+class JavaBSPBuildTargetsRequest(BSPBuildTargetsRequest):
     pass
 
 
 @dataclass(frozen=True)
-class ResolveScalaBSPBuildTargetRequest:
+class ResolveJavaBSPBuildTargetRequest:
     target: Target
 
 
 @rule
-async def bsp_resolve_one_scala_build_target(
-    request: ResolveScalaBSPBuildTargetRequest,
-    jvm: JvmSubsystem,
-    scala: ScalaSubsystem,
+async def bsp_resolve_one_java_build_target(
+    request: ResolveJavaBSPBuildTargetRequest,
     union_membership: UnionMembership,
 ) -> BuildTarget:
-    resolve = request.target[JvmResolveField].normalized_value(jvm)
-    scala_version = scala.version_for_resolve(resolve)
-
     dep_addrs = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
     impls = union_membership.get(BSPCompileFieldSet)
 
@@ -101,59 +88,52 @@ async def bsp_resolve_one_scala_build_target(
         ),
         language_ids=(LANGUAGE_ID,),
         dependencies=tuple(reported_deps),
-        data_kind="scala",
-        data=ScalaBuildTarget(
-            scala_organization="unknown",
-            scala_version=".".join(scala_version.split(".")[0:2]),
-            scala_binary_version=scala_version,
-            platform=ScalaPlatform.JVM,
-            # TODO: These are the jars for the scalac tool.
-            jars=(),
-        ),
+        data_kind="jvm",
+        data=JvmBuildTarget(),
     )
 
 
 @rule
-async def bsp_resolve_all_scala_build_targets(
-    _: ScalaBSPBuildTargetsRequest,
-    all_scala_targets: AllScalaTargets,
+async def bsp_resolve_all_java_build_targets(
+    _: JavaBSPBuildTargetsRequest,
+    all_java_targets: AllJavaTargets,
     bsp_context: BSPContext,
 ) -> BSPBuildTargets:
     if LANGUAGE_ID not in bsp_context.client_params.capabilities.language_ids:
         return BSPBuildTargets()
     build_targets = await MultiGet(
-        Get(BuildTarget, ResolveScalaBSPBuildTargetRequest(tgt)) for tgt in all_scala_targets
+        Get(BuildTarget, ResolveJavaBSPBuildTargetRequest(tgt)) for tgt in all_java_targets
     )
     return BSPBuildTargets(targets=tuple(build_targets))
 
 
 # -----------------------------------------------------------------------------------------------
-# Scalac Options Request
-# See https://build-server-protocol.github.io/docs/extensions/scala.html#scalac-options-request
+# Javac Options Request
+# See https://build-server-protocol.github.io/docs/extensions/java.html#javac-options-request
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalacOptionsHandlerMapping(BSPHandlerMapping):
-    method_name = "buildTarget/scalacOptions"
-    request_type = ScalacOptionsParams
-    response_type = ScalacOptionsResult
+class JavacOptionsHandlerMapping(BSPHandlerMapping):
+    method_name = "buildTarget/javacOptions"
+    request_type = JavacOptionsParams
+    response_type = JavacOptionsResult
 
 
 @dataclass(frozen=True)
-class HandleScalacOptionsRequest:
+class HandleJavacOptionsRequest:
     bsp_target_id: BuildTargetIdentifier
 
 
 @dataclass(frozen=True)
-class HandleScalacOptionsResult:
-    item: ScalacOptionsItem
+class HandleJavacOptionsResult:
+    item: JavacOptionsItem
 
 
 @rule
-async def handle_bsp_scalac_options_request(
-    request: HandleScalacOptionsRequest,
+async def handle_bsp_java_options_request(
+    request: HandleJavacOptionsRequest,
     build_root: BuildRoot,
-) -> HandleScalacOptionsResult:
+) -> HandleJavacOptionsResult:
     wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
     coarsened_targets = await Get(CoarsenedTargets, Addresses([wrapped_target.target.address]))
     assert len(coarsened_targets) == 1
@@ -161,8 +141,8 @@ async def handle_bsp_scalac_options_request(
     resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
     output_file = compute_output_jar_filename(coarsened_target)
 
-    return HandleScalacOptionsResult(
-        ScalacOptionsItem(
+    return HandleJavacOptionsResult(
+        JavacOptionsItem(
             target=request.bsp_target_id,
             options=(),
             classpath=(
@@ -178,11 +158,11 @@ async def handle_bsp_scalac_options_request(
 
 
 @rule
-async def bsp_scalac_options_request(request: ScalacOptionsParams) -> ScalacOptionsResult:
+async def bsp_javac_options_request(request: JavacOptionsParams) -> JavacOptionsResult:
     results = await MultiGet(
-        Get(HandleScalacOptionsResult, HandleScalacOptionsRequest(btgt)) for btgt in request.targets
+        Get(HandleJavacOptionsResult, HandleJavacOptionsRequest(btgt)) for btgt in request.targets
     )
-    return ScalacOptionsResult(items=tuple(result.item for result in results))
+    return JavacOptionsResult(items=tuple(result.item for result in results))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -191,17 +171,15 @@ async def bsp_scalac_options_request(request: ScalacOptionsParams) -> ScalacOpti
 
 
 @dataclass(frozen=True)
-class ScalaBSPCompileFieldSet(BSPCompileFieldSet):
-    required_fields = (ScalaSourceField,)
-    source: ScalaSourceField
+class JavaBSPCompileFieldSet(BSPCompileFieldSet):
+    required_fields = (JavaSourceField,)
+    source: JavaSourceField
 
 
 @rule
-async def bsp_scala_compile_request(
-    request: ScalaBSPCompileFieldSet,
+async def bsp_java_compile_request(
+    request: JavaBSPCompileFieldSet,
     union_membership: UnionMembership,
-    unzip: UnzipBinary,
-    bash: BashBinary,
 ) -> BSPCompileResult:
     coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
     assert len(coarsened_targets) == 1
@@ -215,7 +193,7 @@ async def bsp_scala_compile_request(
             union_membership, component=coarsened_target, resolve=resolve
         ),
     )
-    _logger.info(f"scala compile result = {result}")
+    _logger.info(f"java compile result = {result}")
     output_digest = EMPTY_DIGEST
     if result.exit_code == 0 and result.output:
         entries = await Get(DigestEntries, Digest, result.output.digest)
@@ -236,8 +214,8 @@ async def bsp_scala_compile_request(
 def rules():
     return (
         *collect_rules(),
-        UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
-        UnionRule(BSPBuildTargetsRequest, ScalaBSPBuildTargetsRequest),
-        UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
-        UnionRule(BSPCompileFieldSet, ScalaBSPCompileFieldSet),
+        UnionRule(BSPLanguageSupport, JavaBSPLanguageSupport),
+        UnionRule(BSPBuildTargetsRequest, JavaBSPBuildTargetsRequest),
+        UnionRule(BSPHandlerMapping, JavacOptionsHandlerMapping),
+        UnionRule(BSPCompileFieldSet, JavaBSPCompileFieldSet),
     )
