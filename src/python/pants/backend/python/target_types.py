@@ -1034,11 +1034,6 @@ class PythonRequirementTarget(Target):
             )
 
 
-# -----------------------------------------------------------------------------------------------
-# `_python_requirements_file` target
-# -----------------------------------------------------------------------------------------------
-
-
 def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequirement]:
     """Parse all `PipRequirement` objects from a requirements.txt-style file.
 
@@ -1057,21 +1052,6 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
                     line, e, description_of_origin=f"{rel_path} at line {i + 1}"
                 )
             )
-
-
-class PythonRequirementsFileSourcesField(SingleSourceField):
-    uses_source_roots = False
-
-
-# This allows us to work around https://github.com/pantsbuild/pants/issues/13118. Because a
-# generated target does not depend on its target generator, `--changed-since --changed-dependees`
-# would not mark the generated targets as changing when the `requirements.txt` changes, even though
-# it may be impacted. Fixing that will be A Thing and requires design work, so instead we can
-# depend on this private target type that owns `requirements.txt` to get `--changed-since` working.
-class PythonRequirementsFileTarget(Target):
-    alias = "_python_requirements_file"
-    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSourcesField)
-    help = "A private helper target type used by `python_requirement` target generators."
 
 
 # -----------------------------------------------------------------------------------------------

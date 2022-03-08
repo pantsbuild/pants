@@ -18,10 +18,12 @@ from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementResolveField,
     PythonRequirementsField,
-    PythonRequirementsFileSourcesField,
-    PythonRequirementsFileTarget,
     PythonRequirementTarget,
     PythonRequirementTypeStubModulesField,
+)
+from pants.core.target_types import (
+    TargetGeneratorSourcesHelperSourcesField,
+    TargetGeneratorSourcesHelperTarget,
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
@@ -76,8 +78,8 @@ async def generate_from_pipenv_requirement(
         for k, v in request.require_unparametrized_overrides().items()
     }
 
-    file_tgt = PythonRequirementsFileTarget(
-        {PythonRequirementsFileSourcesField.alias: lock_rel_path},
+    file_tgt = TargetGeneratorSourcesHelperTarget(
+        {TargetGeneratorSourcesHelperSourcesField.alias: [lock_rel_path]},
         Address(
             generator.address.spec_path,
             target_name=generator.address.target_name,
