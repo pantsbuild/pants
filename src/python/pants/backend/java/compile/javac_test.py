@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget, ProtobufSourcesGeneratorTarget
 
 import pytest
 
@@ -17,11 +16,11 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResult, CheckResults
-from pants.core.util_rules import config_files, source_files, stripped_source_files, system_binaries
+from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import CoarsenedTargets, GeneratedSources, HydrateSourcesRequest, HydratedSources, Targets
+from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
@@ -29,7 +28,6 @@ from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
-from pants.backend.codegen.protobuf.java import rules as protobuf_java_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -58,19 +56,13 @@ def rule_runner() -> RuleRunner:
             *java_dep_inf_rules(),
             *source_files.rules(),
             *testutil.rules(),
-            *protobuf_java_rules.rules(),
             QueryRule(CheckResults, (JavacCheckRequest,)),
             QueryRule(ClasspathEntry, (CompileJavaSourceRequest,)),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(FallibleClasspathEntry, (CompileJavaSourceRequest,)),
             QueryRule(RenderedClasspath, (CompileJavaSourceRequest,)),
-                        *stripped_source_files.rules(),
-
-                        QueryRule(HydratedSources, [HydrateSourcesRequest]),
-            QueryRule(GeneratedSources, [protobuf_java_rules.GenerateJavaFromProtobufRequest]),
-
         ],
-        target_types=[JavaSourcesGeneratorTarget, JvmArtifactTarget, ProtobufSourceTarget, ProtobufSourcesGeneratorTarget,],
+        target_types=[JavaSourcesGeneratorTarget, JvmArtifactTarget],
     )
     rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -761,96 +753,3 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
     fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
     assert "package org.joda.time does not exist" in fallible_result.stderr
-
-
-
-
-@maybe_skip_jdk_test
-def test_compile_protobuf_deps(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": dedent(
-                """\
-                java_sources(
-                    name = 'main',
-
-                    dependencies = [
-                        'lib:lib',
-                        'src/protobuf/dir1',
-                    ]
-                )
-                """
-            ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
-            "Example.java": JAVA_LIB_MAIN_SOURCE,
-            "lib/BUILD": dedent(
-                """\
-                java_sources(
-                    name = 'lib',
-
-                )
-                """
-            ),
-            "lib/ExampleLib.java": JAVA_LIB_SOURCE,
-
-            "src/protobuf/dir1/f.proto": dedent(
-                """\
-                syntax = "proto3";
-
-                package dir1;
-
-                message Person {
-                  string name = 1;
-                  int32 id = 2;
-                  string email = 3;
-                }
-                """
-            ),
-            "src/protobuf/dir1/f2.proto": dedent(
-                """\
-                syntax = "proto3";
-
-                package dir1;
-                """
-            ),
-            "src/protobuf/dir1/BUILD": "protobuf_sources()",
-            "src/protobuf/dir2/f.proto": dedent(
-                """\
-                syntax = "proto3";
-
-                package dir2;
-
-                import "dir1/f.proto";
-                """
-            ),
-            "src/protobuf/dir2/BUILD": "protobuf_sources(dependencies=['src/protobuf/dir1'])",
-            # Test another source root.
-            "tests/protobuf/test_protos/f.proto": dedent(
-                """\
-                syntax = "proto3";
-
-                package test_protos;
-
-                import "dir2/f.proto";
-                """
-            ),
-            "tests/protobuf/test_protos/BUILD": (
-                "protobuf_sources(dependencies=['src/protobuf/dir2'])"
-            ),
-
-        }
-    )
-    classpath = rule_runner.request(
-        RenderedClasspath,
-        [
-            CompileJavaSourceRequest(
-                component=expect_single_expanded_coarsened_target(
-                    rule_runner, Address(spec_path="", target_name="main")
-                ),
-                resolve=make_resolve(rule_runner),
-            )
-        ],
-    )
-    assert classpath.content == {
-        ".Example.java.main.javac.jar": {"org/pantsbuild/example/Example.class"}
-    }
