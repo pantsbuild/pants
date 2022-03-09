@@ -3,6 +3,19 @@ from __future__ import annotations
 from pathlib import PurePath
 
 import pytest
+
+from pants.backend.helm.goals import package
+from pants.backend.helm.goals.package import BuiltHelmArtifact, HelmPackageFieldSet
+from pants.backend.helm.subsystems.helm import HelmSubsystem
+from pants.backend.helm.target_types import HelmChartTarget
+from pants.backend.helm.testutil import (
+    HELM_TEMPLATE_HELPERS_FILE,
+    HELM_VALUES_FILE,
+    K8S_SERVICE_FILE,
+    gen_chart_file,
+)
+from pants.backend.helm.util_rules import chart, sources, tool
+from pants.backend.helm.util_rules.chart import HelmChartMetadata
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
@@ -11,18 +24,6 @@ from pants.engine.rules import QueryRule, SubsystemRule
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.rule_runner import RuleRunner
 
-from pants.backend.helm.goals.package import HelmPackageFieldSet, BuiltHelmArtifact
-from pants.backend.helm.goals import package
-from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.util_rules import chart, tool, sources
-from pants.backend.helm.target_types import HelmChartTarget
-from pants.backend.helm.util_rules.chart import HelmChartMetadata
-from pants.backend.helm.testutil import (
-    HELM_CHART_FILE,
-    HELM_TEMPLATE_HELPERS_FILE,
-    HELM_VALUES_FILE,
-    K8S_SERVICE_FILE,
-)
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -43,11 +44,15 @@ def rule_runner() -> RuleRunner:
         ],
     )
 
+
 def test_helm_package(rule_runner: RuleRunner) -> None:
+    chart_name = "foo"
+    chart_version = "0.1.0"
+
     rule_runner.write_files(
         {
             "BUILD": "helm_chart(name='mychart')",
-            "Chart.yaml": HELM_CHART_FILE,
+            "Chart.yaml": gen_chart_file(chart_name, version=chart_version),
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "templates/service.yaml": K8S_SERVICE_FILE,
@@ -58,11 +63,8 @@ def test_helm_package(rule_runner: RuleRunner) -> None:
     field_set = HelmPackageFieldSet.create(target)
 
     expected_metadata = HelmChartMetadata(
-        api_version="v2",
-        name="mychart",
-        version="0.1.0",
-        icon="https://www.example.com/icon.png",
-        description="A Helm chart for Kubernetes",
+        name=chart_name,
+        version=chart_version,
     )
     expected_built_package = BuiltHelmArtifact.create(PurePath("./"), expected_metadata)
 
@@ -73,4 +75,4 @@ def test_helm_package(rule_runner: RuleRunner) -> None:
     assert result.artifacts[0] == expected_built_package
 
     assert len(chart_entries) == 1
-    assert chart_entries[0].path == "mychart-0.1.0.tgz"
+    assert chart_entries[0].path == f"{chart_name}-{chart_version}.tgz"
