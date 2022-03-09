@@ -97,6 +97,7 @@ class HelmChartDependency:
         return d
 
 
+<<<<<<< HEAD
 @dataclass(frozen=True)
 class HelmChartMaintainer:
     name: str
@@ -117,6 +118,9 @@ class HelmChartMaintainer:
 
 
 DEFAULT_API_VERSION = "v2"
+=======
+DEFAULT_API_VERSION = "v1"
+>>>>>>> Test producing a Helm chart package
 
 
 @dataclass(frozen=True)
