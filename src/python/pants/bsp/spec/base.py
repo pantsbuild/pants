@@ -12,6 +12,7 @@ from pants.build_graph.address import Address, AddressInput
 # Basic JSON Structures
 # See https://build-server-protocol.github.io/docs/specification.html#basic-json-structures
 # -----------------------------------------------------------------------------------------------
+from pants.util.meta import classproperty
 
 Uri = str
 
@@ -252,3 +253,14 @@ class StatusCode(IntEnum):
 
     # Execution was cancelled.
     CANCELLED = 3
+
+
+class BSPData:
+    """Mix-in for BSP spec types that can live in a data field."""
+
+    @classproperty
+    def DATA_KIND(cls):
+        raise NotImplementedError
+
+    def to_json_dict(self) -> dict[str, Any]:
+        raise NotImplementedError

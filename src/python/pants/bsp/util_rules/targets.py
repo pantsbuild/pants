@@ -23,8 +23,10 @@ from pants.bsp.spec.targets import (
     WorkspaceBuildTargetsResult,
 )
 from pants.build_graph.address import AddressInput
+from pants.engine.fs import Workspace
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule
 from pants.engine.target import SourcesField, SourcesPaths, SourcesPathsRequest, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule, union
 
@@ -40,6 +42,7 @@ class BSPBuildTargets:
     """Response type for a BSPBuildTargetsRequest."""
 
     targets: tuple[BuildTarget, ...] = ()
+    digest: Digest = EMPTY_DIGEST
 
 
 # -----------------------------------------------------------------------------------------------
@@ -54,9 +57,9 @@ class WorkspaceBuildTargetsHandlerMapping(BSPHandlerMapping):
     response_type = WorkspaceBuildTargetsResult
 
 
-@rule
+@_uncacheable_rule
 async def bsp_workspace_build_targets(
-    _: WorkspaceBuildTargetsParams, union_membership: UnionMembership
+    _: WorkspaceBuildTargetsParams, union_membership: UnionMembership, workspace: Workspace
 ) -> WorkspaceBuildTargetsResult:
     request_types = union_membership.get(BSPBuildTargetsRequest)
     responses = await MultiGet(
@@ -67,6 +70,8 @@ async def bsp_workspace_build_targets(
     for response in responses:
         result.extend(response.targets)
     result.sort(key=lambda btgt: btgt.id.uri)
+    output_digest = await Get(Digest, MergeDigests([r.digest for r in responses]))
+    workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
     return WorkspaceBuildTargetsResult(
         targets=tuple(result),
     )
