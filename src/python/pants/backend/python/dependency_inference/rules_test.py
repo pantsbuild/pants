@@ -159,7 +159,7 @@ def test_infer_python_imports(caplog) -> None:
     assert "disambiguated_via_ignores.py" not in caplog.text
 
 
-def test_infer_python_assets() -> None:
+def test_infer_python_assets(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[
             *import_rules(),
@@ -232,6 +232,54 @@ def test_infer_python_assets() -> None:
             Address("src/python", target_name="txtfiles", relative_file_path="data/flavors.txt"),
         ],
     )
+
+    # Test handling of ambiguous assets. We should warn on the ambiguous dependency, but not warn
+    # on the disambiguated one and should infer a dep.
+    caplog.clear()
+    rule_runner.write_files(
+        {
+            "src/python/data/BUILD": dedent(
+                """\
+                    resources(name='jsonfiles', sources=['*.json'])
+                    resources(name='also_jsonfiles', sources=['*.json'])
+                """
+            ),
+            "src/python/data/ambiguous.json": "",
+            "src/python/data/disambiguated_with_bang.json": "",
+            "src/python/app.py": dedent(
+                """\
+                pkgutil.get_data(__name__, "data/ambiguous.json")
+                pkgutil.get_data(__name__, "data/disambiguated_with_bang.json")
+                """
+            ),
+            "src/python/BUILD": dedent(
+                """\
+                python_sources(
+                    name="main",
+                    dependencies=['!./data/disambiguated_with_bang.json:also_jsonfiles'],
+                )
+                """
+            ),
+        }
+    )
+    assert run_dep_inference(
+        Address("src/python", target_name="main", relative_file_path="app.py")
+    ) == InferredDependencies(
+        [
+            Address(
+                "src/python/data",
+                target_name="jsonfiles",
+                relative_file_path="disambiguated_with_bang.json",
+            ),
+        ],
+    )
+    assert len(caplog.records) == 1
+    assert "The target src/python/app.py:main uses `data/ambiguous.json`" in caplog.text
+    assert (
+        "['src/python/data/ambiguous.json:also_jsonfiles', 'src/python/data/ambiguous.json:jsonfiles']"
+        in caplog.text
+    )
+    assert "disambiguated_with_bang.py" not in caplog.text
 
 
 def test_infer_python_inits() -> None:

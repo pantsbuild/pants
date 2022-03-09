@@ -78,9 +78,7 @@ def assert_deps_parsed(
         ],
     )
     assert dict(result.imports) == expected_imports
-    assert list(result.assets) == [
-        ("project.foo", resource) for resource in sorted(expected_assets)
-    ]
+    assert list(result.assets) == sorted(expected_assets)
 
 
 def test_normal_imports(rule_runner: RuleRunner) -> None:

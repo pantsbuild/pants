@@ -2,10 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
-import pathlib
 import pkgutil
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -34,11 +32,8 @@ class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
     """All the discovered imports from a Python source file mapped to the relevant info."""
 
 
-class ParsedPythonAssets(DeduplicatedCollection[Tuple[str, str]]):
-    """All the discovered possible assets from a Python source file.
-
-    The tuple is of (containing module, filename).
-    """
+class ParsedPythonAssets(DeduplicatedCollection[str]):
+    """All the discovered possible assets from a Python source file."""
 
     # N.B. Don't set `sort_input`, as the input is already sorted
 
@@ -57,10 +52,6 @@ class ParsePythonDependenciesRequest:
     string_imports_min_dots: int
     assets: bool
     asset_min_slashes: int
-
-
-def _filepath_to_modname(filepath: str) -> str:
-    return str(pathlib.Path(filepath).with_suffix("")).replace("/", ".")
 
 
 @rule
@@ -110,15 +101,7 @@ async def parse_python_dependencies(
         imports=ParsedPythonImports(
             (key, ParsedPythonImportInfo(**val)) for key, val in output.get("imports", {}).items()
         ),
-        assets=ParsedPythonAssets(
-            [
-                (
-                    _filepath_to_modname(request.source.file_path) if pkgname is None else pkgname,
-                    filepath,
-                )
-                for pkgname, filepath in output.get("assets", [])
-            ]
-        ),
+        assets=ParsedPythonAssets(output.get("assets", [])),
     )
 
 

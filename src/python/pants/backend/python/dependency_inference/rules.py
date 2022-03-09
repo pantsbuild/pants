@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections import defaultdict
 from enum import Enum
 from pathlib import PurePath
-from typing import Dict, Iterable, Iterator, cast
+from typing import Iterable, Iterator, cast
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -162,21 +163,33 @@ class InferPythonImportDependencies(InferDependenciesRequest):
 
 
 def _get_inferred_resource_deps(
+    address: Address,
+    request_file_path: PurePath,
     all_asset_targets: AllAssetTargets,
     assets: ParsedPythonAssets,
+    explicitly_provided_deps: ExplicitlyProvidedDependencies,
 ) -> Iterator[Address]:
-    assets_by_path: Dict[PurePath, Target] = {}
+    assets_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
     for file_tgt in all_asset_targets.files:
-        assets_by_path[PurePath(file_tgt[FileSourceField].file_path)] = file_tgt
+        assets_by_path[PurePath(file_tgt[FileSourceField].file_path)].add(file_tgt)
     for resource_tgt in all_asset_targets.resources:
         path = PurePath(resource_tgt[ResourceSourceField].file_path)
-        assets_by_path[path] = resource_tgt
+        assets_by_path[path].add(resource_tgt)
 
-    for pkgname, filepath in assets:
-        resource_path = PurePath(*pkgname.split(".")).parent / filepath
+    for filepath in assets:
+        resource_path = PurePath(request_file_path).parent / filepath
         inferred_resource_tgt = assets_by_path.get(resource_path)
         if inferred_resource_tgt:
-            yield inferred_resource_tgt.address
+            possible_addresses = tuple(tgt.address for tgt in inferred_resource_tgt)
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                possible_addresses,
+                address,
+                import_reference="module",
+                context=f"The target {address} uses `{filepath}`",
+            )
+            maybe_disambiguated = explicitly_provided_deps.disambiguated(possible_addresses)
+            if maybe_disambiguated:
+                yield maybe_disambiguated
 
 
 def _get_imports_info(
@@ -268,10 +281,11 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports:
         parsed_imports = ParsedPythonImports([])
 
+    explicitly_provided_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])
+    )
+
     if parsed_imports:
-        explicitly_provided_deps = await Get(
-            ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])
-        )
         resolve = tgt[PythonResolveField].normalized_value(python_setup)
         import_deps, unowned_imports = _get_imports_info(
             address=tgt.address,
@@ -286,7 +300,15 @@ async def infer_python_dependencies_via_source(
 
     if parsed_assets:
         all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
-        inferred_deps.update(_get_inferred_resource_deps(all_asset_targets, parsed_assets))
+        inferred_deps.update(
+            _get_inferred_resource_deps(
+                tgt.address,
+                request.sources_field.file_path,
+                all_asset_targets,
+                parsed_assets,
+                explicitly_provided_deps,
+            )
+        )
 
     _maybe_warn_unowned(
         tgt.address,

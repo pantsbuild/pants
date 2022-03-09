@@ -91,7 +91,7 @@ class AstVisitor(ast.NodeVisitor):
         if STRING_IMPORTS and STRING_IMPORT_REGEX.match(s):
             self.weak_imports.setdefault(s, node.lineno)
         if ASSETS and ASSET_REGEX.match(s):
-            self.assets.add((None, s))
+            self.assets.add(s)
 
     def visit_Import(self, node):
         self._visit_import_stmt(node, "")
