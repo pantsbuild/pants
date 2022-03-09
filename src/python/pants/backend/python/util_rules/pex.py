@@ -434,8 +434,16 @@ async def build_pex(
                 return PythonLockfileMetadata.from_lockfile(resolve_name, lock_bytes)
 
         is_monolithic_resolve = True
-        argv.extend(["--requirement", lock_path, "--no-transitive"])
-        requirement_count = len(lock_bytes.decode().splitlines())
+
+        is_pex_json_lock = False  # TODO: calculate via inspection of lock_bytes and maybe lock_path
+        if is_pex_json_lock:
+            requirements_file_digest = requirements_file_digest  # TODO: strip the Pants header
+            requirement_count = 1   # TODO: set this appropriately, which requires parsing the JSON.
+            argv.extend(["--lock", lock_path])
+        else:
+            argv.extend(["--requirement", lock_path, "--no-transitive"])
+            requirement_count = len(lock_bytes.decode().splitlines())
+
         maybe_validate_metadata(
             parse_metadata, request.interpreter_constraints, request.requirements, python_setup  # type: ignore[arg-type]
         )

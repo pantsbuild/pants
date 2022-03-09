@@ -113,6 +113,7 @@ def maybe_warn_python_repos(
     _: MaybeWarnPythonReposRequest, python_repos: PythonRepos
 ) -> MaybeWarnPythonRepos:
     def warn_python_repos(option: str) -> None:
+        # TODO: suggest using Pex for lockfile generation
         logger.warning(
             f"The option `[python-repos].{option}` is configured, but it does not currently work "
             "with lockfile generation. Lockfile generation will fail if the relevant requirements "
@@ -139,6 +140,7 @@ async def generate_lockfile(
     python_repos: PythonRepos,
     python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
+    # TODO: add [python].lockfile_generator to set this.
     if req.use_pex:
         result = await Get(
             ProcessResult,
