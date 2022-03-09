@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 def _helm_artifact_filename(chart_metadata: HelmChartMetadata) -> str:
     return f"{chart_metadata.name}-{chart_metadata.version}.tgz"
 
-
 @dataclass(frozen=True)
 class HelmPackageFieldSet(HelmChartFieldSet, PackageFieldSet):
     output_path: HelmChartOutputPathField

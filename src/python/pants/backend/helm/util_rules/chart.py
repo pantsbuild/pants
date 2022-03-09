@@ -116,6 +116,7 @@ class HelmChartDependency:
         return d
 
 
+<<<<<<< HEAD
 @dataclass(frozen=True)
 class HelmChartMaintainer:
     name: str
@@ -136,6 +137,9 @@ class HelmChartMaintainer:
 
 
 DEFAULT_API_VERSION = "v2"
+=======
+DEFAULT_API_VERSION = "v1"
+>>>>>>> Test producing a Helm chart package
 
 
 @dataclass(frozen=True)
@@ -190,6 +194,10 @@ class HelmChartMetadata:
     @classmethod
     def from_bytes(cls, content: bytes) -> HelmChartMetadata:
         return cls.from_dict(yaml.safe_load(content))
+
+    @property
+    def artifact_name(self) -> str:
+        return f"{self.name}-{self.version}"
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
