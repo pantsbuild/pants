@@ -57,7 +57,7 @@ class JVMRequestTypes:
 @rule
 def calculate_jvm_request_types(union_membership: UnionMembership) -> JVMRequestTypes:
     cpe_impls = union_membership.get(ClasspathEntryRequest)
-    b: dict[type[Field], type[ClasspathEntryRequest]] = set()
+    b: dict[type[Field], type[ClasspathEntryRequest]] = {}
     for impl in cpe_impls:
         for field_set in impl.field_sets:
             for field in field_set.required_fields:
@@ -68,7 +68,10 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> JVMRequest
         GenerateSourcesRequest
     )
 
-    usable_generators = {g.input: (g, b[g.output]) for g in generators if g.output in b}
+    # TODO: Does not currently support multiple code generators per source type
+    # We'll need to add support for that, once it's possible to disambiguate in
+    # a build file
+    usable_generators = {g.input: b[g.output] for g in generators if g.output in b}
 
     return JVMRequestTypes(tuple(cpe_impls), FrozenDict(usable_generators))
 
@@ -121,7 +124,8 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
         # TODO: filter usable generators by acceptable languages
         
         for (input, request_type) in usable_generators.items():
-            if component.representative.get(input) is not None:
+            logger.warning(f"{component.representative} {input} { request_type}")
+            if component.representative.has_field(input): 
                 return request_type(component, resolve, None)
 
         compatible = []
