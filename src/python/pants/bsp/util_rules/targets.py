@@ -42,6 +42,7 @@ from pants.engine.target import (
     Targets,
     WrappedTarget,
 )
+from pants.engine.target import SourcesField, SourcesPaths, SourcesPathsRequest, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
