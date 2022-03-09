@@ -51,7 +51,7 @@ class ParsePythonDependenciesRequest:
     string_imports: bool
     string_imports_min_dots: int
     assets: bool
-    asset_min_slashes: int
+    assets_min_slashes: int
 
 
 @rule
@@ -85,9 +85,9 @@ async def parse_python_dependencies(
             description=f"Determine Python dependencies for {request.source.address}",
             env={
                 "STRING_IMPORTS": "y" if request.string_imports else "n",
-                "STRING_IMPORT_MIN_DOTS": str(request.string_imports_min_dots),
+                "STRING_IMPORTS_MIN_DOTS": str(request.string_imports_min_dots),
                 "ASSETS": "y" if request.assets else "n",
-                "ASSET_MIN_SLASHES": str(request.asset_min_slashes),
+                "ASSETS_MIN_SLASHES": str(request.assets_min_slashes),
             },
             level=LogLevel.DEBUG,
         ),

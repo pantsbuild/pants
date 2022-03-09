@@ -4,7 +4,7 @@
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
 # NB: If you're needing to debug this, an easy way is to just invoke it on a file.
-#   E.g. `STRING_IMPORT_MIN_DOTS=1 ... python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
+#   E.g. `STRING_IMPORTS=y ... python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
 
 from __future__ import print_function, unicode_literals
 
@@ -36,7 +36,7 @@ class AstVisitor(ast.NodeVisitor):
             #  `importlib.import_module("example.subdir.Foo")`.
             self._string_import_regex = re.compile(
                 r"^([a-z_][a-z_\d]*\.){"
-                + os.environ["STRING_IMPORT_MIN_DOTS"]
+                + os.environ["STRING_IMPORTS_MIN_DOTS"]
                 + r",}[a-zA-Z_]\w*$",
                 re.UNICODE,
             )
@@ -49,7 +49,7 @@ class AstVisitor(ast.NodeVisitor):
             # Since Unix allows basically anything for filenames, we require some "sane" subset of
             #  possibilities namely, word-character filenames and a mandatory extension.
             self._asset_regex = re.compile(
-                r"^([\w]*\/){" + os.environ["ASSET_MIN_SLASHES"] + r",}\w*(\.[^\/\.\n]+)+$",
+                r"^([\w]*\/){" + os.environ["ASSETS_MIN_SLASHES"] + r",}\w*(\.[^\/\.\n]+)+$",
                 re.UNICODE,
             )
         else:

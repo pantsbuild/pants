@@ -54,7 +54,7 @@ def assert_deps_parsed(
     string_imports: bool = True,
     string_imports_min_dots: int = 2,
     assets: bool = True,
-    asset_min_slashes: int = 1,
+    assets_min_slashes: int = 1,
 ) -> None:
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     rule_runner.write_files(
@@ -73,7 +73,7 @@ def assert_deps_parsed(
                 string_imports=string_imports,
                 string_imports_min_dots=string_imports_min_dots,
                 assets=assets,
-                asset_min_slashes=asset_min_slashes,
+                assets_min_slashes=assets_min_slashes,
             )
         ],
     )
@@ -516,6 +516,6 @@ def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
     expected = [s for s in potentially_valid if s.count("/") >= min_slashes]
 
     assert_deps_parsed(
-        rule_runner, content, expected_assets=expected, asset_min_slashes=min_slashes
+        rule_runner, content, expected_assets=expected, assets_min_slashes=min_slashes
     )
     assert_deps_parsed(rule_runner, content, assets=False, expected_assets=[])

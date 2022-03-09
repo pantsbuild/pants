@@ -112,8 +112,8 @@ class PythonInferSubsystem(Subsystem):
             "false positives, put `!{bad_address}` in the `dependencies` field of your target."
         ),
     )
-    asset_min_slashes = IntOption(
-        "--asset-min-slashes",
+    assets_min_slashes = IntOption(
+        "--assets-min-slashes",
         default=1,
         help=(
             "If --assets is True, treat valid-looking strings with at least this many forward "
@@ -270,7 +270,7 @@ async def infer_python_dependencies_via_source(
             string_imports=python_infer_subsystem.string_imports,
             string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
             assets=python_infer_subsystem.assets,
-            asset_min_slashes=python_infer_subsystem.asset_min_slashes,
+            assets_min_slashes=python_infer_subsystem.assets_min_slashes,
         ),
     )
 
