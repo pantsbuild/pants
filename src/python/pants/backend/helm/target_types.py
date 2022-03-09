@@ -14,6 +14,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     SingleSourceField,
     Target,
+    TargetFilesGenerator,
     TriBoolField,
 )
 from pants.util.docutil import bin_name
@@ -105,3 +106,51 @@ class HelmChartFieldSet(FieldSet):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
+
+
+# -----------------------------------------------------------------------------------------------
+# `helm_unittest_test` target
+# -----------------------------------------------------------------------------------------------
+
+class HelmUnitTestDependenciesField(Dependencies):
+    pass
+
+class HelmUnitTestSourceField(SingleSourceField):
+    expected_file_extensions = (
+        ".yaml",
+        ".yml",
+    )
+
+class HelmUnitTestTestTarget(Target):
+    alias = "helm_unittest_test"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        HelmUnitTestSourceField,
+        HelmUnitTestDependenciesField
+    )
+    help = "A single helm-unittest suite file"
+
+# -----------------------------------------------------------------------------------------------
+# `helm_unittest_tests` target generator
+# -----------------------------------------------------------------------------------------------
+
+class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
+    default = ("*_test.yaml",)
+    expected_file_extensions = (
+        ".yaml",
+        ".yml",
+    )
+
+class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
+    alias = "helm_unittest_tests"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        HelmUnitTestDependenciesField,
+        HelmUnitTestGeneratingSourcesField
+    )
+    generated_target_cls = HelmUnitTestTestTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        HelmUnitTestDependenciesField
+    )
+    help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field"
