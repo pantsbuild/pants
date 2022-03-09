@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
+from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField, AllProtobufTargets
 from pants.backend.go.target_type_rules import ImportPathToPackages
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest
@@ -22,8 +23,9 @@ from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, SourceFiles
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -46,10 +48,11 @@ from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
     TransitiveTargets,
-    TransitiveTargetsRequest,
+    TransitiveTargetsRequest, Targets, AllTargets,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
@@ -78,6 +81,132 @@ def parse_go_package_option(content_raw: bytes) -> str | None:
         if m:
             return m.group(1)
     return None
+
+
+@dataclass(frozen=True)
+class GoProtobufImportPathMapping:
+    """Maps import paths of Go Protobuf packages to the addresses """
+    mapping: FrozenDict[str, tuple[Address, ...]]
+
+
+@rule(desc="Find all Protobuf targets in project to be compiled for Go", level=LogLevel.DEBUG)
+def find_all_go_protobuf_targets(targets: AllProtobufTargets) -> GoProtobufImportPathMapping:
+    sources = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(
+            tgt[ProtobufSourceField]),
+            for_sources_types=(ProtobufSourceField,),
+            enable_codegen=True,
+        )
+        for tgt in targets
+    )
+
+    all_contents = await MultiGet(
+        Get(DigestContents, Digest, source.snapshot.digest)
+        for source in sources
+    )
+
+
+    go_protobuf_targets: dict[str, set[Address]] = defaultdict(set)
+    for tgt, contents  in zip(targets, all_contents):
+        if not contents:
+            continue
+        if len(contents) > 1:
+            raise AssertionError(f"Protobuf target `{tgt.address}` mapped to more than one source file.")
+        import_path = parse_go_package_option(contents[0])
+        if not import_path:
+            continue
+        go_protobuf_targets[import_path].add(tgt.address)
+
+    return GoProtobufImportPathMapping(FrozenDict({ip: tuple(addrs) for ip, addrs in go_protobuf_targets.items()}))
+
+
+@dataclass(frozen=True)
+class _SetupGoProtobufPackageBuildRequest:
+    """Request type used to trigger setup of a BuildGoPackageRequest for entire generated Go Protobuf package.
+
+    This type is separate so that a build of the full package can be cached no matter which one of its
+    component source files was requested. This occurs because a request to build any one of the source
+    files will be converted into this type and then built.
+    """
+    addresses: tuple[Address, ...]
+    import_path: str
+
+
+@rule
+async def setup_full_package_build_request(
+    request: _SetupGoProtobufPackageBuildRequest,
+    protoc: Protoc,
+) -> BuildGoPackageRequest:
+    targets = await Get(Targets, Addresses(request.addresses))
+    sources = await Get(SourceFiles, SourceFilesRequest(
+        sources_fields=(tgt[ProtobufSourceField] for tgt in targets),
+        for_sources_types=(ProtobufSourceField,),
+        enable_codegen=True,
+    ))
+    source_roots = await MultiGet(
+        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(tgt))
+        for tgt in targets
+    )
+    source_roots_deduped = {sr.path for sr in source_roots}
+
+    output_dir = "_generated_files"
+    protoc_relpath = "__protoc"
+    protoc_go_plugin_relpath = "__protoc_gen_go"
+
+    downloaded_protoc_binary, empty_output_dir, transitive_targets = await MultiGet(
+        Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
+        Get(Digest, CreateDigest([Directory(output_dir)])),
+        Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
+    )
+
+    input_digest = await Get(
+        Digest, MergeDigests([all_sources_stripped.snapshot.digest, empty_output_dir])
+    )
+
+    maybe_grpc_plugin_args = []
+    if request.protocol_target.get(ProtobufGrpcToggleField).value:
+        maybe_grpc_plugin_args = [
+            f"--go-grpc_out={output_dir}",
+            "--go-grpc_opt=paths=source_relative",
+        ]
+
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=[
+                os.path.join(protoc_relpath, downloaded_protoc_binary.exe),
+                f"--plugin=go={os.path.join('.', protoc_go_plugin_relpath, 'protoc-gen-go')}",
+                f"--plugin=go-grpc={os.path.join('.', protoc_go_plugin_relpath, 'protoc-gen-go-grpc')}",
+                f"--go_out={output_dir}",
+                "--go_opt=paths=source_relative",
+                *maybe_grpc_plugin_args,
+                *target_sources_stripped.snapshot.files,
+            ],
+            # Note: Necessary or else --plugin option needs absolute path.
+            env={"PATH": protoc_go_plugin_relpath},
+            input_digest=input_digest,
+            immutable_input_digests={
+                protoc_relpath: downloaded_protoc_binary.digest,
+                protoc_go_plugin_relpath: go_protoc_plugin.digest,
+            },
+            description=f"Generating Go sources from {request.protocol_target.address}.",
+            level=LogLevel.DEBUG,
+            output_directories=(output_dir,),
+        ),
+    )
+
+    normalized_digest, source_root = await MultiGet(
+        Get(Digest, RemovePrefix(result.output_digest, output_dir)),
+        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
+    )
+
+    source_root_restored = (
+        await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))
+        if source_root.path != "."
+        else await Get(Snapshot, Digest, normalized_digest)
+    )
+    return GeneratedSources(source_root_restored)
+
 
 
 @rule
