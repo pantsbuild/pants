@@ -19,6 +19,7 @@ from pants.engine.target import (
     generate_file_based_overrides_field_help_message,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.target_types import JvmJdkField
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 
@@ -60,7 +61,9 @@ class ProtobufSourceTarget(Target):
         ProtobufDependenciesField,
         ProtobufSourceField,
         ProtobufGrpcToggleField,
+        JvmJdkField,
     )
+    jdk = JvmJdkField
     help = (
         "A single Protobuf file used to generate various languages.\n\n"
         f"See {doc_url('protobuf')}."
@@ -117,7 +120,10 @@ class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         ProtobufDependenciesField,
     )
-    moved_fields = (ProtobufGrpcToggleField,)
+    moved_fields = (
+        ProtobufGrpcToggleField,
+        JvmJdkField,
+    )
     settings_request_cls = GeneratorSettingsRequest
     help = "Generate a `protobuf_source` target for each file in the `sources` field."
 

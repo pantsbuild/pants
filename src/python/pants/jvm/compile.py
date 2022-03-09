@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABCMeta
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
@@ -17,7 +17,13 @@ from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import CoarsenedTarget, Field, FieldSet, GenerateSourcesRequest
+from pants.engine.target import (
+    CoarsenedTarget,
+    Field,
+    FieldSet,
+    GenerateSourcesRequest,
+    SourcesField,
+)
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.frozendict import FrozenDict
@@ -51,7 +57,7 @@ class _ClasspathEntryRequestClassification(Enum):
 @dataclass(frozen=True)
 class JVMRequestTypes:
     classpath_entry_requests: tuple[type[ClasspathEntryRequest], ...]
-    code_generator_requests: FrozenDict[type[GenerateSourcesRequest], type[ClasspathEntryRequest]]
+    code_generator_requests: FrozenDict[type[SourcesField], type[ClasspathEntryRequest]]
 
 
 @rule
@@ -71,9 +77,9 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> JVMRequest
     # TODO: Does not currently support multiple code generators per source type
     # We'll need to add support for that, once it's possible to disambiguate in
     # a build file
-    usable_generators = {g.input: b[g.output] for g in generators if g.output in b}
+    usable_generators = FrozenDict((g.input, b[g.output]) for g in generators if g.output in b)
 
-    return JVMRequestTypes(tuple(cpe_impls), FrozenDict(usable_generators))
+    return JVMRequestTypes(tuple(cpe_impls), usable_generators)
 
 
 @union
@@ -122,10 +128,9 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
         usable_generators = jvm_request_types.code_generator_requests
 
         # TODO: filter usable generators by acceptable languages
-        
+
         for (input, request_type) in usable_generators.items():
-            logger.warning(f"{component.representative} {input} { request_type}")
-            if component.representative.has_field(input): 
+            if component.representative.has_field(input):
                 return request_type(component, resolve, None)
 
         compatible = []

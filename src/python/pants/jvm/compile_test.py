@@ -66,6 +66,7 @@ from pants.jvm.testutil import (
 )
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 DEFAULT_LOCKFILE = TestCoursierWrapper(
     CoursierResolvedLockfile(
@@ -193,7 +194,7 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
         members: Sequence[type[ClasspathEntryRequest]],
     ) -> tuple[type[ClasspathEntryRequest], type[ClasspathEntryRequest] | None]:
         req = ClasspathEntryRequest.for_targets(
-            JVMRequestTypes(tuple(members), ()),
+            JVMRequestTypes(tuple(members), FrozenDict()),
             CoarsenedTarget(targets, ()),
             CoursierResolveKey("example", "path", EMPTY_DIGEST),
         )
