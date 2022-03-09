@@ -39,13 +39,13 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.target import CoarsenedTarget, Target, UnexpandedTargets
-from pants.engine.unions import UnionMembership
 from pants.jvm import classpath, jdk_rules, testutil
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
     ClasspathEntryRequest,
     ClasspathSourceAmbiguity,
     ClasspathSourceMissing,
+    JVMRequestTypes,
 )
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
@@ -193,7 +193,7 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
         members: Sequence[type[ClasspathEntryRequest]],
     ) -> tuple[type[ClasspathEntryRequest], type[ClasspathEntryRequest] | None]:
         req = ClasspathEntryRequest.for_targets(
-            UnionMembership({ClasspathEntryRequest: members}),
+            JVMRequestTypes(tuple(members), ()),
             CoarsenedTarget(targets, ()),
             CoursierResolveKey("example", "path", EMPTY_DIGEST),
         )

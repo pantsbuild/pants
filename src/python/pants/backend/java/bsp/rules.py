@@ -36,7 +36,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.bsp.spec import JvmBuildTarget
-from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
+from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry, JVMRequestTypes
 from pants.jvm.resolve.key import CoursierResolveKey
 
 LANGUAGE_ID = "java"
@@ -178,8 +178,7 @@ class JavaBSPCompileFieldSet(BSPCompileFieldSet):
 
 @rule
 async def bsp_java_compile_request(
-    request: JavaBSPCompileFieldSet,
-    union_membership: UnionMembership,
+    request: JavaBSPCompileFieldSet, jvm_request_types: JVMRequestTypes
 ) -> BSPCompileResult:
     coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
     assert len(coarsened_targets) == 1
@@ -190,7 +189,7 @@ async def bsp_java_compile_request(
         FallibleClasspathEntry,
         ClasspathEntryRequest,
         ClasspathEntryRequest.for_targets(
-            union_membership, component=coarsened_target, resolve=resolve
+            jvm_request_types, component=coarsened_target, resolve=resolve
         ),
     )
     _logger.info(f"java compile result = {result}")

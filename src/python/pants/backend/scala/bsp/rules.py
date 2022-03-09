@@ -29,7 +29,6 @@ from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.build_graph.address import Address, AddressInput
-from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries
 from pants.engine.internals.selectors import Get, MultiGet
@@ -42,7 +41,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
+from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry, JVMRequestTypes
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -199,9 +198,7 @@ class ScalaBSPCompileFieldSet(BSPCompileFieldSet):
 @rule
 async def bsp_scala_compile_request(
     request: ScalaBSPCompileFieldSet,
-    union_membership: UnionMembership,
-    unzip: UnzipBinary,
-    bash: BashBinary,
+    jvm_request_types: JVMRequestTypes,
 ) -> BSPCompileResult:
     coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
     assert len(coarsened_targets) == 1
@@ -212,7 +209,7 @@ async def bsp_scala_compile_request(
         FallibleClasspathEntry,
         ClasspathEntryRequest,
         ClasspathEntryRequest.for_targets(
-            union_membership, component=coarsened_target, resolve=resolve
+            jvm_request_types, component=coarsened_target, resolve=resolve
         ),
     )
     _logger.info(f"scala compile result = {result}")

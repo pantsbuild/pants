@@ -10,8 +10,7 @@ from typing import Iterator
 from pants.engine.fs import Digest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
-from pants.engine.unions import UnionMembership
-from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, JVMRequestTypes
 from pants.jvm.resolve.key import CoursierResolveKey
 
 logger = logging.getLogger(__name__)
@@ -69,7 +68,7 @@ class Classpath:
 @rule
 async def classpath(
     coarsened_targets: CoarsenedTargets,
-    union_membership: UnionMembership,
+    jvm_request_types: JVMRequestTypes,
 ) -> Classpath:
     # Compute a single shared resolve for all of the roots, which will validate that they
     # are compatible with one another.
@@ -81,7 +80,7 @@ async def classpath(
             ClasspathEntry,
             ClasspathEntryRequest,
             ClasspathEntryRequest.for_targets(
-                union_membership, component=t, resolve=resolve, root=True
+                jvm_request_types, component=t, resolve=resolve, root=True
             ),
         )
         for t in coarsened_targets

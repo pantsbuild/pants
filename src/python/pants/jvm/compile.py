@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABCMeta
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
@@ -17,9 +17,10 @@ from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import CoarsenedTarget, FieldSet
+from pants.engine.target import CoarsenedTarget, Field, FieldSet, GenerateSourcesRequest
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -45,6 +46,31 @@ class _ClasspathEntryRequestClassification(Enum):
     PARTIAL = auto()
     CONSUME_ONLY = auto()
     INCOMPATIBLE = auto()
+
+
+@dataclass(frozen=True)
+class JVMRequestTypes:
+    classpath_entry_requests: tuple[type[ClasspathEntryRequest], ...]
+    code_generator_requests: FrozenDict[type[GenerateSourcesRequest], type[ClasspathEntryRequest]]
+
+
+@rule
+def calculate_jvm_request_types(union_membership: UnionMembership) -> JVMRequestTypes:
+    cpe_impls = union_membership.get(ClasspathEntryRequest)
+    b: dict[type[Field], type[ClasspathEntryRequest]] = set()
+    for impl in cpe_impls:
+        for field_set in impl.field_sets:
+            for field in field_set.required_fields:
+                # Assume only one impl per field (normally sound)
+                b[field] = impl
+
+    generators: Iterable[type[GenerateSourcesRequest]] = union_membership.get(
+        GenerateSourcesRequest
+    )
+
+    usable_generators = {g.input: (g, b[g.output]) for g in generators if g.output in b}
+
+    return JVMRequestTypes(tuple(cpe_impls), FrozenDict(usable_generators))
 
 
 @union
@@ -77,7 +103,7 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
 
     @staticmethod
     def for_targets(
-        union_membership: UnionMembership,
+        jvm_request_types: JVMRequestTypes,
         component: CoarsenedTarget,
         resolve: CoursierResolveKey,
         *,
@@ -89,10 +115,19 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
         request types which are marked `root_only`.
         """
 
+        impls = jvm_request_types.classpath_entry_requests
+        usable_generators = jvm_request_types.code_generator_requests
+
+        # TODO: filter usable generators by acceptable languages
+        
+        for (input, request_type) in usable_generators.items():
+            if component.representative.get(input) is not None:
+                return request_type(component, resolve, None)
+
         compatible = []
         partial = []
         consume_only = []
-        impls = union_membership.get(ClasspathEntryRequest)
+        impls = jvm_request_types.classpath_entry_requests
         for impl in impls:
             classification = ClasspathEntryRequest.classify_impl(impl, component)
             if classification == _ClasspathEntryRequestClassification.INCOMPATIBLE:
@@ -341,7 +376,7 @@ def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEnt
 
 @rule
 def classpath_dependency_requests(
-    union_membership: UnionMembership, request: ClasspathDependenciesRequest
+    jvm_request_types: JVMRequestTypes, request: ClasspathDependenciesRequest
 ) -> ClasspathEntryRequests:
     def ignore_because_generated(coarsened_dep: CoarsenedTarget) -> bool:
         if len(coarsened_dep.members) == 1:
@@ -352,7 +387,7 @@ def classpath_dependency_requests(
 
     return ClasspathEntryRequests(
         ClasspathEntryRequest.for_targets(
-            union_membership, component=coarsened_dep, resolve=request.request.resolve
+            jvm_request_types, component=coarsened_dep, resolve=request.request.resolve
         )
         for coarsened_dep in request.request.component.dependencies
         if not request.ignore_generated or not ignore_because_generated(coarsened_dep)
