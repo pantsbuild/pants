@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from pants.bsp.spec.base import Uri
+from pants.bsp.spec.base import BSPData, Uri
+from pants.util.meta import classproperty
 
 
 @dataclass(frozen=True)
@@ -31,4 +32,58 @@ class JvmBuildTarget:
             result["javaHome"] = self.java_home
         if self.java_version is not None:
             result["javaVersion"] = self.java_version
+        return result
+
+
+@dataclass(frozen=True)
+class MavenDependencyModuleArtifact:
+    uri: Uri
+    classifier: str | None = None
+
+    @classmethod
+    def from_json_dict(cls, d: dict[str, Any]) -> Any:
+        return cls(uri=d["uri"], classifier=d.get("classifier"))
+
+    def to_json_dict(self) -> Any:
+        result = {"uri": self.uri}
+        if self.classifier is not None:
+            result["classifier"] = self.classifier
+        return result
+
+
+@dataclass(frozen=True)
+class MavenDependencyModule(BSPData):
+    """Maven-related module metadata."""
+
+    organization: str
+    name: str
+    version: str
+    scope: str | None
+    artifacts: tuple[MavenDependencyModuleArtifact, ...]
+
+    @classproperty
+    def DATA_KIND(cls):
+        return "maven"
+
+    @classmethod
+    def from_json_dict(cls, d: dict[str, Any]) -> Any:
+        return cls(
+            organization=d["organization"],
+            name=d["name"],
+            version=d["version"],
+            scope=d.get("scope"),
+            artifacts=tuple(
+                MavenDependencyModuleArtifact.from_json_dict(ma) for ma in d.get("artifacts", [])
+            ),
+        )
+
+    def to_json_dict(self) -> Any:
+        result = {
+            "organization": self.organization,
+            "name": self.name,
+            "version": self.version,
+            "artifacts": [ma.to_json_dict() for ma in self.artifacts],
+        }
+        if self.scope is not None:
+            result["scope"] = self.scope
         return result
