@@ -9,15 +9,16 @@ use crate::selectors::{DependencyKey, Get, Select};
 
 use deepsize::DeepSizeOf;
 use indexmap::IndexSet;
+use internment::Intern;
 use log::Level;
 use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
 
 #[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
   // Intrinsic rules are implemented in rust.
-  Intrinsic(Intrinsic),
+  Intrinsic(Intern<Intrinsic>),
   // Task rules are implemented in python.
-  Task(Task),
+  Task(Intern<Task>),
 }
 
 impl DisplayForGraph for Rule {
@@ -82,16 +83,14 @@ impl rule_graph::Rule for Rule {
 
   fn dependency_keys(&self) -> Vec<DependencyKey> {
     match self {
-      &Rule::Task(Task {
-        ref clause,
-        ref gets,
-        ..
-      }) => clause
+      &Rule::Task(task) => task
+        .clause
         .iter()
         .map(|t| DependencyKey::JustSelect(Select::new(*t)))
-        .chain(gets.iter().map(|g| DependencyKey::JustGet(*g)))
+        .chain(task.gets.iter().map(|g| DependencyKey::JustGet(*g)))
         .collect(),
-      &Rule::Intrinsic(Intrinsic { ref inputs, .. }) => inputs
+      &Rule::Intrinsic(intrinsic) => intrinsic
+        .inputs
         .iter()
         .map(|t| DependencyKey::JustSelect(Select::new(*t)))
         .collect(),
@@ -211,7 +210,9 @@ impl Tasks {
 
   pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
     for intrinsic in intrinsics.keys() {
-      self.rules.insert(Rule::Intrinsic(intrinsic.clone()));
+      self
+        .rules
+        .insert(Rule::Intrinsic(Intern::new(intrinsic.clone())));
     }
   }
 
@@ -282,7 +283,7 @@ impl Tasks {
       .preparing
       .take()
       .expect("Must `begin()` a task creation before ending it!");
-    self.rules.insert(Rule::Task(task));
+    self.rules.insert(Rule::Task(Intern::new(task)));
   }
 
   pub fn query_add(&mut self, product: TypeId, params: Vec<TypeId>) {

@@ -22,8 +22,8 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, FileOption
-from pants.util.docutil import bin_name, git_url
+from pants.option.option_types import ArgsListOption, FileOption, SkipOption
+from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
 
@@ -41,6 +41,7 @@ class BanditFieldSet(FieldSet):
 
 class Bandit(PythonToolBase):
     options_scope = "bandit"
+    name = "Bandit"
     help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
 
     # When upgrading, check if Bandit has started using PEP 517 (a `pyproject.toml` file). If so,
@@ -60,17 +61,8 @@ class Bandit(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/bandit/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use Bandit when running `{bin_name()} lint`",
-    )
-    args = ArgsListOption(
-        help=lambda cls: (
-            f"Arguments to pass directly to Bandit, e.g. "
-            f'`--{cls.options_scope}-args="--skip B101,B308 --confidence"`'
-        ),
-    )
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="--skip B101,B308 --confidence")
     config = FileOption(
         "--config",
         default=None,

@@ -17,26 +17,6 @@ import sys
 import tokenize
 from io import open
 
-STRING_IMPORTS = os.environ["STRING_IMPORTS"] == "y"
-STRING_IMPORT_MIN_DOTS = os.environ["STRING_IMPORT_MIN_DOTS"]
-ASSETS = os.environ["ASSETS"] == "y"
-ASSET_MIN_SLASHES = os.environ["ASSET_MIN_SLASHES"]
-
-# This regex is used to infer imports from strings, e.g.
-#  `importlib.import_module("example.subdir.Foo")`.
-STRING_IMPORT_REGEX = re.compile(
-    r"^([a-z_][a-z_\d]*\.){" + STRING_IMPORT_MIN_DOTS + r",}[a-zA-Z_]\w*$",
-    re.UNICODE,
-)
-# This regex is used to infer asset names from strings, e.g.
-#  `load_resource("data/db1.json")
-# Since Unix allows basically anything for filenames, we require some "sane" subset of possibilities
-#  namely, word-character filenames and a mandatory extension.
-ASSET_REGEX = re.compile(
-    r"^([\w]*\/){" + ASSET_MIN_SLASHES + r",}\w*(\.[^\/\.\n]+)+$",
-    re.UNICODE,
-)
-
 
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts, contents):
@@ -51,6 +31,32 @@ class AstVisitor(ast.NodeVisitor):
         self.weak_imports = {}
         self.assets = set()
         self._weaken_strong_imports = False
+        if os.environ["STRING_IMPORTS"] == "y":
+            # This regex is used to infer imports from strings, e.g .
+            #  `importlib.import_module("example.subdir.Foo")`.
+            self._string_import_regex = re.compile(
+                r"^([a-z_][a-z_\d]*\.){" + os.environ["MIN_DOTS"] + r",}[a-zA-Z_]\w*$", re.UNICODE
+            )
+        else:
+            self._string_import_regex = None
+
+        if os.environ["ASSETS"] == "y":
+            # This regex is used to infer asset names from strings, e.g.
+            #  `load_resource("data/db1.json")
+            # Since Unix allows basically anything for filenames, we require some "sane" subset of
+            #  possibilities namely, word-character filenames and a mandatory extension.
+            self._asset_regex = re.compile(
+                r"^([\w]*\/){" + os.environ["ASSET_MIN_SLASHES"] + r",}\w*(\.[^\/\.\n]+)+$",
+                re.UNICODE,
+            )
+        else:
+            self._asset_regex = None
+
+    def maybe_add_string_dependency(self, node, s):
+        if self._string_import_regex and self._string_import_regex.match(s):
+            self.weak_imports.setdefault(s, node.lineno)
+        if self._asset_regex and self._asset_regex.match(s):
+            self.assets.add(s)
 
     def add_strong_import(self, name, lineno):
         imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
@@ -86,12 +92,6 @@ class AstVisitor(ast.NodeVisitor):
                 self.add_strong_import(import_prefix + alias.name, lineno)
             if alias.asname and token[1] != alias.asname:
                 find_token(alias.asname)
-
-    def maybe_add_string_dependency(self, node, s):
-        if STRING_IMPORTS and STRING_IMPORT_REGEX.match(s):
-            self.weak_imports.setdefault(s, node.lineno)
-        if ASSETS and ASSET_REGEX.match(s):
-            self.assets.add(s)
 
     def visit_Import(self, node):
         self._visit_import_stmt(node, "")

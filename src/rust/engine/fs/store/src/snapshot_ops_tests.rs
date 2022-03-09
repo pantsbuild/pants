@@ -4,19 +4,21 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use fs::{GlobExpansionConjunction, PosixFS, PreparedPathGlobs, StrictGlobMatching};
+use fs::{
+  DigestTrie, DirectoryDigest, GlobExpansionConjunction, PosixFS, PreparedPathGlobs,
+  StrictGlobMatching,
+};
 use hashing::Digest;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use testutil::make_file;
 
 use crate::{
-  snapshot_ops::StoreWrapper,
   snapshot_tests::{expand_all_sorted, setup, STR, STR2},
   OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, SubsetParams,
 };
 
-async fn get_duplicate_rolands<T: StoreWrapper + 'static>(
+async fn get_duplicate_rolands<T: SnapshotOps>(
   store: Store,
   store_wrapper: T,
   base_path: &Path,
@@ -147,13 +149,17 @@ struct LoadTrackingStore {
 }
 
 #[async_trait]
-impl StoreWrapper for LoadTrackingStore {
+impl SnapshotOps for LoadTrackingStore {
   async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, String> {
-    Ok(Store::load_file_bytes_with(&self.store, digest, f).await?)
+    Store::load_file_bytes_with(&self.store, digest, f).await
+  }
+
+  async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String> {
+    Store::load_digest_trie(&self.store, digest).await
   }
 
   async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String> {
@@ -162,7 +168,7 @@ impl StoreWrapper for LoadTrackingStore {
       let entry = counts.entry(digest).or_insert(0);
       *entry += 1;
     }
-    Ok(Store::load_directory(&self.store, digest).await?)
+    Store::load_directory(&self.store, digest).await
   }
 
   async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String> {
@@ -172,6 +178,10 @@ impl StoreWrapper for LoadTrackingStore {
       *entry += 1;
     }
     Snapshot::get_directory_or_err(self.store.clone(), digest).await
+  }
+
+  async fn record_digest_trie(&self, tree: DigestTrie) -> Result<DirectoryDigest, String> {
+    Store::record_digest_trie(&self.store, tree, true).await
   }
 
   async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String> {

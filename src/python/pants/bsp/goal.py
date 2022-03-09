@@ -22,6 +22,10 @@ class BSPGoal(BuiltinGoal):
     name = "experimental-bsp"
     help = "Run server for Build Server Protocol (https://build-server-protocol.github.io/)."
 
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return False
+
     def run(
         self,
         *,

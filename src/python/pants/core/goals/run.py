@@ -82,9 +82,9 @@ class RunSubsystem(GoalSubsystem):
         return RunFieldSet in union_membership
 
     args = ArgsListOption(
+        example="val1 val2 --debug",
+        tool_name="the executed target",
         passthrough=True,
-        help="Arguments to pass directly to the executed target, e.g. "
-        '`--run-args="val1 val2 --debug"`',
     )
     cleanup = BoolOption(
         "--cleanup",

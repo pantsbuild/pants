@@ -20,7 +20,6 @@ from pants.backend.python.dependency_inference.rules import (
 from pants.backend.python.macros import python_requirements
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.target_types import (
-    PythonRequirementsFileTarget,
     PythonRequirementTarget,
     PythonSourceField,
     PythonSourcesGeneratorTarget,
@@ -396,7 +395,6 @@ def test_infer_python_strict(caplog) -> None:
         target_types=[
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
-            PythonRequirementsFileTarget,
             PythonRequirementsTargetGenerator,
         ],
     )

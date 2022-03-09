@@ -1,5 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from __future__ import annotations
 
@@ -338,6 +339,34 @@ def find_all_assets(
         if tgt.has_field(FileSourceField):
             files.append(tgt)
     return AllAssetTargets(tuple(resources), tuple(files))
+
+
+# -----------------------------------------------------------------------------------------------
+# `_target_generator_sources_helper` target
+# -----------------------------------------------------------------------------------------------
+
+
+class TargetGeneratorSourcesHelperSourcesField(MultipleSourcesField):
+    uses_source_roots = False
+    required = True
+
+
+class TargetGeneratorSourcesHelperTarget(Target):
+    """Target generators that work by reading in some source file(s) should also generate this
+    target and add it as a dependency to every generated target so that `--changed-since` works
+    properly.
+
+    See https://github.com/pantsbuild/pants/issues/13118 for discussion of why this is necessary and
+    alternatives considered.
+    """
+
+    alias = "_generator_sources_helper"
+    core_fields = (*COMMON_TARGET_FIELDS, TargetGeneratorSourcesHelperSourcesField)
+    help = (
+        "A private helper target type used by some target generators.\n\n"
+        "This tracks their `sources` field so that `--changed-since --changed-dependees` works "
+        "properly for generated targets."
+    )
 
 
 # -----------------------------------------------------------------------------------------------

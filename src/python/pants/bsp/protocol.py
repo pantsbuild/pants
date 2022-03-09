@@ -16,7 +16,9 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # ty
 
 from pants.bsp.context import BSPContext
 from pants.bsp.spec.task import BSPNotification
+from pants.engine.fs import Workspace
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.selectors import Params
 from pants.engine.unions import UnionMembership, union
 
 try:
@@ -130,10 +132,11 @@ class BSPConnection:
             request = method_mapping.request_type.from_json_dict(params)
         except Exception:
             return _make_error_future(JsonRpcInvalidRequest())
-
+        workspace = Workspace(self._scheduler_session)
+        params = Params(request, workspace)
         execution_request = self._scheduler_session.execution_request(
             products=[method_mapping.response_type],
-            subjects=[request],
+            subjects=[params],
         )
         returns, throws = self._scheduler_session.execute(execution_request)
         if len(returns) == 1 and len(throws) == 0:

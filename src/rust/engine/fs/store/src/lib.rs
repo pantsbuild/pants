@@ -33,7 +33,7 @@ mod snapshot_ops;
 mod snapshot_ops_tests;
 #[cfg(test)]
 mod snapshot_tests;
-pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, StoreWrapper, SubsetParams};
+pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, SubsetParams};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
@@ -47,7 +47,10 @@ use std::time::{Duration, Instant};
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
-use fs::{default_cache_path, DigestEntry, FileContent, FileEntry, Permissions, RelativePath};
+use fs::{
+  default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
+  FileEntry, PathStat, Permissions, RelativePath,
+};
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -268,7 +271,7 @@ impl Store {
   }
 
   ///
-  /// A convenience method for storing a file.
+  /// A convenience method for storing small files.
   ///
   /// NB: This method should not be used for large blobs: prefer to stream them from their source
   /// using `store_file`.
@@ -280,7 +283,7 @@ impl Store {
   ) -> Result<Digest, String> {
     self
       .local
-      .store_bytes(EntryType::File, bytes, initial_lease)
+      .store_bytes(EntryType::File, None, bytes, initial_lease)
       .await
   }
 
@@ -372,6 +375,32 @@ impl Store {
   }
 
   ///
+  /// Ensure that the recursive contents of the given DigestTrie are persisted in the local Store.
+  ///
+  pub async fn record_digest_trie(
+    &self,
+    tree: DigestTrie,
+    initial_lease: bool,
+  ) -> Result<DirectoryDigest, String> {
+    // Collect all Directory structs in the trie.
+    let mut directories = Vec::new();
+    tree.walk(&mut |_, entry| match entry {
+      directory::Entry::Directory(d) => {
+        directories.push((Some(d.digest()), d.as_remexec_directory().to_bytes()))
+      }
+      directory::Entry::File(_) => (),
+    });
+
+    // Then store them as a batch.
+    let local = self.local.clone();
+    let digests = local
+      .store_bytes_batch(EntryType::Directory, directories, initial_lease)
+      .await?;
+
+    Ok(DirectoryDigest::new(digests[0], tree))
+  }
+
+  ///
   /// Save the bytes of the Directory proto locally, without regard for any of the
   /// contents of any FileNodes or DirectoryNodes therein (i.e. does not require that its
   /// children are already stored).
@@ -383,8 +412,67 @@ impl Store {
   ) -> Result<Digest, String> {
     let local = self.local.clone();
     local
-      .store_bytes(EntryType::Directory, directory.to_bytes(), initial_lease)
+      .store_bytes(
+        EntryType::Directory,
+        None,
+        directory.to_bytes(),
+        initial_lease,
+      )
       .await
+  }
+
+  ///
+  /// Loads a DigestTree from the local store, back-filling from remote if necessary.
+  ///
+  /// TODO: Add a native implementation that skips creating PathStats and directly produces
+  /// a DigestTrie.
+  ///
+  pub async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String> {
+    if let Some(tree) = digest.tree {
+      // The DigestTrie is already loaded.
+      return Ok(tree);
+    }
+
+    // The DigestTrie needs to be loaded from the Store.
+    let path_stats_per_directory = self
+      .walk(digest.as_digest(), |_, path_so_far, _, directory| {
+        let mut path_stats = Vec::new();
+        path_stats.extend(directory.directories.iter().map(move |dir_node| {
+          let path = path_so_far.join(dir_node.name.clone());
+          (PathStat::dir(path.clone(), Dir(path)), None)
+        }));
+        path_stats.extend(directory.files.iter().map(move |file_node| {
+          let path = path_so_far.join(file_node.name.clone());
+          (
+            PathStat::file(
+              path.clone(),
+              File {
+                path: path.clone(),
+                is_executable: file_node.is_executable,
+              },
+            ),
+            Some((path, file_node.digest.as_ref().unwrap().try_into().unwrap())),
+          )
+        }));
+        future::ok(path_stats).boxed()
+      })
+      .await?;
+
+    let (path_stats, maybe_digests): (Vec<_>, Vec<_>) =
+      Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter)).unzip();
+    let file_digests = maybe_digests.into_iter().flatten().collect();
+
+    let tree = DigestTrie::from_path_stats(path_stats, &file_digests)?;
+    let computed_digest = tree.compute_root_digest();
+    if digest.as_digest() != computed_digest {
+      return Err(format!(
+        "Computed digest for Snapshot loaded from store mismatched: {:?} vs {:?}",
+        digest.as_digest(),
+        computed_digest
+      ));
+    }
+
+    Ok(tree)
   }
 
   ///
@@ -474,7 +562,7 @@ impl Store {
         match maybe_bytes {
           Some(bytes) => {
             let value = f_remote(bytes.clone())?;
-            let stored_digest = local.store_bytes(entry_type, bytes, true).await?;
+            let stored_digest = local.store_bytes(entry_type, None, bytes, true).await?;
             if digest == stored_digest {
               Ok(Some(value))
             } else {
@@ -1262,21 +1350,29 @@ pub enum LocalMissingBehavior {
 }
 
 #[async_trait]
-impl StoreWrapper for Store {
+impl SnapshotOps for Store {
   async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, String> {
-    Ok(Store::load_file_bytes_with(self, digest, f).await?)
+    Store::load_file_bytes_with(self, digest, f).await
+  }
+
+  async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String> {
+    Store::load_digest_trie(self, digest).await
   }
 
   async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String> {
-    Ok(Store::load_directory(self, digest).await?)
+    Store::load_directory(self, digest).await
   }
 
   async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String> {
     Snapshot::get_directory_or_err(self.clone(), digest).await
+  }
+
+  async fn record_digest_trie(&self, tree: DigestTrie) -> Result<DirectoryDigest, String> {
+    Store::record_digest_trie(self, tree, true).await
   }
 
   async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String> {

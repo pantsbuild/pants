@@ -10,8 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::BytesMut;
 use fs::{
-  ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob, PreparedPathGlobs, RelativePath,
-  DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
+  DigestTrie, DirectoryDigest, ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob,
+  PreparedPathGlobs, RelativePath, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
 use futures::future::{self, FutureExt, TryFutureExt};
 use glob::Pattern;
@@ -46,41 +46,23 @@ pub struct SubsetParams {
 }
 
 ///
-/// A trait that encapsulates some of the features of a Store, with nicer type signatures. This is
-/// used to implement the `SnapshotOps` trait.
-///
-#[async_trait]
-pub trait StoreWrapper: Clone + Send + Sync {
-  async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
-    &self,
-    digest: Digest,
-    f: F,
-  ) -> Result<Option<T>, String>;
-
-  async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String>;
-  async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String>;
-
-  async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String>;
-}
-
-///
 /// Given Digest(s) representing Directory instances, merge them recursively into a single
 /// output Directory Digest.
 ///
 /// If a file is present with the same name and contents multiple times, it will appear once.
 /// If a file is present with the same name, but different contents, an error will be returned.
 ///
-async fn merge_directories<T: StoreWrapper + 'static>(
-  store_wrapper: T,
+async fn merge_directories<T: SnapshotOps + 'static>(
+  store: T,
   dir_digests: Vec<Digest>,
 ) -> Result<Digest, String> {
-  merge_directories_recursive(store_wrapper, PathBuf::new(), dir_digests).await
+  merge_directories_recursive(store, PathBuf::new(), dir_digests).await
 }
 
 // NB: This function is recursive, and so cannot be directly marked async:
 //   https://rust-lang.github.io/async-book/07_workarounds/05_recursion.html
-fn merge_directories_recursive<T: StoreWrapper + 'static>(
-  store_wrapper: T,
+fn merge_directories_recursive<T: SnapshotOps + 'static>(
+  store: T,
   parent_path: PathBuf,
   dir_digests: Vec<Digest>,
 ) -> future::BoxFuture<'static, Result<Digest, String>> {
@@ -96,7 +78,7 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
       dir_digests
         .into_iter()
         .map(|digest| {
-          store_wrapper
+          store
             .load_directory(digest)
             .and_then(move |maybe_directory| {
               future::ready(
@@ -119,7 +101,7 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
 
     // Group and recurse for DirectoryNodes.
     let child_directory_futures = {
-      let store = store_wrapper.clone();
+      let store = store.clone();
       let parent_path = parent_path.clone();
       let mut directories_to_merge = Iterator::flatten(
         directories
@@ -164,8 +146,8 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
 
     out_dir.directories = child_directories;
 
-    error_for_collisions(&store_wrapper, &parent_path, &out_dir).await?;
-    store_wrapper.record_directory(&out_dir).await
+    error_for_collisions(&store, &parent_path, &out_dir).await?;
+    store.record_directory(&out_dir).await
   }
   .boxed()
 }
@@ -173,8 +155,8 @@ fn merge_directories_recursive<T: StoreWrapper + 'static>(
 ///
 /// Ensure merge is unique and fail with debugging info if not.
 ///
-async fn error_for_collisions<T: StoreWrapper + 'static>(
-  store_wrapper: &T,
+async fn error_for_collisions<T: SnapshotOps + 'static>(
+  store: &T,
   parent_path: &Path,
   dir: &remexec::Directory,
 ) -> Result<(), String> {
@@ -200,7 +182,7 @@ async fn error_for_collisions<T: StoreWrapper + 'static>(
         digest.hash, digest.size_bytes
       );
 
-      let contents = store_wrapper
+      let contents = store
         .load_file_bytes_with(digest, |bytes| {
           const MAX_LENGTH: usize = 1024;
           let content_length = bytes.len();
@@ -499,8 +481,8 @@ impl IntermediateGlobbedFilesAndDirectories {
   }
 }
 
-async fn snapshot_glob_match<T: StoreWrapper>(
-  store_wrapper: T,
+async fn snapshot_glob_match<T: SnapshotOps + 'static>(
+  store: T,
   digest: Digest,
   path_globs: PreparedPathGlobs,
 ) -> Result<Digest, SnapshotOpsError> {
@@ -529,7 +511,7 @@ async fn snapshot_glob_match<T: StoreWrapper>(
   )) = unexpanded_stack.pop()
   {
     // 1a. Extract a single level of directory structure from the digest.
-    let cur_dir = store_wrapper
+    let cur_dir = store
       .load_directory(digest)
       .await?
       .ok_or_else(|| format!("directory digest {:?} was not found!", digest))?;
@@ -646,7 +628,7 @@ async fn snapshot_glob_match<T: StoreWrapper>(
       directories: all_directories,
       ..remexec::Directory::default()
     };
-    let digest = store_wrapper.record_directory(&final_directory).await?;
+    let digest = store.record_directory(&final_directory).await?;
     completed_digests.insert(prefix, digest);
   }
 
@@ -661,7 +643,20 @@ async fn snapshot_glob_match<T: StoreWrapper>(
 /// these primitives to compose any higher-level snapshot operations elsewhere in the codebase.
 ///
 #[async_trait]
-pub trait SnapshotOps: StoreWrapper + 'static {
+pub trait SnapshotOps: Clone + Send + Sync + 'static {
+  async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+    &self,
+    digest: Digest,
+    f: F,
+  ) -> Result<Option<T>, String>;
+
+  async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String>;
+  async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String>;
+  async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String>;
+
+  async fn record_digest_trie(&self, tree: DigestTrie) -> Result<DirectoryDigest, String>;
+  async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String>;
+
   ///
   /// Given N Snapshots, returns a new Snapshot that merges them.
   ///
@@ -783,8 +778,6 @@ pub trait SnapshotOps: StoreWrapper + 'static {
     self.add_prefix(EMPTY_DIGEST, path).await
   }
 }
-
-impl<T: StoreWrapper + 'static> SnapshotOps for T {}
 
 struct PartiallyExpandedDirectoryContext {
   pub files: Vec<remexec::FileNode>,

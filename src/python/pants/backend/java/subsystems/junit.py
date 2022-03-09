@@ -8,6 +8,7 @@ from pants.util.docutil import git_url
 
 class JUnit(JvmToolBase):
     options_scope = "junit"
+    name = "JUnit"
     help = "The JUnit test framework (https://junit.org)"
 
     default_version = "5.7.2"
@@ -20,7 +21,4 @@ class JUnit(JvmToolBase):
     default_lockfile_path = "src/python/pants/jvm/test/junit.default.lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    args = ArgsListOption(
-        passthrough=True,
-        help="Arguments to pass directly to JUnit, e.g. `--disable-ansi-colors`",
-    )
+    args = ArgsListOption(example="--disable-ansi-colors", passthrough=True)

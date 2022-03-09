@@ -1129,7 +1129,7 @@ def test_snapshot_properties() -> None:
     digest = Digest("a" * 64, 1000)
     snapshot = Snapshot._unsafe_create(digest, ["f.ext", "dir/f.ext"], ["dir"])
     assert snapshot.digest == digest
-    assert snapshot.files == ("f.ext", "dir/f.ext")
+    assert snapshot.files == ("dir/f.ext", "f.ext")
     assert snapshot.dirs == ("dir",)
 
 

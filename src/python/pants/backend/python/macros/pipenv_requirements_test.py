@@ -9,7 +9,8 @@ import pytest
 
 from pants.backend.python.macros import pipenv_requirements
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTargetGenerator
-from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.target import Target
@@ -78,6 +79,6 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="reqs", generated_name="cachetools"),
             ),
-            PythonRequirementsFileTarget({"source": "Pipfile.lock"}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"sources": ["Pipfile.lock"]}, file_addr),
         },
     )

@@ -42,10 +42,11 @@ from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
     FileOption,
+    SkipOption,
     StrListOption,
     TargetListOption,
 )
-from pants.util.docutil import bin_name, doc_url, git_url
+from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -70,6 +71,7 @@ class MyPyFieldSet(FieldSet):
 
 class MyPy(PythonToolBase):
     options_scope = "mypy"
+    name = "MyPy"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
     default_version = "mypy==0.910"
@@ -85,17 +87,8 @@ class MyPy(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
     uses_requirements_from_source_plugins = True
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't use MyPy when running `{bin_name()} typecheck`.",
-    )
-    args = ArgsListOption(
-        help=lambda cls: (
-            "Arguments to pass directly to mypy, e.g. "
-            f'`--{cls.options_scope}-args="--python-version 3.7 --disallow-any-expr"`'
-        ),
-    )
+    skip = SkipOption("check")
+    args = ArgsListOption(example="--python-version 3.7 --disallow-any-expr")
     config = FileOption(
         "--config",
         default=None,

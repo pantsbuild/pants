@@ -58,6 +58,7 @@ class PythonTestFieldSet(TestFieldSet):
 
 class PyTest(PythonToolBase):
     options_scope = "pytest"
+    name = "Pytest"
     help = "The pytest Python test framework (https://docs.pytest.org/)."
 
     # This should be compatible with requirements.txt, although it can be more precise.
@@ -73,10 +74,7 @@ class PyTest(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/subsystems/pytest_lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    args = ArgsListOption(
-        passthrough=True,
-        help='Arguments to pass directly to Pytest, e.g. `--pytest-args="-k test_foo --quiet"`',
-    )
+    args = ArgsListOption(example="-k test_foo --quiet", passthrough=True)
     timeouts_enabled = BoolOption(
         "--timeouts",
         default=True,

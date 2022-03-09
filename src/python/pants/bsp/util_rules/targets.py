@@ -8,6 +8,12 @@ from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier
 from pants.bsp.spec.targets import (
+    DependencyModulesItem,
+    DependencyModulesParams,
+    DependencyModulesResult,
+    DependencySourcesItem,
+    DependencySourcesParams,
+    DependencySourcesResult,
     SourceItem,
     SourceItemKind,
     SourcesItem,
@@ -131,9 +137,52 @@ async def bsp_build_target_sources(request: SourcesParams) -> SourcesResult:
     return SourcesResult(items=tuple(si.sources_item for si in sources_items))
 
 
+# -----------------------------------------------------------------------------------------------
+# Dependency Sources Request
+# See https://build-server-protocol.github.io/docs/specification.html#dependency-sources-request
+# -----------------------------------------------------------------------------------------------
+
+
+class DependencySourcesHandlerMapping(BSPHandlerMapping):
+    method_name = "buildTarget/dependencySources"
+    request_type = DependencySourcesParams
+    response_type = DependencySourcesResult
+
+
+@rule
+async def bsp_dependency_sources(request: DependencySourcesParams) -> DependencySourcesResult:
+    # TODO: This is a stub.
+    return DependencySourcesResult(
+        tuple(DependencySourcesItem(target=tgt, sources=()) for tgt in request.targets)
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# Dependency Modules Request
+# See https://build-server-protocol.github.io/docs/specification.html#dependency-modules-request
+# -----------------------------------------------------------------------------------------------
+
+
+class DependencyModulesHandlerMapping(BSPHandlerMapping):
+    method_name = "buildTarget/dependencyModules"
+    request_type = DependencyModulesParams
+    response_type = DependencyModulesResult
+
+
+@rule
+async def bsp_dependency_modules(request: DependencyModulesParams) -> DependencyModulesResult:
+    # TODO: This is a stub.
+    # Note: VSCode expects this endpoint to exist even if the capability bit for it is set `false`.
+    return DependencyModulesResult(
+        tuple(DependencyModulesItem(target=tgt, modules=()) for tgt in request.targets)
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(BSPHandlerMapping, WorkspaceBuildTargetsHandlerMapping),
         UnionRule(BSPHandlerMapping, BuildTargetSourcesHandlerMapping),
+        UnionRule(BSPHandlerMapping, DependencySourcesHandlerMapping),
+        UnionRule(BSPHandlerMapping, DependencyModulesHandlerMapping),
     )

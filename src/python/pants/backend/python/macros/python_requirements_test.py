@@ -9,7 +9,8 @@ import pytest
 
 from pants.backend.python.macros import python_requirements
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
-from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.target import Target
@@ -113,7 +114,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="reqs", generated_name="pip"),
             ),
-            PythonRequirementsFileTarget({"source": "requirements.txt"}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"sources": ["requirements.txt"]}, file_addr),
         },
     )
 
@@ -150,7 +151,7 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
                 {"requirements": ["repletewateringcan>=7"], "dependencies": [file_addr.spec]},
                 Address("", target_name="reqs", generated_name="repletewateringcan"),
             ),
-            PythonRequirementsFileTarget({"source": "requirements.txt"}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"sources": ["requirements.txt"]}, file_addr),
         },
     )
 
@@ -189,6 +190,6 @@ def test_source_override(rule_runner: RuleRunner) -> None:
                 {"requirements": ["ansicolors>=1.18.0"], "dependencies": [file_addr.spec]},
                 Address("", target_name="reqs", generated_name="ansicolors"),
             ),
-            PythonRequirementsFileTarget({"source": "subdir/requirements.txt"}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"sources": ["subdir/requirements.txt"]}, file_addr),
         },
     )

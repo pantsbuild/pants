@@ -26,13 +26,15 @@ from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementResolveField,
     PythonRequirementsField,
-    PythonRequirementsFileSourcesField,
-    PythonRequirementsFileTarget,
     PythonRequirementTarget,
     PythonRequirementTypeStubModulesField,
 )
 from pants.base.build_root import BuildRoot
 from pants.base.parse_context import ParseContext
+from pants.core.target_types import (
+    TargetGeneratorSourcesHelperSourcesField,
+    TargetGeneratorSourcesHelperTarget,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
@@ -426,8 +428,8 @@ async def generate_from_python_requirement(
         for k, v in request.require_unparametrized_overrides().items()
     }
 
-    file_tgt = PythonRequirementsFileTarget(
-        {PythonRequirementsFileSourcesField.alias: pyproject_rel_path},
+    file_tgt = TargetGeneratorSourcesHelperTarget(
+        {TargetGeneratorSourcesHelperSourcesField.alias: [pyproject_rel_path]},
         Address(
             generator.address.spec_path,
             target_name=generator.address.target_name,

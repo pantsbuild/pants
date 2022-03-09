@@ -6,15 +6,28 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Generic, TypeVar, Union, cast, overload
+from typing import Any, Callable, Generic, Iterator, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
+from pants.util.docutil import bin_name
 
 
 @dataclass(frozen=True)
 class OptionsInfo:
     flag_names: tuple[str, ...]
     flag_options: dict[str, Any]
+
+
+def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
+    """Yields the ordered options info from the MRO of the provided class."""
+    # NB: Since registration ordering matters (it impacts `help` output), we register these in
+    # class attribute order, starting from the base class down.
+    for class_ in reversed(inspect.getmro(cls)):
+        for attrname in class_.__dict__.keys():
+            # NB: We use attrname and getattr to trigger descriptors
+            attr = getattr(cls, attrname)
+            if isinstance(attr, OptionsInfo):
+                yield attr
 
 
 # The type of the option.
@@ -36,6 +49,9 @@ _DynamicDefaultT = Callable[[_SubsystemType], Any]
 _MaybeDynamicT = Union[_DynamicDefaultT, _DefaultT]
 # The type of the `help` parameter for each option.
 _HelpT = _MaybeDynamicT[str]
+# NB: Ideally this would be `Callable[[_SubsystemType], bool]`, however where this type is used is
+# generally provided untyped lambdas.
+_RegisterIfFuncT = Callable[[_SubsystemType], Any]
 
 
 def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
@@ -55,6 +71,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     _flag_names: tuple[str, ...]
     _default: _MaybeDynamicT[_DefaultT]
     _help: _HelpT
+    _register_if: _RegisterIfFuncT
     _extra_kwargs: dict[str, Any]
 
     # NB: We define `__new__` rather than `__init__` because some subclasses need to define
@@ -64,6 +81,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         *flag_names: str,
         default: _MaybeDynamicT[_DefaultT],
         help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -79,6 +97,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         self._flag_names = flag_names
         self._default = default
         self._help = help
+        self._register_if = register_if or (lambda cls: True)
         self._extra_kwargs = {
             k: v
             for k, v in {
@@ -113,7 +132,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         )
 
     @overload
-    def __get__(self, obj: None, objtype: Any) -> OptionsInfo:
+    def __get__(self, obj: None, objtype: Any) -> OptionsInfo | None:
         ...
 
     @overload
@@ -122,7 +141,9 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
 
     def __get__(self, obj, objtype):
         if obj is None:
-            return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
+            if self._register_if(objtype):
+                return OptionsInfo(self._flag_names, self.get_flag_options(objtype))
+            return None
         long_name = self._flag_names[-1]
         option_value = getattr(obj.options, long_name[2:].replace("-", "_"))
         if option_value is None:
@@ -154,6 +175,7 @@ class _ListOptionBase(
         *flag_names: str,
         default: _MaybeDynamicT[list[_ListMemberT]] = [],
         help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -171,6 +193,7 @@ class _ListOptionBase(
             *flag_names,
             default=default,  # type: ignore[arg-type]
             help=help,
+            register_if=register_if,
             advanced=advanced,
             daemon=daemon,
             default_help_repr=default_help_repr,
@@ -365,6 +388,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         *flag_names: str,
         default: _EnumT,
         help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -386,6 +410,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -407,6 +432,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type: type[_EnumT],
         default: None,
         help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -426,6 +452,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type=None,
         default,
         help,
+        register_if=None,
         # Additional bells/whistles
         advanced=None,
         daemon=None,
@@ -442,6 +469,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
             *flag_names,
             default=default,
             help=help,
+            register_if=register_if,
             advanced=advanced,
             daemon=daemon,
             default_help_repr=default_help_repr,
@@ -490,6 +518,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         *flag_names: str,
         default: list[_EnumT],
         help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = ...,
         daemon: bool | None = ...,
@@ -511,6 +540,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = ...,
         daemon: bool | None = ...,
@@ -531,6 +561,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         *flag_names: str,
         enum_type: type[_EnumT],
         help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = ...,
         daemon: bool | None = ...,
@@ -550,6 +581,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         enum_type=None,
         default=[],
         help,
+        register_if=None,
         # Additional bells/whistles
         advanced=None,
         daemon=None,
@@ -566,6 +598,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
             *flag_names,
             default=default,
             help=help,
+            register_if=register_if,
             advanced=advanced,
             daemon=daemon,
             default_help_repr=default_help_repr,
@@ -627,6 +660,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         *flag_names,
         default: _MaybeDynamicT[dict[str, _ValueT]] = {},
         help,
+        register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
         daemon: bool | None = None,
         default_help_repr: str | None = None,
@@ -642,6 +676,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
             *flag_names,
             default=default,  # type: ignore[arg-type]
             help=help,
+            register_if=register_if,
             advanced=advanced,
             daemon=daemon,
             default_help_repr=default_help_repr,
@@ -662,17 +697,48 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 # -----------------------------------------------------------------------------------------------
 
 
+class SkipOption(BoolOption[bool]):
+    """A --skip option (for an invocable tool)."""
+
+    def __new__(cls, goal: str, *other_goals: str):
+        goals = (goal,) + other_goals
+        invocation_str = " and ".join([f"`{bin_name()} {goal}`" for goal in goals])
+        return super().__new__(
+            cls,  # type: ignore[arg-type]
+            "--skip",
+            default=False,  # type: ignore[arg-type]
+            help=(
+                lambda subsystem_cls: (
+                    f"Don't use {subsystem_cls.name} when running {invocation_str}."
+                )
+            ),
+        )
+
+
 class ArgsListOption(ShellStrListOption):
-    """A homogenous list of shell str options, to be used as arguments passed to some other tool.
+    """An option for arguments passed to some other tool."""
 
-    Clients can call `passthrough()` to set the "passthrough" flag. See `passthrough` for more info.
-    """
-
-    def __new__(cls, help: _HelpT, *, passthrough: bool | None = None):
+    def __new__(
+        cls,
+        *,
+        example: str,
+        extra_help: str = "",
+        tool_name: str | None = None,
+        # This should be set when callers can alternatively use "--" followed by the arguments,
+        # instead of having to provide "--[scope]-args='--arg1 --arg2'".
+        passthrough: bool | None = None,
+    ):
+        if extra_help:
+            extra_help = "\n\n" + extra_help
         instance = super().__new__(
             cls,  # type: ignore[arg-type]
             "--args",
-            help=help,
+            help=(
+                lambda subsystem_cls: (
+                    f"Arguments to pass directly to {tool_name or subsystem_cls.name}, "
+                    f"e.g. `--{subsystem_cls.options_scope}-args='{example}'`.{extra_help}"
+                )
+            ),
         )
         if passthrough is not None:
             instance._extra_kwargs["passthrough"] = passthrough

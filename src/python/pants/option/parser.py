@@ -585,10 +585,8 @@ class Parser:
         # Get value from config files, and capture details about its derivation.
         config_details = None
         config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
-        config_default_val_or_str = expand(
-            self._config.get(Config.DEFAULT_SECTION, dest, default=None)
-        )
-        config_val_or_str = expand(self._config.get(config_section, dest, default=None))
+        config_default_val_or_str = expand(self._config.get(Config.DEFAULT_SECTION, dest))
+        config_val_or_str = expand(self._config.get(config_section, dest))
         config_source_file = self._config.get_source_for_option(
             config_section, dest
         ) or self._config.get_source_for_option(Config.DEFAULT_SECTION, dest)

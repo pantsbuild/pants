@@ -6,7 +6,10 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.codegen.thrift.apache.python.rules import GeneratePythonFromThriftRequest
+from pants.backend.codegen.thrift.apache.python.rules import (
+    GeneratePythonFromThriftRequest,
+    InjectApacheThriftPythonDependencies,
+)
 from pants.backend.codegen.thrift.apache.python.rules import rules as apache_thrift_python_rules
 from pants.backend.codegen.thrift.apache.rules import rules as apache_thrift_rules
 from pants.backend.codegen.thrift.rules import rules as thrift_rules
@@ -14,13 +17,25 @@ from pants.backend.codegen.thrift.target_types import (
     ThriftSourceField,
     ThriftSourcesGeneratorTarget,
 )
+from pants.backend.codegen.utils import (
+    AmbiguousPythonCodegenRuntimeLibrary,
+    MissingPythonCodegenRuntimeLibrary,
+)
+from pants.backend.python.dependency_inference import module_mapper
+from pants.backend.python.target_types import PythonRequirementTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.internals import graph
 from pants.engine.rules import QueryRule
-from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.engine.target import (
+    Dependencies,
+    GeneratedSources,
+    HydratedSources,
+    HydrateSourcesRequest,
+    InjectedDependencies,
+)
 from pants.source import source_root
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -34,10 +49,11 @@ def rule_runner() -> RuleRunner:
             *source_root.rules(),
             *graph.rules(),
             *stripped_source_files.rules(),
+            *module_mapper.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GeneratePythonFromThriftRequest]),
         ],
-        target_types=[ThriftSourcesGeneratorTarget],
+        target_types=[ThriftSourcesGeneratorTarget, PythonRequirementTarget],
     )
 
 
@@ -49,7 +65,11 @@ def assert_files_generated(
     source_roots: list[str],
     extra_args: list[str] | None = None,
 ) -> None:
-    args = [f"--source-root-patterns={repr(source_roots)}", *(extra_args or ())]
+    args = [
+        f"--source-root-patterns={repr(source_roots)}",
+        "--no-python-thrift-infer-runtime-dependency",
+        *(extra_args or ()),
+    ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     tgt = rule_runner.get_target(address)
     thrift_sources = rule_runner.request(
@@ -156,3 +176,37 @@ def test_top_level_source_root(rule_runner: RuleRunner) -> None:
             "custom_namespace/module/ttypes.py",
         ],
     )
+
+
+def test_find_thrift_python_requirement(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"codegen/dir/f.thrift": "", "codegen/dir/BUILD": "thrift_sources()"})
+    rule_runner.set_options(
+        ["--python-resolves={'python-default': '', 'another': ''}", "--python-enable-resolves"]
+    )
+    thrift_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.thrift"))
+    request = InjectApacheThriftPythonDependencies(thrift_tgt[Dependencies])
+
+    # Start with no relevant requirements.
+    with engine_error(MissingPythonCodegenRuntimeLibrary):
+        rule_runner.request(InjectedDependencies, [request])
+
+    # If exactly one, match it.
+    rule_runner.write_files({"reqs1/BUILD": "python_requirement(requirements=['thrift'])"})
+    assert rule_runner.request(InjectedDependencies, [request]) == InjectedDependencies(
+        [Address("reqs1")]
+    )
+
+    # Multiple is fine if from other resolve.
+    rule_runner.write_files(
+        {"another_resolve/BUILD": "python_requirement(requirements=['thrift'], resolve='another')"}
+    )
+    assert rule_runner.request(InjectedDependencies, [request]) == InjectedDependencies(
+        [Address("reqs1")]
+    )
+
+    # If multiple from the same resolve, error.
+    rule_runner.write_files({"reqs2/BUILD": "python_requirement(requirements=['thrift'])"})
+    with engine_error(
+        AmbiguousPythonCodegenRuntimeLibrary, contains="['reqs1:reqs1', 'reqs2:reqs2']"
+    ):
+        rule_runner.request(InjectedDependencies, [request])
