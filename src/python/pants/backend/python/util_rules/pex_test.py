@@ -31,6 +31,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
+    _pex_lockfile_requirement_count,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
@@ -665,3 +666,57 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     )
     with engine_error(InvalidLockfileError):
         create_pex_and_get_all_data(rule_runner, requirements=lockfile_content)
+
+
+def test_pex_lockfile_requirement_count() -> None:
+    assert _pex_lockfile_requirement_count("empty") == 2
+    assert (
+        _pex_lockfile_requirement_count(
+            textwrap.dedent(
+                """\
+            {
+              "allow_builds": true,
+              "allow_prereleases": false,
+              "allow_wheels": true,
+              "build_isolation": true,
+              "constraints": [],
+              "locked_resolves": [
+                {
+                  "locked_requirements": [
+                    {
+                      "artifacts": [
+                        {
+                          "algorithm": "sha256",
+                          "hash": "00d2dde5a675579325902536738dd27e4fac1fd68f773fe36c21044eb559e187",
+                          "url": "https://files.pythonhosted.org/packages/53/18/a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/ansicolors-1.1.8-py2.py3-none-any.whl"
+                        }
+                      ],
+                      "project_name": "ansicolors",
+                      "requires_dists": [],
+                      "requires_python": null,
+                      "version": "1.1.8"
+                    }
+                  ],
+                  "platform_tag": [
+                    "cp39",
+                    "cp39",
+                    "macosx_11_0_arm64"
+                  ]
+                }
+              ],
+              "pex_version": "2.1.70",
+              "prefer_older_binary": false,
+              "requirements": [
+                "ansicolors"
+              ],
+              "requires_python": [],
+              "resolver_version": "pip-legacy-resolver",
+              "style": "strict",
+              "transitive": true,
+              "use_pep517": null
+            }
+            """
+            )
+        )
+        == 3
+    )

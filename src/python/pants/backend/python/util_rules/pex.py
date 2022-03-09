@@ -438,11 +438,14 @@ async def build_pex(
         is_pex_json_lock = False  # TODO: calculate via inspection of lock_bytes and maybe lock_path
         if is_pex_json_lock:
             requirements_file_digest = requirements_file_digest  # TODO: strip the Pants header
-            requirement_count = 1   # TODO: set this appropriately, which requires parsing the JSON.
+
+            requirement_count = _pex_lockfile_requirement_count(lock_bytes.decode())
             argv.extend(["--lock", lock_path])
         else:
-            argv.extend(["--requirement", lock_path, "--no-transitive"])
+            # Note: this is a very naive heuristic. It will overcount because entries often
+            # have >1 line due to `--hash`.
             requirement_count = len(lock_bytes.decode().splitlines())
+            argv.extend(["--requirement", lock_path, "--no-transitive"])
 
         maybe_validate_metadata(
             parse_metadata, request.interpreter_constraints, request.requirements, python_setup  # type: ignore[arg-type]
@@ -559,6 +562,20 @@ def _build_pex_description(request: PexRequest) -> str:
                 f"{', '.join(request.requirements.req_strings)}"
             )
     return f"Building {request.output_filename} {desc_suffix}"
+
+
+def _pex_lockfile_requirement_count(lock_content: str) -> int:
+    # TODO: this is a very naive heuristic that will overcount, and also relies on Pants
+    #  setting `--indent` when generating lockfiles. More robust would be parsing the JSON
+    #  and getting the len(locked_resolves.locked_requirements.project_name), but we risk
+    #  if Pex ever changes its lockfile format.
+
+    num_lines = len(lock_content.splitlines())
+    # These are very naive estimates, and they bias towards overcounting. For example, requirements
+    # often are 20+ lines.
+    num_lines_for_options = 10
+    lines_per_req = 10
+    return max((num_lines - num_lines_for_options) // lines_per_req, 2)
 
 
 @rule
