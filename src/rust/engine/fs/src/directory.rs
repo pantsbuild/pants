@@ -42,6 +42,12 @@ pub struct DirectoryDigest {
   pub tree: Option<DigestTrie>,
 }
 
+impl workunit_store::DirectoryDigest for DirectoryDigest {
+  fn as_any(&self) -> &dyn std::any::Any {
+    self
+  }
+}
+
 impl Eq for DirectoryDigest {}
 
 impl PartialEq for DirectoryDigest {

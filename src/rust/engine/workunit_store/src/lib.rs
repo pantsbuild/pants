@@ -25,10 +25,12 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::any::Any;
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::collections::hash_map::Entry;
 use std::collections::{BinaryHeap, HashMap};
+use std::fmt::Debug;
 use std::future::Future;
 use std::sync::atomic::{self, AtomicBool};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -174,10 +176,24 @@ impl WorkunitState {
   }
 }
 
+// NB: Only implemented for `fs::DirectoryDigest`, but is boxed to avoid a cycle between this crate
+// and the `fs` crate.
+pub trait DirectoryDigest: Any + Debug + Send + Sync + 'static {
+  // See https://vorner.github.io/2020/08/02/fights-with-downcasting.html.
+  fn as_any(&self) -> &dyn Any;
+}
+
+// NB: Only implemented for `Value`, but is boxed to avoid a cycle between this crate and the
+// `engine` crate.
+pub trait Value: Any + Debug + Send + Sync + 'static {
+  // See https://vorner.github.io/2020/08/02/fights-with-downcasting.html.
+  fn as_any(&self) -> &dyn Any;
+}
+
 #[derive(Clone, Debug)]
 pub enum ArtifactOutput {
   FileDigest(hashing::Digest),
-  Snapshot(hashing::Digest),
+  Snapshot(Arc<dyn DirectoryDigest>),
 }
 
 #[derive(Clone, Debug)]
@@ -206,20 +222,12 @@ impl Default for WorkunitMetadata {
 }
 
 /// Abstract id for passing user metadata items around
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub enum UserMetadataItem {
-  PyValue(UserMetadataPyValue),
+  // NB: Always stores a ...
+  PyValue(Arc<dyn Value>),
   ImmediateInt(i64),
   ImmediateString(String),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct UserMetadataPyValue(uuid::Uuid);
-
-impl UserMetadataPyValue {
-  pub fn new() -> UserMetadataPyValue {
-    UserMetadataPyValue(uuid::Uuid::new_v4())
-  }
 }
 
 enum StoreMsg {
