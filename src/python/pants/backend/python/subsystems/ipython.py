@@ -60,7 +60,9 @@ async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not ipython.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(ipython)
+        return GeneratePythonLockfile.from_tool(
+            ipython, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # IPython is often run against the whole repo (`./pants repl ::`), but it is possible to run
     # on subsets of the codebase with disjoint interpreter constraints, such as
@@ -79,7 +81,9 @@ async def setup_ipython_lockfile(
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return GeneratePythonLockfile.from_tool(
-        ipython, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        ipython,
+        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

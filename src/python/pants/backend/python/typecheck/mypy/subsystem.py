@@ -274,7 +274,9 @@ async def setup_mypy_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not mypy.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(mypy)
+        return GeneratePythonLockfile.from_tool(
+            mypy, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
@@ -293,7 +295,10 @@ async def setup_mypy_lockfile(
             constraints = code_constraints
 
     return GeneratePythonLockfile.from_tool(
-        mypy, constraints, extra_requirements=first_party_plugins.requirement_strings
+        mypy,
+        constraints,
+        extra_requirements=first_party_plugins.requirement_strings,
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

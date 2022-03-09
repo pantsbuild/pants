@@ -15,6 +15,7 @@ import toml
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
@@ -216,9 +217,11 @@ class CoveragePyLockfileSentinel(GenerateToolLockfileSentinel):
 
 @rule
 def setup_coverage_lockfile(
-    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem
+    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(coverage)
+    return GeneratePythonLockfile.from_tool(
+        coverage, use_pex=python_setup.generate_lockfiles_with_pex
+    )
 
 
 @dataclass(frozen=True)

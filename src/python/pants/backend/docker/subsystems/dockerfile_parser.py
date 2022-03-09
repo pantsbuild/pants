@@ -13,6 +13,7 @@ from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -52,9 +53,13 @@ class DockerfileParserLockfileSentinel(GenerateToolLockfileSentinel):
 
 @rule
 def setup_lockfile_request(
-    _: DockerfileParserLockfileSentinel, dockerfile_parser: DockerfileParser
+    _: DockerfileParserLockfileSentinel,
+    dockerfile_parser: DockerfileParser,
+    python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(dockerfile_parser)
+    return GeneratePythonLockfile.from_tool(
+        dockerfile_parser, use_pex=python_setup.generate_lockfiles_with_pex
+    )
 
 
 @dataclass(frozen=True)

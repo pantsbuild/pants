@@ -233,7 +233,9 @@ async def setup_pylint_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not pylint.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(pylint)
+        return GeneratePythonLockfile.from_tool(
+            pylint, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # While Pylint will run in partitions, we need a single lockfile that works with every
     # partition. We must also consider any 3rd-party requirements used by 1st-party plugins.
@@ -274,6 +276,7 @@ async def setup_pylint_lockfile(
         pylint,
         constraints or InterpreterConstraints(python_setup.interpreter_constraints),
         extra_requirements=first_party_plugins.requirement_strings,
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 
