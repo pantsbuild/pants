@@ -790,10 +790,12 @@ class PythonTestUtilsGeneratorTarget(Target):
     )
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
-        "This target generator is intended for test utility files like `conftest.py`, although it "
-        "behaves identically to the `python_sources` target generator and you can safely use that "
-        "instead. This target only exists to help you better model and keep separate test support "
-        "files vs. production files."
+        "This target generator is intended for test utility files like `conftest.py` or "
+        "`my_test_utils.py`. Technically, it generates `python_source` targets in the exact same "
+        "way as the `python_sources` target generator does, only that the `sources` field has a "
+        "different default. So it is valid to use `python_sources` instead. However, this target "
+        "can be helpful to better model your code by keeping separate test support files vs. "
+        "production files."
     )
 
 
