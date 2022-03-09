@@ -42,7 +42,6 @@ from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass(frozen=True)
 class HelmChart:
     address: Address
