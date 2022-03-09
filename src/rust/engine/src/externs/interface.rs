@@ -665,7 +665,6 @@ async fn workunit_to_py_value(
   workunit_store: &WorkunitStore,
   workunit: &Workunit,
   core: &Arc<Core>,
-  session: &Session,
 ) -> PyO3Result<Value> {
   let mut dict_entries = {
     let gil = Python::acquire_gil();
@@ -749,11 +748,18 @@ async fn workunit_to_py_value(
         crate::nodes::Snapshot::store_file_digest(gil.python(), *digest)
           .map_err(PyException::new_err)?
       }
-      ArtifactOutput::Snapshot(digest) => {
-        let snapshot =
-          store::Snapshot::from_digest(store, DirectoryDigest::todo_from_digest(*digest))
-            .await
-            .map_err(PyException::new_err)?;
+      ArtifactOutput::Snapshot(digest_handle) => {
+        let digest = (&**digest_handle)
+          .as_any()
+          .downcast_ref::<DirectoryDigest>()
+          .ok_or_else(|| {
+            PyException::new_err(format!(
+              "Failed to convert {digest_handle:?} to a DirectoryDigest."
+            ))
+          })?;
+        let snapshot = store::Snapshot::from_digest(store, digest.clone())
+          .await
+          .map_err(PyException::new_err)?;
         let gil = Python::acquire_gil();
         let py = gil.python();
         crate::nodes::Snapshot::store_snapshot(py, snapshot).map_err(PyException::new_err)?
@@ -775,18 +781,13 @@ async fn workunit_to_py_value(
     let value = match user_metadata_item {
       UserMetadataItem::ImmediateString(v) => v.into_py(py),
       UserMetadataItem::ImmediateInt(n) => n.into_py(py),
-      UserMetadataItem::PyValue(py_val_handle) => {
-        match session.with_metadata_map(|map| map.get(py_val_handle).cloned()) {
-          None => {
-            log::warn!(
-              "Workunit metadata() value not found for key: {}",
-              user_metadata_key
-            );
-            continue;
-          }
-          Some(v) => v,
-        }
-      }
+      UserMetadataItem::PyValue(py_val_handle) => (&**py_val_handle)
+        .as_any()
+        .downcast_ref::<Value>()
+        .ok_or_else(|| {
+          PyException::new_err(format!("Failed to convert {py_val_handle:?} to a Value."))
+        })?
+        .to_object(py),
     };
     user_metadata_entries.push((
       externs::store_utf8(py, user_metadata_key.as_str()),
@@ -849,11 +850,10 @@ async fn workunits_to_py_tuple_value(
   workunit_store: &WorkunitStore,
   workunits: Vec<Workunit>,
   core: &Arc<Core>,
-  session: &Session,
 ) -> PyO3Result<Value> {
   let mut workunit_values = Vec::new();
   for workunit in workunits {
-    let py_value = workunit_to_py_value(workunit_store, &workunit, core, session).await?;
+    let py_value = workunit_to_py_value(workunit_store, &workunit, core).await?;
     workunit_values.push(py_value);
   }
 
@@ -902,14 +902,12 @@ fn session_poll_workunits(
         &workunit_store,
         started,
         &core,
-        &session,
       ))?;
       let completed_val = core.executor.block_on(workunits_to_py_tuple_value(
         py,
         &workunit_store,
         completed,
         &core,
-        &session,
       ))?;
       Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
     })

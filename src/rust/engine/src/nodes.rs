@@ -1192,7 +1192,7 @@ impl WrappedNode for Task {
     let engine_aware_return_type = if self.task.engine_aware_return_type {
       let gil = Python::acquire_gil();
       let py = gil.python();
-      EngineAwareReturnType::from_task_result((*result_val).as_ref(py), &context)
+      EngineAwareReturnType::from_task_result((*result_val).as_ref(py))
     } else {
       EngineAwareReturnType::default()
     };
@@ -1397,7 +1397,7 @@ impl Node for NodeKey {
       let py = gil.python();
       engine_aware_params
         .iter()
-        .flat_map(|val| EngineAwareParameter::metadata(&context, (**val).as_ref(py)))
+        .flat_map(|val| EngineAwareParameter::metadata((**val).as_ref(py)))
         .collect()
     };
 

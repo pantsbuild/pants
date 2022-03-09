@@ -851,6 +851,7 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
+ "workunit_store",
 ]
 
 [[package]]
@@ -3977,7 +3978,6 @@ dependencies = [
  "strum",
  "strum_macros",
  "tokio",
- "uuid",
 ]
 
 [[package]]

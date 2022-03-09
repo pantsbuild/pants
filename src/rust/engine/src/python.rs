@@ -273,8 +273,8 @@ impl Key {
 pub struct Value(Arc<PyObject>);
 
 // NB: The size of objects held by a Graph is tracked independently, so we assert that each Value
-// is only as large as its pointers.
-known_deep_size!(8 * 3; Value);
+// is only as large as its pointer.
+known_deep_size!(8; Value);
 
 impl Value {
   pub fn new(obj: PyObject) -> Value {
@@ -287,6 +287,12 @@ impl Value {
       Ok(obj) => obj,
       Err(arc_handle) => arc_handle.clone_ref(py),
     }
+  }
+}
+
+impl workunit_store::Value for Value {
+  fn as_any(&self) -> &dyn std::any::Any {
+    self
   }
 }
 
