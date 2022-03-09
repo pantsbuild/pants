@@ -69,6 +69,7 @@ class JdkRequest:
         fields = [t[JvmJdkField] for t in target.members if t.has_field(JvmJdkField)]
 
         if not fields:
+            return JdkRequest("adopt:1.11")
             raise ValueError(
                 f"Cannot construct a JDK request for {target}, since none of its "
                 f"members have a `{JvmJdkField.alias}=` field:\n{target.bullet_list()}"

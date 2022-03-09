@@ -6,11 +6,25 @@
 # {
 #   "version": 1,
 #   "generated_with_requirements": [
+#     "com.google.protobuf:protobuf-java:3.19.0,url=not_provided,jar=not_provided",
 #     "org.scala-lang:scala-library:2.13.6,url=not_provided,jar=not_provided"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
 
+[[entries]]
+directDependencies = []
+dependencies = []
+file_name = "com.google.protobuf_protobuf-java_3.19.0.jar"
+
+[entries.coord]
+group = "com.google.protobuf"
+artifact = "protobuf-java"
+version = "3.19.0"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "3173634eb143b38542be6174f175fa5031020651f7347c3abe984e8af9e0150e"
+serialized_bytes_length = 1681556
 [[entries]]
 directDependencies = []
 dependencies = []

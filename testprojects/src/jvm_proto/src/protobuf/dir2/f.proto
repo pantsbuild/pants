@@ -1,0 +1,6 @@
+                syntax = "proto3";
+
+                package dir2;
+
+                import "dir1/f.proto";
+

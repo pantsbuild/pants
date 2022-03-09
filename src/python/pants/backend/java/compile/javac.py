@@ -13,7 +13,7 @@ from pants.backend.java.dependency_inference.rules import (
 )
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inference_rules
 from pants.backend.java.subsystems.javac import JavacSubsystem
-from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
+from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaProtobufFieldSet, JavaSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 class CompileJavaSourceRequest(ClasspathEntryRequest):
-    field_sets = (JavaFieldSet, JavaGeneratorFieldSet)
+    field_sets = (JavaFieldSet, JavaGeneratorFieldSet, JavaProtobufFieldSet,)
 
 
 # TODO: This code is duplicated in the javac and BSP rules.
@@ -182,6 +182,9 @@ async def compile_java_source(
             level=LogLevel.DEBUG,
         ),
     )
+
+    logger.warning(f"{compile_result.stderr.decode()}")
+
     if compile_result.exit_code != 0:
         return FallibleClasspathEntry.from_fallible_process_result(
             str(request.component),
@@ -210,7 +213,7 @@ async def compile_java_source(
                 input_digest=compile_result.output_digest,
                 output_files=output_files,
                 description=f"Capture outputs of {request.component} for javac",
-                level=LogLevel.TRACE,
+                level=LogLevel.DEBUG,
             ),
         )
         jar_output_digest = jar_result.output_digest

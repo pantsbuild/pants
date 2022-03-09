@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
 
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
@@ -36,6 +37,14 @@ class JavaFieldSet(FieldSet):
     required_fields = (JavaSourceField,)
 
     sources: JavaSourceField
+
+
+@dataclass(frozen=True)
+class JavaProtobufFieldSet(FieldSet):
+    required_fields = (ProtobufSourceField,)
+
+    sources: ProtobufSourceField
+
 
 
 @dataclass(frozen=True)

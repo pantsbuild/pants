@@ -119,6 +119,5 @@ async def generate_java_from_protobuf(
 def rules():
     return [
         *collect_rules(),
-        *pex.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
     ]
