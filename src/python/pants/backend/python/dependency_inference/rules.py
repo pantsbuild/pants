@@ -184,7 +184,7 @@ def _get_inferred_asset_deps(
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 possible_addresses,
                 address,
-                import_reference="module",
+                import_reference="asset",
                 context=f"The target {address} uses `{filepath}`",
             )
             maybe_disambiguated = explicitly_provided_deps.disambiguated(possible_addresses)
