@@ -49,13 +49,13 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
   default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
-  FileEntry, PathStat, Permissions, RelativePath,
+  FileEntry, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::status_to_str;
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -473,6 +473,22 @@ impl Store {
     }
 
     Ok(tree)
+  }
+
+  ///
+  /// Loads the given directory Digest as a DirectoryDigest, eagerly fetching its tree from
+  /// storage. To convert non-eagerly, use `DirectoryDigest::from_persisted_digest`.
+  ///
+  /// In general, DirectoryDigests should be consumed lazily to avoid fetching from a remote
+  /// store unnecessarily, so this method is primarily useful for tests and benchmarks.
+  ///
+  pub async fn load_directory_digest(&self, digest: Digest) -> Result<DirectoryDigest, String> {
+    Ok(DirectoryDigest::new(
+      digest,
+      self
+        .load_digest_trie(DirectoryDigest::from_persisted_digest(digest))
+        .await?,
+    ))
   }
 
   ///
@@ -1147,105 +1163,70 @@ impl Store {
   ///
   /// Returns files sorted by their path.
   ///
-  pub fn contents_for_directory(
+  pub async fn contents_for_directory(
     &self,
-    digest: Digest,
-  ) -> BoxFuture<'static, Result<Vec<FileContent>, String>> {
+    digest: DirectoryDigest,
+  ) -> Result<Vec<FileContent>, String> {
+    let mut files = Vec::new();
     self
-      .walk(digest, move |store, path_so_far, _, directory| {
-        future::try_join_all(
-          directory
-            .files
-            .iter()
-            .map(|file_node| {
-              let path = path_so_far.join(file_node.name.clone());
-              let is_executable = file_node.is_executable;
-              let file_node_digest = try_future!(require_digest(file_node.digest.as_ref()));
-              let store = store.clone();
-              let res = async move {
-                let maybe_bytes = store
-                  .load_file_bytes_with(file_node_digest, Bytes::copy_from_slice)
-                  .await?;
-                maybe_bytes
-                  .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                  .map(|content| FileContent {
-                    path,
-                    content,
-                    is_executable,
-                  })
-              };
-              res.boxed()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .boxed()
-      })
-      .map(|file_contents_per_directory| {
-        file_contents_per_directory.map(|xs| {
-          let mut vec = xs
-            .into_iter()
-            .flat_map(|x| x.into_iter())
-            .collect::<Vec<_>>();
-          vec.sort_by(|l, r| l.path.cmp(&r.path));
-          vec
-        })
-      })
-      .boxed()
+      .load_digest_trie(digest)
+      .await?
+      .walk(&mut |path, entry| match entry {
+        directory::Entry::File(f) => files.push((path.to_owned(), f.digest(), f.is_executable())),
+        directory::Entry::Directory(_) => (),
+      });
+
+    future::try_join_all(files.into_iter().map(|(path, digest, is_executable)| {
+      let store = self.clone();
+      async move {
+        let maybe_bytes = store
+          .load_file_bytes_with(digest, Bytes::copy_from_slice)
+          .await?;
+        maybe_bytes
+          .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
+          .map(|content| FileContent {
+            path,
+            content,
+            is_executable,
+          })
+      }
+    }))
+    .await
   }
 
   ///
   /// Returns indirect references to files in a Digest sorted by their path.
   ///
-  pub fn entries_for_directory(
+  pub async fn entries_for_directory(
     &self,
-    digest: Digest,
-  ) -> BoxFuture<'static, Result<Vec<DigestEntry>, String>> {
-    if digest == EMPTY_DIGEST {
-      return future::ready(Ok(vec![])).boxed();
+    digest: DirectoryDigest,
+  ) -> Result<Vec<DigestEntry>, String> {
+    if digest == *EMPTY_DIRECTORY_DIGEST {
+      return Ok(vec![]);
     }
 
+    let mut entries = Vec::new();
     self
-      .walk(digest, move |_, path_so_far, _, directory| {
-        if directory.files.is_empty() {
-          // Only report an empty directory if the directory is a leaf node. (The caller is
-          // expected to create parent directories for both files and empty leaf
-          // directories.)
-          if directory.directories.is_empty() {
-            future::ready(Ok(vec![DigestEntry::EmptyDirectory(path_so_far.into())])).boxed()
-          } else {
-            future::ready(Ok(vec![])).boxed()
-          }
-        } else {
-          future::ready(
-            directory
-              .files
-              .iter()
-              .map(|file_node| {
-                let path = path_so_far.join(file_node.name.clone());
-                let is_executable = file_node.is_executable;
-                let digest = require_digest(file_node.digest.as_ref())?;
-                Ok(DigestEntry::File(FileEntry {
-                  path,
-                  digest,
-                  is_executable,
-                }))
-              })
-              .collect::<Result<Vec<_>, String>>(),
-          )
-          .boxed()
+      .load_digest_trie(digest)
+      .await?
+      .walk(&mut |path, entry| match entry {
+        directory::Entry::File(f) => {
+          entries.push(DigestEntry::File(FileEntry {
+            path: path.to_owned(),
+            digest: f.digest(),
+            is_executable: f.is_executable(),
+          }));
         }
-      })
-      .map(|file_contents_per_directory| {
-        file_contents_per_directory.map(|xs| {
-          let mut vec = xs
-            .into_iter()
-            .flat_map(|x| x.into_iter())
-            .collect::<Vec<_>>();
-          vec.sort_by(|l, r| l.path().cmp(r.path()));
-          vec
-        })
-      })
-      .boxed()
+        directory::Entry::Directory(d) => {
+          // Only report a directory if it is a leaf node. (The caller is expected to create parent
+          // directories for both files and empty leaf directories.)
+          if d.tree().entries().is_empty() {
+            entries.push(DigestEntry::EmptyDirectory(path.to_owned()));
+          }
+        }
+      });
+
+    Ok(entries)
   }
 
   ///

@@ -218,16 +218,16 @@ impl PySnapshot {
 
 #[pyclass(name = "MergeDigests")]
 #[derive(Debug, PartialEq)]
-pub struct PyMergeDigests(pub Vec<Digest>);
+pub struct PyMergeDigests(pub Vec<DirectoryDigest>);
 
 #[pymethods]
 impl PyMergeDigests {
   #[new]
   fn __new__(digests: &PyAny, py: Python) -> PyResult<Self> {
-    let digests: PyResult<Vec<Digest>> = PyIterator::from_object(py, digests)?
+    let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_object(py, digests)?
       .map(|v| {
         let py_digest = v?.extract::<PyDigest>()?;
-        Ok(py_digest.0.todo_as_digest())
+        Ok(py_digest.0)
       })
       .collect();
     Ok(Self(digests?))
@@ -243,7 +243,7 @@ impl PyMergeDigests {
     let digests = self
       .0
       .iter()
-      .map(|d| format!("{}", PyDigest(DirectoryDigest::todo_from_digest(*d))))
+      .map(|d| format!("{}", PyDigest(d.clone())))
       .join(", ");
     format!("MergeDigests([{}])", digests)
   }
@@ -260,7 +260,7 @@ impl PyMergeDigests {
 #[pyclass(name = "AddPrefix")]
 #[derive(Debug, PartialEq)]
 pub struct PyAddPrefix {
-  pub digest: Digest,
+  pub digest: DirectoryDigest,
   pub prefix: PathBuf,
 }
 
@@ -269,14 +269,14 @@ impl PyAddPrefix {
   #[new]
   fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
     Self {
-      digest: digest.0.todo_as_digest(),
+      digest: digest.0,
       prefix,
     }
   }
 
   fn __hash__(&self) -> u64 {
     let mut s = DefaultHasher::new();
-    self.digest.hash.prefix_hash().hash(&mut s);
+    self.digest.as_digest().hash.prefix_hash().hash(&mut s);
     self.prefix.hash(&mut s);
     s.finish()
   }
@@ -284,7 +284,7 @@ impl PyAddPrefix {
   fn __repr__(&self) -> String {
     format!(
       "AddPrefix('{}', {})",
-      PyDigest(DirectoryDigest::todo_from_digest(self.digest)),
+      PyDigest(self.digest.clone()),
       self.prefix.display()
     )
   }
@@ -301,7 +301,7 @@ impl PyAddPrefix {
 #[pyclass(name = "RemovePrefix")]
 #[derive(Debug, PartialEq)]
 pub struct PyRemovePrefix {
-  pub digest: Digest,
+  pub digest: DirectoryDigest,
   pub prefix: PathBuf,
 }
 
@@ -310,14 +310,14 @@ impl PyRemovePrefix {
   #[new]
   fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
     Self {
-      digest: digest.0.todo_as_digest(),
+      digest: digest.0,
       prefix,
     }
   }
 
   fn __hash__(&self) -> u64 {
     let mut s = DefaultHasher::new();
-    self.digest.hash.prefix_hash().hash(&mut s);
+    self.digest.as_digest().hash.prefix_hash().hash(&mut s);
     self.prefix.hash(&mut s);
     s.finish()
   }
@@ -325,7 +325,7 @@ impl PyRemovePrefix {
   fn __repr__(&self) -> String {
     format!(
       "RemovePrefix('{}', {})",
-      PyDigest(DirectoryDigest::todo_from_digest(self.digest)),
+      PyDigest(self.digest.clone()),
       self.prefix.display()
     )
   }

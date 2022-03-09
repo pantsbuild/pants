@@ -8,10 +8,10 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 
 use bytes::{Bytes, BytesMut};
-use fs::{DigestEntry, FileEntry, Permissions};
+use fs::{DigestEntry, FileEntry, Permissions, EMPTY_DIRECTORY_DIGEST};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
@@ -1101,7 +1101,7 @@ async fn contents_for_directory_empty() {
   let store = new_local_store(store_dir.path());
 
   let file_contents = store
-    .contents_for_directory(TestDirectory::empty().digest())
+    .contents_for_directory(TestDirectory::empty().directory_digest())
     .await
     .expect("Getting FileContents");
 
@@ -1135,7 +1135,7 @@ async fn contents_for_directory() {
     .expect("Error saving catnip file bytes");
 
   let file_contents = store
-    .contents_for_directory(recursive_testdir.digest())
+    .contents_for_directory(recursive_testdir.directory_digest())
     .await
     .expect("Getting FileContents");
 
@@ -1223,7 +1223,7 @@ async fn entries_for_directory() {
     .expect("Error saving catnip file bytes");
 
   let digest_entries = store
-    .entries_for_directory(recursive_testdir.digest())
+    .entries_for_directory(recursive_testdir.directory_digest())
     .await
     .expect("Getting FileContents");
 
@@ -1244,7 +1244,7 @@ async fn entries_for_directory() {
   );
 
   let empty_digest_entries = store
-    .entries_for_directory(EMPTY_DIGEST)
+    .entries_for_directory(EMPTY_DIRECTORY_DIGEST.clone())
     .await
     .expect("Getting EMTPY_DIGEST");
 

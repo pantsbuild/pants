@@ -949,13 +949,13 @@ impl DownloadedFile {
 
 #[async_trait]
 impl WrappedNode for DownloadedFile {
-  type Item = Digest;
+  type Item = store::Snapshot;
 
   async fn run_wrapped_node(
     self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Digest> {
+  ) -> NodeResult<store::Snapshot> {
     let (url_str, expected_digest) = Python::with_gil(|py| {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
@@ -967,11 +967,10 @@ impl WrappedNode for DownloadedFile {
     })?;
     let url = Url::parse(&url_str)
       .map_err(|err| throw(format!("Error parsing URL {}: {}", url_str, err)))?;
-    let snapshot = self
+    self
       .load_or_download(context.core, url, expected_digest)
       .await
-      .map_err(throw)?;
-    Ok(snapshot.digest)
+      .map_err(throw)
   }
 }
 
@@ -1440,7 +1439,7 @@ impl Node for NodeKey {
           }
           NodeKey::DownloadedFile(n) => {
             n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::FileDigest)
+              .map_ok(NodeOutput::Snapshot)
               .await
           }
           NodeKey::ExecuteProcess(n) => {

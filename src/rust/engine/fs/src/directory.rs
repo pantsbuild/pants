@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
+use std::hash::{self, Hash};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,7 +18,7 @@ use grpc_util::prost::MessageExt;
 use hashing::{Digest, EMPTY_DIGEST};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
-use crate::PathStat;
+use crate::{PathStat, RelativePath};
 
 lazy_static! {
   pub static ref EMPTY_DIGEST_TREE: DigestTrie = DigestTrie(vec![].into());
@@ -46,6 +47,12 @@ impl Eq for DirectoryDigest {}
 impl PartialEq for DirectoryDigest {
   fn eq(&self, other: &Self) -> bool {
     self.digest == other.digest
+  }
+}
+
+impl Hash for DirectoryDigest {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    self.digest.hash(state);
   }
 }
 
@@ -94,6 +101,13 @@ impl DirectoryDigest {
   /// before closing #13112.
   pub fn todo_from_digest(digest: Digest) -> Self {
     Self { digest, tree: None }
+  }
+
+  pub fn from_tree(tree: DigestTrie) -> Self {
+    Self {
+      digest: tree.compute_root_digest(),
+      tree: Some(tree),
+    }
   }
 
   /// Returns the `Digest` for this `DirectoryDigest`.
@@ -145,7 +159,7 @@ impl Deref for Name {
   }
 }
 
-#[derive(DeepSizeOf)]
+#[derive(Clone, DeepSizeOf)]
 pub enum Entry {
   Directory(Directory),
   File(File),
@@ -160,7 +174,7 @@ impl Entry {
   }
 }
 
-#[derive(DeepSizeOf)]
+#[derive(Clone, DeepSizeOf)]
 pub struct Directory {
   name: Name,
   digest: Digest,
@@ -180,8 +194,16 @@ impl Directory {
     }
   }
 
+  pub fn name(&self) -> &str {
+    self.name.as_ref()
+  }
+
   pub fn digest(&self) -> Digest {
     self.digest
+  }
+
+  pub fn tree(&self) -> &DigestTrie {
+    &self.tree
   }
 
   pub fn as_remexec_directory(&self) -> remexec::Directory {
@@ -196,7 +218,7 @@ impl Directory {
   }
 }
 
-#[derive(DeepSizeOf)]
+#[derive(Clone, DeepSizeOf)]
 pub struct File {
   name: Name,
   digest: Digest,
@@ -204,6 +226,18 @@ pub struct File {
 }
 
 impl File {
+  pub fn name(&self) -> &str {
+    self.name.as_ref()
+  }
+
+  pub fn digest(&self) -> Digest {
+    self.digest
+  }
+
+  pub fn is_executable(&self) -> bool {
+    self.is_executable
+  }
+
   pub fn as_remexec_file_node(&self) -> remexec::FileNode {
     remexec::FileNode {
       name: self.name.as_ref().to_owned(),
@@ -425,6 +459,216 @@ impl DigestTrie {
       }
     }
   }
+
+  /// Add the given path as a prefix for this trie, returning the resulting trie.
+  pub fn add_prefix(self, prefix: &RelativePath) -> Result<DigestTrie, String> {
+    let mut prefix_iter = prefix.iter();
+    let mut tree = self;
+    while let Some(parent) = prefix_iter.next_back() {
+      let directory = Directory {
+        name: first_path_component_to_name(parent.as_ref())?,
+        digest: tree.compute_root_digest(),
+        tree,
+      };
+
+      tree = DigestTrie(vec![Entry::Directory(directory)].into());
+    }
+
+    Ok(tree)
+  }
+
+  /// Remove the given prefix from this trie, returning the resulting trie.
+  pub fn remove_prefix(self, prefix: &RelativePath) -> Result<DigestTrie, String> {
+    let root = self.clone();
+    let mut tree = self;
+    let mut already_stripped = PathBuf::new();
+    for component_to_strip in prefix.components() {
+      let component_to_strip = component_to_strip.as_os_str();
+      let mut matching_dir = None;
+      let mut extra_directories = Vec::new();
+      let mut files = Vec::new();
+      for entry in tree.entries() {
+        match entry {
+          Entry::Directory(d) if Path::new(d.name.as_ref()).as_os_str() == component_to_strip => {
+            matching_dir = Some(d)
+          }
+          Entry::Directory(d) => extra_directories.push(d.name.as_ref().to_owned()),
+          Entry::File(f) => files.push(f.name.as_ref().to_owned()),
+        }
+      }
+
+      let has_already_stripped_any = already_stripped.components().next().is_some();
+      match (
+        matching_dir,
+        extra_directories.is_empty() && files.is_empty(),
+      ) {
+        (None, true) => {
+          tree = EMPTY_DIGEST_TREE.clone();
+          break;
+        }
+        (None, false) => {
+          // Prefer "No subdirectory found" error to "had extra files" error.
+          return Err(format!(
+            "Cannot strip prefix {} from root directory (Digest with hash {:?}) - \
+             {}directory{} didn't contain a directory named {}{}",
+            prefix.display(),
+            root.compute_root_digest().hash,
+            if has_already_stripped_any {
+              "sub"
+            } else {
+              "root "
+            },
+            if has_already_stripped_any {
+              format!(" {}", already_stripped.display())
+            } else {
+              String::new()
+            },
+            Path::new(component_to_strip).display(),
+            if !extra_directories.is_empty() || !files.is_empty() {
+              format!(
+                " but did contain {}",
+                format_directories_and_files(&extra_directories, &files)
+              )
+            } else {
+              String::new()
+            },
+          ));
+        }
+        (Some(_), false) => {
+          return Err(format!(
+            "Cannot strip prefix {} from root directory (Digest with hash {:?}) - \
+             {}directory{} contained non-matching {}",
+            prefix.display(),
+            root.compute_root_digest().hash,
+            if has_already_stripped_any {
+              "sub"
+            } else {
+              "root "
+            },
+            if has_already_stripped_any {
+              format!(" {}", already_stripped.display())
+            } else {
+              String::new()
+            },
+            format_directories_and_files(&extra_directories, &files),
+          ))
+        }
+        (Some(d), true) => {
+          already_stripped = already_stripped.join(component_to_strip);
+          tree = d.tree.clone();
+        }
+      }
+    }
+
+    Ok(tree)
+  }
+
+  /// Given DigestTries, merge them recursively into a single DigestTrie.
+  ///
+  /// If a file is present with the same name and contents multiple times, it will appear once.
+  /// If a file is present with the same name, but different contents, an error will be returned.
+  pub fn merge(trees: Vec<DigestTrie>) -> Result<DigestTrie, MergeError> {
+    Self::merge_helper(PathBuf::new(), trees)
+  }
+
+  fn merge_helper(parent_path: PathBuf, trees: Vec<DigestTrie>) -> Result<DigestTrie, MergeError> {
+    if trees.is_empty() {
+      return Ok(EMPTY_DIGEST_TREE.clone());
+    } else if trees.len() == 1 {
+      let mut trees = trees;
+      return Ok(trees.pop().unwrap());
+    }
+
+    // Merge and sort Entries.
+    let input_entries = trees
+      .iter()
+      .map(|tree| tree.entries())
+      .flatten()
+      .sorted_by(|a, b| a.name().cmp(&b.name()));
+
+    // Then group by name, and merge into an output list.
+    let mut entries: Vec<Entry> = Vec::new();
+    for (name, group) in &input_entries.into_iter().group_by(|e| e.name()) {
+      let mut group = group.peekable();
+      let first = group.next().unwrap();
+      if group.peek().is_none() {
+        // There was only one Entry: emit it.
+        entries.push(first.clone());
+        continue;
+      }
+
+      match first {
+        Entry::File(f) => {
+          // If any Entry is a File, then they must all be identical.
+          let (mut mismatched_files, mismatched_dirs) = collisions(f.digest, group);
+          if !mismatched_files.is_empty() || !mismatched_dirs.is_empty() {
+            mismatched_files.push(f);
+            return Err(MergeError::duplicates(
+              parent_path,
+              mismatched_files,
+              mismatched_dirs,
+            ));
+          }
+
+          // All entries matched: emit one copy.
+          entries.push(first.clone());
+        }
+        Entry::Directory(d) => {
+          // If any Entry is a Directory, then they must all be Directories which will be merged.
+          let (mismatched_files, mut mismatched_dirs) = collisions(d.digest, group);
+
+          // If there were any Files, error.
+          if !mismatched_files.is_empty() {
+            mismatched_dirs.push(d);
+            return Err(MergeError::duplicates(
+              parent_path,
+              mismatched_files,
+              mismatched_dirs,
+            ));
+          }
+
+          if mismatched_dirs.is_empty() {
+            // All directories matched: emit one copy.
+            entries.push(first.clone());
+          } else {
+            // Some directories mismatched, so merge all of them into a new entry and emit that.
+            mismatched_dirs.push(d);
+            let merged_tree = Self::merge_helper(
+              parent_path.join(name.as_ref()),
+              mismatched_dirs
+                .into_iter()
+                .map(|d| d.tree.clone())
+                .collect(),
+            )?;
+            entries.push(Entry::Directory(Directory::from_digest_tree(
+              name,
+              merged_tree,
+            )));
+          }
+        }
+      }
+    }
+
+    Ok(DigestTrie(entries.into()))
+  }
+}
+
+pub enum MergeError {
+  Duplicates {
+    parent_path: PathBuf,
+    files: Vec<File>,
+    directories: Vec<Directory>,
+  },
+}
+
+impl MergeError {
+  fn duplicates(parent_path: PathBuf, files: Vec<&File>, directories: Vec<&Directory>) -> Self {
+    MergeError::Duplicates {
+      parent_path,
+      files: files.into_iter().cloned().collect(),
+      directories: directories.into_iter().cloned().collect(),
+    }
+  }
 }
 
 fn paths_of_child_dir(name: Name, paths: Vec<TypedPath>) -> Vec<TypedPath> {
@@ -458,4 +702,51 @@ fn first_path_component_to_name(path: &Path) -> Result<Name, String> {
     .to_str()
     .ok_or_else(|| format!("{:?} is not representable in UTF8", first_path_component))?;
   Ok(Name(Intern::from(name)))
+}
+
+/// Return any entries which did not have the same Digest as the given Entry.
+fn collisions<'a>(
+  digest: Digest,
+  entries: impl Iterator<Item = &'a Entry>,
+) -> (Vec<&'a File>, Vec<&'a Directory>) {
+  let mut mismatched_files = Vec::new();
+  let mut mismatched_dirs = Vec::new();
+  for entry in entries {
+    match entry {
+      Entry::File(other) if other.digest != digest => mismatched_files.push(other),
+      Entry::Directory(other) if other.digest != digest => mismatched_dirs.push(other),
+      _ => (),
+    }
+  }
+  (mismatched_files, mismatched_dirs)
+}
+
+/// Format directories and files as a human readable string.
+fn format_directories_and_files(directories: &[String], files: &[String]) -> String {
+  format!(
+    "{}{}{}",
+    if directories.is_empty() {
+      String::new()
+    } else {
+      format!(
+        "director{} named: {}",
+        if directories.len() == 1 { "y" } else { "ies" },
+        directories.join(", ")
+      )
+    },
+    if !directories.is_empty() && !files.is_empty() {
+      " and "
+    } else {
+      ""
+    },
+    if files.is_empty() {
+      String::new()
+    } else {
+      format!(
+        "file{} named: {}",
+        if files.len() == 1 { "" } else { "s" },
+        files.join(", ")
+      )
+    },
+  )
 }

@@ -1,21 +1,14 @@
-use std::collections::HashMap;
 use std::fs::create_dir_all;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use fs::{
-  DigestTrie, DirectoryDigest, GlobExpansionConjunction, PosixFS, PreparedPathGlobs,
-  StrictGlobMatching,
-};
+use fs::{GlobExpansionConjunction, PosixFS, PreparedPathGlobs, StrictGlobMatching};
 use hashing::Digest;
-use parking_lot::Mutex;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use testutil::make_file;
 
 use crate::{
   snapshot_tests::{expand_all_sorted, setup, STR, STR2},
-  OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, SubsetParams,
+  OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams,
 };
 
 async fn get_duplicate_rolands<T: SnapshotOps>(
@@ -46,11 +39,11 @@ async fn get_duplicate_rolands<T: SnapshotOps>(
     .unwrap();
 
   let merged_digest = store_wrapper
-    .merge(vec![snapshot1.digest, snapshot2.digest])
+    .merge(vec![snapshot1.clone().into(), snapshot2.clone().into()])
     .await
     .unwrap();
 
-  (merged_digest, snapshot1, snapshot2)
+  (merged_digest.as_digest(), snapshot1, snapshot2)
 }
 
 fn make_subset_params(globs: &[&str]) -> SubsetParams {
@@ -140,103 +133,4 @@ async fn subset_recursive_wildcard() {
     .await
     .unwrap();
   assert_eq!(subset_roland4, snapshot1.digest);
-}
-
-#[derive(Clone)]
-struct LoadTrackingStore {
-  store: Store,
-  load_counts: Arc<Mutex<HashMap<Digest, usize>>>,
-}
-
-#[async_trait]
-impl SnapshotOps for LoadTrackingStore {
-  async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
-    &self,
-    digest: Digest,
-    f: F,
-  ) -> Result<Option<T>, String> {
-    Store::load_file_bytes_with(&self.store, digest, f).await
-  }
-
-  async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String> {
-    Store::load_digest_trie(&self.store, digest).await
-  }
-
-  async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String> {
-    {
-      let mut counts = self.load_counts.lock();
-      let entry = counts.entry(digest).or_insert(0);
-      *entry += 1;
-    }
-    Store::load_directory(&self.store, digest).await
-  }
-
-  async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String> {
-    {
-      let mut counts = self.load_counts.lock();
-      let entry = counts.entry(digest).or_insert(0);
-      *entry += 1;
-    }
-    Snapshot::get_directory_or_err(self.store.clone(), digest).await
-  }
-
-  async fn record_digest_trie(&self, tree: DigestTrie) -> Result<DirectoryDigest, String> {
-    Store::record_digest_trie(&self.store, tree, true).await
-  }
-
-  async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String> {
-    Store::record_directory(&self.store, directory, true).await
-  }
-}
-
-#[tokio::test]
-async fn subset_tracking_load_counts() {
-  let (store, tempdir, posix_fs, digester) = setup();
-
-  let load_tracking_store = LoadTrackingStore {
-    store: store.clone(),
-    load_counts: Arc::new(Mutex::new(HashMap::new())),
-  };
-
-  let (merged_digest, _, _) = get_duplicate_rolands(
-    store.clone(),
-    load_tracking_store.clone(),
-    tempdir.path(),
-    posix_fs.clone(),
-    digester,
-  )
-  .await;
-
-  let prefix = RelativePath::new(PathBuf::from("subdir")).unwrap();
-  let subdir_digest = load_tracking_store
-    .strip_prefix(merged_digest, prefix)
-    .await
-    .unwrap();
-
-  let num_subdir_loads = {
-    let num_loads: HashMap<Digest, usize> = load_tracking_store.load_counts.lock().clone();
-    *num_loads.get(&subdir_digest).unwrap()
-  };
-  assert_eq!(1, num_subdir_loads);
-
-  let subset_everything = make_subset_params(&["**/*"]);
-  let subset_result = load_tracking_store
-    .subset(merged_digest, subset_everything)
-    .await
-    .unwrap();
-  assert_eq!(merged_digest, subset_result);
-  // Verify that no extra digest loads for the subdirectory "subdir" are performed when a ** glob is
-  // used, which should just take the digest unmodified, and not attempt to examine its contents.
-  let num_loads: HashMap<Digest, usize> = load_tracking_store.load_counts.lock().clone();
-  assert_eq!(num_subdir_loads, *num_loads.get(&subdir_digest).unwrap());
-
-  // Check that the same result occurs when the trailing glob is just /**.
-  let subset_everything = make_subset_params(&["**"]);
-  let subset_result = load_tracking_store
-    .subset(merged_digest, subset_everything)
-    .await
-    .unwrap();
-  assert_eq!(merged_digest, subset_result);
-  let num_loads: HashMap<Digest, usize> = load_tracking_store.load_counts.lock().clone();
-  assert_eq!(num_subdir_loads, *num_loads.get(&subdir_digest).unwrap());
 }

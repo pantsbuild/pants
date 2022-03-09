@@ -258,17 +258,16 @@ fn directory_digest_to_digest_contents(
       lift_directory_digest(py_digest)
     })
     .map_err(throw)?;
-    let snapshot = context
+
+    let digest_contents = context
       .core
       .store()
-      .contents_for_directory(digest.todo_as_digest())
+      .contents_for_directory(digest)
       .await
-      .and_then(move |digest_contents| {
-        let gil = Python::acquire_gil();
-        Snapshot::store_digest_contents(gil.python(), &context, &digest_contents)
-      })
       .map_err(throw)?;
-    Ok(snapshot)
+
+    let gil = Python::acquire_gil();
+    Snapshot::store_digest_contents(gil.python(), &context, &digest_contents).map_err(throw)
   }
   .boxed()
 }
@@ -286,7 +285,7 @@ fn directory_digest_to_digest_entries(
     let snapshot = context
       .core
       .store()
-      .entries_for_directory(digest.todo_as_digest())
+      .entries_for_directory(digest)
       .await
       .and_then(move |digest_entries| {
         let gil = Python::acquire_gil();
@@ -310,18 +309,17 @@ fn remove_prefix_request_to_digest(
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_remove_prefix.prefix)
         .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-      let res: NodeResult<(Digest, RelativePath)> = Ok((py_remove_prefix.digest, prefix));
+      let res: NodeResult<_> = Ok((py_remove_prefix.digest.clone(), prefix));
       res
     })?;
     let digest = context
       .core
       .store()
-      .strip_prefix(digest, prefix)
+      .strip_prefix(digest, &prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -338,7 +336,8 @@ fn add_prefix_request_to_digest(
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_add_prefix.prefix)
         .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-      let res: NodeResult<(Digest, RelativePath)> = Ok((py_add_prefix.digest, prefix));
+      let res: NodeResult<(DirectoryDigest, RelativePath)> =
+        Ok((py_add_prefix.digest.clone(), prefix));
       res
     })?;
     let digest = context
@@ -348,8 +347,7 @@ fn add_prefix_request_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -388,8 +386,7 @@ fn merge_digests_request_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -400,10 +397,9 @@ fn download_file_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from_py_err)?;
-    let digest = context.get(DownloadedFile(key)).await?;
+    let snapshot = context.get(DownloadedFile(key)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), snapshot.into()).map_err(throw)
   }
   .boxed()
 }
@@ -478,6 +474,9 @@ fn create_digest_to_digest(
       .collect()
   };
 
+  // TODO: Rather than creating independent Digests and then merging them, this should use
+  // `DigestTrie::from_path_stats`.
+  //   see https://github.com/pantsbuild/pants/pull/14569#issuecomment-1057286943
   let digest_futures: Vec<_> = items
     .into_iter()
     .map(|item| {
@@ -489,14 +488,14 @@ fn create_digest_to_digest(
             let snapshot = store
               .snapshot_of_one_file(path, digest, is_executable)
               .await?;
-            let res: Result<_, String> = Ok(snapshot.digest);
+            let res: Result<DirectoryDigest, String> = Ok(snapshot.into());
             res
           }
           CreateDigestItem::FileEntry(path, digest, is_executable) => {
             let snapshot = store
               .snapshot_of_one_file(path, digest, is_executable)
               .await?;
-            let res: Result<_, String> = Ok(snapshot.digest);
+            let res: Result<_, String> = Ok(snapshot.into());
             res
           }
           CreateDigestItem::Dir(path) => store
@@ -516,8 +515,7 @@ fn create_digest_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }

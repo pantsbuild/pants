@@ -11,7 +11,7 @@ use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use concrete_time::TimeSpan;
-use fs::{self, File, PathStat};
+use fs::{self, DirectoryDigest, File, PathStat};
 use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use futures::{Stream, StreamExt};
@@ -1229,7 +1229,8 @@ pub fn extract_output_files(
             digest = store.record_directory(&directory, true).await?;
           }
         }
-        let res: Result<_, String> = Ok(digest);
+        // TODO: Implement an operation to directly convert a `Tree` into a `DigestTrie`. See #13112.
+        let res: Result<_, String> = Ok(DirectoryDigest::todo_from_digest(digest));
         res
       })
       .map_err(|err| format!("Error saving remote output directory: {}", err)),
@@ -1299,12 +1300,13 @@ pub fn extract_output_files(
     let (files_snapshot, mut directory_digests) =
       future::try_join(files_snapshot, future::try_join_all(directory_digests)).await?;
 
-    directory_digests.push(files_snapshot.digest);
+    directory_digests.push(files_snapshot.into());
 
-    store
+    let directory_digest = store
       .merge(directory_digests)
       .map_err(|err| format!("Error when merging output files and directories: {:?}", err))
-      .await
+      .await?;
+    Ok(directory_digest.todo_as_digest())
   }
   .boxed()
 }

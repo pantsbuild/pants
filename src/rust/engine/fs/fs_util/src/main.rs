@@ -35,8 +35,8 @@ use std::time::Duration;
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
 use fs::{
-  GlobExpansionConjunction, GlobMatching, Permissions, PreparedPathGlobs, RelativePath,
-  StrictGlobMatching,
+  DirectoryDigest, GlobExpansionConjunction, GlobMatching, Permissions, PreparedPathGlobs,
+  RelativePath, StrictGlobMatching,
 };
 use futures::future::{self, BoxFuture};
 use futures::FutureExt;
@@ -614,8 +614,12 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           // It's a shame we can't just .and_then here, because we can't use async closures.
           if let Ok(subset_digest) = result {
             result = store
-              .strip_prefix(subset_digest, RelativePath::new(prefix_to_strip)?)
-              .await;
+              .strip_prefix(
+                DirectoryDigest::todo_from_digest(subset_digest),
+                &RelativePath::new(prefix_to_strip)?,
+              )
+              .await
+              .map(|dd| dd.as_digest());
           }
           digest = result.map_err(|err| match err {
             SnapshotOpsError::String(string)

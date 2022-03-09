@@ -320,6 +320,10 @@ impl TestDirectory {
   pub fn digest(&self) -> hashing::Digest {
     hashing::Digest::of_bytes(&self.bytes())
   }
+
+  pub fn directory_digest(&self) -> fs::DirectoryDigest {
+    fs::DirectoryDigest::from_persisted_digest(self.digest())
+  }
 }
 
 pub struct TestTree {
