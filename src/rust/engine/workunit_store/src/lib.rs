@@ -224,7 +224,6 @@ impl Default for WorkunitMetadata {
 /// Abstract id for passing user metadata items around
 #[derive(Clone, Debug)]
 pub enum UserMetadataItem {
-  // NB: Always stores a ...
   PyValue(Arc<dyn Value>),
   ImmediateInt(i64),
   ImmediateString(String),
