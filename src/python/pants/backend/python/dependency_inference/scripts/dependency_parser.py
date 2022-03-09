@@ -35,7 +35,10 @@ class AstVisitor(ast.NodeVisitor):
             # This regex is used to infer imports from strings, e.g .
             #  `importlib.import_module("example.subdir.Foo")`.
             self._string_import_regex = re.compile(
-                r"^([a-z_][a-z_\d]*\.){" + os.environ["MIN_DOTS"] + r",}[a-zA-Z_]\w*$", re.UNICODE
+                r"^([a-z_][a-z_\d]*\.){"
+                + os.environ["STRING_IMPORT_MIN_DOTS"]
+                + r",}[a-zA-Z_]\w*$",
+                re.UNICODE,
             )
         else:
             self._string_import_regex = None

@@ -162,9 +162,9 @@ class InferPythonImportDependencies(InferDependenciesRequest):
     infer_from = PythonSourceField
 
 
-def _get_inferred_resource_deps(
+def _get_inferred_asset_deps(
     address: Address,
-    request_file_path: PurePath,
+    request_file_path: str,
     all_asset_targets: AllAssetTargets,
     assets: ParsedPythonAssets,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
@@ -301,7 +301,7 @@ async def infer_python_dependencies_via_source(
     if parsed_assets:
         all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
         inferred_deps.update(
-            _get_inferred_resource_deps(
+            _get_inferred_asset_deps(
                 tgt.address,
                 request.sources_field.file_path,
                 all_asset_targets,
