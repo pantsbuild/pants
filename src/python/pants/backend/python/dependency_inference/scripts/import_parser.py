@@ -17,15 +17,6 @@ import sys
 import tokenize
 from io import open
 
-MIN_DOTS = os.environ["MIN_DOTS"]
-
-# This regex is used to infer imports from strings, e.g.
-#  `importlib.import_module("example.subdir.Foo")`.
-STRING_IMPORT_REGEX = re.compile(
-    r"^([a-z_][a-z_\d]*\.){" + MIN_DOTS + r",}[a-zA-Z_]\w*$",
-    re.UNICODE,
-)
-
 
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts, contents):
@@ -39,9 +30,17 @@ class AstVisitor(ast.NodeVisitor):
         self.strong_imports = {}
         self.weak_imports = {}
         self._weaken_strong_imports = False
+        if os.environ["STRING_IMPORTS"] == "y":
+            # This regex is used to infer imports from strings, e.g .
+            #  `importlib.import_module("example.subdir.Foo")`.
+            self._string_import_regex = re.compile(
+                r"^([a-z_][a-z_\d]*\.){" + os.environ["MIN_DOTS"] + r",}[a-zA-Z_]\w*$", re.UNICODE
+            )
+        else:
+            self._string_import_regex = None
 
     def maybe_add_string_import(self, node, s):
-        if os.environ["STRING_IMPORTS"] == "y" and STRING_IMPORT_REGEX.match(s):
+        if self._string_import_regex and self._string_import_regex.match(s):
             self.weak_imports.setdefault(s, node.lineno)
 
     def add_strong_import(self, name, lineno):
