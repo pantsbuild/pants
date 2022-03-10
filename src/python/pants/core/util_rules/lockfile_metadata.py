@@ -179,7 +179,7 @@ class LockfileMetadata:
         header = (
             f"{delimeter} {BEGIN_LOCKFILE_HEADER}\n"
             f"{metadata_as_a_comment}\n"
-            f"{delimeter} END_LOCKFILE_HEADER"
+            f"{delimeter} {END_LOCKFILE_HEADER}"
         ).encode("ascii")
 
         return b"%b\n%b\n%b\n\n%b" % (
