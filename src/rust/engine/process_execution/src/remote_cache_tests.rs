@@ -412,25 +412,12 @@ async fn make_tree_from_directory() {
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
     .expect("Error saving file bytes");
-  store
-    .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .await
-    .expect("Error saving directory");
-  store
-    .record_directory(&TestDirectory::nested().directory(), true)
-    .await
-    .expect("Error saving directory");
-  let directory_digest = store
-    .record_directory(&TestDirectory::double_nested().directory(), true)
-    .await
-    .expect("Error saving directory");
+  let input_tree = TestTree::double_nested();
 
   let (tree, file_digests) = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
-    directory_digest,
+    &input_tree.digest_trie(),
     RelativePath::new("pets").unwrap(),
-    &store,
   )
-  .await
   .unwrap()
   .unwrap();
 
@@ -457,21 +444,17 @@ async fn make_tree_from_directory() {
   // Test that extracting non-existent output directories fails gracefully.
   assert!(
     crate::remote_cache::CommandRunner::make_tree_for_output_directory(
-      directory_digest,
+      &input_tree.digest_trie(),
       RelativePath::new("animals").unwrap(),
-      &store,
     )
-    .await
     .unwrap()
     .is_none()
   );
   assert!(
     crate::remote_cache::CommandRunner::make_tree_for_output_directory(
-      directory_digest,
+      &input_tree.digest_trie(),
       RelativePath::new("pets/xyzzy").unwrap(),
-      &store,
     )
-    .await
     .unwrap()
     .is_none()
   );
@@ -487,55 +470,41 @@ async fn extract_output_file() {
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
     .expect("Error saving file bytes");
-  store
-    .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .await
-    .expect("Error saving directory");
-  let directory_digest = store
-    .record_directory(&TestDirectory::nested().directory(), true)
-    .await
-    .expect("Error saving directory");
+  let input_tree = TestTree::nested();
 
-  let file_node = crate::remote_cache::CommandRunner::extract_output_file(
-    directory_digest,
-    RelativePath::new("cats/roland.ext").unwrap(),
-    &store,
+  let output_file = crate::remote_cache::CommandRunner::extract_output_file(
+    &input_tree.digest_trie(),
+    "cats/roland.ext",
   )
-  .await
   .unwrap()
   .unwrap();
 
-  // Note that the `FileNode` only stores the file name, but we will end up storing the full path
-  // in the final ActionResult.
-  assert_eq!(file_node.name, "roland.ext");
-  let file_digest: Digest = file_node.digest.unwrap().try_into().unwrap();
+  assert_eq!(output_file.path, "cats/roland.ext");
+  let file_digest: Digest = output_file.digest.unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
 
   // Extract non-existent files to make sure that Ok(None) is returned.
   assert!(crate::remote_cache::CommandRunner::extract_output_file(
-    directory_digest,
-    RelativePath::new("animals.ext").unwrap(),
-    &store,
+    &input_tree.digest_trie(),
+    "animals.ext",
   )
-  .await
   .unwrap()
   .is_none());
   assert!(crate::remote_cache::CommandRunner::extract_output_file(
-    directory_digest,
-    RelativePath::new("cats").unwrap(),
-    &store,
+    &input_tree.digest_trie(),
+    "cats/xyzzy",
   )
-  .await
   .unwrap()
   .is_none());
-  assert!(crate::remote_cache::CommandRunner::extract_output_file(
-    directory_digest,
-    RelativePath::new("cats/xyzzy").unwrap(),
-    &store,
-  )
-  .await
-  .unwrap()
-  .is_none());
+
+  // Error if a path has been declared as a file but isn't.
+  assert_eq!(
+    crate::remote_cache::CommandRunner::extract_output_file(&input_tree.digest_trie(), "cats",),
+    Err(format!(
+      "Declared output file path \"cats\" in output digest {:?} contained a directory instead.",
+      TestDirectory::nested().digest()
+    ))
+  );
 }
 
 #[tokio::test]
