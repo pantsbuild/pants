@@ -292,17 +292,11 @@ impl ExecuteProcess {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
       let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
-        .map_err(|err| format!("Error parsing input_digest {}", err))?
-        .todo_as_digest();
+        .map_err(|err| format!("Error parsing input_digest {}", err))?;
       let immutable_inputs =
         externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
           .into_iter()
-          .map(|(path, digest)| {
-            Ok((
-              RelativePath::new(path)?,
-              lift_directory_digest(digest)?.todo_as_digest(),
-            ))
-          })
+          .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
           .collect::<Result<BTreeMap<_, _>, String>>()?;
       let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")
         .unwrap()
@@ -877,7 +871,7 @@ impl WrappedNode for Snapshot {
       .map_err(|e| throw(format!("{}", e)))
       .await?;
 
-    store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
+    store::Snapshot::from_path_stats(context.clone(), path_stats)
       .map_err(|e| throw(format!("Snapshot failed: {}", e)))
       .await
   }
@@ -1661,11 +1655,17 @@ impl NodeOutput {
     match self {
       NodeOutput::FileDigest(d) => vec![*d],
       NodeOutput::Snapshot(s) => {
+        // TODO: Callers should maybe be adapted for the fact that these nodes will now return
+        // transitive lists of digests (since lease extension might be operating recursively
+        // too). #13112.
         let dd: DirectoryDigest = s.clone().into();
         dd.digests()
       }
       NodeOutput::ProcessResult(p) => {
-        vec![p.0.stdout_digest, p.0.stderr_digest, p.0.output_directory]
+        let mut digests = p.0.output_directory.digests();
+        digests.push(p.0.stdout_digest);
+        digests.push(p.0.stderr_digest);
+        digests
       }
       NodeOutput::DirectoryListing(_)
       | NodeOutput::LinkDest(_)

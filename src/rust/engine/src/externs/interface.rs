@@ -134,6 +134,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(single_file_digests_to_bytes, m)?)?;
   m.add_function(wrap_pyfunction!(ensure_remote_has_recursive, m)?)?;
+  m.add_function(wrap_pyfunction!(ensure_directory_digest_persisted, m)?)?;
 
   m.add_function(wrap_pyfunction!(scheduler_execute, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_metrics, m)?)?;
@@ -1453,7 +1454,7 @@ fn ensure_remote_has_recursive(
       .iter()
       .map(|value| {
         crate::nodes::lift_directory_digest(value)
-          .map(|dd| dd.todo_as_digest())
+          .map(|dd| dd.as_digest())
           .or_else(|_| crate::nodes::lift_file_digest(value))
       })
       .collect::<Result<Vec<Digest>, _>>()
@@ -1463,6 +1464,26 @@ fn ensure_remote_has_recursive(
       core
         .executor
         .block_on(core.store().ensure_remote_has_recursive(digests))
+    })
+    .map_err(PyException::new_err)?;
+    Ok(())
+  })
+}
+
+#[pyfunction]
+fn ensure_directory_digest_persisted(
+  py: Python,
+  py_scheduler: &PyScheduler,
+  py_digest: &PyAny,
+) -> PyO3Result<()> {
+  let core = &py_scheduler.0.core;
+  core.executor.enter(|| {
+    let digest = crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
+
+    py.allow_threads(|| {
+      core
+        .executor
+        .block_on(core.store().ensure_directory_digest_persisted(digest))
     })
     .map_err(PyException::new_err)?;
     Ok(())
@@ -1524,12 +1545,15 @@ fn write_digest(
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
 
-    block_in_place_and_wait(py, || {
-      core.store().materialize_directory(
-        destination.clone(),
-        lifted_digest.todo_as_digest(),
-        fs::Permissions::Writable,
-      )
+    block_in_place_and_wait(py, || async move {
+      core
+        .store()
+        .materialize_directory(
+          destination.clone(),
+          lifted_digest,
+          fs::Permissions::Writable,
+        )
+        .await
     })
     .map_err(PyValueError::new_err)
   })

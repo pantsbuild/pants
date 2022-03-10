@@ -57,7 +57,6 @@ impl Snapshot {
     S: StoreFileByDigest<Error> + Sized + Clone + Send + 'static,
     Error: fmt::Debug + 'static + Send,
   >(
-    store: Store,
     file_digester: S,
     path_stats: Vec<PathStat>,
   ) -> Result<Snapshot, String> {
@@ -83,12 +82,8 @@ impl Snapshot {
       .collect::<HashMap<_, _>>();
 
     let tree = DigestTrie::from_path_stats(path_stats, &file_digests_map)?;
-    // TODO: When "enough" intrinsics are ported to directly producing/consuming DirectoryDigests
-    // this call to persist the tree to the store should be removed, and the tree will be in-memory
-    // only (as allowed by the DirectoryDigest contract). See #13112.
-    let directory_digest = store.record_digest_trie(tree.clone(), true).await?;
     Ok(Self {
-      digest: directory_digest.as_digest(),
+      digest: tree.compute_root_digest(),
       tree,
     })
   }
@@ -151,7 +146,6 @@ impl Snapshot {
         .await
         .map_err(|err| format!("Error expanding globs: {}", err))?;
       Snapshot::from_path_stats(
-        store.clone(),
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )

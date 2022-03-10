@@ -11,7 +11,7 @@ use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use concrete_time::TimeSpan;
-use fs::{self, DirectoryDigest, File, PathStat};
+use fs::{self, DirectoryDigest, File, PathStat, EMPTY_DIRECTORY_DIGEST};
 use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use futures::{Stream, StreamExt};
@@ -792,7 +792,7 @@ impl crate::CommandRunner for CommandRunner {
       &self.store,
       command_digest,
       action_digest,
-      Some(request.input_digests.complete),
+      Some(request.input_digests.complete.clone()),
     )
     .await?;
 
@@ -1031,7 +1031,7 @@ pub fn make_execute_request(
 
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
-    input_root_digest: Some((&req.input_digests.complete).into()),
+    input_root_digest: Some((&req.input_digests.complete.as_digest()).into()),
     ..remexec::Action::default()
   };
 
@@ -1068,7 +1068,7 @@ pub async fn populate_fallible_execution_result_for_timeout(
     stdout_digest,
     stderr_digest: hashing::EMPTY_DIGEST,
     exit_code: -libc::SIGTERM,
-    output_directory: hashing::EMPTY_DIGEST,
+    output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
     platform,
     metadata: ProcessResultMetadata::new(
       Some(elapsed.into()),
@@ -1166,11 +1166,13 @@ fn extract_stderr<'a>(
   .boxed()
 }
 
+// TODO: Port to #13112 by converting from `remexec::Tree` to `DigestTrie`, and then fetching
+// files.
 pub fn extract_output_files(
   store: Store,
   action_result: &remexec::ActionResult,
   treat_tree_digest_as_final_directory_hack: bool,
-) -> BoxFuture<'static, Result<Digest, String>> {
+) -> BoxFuture<'static, Result<DirectoryDigest, String>> {
   // HACK: The caching CommandRunner stores the digest of the Directory that merges all output
   // files and output directories in the `tree_digest` field of the `output_directories` field
   // of the ActionResult/ExecuteResponse stored in the local cache. When
@@ -1181,7 +1183,12 @@ pub fn extract_output_files(
     match &action_result.output_directories[..] {
       &[ref directory] => {
         match require_digest(directory.tree_digest.as_ref()) {
-          Ok(digest) => return future::ready::<Result<Digest, String>>(Ok(digest)).boxed(),
+          Ok(digest) => {
+            return future::ready::<Result<_, String>>(Ok(DirectoryDigest::from_persisted_digest(
+              digest,
+            )))
+            .boxed()
+          }
           Err(err) => return futures::future::err(err).boxed(),
         };
       }
@@ -1285,28 +1292,25 @@ pub fn extract_output_files(
   }
 
   async move {
-    let files_snapshot = Snapshot::from_path_stats(
-      store.clone(),
-      StoreOneOffRemoteDigest::new(path_map),
-      path_stats,
-    )
-    .map_err(move |error| {
-      format!(
-        "Error when storing the output file directory info in the remote CAS: {:?}",
-        error
-      )
-    });
+    let files_snapshot =
+      Snapshot::from_path_stats(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
+        move |error| {
+          format!(
+            "Error when storing the output file directory info in the remote CAS: {:?}",
+            error
+          )
+        },
+      );
 
     let (files_snapshot, mut directory_digests) =
       future::try_join(files_snapshot, future::try_join_all(directory_digests)).await?;
 
     directory_digests.push(files_snapshot.into());
 
-    let directory_digest = store
+    store
       .merge(directory_digests)
       .map_err(|err| format!("Error when merging output files and directories: {:?}", err))
-      .await?;
-    Ok(directory_digest.todo_as_digest())
+      .await
   }
   .boxed()
 }
@@ -1475,7 +1479,7 @@ pub async fn ensure_action_uploaded(
   store: &Store,
   command_digest: Digest,
   action_digest: Digest,
-  input_files: Option<Digest>,
+  input_files: Option<DirectoryDigest>,
 ) -> Result<(), String> {
   in_workunit!(
     context.workunit_store.clone(),
@@ -1487,7 +1491,13 @@ pub async fn ensure_action_uploaded(
     },
     |_workunit| async move {
       let mut digests = vec![command_digest, action_digest];
-      digests.extend(input_files);
+      if let Some(input_files) = input_files {
+        // TODO: Port ensure_remote_has_recursive. See #13112.
+        store
+          .ensure_directory_digest_persisted(input_files.clone())
+          .await?;
+        digests.push(input_files.todo_as_digest());
+      }
       let _ = store.ensure_remote_has_recursive(digests).await?;
       Ok(())
     },

@@ -73,10 +73,7 @@ async fn merge_directories<T: SnapshotOps + 'static>(
     }
   };
 
-  // TODO: Remove persistence as the final step of #13112.
-  let directory_digest = store.record_digest_trie(tree.clone()).await?;
-
-  Ok(directory_digest)
+  Ok(tree.into())
 }
 
 ///
@@ -592,9 +589,13 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     digest: DirectoryDigest,
     prefix: &RelativePath,
   ) -> Result<DirectoryDigest, SnapshotOpsError> {
-    let tree = self.load_digest_trie(digest).await?.add_prefix(prefix)?;
-    // TODO: Remove persistence as the final step of #13112.
-    Ok(self.record_digest_trie(tree).await?)
+    Ok(
+      self
+        .load_digest_trie(digest)
+        .await?
+        .add_prefix(prefix)?
+        .into(),
+    )
   }
 
   async fn strip_prefix(
@@ -602,14 +603,29 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     digest: DirectoryDigest,
     prefix: &RelativePath,
   ) -> Result<DirectoryDigest, SnapshotOpsError> {
-    let tree = self.load_digest_trie(digest).await?.remove_prefix(prefix)?;
-    // TODO: Remove persistence as the final step of #13112.
-    Ok(self.record_digest_trie(tree).await?)
+    Ok(
+      self
+        .load_digest_trie(digest)
+        .await?
+        .remove_prefix(prefix)?
+        .into(),
+    )
   }
 
-  async fn subset(&self, digest: Digest, params: SubsetParams) -> Result<Digest, SnapshotOpsError> {
+  async fn subset(
+    &self,
+    directory_digest: DirectoryDigest,
+    params: SubsetParams,
+  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+    // TODO: Port subset for #13112. For now, we just ensure that the directory is persisted so
+    // that we can load it while subsetting.
+    let input_digest = directory_digest.todo_as_digest();
+    let tree = self.load_digest_trie(directory_digest).await?;
+    let _ = self.record_digest_trie(tree).await?;
+
     let SubsetParams { globs } = params;
-    snapshot_glob_match(self.clone(), digest, globs).await
+    let output_digest = snapshot_glob_match(self.clone(), input_digest, globs).await?;
+    Ok(DirectoryDigest::todo_from_digest(output_digest))
   }
 
   async fn create_empty_dir(
