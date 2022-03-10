@@ -52,12 +52,7 @@ class PythonLockfileMetadata(LockfileMetadata):
     def from_lockfile(
         cls, resolve_name: str, lockfile: bytes, lockfile_path: str | None = None
     ) -> PythonLockfileMetadata:
-        return cast(
-            PythonLockfileMetadata,
-            LockfileMetadata.from_lockfile_for_scope(
-                LockfileScope.PYTHON, lockfile, lockfile_path, resolve_name
-            ),
-        )
+        return PythonLockfileMetadata.from_lockfile_for_scope(lockfile, lockfile_path, resolve_name)
 
     @classmethod
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
