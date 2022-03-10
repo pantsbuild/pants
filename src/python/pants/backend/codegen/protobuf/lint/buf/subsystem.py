@@ -3,16 +3,14 @@
 
 from __future__ import annotations
 
-from typing import List, cast
-
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.custom_types import shell_str
-from pants.util.docutil import bin_name
+from pants.option.option_types import ArgsListOption, SkipOption
 
 
 class BufSubsystem(TemplatedExternalTool):
     options_scope = "buf-lint"
+    name = "Buf"
     help = "A linter for Protocol Buffers (https://github.com/bufbuild/buf)."
 
     default_version = "v1.0.0"
@@ -32,33 +30,8 @@ class BufSubsystem(TemplatedExternalTool):
         "linux_x86_64": "Linux-x86_64",
     }
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=f"Don't use Buf when running `{bin_name()} lint`.",
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help="Arguments to pass directly to Buf, e.g. `--buf-lint-args='--error-format json'`.'",
-        )
-
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
-
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="--error-format json")
 
     def generate_exe(self, plat: Platform) -> str:
         return "./buf/bin/buf"
-
-    @property
-    def runtime_targets(self) -> List[str]:
-        return cast(List[str], self.options.runtime_targets)
