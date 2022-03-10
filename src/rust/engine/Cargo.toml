@@ -113,9 +113,10 @@ bytes = "1.0"
 cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
-either = "1.6"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.3"
@@ -124,6 +125,7 @@ graph = { path = "graph" }
 grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
 indexmap = "1.8"
+internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
 libc = "0.2.112"
@@ -134,12 +136,12 @@ num_enum = "0.5"
 parking_lot = "0.12"
 petgraph = "0.5"
 process_execution = { path = "process_execution" }
-pyo3 = "0.15.1"
+pyo3 = "0.16"
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-smallvec = "0.6"
+smallvec = "1"
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
 serde_json = "1.0"
@@ -161,4 +163,4 @@ fs = { path = "./fs" }
 env_logger = "0.5.4"
 
 [build-dependencies]
-pyo3-build-config = "0.15.1"
+pyo3-build-config = "0.16"

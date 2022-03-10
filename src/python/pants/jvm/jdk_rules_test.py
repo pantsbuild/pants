@@ -7,12 +7,12 @@ import textwrap
 
 import pytest
 
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.core.util_rules.external_tool import rules as external_tool_rules
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import BashBinary, ProcessResult
-from pants.engine.process import rules as process_rules
+from pants.engine.process import ProcessResult
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess, parse_jre_major_version
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -33,7 +33,7 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *util_rules(),
             *jdk_rules(),
-            *process_rules(),
+            *system_binaries.rules(),
             QueryRule(BashBinary, ()),
             QueryRule(InternalJdk, ()),
             QueryRule(ProcessResult, (JvmProcess,)),

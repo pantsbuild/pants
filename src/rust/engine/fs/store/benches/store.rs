@@ -80,7 +80,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 }
 
 ///
-/// NB: More accurately, this benchmarks `Snapshot::digest_from_path_stats`, which avoids
+/// NB: More accurately, this benchmarks `Snapshot::from_path_stats`, which avoids
 /// filesystem traversal overheads and focuses on digesting/capturing.
 ///
 pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
@@ -115,7 +115,7 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
         b.iter(|| {
           for _ in 0..captures {
             let _ = executor
-              .block_on(Snapshot::digest_from_path_stats(
+              .block_on(Snapshot::from_path_stats(
                 store.clone(),
                 OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone(), immutable),
                 path_stats.clone(),
@@ -205,6 +205,15 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
     .block_on(store.record_directory(&bazel_removed_files_directory, true))
     .unwrap();
 
+  // NB: We benchmark with trees that are already held in memory, since that's the expected case in
+  // production.
+  let removed_digest = executor
+    .block_on(store.load_directory_digest(removed_digest))
+    .unwrap();
+  let modified_digest = executor
+    .block_on(store.load_directory_digest(modified_digest))
+    .unwrap();
+
   let mut cgroup = c.benchmark_group("snapshot_merge");
 
   cgroup
@@ -213,13 +222,13 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
     .bench_function("snapshot_merge", |b| {
       b.iter(|| {
         // Merge the old and the new snapshot together, allowing any file to be duplicated.
-        let old_first: Digest = executor
-          .block_on(store.merge(vec![removed_digest, modified_digest]))
+        let old_first = executor
+          .block_on(store.merge(vec![removed_digest.clone(), modified_digest.clone()]))
           .unwrap();
 
         // Test the performance of either ordering of snapshots.
-        let new_first: Digest = executor
-          .block_on(store.merge(vec![modified_digest, removed_digest]))
+        let new_first = executor
+          .block_on(store.merge(vec![modified_digest.clone(), removed_digest.clone()]))
           .unwrap();
 
         assert_eq!(old_first, new_first);
@@ -338,14 +347,15 @@ fn snapshot(
         executor.clone(),
       )
       .unwrap();
-      Snapshot::digest_from_path_stats(
+      Snapshot::from_path_stats(
         store2.clone(),
         OneOffStoreFileByDigest::new(store2, Arc::new(posix_fs), true),
         path_stats,
       )
       .await
     })
-    .unwrap();
+    .unwrap()
+    .digest;
 
   (store, storedir, digest)
 }

@@ -559,6 +559,10 @@ async fn make_execute_request_using_immutable_inputs() {
 
   let prefix = RelativePath::new("cats").unwrap();
   let input_directory = TestDirectory::containing_roland();
+  store
+    .record_directory(&input_directory.directory(), false)
+    .await
+    .expect("Saving directory bytes to store");
   let input_digests = InputDigests::new(
     &store,
     EMPTY_DIGEST,
@@ -572,9 +576,9 @@ async fn make_execute_request_using_immutable_inputs() {
   .await
   .unwrap();
 
-  // The computed input root digest should be prefixed will be prefixed with the mount point.
+  // The computed input root digest will be prefixed with the mount point.
   let expected_digest = store
-    .add_prefix(input_directory.digest(), &prefix)
+    .add_prefix(input_directory.directory_digest(), &prefix)
     .await
     .unwrap();
 
@@ -627,7 +631,7 @@ async fn make_execute_request_using_immutable_inputs() {
       ))
         .into(),
     ),
-    input_root_digest: Some((&expected_digest).into()),
+    input_root_digest: Some((&expected_digest.as_digest()).into()),
     ..Default::default()
   };
 
@@ -999,7 +1003,7 @@ async fn sends_headers() {
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkunitStore::new(false),
+    workunit_store: WorkunitStore::new(false, log::Level::Debug),
     build_id: String::from("marmosets"),
     run_id: RunId(0),
   };

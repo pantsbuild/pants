@@ -122,7 +122,8 @@ class RegexLintSubsystem(Subsystem):
             "It's often helpful to load this config from a JSON or YAML file. To do that, set "
             "`[regex-lint].config = '@path/to/config.yaml'`, for example."
         ),
-    ).from_file()
+        fromfile=True,
+    )
     detail_level = EnumOption(
         "--detail-level",
         default=DetailLevel.nonmatching,

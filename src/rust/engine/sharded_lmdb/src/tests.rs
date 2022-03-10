@@ -32,7 +32,7 @@ async fn shard_counts() {
     let mut databases = HashMap::new();
     for prefix_byte in 0u8..=255u8 {
       *databases
-        .entry(s.get_raw(prefix_byte).0.clone())
+        .entry(s.get_raw(&[prefix_byte]).0.clone())
         .or_insert(0) += 1;
     }
     assert_eq!(databases.len(), shard_count as usize);

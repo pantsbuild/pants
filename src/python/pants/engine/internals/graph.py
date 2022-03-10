@@ -127,20 +127,7 @@ def target_types_to_generate_targets_requests(
     )
 
 
-# We use a rule for this warning so that it gets memoized, i.e. doesn't get repeated for every
-# offending target.
-class _WarnDeprecatedTarget:
-    pass
-
-
-@dataclass(frozen=True)
-class _WarnDeprecatedTargetRequest:
-    tgt_type: type[Target]
-
-
-@rule
-def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnDeprecatedTarget:
-    tgt_type = request.tgt_type
+def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     assert tgt_type.deprecated_alias_removal_version is not None
     warn_or_error(
         removal_version=tgt_type.deprecated_alias_removal_version,
@@ -150,23 +137,9 @@ def warn_deprecated_target_type(request: _WarnDeprecatedTargetRequest) -> _WarnD
             "update-build-files` to automatically fix your BUILD files."
         ),
     )
-    return _WarnDeprecatedTarget()
 
 
-# We use a rule for this warning so that it gets memoized, i.e. doesn't get repeated for every
-# offending field.
-class _WarnDeprecatedField:
-    pass
-
-
-@dataclass(frozen=True)
-class _WarnDeprecatedFieldRequest:
-    field_type: type[Field]
-
-
-@rule
-def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDeprecatedField:
-    field_type = request.field_type
+def warn_deprecated_field_type(field_type: type[Field]) -> None:
     assert field_type.deprecated_alias_removal_version is not None
     warn_or_error(
         removal_version=field_type.deprecated_alias_removal_version,
@@ -176,7 +149,6 @@ def warn_deprecated_field_type(request: _WarnDeprecatedFieldRequest) -> _WarnDep
             "update-build-files` to automatically fix your BUILD files."
         ),
     )
-    return _WarnDeprecatedField()
 
 
 @rule
@@ -200,7 +172,7 @@ async def resolve_target_parametrizations(
         and target_type.deprecated_alias == target_adaptor.type_alias
         and not address.is_generated_target
     ):
-        await Get(_WarnDeprecatedTarget, _WarnDeprecatedTargetRequest(target_type))
+        warn_deprecated_target_type(target_type)
 
     target = None
     parametrizations: list[_TargetParametrization] = []
@@ -302,7 +274,7 @@ async def resolve_target_parametrizations(
             field_type.deprecated_alias is not None
             and field_type.deprecated_alias in target_adaptor.kwargs
         ):
-            await Get(_WarnDeprecatedField, _WarnDeprecatedFieldRequest(field_type))
+            warn_deprecated_field_type(field_type)
 
     return _TargetParametrizations(parametrizations)
 
@@ -854,12 +826,13 @@ class AmbiguousCodegenImplementationsException(Exception):
     """Exception for when there are multiple codegen implementations and it is ambiguous which to
     use."""
 
-    def __init__(
-        self,
+    @classmethod
+    def create(
+        cls,
         generators: Iterable[type[GenerateSourcesRequest]],
         *,
         for_sources_types: Iterable[type[SourcesField]],
-    ) -> None:
+    ) -> AmbiguousCodegenImplementationsException:
         all_same_generator_paths = (
             len({(generator.input, generator.output) for generator in generators}) == 1
         )
@@ -867,29 +840,28 @@ class AmbiguousCodegenImplementationsException(Exception):
         input = example_generator.input.__name__
         if all_same_generator_paths:
             output = example_generator.output.__name__
-            super().__init__(
-                f"Multiple of the registered code generators can generate {output} from {input}. "
+            return cls(
+                f"Multiple registered code generators can generate {output} from {input}. "
                 "It is ambiguous which implementation to use.\n\nPossible implementations:\n\n"
                 f"{bullet_list(sorted(generator.__name__ for generator in generators))}"
             )
-        else:
-            possible_output_types = sorted(
-                generator.output.__name__
-                for generator in generators
-                if issubclass(generator.output, tuple(for_sources_types))
-            )
-            possible_generators_with_output = [
-                f"{generator.__name__} -> {generator.output.__name__}"
-                for generator in sorted(generators, key=lambda generator: generator.output.__name__)
-            ]
-            super().__init__(
-                f"Multiple of the registered code generators can generate one of "
-                f"{possible_output_types} from {input}. It is ambiguous which implementation to "
-                f"use. This can happen when the call site requests too many different output types "
-                f"from the same original protocol sources.\n\nPossible implementations with their "
-                f"output type:\n\n"
-                f"{bullet_list(possible_generators_with_output)}"
-            )
+        possible_output_types = sorted(
+            generator.output.__name__
+            for generator in generators
+            if issubclass(generator.output, tuple(for_sources_types))
+        )
+        possible_generators_with_output = [
+            f"{generator.__name__} -> {generator.output.__name__}"
+            for generator in sorted(generators, key=lambda generator: generator.output.__name__)
+        ]
+        return cls(
+            f"Multiple registered code generators can generate one of "
+            f"{possible_output_types} from {input}. It is ambiguous which implementation to "
+            f"use. This can happen when the call site requests too many different output types "
+            f"from the same original protocol sources.\n\nPossible implementations with their "
+            f"output type:\n\n"
+            f"{bullet_list(possible_generators_with_output)}"
+        )
 
 
 @rule(desc="Hydrate the `sources` field")
@@ -912,7 +884,7 @@ async def hydrate_sources(
         and issubclass(generate_request_type.output, request.for_sources_types)
     ]
     if request.enable_codegen and len(relevant_generate_request_types) > 1:
-        raise AmbiguousCodegenImplementationsException(
+        raise AmbiguousCodegenImplementationsException.create(
             relevant_generate_request_types, for_sources_types=request.for_sources_types
         )
     generate_request_type = next(iter(relevant_generate_request_types), None)

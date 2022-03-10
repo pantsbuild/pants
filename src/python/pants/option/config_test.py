@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import configparser
 import unittest
 from dataclasses import dataclass
 from textwrap import dedent
@@ -11,6 +10,7 @@ import pytest
 
 from pants.engine.fs import FileContent
 from pants.option.config import Config, TomlSerializer
+from pants.option.errors import NoSectionError
 from pants.util.ordered_set import OrderedSet
 
 
@@ -194,7 +194,7 @@ class ConfigTest(unittest.TestCase):
             ]
         # Check non-existent section
         for config in file1_config, file2_config:
-            with pytest.raises(configparser.NoSectionError):
+            with pytest.raises(NoSectionError):
                 config.values.options("fake")
 
     def test_default_values(self) -> None:
@@ -228,14 +228,6 @@ class ConfigTest(unittest.TestCase):
             for option, default_value in FILE_1.default_values.items():
                 expected = default_value if option not in section_values else section_values[option]
                 assert self.config.get(section=section, option=option) == expected
-
-        def check_defaults(default: str) -> None:
-            assert self.config.get(section="c", option="fast") is None
-            assert self.config.get(section="c", option="preempt", default=None) is None
-            assert self.config.get(section="c", option="jake", default=default) == default
-
-        check_defaults("")
-        check_defaults("42")
 
     def test_empty(self) -> None:
         config = Config.load([])

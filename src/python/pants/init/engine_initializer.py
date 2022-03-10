@@ -12,7 +12,9 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
+from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules import system_binaries
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
@@ -37,7 +39,7 @@ from pants.option.global_options import (
 )
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
-from pants.python import binaries as python_binaries
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
 
@@ -57,6 +59,7 @@ class GraphScheduler:
         dynamic_ui: bool = False,
         ui_use_prodash: bool = False,
         use_colors=True,
+        max_workunit_level: LogLevel = LogLevel.DEBUG,
         session_values: SessionValues | None = None,
         cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> GraphSession:
@@ -64,6 +67,7 @@ class GraphScheduler:
             build_id,
             dynamic_ui,
             ui_use_prodash,
+            max_workunit_level=max_workunit_level,
             session_values=session_values,
             cancellation_latch=cancellation_latch,
         )
@@ -124,10 +128,7 @@ class GraphSession:
             # NB: We no-op for goals that have no implementation because no relevant backends are
             # registered. We might want to reconsider the behavior to instead warn or error when
             # trying to run something like `./pants run` without any backends registered.
-            is_implemented = union_membership.has_members_for_all(
-                goal_product.subsystem_cls.required_union_implementations
-            )
-            if not is_implemented:
+            if not goal_product.subsystem_cls.activated(union_membership):
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
             params = Params(specs, self.console, workspace)
@@ -260,7 +261,7 @@ class EngineInitializer:
                 *graph.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
-                *python_binaries.rules(),
+                *system_binaries.rules(),
                 *platform.rules(),
                 *changed_rules(),
                 *streaming_workunit_handler_rules(),
@@ -268,7 +269,16 @@ class EngineInitializer:
                 *rules,
             )
         )
+
         goal_map = EngineInitializer._make_goal_map_from_rules(rules)
+
+        union_membership = UnionMembership.from_rules(
+            (
+                *build_configuration.union_rules,
+                *(r for r in rules if isinstance(r, UnionRule)),
+            )
+        )
+
         rules = FrozenOrderedSet(
             (
                 *rules,
@@ -277,13 +287,14 @@ class EngineInitializer:
                     QueryRule(goal_type, GraphSession.goal_param_types)
                     for goal_type in goal_map.values()
                 ),
+                # Install queries for each request/response pair used by the BSP support.
+                # Note: These are necessary because the BSP support is a built-in goal that makes
+                # synchronous requests into the engine.
+                *(
+                    QueryRule(impl.response_type, (impl.request_type, Workspace))
+                    for impl in union_membership.get(BSPHandlerMapping)
+                ),
                 QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.
-            )
-        )
-        union_membership = UnionMembership.from_rules(
-            (
-                *build_configuration.union_rules,
-                *(r for r in rules if isinstance(r, UnionRule)),
             )
         )
 

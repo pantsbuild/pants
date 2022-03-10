@@ -67,7 +67,7 @@ async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
     parser_script_content = pkgutil.get_data(_DOCKERFILE_PACKAGE, _DOCKERFILE_SANDBOX_TOOL)
     if not parser_script_content:
         raise ValueError(
-            "Unable to find source to {_DOCKERFILE_SANDBOX_TOOL!r} in {_DOCKERFILE_PACKAGE}."
+            f"Unable to find source to {_DOCKERFILE_SANDBOX_TOOL!r} in {_DOCKERFILE_PACKAGE}."
         )
 
     parser_content = FileContent(
@@ -75,21 +75,15 @@ async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
         content=parser_script_content,
         is_executable=True,
     )
-
     parser_digest = await Get(Digest, CreateDigest([parser_content]))
 
     parser_pex = await Get(
         VenvPex,
-        PexRequest(
-            output_filename="dockerfile_parser.pex",
-            internal_only=True,
-            requirements=dockerfile_parser.pex_requirements(),
-            interpreter_constraints=dockerfile_parser.interpreter_constraints,
-            main=EntryPoint(PurePath(parser_content.path).stem),
-            sources=parser_digest,
+        PexRequest,
+        dockerfile_parser.to_pex_request(
+            main=EntryPoint(PurePath(parser_content.path).stem), sources=parser_digest
         ),
     )
-
     return ParserSetup(parser_pex)
 
 

@@ -19,7 +19,9 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use fs::{safe_create_dir_all_ioerror, Permissions, PreparedPathGlobs, RelativePath};
+use fs::{
+  safe_create_dir_all_ioerror, DirectoryDigest, Permissions, PreparedPathGlobs, RelativePath,
+};
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::IndexMap;
@@ -154,13 +156,13 @@ impl Intrinsics {
 
   pub async fn run(
     &self,
-    intrinsic: Intrinsic,
+    intrinsic: &Intrinsic,
     context: Context,
     args: Vec<Value>,
   ) -> NodeResult<Value> {
     let function = self
       .intrinsics
-      .get(&intrinsic)
+      .get(intrinsic)
       .unwrap_or_else(|| panic!("Unrecognized intrinsic: {:?}", intrinsic));
     function(context, args).await
   }
@@ -217,7 +219,11 @@ fn process_request_to_process_result(
         externs::store_bytes(py, &stderr_bytes),
         Snapshot::store_file_digest(py, result.stderr_digest).map_err(throw)?,
         externs::store_i64(py, result.exit_code.into()),
-        Snapshot::store_directory_digest(py, result.output_directory).map_err(throw)?,
+        Snapshot::store_directory_digest(
+          py,
+          DirectoryDigest::todo_from_digest(result.output_directory),
+        )
+        .map_err(throw)?,
         externs::unsafe_call(
           py,
           context.core.types.platform,
@@ -252,17 +258,16 @@ fn directory_digest_to_digest_contents(
       lift_directory_digest(py_digest)
     })
     .map_err(throw)?;
-    let snapshot = context
+
+    let digest_contents = context
       .core
       .store()
       .contents_for_directory(digest)
       .await
-      .and_then(move |digest_contents| {
-        let gil = Python::acquire_gil();
-        Snapshot::store_digest_contents(gil.python(), &context, &digest_contents)
-      })
       .map_err(throw)?;
-    Ok(snapshot)
+
+    let gil = Python::acquire_gil();
+    Snapshot::store_digest_contents(gil.python(), &context, &digest_contents).map_err(throw)
   }
   .boxed()
 }
@@ -304,13 +309,13 @@ fn remove_prefix_request_to_digest(
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_remove_prefix.prefix)
         .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-      let res: NodeResult<(Digest, RelativePath)> = Ok((py_remove_prefix.digest, prefix));
+      let res: NodeResult<_> = Ok((py_remove_prefix.digest.clone(), prefix));
       res
     })?;
     let digest = context
       .core
       .store()
-      .strip_prefix(digest, prefix)
+      .strip_prefix(digest, &prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
@@ -331,7 +336,8 @@ fn add_prefix_request_to_digest(
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_add_prefix.prefix)
         .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-      let res: NodeResult<(Digest, RelativePath)> = Ok((py_add_prefix.digest, prefix));
+      let res: NodeResult<(DirectoryDigest, RelativePath)> =
+        Ok((py_add_prefix.digest.clone(), prefix));
       res
     })?;
     let digest = context
@@ -391,9 +397,9 @@ fn download_file_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from_py_err)?;
-    let digest = context.get(DownloadedFile(key)).await?;
+    let snapshot = context.get(DownloadedFile(key)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), snapshot.into()).map_err(throw)
   }
   .boxed()
 }
@@ -408,9 +414,9 @@ fn path_globs_to_digest(
       Snapshot::lift_path_globs(py_path_globs)
     })
     .map_err(|e| throw(format!("Failed to parse PathGlobs: {}", e)))?;
-    let digest = context.get(Snapshot::from_path_globs(path_globs)).await?;
+    let snapshot = context.get(Snapshot::from_path_globs(path_globs)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), snapshot.into()).map_err(throw)
   }
   .boxed()
 }
@@ -468,6 +474,9 @@ fn create_digest_to_digest(
       .collect()
   };
 
+  // TODO: Rather than creating independent Digests and then merging them, this should use
+  // `DigestTrie::from_path_stats`.
+  //   see https://github.com/pantsbuild/pants/pull/14569#issuecomment-1057286943
   let digest_futures: Vec<_> = items
     .into_iter()
     .map(|item| {
@@ -479,14 +488,14 @@ fn create_digest_to_digest(
             let snapshot = store
               .snapshot_of_one_file(path, digest, is_executable)
               .await?;
-            let res: Result<_, String> = Ok(snapshot.digest);
+            let res: Result<DirectoryDigest, String> = Ok(snapshot.into());
             res
           }
           CreateDigestItem::FileEntry(path, digest, is_executable) => {
             let snapshot = store
               .snapshot_of_one_file(path, digest, is_executable)
               .await?;
-            let res: Result<_, String> = Ok(snapshot.digest);
+            let res: Result<_, String> = Ok(snapshot.into());
             res
           }
           CreateDigestItem::Dir(path) => store
@@ -523,7 +532,9 @@ fn digest_subset_to_digest(
       let py_digest = externs::getattr(py_digest_subset, "digest").unwrap();
       let res: NodeResult<(PreparedPathGlobs, Digest)> = Ok((
         Snapshot::lift_prepared_path_globs(py_path_globs).map_err(throw)?,
-        lift_directory_digest(py_digest).map_err(throw)?,
+        lift_directory_digest(py_digest)
+          .map_err(throw)?
+          .todo_as_digest(),
       ));
       res
     })?;
@@ -533,7 +544,8 @@ fn digest_subset_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
+      .map_err(throw)
   }
   .boxed()
 }
@@ -563,7 +575,7 @@ fn interactive_process(
       let run_in_workspace: bool = externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
       let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
       let py_input_digest = externs::getattr(py_interactive_process, "input_digest").unwrap();
-      let input_digest: Digest = lift_directory_digest(py_input_digest)?;
+      let input_digest: Digest = lift_directory_digest(py_input_digest)?.todo_as_digest();
       let env: BTreeMap<String, String> = externs::getattr_from_str_frozendict(py_interactive_process, "env");
 
       let append_only_caches = externs::getattr_from_str_frozendict::<&str>(py_interactive_process, "append_only_caches")
@@ -704,7 +716,7 @@ fn interactive_process(
           _ = session.cancelled() => {
             // The Session was cancelled: attempt to kill the process group / process, and
             // then wait for it to exit (to avoid zombies).
-            if let Err(e) = subprocess.kill_pgid() {
+            if let Err(e) = subprocess.graceful_shutdown_sync() {
               // Failed to kill the PGID: try the non-group form.
               log::warn!("Failed to kill spawned process group ({}). Will try killing only the top process.\n\
                          This is unexpected: please file an issue about this problem at \

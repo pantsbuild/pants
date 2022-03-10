@@ -51,14 +51,13 @@ class ScalaDependenciesField(Dependencies):
 
 
 class ScalaConsumedPluginNamesField(StringSequenceField):
-    help = """The names of Scala plugins that this source file requires.
-
-        The plugin must be defined by a corresponding `scalac_plugin` AND `jvm_artifact` target,
-        and must be present in this target's resolve's lockfile.
-
-        If not specified, this will default to the plugins specified in `--scalac-plugins` for this
-        target's resolve.
-        """
+    help = (
+        "The names of Scala plugins that this source file requires.\n\n"
+        "The plugin must be defined by a corresponding `scalac_plugin` AND `jvm_artifact` target, "
+        "and must be present in this target's resolve's lockfile.\n\n"
+        "If not specified, this will default to the plugins specified in "
+        "`[scalac].plugins_for_resolve` for this target's resolve."
+    )
 
     alias = "scalac_plugins"
     required = False

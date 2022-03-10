@@ -8,13 +8,14 @@ publish = false
 [dependencies]
 bytes = "1.0"
 concrete_time = { path = "../concrete_time" }
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
 hashing = { path = "../hashing" }
-hdrhistogram = "7.4"
-parking_lot = "0.12"
-rand = "0.8"
-tokio = { version = "1.16", features = ["rt"] }
-petgraph = "0.5"
+hdrhistogram = "7.5"
 log = "0.4"
+parking_lot = "0.12"
+petgraph = "0.5"
+rand = "0.8"
 strum = "0.20"
 strum_macros = "0.23"
-uuid = { version = "0.8", features = ["v4"] }
+tokio = { version = "1.16", features = ["rt"] }

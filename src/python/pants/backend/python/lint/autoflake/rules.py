@@ -66,16 +66,7 @@ def generate_argv(
 
 @rule(level=LogLevel.DEBUG)
 async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> Setup:
-    autoflake_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="autoflake.pex",
-            internal_only=True,
-            requirements=autoflake.pex_requirements(),
-            interpreter_constraints=autoflake.interpreter_constraints,
-            main=autoflake.main,
-        ),
-    )
+    autoflake_pex_get = Get(VenvPex, PexRequest, autoflake.to_pex_request())
 
     source_files_get = Get(
         SourceFiles,

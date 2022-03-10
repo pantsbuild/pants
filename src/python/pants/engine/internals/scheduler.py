@@ -308,6 +308,7 @@ class Scheduler:
         build_id: str,
         dynamic_ui: bool = False,
         ui_use_prodash: bool = False,
+        max_workunit_level: LogLevel = LogLevel.DEBUG,
         session_values: SessionValues | None = None,
         cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> SchedulerSession:
@@ -318,6 +319,7 @@ class Scheduler:
                 scheduler=self.py_scheduler,
                 dynamic_ui=dynamic_ui,
                 ui_use_prodash=ui_use_prodash,
+                max_workunit_level=max_workunit_level.level,
                 build_id=build_id,
                 session_values=session_values or SessionValues(),
                 cancellation_latch=cancellation_latch or PySessionCancellationLatch(),
@@ -434,6 +436,10 @@ class SchedulerSession:
     def metrics(self) -> dict[str, int]:
         """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
         return native_engine.scheduler_metrics(self.py_scheduler, self.py_session)
+
+    def live_items(self) -> tuple[list[Any], dict[str, tuple[int, int]]]:
+        """Return all Python objects held by the Scheduler."""
+        return native_engine.scheduler_live_items(self.py_scheduler, self.py_session)
 
     def _maybe_visualize(self) -> None:
         if self._scheduler.visualize_to_dir is not None:
@@ -616,7 +622,10 @@ class SchedulerSession:
     def garbage_collect_store(self, target_size_bytes: int) -> None:
         self._scheduler.garbage_collect_store(target_size_bytes)
 
-    def get_observation_histograms(self) -> dict:
+    def get_metrics(self) -> dict[str, int]:
+        return native_engine.session_get_metrics(self.py_session)
+
+    def get_observation_histograms(self) -> dict[str, Any]:
         return native_engine.session_get_observation_histograms(self.py_scheduler, self.py_session)
 
     def record_test_observation(self, value: int) -> None:

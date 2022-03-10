@@ -7,6 +7,7 @@ import os
 import shlex
 import textwrap
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import ClassVar, Iterable, Tuple
 
 from pants.core.util_rules import external_tool
@@ -15,12 +16,15 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
+from pants.core.util_rules.system_binaries import BashBinary, PythonBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process
+from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.python.binaries import PythonBinary
+from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
+from pants.util.ordered_set import FrozenOrderedSet
 
 COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """\
@@ -36,6 +40,11 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     # times if the source is the same as well.
     classpath = dict()
     for dep in report['dependencies']:
+        if not dep.get('file'):
+            raise Exception(
+                f"No jar found for {dep['coord']}. Check that it's available in the "
+                "repositories configured in [coursier].repos in pants.toml."
+            )
         source = PurePath(dep['file'])
         dest_name = dep['coord'].replace(":", "_")
         _, ext = os.path.splitext(source)
@@ -114,19 +123,20 @@ class CoursierSubsystem(TemplatedExternalTool):
         "linux_x86_64": "x86_64-pc-linux",
     }
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--repos",
-            type=list,
-            member_type=str,
-            default=[
-                "https://maven-central.storage-download.googleapis.com/maven2",
-                "https://repo1.maven.org/maven2",
-            ],
-            help=("Maven style repositories to resolve artifacts from."),
-        )
+    repos = StrListOption(
+        "--repos",
+        default=[
+            "https://maven-central.storage-download.googleapis.com/maven2",
+            "https://repo1.maven.org/maven2",
+        ],
+        help=(
+            "Maven style repositories to resolve artifacts from."
+            "\n\n"
+            "Coursier will resolve these repositories in the order in which they are "
+            "specifed, and re-ordering repositories will cause artifacts to be "
+            "re-downloaded. This can result in artifacts in lockfiles becoming invalid."
+        ),
+    )
 
     def generate_exe(self, plat: Platform) -> str:
         archive_filename = os.path.basename(self.generate_url(plat))
@@ -140,6 +150,7 @@ class Coursier:
 
     coursier: DownloadedExternalTool
     _digest: Digest
+    repos: FrozenOrderedSet[str]
 
     bin_dir: ClassVar[str] = "__coursier"
     fetch_wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_fetch_wrapper_script.sh"
@@ -157,13 +168,26 @@ class Coursier:
             *args,
         )
 
+    @memoized_property
+    def _coursier_cache_prefix(self) -> str:
+        """Returns a key for `COURSIER_CACHE` determined by the configured repositories.
+
+        This helps us avoid a cache poisoning issue that we uncovered in #14577.
+        """
+        sha = sha256()
+        for repo in self.repos:
+            sha.update(repo.encode("utf-8"))
+        return sha.digest().hex()
+
     @property
     def env(self) -> dict[str, str]:
         # NB: These variables have changed a few times, and they change again on `main`. But as of
         # `v2.0.16+73-gddc6d9cc9` they are accurate. See:
         #  https://github.com/coursier/coursier/blob/v2.0.16+73-gddc6d9cc9/modules/paths/src/main/java/coursier/paths/CoursierPaths.java#L38-L48
         return {
-            "COURSIER_CACHE": f"{self.cache_dir}/jdk",
+            # Maven artifacts and JDK tarballs go here
+            "COURSIER_CACHE": f"{self.cache_dir}/{self._coursier_cache_prefix}/jdk",
+            # extracted JDK tarballs go here
             "COURSIER_ARCHIVE_CACHE": f"{self.cache_dir}/arc",
             "COURSIER_JVM_CACHE": f"{self.cache_dir}/v1",
         }
@@ -178,7 +202,7 @@ class Coursier:
 
 
 @dataclass(frozen=True)
-class CoursierWrapperProcess:
+class CoursierFetchProcess:
 
     args: Tuple[str, ...]
     input_digest: Digest
@@ -191,7 +215,7 @@ class CoursierWrapperProcess:
 async def invoke_coursier_wrapper(
     bash: BashBinary,
     coursier: Coursier,
-    request: CoursierWrapperProcess,
+    request: CoursierFetchProcess,
 ) -> Process:
 
     return Process(
@@ -215,7 +239,10 @@ async def setup_coursier(
     coursier_subsystem: CoursierSubsystem,
     python: PythonBinary,
 ) -> Coursier:
-    repos_args = " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.options.repos)
+    repos_args = (
+        " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.options.repos)
+        + " --no-default"
+    )
     coursier_wrapper_script = COURSIER_FETCH_WRAPPER_SCRIPT.format(
         repos_args=repos_args,
         coursier_working_directory=Coursier.working_directory_placeholder,
@@ -268,6 +295,7 @@ async def setup_coursier(
                 ]
             ),
         ),
+        repos=FrozenOrderedSet(coursier_subsystem.options.repos),
     )
 
 

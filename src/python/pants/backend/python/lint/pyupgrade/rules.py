@@ -45,16 +45,7 @@ class PyUpgradeResult:
 
 @rule(level=LogLevel.DEBUG)
 async def run_pyupgrade(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> PyUpgradeResult:
-    pyupgrade_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="pyupgrade.pex",
-            internal_only=True,
-            requirements=pyupgrade.pex_requirements(),
-            interpreter_constraints=pyupgrade.interpreter_constraints,
-            main=pyupgrade.main,
-        ),
-    )
+    pyupgrade_pex_get = Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
     source_files_get = Get(
         SourceFiles,
         SourceFilesRequest(field_set.source for field_set in request.field_sets),

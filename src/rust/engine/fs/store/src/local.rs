@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 
-use bytes::{Buf, Bytes};
+use bytes::Bytes;
 use futures::future;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
@@ -248,19 +248,76 @@ impl ByteStore {
     dbs?.remove(digest.hash).await
   }
 
+  ///
+  /// Store the given data in a single pass, optionally using the given Digest. Prefer `Self::store`
+  /// for values which should not be pulled into memory, and `Self::store_bytes_batch` when storing
+  /// multiple values at a time.
+  ///
   pub async fn store_bytes(
     &self,
     entry_type: EntryType,
+    digest: Option<Digest>,
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Digest, String> {
-    self
-      .store(entry_type, initial_lease, true, move || {
-        Ok(bytes.clone().reader())
-      })
-      .await
+    let dbs = match entry_type {
+      EntryType::Directory => self.inner.directory_dbs.clone(),
+      EntryType::File => self.inner.file_dbs.clone(),
+    };
+    let len = bytes.len();
+    let fingerprint = dbs?
+      .store_bytes(digest.map(|d| d.hash), bytes, initial_lease)
+      .await?;
+
+    Ok(Digest::new(fingerprint, len))
   }
 
+  ///
+  /// Store the given items in a single pass, optionally using the given Digests. Prefer `Self::store`
+  /// for values which should not be pulled into memory.
+  ///
+  /// See also: `Self::store_bytes`.
+  ///
+  pub async fn store_bytes_batch(
+    &self,
+    entry_type: EntryType,
+    items: Vec<(Option<Digest>, Bytes)>,
+    initial_lease: bool,
+  ) -> Result<Vec<Digest>, String> {
+    let dbs = match entry_type {
+      EntryType::Directory => self.inner.directory_dbs.clone(),
+      EntryType::File => self.inner.file_dbs.clone(),
+    };
+    // NB: False positive: we do actually need to create the Vec here, since `items` will move
+    // before we use `lens`.
+    #[allow(clippy::needless_collect)]
+    let lens = items
+      .iter()
+      .map(|(_, bytes)| bytes.len())
+      .collect::<Vec<_>>();
+    let fingerprints = dbs?
+      .store_bytes_batch(
+        items
+          .into_iter()
+          .map(|(d, bytes)| (d.map(|d| d.hash), bytes))
+          .collect(),
+        initial_lease,
+      )
+      .await?;
+
+    Ok(
+      fingerprints
+        .into_iter()
+        .zip(lens.into_iter())
+        .map(|(f, len)| Digest::new(f, len))
+        .collect(),
+    )
+  }
+
+  ///
+  /// Store data in two passes, without buffering it entirely into memory. Prefer
+  /// `Self::store_bytes` for small values which fit comfortably in memory.
+  ///
   pub async fn store<F, R>(
     &self,
     entry_type: EntryType,

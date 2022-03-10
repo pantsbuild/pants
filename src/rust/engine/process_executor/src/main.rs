@@ -41,7 +41,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
-use store::{Store, StoreWrapper};
+use store::{SnapshotOps, Store};
 use structopt::StructOpt;
 use workunit_store::{in_workunit, WorkunitMetadata, WorkunitStore};
 
@@ -210,7 +210,7 @@ struct Opt {
 #[tokio::main]
 async fn main() {
   env_logger::init();
-  let workunit_store = WorkunitStore::new(false);
+  let workunit_store = WorkunitStore::new(false, log::Level::Debug);
   workunit_store.init_thread_state(None);
 
   let args = Opt::from_args();

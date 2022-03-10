@@ -112,7 +112,10 @@ def maybe_validate_metadata(
     lockfile: Lockfile | LockfileContent,
     python_setup: PythonSetup,
 ) -> None:
-    if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.ignore:
+    is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
+    if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.ignore or not (
+        is_tool or python_setup.resolves_generate_lockfiles
+    ):
         return
 
     # TODO(#12314): Improve the exception if invalid strings
@@ -137,7 +140,7 @@ def maybe_validate_metadata(
     )
     msg_iter = (
         _invalid_tool_lockfile_error(**error_msg_kwargs)  # type: ignore[arg-type]
-        if isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
+        if is_tool
         else _invalid_user_lockfile_error(**error_msg_kwargs)  # type: ignore[arg-type]
     )
     msg = "".join(msg_iter).strip()

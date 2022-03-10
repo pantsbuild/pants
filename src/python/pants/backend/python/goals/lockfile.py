@@ -187,13 +187,9 @@ async def generate_lockfile(
 
         _poetry_pex = await Get(
             VenvPex,
-            PexRequest(
-                output_filename="poetry.pex",
-                internal_only=True,
-                requirements=poetry_subsystem.pex_requirements(),
-                interpreter_constraints=poetry_subsystem.interpreter_constraints,
-                main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
-                sources=_launcher_digest,
+            PexRequest,
+            poetry_subsystem.to_pex_request(
+                main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem), sources=_launcher_digest
             ),
         )
 
@@ -266,7 +262,7 @@ def determine_python_user_resolves(
 async def setup_user_lockfile_requests(
     requested: RequestedPythonUserResolveNames, all_targets: AllTargets, python_setup: PythonSetup
 ) -> UserGenerateLockfiles:
-    if not python_setup.enable_resolves:
+    if not (python_setup.enable_resolves and python_setup.resolves_generate_lockfiles):
         return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)

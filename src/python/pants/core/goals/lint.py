@@ -24,6 +24,7 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import FieldSet, Targets
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -160,33 +161,20 @@ class LintSubsystem(GoalSubsystem):
     name = "lint"
     help = "Run all linters and/or formatters in check mode."
 
-    required_union_implementations = (LintTargetsRequest,)
-
     @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--only",
-            type=list,
-            member_type=str,
-            default=[],
-            help=only_option_help("lint", "linter", "flake8", "shellcheck"),
-        )
-        register(
-            "--batch-size",
-            advanced=True,
-            type=int,
-            default=128,
-            help=style_batch_size_help(uppercase="Linter", lowercase="linter"),
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return LintTargetsRequest in union_membership or LintFilesRequest in union_membership
 
-    @property
-    def only(self) -> tuple[str, ...]:
-        return tuple(self.options.only)
-
-    @property
-    def batch_size(self) -> int:
-        return cast(int, self.options.batch_size)
+    only = StrListOption(
+        "--only",
+        help=only_option_help("lint", "linter", "flake8", "shellcheck"),
+    )
+    batch_size = IntOption(
+        "--batch-size",
+        advanced=True,
+        default=128,
+        help=style_batch_size_help(uppercase="Linter", lowercase="linter"),
+    )
 
 
 class Lint(Goal):
@@ -224,10 +212,14 @@ async def lint(
         )
         for request_type in target_request_types
     )
-    file_requests = tuple(
-        request_type(specs_snapshot.snapshot.files)
-        for request_type in file_request_types
-        if request_type.name in specified_names
+    file_requests = (
+        tuple(
+            request_type(specs_snapshot.snapshot.files)
+            for request_type in file_request_types
+            if request_type.name in specified_names
+        )
+        if specs_snapshot.snapshot.files
+        else ()
     )
 
     def address_str(fs: FieldSet) -> str:

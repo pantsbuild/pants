@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pants.backend.java.subsystems.junit import JUnit
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.target_types import FileSourceField
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
@@ -17,6 +19,7 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
@@ -39,6 +42,7 @@ class JunitTestFieldSet(TestFieldSet):
 
     sources: JunitTestSourceField
     jdk_version: JvmJdkField
+    dependencies: Dependencies
 
 
 class JunitToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -65,17 +69,26 @@ async def setup_junit_for_target(
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
 
-    jdk = await Get(
-        JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)
+    jdk, dependencies = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)),
+        Get(Targets, DependenciesRequest(request.field_set.dependencies)),
     )
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, JunitToolLockfileSentinel())
-    classpath, junit_classpath = await MultiGet(
+    classpath, junit_classpath, files = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
+        Get(
+            SourceFiles,
+            SourceFilesRequest(
+                (dep.get(SourcesField) for dep in dependencies),
+                for_sources_types=(FileSourceField,),
+                enable_codegen=True,
+            ),
+        ),
     )
 
-    merged_classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
+    input_digest = await Get(Digest, MergeDigests((*classpath.digests(), files.snapshot.digest)))
 
     toolcp_relpath = "__toolcp"
     extra_immutable_input_digests = {
@@ -112,7 +125,7 @@ async def setup_junit_for_target(
             reports_dir,
             *junit.options.args,
         ],
-        input_digest=merged_classpath_digest,
+        input_digest=input_digest,
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run JUnit 5 ConsoleLauncher against {request.field_set.address}",

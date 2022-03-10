@@ -31,10 +31,3 @@ class TestParseLiteral:
         # Now we can safely assume the ValueError is raise due to type checking.
         with pytest.raises(ValueError):
             parse_expression("1.0", acceptable_types=int)
-
-    def test_custom_error_type(self) -> None:
-        class CustomError(Exception):
-            pass
-
-        with pytest.raises(CustomError):
-            parse_expression("1.0", acceptable_types=int, raise_type=CustomError)

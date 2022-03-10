@@ -91,13 +91,8 @@ async def setup_black(
 
     black_pex_get = Get(
         VenvPex,
-        PexRequest(
-            output_filename="black.pex",
-            internal_only=True,
-            requirements=black.pex_requirements(),
-            interpreter_constraints=tool_interpreter_constraints,
-            main=black.main,
-        ),
+        PexRequest,
+        black.to_pex_request(interpreter_constraints=tool_interpreter_constraints),
     )
 
     source_files_get = Get(

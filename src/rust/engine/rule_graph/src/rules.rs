@@ -5,11 +5,15 @@ use std::collections::BTreeSet;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
+use deepsize::DeepSizeOf;
+
 use super::{params_str, Palette};
 
 pub type ParamTypes<T> = BTreeSet<T>;
 
-pub trait TypeId: Clone + Copy + Debug + Display + Hash + Eq + Ord + Sized + 'static {
+pub trait TypeId:
+  Clone + Copy + Debug + DeepSizeOf + Display + Hash + Eq + Ord + Sized + Send + Sync + 'static
+{
   ///
   /// Render a string for a collection of TypeIds.
   ///
@@ -73,7 +77,9 @@ impl DisplayForGraphArgs {
   }
 }
 
-pub trait Rule: Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + 'static {
+pub trait Rule:
+  Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + Send + Sync + 'static
+{
   type TypeId: TypeId;
   type DependencyKey: DependencyKey<TypeId = Self::TypeId>;
 
@@ -99,7 +105,7 @@ pub trait Rule: Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + 
   fn color(&self) -> Option<Palette>;
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Query<R: Rule> {
   pub product: R::TypeId,
   pub params: ParamTypes<R::TypeId>,

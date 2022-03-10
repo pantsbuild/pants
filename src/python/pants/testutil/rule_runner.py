@@ -189,6 +189,8 @@ class RuleRunner:
         ca_certs_path: str | None = None,
         bootstrap_args: Iterable[str] = (),
         use_deprecated_python_macros: bool = False,
+        extra_session_values: dict[Any, Any] | None = None,
+        max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -268,8 +270,10 @@ class RuleRunner:
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
                     CompleteEnvironment: self.environment,
+                    **(extra_session_values or {}),
                 }
             ),
+            max_workunit_level=max_workunit_verbosity,
         )
         self.scheduler = graph_session.scheduler_session
 
@@ -573,7 +577,7 @@ def run_rule_with_mocks(
                     mock_get.input_type == type(res.input)  # noqa: E721
                     or (
                         union_membership
-                        and union_membership.has_members(mock_get.input_type)
+                        and mock_get.input_type in union_membership
                         and union_membership.is_member(mock_get.input_type, res.input)
                     )
                 )

@@ -41,6 +41,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 )
 from pants.backend.python.util_rules.pex_requirements import maybe_validate_metadata
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -58,7 +59,7 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
 from pants.util.frozendict import FrozenDict
@@ -592,8 +593,9 @@ class VenvScriptWriter:
         cls, pex_environment: PexEnvironment, pex: Pex, venv_rel_dir: PurePath
     ) -> VenvScriptWriter:
         # N.B.: We don't know the working directory that will be used in any given
-        # invocation of the venv scripts; so we deal with working_directory inside the scripts
-        # themselves by absolutifying all relevant paths at runtime.
+        # invocation of the venv scripts; so we deal with working_directory once in an
+        # `adjust_relative_paths` function inside the script to save rule authors from having to do
+        # CWD offset math in every rule for all the relative paths their process depends on.
         complete_pex_env = pex_environment.in_sandbox(working_directory=None)
         venv_dir = complete_pex_env.pex_root / venv_rel_dir
         return cls(complete_pex_env=complete_pex_env, pex=pex, venv_dir=venv_dir)
@@ -615,7 +617,7 @@ class VenvScriptWriter:
         target_venv_executable = shlex.quote(str(venv_executable))
         venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
-            f"$(ensure_absolute {shlex.quote(arg)})"
+            f"$(adjust_relative_paths {shlex.quote(arg)})"
             for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
         )
 
@@ -624,30 +626,42 @@ class VenvScriptWriter:
             #!{bash.path}
             set -euo pipefail
 
-            # N.B.: We convert all sandbox root relative paths to absolute paths so this script
-            # works when run with a cwd set elsewhere.
-
             # N.B.: This relies on BASH_SOURCE which has been available since bash-3.0, released in
-            # 2004. In turn, our use of BASH_SOURCE relies on the fact that this script is executed
-            # by the engine via its absolute path.
-            ABS_SANDBOX_ROOT="${{BASH_SOURCE%/*}}"
+            # 2004. It will either contain the absolute path of the venv script or it will contain
+            # the relative path from the CWD to the venv script. Either way, we know the venv script
+            # parent directory is the sandbox root directory.
+            SANDBOX_ROOT="${{BASH_SOURCE%/*}}"
 
-            function ensure_absolute() {{
+            function adjust_relative_paths() {{
                 local value0="$1"
                 shift
                 if [ "${{value0:0:1}}" == "/" ]; then
+                    # Don't relativize absolute paths.
                     echo "${{value0}}" "$@"
                 else
-                    echo "${{ABS_SANDBOX_ROOT}}/${{value0}}" "$@"
+                    # N.B.: We convert all relative paths to paths relative to the sandbox root so
+                    # this script works when run with a PWD set somewhere else than the sandbox
+                    # root.
+                    #
+                    # There are two cases to consider. For the purposes of example, assume PWD is
+                    # `/tmp/sandboxes/abc123/foo/bar`; i.e.: the rule API sets working_directory to
+                    # `foo/bar`. Also assume `config/tool.yml` is the relative path in question.
+                    #
+                    # 1. If our BASH_SOURCE is  `/tmp/sandboxes/abc123/pex_shim.sh`; so our
+                    #    SANDBOX_ROOT is `/tmp/sandboxes/abc123`, we calculate
+                    #    `/tmp/sandboxes/abc123/config/tool.yml`.
+                    # 2. If our BASH_SOURCE is instead `../../pex_shim.sh`; so our SANDBOX_ROOT is
+                    #    `../..`, we calculate `../../config/tool.yml`.
+                    echo "${{SANDBOX_ROOT}}/${{value0}}" "$@"
                 fi
             }}
 
             export {" ".join(env_vars)}
-            export PEX_ROOT="$(ensure_absolute ${{PEX_ROOT}})"
+            export PEX_ROOT="$(adjust_relative_paths ${{PEX_ROOT}})"
 
             execute_pex_args="{execute_pex_args}"
-            target_venv_executable="$(ensure_absolute {target_venv_executable})"
-            venv_dir="$(ensure_absolute {venv_dir})"
+            target_venv_executable="$(adjust_relative_paths {target_venv_executable})"
+            venv_dir="$(adjust_relative_paths {venv_dir})"
 
             # Let PEX_TOOLS invocations pass through to the original PEX file since venvs don't come
             # with tools support.
@@ -823,7 +837,7 @@ class PexProcess:
     level: LogLevel
     input_digest: Digest | None
     working_directory: str | None
-    extra_env: FrozenDict[str, str] | None
+    extra_env: FrozenDict[str, str]
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
@@ -854,7 +868,7 @@ class PexProcess:
         self.level = level
         self.input_digest = input_digest
         self.working_directory = working_directory
-        self.extra_env = FrozenDict(extra_env) if extra_env else None
+        self.extra_env = FrozenDict(extra_env or {})
         self.output_files = tuple(output_files) if output_files else None
         self.output_directories = tuple(output_directories) if output_directories else None
         self.timeout_seconds = timeout_seconds
@@ -870,7 +884,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
     argv = complete_pex_env.create_argv(pex.name, *request.argv, python=pex.python)
     env = {
         **complete_pex_env.environment_dict(python_configured=pex.python is not None),
-        **(request.extra_env or {}),
+        **request.extra_env,
     }
     input_digest = (
         await Get(Digest, MergeDigests((pex.digest, request.input_digest)))

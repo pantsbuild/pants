@@ -9,24 +9,15 @@ import re
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from textwrap import dedent
 
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.process import (
-    BinaryNotFoundError,
-    BinaryPath,
-    BinaryPathRequest,
-    BinaryPaths,
-    BinaryPathTest,
-)
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
-from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 
 logger = logging.getLogger(__name__)
@@ -42,46 +33,42 @@ class PythonBootstrapSubsystem(Subsystem):
         "`python` subsystem for that."
     )
 
-    search_path = (
-        StrListOption(
-            "--search-path",
-            default=["<PYENV>", "<PATH>"],
-            help=(
-                "A list of paths to search for Python interpreters.\n\n"
-                "Which interpeters are actually used from these paths is context-specific: "
-                "the Python backend selects interpreters using options on the `python` subsystem, "
-                "in particular, the `[python].interpreter_constraints` option.\n\n"
-                "You can specify absolute paths to interpreter binaries "
-                "and/or to directories containing interpreter binaries. The order of entries does "
-                "not matter.\n\n"
-                "The following special strings are supported:\n\n"
-                "* `<PATH>`, the contents of the PATH env var\n"
-                "* `<ASDF>`, all Python versions currently configured by ASDF "
-                "`(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions\n"
-                "* `<ASDF_LOCAL>`, the ASDF interpreter with the version in "
-                "BUILD_ROOT/.tool-versions\n"
-                "* `<PYENV>`, all Python versions under $(pyenv root)/versions\n"
-                "* `<PYENV_LOCAL>`, the Pyenv interpreter with the version in "
-                "BUILD_ROOT/.python-version\n"
-                "* `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc"
-            ),
-        )
-        .advanced()
-        .metavar("<binary-paths>")
+    search_path = StrListOption(
+        "--search-path",
+        default=["<PYENV>", "<PATH>"],
+        help=(
+            "A list of paths to search for Python interpreters.\n\n"
+            "Which interpeters are actually used from these paths is context-specific: "
+            "the Python backend selects interpreters using options on the `python` subsystem, "
+            "in particular, the `[python].interpreter_constraints` option.\n\n"
+            "You can specify absolute paths to interpreter binaries "
+            "and/or to directories containing interpreter binaries. The order of entries does "
+            "not matter.\n\n"
+            "The following special strings are supported:\n\n"
+            "* `<PATH>`, the contents of the PATH env var\n"
+            "* `<ASDF>`, all Python versions currently configured by ASDF "
+            "`(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions\n"
+            "* `<ASDF_LOCAL>`, the ASDF interpreter with the version in "
+            "BUILD_ROOT/.tool-versions\n"
+            "* `<PYENV>`, all Python versions under $(pyenv root)/versions\n"
+            "* `<PYENV_LOCAL>`, the Pyenv interpreter with the version in "
+            "BUILD_ROOT/.python-version\n"
+            "* `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc"
+        ),
+        advanced=True,
+        metavar="<binary-paths>",
     )
-    names = (
-        StrListOption(
-            "--names",
-            default=["python", "python3"],
-            help=(
-                "The names of Python binaries to search for. See the `--search-path` option to "
-                "influence where interpreters are searched for.\n\n"
-                "This does not impact which Python interpreter is used to run your code, only what "
-                "is used to run internal tools."
-            ),
-        )
-        .advanced()
-        .metavar("<python-binary-names>")
+    names = StrListOption(
+        "--names",
+        default=["python", "python3"],
+        help=(
+            "The names of Python binaries to search for. See the `--search-path` option to "
+            "influence where interpreters are searched for.\n\n"
+            "This does not impact which Python interpreter is used to run your code, only what "
+            "is used to run internal tools."
+        ),
+        advanced=True,
+        metavar="<python-binary-names>",
     )
 
 
@@ -358,84 +345,6 @@ async def python_bootstrap(python_bootstrap_subsystem: PythonBootstrapSubsystem)
         Environment, EnvironmentRequest(["PATH", "HOME", "PYENV_ROOT", "ASDF_DIR", "ASDF_DATA_DIR"])
     )
     return PythonBootstrap(environment, python_bootstrap_subsystem.options)
-
-
-class PythonBinary(BinaryPath):
-    """A Python3 interpreter for use by `@rule` code as an alternative to BashBinary scripts.
-
-    Python is usable for `@rule` scripting independently of `pants.backend.python`, but currently
-    thirdparty dependencies are not supported, because PEX lives in that backend.
-
-    TODO: Consider extracting PEX out into the core in order to support thirdparty dependencies.
-    """
-
-
-@rule(desc="Finding a `python` binary", level=LogLevel.TRACE)
-async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
-
-    # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
-    # for maximum compatibility with internal scripts.
-    interpreter_search_paths = python_bootstrap.interpreter_search_paths()
-    all_python_binary_paths = await MultiGet(
-        Get(
-            BinaryPaths,
-            BinaryPathRequest(
-                search_path=interpreter_search_paths,
-                binary_name=binary_name,
-                check_file_entries=True,
-                test=BinaryPathTest(
-                    args=[
-                        "-c",
-                        # N.B.: The following code snippet must be compatible with Python 3.6+.
-                        #
-                        # We hash the underlying Python interpreter executable to ensure we detect
-                        # changes in the real interpreter that might otherwise be masked by Pyenv
-                        # shim scripts found on the search path. Naively, just printing out the full
-                        # version_info would be enough, but that does not account for supported abi
-                        # changes (e.g.: a pyenv switch from a py27mu interpreter to a py27m
-                        # interpreter.)
-                        #
-                        # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
-                        # (writes) since it's a common OS buffer size and an even multiple of the
-                        # hash block size.
-                        dedent(
-                            """\
-                            import sys
-
-                            major, minor = sys.version_info[:2]
-                            if not (major == 3 and minor >= 6):
-                                sys.exit(1)
-
-                            import hashlib
-                            hasher = hashlib.sha256()
-                            with open(sys.executable, "rb") as fp:
-                                for chunk in iter(lambda: fp.read(8192), b""):
-                                    hasher.update(chunk)
-                            sys.stdout.write(hasher.hexdigest())
-                            """
-                        ),
-                    ],
-                    fingerprint_stdout=False,  # We already emit a usable fingerprint to stdout.
-                ),
-            ),
-        )
-        for binary_name in python_bootstrap.interpreter_names
-    )
-
-    for binary_paths in all_python_binary_paths:
-        path = binary_paths.first_path
-        if path:
-            return PythonBinary(
-                path=path.path,
-                fingerprint=path.fingerprint,
-            )
-
-    raise BinaryNotFoundError(
-        "Was not able to locate a Python interpreter to execute rule code.\n"
-        "Please ensure that Python is available in one of the locations identified by "
-        "`[python-bootstrap] search_path`, which currently expands to:\n"
-        f"  {interpreter_search_paths}"
-    )
 
 
 def rules():

@@ -244,7 +244,9 @@ class TailorSubsystem(GoalSubsystem):
     name = "tailor"
     help = "Auto-generate BUILD file targets for new source files."
 
-    required_union_implementations = (PutativeTargetsRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PutativeTargetsRequest in union_membership
 
     check = BoolOption(
         "--check",
@@ -261,16 +263,20 @@ class TailorSubsystem(GoalSubsystem):
             "The name to use for generated BUILD files.\n\n"
             "This must be compatible with `[GLOBAL].build_patterns`."
         ),
-    ).advanced()
+        advanced=True,
+    )
     build_file_header = StrOption(
         "--build-file-header",
+        default=None,
         help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
-    ).advanced()
+        advanced=True,
+    )
     build_file_indent = StrOption(
         "--build-file-indent",
         default="    ",
         help="The indent to use when auto-editing BUILD files.",
-    ).advanced()
+        advanced=True,
+    )
     _alias_mapping = DictOption[str](
         "--alias-mapping",
         help=(
@@ -278,7 +284,8 @@ class TailorSubsystem(GoalSubsystem):
             "type can be a custom target type or a macro that offers compatible functionality "
             f"to the one it replaces (see {doc_url('macros')})."
         ),
-    ).advanced()
+        advanced=True,
+    )
     ignore_paths = StrListOption(
         "--ignore-paths",
         help=(
@@ -289,7 +296,8 @@ class TailorSubsystem(GoalSubsystem):
             "_read_ BUILD files at certain paths. In contrast, this option only tells Pants to "
             "not edit/create BUILD files at the specified paths."
         ),
-    ).advanced()
+        advanced=True,
+    )
     _ignore_adding_targets = StrListOption(
         "--ignore-adding-targets",
         help=(
@@ -302,7 +310,8 @@ class TailorSubsystem(GoalSubsystem):
             "the path, e.g. `//:bin`.\n\n"
             "Does not work with macros."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     @property
     def ignore_adding_targets(self) -> set[str]:

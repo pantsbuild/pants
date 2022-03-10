@@ -26,9 +26,8 @@ from pants.core.target_types import (
     ResourceTarget,
 )
 from pants.core.target_types import rules as target_type_rules
-from pants.core.util_rules.archive import rules as archive_rules
+from pants.core.util_rules import archive, source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
 from pants.engine.internals.graph import _TargetParametrizations
@@ -47,8 +46,9 @@ def test_relocated_files() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
-            *archive_rules(),
-            *source_files_rules(),
+            *archive.rules(),
+            *source_files.rules(),
+            *system_binaries.rules(),
             QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),

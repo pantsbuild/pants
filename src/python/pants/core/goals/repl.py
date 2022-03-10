@@ -6,7 +6,7 @@ import os
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Iterable, Mapping, Optional, Tuple, cast
+from typing import ClassVar, Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Addresses
@@ -20,6 +20,7 @@ from pants.engine.rules import Effect, Get, collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
+from pants.option.option_types import BoolOption, StrOption
 from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
@@ -51,31 +52,20 @@ class ReplSubsystem(GoalSubsystem):
     name = "repl"
     help = "Open a REPL with the specified code loadable."
 
-    required_union_implementations = (ReplImplementation,)
-
     @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--shell",
-            type=str,
-            default=None,
-            help="Override the automatically-detected REPL program for the target(s) specified.",
-        )
-        register(
-            "--restartable",
-            type=bool,
-            default=False,
-            help="True if the REPL should be restarted if its inputs have changed.",
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return ReplImplementation in union_membership
 
-    @property
-    def shell(self) -> Optional[str]:
-        return cast(Optional[str], self.options.shell)
-
-    @property
-    def restartable(self) -> bool:
-        return cast(bool, self.options.restartable)
+    shell = StrOption(
+        "--shell",
+        default=None,
+        help="Override the automatically-detected REPL program for the target(s) specified.",
+    )
+    restartable = BoolOption(
+        "--restartable",
+        default=False,
+        help="True if the REPL should be restarted if its inputs have changed.",
+    )
 
 
 class Repl(Goal):

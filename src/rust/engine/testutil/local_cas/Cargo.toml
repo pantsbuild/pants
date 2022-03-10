@@ -7,6 +7,6 @@ publish = false
 
 [dependencies]
 mock = { path = "../mock" }
-clap = "2"
+clap = "3"
 env_logger = "0.5.4"
 

@@ -38,6 +38,7 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.option.option_types import BoolOption, EnumOption
 from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
@@ -110,79 +111,53 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         "project."
     )
 
-    required_union_implementations = (RewrittenBuildFileRequest,)
-
     @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--check",
-            type=bool,
-            default=False,
-            help=(
-                "Do not write changes to disk, only write back what would change. Return code "
-                "0 means there would be no changes, and 1 means that there would be. "
-            ),
-        )
-        register(
-            "--fmt",
-            type=bool,
-            default=True,
-            help=(
-                "Format BUILD files using Black or Yapf.\n\n"
-                "Set `[black].args` / `[yapf].args`, `[black].config` / `[yapf].config` , "
-                "and `[black].config_discovery` / `[yapf].config_discovery` to change "
-                "Black's or Yapf's behavior. Set "
-                "`[black].interpreter_constraints` / `[yapf].interpreter_constraints` "
-                "and `[python].interpreter_search_path` to change which interpreter is "
-                "used to run the formatter."
-            ),
-        )
-        register(
-            "--formatter",
-            type=Formatter,
-            default=Formatter.BLACK,
-            help="Which formatter Pants should use to format BUILD files.",
-        )
-        register(
-            "--fix-safe-deprecations",
-            type=bool,
-            default=True,
-            help=(
-                "Automatically fix deprecations, such as target type renames, that are safe "
-                "because they do not change semantics."
-            ),
-        )
-        register(
-            "--fix-python-macros",
-            type=bool,
-            default=False,
-            help=(
-                "Update references to targets generated from `python_requirements` and "
-                "`poetry_requirements` from the old deprecated macro mechanism to the new target "
-                f"generation mechanism described at {doc_url('targets#target-generation')}.\n\n"
-            ),
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return RewrittenBuildFileRequest in union_membership
 
-    @property
-    def check(self) -> bool:
-        return cast(bool, self.options.check)
-
-    @property
-    def fmt(self) -> bool:
-        return cast(bool, self.options.fmt)
-
-    @property
-    def formatter(self) -> Formatter:
-        return cast(Formatter, self.options.formatter)
-
-    @property
-    def fix_safe_deprecations(self) -> bool:
-        return cast(bool, self.options.fix_safe_deprecations)
-
-    @property
-    def fix_python_macros(self) -> bool:
-        return cast(bool, self.options.fix_python_macros)
+    check = BoolOption(
+        "--check",
+        default=False,
+        help=(
+            "Do not write changes to disk, only write back what would change. Return code "
+            "0 means there would be no changes, and 1 means that there would be. "
+        ),
+    )
+    fmt = BoolOption(
+        "--fmt",
+        default=True,
+        help=(
+            "Format BUILD files using Black or Yapf.\n\n"
+            "Set `[black].args` / `[yapf].args`, `[black].config` / `[yapf].config` , "
+            "and `[black].config_discovery` / `[yapf].config_discovery` to change "
+            "Black's or Yapf's behavior. Set "
+            "`[black].interpreter_constraints` / `[yapf].interpreter_constraints` "
+            "and `[python].interpreter_search_path` to change which interpreter is "
+            "used to run the formatter."
+        ),
+    )
+    formatter = EnumOption(
+        "--formatter",
+        default=Formatter.BLACK,
+        help="Which formatter Pants should use to format BUILD files.",
+    )
+    fix_safe_deprecations = BoolOption(
+        "--fix-safe-deprecations",
+        default=True,
+        help=(
+            "Automatically fix deprecations, such as target type renames, that are safe "
+            "because they do not change semantics."
+        ),
+    )
+    fix_python_macros = BoolOption(
+        "--fix-python-macros",
+        default=False,
+        help=(
+            "Update references to targets generated from `python_requirements` and "
+            "`poetry_requirements` from the old deprecated macro mechanism to the new target "
+            f"generation mechanism described at {doc_url('targets#target-generation')}.\n\n"
+        ),
+    )
 
 
 class UpdateBuildFilesGoal(Goal):
@@ -300,16 +275,7 @@ class FormatWithYapfRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_yapf(
     request: FormatWithYapfRequest, yapf: Yapf
 ) -> RewrittenBuildFile:
-    yapf_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="yapf.pex",
-            internal_only=True,
-            requirements=yapf.pex_requirements(),
-            interpreter_constraints=yapf.interpreter_constraints,
-            main=yapf.main,
-        ),
-    )
+    yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, yapf.config_request(recursive_dirname(request.path))
@@ -362,16 +328,7 @@ class FormatWithBlackRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
-    black_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="black.pex",
-            internal_only=True,
-            requirements=black.pex_requirements(),
-            interpreter_constraints=black.interpreter_constraints,
-            main=black.main,
-        ),
-    )
+    black_pex_get = Get(VenvPex, PexRequest, black.to_pex_request())
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, black.config_request(recursive_dirname(request.path))

@@ -303,18 +303,20 @@ class PexPlatformsField(StringSequenceField):
         "meaning that the PEX will be executable in all of the supported environments.\n\n"
         "Platforms should be in the format defined by Pex "
         "(https://pex.readthedocs.io/en/latest/buildingpex.html#platform), i.e. "
-        'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-27-cp27mu", '
-        '"macosx_10.12_x86_64-cp-36-cp36m"):\n\n'
+        'PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-37-cp37m", '
+        '"macosx_10.12_x86_64-cp-310-cp310"):\n\n'
         "  - PLATFORM: the host platform, e.g. "
-        '"linux-x86_64", "macosx-10.12-x86_64".\n  - IMPL: the Python implementation '
-        'abbreviation, e.g. "cp", "pp", "jp".\n  - PYVER: a two-digit string representing '
-        'the Python version, e.g. "27", "36".\n  - ABI: the ABI tag, e.g. "cp36m", '
-        '"cp27mu", "abi3", "none".\n\nNote that using an abbreviated platform means that certain '
-        "resolves will fail when they contain environment markers that cannot be deduced from the "
-        "abbreviated platform string. A common example of this is 'python_full_version' which "
-        "requires knowing the patch level version of the foreign platform. If your resolves fail "
-        "due to undefined environment markers like this, you should switch to specifying "
-        "`complete_platforms` instead."
+        '"linux-x86_64", "macosx-10.12-x86_64".\n  - IMPL: the Python implementation abbreviation, '
+        'e.g. "cp" or "pp".\n  - PYVER: a two or more digit string representing the python '
+        'major/minor version (e.g., "37" or "310") or else a component dotted version string (e.g.,'
+        '"3.7" or "3.10.1").\n  - ABI: the ABI tag, e.g. "cp37m", "cp310", "abi3", "none".\n\nNote '
+        "that using an abbreviated platform means that certain resolves will fail when they "
+        "encounter environment markers that cannot be deduced from the abbreviated platform "
+        "string. A common example of this is 'python_full_version' which requires knowing the "
+        "patch level version of the foreign Python interpreter. To remedy this you should use a "
+        "3-component dotted version for PYVER. If your resolves fail due to more esoteric "
+        "undefined environment markers, you should switch to specifying `complete_platforms` "
+        "instead."
     )
 
 
@@ -595,7 +597,8 @@ class PexBinaryDefaults(Subsystem):
             "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
             "`pex_binary` targets"
         ),
-    ).advanced()
+        advanced=True,
+    )
     resolve_local_platforms = BoolOption(
         "--resolve-local-platforms",
         default=False,
@@ -607,7 +610,8 @@ class PexBinaryDefaults(Subsystem):
             "is found (or if this option is `False`), resolve for the platform by accepting "
             "only pre-built binary distributions (wheels)."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -816,10 +820,12 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
-        "This target generator is intended for test utility files like `conftest.py`, although it "
-        "behaves identically to the `python_sources` target generator and you can safely use that "
-        "instead. This target only exists to help you better model and keep separate test support "
-        "files vs. production files."
+        "This target generator is intended for test utility files like `conftest.py` or "
+        "`my_test_utils.py`. Technically, it generates `python_source` targets in the exact same "
+        "way as the `python_sources` target generator does, only that the `sources` field has a "
+        "different default. So it is valid to use `python_sources` instead. However, this target "
+        "can be helpful to better model your code by keeping separate test support files vs. "
+        "production files."
     )
 
 
@@ -1030,11 +1036,6 @@ class PythonRequirementTarget(Target):
             )
 
 
-# -----------------------------------------------------------------------------------------------
-# `_python_requirements_file` target
-# -----------------------------------------------------------------------------------------------
-
-
 def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequirement]:
     """Parse all `PipRequirement` objects from a requirements.txt-style file.
 
@@ -1053,21 +1054,6 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
                     line, e, description_of_origin=f"{rel_path} at line {i + 1}"
                 )
             )
-
-
-class PythonRequirementsFileSourcesField(SingleSourceField):
-    uses_source_roots = False
-
-
-# This allows us to work around https://github.com/pantsbuild/pants/issues/13118. Because a
-# generated target does not depend on its target generator, `--changed-since --changed-dependees`
-# would not mark the generated targets as changing when the `requirements.txt` changes, even though
-# it may be impacted. Fixing that will be A Thing and requires design work, so instead we can
-# depend on this private target type that owns `requirements.txt` to get `--changed-since` working.
-class PythonRequirementsFileTarget(Target):
-    alias = "_python_requirements_file"
-    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSourcesField)
-    help = "A private helper target type used by `python_requirement` target generators."
 
 
 # -----------------------------------------------------------------------------------------------

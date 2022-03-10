@@ -37,20 +37,18 @@ class PythonSetup(Subsystem):
     default_interpreter_constraints = ["CPython>=3.6,<4"]
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
 
-    interpreter_constraints = (
-        StrListOption(
-            "--interpreter-constraints",
-            default=default_interpreter_constraints,
-            help=(
-                "The Python interpreters your codebase is compatible with.\n\nSpecify with "
-                "requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with version "
-                ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
-                "constraint strings will be ORed together.\n\nThese constraints are used as the "
-                "default value for the `interpreter_constraints` field of Python targets."
-            ),
-        )
-        .advanced()
-        .metavar("<requirement>")
+    interpreter_constraints = StrListOption(
+        "--interpreter-constraints",
+        default=default_interpreter_constraints,
+        help=(
+            "The Python interpreters your codebase is compatible with.\n\nSpecify with "
+            "requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with version "
+            ">=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple "
+            "constraint strings will be ORed together.\n\nThese constraints are used as the "
+            "default value for the `interpreter_constraints` field of Python targets."
+        ),
+        advanced=True,
+        metavar="<requirement>",
     )
     interpreter_universe = StrListOption(
         "--interpreter-versions-universe",
@@ -69,24 +67,24 @@ class PythonSetup(Subsystem):
             "All elements must be the minor and major Python version, e.g. '2.7' or '3.10'. Do "
             "not include the patch version.\n\n"
         ),
-    ).advanced()
-    requirement_constraints = (
-        FileOption(
-            "--requirement-constraints",
-            help=(
-                "When resolving third-party requirements for your own code (vs. tools you run), "
-                "use this constraints file to determine which versions to use.\n\n"
-                "This only applies when resolving user requirements, rather than tools you run "
-                "like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g. "
-                "`[black].lockfile`.\n\n"
-                "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
-                "information on the format of constraint files and how constraints are applied in "
-                "Pex and pip.\n\n"
-                "Mutually exclusive with `[python].enable_resolves`."
-            ),
-        )
-        .advanced()
-        .mutually_exclusive_group("lockfile")
+        advanced=True,
+    )
+    requirement_constraints = FileOption(
+        "--requirement-constraints",
+        default=None,
+        help=(
+            "When resolving third-party requirements for your own code (vs. tools you run), "
+            "use this constraints file to determine which versions to use.\n\n"
+            "This only applies when resolving user requirements, rather than tools you run "
+            "like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g. "
+            "`[black].lockfile`.\n\n"
+            "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
+            "information on the format of constraint files and how constraints are applied in "
+            "Pex and pip.\n\n"
+            "Mutually exclusive with `[python].enable_resolves`."
+        ),
+        advanced=True,
+        mutually_exclusive_group="lockfile",
     )
     resolve_all_constraints = BoolOption(
         "--resolve-all-constraints",
@@ -102,41 +100,46 @@ class PythonSetup(Subsystem):
             "resolves."
             "\n\nRequires [python].requirement_constraints to be set."
         ),
-    ).advanced()
-    enable_resolves = (
-        BoolOption(
-            "--enable-resolves",
-            default=False,
-            help=(
-                "Set to true to enable the multiple resolves mechanism. See "
-                "`[python].resolves` for an explanation of this feature.\n\n"
-                "Warning: you may have issues with generating valid lockfiles via the "
-                "`generate-lockfiles` goal. Categorically, the resolves feature will not work if "
-                "you need to use VCS (Git) requirements and local requirements, along with "
-                "`[python-repos]` for custom indexes/cheeseshops. Several users have also had "
-                "issues with how Poetry's lockfile generation handles environment markers for "
-                "transitive dependencies; certain dependencies end up with nonsensical "
-                "environment markers which cause the dependency to not be installed, then "
-                "for Pants/Pex to complain the dependency is missing, even though it's in the "
-                "lockfile. The workaround is to manually create a `python_requirement` target for "
-                "the problematic transitive dependencies so that they are seen as direct "
-                "requirements, rather than transitive, then to regenerate the lockfile with "
-                "`generate-lockfiles`. We are working to fix these issues by using PEX & pip to "
-                "generate the lockfile.\n\n"
-                "Outside of the above issues with lockfile generation, we believe this "
-                "feature is stable. It offers three major benefits compared to "
-                "`[python].requirement_constraints`:\n\n"
-                "  1. Uses `--hash` to validate that all downloaded files are expected, which "
-                "reduces the risk of supply chain attacks.\n"
-                "  2. Enforces that all transitive dependencies are in the lockfile, whereas "
-                "constraints allow you to leave off dependencies. This ensures your build is more "
-                "stable and reduces the risk of supply chain attacks.\n"
-                "  3. Allows you to have multiple resolves in your repository.\n\n"
-                "Mutually exclusive with `[python].requirement_constraints`."
-            ),
-        )
-        .advanced()
-        .mutually_exclusive_group("lockfile")
+        advanced=True,
+    )
+    enable_resolves = BoolOption(
+        "--enable-resolves",
+        default=False,
+        help=(
+            "Set to true to enable the multiple resolves mechanism. See "
+            "`[python].resolves` for an explanation of this feature.\n\n"
+            "Warning: you may have issues with generating valid lockfiles via the "
+            "`generate-lockfiles` goal. Categorically, the lockfile cannot be generated by Pants "
+            "if you need to use VCS (Git) requirements and local requirements, along with "
+            "`[python-repos]` for custom indexes/cheeseshops. You can still use multiple resolves, "
+            "but you must manually generate your lockfiles rather than using the "
+            "`generate-lockfiles` goal, e.g. by running `pip freeze`. Specifically, set up "
+            "`[python].resolves` to point to your manually generated lockfile paths, and then set "
+            "`[python].resolves_generate_lockfiles = false` in `pants.toml`.\n\n"
+            "Several users have also had "
+            "issues with how Poetry's lockfile generation handles environment markers for "
+            "transitive dependencies; certain dependencies end up with nonsensical "
+            "environment markers which cause the dependency to not be installed, then "
+            "for Pants/Pex to complain the dependency is missing, even though it's in the "
+            "lockfile. The workaround is to manually create a `python_requirement` target for "
+            "the problematic transitive dependencies so that they are seen as direct "
+            "requirements, rather than transitive, then to regenerate the lockfile with "
+            "`generate-lockfiles`.\n\n"
+            "We are working to fix these issues by using PEX & pip to "
+            "generate the lockfile.\n\n"
+            "Outside of the above issues with lockfile generation, we believe this "
+            "feature is stable. It offers three major benefits compared to "
+            "`[python].requirement_constraints`:\n\n"
+            "  1. Uses `--hash` to validate that all downloaded files are expected, which "
+            "reduces the risk of supply chain attacks.\n"
+            "  2. Enforces that all transitive dependencies are in the lockfile, whereas "
+            "constraints allow you to leave off dependencies. This ensures your build is more "
+            "stable and reduces the risk of supply chain attacks.\n"
+            "  3. Allows you to have multiple resolves in your repository.\n\n"
+            "Mutually exclusive with `[python].requirement_constraints`."
+        ),
+        advanced=True,
+        mutually_exclusive_group="lockfile",
     )
     resolves = DictOption[str](
         "--resolves",
@@ -151,7 +154,8 @@ class PythonSetup(Subsystem):
             "you cannot ergonomically set a `python_requirement` or `python_source` target, "
             "for example, to work with multiple resolves. Practically, this means that you "
             "cannot yet ergonomically reuse common code, such as util files, across projects "
-            "using different resolves. Support for overlapping resolves is coming soon.\n\n"
+            "using different resolves. Support for overlapping resolves is coming in Pants 2.11 "
+            "through a new 'parametrization' feature.\n\n"
             f"If you only need a single resolve, run `{bin_name()} generate-lockfiles` to "
             "generate the lockfile.\n\n"
             "If you need multiple resolves:\n\n"
@@ -172,7 +176,8 @@ class PythonSetup(Subsystem):
             "resolve with the `resolve` field.\n\n"
             "Only applies if `[python].enable_resolves` is true."
         ),
-    ).advanced()
+        advanced=True,
+    )
     default_resolve = StrOption(
         "--default-resolve",
         default="python-default",
@@ -180,7 +185,8 @@ class PythonSetup(Subsystem):
             "The default value used for the `resolve` field.\n\n"
             "The name must be defined as a resolve in `[python].resolves`."
         ),
-    ).advanced()
+        advanced=True,
+    )
     _resolves_to_interpreter_constraints = DictOption["list[str]"](
         "--resolves-to-interpreter-constraints",
         help=(
@@ -197,16 +203,37 @@ class PythonSetup(Subsystem):
             "Pants will error explaining the incompatibility.\n\n"
             "The keys must be defined as resolves in `[python].resolves`."
         ),
-    ).advanced()
+        advanced=True,
+    )
     invalid_lockfile_behavior = EnumOption(
         "--invalid-lockfile-behavior",
         default=InvalidLockfileBehavior.error,
         help=(
             "The behavior when a lockfile has requirements or interpreter constraints that are "
             "not compatible with what the current build is using.\n\n"
-            "We recommend keeping the default of `error` for CI builds."
+            "We recommend keeping the default of `error` for CI builds.\n\n"
+            "Note that `warn` will still expect a Pants lockfile header, it only won't error if "
+            "the lockfile is stale and should be regenerated. Use `ignore` to avoid needing a "
+            "lockfile header at all, e.g. if you are manually managing lockfiles rather than "
+            "using the `generate-lockfiles` goal."
         ),
-    ).advanced()
+        advanced=True,
+    )
+    resolves_generate_lockfiles = BoolOption(
+        "--resolves-generate-lockfiles",
+        default=True,
+        help=(
+            "If False, Pants will not attempt to generate lockfiles for `[python].resolves` when "
+            "running the `generate-lockfiles` goal.\n\n"
+            "This is intended to allow you to manually generate lockfiles as a workaround for the "
+            "issues described in the `[python].enable_resolves` option.\n\n"
+            "If you set this to False, Pants will not attempt to validate the metadata headers "
+            "for your user lockfiles. This is useful so that you can keep "
+            "`[python].invalid_lockfile_behavior` to `error` or `warn` if you'd like so that tool "
+            "lockfiles continue to be validated, while user lockfiles are skipped."
+        ),
+        advanced=True,
+    )
     run_against_entire_lockfile = BoolOption(
         "--run-against-entire-lockfile",
         default=False,
@@ -222,14 +249,16 @@ class PythonSetup(Subsystem):
             "PEX files, wheels and cloud functions, which will still use just the exact "
             "subset of requirements needed."
         ),
-    ).advanced()
+        advanced=True,
+    )
     resolver_manylinux = StrOption(
         "--resolver-manylinux",
         default="manylinux2014",
         help="Whether to allow resolution of manylinux wheels when resolving requirements for "
         "foreign linux platforms. The value should be a manylinux platform upper bound, "
         "e.g.: 'manylinux2010', or else the string 'no' to disallow.",
-    ).advanced()
+        advanced=True,
+    )
     tailor_ignore_solitary_init_files = BoolOption(
         "--tailor-ignore-solitary-init-files",
         default=True,
@@ -237,17 +266,20 @@ class PythonSetup(Subsystem):
         "those usually exist as import scaffolding rather than true library code.\n\n"
         "Set to False if you commonly have packages containing real code in "
         "`__init__.py` and there are no other .py files in the package.",
-    ).advanced()
+        advanced=True,
+    )
     tailor_requirements_targets = BoolOption(
         "--tailor-requirements-targets",
         default=True,
         help="Tailor python_requirements() targets for requirements files.",
-    ).advanced()
+        advanced=True,
+    )
     tailor_pex_binary_targets = BoolOption(
         "--tailor-pex-binary-targets",
         default=True,
         help="Tailor pex_binary() targets for Python entry point files.",
-    ).advanced()
+        advanced=True,
+    )
     macos_big_sur_compatibility = BoolOption(
         "--macos-big-sur-compatibility",
         default=False,
