@@ -1,19 +1,31 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
+import json
 import logging
 import os
+import shlex
 import sys
+import textwrap
+from typing import Mapping
 
-from pants.base.exiter import ExitCode
+from pants.base.build_root import BuildRoot
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
+from pants.bsp.util_rules.lifecycle import BSP_VERSION, BSPLanguageSupport
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
+from pants.util.docutil import bin_name
+from pants.version import VERSION
 
 _logger = logging.getLogger(__name__)
 
@@ -26,6 +38,35 @@ class BSPGoal(BuiltinGoal):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return False
 
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--server",
+            type=bool,
+            default=False,
+            advanced=True,
+            help=(
+                "Run the Build Server Protocol server. Pants will receive RPC requests via the console. "
+                "This should only be invoked via the IDE."
+            ),
+        )
+        register(
+            "--runner-env-vars",
+            type=list,
+            member_type=str,
+            default=["PATH"],
+            help=(
+                "Environment variables to set in the BSP runner script when setting up BSP support. "
+                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
+                "or just `ENV_VAR` to copy the value from Pants' own environment.\n\n"
+                "Note: IntelliJ on macOS apparently does not pass through the PATH from the shell, "
+                "and so on macOS at the very least, `PATH` should be explicitly written into the BSP "
+                "runner script via this option."
+            ),
+            advanced=True,
+        )
+
     def run(
         self,
         *,
@@ -33,8 +74,104 @@ class BSPGoal(BuiltinGoal):
         graph_session: GraphSession,
         options: Options,
         specs: Specs,
-        union_membership: UnionMembership
+        union_membership: UnionMembership,
     ) -> ExitCode:
+        goal_options = options.for_scope(self.name)
+        if goal_options.server:
+            return self._run_server(
+                graph_session=graph_session,
+                union_membership=union_membership,
+            )
+        current_session_values = graph_session.scheduler_session.py_session.session_values
+        env = current_session_values[CompleteEnvironment]
+        return self._setup_bsp_connection(
+            union_membership=union_membership, env=env, options=goal_options
+        )
+
+    def _setup_bsp_connection(
+        self,
+        union_membership: UnionMembership,
+        env: Mapping[str, str],
+        options: OptionValueContainer,
+    ) -> ExitCode:
+        """Setup the BSP connection file."""
+
+        build_root = BuildRoot()
+        bsp_conn_path = build_root.pathlib_path / ".bsp" / "pants.json"
+        if bsp_conn_path.exists():
+            print(
+                f"ERROR: A BSP connection file already exists at path `{bsp_conn_path}`. "
+                "Please delete that file if you intend to re-setup BSP in this repository."
+            )
+            return PANTS_FAILED_EXIT_CODE
+
+        bsp_dir = build_root.pathlib_path / ".pants.d" / "bsp"
+
+        bsp_scripts_dir = bsp_dir / "scripts"
+        bsp_scripts_dir.mkdir(exist_ok=True, parents=True)
+
+        bsp_logs_dir = bsp_dir / "logs"
+        bsp_logs_dir.mkdir(exist_ok=True, parents=True)
+
+        run_script_env_lines: list[str] = []
+        for env_var in options.runner_env_vars:
+            if "=" in env_var:
+                run_script_env_lines.append(env_var)
+            else:
+                if env_var not in env:
+                    print(
+                        f"ERROR: The `[{self.name}].runner_env_vars` option is configured to add the `{env_var}` "
+                        "environment variable to the BSP runner script using its value in  the current environment. "
+                        "That environment variable, however, is not present in the current environment. "
+                        "Please either set it in the current environment first or else configure a specific value "
+                        "in `pants.toml`."
+                    )
+                    return PANTS_FAILED_EXIT_CODE
+                run_script_env_lines.append(f"{env_var}={env[env_var]}")
+
+        run_script_env_lines_str = "\n".join(
+            [f"export {shlex.quote(line)}" for line in run_script_env_lines]
+        )
+
+        run_script_path = bsp_scripts_dir / "run-bsp.sh"
+        run_script_path.write_text(
+            textwrap.dedent(
+                f"""\
+            #!/bin/sh
+            {run_script_env_lines_str}
+            exec 2>>{shlex.quote(str(bsp_logs_dir / 'stderr.log'))}
+            env 1>&2
+            exec {shlex.quote(bin_name())} --no-pantsd {self.name} --server
+            """
+            )
+        )
+        run_script_path.chmod(0o755)
+        print(f"Wrote BSP runner script to `{run_script_path}`.")
+
+        bsp_conn_data = {
+            "name": "Pants",
+            "version": VERSION,
+            "bspVersion": BSP_VERSION,
+            "languages": sorted(
+                [lang.language_id for lang in union_membership.get(BSPLanguageSupport)]
+            ),
+            "argv": ["./.pants.d/bsp/scripts/run-bsp.sh"],
+        }
+
+        bsp_conn_path.parent.mkdir(exist_ok=True, parents=True)
+        bsp_conn_path.write_text(json.dumps(bsp_conn_data))
+        print(f"Wrote BSP connection file to `{bsp_conn_path}`.")
+
+        return PANTS_SUCCEEDED_EXIT_CODE
+
+    def _run_server(
+        self,
+        *,
+        graph_session: GraphSession,
+        union_membership: UnionMembership,
+    ) -> ExitCode:
+        """Run the BSP server."""
+
         current_session_values = graph_session.scheduler_session.py_session.session_values
         context = BSPContext()
         session_values = SessionValues(
