@@ -252,7 +252,7 @@ class CoursierResolvedLockfile:
         entries = tuple(
             CoursierLockfileEntry.from_json_dict(entry) for entry in (contents["entries"])
         )
-        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes)
+        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes, delimeter="#")
 
         return cls(
             entries=entries,

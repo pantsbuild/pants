@@ -29,7 +29,6 @@ class InvalidPythonLockfileReason(Enum):
 @dataclass(frozen=True)
 class PythonLockfileMetadata(LockfileMetadata):
 
-    delimeter = "#"
     scope = LockfileScope.PYTHON
 
     valid_for_interpreter_constraints: InterpreterConstraints
