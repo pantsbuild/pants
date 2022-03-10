@@ -6,4 +6,4 @@ from pants.backend.codegen.protobuf.lint.buf.rules import rules as buf_rules
 
 
 def rules():
-    return *buf_rules(), *skip_field.rules()
+    return (*buf_rules(), *skip_field.rules())
