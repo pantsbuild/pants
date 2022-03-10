@@ -435,7 +435,7 @@ impl DigestTrie {
   }
 
   /// Create a DigestTrie from a root remexec::Directory and a map of its transitive children.
-  pub fn from_remexec_directories(
+  fn from_remexec_directories(
     root: &remexec::Directory,
     children_by_digest: &HashMap<Digest, remexec::Directory>,
   ) -> Result<Self, String> {
@@ -670,9 +670,13 @@ impl DigestTrie {
       // We need to descend further, so the entry must be a Directory.
       tree = match matching_entry {
         Some(Entry::Directory(d)) => &d.tree,
-        None => { return Ok(None) },
+        None => return Ok(None),
         Some(Entry::File(_)) => {
-          return Err(format!("{tree_digest:?} cannot contain a path at {path:?}, because a file was encountered at {path_so_far:?}.", tree_digest=self.compute_root_digest()))
+          return Err(format!(
+            "{tree_digest:?} cannot contain a path at {path:?}, \
+             because a file was encountered at {path_so_far:?}.",
+            tree_digest = self.compute_root_digest()
+          ))
         }
       };
     }
