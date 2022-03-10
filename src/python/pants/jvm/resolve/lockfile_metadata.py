@@ -32,6 +32,7 @@ class LockfileContext(Enum):
 @dataclass(frozen=True)
 class JVMLockfileMetadata(LockfileMetadata):
 
+    delimeter = "#"
     scope = LockfileScope.JVM
 
     @staticmethod
@@ -47,12 +48,6 @@ class JVMLockfileMetadata(LockfileMetadata):
         """
 
         return JVMLockfileMetadataV1.from_artifact_requirements(requirements)
-
-    @classmethod
-    def from_lockfile(
-        cls, lockfile: bytes, lockfile_path: str | None = None, resolve_name: str | None = None
-    ) -> JVMLockfileMetadata:
-        return JVMLockfileMetadata.from_lockfile_for_scope(lockfile, lockfile_path, resolve_name)
 
     def is_valid_for(
         self,

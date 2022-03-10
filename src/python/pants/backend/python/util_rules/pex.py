@@ -423,7 +423,7 @@ async def build_pex(
             lock_bytes = _digest_contents[0].content
 
             def parse_metadata() -> PythonLockfileMetadata:
-                return PythonLockfileMetadata.from_lockfile(resolve_name, lock_bytes, lock_path)
+                return PythonLockfileMetadata.from_lockfile(lock_bytes, lock_path, resolve_name)
 
         else:
             _fc = request.requirements.file_content
@@ -431,7 +431,7 @@ async def build_pex(
             requirements_file_digest = await Get(Digest, CreateDigest([_fc]))
 
             def parse_metadata() -> PythonLockfileMetadata:
-                return PythonLockfileMetadata.from_lockfile(resolve_name, lock_bytes)
+                return PythonLockfileMetadata.from_lockfile(lock_bytes, resolve_name=resolve_name)
 
         is_monolithic_resolve = True
         argv.extend(["--requirement", lock_path, "--no-transitive"])

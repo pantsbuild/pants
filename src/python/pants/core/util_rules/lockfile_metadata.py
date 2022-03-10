@@ -76,11 +76,11 @@ class LockfileMetadata:
 
     # N.B. This __must not__ change between multiple versions of a lockfile metadata for a
     # particular scope. The delimeter for version 1 must be the delimeter for version N.
-    delimeter: ClassVar[str] = "#"
+    delimeter: ClassVar[str]
     scope: ClassVar[LockfileScope]
 
     @classmethod
-    def from_lockfile_for_scope(
+    def from_lockfile(
         cls: type[_LockfileMetadataSubclass],
         lockfile: bytes,
         lockfile_path: str | None = None,
@@ -142,7 +142,7 @@ class LockfileMetadata:
         )
 
         assert concrete_class.scope == cls.scope, (
-            "The class used to call `from_lockfile_for_scope` has a different scope than what was "
+            "The class used to call `from_lockfile` has a different scope than what was "
             f"expected given the metadata. Expected '{cls.scope}', got '{concrete_class.scope}'",
         )
 

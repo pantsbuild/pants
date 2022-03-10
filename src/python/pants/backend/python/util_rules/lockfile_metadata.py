@@ -29,6 +29,7 @@ class InvalidPythonLockfileReason(Enum):
 @dataclass(frozen=True)
 class PythonLockfileMetadata(LockfileMetadata):
 
+    delimeter = "#"
     scope = LockfileScope.PYTHON
 
     valid_for_interpreter_constraints: InterpreterConstraints
@@ -47,12 +48,6 @@ class PythonLockfileMetadata(LockfileMetadata):
         """
 
         return PythonLockfileMetadataV2(valid_for_interpreter_constraints, requirements)
-
-    @classmethod
-    def from_lockfile(
-        cls, resolve_name: str, lockfile: bytes, lockfile_path: str | None = None
-    ) -> PythonLockfileMetadata:
-        return PythonLockfileMetadata.from_lockfile_for_scope(lockfile, lockfile_path, resolve_name)
 
     @classmethod
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
