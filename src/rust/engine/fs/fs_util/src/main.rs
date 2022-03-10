@@ -584,7 +584,6 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .map_err(|e| format!("Error expanding globs: {:?}", e))?;
 
         let snapshot = Snapshot::from_path_stats(
-          store_copy.clone(),
           store::OneOffStoreFileByDigest::new(store_copy, posix_fs, false),
           paths,
         )

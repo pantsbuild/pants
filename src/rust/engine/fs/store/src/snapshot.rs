@@ -57,7 +57,6 @@ impl Snapshot {
     S: StoreFileByDigest<Error> + Sized + Clone + Send + 'static,
     Error: fmt::Debug + 'static + Send,
   >(
-    _store: Store,
     file_digester: S,
     path_stats: Vec<PathStat>,
   ) -> Result<Snapshot, String> {
@@ -147,7 +146,6 @@ impl Snapshot {
         .await
         .map_err(|err| format!("Error expanding globs: {}", err))?;
       Snapshot::from_path_stats(
-        store.clone(),
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )

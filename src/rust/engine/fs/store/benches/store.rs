@@ -116,7 +116,6 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
           for _ in 0..captures {
             let _ = executor
               .block_on(Snapshot::from_path_stats(
-                store.clone(),
                 OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone(), immutable),
                 path_stats.clone(),
               ))
@@ -351,7 +350,6 @@ fn snapshot(
       )
       .unwrap();
       Snapshot::from_path_stats(
-        store2.clone(),
         OneOffStoreFileByDigest::new(store2, Arc::new(posix_fs), true),
         path_stats,
       )

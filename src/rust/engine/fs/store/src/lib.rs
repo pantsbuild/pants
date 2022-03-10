@@ -333,7 +333,6 @@ impl Store {
     }
 
     Snapshot::from_path_stats(
-      self.clone(),
       Digester { digest },
       vec![fs::PathStat::File {
         path: name.clone().into(),

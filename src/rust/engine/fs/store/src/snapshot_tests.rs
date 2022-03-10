@@ -42,13 +42,13 @@ pub fn setup() -> (
 
 #[tokio::test]
 async fn snapshot_one_file() {
-  let (store, dir, posix_fs, digester) = setup();
+  let (_, dir, posix_fs, digester) = setup();
 
   let file_name = PathBuf::from("roland");
   make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let snapshot = Snapshot::from_path_stats(store, digester, path_stats)
+  let snapshot = Snapshot::from_path_stats(digester, path_stats)
     .await
     .unwrap();
   assert_eq!(
@@ -69,7 +69,7 @@ async fn snapshot_one_file() {
 
 #[tokio::test]
 async fn snapshot_recursive_directories() {
-  let (store, dir, posix_fs, digester) = setup();
+  let (_, dir, posix_fs, digester) = setup();
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
@@ -77,7 +77,7 @@ async fn snapshot_recursive_directories() {
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let snapshot = Snapshot::from_path_stats(store, digester, path_stats)
+  let snapshot = Snapshot::from_path_stats(digester, path_stats)
     .await
     .unwrap();
   assert_eq!(
@@ -109,7 +109,7 @@ async fn snapshot_from_digest() {
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let expected_snapshot = Snapshot::from_path_stats(store.clone(), digester, path_stats)
+  let expected_snapshot = Snapshot::from_path_stats(digester, path_stats)
     .await
     .unwrap();
 
@@ -142,7 +142,7 @@ async fn snapshot_from_digest() {
 
 #[tokio::test]
 async fn snapshot_recursive_directories_including_empty() {
-  let (store, dir, posix_fs, digester) = setup();
+  let (_, dir, posix_fs, digester) = setup();
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
@@ -156,7 +156,7 @@ async fn snapshot_recursive_directories_including_empty() {
   let sorted_path_stats = expand_all_sorted(posix_fs).await;
   let mut unsorted_path_stats = sorted_path_stats.clone();
   unsorted_path_stats.reverse();
-  let snapshot = Snapshot::from_path_stats(store, digester, unsorted_path_stats)
+  let snapshot = Snapshot::from_path_stats(digester, unsorted_path_stats)
     .await
     .unwrap();
   assert_eq!(
@@ -292,18 +292,13 @@ async fn snapshot_merge_two_files() {
     true,
   );
 
-  let snapshot1 = Snapshot::from_path_stats(
-    store.clone(),
-    digester.clone(),
-    vec![dir.clone(), file1.clone()],
-  )
-  .await
-  .unwrap();
+  let snapshot1 = Snapshot::from_path_stats(digester.clone(), vec![dir.clone(), file1.clone()])
+    .await
+    .unwrap();
 
-  let snapshot2 =
-    Snapshot::from_path_stats(store.clone(), digester, vec![dir.clone(), file2.clone()])
-      .await
-      .unwrap();
+  let snapshot2 = Snapshot::from_path_stats(digester, vec![dir.clone(), file2.clone()])
+    .await
+    .unwrap();
 
   let merged = store
     .merge(vec![snapshot1.into(), snapshot2.into()])
@@ -356,10 +351,10 @@ async fn snapshot_merge_same_file() {
   );
 
   // When the file is the exact same, merging should succeed.
-  let snapshot1 = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file.clone()])
+  let snapshot1 = Snapshot::from_path_stats(digester.clone(), vec![file.clone()])
     .await
     .unwrap();
-  let snapshot1_cloned = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file])
+  let snapshot1_cloned = Snapshot::from_path_stats(digester.clone(), vec![file])
     .await
     .unwrap();
 
@@ -376,7 +371,7 @@ async fn snapshot_merge_colliding() {
 
   make_file(&tempdir.path().join("roland"), STR.as_bytes(), 0o600);
   let path_stats1 = expand_all_sorted(posix_fs).await;
-  let snapshot1 = Snapshot::from_path_stats(store.clone(), digester.clone(), path_stats1)
+  let snapshot1 = Snapshot::from_path_stats(digester.clone(), path_stats1)
     .await
     .unwrap();
 
@@ -384,7 +379,7 @@ async fn snapshot_merge_colliding() {
   let (_store2, tempdir2, posix_fs2, digester2) = setup();
   make_file(&tempdir2.path().join("roland"), STR2.as_bytes(), 0o600);
   let path_stats2 = expand_all_sorted(posix_fs2).await;
-  let snapshot2 = Snapshot::from_path_stats(store.clone(), digester2, path_stats2)
+  let snapshot2 = Snapshot::from_path_stats(digester2, path_stats2)
     .await
     .unwrap();
 

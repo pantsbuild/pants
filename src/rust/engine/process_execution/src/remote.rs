@@ -1292,17 +1292,15 @@ pub fn extract_output_files(
   }
 
   async move {
-    let files_snapshot = Snapshot::from_path_stats(
-      store.clone(),
-      StoreOneOffRemoteDigest::new(path_map),
-      path_stats,
-    )
-    .map_err(move |error| {
-      format!(
-        "Error when storing the output file directory info in the remote CAS: {:?}",
-        error
-      )
-    });
+    let files_snapshot =
+      Snapshot::from_path_stats(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
+        move |error| {
+          format!(
+            "Error when storing the output file directory info in the remote CAS: {:?}",
+            error
+          )
+        },
+      );
 
     let (files_snapshot, mut directory_digests) =
       future::try_join(files_snapshot, future::try_join_all(directory_digests)).await?;

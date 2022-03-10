@@ -871,7 +871,7 @@ impl WrappedNode for Snapshot {
       .map_err(|e| throw(format!("{}", e)))
       .await?;
 
-    store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
+    store::Snapshot::from_path_stats(context.clone(), path_stats)
       .map_err(|e| throw(format!("Snapshot failed: {}", e)))
       .await
   }

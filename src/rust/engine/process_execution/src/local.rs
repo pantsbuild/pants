@@ -120,7 +120,6 @@ impl CommandRunner {
         .map_err(|err| format!("Error expanding output globs: {}", err))
         .await?;
       Snapshot::from_path_stats(
-        store.clone(),
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )
