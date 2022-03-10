@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display};
 use std::hash::{self, Hash};
 use std::ops::Deref;
@@ -18,6 +19,7 @@ use serde::Serialize;
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, EMPTY_DIGEST};
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
 
 use crate::{PathStat, RelativePath};
 
@@ -149,7 +151,7 @@ impl DirectoryDigest {
 /// A single component of a filesystem path.
 ///
 /// For example: the path `foo/bar` will be broken up into `Name("foo")` and `Name("bar")`.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Name(Intern<String>);
 // NB: Calculating the actual deep size of an `Intern` is very challenging, because it does not
 // keep any record of the number of held references, and instead effectively makes its held value
@@ -195,6 +197,24 @@ pub struct Directory {
 impl Directory {
   fn new(name: Name, entries: Vec<Entry>) -> Self {
     Self::from_digest_tree(name, DigestTrie(entries.into()))
+  }
+
+  fn from_remexec_directory_node(
+    dir_node: &remexec::DirectoryNode,
+    directories_by_digest: &HashMap<Digest, remexec::Directory>,
+  ) -> Result<Self, String> {
+    let digest = require_digest(&dir_node.digest)?;
+    let directory = directories_by_digest.get(&digest).ok_or_else(|| {
+      format!(
+        "Child of {name} with {digest:?} was not present.",
+        name = dir_node.name
+      )
+    })?;
+    Ok(Self {
+      name: Name(Intern::from(&dir_node.name)),
+      digest,
+      tree: DigestTrie::from_remexec_directories(directory, directories_by_digest)?,
+    })
   }
 
   fn from_digest_tree(name: Name, tree: DigestTrie) -> Self {
@@ -268,6 +288,18 @@ impl File {
       is_executable: self.is_executable,
       ..remexec::FileNode::default()
     }
+  }
+}
+
+impl TryFrom<&remexec::FileNode> for File {
+  type Error = String;
+
+  fn try_from(file_node: &remexec::FileNode) -> Result<Self, Self::Error> {
+    Ok(Self {
+      name: Name(Intern::from(&file_node.name)),
+      digest: require_digest(&file_node.digest)?,
+      is_executable: file_node.is_executable,
+    })
   }
 }
 
@@ -395,6 +427,23 @@ impl DigestTrie {
       }
     }
 
+    Ok(Self(entries.into()))
+  }
+
+  /// Create a DigestTrie from a root remexec::Directory and a map of its transitive children.
+  pub fn from_remexec_directories(
+    root: &remexec::Directory,
+    children_by_digest: &HashMap<Digest, remexec::Directory>,
+  ) -> Result<Self, String> {
+    let mut entries = root
+      .files
+      .iter()
+      .map(|f| File::try_from(f).map(Entry::File))
+      .chain(root.directories.iter().map(|d| {
+        Directory::from_remexec_directory_node(d, children_by_digest).map(Entry::Directory)
+      }))
+      .collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by_key(|e| e.name());
     Ok(Self(entries.into()))
   }
 
@@ -682,6 +731,24 @@ impl DigestTrie {
     }
 
     Ok(DigestTrie(entries.into()))
+  }
+}
+
+impl TryFrom<remexec::Tree> for DigestTrie {
+  type Error = String;
+
+  fn try_from(tree: remexec::Tree) -> Result<Self, Self::Error> {
+    let root = tree
+      .root
+      .as_ref()
+      .ok_or_else(|| format!("Corrupt tree, no root: {tree:?}"))?;
+    let children = tree
+      .children
+      .into_iter()
+      .map(|d| (Digest::of_bytes(&d.to_bytes()), d))
+      .collect::<HashMap<_, _>>();
+
+    Self::from_remexec_directories(&root, &children)
   }
 }
 

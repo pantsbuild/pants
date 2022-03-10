@@ -11,7 +11,7 @@ use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use concrete_time::TimeSpan;
-use fs::{self, DirectoryDigest, File, PathStat, EMPTY_DIRECTORY_DIGEST};
+use fs::{self, DirectoryDigest, File, PathStat, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use futures::{Stream, StreamExt};
@@ -1166,8 +1166,6 @@ fn extract_stderr<'a>(
   .boxed()
 }
 
-// TODO: Port to #13112 by converting from `remexec::Tree` to `DigestTrie`, and then fetching
-// files.
 pub fn extract_output_files(
   store: Store,
   action_result: &remexec::ActionResult,
@@ -1217,30 +1215,16 @@ pub fn extract_output_files(
         // of the output directory needed to construct the series of `Directory` protos needed
         // for the final merge of the output directories.
         let tree_digest: Digest = require_digest(dir.tree_digest.as_ref())?;
-        let root_digest_opt = store.load_tree_from_remote(tree_digest).await?;
-        let root_digest = root_digest_opt
+        let directory_digest = store
+          .load_tree_from_remote(tree_digest)
+          .await?
           .ok_or_else(|| format!("Tree with digest {:?} was not in remote", tree_digest))?;
 
-        let mut digest = root_digest;
-
-        if !dir.path.is_empty() {
-          for component in dir.path.rsplit('/') {
-            let component = component.to_owned();
-            let directory = remexec::Directory {
-              directories: vec![remexec::DirectoryNode {
-                name: component,
-                digest: Some((&digest).into()),
-              }],
-              ..remexec::Directory::default()
-            };
-            digest = store.record_directory(&directory, true).await?;
-          }
-        }
-        // TODO: Implement an operation to directly convert a `Tree` into a `DigestTrie`. See #13112.
-        let res: Result<_, String> = Ok(DirectoryDigest::todo_from_digest(digest));
-        res
+        store
+          .add_prefix(directory_digest, &RelativePath::new(dir.path)?)
+          .await
       })
-      .map_err(|err| format!("Error saving remote output directory: {}", err)),
+      .map_err(|err| format!("Error saving remote output directory: {:?}", err)),
     );
   }
 

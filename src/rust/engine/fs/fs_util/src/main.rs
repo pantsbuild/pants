@@ -523,9 +523,8 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .load_tree_from_remote(digest)
           .await
           .expect("protocol error");
-        let output_digest = DirectoryDigest::from_persisted_digest(
-          output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?,
-        );
+        let output_digest =
+          output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?;
         store
           .materialize_directory(destination, output_digest, Permissions::Writable)
           .await
