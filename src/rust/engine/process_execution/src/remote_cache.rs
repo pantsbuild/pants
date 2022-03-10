@@ -1,12 +1,10 @@
-use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
-use std::ffi::OsString;
-use std::path::Component;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use fs::RelativePath;
+use fs::{directory, DigestTrie, RelativePath};
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use grpc_util::retry::status_is_retryable;
@@ -18,7 +16,7 @@ use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::action_cache_client::ActionCacheClient;
-use remexec::{ActionResult, Command, FileNode, Tree};
+use remexec::{ActionResult, Command, Tree};
 use store::Store;
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
@@ -125,162 +123,53 @@ impl CommandRunner {
   ///
   /// Returns the created Tree and any File Digests referenced within it. If the output directory
   /// does not exist, then returns Ok(None).
-  pub(crate) async fn make_tree_for_output_directory(
-    root_directory_digest: Digest,
+  pub(crate) fn make_tree_for_output_directory(
+    root_trie: &DigestTrie,
     directory_path: RelativePath,
-    store: &Store,
   ) -> Result<Option<(Tree, Vec<Digest>)>, String> {
-    // Traverse down from the root directory digest to find the directory digest for
-    // the output directory.
-    let mut current_directory_digest = root_directory_digest;
-    for next_path_component in directory_path.as_ref().components() {
-      let next_name = match next_path_component {
-        Component::Normal(name) => name
-          .to_str()
-          .ok_or_else(|| format!("unable to convert '{:?}' to string", name))?,
-        _ => return Ok(None),
-      };
+    let sub_trie = match root_trie.entry(&directory_path)? {
+      Some(directory::Entry::Directory(d)) => d.tree(),
+      None => return Ok(None),
+      Some(directory::Entry::File(_)) => {
+        return Err(format!(
+          "Declared output directory path {directory_path:?} in output \
+           digest {trie_digest:?} contained a file instead.",
+          trie_digest = root_trie.compute_root_digest(),
+        ))
+      }
+    };
 
-      // Load the Directory proto corresponding to `current_directory_digest`.
-      let current_directory = match store.load_directory(current_directory_digest).await? {
-        Some(dir) => dir,
-        None => {
-          return Err(format!(
-            "Directory digest {:?} was referenced in output, but was not found in store.",
-            current_directory_digest
-          ))
-        }
-      };
-
-      // Scan the current directory for the current path component.
-      let dir_node = match current_directory
-        .directories
-        .iter()
-        .find(|dn| dn.name == next_name)
-      {
-        Some(dn) => dn,
-        None => return Ok(None),
-      };
-
-      // Set the current directory digest to be the digest in the DirectoryNode just found.
-      // If there are more path components, then the search will continue there.
-      // Otherwise, if this loop ends then the final Directory digest has been found.
-      current_directory_digest = require_digest(dir_node.digest.as_ref())?;
-    }
-
-    // At this point, `current_directory_digest` holds the digest of the output directory.
-    // This will be the root of the Tree. Add it to a queue of digests to traverse.
-    // TODO: The remainder of this method can be implemented in terms of
-    // `Store::entries_for_directory`, but it does not exist on the 2.7.x branch.
-    let mut tree = Tree::default();
+    let tree = sub_trie.into();
     let mut file_digests = Vec::new();
-
-    let mut digest_queue = VecDeque::new();
-    digest_queue.push_back(current_directory_digest);
-
-    while let Some(directory_digest) = digest_queue.pop_front() {
-      let directory = match store.load_directory(directory_digest).await? {
-        Some(dir) => dir,
-        None => {
-          return Err(format!(
-            "illegal state: directory for digest {:?} did not exist locally",
-            &current_directory_digest
-          ))
-        }
-      };
-
-      // Add all of the digests for subdirectories into the queue so they are processed
-      // in future iterations of the loop.
-      for subdirectory_node in &directory.directories {
-        let subdirectory_digest = require_digest(subdirectory_node.digest.as_ref())?;
-        digest_queue.push_back(subdirectory_digest);
-      }
-
-      // Collect referenced file Digests.
-      file_digests.extend(
-        directory
-          .files
-          .iter()
-          .map(|file_node| require_digest(file_node.digest.as_ref()))
-          .collect::<Result<Vec<_>, String>>()?,
-      );
-
-      // Store this directory either as the `root` or one of the `children` if not the root.
-      if directory_digest == current_directory_digest {
-        tree.root = Some(directory);
-      } else {
-        tree.children.push(directory)
-      }
-    }
+    sub_trie.walk(&mut |_, entry| match entry {
+      directory::Entry::File(f) => file_digests.push(f.digest()),
+      directory::Entry::Directory(_) => {}
+    });
 
     Ok(Some((tree, file_digests)))
   }
 
-  pub(crate) async fn extract_output_file(
-    root_directory_digest: Digest,
-    file_path: RelativePath,
-    store: &Store,
-  ) -> Result<Option<FileNode>, String> {
-    // Traverse down from the root directory digest to find the directory digest for
-    // the output directory.
-    let mut current_directory_digest = root_directory_digest;
-    let parent_path = file_path.as_ref().parent();
-    let components_opt = parent_path.map(|x| x.components());
-    if let Some(components) = components_opt {
-      for next_path_component in components {
-        let next_name = match next_path_component {
-          Component::Normal(name) => name
-            .to_str()
-            .ok_or_else(|| format!("unable to convert '{:?}' to string", name))?,
-          _ => return Ok(None),
+  pub(crate) fn extract_output_file(
+    root_trie: &DigestTrie,
+    file_path: &str,
+  ) -> Result<Option<remexec::OutputFile>, String> {
+    match root_trie.entry(&RelativePath::new(file_path)?)? {
+      Some(directory::Entry::File(f)) => {
+        let output_file = remexec::OutputFile {
+          digest: Some(f.digest().into()),
+          path: file_path.to_owned(),
+          is_executable: f.is_executable(),
+          ..remexec::OutputFile::default()
         };
-
-        // Load the Directory proto corresponding to `current_directory_digest`.
-        let current_directory = match store.load_directory(current_directory_digest).await? {
-          Some(dir) => dir,
-          None => {
-            return Err(format!(
-              "Directory digest {:?} was referenced in output, but was not found in store.",
-              current_directory_digest
-            ))
-          }
-        };
-
-        // Scan the current directory for the current path component.
-        let dir_node = match current_directory
-          .directories
-          .iter()
-          .find(|dn| dn.name == next_name)
-        {
-          Some(dn) => dn,
-          None => return Ok(None),
-        };
-
-        // Set the current directory digest to be the digest in the DirectoryNode just found.
-        // If there are more path components, then the search will continue there.
-        // Otherwise, if this loop ends then the final Directory digest has been found.
-        current_directory_digest = require_digest(dir_node.digest.as_ref())?;
+        Ok(Some(output_file))
       }
+      None => Ok(None),
+      Some(directory::Entry::Directory(_)) => Err(format!(
+        "Declared output file path {file_path:?} in output \
+           digest {trie_digest:?} contained a directory instead.",
+        trie_digest = root_trie.compute_root_digest(),
+      )),
     }
-
-    // Load the final directory.
-    let directory = match store.load_directory(current_directory_digest).await? {
-      Some(dir) => dir,
-      None => return Ok(None),
-    };
-
-    // Search for the file.
-    let file_base_name = file_path.as_ref().file_name().unwrap();
-    Ok(
-      directory
-        .files
-        .iter()
-        .find(|node| {
-          let name = OsString::from(&node.name);
-          name == file_base_name
-        })
-        .cloned(),
-    )
   }
 
   /// Converts a REAPI `Command` and a `FallibleProcessResultWithPlatform` produced from executing
@@ -295,10 +184,8 @@ impl CommandRunner {
     result: &FallibleProcessResultWithPlatform,
     store: &Store,
   ) -> Result<(ActionResult, Vec<Digest>), String> {
-    // TODO: Port to #13112. For now, we just ensure that the digest is persisted so that it can be
-    // used in `make_tree_for_output_directory` and `extract_output_file`.
-    store
-      .ensure_directory_digest_persisted(result.output_directory.clone())
+    let output_trie = store
+      .load_digest_trie(result.output_directory.clone())
       .await?;
 
     // Keep track of digests that need to be uploaded.
@@ -317,12 +204,9 @@ impl CommandRunner {
 
     for output_directory in &command.output_directories {
       let (tree, file_digests) = match Self::make_tree_for_output_directory(
-        result.output_directory.todo_as_digest(),
+        &output_trie,
         RelativePath::new(output_directory).unwrap(),
-        store,
-      )
-      .await?
-      {
+      )? {
         Some(res) => res,
         None => continue,
       };
@@ -339,29 +223,14 @@ impl CommandRunner {
         });
     }
 
-    for output_file in &command.output_files {
-      let file_node = match Self::extract_output_file(
-        result.output_directory.todo_as_digest(),
-        RelativePath::new(output_file).unwrap(),
-        store,
-      )
-      .await?
-      {
-        Some(node) => node,
+    for output_file_path in &command.output_files {
+      let output_file = match Self::extract_output_file(&output_trie, output_file_path)? {
+        Some(output_file) => output_file,
         None => continue,
       };
 
-      let digest = require_digest(file_node.digest.as_ref())?;
-      digests.insert(digest);
-
-      action_result.output_files.push({
-        remexec::OutputFile {
-          digest: Some(digest.into()),
-          path: output_file.to_owned(),
-          is_executable: file_node.is_executable,
-          ..remexec::OutputFile::default()
-        }
-      })
+      digests.insert(require_digest(output_file.digest.as_ref())?);
+      action_result.output_files.push(output_file);
     }
 
     Ok((action_result, digests.into_iter().collect::<Vec<_>>()))
