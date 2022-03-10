@@ -34,6 +34,16 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTargets, FieldSet, Target, Targets
 from pants.engine.unions import UnionRule
+from pants.engine.target import (
+    CoarsenedTargets,
+    Dependencies,
+    DependenciesRequest,
+    Target,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    WrappedTarget,
+)
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.compile import (
     ClasspathEntryRequest,
     ClasspathEntryRequestFactory,
@@ -44,7 +54,7 @@ from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmResolveField
+from pants.jvm.target_types import JvmArtifactFieldSet, JvmResolveField
 
 LANGUAGE_ID = "scala"
 
@@ -215,6 +225,35 @@ async def bsp_scalac_options_request(request: ScalacOptionsParams) -> ScalacOpti
         Get(HandleScalacOptionsResult, HandleScalacOptionsRequest(btgt)) for btgt in request.targets
     )
     return ScalacOptionsResult(items=tuple(result.item for result in results))
+
+
+# -----------------------------------------------------------------------------------------------
+# Dependency Modules
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ScalaBSPDependencyModulesFieldSet(BSPDependencyModulesFieldSet):
+    required_fields = (ScalaSourceField,)
+    source: ScalaSourceField
+
+
+@rule
+async def scala_bsp_dependency_modules(
+    request: ScalaBSPDependencyModulesFieldSet,
+) -> BSPDependencyModules:
+    coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
+    assert len(coarsened_targets) == 1
+    coarsened_target = coarsened_targets[0]
+    # resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
+
+    transitive_targets = await Get(
+        TransitiveTargets,
+        TransitiveTargetsRequest(roots=[tgt.addr for tgt in coarsened_target.members]),
+    )
+    # jvm_artifact_targets = [
+    #     tgt for tgt in transitive_targets if JvmArtifactFieldSet.is_applicable(tgt)
+    # ]
 
 
 # -----------------------------------------------------------------------------------------------
