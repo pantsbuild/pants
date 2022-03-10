@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABCMeta
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
@@ -57,7 +57,7 @@ class _ClasspathEntryRequestClassification(Enum):
 @dataclass(frozen=True)
 class JVMRequestTypes:
     classpath_entry_requests: tuple[type[ClasspathEntryRequest], ...]
-    code_generator_requests: FrozenDict[type[SourcesField], type[ClasspathEntryRequest]]
+    code_generator_requests: FrozenDict[type[SourcesField], tuple[type[ClasspathEntryRequest], ...]]
 
 
 @rule
@@ -68,18 +68,20 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> JVMRequest
         for field_set in impl.field_sets:
             for field in field_set.required_fields:
                 # Assume only one impl per field (normally sound)
+                # (note that subsequently, we only check for `SourceFields`, so no need to filter)
                 impls_by_source[field] = impl
 
     generators: Iterable[type[GenerateSourcesRequest]] = union_membership.get(
         GenerateSourcesRequest
     )
 
-    # TODO: Does not currently support multiple code generators per source type
-    # We'll need to add support for that, once it's possible to disambiguate in
-    # a build file
-    usable_generators = FrozenDict(
-        (g.input, impls_by_source[g.output]) for g in generators if g.output in impls_by_source
+    usable_generators_: dict[type[SourcesField], list[type[ClasspathEntryRequest]]] = defaultdict(
+        list
     )
+    for g in generators:
+        if g.output in impls_by_source:
+            usable_generators_[g.input].append(impls_by_source[g.output])
+    usable_generators = FrozenDict((key, tuple(value)) for key, value in usable_generators_.items())
 
     return JVMRequestTypes(tuple(cpe_impls), usable_generators)
 
@@ -126,12 +128,11 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
         request types which are marked `root_only`.
         """
 
-        impls = jvm_request_types.classpath_entry_requests
-        usable_generators = jvm_request_types.code_generator_requests
-
-        # TODO: filter usable generators by acceptable languages
-
-        for (input, request_type) in usable_generators.items():
+        for (input, request_types) in jvm_request_types.code_generator_requests.items():
+            if len(request_types) > 1:
+                # TODO: filter usable generators by acceptable languages
+                pass
+            request_type = request_types[0]
             if component.representative.has_field(input):
                 return request_type(component, resolve, None)
 
