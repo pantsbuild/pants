@@ -240,13 +240,6 @@ impl Directory {
   pub fn as_remexec_directory(&self) -> remexec::Directory {
     self.tree.as_remexec_directory()
   }
-
-  pub fn as_remexec_directory_node(&self) -> remexec::DirectoryNode {
-    remexec::DirectoryNode {
-      name: self.name.as_ref().to_owned(),
-      digest: Some((&self.digest).into()),
-    }
-  }
 }
 
 impl Debug for Directory {
@@ -258,6 +251,15 @@ impl Debug for Directory {
       .field("digest", &self.digest)
       .field("tree", &"..")
       .finish()
+  }
+}
+
+impl From<&Directory> for remexec::DirectoryNode {
+  fn from(dir: &Directory) -> Self {
+    remexec::DirectoryNode {
+      name: dir.name.as_ref().to_owned(),
+      digest: Some((&dir.digest).into()),
+    }
   }
 }
 
@@ -280,15 +282,6 @@ impl File {
   pub fn is_executable(&self) -> bool {
     self.is_executable
   }
-
-  pub fn as_remexec_file_node(&self) -> remexec::FileNode {
-    remexec::FileNode {
-      name: self.name.as_ref().to_owned(),
-      digest: Some(self.digest.into()),
-      is_executable: self.is_executable,
-      ..remexec::FileNode::default()
-    }
-  }
 }
 
 impl TryFrom<&remexec::FileNode> for File {
@@ -300,6 +293,17 @@ impl TryFrom<&remexec::FileNode> for File {
       digest: require_digest(&file_node.digest)?,
       is_executable: file_node.is_executable,
     })
+  }
+}
+
+impl From<&File> for remexec::FileNode {
+  fn from(file: &File) -> Self {
+    remexec::FileNode {
+      name: file.name.as_ref().to_owned(),
+      digest: Some(file.digest.into()),
+      is_executable: file.is_executable,
+      ..remexec::FileNode::default()
+    }
   }
 }
 
@@ -453,8 +457,8 @@ impl DigestTrie {
 
     for entry in &*self.0 {
       match entry {
-        Entry::File(f) => files.push(f.as_remexec_file_node()),
-        Entry::Directory(d) => directories.push(d.as_remexec_directory_node()),
+        Entry::File(f) => files.push(f.into()),
+        Entry::Directory(d) => directories.push(d.into()),
       }
     }
 
@@ -644,6 +648,38 @@ impl DigestTrie {
     Ok(tree)
   }
 
+  /// Return the Entry at the given relative path in the trie, or None if no such path was present.
+  ///
+  /// An error will be returned if the given path attempts to traverse below a file entry.
+  pub fn entry<'a>(&'a self, path: &RelativePath) -> Result<Option<&'a Entry>, String> {
+    let mut tree = self;
+    let mut path_so_far = PathBuf::new();
+    let mut components = path.components().peekable();
+    while let Some(component) = components.next() {
+      path_so_far.push(component);
+      let component = component.as_os_str();
+
+      let matching_entry = tree
+        .entries()
+        .iter()
+        .find(|entry| Path::new(entry.name().as_ref()).as_os_str() == component);
+      if components.peek().is_none() {
+        return Ok(matching_entry);
+      }
+
+      // We need to descend further, so the entry must be a Directory.
+      tree = match matching_entry {
+        Some(Entry::Directory(d)) => &d.tree,
+        None => { return Ok(None) },
+        Some(Entry::File(_)) => {
+          return Err(format!("{tree_digest:?} cannot contain a path at {path:?}, because a file was encountered at {path_so_far:?}.", tree_digest=self.compute_root_digest()))
+        }
+      };
+    }
+
+    Ok(None)
+  }
+
   /// Given DigestTries, merge them recursively into a single DigestTrie.
   ///
   /// If a file is present with the same name and contents multiple times, it will appear once.
@@ -748,7 +784,27 @@ impl TryFrom<remexec::Tree> for DigestTrie {
       .map(|d| (Digest::of_bytes(&d.to_bytes()), d))
       .collect::<HashMap<_, _>>();
 
-    Self::from_remexec_directories(&root, &children)
+    Self::from_remexec_directories(root, &children)
+  }
+}
+
+impl From<&DigestTrie> for remexec::Tree {
+  fn from(trie: &DigestTrie) -> Self {
+    let mut tree = remexec::Tree::default();
+    trie.walk(&mut |_, entry| {
+      match entry {
+        Entry::File(_) => (),
+        Entry::Directory(d) if d.name.is_empty() => {
+          // Is the root directory.
+          tree.root = Some(d.tree.as_remexec_directory());
+        }
+        Entry::Directory(d) => {
+          // Is a child directory.
+          tree.children.push(d.tree.as_remexec_directory());
+        }
+      }
+    });
+    tree
   }
 }
 
