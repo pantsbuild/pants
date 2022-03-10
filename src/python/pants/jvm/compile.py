@@ -63,12 +63,12 @@ class JVMRequestTypes:
 @rule
 def calculate_jvm_request_types(union_membership: UnionMembership) -> JVMRequestTypes:
     cpe_impls = union_membership.get(ClasspathEntryRequest)
-    b: dict[type[Field], type[ClasspathEntryRequest]] = {}
+    impls_by_source: dict[type[Field], type[ClasspathEntryRequest]] = {}
     for impl in cpe_impls:
         for field_set in impl.field_sets:
             for field in field_set.required_fields:
                 # Assume only one impl per field (normally sound)
-                b[field] = impl
+                impls_by_source[field] = impl
 
     generators: Iterable[type[GenerateSourcesRequest]] = union_membership.get(
         GenerateSourcesRequest
@@ -77,7 +77,9 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> JVMRequest
     # TODO: Does not currently support multiple code generators per source type
     # We'll need to add support for that, once it's possible to disambiguate in
     # a build file
-    usable_generators = FrozenDict((g.input, b[g.output]) for g in generators if g.output in b)
+    usable_generators = FrozenDict(
+        (g.input, impls_by_source[g.output]) for g in generators if g.output in impls_by_source
+    )
 
     return JVMRequestTypes(tuple(cpe_impls), usable_generators)
 
