@@ -33,7 +33,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
-use clap::{value_t, App, Arg, SubCommand};
+use clap::{Arg, Command};
 use fs::{
   DirectoryDigest, GlobExpansionConjunction, GlobMatching, Permissions, PreparedPathGlobs,
   RelativePath, StrictGlobMatching,
@@ -77,207 +77,207 @@ async fn main() {
   env_logger::init();
 
   match execute(
-    &App::new("fs_util")
+    &Command::new("fs_util")
       .subcommand(
-        SubCommand::with_name("file")
+        Command::new("file")
           .subcommand(
-            SubCommand::with_name("cat")
+            Command::new("cat")
               .about("Output the contents of a file by fingerprint.")
-              .arg(Arg::with_name("fingerprint").required(true).takes_value(
+              .arg(Arg::new("fingerprint").required(true).takes_value(
                 true,
               ))
-              .arg(Arg::with_name("size_bytes").required(true).takes_value(
+              .arg(Arg::new("size_bytes").required(true).takes_value(
                 true,
               )),
           )
           .subcommand(
-            SubCommand::with_name("save")
+            Command::new("save")
               .about(
                 "Ingest a file by path, which allows it to be used in Directories/Snapshots. \
 Outputs a fingerprint of its contents and its size in bytes, separated by a space.",
               )
-              .arg(Arg::with_name("path").required(true).takes_value(true))
-              .arg(Arg::with_name("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple(false).takes_value(true).help(
+              .arg(Arg::new("path").required(true).takes_value(true))
+              .arg(Arg::new("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple_occurrences(false).takes_value(true).help(
                 "Set to manipulate the way a report is displayed."
               )),
           ),
       )
       .subcommand(
-        SubCommand::with_name("directory")
+        Command::new("directory")
           .subcommand(
-            SubCommand::with_name("materialize")
+            Command::new("materialize")
               .about(
                 "Materialize a directory by fingerprint to the filesystem. \
 Destination must not exist before this command is run.",
               )
-              .arg(Arg::with_name("fingerprint").required(true).takes_value(
+              .arg(Arg::new("fingerprint").required(true).takes_value(
                 true,
               ))
-              .arg(Arg::with_name("size_bytes").required(true).takes_value(
+              .arg(Arg::new("size_bytes").required(true).takes_value(
                 true,
               ))
-              .arg(Arg::with_name("destination").required(true).takes_value(
+              .arg(Arg::new("destination").required(true).takes_value(
                 true,
               )),
           )
           .subcommand(
-            SubCommand::with_name("save")
+            Command::new("save")
               .about(
                 "Ingest a directory recursively. Saves all files found therein and saves Directory \
 protos for each directory found. Outputs a fingerprint of the canonical top-level Directory proto \
 and the size of the serialized proto in bytes, separated by a space.",
               )
               .arg(
-                Arg::with_name("globs")
+                Arg::new("globs")
                   .required(true)
                   .takes_value(true)
-                  .multiple(true)
+                  .multiple_occurrences(true)
                   .help(
                     "globs matching the files and directories which should be included in the \
 directory, relative to the root.",
                   ),
               )
-                .arg(Arg::with_name("root").long("root").required(true).takes_value(true).help(
+                .arg(Arg::new("root").long("root").required(true).takes_value(true).help(
                   "Root under which the globs live. The Directory proto produced will be relative \
 to this directory.",
             ))
-                .arg(Arg::with_name("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple(false).takes_value(true).help(
+                .arg(Arg::new("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple_occurrences(false).takes_value(true).help(
                   "Set to manipulate the way a report is displayed."
                 )),
           )
           .subcommand(
-            SubCommand::with_name("cat-proto")
+            Command::new("cat-proto")
               .about(
                 "Output the bytes of a serialized Directory proto addressed by fingerprint.",
               )
               .arg(
-                Arg::with_name("output-format")
+                Arg::new("output-format")
                   .long("output-format")
                   .takes_value(true)
                   .default_value("binary")
                   .possible_values(&["binary", "recursive-file-list", "recursive-file-list-with-digests", "text"]),
               )
               .arg(
-                Arg::with_name("child-dir")
+                Arg::new("child-dir")
                     .long("child-dir")
                     .takes_value(true)
                     .help("Relative path of child Directory inside the Directory represented by the digest to navigate to before operating.")
               )
-              .arg(Arg::with_name("fingerprint").required(true).takes_value(
+              .arg(Arg::new("fingerprint").required(true).takes_value(
                 true,
               ))
-              .arg(Arg::with_name("size_bytes").required(true).takes_value(
+              .arg(Arg::new("size_bytes").required(true).takes_value(
                 true,
               )),
           ),
       )
       .subcommand(
-        SubCommand::with_name("tree")
+        Command::new("tree")
             .about("Operate on REAPI Tree protos.")
             .subcommand(
-              SubCommand::with_name("materialize")
+              Command::new("materialize")
                   .about(
                     "Materialize an REAPI Tree by fingerprint to the filesystem. \
 Destination must not exist before this command is run.",
                   )
-                  .arg(Arg::with_name("fingerprint").required(true).takes_value(
+                  .arg(Arg::new("fingerprint").required(true).takes_value(
                     true,
                   ))
-                  .arg(Arg::with_name("size_bytes").required(true).takes_value(
+                  .arg(Arg::new("size_bytes").required(true).takes_value(
                     true,
                   ))
-                  .arg(Arg::with_name("destination").required(true).takes_value(
+                  .arg(Arg::new("destination").required(true).takes_value(
                     true,
                   )),
             )
       )
       .subcommand(
-        SubCommand::with_name("cat")
+        Command::new("cat")
           .about(
             "Output the contents of a file or Directory proto addressed by fingerprint.",
           )
-          .arg(Arg::with_name("fingerprint").required(true).takes_value(
+          .arg(Arg::new("fingerprint").required(true).takes_value(
             true,
           ))
-          .arg(Arg::with_name("size_bytes").required(true).takes_value(
+          .arg(Arg::new("size_bytes").required(true).takes_value(
             true,
           )),
       )
         .subcommand(
-          SubCommand::with_name("directories")
-              .subcommand(SubCommand::with_name("list"))
+          Command::new("directories")
+              .subcommand(Command::new("list"))
               .about("List all directory digests known in the local store")
         )
         .subcommand(
-          SubCommand::with_name("gc")
+          Command::new("gc")
               .about("Garbage collect the on-disk store. Note that after running this command, any processes with an open store (e.g. a pantsd) may need to re-initialize their store.")
               .arg(
-                Arg::with_name("target-size-bytes")
+                Arg::new("target-size-bytes")
                     .takes_value(true)
                     .long("target-size-bytes")
                     .required(true),
               )
         )
       .arg(
-        Arg::with_name("local-store-path")
+        Arg::new("local-store-path")
           .takes_value(true)
           .long("local-store-path")
           .required(false),
       )
         .arg(
-          Arg::with_name("server-address")
+          Arg::new("server-address")
               .takes_value(true)
               .long("server-address")
               .required(false)
         )
         .arg(
-          Arg::with_name("root-ca-cert-file")
+          Arg::new("root-ca-cert-file")
               .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
               .takes_value(true)
               .long("root-ca-cert-file")
               .required(false)
         )
         .arg(
-          Arg::with_name("header")
+          Arg::new("header")
               .help("Header to add when sending gRPC requests. Format: name=value")
               .takes_value(true)
-              .multiple(true)
+              .multiple_occurrences(true)
               .long("header")
               .required(false)
         )
         .arg(
-          Arg::with_name("oauth-bearer-token-file")
+          Arg::new("oauth-bearer-token-file")
               .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
               .takes_value(true)
               .long("oauth-bearer-token-file")
               .required(false)
         )
         .arg(
-          Arg::with_name("mtls-client-certificate-chain-path")
+          Arg::new("mtls-client-certificate-chain-path")
               .help("Path to certificate chain to use when using MTLS.")
               .takes_value(true)
               .long("mtls-client-certificate-chain-path")
               .required(false)
         )
         .arg(
-          Arg::with_name("mtls-client-key-path")
+          Arg::new("mtls-client-key-path")
               .help("Path to private key to use when using MTLS.")
               .takes_value(true)
               .long("mtls-client-key-path")
               .required(false)
         )
         .arg(
-          Arg::with_name("dangerously-ignore-certificates")
+          Arg::new("dangerously-ignore-certificates")
               .help("Ignore invalid certificates when using a remote CAS.")
               .takes_value(false)
               .long("dangerously-ignore-certificates")
         )
-        .arg(Arg::with_name("remote-instance-name")
+        .arg(Arg::new("remote-instance-name")
             .takes_value(true)
                  .long("remote-instance-name")
                  .required(false))
         .arg(
-          Arg::with_name("chunk-bytes")
+          Arg::new("chunk-bytes")
               .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
               .takes_value(true)
               .long("chunk-bytes")
@@ -285,7 +285,7 @@ Destination must not exist before this command is run.",
               .default_value(&format!("{}", 3 * 1024 * 1024))
         )
         .arg(
-          Arg::with_name("rpc-attempts")
+          Arg::new("rpc-attempts")
               .help("Number of times to attempt any RPC before giving up.")
               .takes_value(true)
               .long("rpc-attempts")
@@ -293,7 +293,7 @@ Destination must not exist before this command is run.",
               .default_value("3")
         )
         .arg(
-          Arg::with_name("rpc-concurrency-limit")
+          Arg::new("rpc-concurrency-limit")
               .help("Maximum concurrenct RPCs to the service.")
               .takes_value(true)
               .long("rpc-concurrency-limit")
@@ -301,7 +301,7 @@ Destination must not exist before this command is run.",
               .default_value("128")
         )
         .arg(
-          Arg::with_name("batch-api-size-limit")
+          Arg::new("batch-api-size-limit")
                .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
                .takes_value(true)
                .long("batch-api-size-limit")
@@ -319,7 +319,7 @@ Destination must not exist before this command is run.",
 
 // TODO: Sure, it's a bit long...
 #[allow(clippy::cognitive_complexity)]
-async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
+async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match
     .value_of("local-store-path")
     .map(PathBuf::from)
@@ -334,8 +334,9 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     })?;
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
-        let chunk_size =
-          value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
+        let chunk_size = top_match
+          .value_of_t::<usize>("chunk-bytes")
+          .expect("Bad chunk-bytes flag");
 
         let root_ca_certs = if let Some(path) = top_match.value_of("root-ca-cert-file") {
           Some(
@@ -426,11 +427,15 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             //
             // See https://github.com/pantsbuild/pants/pull/6433 for more context.
             Duration::from_secs(30 * 60),
-            value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
-            value_t!(top_match.value_of("rpc-concurrency-limit"), usize)
+            top_match
+              .value_of_t::<usize>("rpc-attempts")
+              .expect("Bad rpc-attempts flag"),
+            top_match
+              .value_of_t::<usize>("rpc-concurrency-limit")
               .expect("Bad rpc-concurrency-limit flag"),
             None,
-            value_t!(top_match.value_of("batch-api-size-limit"), usize)
+            top_match
+              .value_of_t::<usize>("batch-api-size-limit")
               .expect("Bad batch-api-size-limit flag"),
           ),
           true,
@@ -441,10 +446,10 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     (store_result?, store_has_remote)
   };
 
-  match top_match.subcommand() {
-    ("file", Some(sub_match)) => {
-      match sub_match.subcommand() {
-        ("cat", Some(args)) => {
+  match expect_subcommand(top_match) {
+    ("file", sub_match) => {
+      match expect_subcommand(sub_match) {
+        ("cat", args) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
           let size_bytes = args
             .value_of("size_bytes")
@@ -462,7 +467,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             )
           })
         }
-        ("save", Some(args)) => {
+        ("save", args) => {
           let path = PathBuf::from(args.value_of("path").unwrap());
           // Canonicalize path to guarantee that a relative path has a parent.
           let posix_fs = make_posix_fs(
@@ -504,8 +509,8 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         (_, _) => unimplemented!(),
       }
     }
-    ("tree", Some(sub_match)) => match sub_match.subcommand() {
-      ("materialize", Some(args)) => {
+    ("tree", sub_match) => match expect_subcommand(sub_match) {
+      ("materialize", args) => {
         let destination = PathBuf::from(args.value_of("destination").unwrap());
         let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
         let size_bytes = args
@@ -533,8 +538,8 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       }
       (_, _) => unimplemented!(),
     },
-    ("directory", Some(sub_match)) => match sub_match.subcommand() {
-      ("materialize", Some(args)) => {
+    ("directory", sub_match) => match expect_subcommand(sub_match) {
+      ("materialize", args) => {
         let destination = PathBuf::from(args.value_of("destination").unwrap());
         let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
         let size_bytes = args
@@ -554,7 +559,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             }
           })
       }
-      ("save", Some(args)) => {
+      ("save", args) => {
         let posix_fs = Arc::new(make_posix_fs(
           runtime.clone(),
           args.value_of("root").unwrap(),
@@ -589,7 +594,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
 
         Ok(())
       }
-      ("cat-proto", Some(args)) => {
+      ("cat-proto", args) => {
         let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
         let size_bytes = args
           .value_of("size_bytes")
@@ -678,7 +683,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       }
       (_, _) => unimplemented!(),
     },
-    ("cat", Some(args)) => {
+    ("cat", args) => {
       let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
       let size_bytes = args
         .value_of("size_bytes")
@@ -707,7 +712,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         )),
       }
     }
-    ("directories", Some(sub_match)) => match sub_match.subcommand() {
+    ("directories", sub_match) => match expect_subcommand(sub_match) {
       ("list", _) => {
         for digest in store
           .all_local_digests(::store::EntryType::Directory)
@@ -719,8 +724,9 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       }
       _ => unimplemented!(),
     },
-    ("gc", Some(args)) => {
-      let target_size_bytes = value_t!(args.value_of("target-size-bytes"), usize)
+    ("gc", args) => {
+      let target_size_bytes = args
+        .value_of_t::<usize>("target-size-bytes")
         .expect("--target-size-bytes must be passed as a non-negative integer");
       store.garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)?;
       Ok(())
@@ -728,6 +734,12 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
 
     (_, _) => unimplemented!(),
   }
+}
+
+fn expect_subcommand(matches: &clap::ArgMatches) -> (&str, &clap::ArgMatches) {
+  matches
+    .subcommand()
+    .unwrap_or_else(|| panic!("Expected subcommand. See `--help`."))
 }
 
 async fn expand_files(
