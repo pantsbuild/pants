@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display};
 use std::hash::{self, Hash};
 use std::ops::Deref;
