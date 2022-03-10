@@ -32,7 +32,7 @@ _logger = logging.getLogger(__name__)
 
 class BSPGoal(BuiltinGoal):
     name = "experimental-bsp"
-    help = "Run server for Build Server Protocol (https://build-server-protocol.github.io/)."
+    help = "Setup repository for Build Server Protocol (https://build-server-protocol.github.io/)."
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
@@ -47,8 +47,8 @@ class BSPGoal(BuiltinGoal):
             default=False,
             advanced=True,
             help=(
-                "Run the Build Server Protocol server. Pants will receive RPC requests via the console. "
-                "This should only be invoked via the IDE."
+                "Run the Build Server Protocol server. Pants will receive BSP RPC requests via the console. "
+                "This should only ever be invoked via the IDE."
             ),
         )
         register(
@@ -57,12 +57,16 @@ class BSPGoal(BuiltinGoal):
             member_type=str,
             default=["PATH"],
             help=(
-                "Environment variables to set in the BSP runner script when setting up BSP support. "
+                "Environment variables to set in the BSP runner script when setting up BSP in a repository. "
                 "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-                "or just `ENV_VAR` to copy the value from Pants' own environment.\n\n"
-                "Note: IntelliJ on macOS apparently does not pass through the PATH from the shell, "
-                "and so on macOS at the very least, `PATH` should be explicitly written into the BSP "
-                "runner script via this option."
+                f"or just `ENV_VAR` to copy the value from Pants' own environment when the {cls.name} goal was run.\n\n"
+                "This option only takes effect when the BSP runner script is written. If the option changes, you "
+                f"must run `{bin_name()} {cls.name}` again to write a new copy of the BSP runner script.\n\n"
+                "Note: The environment variables passed to the Pants BSP server will be those set for your IDE "
+                "and not your shell. For example, on macOS, the IDE is generally launched by `launchd` after "
+                "clicking on a Dock icon, and not from the shell. Thus, any environment variables set for your "
+                "shell will likely not be seen by the Pants BSP server. At the very least, on macOS consider "
+                "writing an explicit PATH into the BSP runner script via this option."
             ),
             advanced=True,
         )
@@ -101,7 +105,8 @@ class BSPGoal(BuiltinGoal):
         if bsp_conn_path.exists():
             print(
                 f"ERROR: A BSP connection file already exists at path `{bsp_conn_path}`. "
-                "Please delete that file if you intend to re-setup BSP in this repository."
+                "Please delete that file if you intend to re-setup BSP in this repository.",
+                file=sys.stderr,
             )
             return PANTS_FAILED_EXIT_CODE
 
@@ -113,6 +118,9 @@ class BSPGoal(BuiltinGoal):
         bsp_logs_dir = bsp_dir / "logs"
         bsp_logs_dir.mkdir(exist_ok=True, parents=True)
 
+        # Determine which environment variables to set in the BSP runner script.
+        # TODO: Consider whether some of this logic could be shared with
+        #  `pants.engine.environment.CompleteEnvironment.get_subset`.
         run_script_env_lines: list[str] = []
         for env_var in options.runner_env_vars:
             if "=" in env_var:
@@ -121,10 +129,11 @@ class BSPGoal(BuiltinGoal):
                 if env_var not in env:
                     print(
                         f"ERROR: The `[{self.name}].runner_env_vars` option is configured to add the `{env_var}` "
-                        "environment variable to the BSP runner script using its value in  the current environment. "
+                        "environment variable to the BSP runner script using its value in the current environment. "
                         "That environment variable, however, is not present in the current environment. "
                         "Please either set it in the current environment first or else configure a specific value "
-                        "in `pants.toml`."
+                        "in `pants.toml`.",
+                        file=sys.stderr,
                     )
                     return PANTS_FAILED_EXIT_CODE
                 run_script_env_lines.append(f"{env_var}={env[env_var]}")
@@ -146,7 +155,7 @@ class BSPGoal(BuiltinGoal):
             )
         )
         run_script_path.chmod(0o755)
-        print(f"Wrote BSP runner script to `{run_script_path}`.")
+        _logger.info(f"Wrote BSP runner script to `{run_script_path}`.")
 
         bsp_conn_data = {
             "name": "Pants",
@@ -160,7 +169,7 @@ class BSPGoal(BuiltinGoal):
 
         bsp_conn_path.parent.mkdir(exist_ok=True, parents=True)
         bsp_conn_path.write_text(json.dumps(bsp_conn_data))
-        print(f"Wrote BSP connection file to `{bsp_conn_path}`.")
+        _logger.info(f"Wrote BSP connection file to `{bsp_conn_path}`.")
 
         return PANTS_SUCCEEDED_EXIT_CODE
 
