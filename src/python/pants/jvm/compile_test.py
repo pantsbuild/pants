@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import textwrap
 from textwrap import dedent
-from typing import Sequence, cast
+from typing import Sequence, Type, cast
 
 import chevron
 import pytest
@@ -272,7 +272,7 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
     all_members = [CompileJavaSourceRequest, CompileScalaSourceRequest, CoursierFetchRequest]
     generators = FrozenDict(
         {
-            CompileJavaSourceRequest: frozenset([cast(type[SourcesField], ProtobufSourceField)]),
+            CompileJavaSourceRequest: frozenset([cast(Type[SourcesField], ProtobufSourceField)]),
             CompileScalaSourceRequest: frozenset(),
         }
     )
