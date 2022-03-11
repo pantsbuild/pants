@@ -43,12 +43,11 @@ async def map_thrift_to_python_modules(
         Get(ParsedThrift, ParsedThriftRequest(tgt[ThriftSourceField])) for tgt in thrift_targets
     )
 
-    resolves_to_modules_to_providers: dict[ResolveName, DefaultDict[str, list[ModuleProvider]]] = {}
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
     for tgt, parsed in zip(thrift_targets, parsed_files):
         resolve = tgt[PythonResolveField].normalized_value(python_setup)
-        if resolve not in resolves_to_modules_to_providers:
-            resolves_to_modules_to_providers[resolve] = defaultdict(list)
-
         provider = ModuleProvider(tgt.address, ModuleProviderType.IMPL)
         m1, m2 = thrift_path_to_py_modules(
             source_path=tgt[ThriftSourceField].file_path, namespace=parsed.namespaces.get("py")

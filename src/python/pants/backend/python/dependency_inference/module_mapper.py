@@ -176,11 +176,11 @@ async def merge_first_party_module_mappings(
         )
         for marker_cls in union_membership.get(FirstPartyPythonMappingImplMarker)
     )
-    resolves_to_modules_to_providers: dict[ResolveName, DefaultDict[str, list[ModuleProvider]]] = {}
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
     for mapping_impl in all_mappings:
         for resolve, modules_to_providers in mapping_impl.items():
-            if resolve not in resolves_to_modules_to_providers:
-                resolves_to_modules_to_providers[resolve] = defaultdict(list)
             for module, providers in modules_to_providers.items():
                 resolves_to_modules_to_providers[resolve][module].extend(providers)
     return FirstPartyPythonModuleMapping(
@@ -211,12 +211,11 @@ async def map_first_party_python_targets_to_modules(
         for tgt in all_python_targets.first_party
     )
 
-    resolves_to_modules_to_providers: dict[ResolveName, DefaultDict[str, list[ModuleProvider]]] = {}
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
     for tgt, stripped_file in zip(all_python_targets.first_party, stripped_file_per_target):
         resolve = tgt[PythonResolveField].normalized_value(python_setup)
-        if resolve not in resolves_to_modules_to_providers:
-            resolves_to_modules_to_providers[resolve] = defaultdict(list)
-
         stripped_f = PurePath(stripped_file.value)
         provider_type = (
             ModuleProviderType.TYPE_STUB if stripped_f.suffix == ".pyi" else ModuleProviderType.IMPL
@@ -276,14 +275,14 @@ async def map_third_party_modules_to_addresses(
     all_python_tgts: AllPythonTargets,
     python_setup: PythonSetup,
 ) -> ThirdPartyPythonModuleMapping:
-    resolves_to_modules_to_providers: dict[ResolveName, DefaultDict[str, list[ModuleProvider]]] = {}
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
 
     for tgt in all_python_tgts.third_party:
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
 
         def add_modules(modules: Iterable[str], *, type_stub: bool = False) -> None:
-            if resolve not in resolves_to_modules_to_providers:
-                resolves_to_modules_to_providers[resolve] = defaultdict(list)
             for module in modules:
                 resolves_to_modules_to_providers[resolve][module].append(
                     ModuleProvider(

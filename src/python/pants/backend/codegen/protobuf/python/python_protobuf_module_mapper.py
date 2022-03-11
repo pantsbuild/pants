@@ -45,11 +45,11 @@ async def map_protobuf_to_python_modules(
         for tgt in protobuf_targets
     )
 
-    resolves_to_modules_to_providers: dict[ResolveName, DefaultDict[str, list[ModuleProvider]]] = {}
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
     for tgt, stripped_file in zip(protobuf_targets, stripped_file_per_target):
         resolve = tgt[PythonResolveField].normalized_value(python_setup)
-        if resolve not in resolves_to_modules_to_providers:
-            resolves_to_modules_to_providers[resolve] = defaultdict(list)
 
         # NB: We don't consider the MyPy plugin, which generates `_pb2.pyi`. The stubs end up
         # sharing the same module as the implementation `_pb2.py`. Because both generated files
