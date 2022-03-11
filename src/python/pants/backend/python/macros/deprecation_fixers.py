@@ -254,7 +254,7 @@ async def maybe_update_macros_references(
     if not update_build_files_subsystem.fix_python_macros:
         return RewrittenBuildFile(request.path, request.lines, ())
 
-    if not global_options.options.use_deprecated_python_macros:
+    if not global_options.use_deprecated_python_macros:
         raise ValueError(
             "`--update-build-files-fix-python-macros` specified when "
             "`[GLOBAL].use_deprecated_python_macros` is already set to false, which means that "

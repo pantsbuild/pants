@@ -132,7 +132,7 @@ class SourceRootConfig(Subsystem):
 
     @memoized_method
     def get_pattern_matcher(self) -> SourceRootPatternMatcher:
-        return SourceRootPatternMatcher(self.options.root_patterns)
+        return SourceRootPatternMatcher(self.root_patterns)
 
 
 @frozen_after_init
@@ -322,7 +322,7 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
     # Create globs for any marker files.
     marker_file_matches: set[str] = set()
-    for marker_filename in source_root_config.options.marker_filenames:
+    for marker_filename in source_root_config.marker_filenames:
         marker_file_matches.add(f"**/{marker_filename}")
 
     # Match the patterns against actual files, to find the roots that actually exist.

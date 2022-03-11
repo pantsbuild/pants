@@ -240,8 +240,7 @@ async def setup_coursier(
     python: PythonBinary,
 ) -> Coursier:
     repos_args = (
-        " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.options.repos)
-        + " --no-default"
+        " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.repos) + " --no-default"
     )
     coursier_wrapper_script = COURSIER_FETCH_WRAPPER_SCRIPT.format(
         repos_args=repos_args,
@@ -295,7 +294,7 @@ async def setup_coursier(
                 ]
             ),
         ),
-        repos=FrozenOrderedSet(coursier_subsystem.options.repos),
+        repos=FrozenOrderedSet(coursier_subsystem.repos),
     )
 
 

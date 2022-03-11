@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence, cast
+from typing import Iterable, NamedTuple, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
@@ -688,7 +688,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 @rule
 def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
-    return cast(OwnersNotFoundBehavior, global_options.options.owners_not_found_behavior)
+    return global_options.owners_not_found_behavior
 
 
 def _log_or_raise_unmatched_owners(
@@ -819,7 +819,7 @@ async def resolve_specs_snapshot(
 
 @rule
 def extract_files_not_found_behavior(global_options: GlobalOptions) -> FilesNotFoundBehavior:
-    return cast(FilesNotFoundBehavior, global_options.options.files_not_found_behavior)
+    return global_options.files_not_found_behavior
 
 
 class AmbiguousCodegenImplementationsException(Exception):
@@ -953,7 +953,7 @@ class SubprojectRoots(Collection[str]):
 
 @rule
 def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
-    return SubprojectRoots(global_options.options.subproject_roots)
+    return SubprojectRoots(global_options.subproject_roots)
 
 
 class ParsedDependencies(NamedTuple):

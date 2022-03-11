@@ -27,7 +27,7 @@ class DistDir:
 
 @rule
 async def get_distdir(global_options: GlobalOptions, buildroot: BuildRoot) -> DistDir:
-    return validate_distdir(Path(global_options.options.pants_distdir), buildroot.pathlib_path)
+    return validate_distdir(Path(global_options.pants_distdir), buildroot.pathlib_path)
 
 
 def validate_distdir(distdir: Path, buildroot: Path) -> DistDir:

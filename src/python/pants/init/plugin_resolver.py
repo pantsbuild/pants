@@ -54,7 +54,7 @@ async def resolve_plugins(
     ProcessCacheScope reference in the body.
     """
     requirements = PexRequirements(
-        req_strings=sorted(global_options.options.plugins),
+        req_strings=sorted(global_options.plugins),
         constraints_strings=(str(constraint) for constraint in request.constraints),
     )
     if not requirements:
@@ -85,7 +85,7 @@ async def resolve_plugins(
     # paths in a way that invalidates the Process-cache. See the method doc.
     cache_scope = (
         ProcessCacheScope.PER_SESSION
-        if global_options.options.plugins_force_resolve
+        if global_options.plugins_force_resolve
         else ProcessCacheScope.PER_RESTART_SUCCESSFUL
     )
 

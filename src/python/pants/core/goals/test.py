@@ -419,8 +419,8 @@ async def run_tests(
                 path_prefix=str(dist_dir.relpath / "test" / result.address.path_safe_spec),
             )
 
-    if test_subsystem.options.xml_dir:
-        xml_dir = test_subsystem.options.xml_dir
+    if test_subsystem.xml_dir:
+        xml_dir = test_subsystem.xml_dir
         merged_xml_results = await Get(
             Digest,
             MergeDigests(result.xml_results.digest for result in results if result.xml_results),

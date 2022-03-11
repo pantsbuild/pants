@@ -171,7 +171,7 @@ async def twine_upload(
         Get(ConfigFiles, ConfigFilesRequest, twine_subsystem.config_request()),
     )
 
-    ca_cert_request = twine_subsystem.ca_certs_digest_request(global_options.options.ca_certs_path)
+    ca_cert_request = twine_subsystem.ca_certs_digest_request(global_options.ca_certs_path)
     ca_cert = await Get(Snapshot, CreateDigest, ca_cert_request) if ca_cert_request else None
     ca_cert_digest = (ca_cert.digest,) if ca_cert else ()
 

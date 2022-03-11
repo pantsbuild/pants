@@ -136,9 +136,9 @@ async def setup_pex_cli_process(
     # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
     # Instead we manually create a FileContent for it.
     cert_args = []
-    if global_options.options.ca_certs_path:
-        ca_certs_content = Path(global_options.options.ca_certs_path).read_bytes()
-        chrooted_ca_certs_path = os.path.basename(global_options.options.ca_certs_path)
+    if global_options.ca_certs_path:
+        ca_certs_content = Path(global_options.ca_certs_path).read_bytes()
+        chrooted_ca_certs_path = os.path.basename(global_options.ca_certs_path)
 
         gets.append(
             Get(
