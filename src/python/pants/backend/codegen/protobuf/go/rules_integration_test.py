@@ -143,12 +143,16 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
                 option go_package = "example.com/dir1";
 
                 package dir1;
+
+                message Place {
+                  string town = 1;
+                  string country = 2;
+                }
                 """
             ),
             "src/protobuf/dir1/BUILD": dedent(
                 """\
                 protobuf_sources()
-                #protobuf_source(name="f", source="f.proto")
                 """
             ),
             "src/protobuf/dir2/f.proto": dedent(
@@ -289,20 +293,27 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
                 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
                 """
             ),
-            "src/go/people/people_test.go": dedent(
+            "src/go/people/proto_test.go": dedent(
                 """\
                 package people
                 import (
                   "testing"
                   pb "example.com/dir1"
                 )
-                func TestPersonProto(t *testing.T) {
+                func TestProtoGen(t *testing.T) {
                   person := pb.Person{
                     Name: "name",
                     Id: 1,
                     Email: "name@example.com",
                   }
                   if person.Name != "name" {
+                    t.Fail()
+                  }
+                  place := pb.Place{
+                    Town: "Any Town",
+                    Country: "Some Country",
+                  }
+                  if place.Town != "Any Town" {
                     t.Fail()
                   }
                 }
@@ -343,7 +354,7 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src/go/people", target_name="pkg"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
-    assert "PASS: TestPersonProto" in result.stdout
+    assert "PASS: TestProtoGen" in result.stdout
 
 
 def test_generates_go_grpc(rule_runner: RuleRunner) -> None:
