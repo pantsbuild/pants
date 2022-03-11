@@ -43,9 +43,9 @@ from pants.jvm import classpath, jdk_rules, testutil
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
     ClasspathEntryRequest,
+    ClasspathEntryRequestFactory,
     ClasspathSourceAmbiguity,
     ClasspathSourceMissing,
-    JVMRequestTypes,
 )
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
@@ -193,8 +193,7 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
         targets: Sequence[Target],
         members: Sequence[type[ClasspathEntryRequest]],
     ) -> tuple[type[ClasspathEntryRequest], type[ClasspathEntryRequest] | None]:
-        req = ClasspathEntryRequest.for_targets(
-            JVMRequestTypes(tuple(members), FrozenDict()),
+        req = ClasspathEntryRequestFactory(tuple(members), FrozenDict()).for_targets(
             CoarsenedTarget(targets, ()),
             CoursierResolveKey("example", "path", EMPTY_DIGEST),
         )

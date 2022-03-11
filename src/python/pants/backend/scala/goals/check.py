@@ -12,7 +12,11 @@ from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule
-from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry, JVMRequestTypes
+from pants.jvm.compile import (
+    ClasspathEntryRequest,
+    ClasspathEntryRequestFactory,
+    FallibleClasspathEntry,
+)
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
 
@@ -27,7 +31,7 @@ class ScalacCheckRequest(CheckRequest):
 @rule(desc="Check compilation for Scala", level=LogLevel.DEBUG)
 async def scalac_check(
     request: ScalacCheckRequest,
-    jvm_request_types: JVMRequestTypes,
+    classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> CheckResults:
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
@@ -43,7 +47,7 @@ async def scalac_check(
         Get(
             FallibleClasspathEntry,
             ClasspathEntryRequest,
-            ClasspathEntryRequest.for_targets(jvm_request_types, component=target, resolve=resolve),
+            classpath_entry_request.for_targets(component=target, resolve=resolve),
         )
         for target, resolve in zip(coarsened_targets, resolves)
     )
