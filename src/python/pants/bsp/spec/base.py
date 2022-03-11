@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any
+from typing import Any, ClassVar
 
 from pants.build_graph.address import Address, AddressInput
 
@@ -12,7 +12,6 @@ from pants.build_graph.address import Address, AddressInput
 # Basic JSON Structures
 # See https://build-server-protocol.github.io/docs/specification.html#basic-json-structures
 # -----------------------------------------------------------------------------------------------
-from pants.util.meta import classproperty
 
 Uri = str
 
@@ -258,9 +257,7 @@ class StatusCode(IntEnum):
 class BSPData:
     """Mix-in for BSP spec types that can live in a data field."""
 
-    @classproperty
-    def DATA_KIND(cls):
-        raise NotImplementedError
+    DATA_KIND: ClassVar[str]
 
     def to_json_dict(self) -> dict[str, Any]:
         raise NotImplementedError

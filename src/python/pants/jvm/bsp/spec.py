@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.bsp.spec.base import BSPData, Uri
-from pants.util.meta import classproperty
 
 
 @dataclass(frozen=True)
@@ -61,9 +60,7 @@ class MavenDependencyModule(BSPData):
     scope: str | None
     artifacts: tuple[MavenDependencyModuleArtifact, ...]
 
-    @classproperty
-    def DATA_KIND(cls):
-        return "maven"
+    DATA_KIND = "maven"
 
     @classmethod
     def from_json_dict(cls, d: dict[str, Any]) -> Any:
