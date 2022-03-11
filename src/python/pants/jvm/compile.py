@@ -85,8 +85,8 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
 
 @dataclass(frozen=True)
 class ClasspathEntryRequestFactory:
-    classpath_entry_requests: tuple[type[ClasspathEntryRequest], ...]
-    code_generator_requests: FrozenDict[type[SourcesField], tuple[type[ClasspathEntryRequest], ...]]
+    impls: tuple[type[ClasspathEntryRequest], ...]
+    generator_sources: FrozenDict[type[ClasspathEntryRequest], frozenset[type[SourcesField]]]
 
     def for_targets(
         self,
@@ -101,21 +101,10 @@ class ClasspathEntryRequestFactory:
         request types which are marked `root_only`.
         """
 
-        for (input, request_types) in self.code_generator_requests.items():
-            if not component.representative.has_field(input):
-                continue
-            if len(request_types) > 1:
-                raise ClasspathSourceAmbiguity(
-                    f"More than one code generator ({request_types}) was compatible with the "
-                    f"inputs:\n{component.bullet_list()}"
-                )
-            request_type = request_types[0]
-            return request_type(component, resolve, None)
-
         compatible = []
         partial = []
         consume_only = []
-        impls = self.classpath_entry_requests
+        impls = self.impls
         for impl in impls:
             classification = self.classify_impl(impl, component)
             if classification == _ClasspathEntryRequestClassification.INCOMPATIBLE:
@@ -161,7 +150,12 @@ class ClasspathEntryRequestFactory:
         self, impl: type[ClasspathEntryRequest], component: CoarsenedTarget
     ) -> _ClasspathEntryRequestClassification:
         targets = component.members
-        compatible = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
+        generator_sources = self.generator_sources.get(impl) or frozenset()
+
+        compatible_direct = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
+        compatible_generated = sum(1 for t in targets for g in generator_sources if t.has_field(g))
+
+        compatible = compatible_direct + compatible_generated
         if compatible == 0:
             return _ClasspathEntryRequestClassification.INCOMPATIBLE
         if compatible == len(targets):
@@ -177,6 +171,7 @@ class ClasspathEntryRequestFactory:
 @rule
 def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathEntryRequestFactory:
     cpe_impls = union_membership.get(ClasspathEntryRequest)
+
     impls_by_source: dict[type[Field], type[ClasspathEntryRequest]] = {}
     for impl in cpe_impls:
         for field_set in impl.field_sets:
@@ -185,19 +180,17 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathE
                 # (note that subsequently, we only check for `SourceFields`, so no need to filter)
                 impls_by_source[field] = impl
 
-    generators: Iterable[type[GenerateSourcesRequest]] = union_membership.get(
-        GenerateSourcesRequest
-    )
-
-    usable_generators_: dict[type[SourcesField], list[type[ClasspathEntryRequest]]] = defaultdict(
+    # Classify code generator sources by their CPE impl
+    sources_by_impl_: dict[type[ClasspathEntryRequest], list[type[SourcesField]]] = defaultdict(
         list
     )
-    for g in generators:
-        if g.output in impls_by_source:
-            usable_generators_[g.input].append(impls_by_source[g.output])
-    usable_generators = FrozenDict((key, tuple(value)) for key, value in usable_generators_.items())
 
-    return ClasspathEntryRequestFactory(tuple(cpe_impls), usable_generators)
+    for g in union_membership.get(GenerateSourcesRequest):
+        if g.output in impls_by_source:
+            sources_by_impl_[impls_by_source[g.output]].append(g.input)
+    sources_by_impl = FrozenDict((key, frozenset(value)) for key, value in sources_by_impl_.items())
+
+    return ClasspathEntryRequestFactory(tuple(cpe_impls), sources_by_impl)
 
 
 @frozen_after_init
