@@ -82,7 +82,7 @@ async def setup_gofmt(setup_request: SetupRequest, goroot: GoRoot) -> Setup:
 
 @rule(desc="Format with gofmt")
 async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem) -> FmtResult:
-    if gofmt.options.skip:
+    if gofmt.skip:
         return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
@@ -93,7 +93,7 @@ async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem) -> FmtResult:
 
 @rule(desc="Lint with gofmt", level=LogLevel.DEBUG)
 async def gofmt_lint(request: GofmtRequest, gofmt: GofmtSubsystem) -> LintResults:
-    if gofmt.options.skip:
+    if gofmt.skip:
         return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)

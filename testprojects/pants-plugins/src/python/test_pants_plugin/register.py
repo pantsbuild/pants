@@ -27,7 +27,7 @@ class LifecycleStubsGoal(Goal):
 
 @goal_rule
 async def run_lifecycle_stubs(opts: LifecycleStubsSubsystem) -> LifecycleStubsGoal:
-    output_file = opts.options.new_interactive_stream_output_file
+    output_file = opts.new_interactive_stream_output_file
     if output_file:
         file_stream = open(output_file, "wb")
     raise Exception("erroneous!")

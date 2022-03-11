@@ -232,7 +232,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             "release if you cannot change the version.",
         ]
 
-        if self.options.use_unsupported_version is UnsupportedVersionUsage.LogWarning:
+        if self.use_unsupported_version is UnsupportedVersionUsage.LogWarning:
             msg.extend(
                 [
                     "Alternatively, you can ignore this warning (at your own peril) by adding this",
@@ -241,7 +241,7 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
                 ]
             )
             logger.warning(" ".join(msg))
-        elif self.options.use_unsupported_version is UnsupportedVersionUsage.RaiseError:
+        elif self.use_unsupported_version is UnsupportedVersionUsage.RaiseError:
             msg.append(
                 f"Alternatively, update [{self.options_scope}].use_unsupported_version to be "
                 f"'warning'."
