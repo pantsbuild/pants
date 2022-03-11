@@ -234,6 +234,8 @@ async def setup_full_package_build_request(
 
     # Analyze the generated sources.
     input_digest = await Get(Digest, MergeDigests([gen_sources.digest, analyzer.digest]))
+    ss = await Get(Snapshot, Digest, input_digest)
+    print(f"gen_sources.ss.files = {ss.files}")
     result = await Get(
         FallibleProcessResult,
         Process(
@@ -271,6 +273,7 @@ async def setup_full_package_build_request(
         test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
         xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
     )
+    print(f"analysis = {analysis}")
 
     # Obtain build requests for third-party dependencies.
     # TODO: Figure out how to handle dependencies on other protobuf sources.
@@ -293,15 +296,17 @@ async def setup_full_package_build_request(
         for addr in build_request_addrs
     )
 
-    return BuildGoPackageRequest(
+    br = BuildGoPackageRequest(
         import_path=request.import_path,
-        digest=sources.snapshot.digest,
+        digest=gen_sources.digest,
         dir_path=analysis.dir_path,
         go_file_names=analysis.go_files,
         s_file_names=analysis.s_files,
         direct_dependencies=dep_build_requests,
         minimum_go_version=analysis.minimum_go_version,
     )
+    print(f"build request = {br}")
+    return br
 
 
 @rule
