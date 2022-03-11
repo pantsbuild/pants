@@ -28,6 +28,7 @@ class DebianSources(MultipleSourcesField):
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         """Check that all files are coming from the same directory."""
+        super().validate_resolved_files(files)
         if not files:
             raise InvalidFieldException(
                 f"The `{self.alias}` field in target `{self.address}` must "

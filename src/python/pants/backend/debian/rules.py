@@ -47,12 +47,14 @@ async def package_debian_package(
         ),
     )
     if not dpkg_deb_path.first_path:
-        raise OSError(f"Could not find the `{dpkg_deb_path.binary_name}` program on search paths ")
+        raise OSError(f"Could not find the `{dpkg_deb_path.binary_name}` program in `/usr/bin`.")
 
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.sources_dir))
 
     # Since all the sources are coming only from a single directory, it is
     # safe to pick an arbitrary file and get its root directory name.
+    # Validation of the resolved files has been called on the target, so it is known that
+    # snapshot.files isn't empty.
     sources_directory_name = PurePath(hydrated_sources.snapshot.files[0]).parts[0]
 
     result = await Get(
