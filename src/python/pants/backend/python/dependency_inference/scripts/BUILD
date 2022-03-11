@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 resource(name="dependency_parser", source="dependency_parser.py")
-file(name="dependency_parser_as_file", source="dependency_parser.py")
 # Also expose scripts as python sources so they get formatted/linted/checked.
 python_source(
     name="dependency_parser_source",
