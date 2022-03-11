@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import inspect
 import itertools
+import logging
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -38,6 +39,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.engine.rule_visitor import collect_awaitables
 
 
 class _RuleVisitor(ast.NodeVisitor):
@@ -122,46 +124,7 @@ def _make_rule(
         if not inspect.isfunction(func):
             raise ValueError("The @rule decorator must be applied innermost of all decorators.")
 
-        owning_module = sys.modules[func.__module__]
-        source = inspect.getsource(func) or "<string>"
-        source_file = inspect.getsourcefile(func)
-        beginning_indent = _get_starting_indent(source)
-        if beginning_indent:
-            source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
-        module_ast = ast.parse(source)
-
-        def resolve_type(name):
-            resolved = getattr(owning_module, name, None) or owning_module.__builtins__.get(
-                name, None
-            )
-            if resolved is None:
-                raise ValueError(
-                    f"Could not resolve type `{name}` in top level of module "
-                    f"{owning_module.__name__} defined in {source_file}"
-                )
-            elif not isinstance(resolved, type):
-                raise ValueError(
-                    f"Expected a `type` constructor for `{name}`, but got: {resolved} (type "
-                    f"`{type(resolved).__name__}`) in {source_file}"
-                )
-            return resolved
-
-        rule_func_node = assert_single_element(
-            node
-            for node in ast.iter_child_nodes(module_ast)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == func.__name__
-        )
-
-        parents_table = {}
-        for parent in ast.walk(rule_func_node):
-            for child in ast.iter_child_nodes(parent):
-                parents_table[child] = parent
-
-        rule_visitor = _RuleVisitor(source_file_name=source_file, resolve_type=resolve_type)
-        rule_visitor.visit(rule_func_node)
-
-        awaitables = FrozenOrderedSet(rule_visitor.awaitables)
+        awaitables = FrozenOrderedSet(collect_awaitables(func))
 
         validate_requirements(func_id, parameter_types, awaitables, cacheable)
 
