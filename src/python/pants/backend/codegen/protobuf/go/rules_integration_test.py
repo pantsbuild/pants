@@ -164,9 +164,14 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
                 package dir2;
 
                 import "dir1/f.proto";
+
+                message Employee {
+                  dir1.Person self = 1;
+                  dir1.Person manager = 2;
+                }
                 """
             ),
-            "src/protobuf/dir2/BUILD": ("protobuf_sources(dependencies=['src/protobuf/dir1'])"),
+            "src/protobuf/dir2/BUILD": "protobuf_sources(dependencies=['src/protobuf/dir1'])",
             # Test another source root.
             "tests/protobuf/test_protos/f.proto": dedent(
                 """\
@@ -185,7 +190,7 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
             "src/go/people/BUILD": dedent(
                 """\
                 go_mod(name="mod")
-                go_package(name="pkg", dependencies=["src/protobuf/dir1/f.proto"])
+                go_package(name="pkg", dependencies=["src/protobuf/dir1", "src/protobuf/dir2"])
                 """
             ),
             "src/go/people/go.mod": dedent(
@@ -298,10 +303,11 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
                 package people
                 import (
                   "testing"
-                  pb "example.com/dir1"
+                  pb_dir1 "example.com/dir1"
+                  pb_dir2 "example.com/dir2"
                 )
                 func TestProtoGen(t *testing.T) {
-                  person := pb.Person{
+                  person := pb_dir1.Person{
                     Name: "name",
                     Id: 1,
                     Email: "name@example.com",
@@ -309,11 +315,26 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
                   if person.Name != "name" {
                     t.Fail()
                   }
-                  place := pb.Place{
+                  place := pb_dir1.Place{
                     Town: "Any Town",
                     Country: "Some Country",
                   }
                   if place.Town != "Any Town" {
+                    t.Fail()
+                  }
+                  employee := pb_dir2.Employee{
+                    Self: &pb_dir1.Person{
+                      Name: "self",
+                      Id: 1,
+                      Email: "self@example.com",
+                    },
+                    Manager: &pb_dir1.Person{
+                      Name: "manager",
+                      Id: 2,
+                      Email: "manager@example.com",
+                    },
+                  }
+                  if employee.Self.Name != "self" {
                     t.Fail()
                   }
                 }
