@@ -8,13 +8,12 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.macros import python_requirements
-from pants.backend.python.macros.python_requirements import (
-    GenerateFromPythonRequirementsRequest,
-    PythonRequirementsTargetGenerator,
-)
-from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
+from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
+from pants.backend.python.target_types import PythonRequirementTarget
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
-from pants.engine.target import GeneratedTargets, Target
+from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 
@@ -23,7 +22,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *python_requirements.rules(),
-            QueryRule(GeneratedTargets, [GenerateFromPythonRequirementsRequest]),
+            QueryRule(_TargetParametrizations, [Address]),
         ],
         target_types=[PythonRequirementsTargetGenerator],
     )
@@ -38,11 +37,8 @@ def assert_python_requirements(
     requirements_txt_relpath: str = "requirements.txt",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, requirements_txt_relpath: requirements_txt})
-    generator = rule_runner.get_target(Address("", target_name="reqs"))
-    result = rule_runner.request(
-        GeneratedTargets, [GenerateFromPythonRequirementsRequest(generator)]
-    )
-    assert set(result.values()) == expected_targets
+    result = rule_runner.request(_TargetParametrizations, [Address("", target_name="reqs")])
+    assert set(result.parametrizations.values()) == expected_targets
 
 
 def test_requirements_txt(rule_runner: RuleRunner) -> None:
@@ -118,7 +114,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="reqs", generated_name="pip"),
             ),
-            PythonRequirementsFileTarget({"source": "requirements.txt"}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"sources": ["requirements.txt"]}, file_addr),
         },
     )
 
@@ -155,7 +151,7 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
                 {"requirements": ["repletewateringcan>=7"], "dependencies": [file_addr.spec]},
                 Address("", target_name="reqs", generated_name="repletewateringcan"),
             ),
-            PythonRequirementsFileTarget({"source": "requirements.txt"}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"sources": ["requirements.txt"]}, file_addr),
         },
     )
 
@@ -194,6 +190,6 @@ def test_source_override(rule_runner: RuleRunner) -> None:
                 {"requirements": ["ansicolors>=1.18.0"], "dependencies": [file_addr.spec]},
                 Address("", target_name="reqs", generated_name="ansicolors"),
             ),
-            PythonRequirementsFileTarget({"source": "subdir/requirements.txt"}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"sources": ["subdir/requirements.txt"]}, file_addr),
         },
     )

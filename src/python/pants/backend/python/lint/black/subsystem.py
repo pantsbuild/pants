@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os.path
-from typing import Iterable, cast
+from typing import Iterable
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -18,16 +18,17 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.option.custom_types import file_option, shell_str
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
 
 class Black(PythonToolBase):
     options_scope = "black"
+    name = "Black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==21.12b0"
+    default_version = "black==22.1.0"
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
@@ -37,63 +38,31 @@ class Black(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")
     default_lockfile_path = "src/python/pants/backend/python/lint/black/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
+    default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=(
-                f"Don't use Black when running `{register.bootstrap.pants_bin_name} fmt` and "
-                f"`{register.bootstrap.pants_bin_name} lint`"
-            ),
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help=(
-                "Arguments to pass directly to Black, e.g. "
-                f'`--{cls.options_scope}-args="--target-version=py37 --quiet"`'
-            ),
-        )
-        register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help=(
-                "Path to a TOML config file understood by Black "
-                "(https://github.com/psf/black#configuration-format).\n\n"
-                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                f"this option if the config is located in a non-standard location."
-            ),
-        )
-        register(
-            "--config-discovery",
-            type=bool,
-            default=True,
-            advanced=True,
-            help=(
-                "If true, Pants will include any relevant pyproject.toml config files during runs."
-                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-                f"non-standard location."
-            ),
-        )
-
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
-
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+    skip = SkipOption("fmt", "lint")
+    args = ArgsListOption(example="--target-version=py37 --quiet")
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help=lambda cls: (
+            "Path to a TOML config file understood by Black "
+            "(https://github.com/psf/black#configuration-format).\n\n"
+            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
+            f"this option if the config is located in a non-standard location."
+        ),
+    )
+    config_discovery = BoolOption(
+        "--config-discovery",
+        default=True,
+        advanced=True,
+        help=lambda cls: (
+            "If true, Pants will include any relevant pyproject.toml config files during runs."
+            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
+            f"non-standard location."
+        ),
+    )
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         # Refer to https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#where-black-looks-for-the-file
@@ -102,13 +71,13 @@ class Black(PythonToolBase):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
-            discovery=cast(bool, self.options.config_discovery),
+            discovery=self.config_discovery,
             check_content=candidates,
         )
 
 
 class BlackLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Black.options_scope
+    resolve_name = Black.options_scope
 
 
 @rule(

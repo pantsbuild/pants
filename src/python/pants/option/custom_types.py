@@ -101,6 +101,20 @@ def shell_str(s: str) -> str:
     return s
 
 
+def workspace_path(s: str) -> str:
+    """Same type as 'str', but indicates string represents a directory path that is relative to
+    either the build root, or a BUILD file if prefix with `./`.
+
+    :API: public
+    """
+    if s.startswith("/"):
+        raise ParseError(
+            f"Invalid value: `{s}`. Expected a relative path, optionally in the form "
+            "`./relative/path` to make it relative to the BUILD files rather than the build root."
+        )
+    return s
+
+
 def memory_size(s: str | int | float) -> int:
     """A string that normalizes the suffixes {GiB, MiB, KiB, B} into the number of bytes.
 
@@ -126,7 +140,7 @@ def memory_size(s: str | int | float) -> int:
 
     def convert_to_bytes(power_of_2) -> int:
         try:
-            return int(float(s[:-3]) * (2 ** power_of_2))  # type: ignore[index]
+            return int(float(s[:-3]) * (2**power_of_2))  # type: ignore[index]
         except TypeError:
             raise invalid
 
@@ -155,7 +169,10 @@ def _convert(val, acceptable_types):
     """
     if isinstance(val, acceptable_types):
         return val
-    return parse_expression(val, acceptable_types, raise_type=ParseError)
+    try:
+        return parse_expression(val, acceptable_types)
+    except ValueError as e:
+        raise ParseError(str(e)) from e
 
 
 def _convert_list(val, member_type, is_enum):

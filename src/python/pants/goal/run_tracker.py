@@ -17,7 +17,7 @@ from typing import Any
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.engine.internals import native_engine
-from pants.option.config import Config
+from pants.option.errors import ConfigValidationError
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
@@ -163,7 +163,7 @@ class RunTracker:
             "standard_goals": [goal for goal in self.goals if goal in self.STANDARD_GOALS],
             # Lets us know of any custom goals were used, without knowing their names.
             "num_goals": str(len(self.goals)),
-            "active_standard_backends": sorted(list(self.active_standard_backends)),
+            "active_standard_backends": sorted(self.active_standard_backends),
         }
 
     def set_pantsd_scheduler_metrics(self, metrics: dict[str, int]) -> None:
@@ -231,7 +231,7 @@ class RunTracker:
                 return value
             else:
                 return value[option]
-        except (Config.ConfigValidationError, AttributeError) as e:
+        except (ConfigValidationError, AttributeError) as e:
             option_str = "" if option is None else f" option {option}"
             raise ValueError(
                 f"Couldn't find option scope {scope}{option_str} for recording ({e!r})"

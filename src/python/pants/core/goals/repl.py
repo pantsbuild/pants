@@ -6,7 +6,7 @@ import os
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Iterable, Mapping, Optional, Tuple, cast
+from typing import ClassVar, Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Addresses
@@ -17,11 +17,13 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
-from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
+from pants.option.option_types import BoolOption, StrOption
 from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
 
@@ -34,42 +36,36 @@ class ReplImplementation(ABC):
     """
 
     name: ClassVar[str]
+
     targets: Targets
     chroot: str  # Absolute path of the chroot the sources will be materialized to.
 
     def in_chroot(self, relpath: str) -> str:
         return os.path.join(self.chroot, relpath)
 
+    @memoized_property
+    def addresses(self) -> Addresses:
+        return Addresses(t.address for t in self.targets)
+
 
 class ReplSubsystem(GoalSubsystem):
     name = "repl"
     help = "Open a REPL with the specified code loadable."
 
-    required_union_implementations = (ReplImplementation,)
-
     @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--shell",
-            type=str,
-            default=None,
-            help="Override the automatically-detected REPL program for the target(s) specified.",
-        )
-        register(
-            "--restartable",
-            type=bool,
-            default=False,
-            help="True if the REPL should be restarted if its inputs have changed.",
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return ReplImplementation in union_membership
 
-    @property
-    def shell(self) -> Optional[str]:
-        return cast(Optional[str], self.options.shell)
-
-    @property
-    def restartable(self) -> bool:
-        return cast(bool, self.options.restartable)
+    shell = StrOption(
+        "--shell",
+        default=None,
+        help="Override the automatically-detected REPL program for the target(s) specified.",
+    )
+    restartable = BoolOption(
+        "--restartable",
+        default=False,
+        help="True if the REPL should be restarted if its inputs have changed.",
+    )
 
 
 class Repl(Goal):
@@ -106,16 +102,12 @@ async def run_repl(
     console: Console,
     workspace: Workspace,
     repl_subsystem: ReplSubsystem,
-    all_specified_addresses: Addresses,
+    specified_targets: Targets,
     build_root: BuildRoot,
     union_membership: UnionMembership,
     global_options: GlobalOptions,
     complete_env: CompleteEnvironment,
 ) -> Repl:
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(all_specified_addresses)
-    )
-
     # TODO: When we support multiple languages, detect the default repl to use based
     #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
@@ -130,9 +122,7 @@ async def run_repl(
         return Repl(-1)
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
-        repl_impl = repl_implementation_cls(
-            targets=Targets(transitive_targets.closure), chroot=tmpdir
-        )
+        repl_impl = repl_implementation_cls(targets=specified_targets, chroot=tmpdir)
         request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
         input_digest = request.digest

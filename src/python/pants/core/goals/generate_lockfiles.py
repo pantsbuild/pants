@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Iterable, Sequence, cast
+from typing import ClassVar, Iterable, Sequence
 
 from pants.engine.collection import Collection
 from pants.engine.fs import Digest, MergeDigests, Workspace
@@ -16,6 +16,8 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import StrListOption, StrOption
+from pants.util.docutil import bin_name
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,7 @@ class GenerateToolLockfileSentinel:
     GeneratePythonLockfile. Register a union rule for the `GenerateToolLockfileSentinel` subclass.
     """
 
-    options_scope: ClassVar[str]
+    resolve_name: ClassVar[str]
 
 
 class UserGenerateLockfiles(Collection[GenerateLockfile]):
@@ -192,8 +194,8 @@ def _check_ambiguous_resolve_names(
 ) -> None:
     resolve_name_to_providers = defaultdict(set)
     for sentinel in all_tool_sentinels:
-        resolve_name_to_providers[sentinel.options_scope].add(
-            _ResolveProvider(sentinel.options_scope, _ResolveProviderType.TOOL)
+        resolve_name_to_providers[sentinel.resolve_name].add(
+            _ResolveProvider(sentinel.resolve_name, _ResolveProviderType.TOOL)
         )
     for known_user_resolve_names in all_known_user_resolve_names:
         for resolve_name in known_user_resolve_names.names:
@@ -218,7 +220,7 @@ def determine_resolves_to_generate(
     _check_ambiguous_resolve_names(all_known_user_resolve_names, all_tool_sentinels)
 
     resolve_names_to_sentinels = {
-        sentinel.options_scope: sentinel for sentinel in all_tool_sentinels
+        sentinel.resolve_name: sentinel for sentinel in all_tool_sentinels
     }
 
     if not requested_resolve_names:
@@ -285,49 +287,41 @@ def filter_tool_lockfile_requests(
 class GenerateLockfilesSubsystem(GoalSubsystem):
     name = "generate-lockfiles"
     help = "Generate lockfiles for Python third-party dependencies."
-    required_union_implementations = (GenerateToolLockfileSentinel, KnownUserResolveNamesRequest)
 
     @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--resolve",
-            type=list,
-            member_type=str,
-            advanced=False,
-            help=(
-                "Only generate lockfiles for the specified resolve(s).\n\n"
-                "Resolves are the logical names for the different lockfiles used in your project. "
-                "For your own code's dependencies, these come from the option "
-                "`[python].experimental_resolves`. For tool lockfiles, resolve "
-                "names are the options scope for that tool such as `black`, `pytest`, and "
-                "`mypy-protobuf`.\n\n"
-                "For example, you can run `./pants generate-lockfiles --resolve=black "
-                "--resolve=pytest --resolve=data-science` to only generate lockfiles for those "
-                "two tools and your resolve named `data-science`.\n\n"
-                "If you specify an invalid resolve name, like 'fake', Pants will output all "
-                "possible values.\n\n"
-                "If not specified, Pants will generate lockfiles for all resolves."
-            ),
-        )
-        register(
-            "--custom-command",
-            advanced=True,
-            type=str,
-            default=None,
-            help=(
-                "If set, lockfile headers will say to run this command to regenerate the lockfile, "
-                "rather than running `./pants generate-lockfiles --resolve=<name>` like normal."
-            ),
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return (
+            GenerateToolLockfileSentinel in union_membership
+            or KnownUserResolveNamesRequest in union_membership
         )
 
-    @property
-    def resolve_names(self) -> tuple[str, ...]:
-        return tuple(self.options.resolve)
-
-    @property
-    def custom_command(self) -> str | None:
-        return cast("str | None", self.options.custom_command)
+    resolve_names = StrListOption(
+        "--resolve",
+        advanced=False,
+        help=(
+            "Only generate lockfiles for the specified resolve(s).\n\n"
+            "Resolves are the logical names for the different lockfiles used in your project. "
+            "For your own code's dependencies, these come from the option "
+            "`[python].resolves`. For tool lockfiles, resolve "
+            "names are the options scope for that tool such as `black`, `pytest`, and "
+            "`mypy-protobuf`.\n\n"
+            f"For example, you can run `{bin_name()} generate-lockfiles --resolve=black "
+            "--resolve=pytest --resolve=data-science` to only generate lockfiles for those "
+            "two tools and your resolve named `data-science`.\n\n"
+            "If you specify an invalid resolve name, like 'fake', Pants will output all "
+            "possible values.\n\n"
+            "If not specified, Pants will generate lockfiles for all resolves."
+        ),
+    )
+    custom_command = StrOption(
+        "--custom-command",
+        advanced=True,
+        default=None,
+        help=(
+            "If set, lockfile headers will say to run this command to regenerate the lockfile, "
+            f"rather than running `{bin_name()} generate-lockfiles --resolve=<name>` like normal."
+        ),
+    )
 
 
 class GenerateLockfilesGoal(Goal):

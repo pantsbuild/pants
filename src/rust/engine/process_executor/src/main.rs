@@ -32,7 +32,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 
-use fs::{Permissions, RelativePath};
+use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
   Context, ImmutableInputs, InputDigests, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata,
@@ -41,7 +41,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
-use store::{Store, StoreWrapper};
+use store::{SnapshotOps, Store};
 use structopt::StructOpt;
 use workunit_store::{in_workunit, WorkunitMetadata, WorkunitStore};
 
@@ -84,6 +84,9 @@ struct CommandSpec {
   /// Path to execute the binary at relative to its input digest root.
   #[structopt(long)]
   working_directory: Option<PathBuf>,
+
+  #[structopt(long)]
+  concurrency_available: Option<usize>,
 
   #[structopt(long)]
   cache_key_gen_version: Option<String>,
@@ -207,7 +210,7 @@ struct Opt {
 #[tokio::main]
 async fn main() {
   env_logger::init();
-  let workunit_store = WorkunitStore::new(false);
+  let workunit_store = WorkunitStore::new(false, log::Level::Debug);
   workunit_store.init_thread_state(None);
 
   let args = Opt::from_args();
@@ -415,9 +418,14 @@ async fn make_request_from_flat_args(
     .transpose()?;
 
   // TODO: Add support for immutable inputs.
-  let input_digests = InputDigests::new(store, input_files, BTreeMap::default(), vec![])
-    .await
-    .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
+  let input_digests = InputDigests::new(
+    store,
+    DirectoryDigest::from_persisted_digest(input_files),
+    BTreeMap::default(),
+    vec![],
+  )
+  .await
+  .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
 
   let process = process_execution::Process {
     argv: args.command.argv.clone(),
@@ -433,6 +441,7 @@ async fn make_request_from_flat_args(
     jdk_home: args.command.jdk.clone(),
     platform_constraint: None,
     execution_slot_variable: None,
+    concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -482,14 +491,16 @@ async fn extract_request_from_action_digest(
     )
   };
 
-  let input_digests = InputDigests::with_input_files(
+  let input_digests = InputDigests::with_input_files(DirectoryDigest::from_persisted_digest(
     require_digest(&action.input_root_digest)
       .map_err(|err| format!("Bad input root digest: {:?}", err))?,
-  );
+  ));
 
   // In case the local Store doesn't have the input root Directory,
   // have it fetch it and identify it as a Directory, so that it doesn't get confused about the unknown metadata.
-  store.load_directory_or_err(input_digests.complete).await?;
+  store
+    .load_directory_or_err(input_digests.complete.as_digest())
+    .await?;
 
   let process = process_execution::Process {
     argv: command.arguments,
@@ -514,6 +525,7 @@ async fn extract_request_from_action_digest(
       std::time::Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
     }),
     execution_slot_variable: None,
+    concurrency_available: 0,
     description: "".to_string(),
     level: log::Level::Error,
     append_only_caches: BTreeMap::new(),

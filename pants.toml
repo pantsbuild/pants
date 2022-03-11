@@ -15,26 +15,21 @@ backend_packages.add = [
   "pants.backend.shell",
   "pants.backend.shell.lint.shellcheck",
   "pants.backend.shell.lint.shfmt",
-  "pants.backend.experimental.codegen.thrift.apache.python",
-  "pants.backend.experimental.codegen.thrift.apache.java",
-  "pants.backend.experimental.docker",
-  "pants.backend.experimental.docker.lint.hadolint",
+  "pants.backend.docker",
+  "pants.backend.docker.lint.hadolint",
   "pants.backend.experimental.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.java.lint.google_java_format",
   "pants.backend.experimental.java.debug_goals",
   "pants.backend.experimental.python",
+  "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
-  "pants.backend.experimental.codegen.avro.java",
-  "pants.backend.experimental.codegen.protobuf.scala",
-  "pants.backend.experimental.codegen.thrift.scrooge.scala",
   "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  # NOTE: Keep this version in sync with `generate_docs.py`!
   "toolchain.pants.plugin==0.17.0",
 ]
 
@@ -69,8 +64,6 @@ remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 
-use_deprecated_python_macros = false
-
 [anonymous-telemetry]
 enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
@@ -88,6 +81,7 @@ root_patterns = [
   "tests/*",
   "3rdparty/*",
   "/build-support/bin",
+  "/build-support/flake8",
   "/build-support/migration-support",
   "/pants-plugins",
 ]
@@ -116,9 +110,10 @@ ignore_adding_targets = [
 venv_use_symlinks = true
 
 [python]
-experimental_lockfile = "3rdparty/python/lockfiles/user_reqs.txt"
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
+resolves = { python-default = "3rdparty/python/lockfiles/user_reqs.txt" }
+enable_resolves = true
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
@@ -127,9 +122,12 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 config = "build-support/flake8/.flake8"
 extra_requirements.add = [
   "flake8-pantsbuild>=2.0,<3",
-  "flake8-2020>=1.6.0,<1.7.0"
+  "flake8-2020>=1.6.0,<1.7.0",
+  "flake8-no-implicit-concat",
+  "flake8-comprehensions>=3.8.0,<4.0",
 ]
 lockfile = "3rdparty/python/lockfiles/flake8.txt"
+source_plugins = ["build-support/flake8"]
 
 [shellcheck]
 args = ["--external-sources"]
@@ -161,6 +159,13 @@ extra_env_vars = [
   "RUST_BACKTRACE=1",
 ]
 
+[mypy]
+interpreter_constraints = [">=3.7,<3.10"]
+extra_requirements.add = [
+  "mypy-typing-asserts",
+]
+lockfile = "3rdparty/python/lockfiles/mypy.txt"
+
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
 
@@ -183,26 +188,8 @@ java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lo
 # Has the same isolation requirements as `java_parser`.
 scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
 
-[java-avro]
-lockfile = "src/python/pants/backend/codegen/avro/java/avro-tools.default.lockfile.txt"
-
-[junit]
-lockfile = "src/python/pants/jvm/test/junit.default.lockfile.txt"
-
-[google-java-format]
-lockfile = "src/python/pants/backend/java/lint/google_java_format/google_java_format.default.lockfile.txt"
-
-[scalafmt]
-lockfile = "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfile.txt"
-
-[scalapb]
-lockfile = "src/python/pants/backend/codegen/protobuf/scala/scalapbc.default.lockfile.txt"
-
-[scalatest]
-lockfile = "src/python/pants/backend/scala/subsystems/scalatest.default.lockfile.txt"
-
-[scrooge]
-lockfile = "src/python/pants/backend/codegen/thrift/scrooge/scrooge.default.lockfile.txt"
+[scala]
+version_for_resolve = { "scala_parser" = '2.13.7' }
 
 [toolchain-setup]
 repo = "pants"
@@ -255,3 +242,4 @@ master = "src/python/pants/notes/master.rst"
 "2.8.x" = "src/python/pants/notes/2.8.x.md"
 "2.9.x" = "src/python/pants/notes/2.9.x.md"
 "2.10.x" = "src/python/pants/notes/2.10.x.md"
+"2.11.x" = "src/python/pants/notes/2.11.x.md"

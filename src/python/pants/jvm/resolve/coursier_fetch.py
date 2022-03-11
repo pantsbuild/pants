@@ -4,32 +4,38 @@
 from __future__ import annotations
 
 import dataclasses
+import importlib.resources
+import itertools
 import json
 import logging
 import os
+from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import Any, FrozenSet, Iterable, Iterator, List, Tuple
+from typing import TYPE_CHECKING, Any, FrozenSet, Iterable, Iterator, List, Tuple
 
 import toml
 
-from pants.base import deprecated
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateLockfilesSubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     AddPrefix,
+    CreateDigest,
     Digest,
     DigestContents,
     DigestSubset,
+    FileContent,
     FileDigest,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Target, Targets
 from pants.engine.unions import UnionRule
@@ -45,16 +51,25 @@ from pants.jvm.resolve.common import (
     ArtifactRequirements,
     Coordinate,
     Coordinates,
+    GatherJvmCoordinatesRequest,
 )
-from pants.jvm.resolve.coursier_setup import Coursier
+from pants.jvm.resolve.coursier_setup import Coursier, CoursierFetchProcess
 from pants.jvm.resolve.key import CoursierResolveKey
-from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata, LockfileContext
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactFieldSet, JvmArtifactJarSourceField, JvmArtifactTarget
+from pants.jvm.target_types import (
+    JvmArtifactFieldSet,
+    JvmArtifactJarSourceField,
+    JvmArtifactTarget,
+    JvmResolveField,
+)
 from pants.jvm.util_rules import ExtractFileDigest
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize
+
+if TYPE_CHECKING:
+    from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 
 logger = logging.getLogger(__name__)
 
@@ -70,17 +85,22 @@ class CoursierError(Exception):
 class NoCompatibleResolve(Exception):
     """No compatible resolve could be found for a set of targets."""
 
-    def __init__(self, jvm: JvmSubsystem, msg_prefix: str, incompatible_targets: Iterable[Target]):
-        targets_and_resolves_str = bullet_list(
-            f"{t.address.spec}\t{jvm.resolves_for_target(t)}" for t in incompatible_targets
+    def __init__(self, jvm: JvmSubsystem, msg_prefix: str, relevant_targets: Iterable[Target]):
+        resolves_to_addresses = defaultdict(list)
+        for tgt in relevant_targets:
+            if tgt.has_field(JvmResolveField):
+                resolve = tgt[JvmResolveField].normalized_value(jvm)
+                resolves_to_addresses[resolve].append(tgt.address.spec)
+
+        formatted_resolve_lists = "\n\n".join(
+            f"{resolve}:\n{bullet_list(sorted(addresses))}"
+            for resolve, addresses in sorted(resolves_to_addresses.items())
         )
         super().__init__(
-            f"{msg_prefix}:\n"
-            f"{targets_and_resolves_str}\n"
-            "Targets which will be merged onto the same classpath must have at least one compatible "
-            f"resolve (from the [resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) or "
-            f"[compatible_resolves]({doc_url('reference-java_sources#codecompatible_resolvescode')}) "
-            "fields) in common."
+            f"{msg_prefix}:\n\n"
+            f"{formatted_resolve_lists}\n\n"
+            "Targets which will be merged onto the same classpath must share a resolve (from the "
+            f"[resolve]({doc_url('reference-deploy_jar#coderesolvecode')}) field)."
         )
 
 
@@ -213,14 +233,6 @@ class CoursierResolvedLockfile:
         return (entry, tuple(entries[(i.group, i.artifact)] for i in entry.dependencies))
 
     @classmethod
-    def from_json_dicts(cls, json_lock_entries) -> CoursierResolvedLockfile:
-        """Construct a CoursierResolvedLockfile from its JSON dictionary representation."""
-
-        return cls(
-            entries=tuple(CoursierLockfileEntry.from_json_dict(dep) for dep in json_lock_entries)
-        )
-
-    @classmethod
     def from_toml(cls, lockfile: str | bytes) -> CoursierResolvedLockfile:
         """Constructs a CoursierResolvedLockfile from it's TOML + metadata comment representation.
 
@@ -240,7 +252,7 @@ class CoursierResolvedLockfile:
         entries = tuple(
             CoursierLockfileEntry.from_json_dict(entry) for entry in (contents["entries"])
         )
-        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes)
+        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes, delimeter="#")
 
         return cls(
             entries=entries,
@@ -252,15 +264,7 @@ class CoursierResolvedLockfile:
         """Construct a CoursierResolvedLockfile from its serialized representation (either TOML with
         attached metadata, or old-style JSON.)."""
 
-        try:
-            return cls.from_toml(lockfile)
-        except toml.TomlDecodeError:
-            deprecated.warn_or_error(
-                "2.11.0.dev0",
-                "JSON-encoded JVM lockfile",
-                "Run `./pants generate-lockfiles` to generate lockfiles in the new format.",
-            )
-            return cls.from_json_dicts(json.loads(lockfile))
+        return cls.from_toml(lockfile)
 
     def to_serialized(self) -> bytes:
         """Export this CoursierResolvedLockfile to a human-readable serialized form.
@@ -289,7 +293,16 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 @dataclass(frozen=True)
 class CoursierResolveInfo:
     coord_arg_strings: FrozenSet[str]
+    extra_args: tuple[str, ...]
     digest: Digest
+
+    @property
+    def argv(self) -> Iterable[str]:
+        """Return coursier arguments that can be used to compute or fetch this resolve.
+
+        Must be used in concert with `digest`.
+        """
+        return itertools.chain(self.coord_arg_strings, self.extra_args)
 
 
 @rule
@@ -300,6 +313,9 @@ async def prepare_coursier_resolve_info(
     # URLs, and put the files in the place specified by the URLs.
     no_jars: List[ArtifactRequirement] = []
     jars: List[Tuple[ArtifactRequirement, JvmArtifactJarSourceField]] = []
+    extra_args: List[str] = []
+
+    LOCAL_EXCLUDE_FILE = "PANTS_RESOLVE_EXCLUDES"
 
     for req in artifact_requirements:
         jar = req.jar
@@ -307,6 +323,23 @@ async def prepare_coursier_resolve_info(
             no_jars.append(req)
         else:
             jars.append((req, jar))
+
+    excludes = [
+        (req.coordinate, exclude)
+        for req in artifact_requirements
+        for exclude in (req.excludes or [])
+    ]
+
+    excludes_digest = EMPTY_DIGEST
+    if excludes:
+        excludes_file_content = FileContent(
+            LOCAL_EXCLUDE_FILE,
+            "\n".join(
+                f"{coord.group}:{coord.artifact}--{exclude}" for (coord, exclude) in excludes
+            ).encode("utf-8"),
+        )
+        excludes_digest = await Get(Digest, CreateDigest([excludes_file_content]))
+        extra_args += ["--local-exclude-file", LOCAL_EXCLUDE_FILE]
 
     jar_files = await Get(SourceFiles, SourceFilesRequest(i[1] for i in jars))
     jar_file_paths = jar_files.snapshot.files
@@ -320,16 +353,17 @@ async def prepare_coursier_resolve_info(
 
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
+    digest = await Get(Digest, MergeDigests([jar_files.snapshot.digest, excludes_digest]))
+
     return CoursierResolveInfo(
         coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
-        digest=jar_files.snapshot.digest,
+        digest=digest,
+        extra_args=tuple(extra_args),
     )
 
 
 @rule(level=LogLevel.DEBUG)
 async def coursier_resolve_lockfile(
-    bash: BashBinary,
-    coursier: Coursier,
     artifact_requirements: ArtifactRequirements,
 ) -> CoursierResolvedLockfile:
     """Run `coursier fetch ...` against a list of Maven coordinates and capture the result.
@@ -364,38 +398,25 @@ async def coursier_resolve_lockfile(
     )
 
     coursier_report_file_name = "coursier_report.json"
+
     process_result = await Get(
         ProcessResult,
-        Process(
-            argv=coursier.args(
-                [
-                    coursier_report_file_name,
-                    *coursier_resolve_info.coord_arg_strings,
-                    # TODO(#13496): Disable --strict-include to work around Coursier issue
-                    # https://github.com/coursier/coursier/issues/1364 which erroneously rejects underscores in
-                    # artifact rules as malformed.
-                    # *(
-                    #     f"--strict-include={req.to_coord_str(versioned=False)}"
-                    #     for req in artifact_requirements
-                    #     if req.strict
-                    # ),
-                ],
-                wrapper=[bash.path, coursier.wrapper_script],
+        CoursierFetchProcess(
+            args=(
+                coursier_report_file_name,
+                *coursier_resolve_info.argv,
             ),
             input_digest=coursier_resolve_info.digest,
-            immutable_input_digests=coursier.immutable_input_digests,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
-            append_only_caches=coursier.append_only_caches,
-            env=coursier.env,
             description=(
                 "Running `coursier fetch` against "
                 f"{pluralize(len(artifact_requirements), 'requirement')}: "
                 f"{', '.join(req.to_coord_arg_str() for req in artifact_requirements)}"
             ),
-            level=LogLevel.DEBUG,
         ),
     )
+
     report_digest = await Get(
         Digest, DigestSubset(process_result.output_digest, PathGlobs([coursier_report_file_name]))
     )
@@ -458,10 +479,12 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
 
     requirement = ArtifactRequirement.from_jvm_artifact_target(request.component.representative)
 
-    if lockfile.metadata and not lockfile.metadata.is_valid_for([requirement]):
+    if lockfile.metadata and not lockfile.metadata.is_valid_for(
+        [requirement], LockfileContext.USER
+    ):
         raise ValueError(
             f"Requirement `{requirement.to_coord_arg_str()}` has changed since the lockfile "
-            f"for {request.resolve.path} was generated. Run `./pants generate-lockfiles` to update your "
+            f"for {request.resolve.path} was generated. Run `{bin_name()} generate-lockfiles` to update your "
             "lockfile based on the new requirements."
         )
 
@@ -494,8 +517,6 @@ class ResolvedClasspathEntries(Collection[ClasspathEntry]):
 
 @rule
 async def coursier_fetch_one_coord(
-    bash: BashBinary,
-    coursier: Coursier,
     request: CoursierLockfileEntry,
 ) -> ClasspathEntry:
     """Run `coursier fetch --intransitive` to fetch a single artifact.
@@ -531,25 +552,19 @@ async def coursier_fetch_one_coord(
     )
 
     coursier_report_file_name = "coursier_report.json"
+
     process_result = await Get(
         ProcessResult,
-        Process(
-            argv=coursier.args(
-                [
-                    coursier_report_file_name,
-                    "--intransitive",
-                    *coursier_resolve_info.coord_arg_strings,
-                ],
-                wrapper=[bash.path, coursier.wrapper_script],
+        CoursierFetchProcess(
+            args=(
+                coursier_report_file_name,
+                "--intransitive",
+                *coursier_resolve_info.argv,
             ),
             input_digest=coursier_resolve_info.digest,
-            immutable_input_digests=coursier.immutable_input_digests,
             output_directories=("classpath",),
             output_files=(coursier_report_file_name,),
-            append_only_caches=coursier.append_only_caches,
-            env=coursier.env,
             description=f"Fetching with coursier: {request.coord.to_coord_str()}",
-            level=LogLevel.DEBUG,
         ),
     )
     report_digest = await Get(
@@ -611,41 +626,25 @@ async def select_coursier_resolve_for_targets(
     resolve is required for multiple roots (such as when running a `repl` over unrelated code), and
     in that case there might be multiple CoarsenedTargets.
     """
-    root_targets = [t for ct in coarsened_targets for t in ct.members]
+    targets = [t for ct in coarsened_targets.closure() for t in ct.members]
 
-    # Find the set of resolves that are compatible with all roots by ANDing them all together.
-    compatible_resolves: set[str] | None = None
-    for tgt in root_targets:
-        current_resolves = set(jvm.resolves_for_target(tgt))
-        if compatible_resolves is None:
-            compatible_resolves = current_resolves
-        else:
-            compatible_resolves &= current_resolves
+    # Find a single resolve that is compatible with all targets in the closure.
+    compatible_resolve: str | None = None
+    all_compatible = True
+    for tgt in targets:
+        if not tgt.has_field(JvmResolveField):
+            continue
+        resolve = tgt[JvmResolveField].normalized_value(jvm)
+        if compatible_resolve is None:
+            compatible_resolve = resolve
+        elif resolve != compatible_resolve:
+            all_compatible = False
 
-    # Select a resolve from the compatible set.
-    if not compatible_resolves:
+    if not compatible_resolve or not all_compatible:
         raise NoCompatibleResolve(
-            jvm, "The selected targets did not have a resolve in common", root_targets
+            jvm, "The selected targets did not have a resolve in common", targets
         )
-    # Take the first compatible resolve.
-    resolve = min(compatible_resolves)
-
-    # Validate that the selected resolve is compatible with all transitive dependencies.
-    incompatible_targets = []
-    for ct in coarsened_targets.closure():
-        for t in ct.members:
-            if not jvm.is_jvm_target(t):
-                continue
-            target_resolves = jvm.resolves_for_target(t)
-            if target_resolves is not None and resolve not in target_resolves:
-                incompatible_targets.append(t)
-    if incompatible_targets:
-        raise NoCompatibleResolve(
-            jvm,
-            f"The resolve chosen for the root targets was {resolve}, but some of their "
-            "dependencies were not compatible with that resolve",
-            incompatible_targets,
-        )
+    resolve = compatible_resolve
 
     # Load the resolve.
     resolve_path = jvm.resolves[resolve]
@@ -668,8 +667,9 @@ async def get_coursier_lockfile_for_resolve(
 
 
 @dataclass(frozen=True)
-class MaterializedClasspathRequest:
-    """A helper to merge various classpath elements.
+class ToolClasspathRequest:
+    """A request to set up the classpath for a JVM tool by fetching artifacts and merging the
+    classpath.
 
     :param prefix: if set, should be a relative directory that will
         be prepended to every classpath element.  This is useful for
@@ -680,16 +680,19 @@ class MaterializedClasspathRequest:
     """
 
     prefix: str | None = None
-    lockfiles: tuple[CoursierResolvedLockfile, ...] = ()
-    artifact_requirements: tuple[ArtifactRequirements, ...] = ()
+    lockfile: GenerateJvmLockfileFromTool | None = None
+    artifact_requirements: ArtifactRequirements = ArtifactRequirements()
+
+    def __post_init__(self) -> None:
+        if not bool(self.lockfile) ^ bool(self.artifact_requirements):
+            raise AssertionError(
+                f"Exactly one of `lockfile` or `artifact_requirements` must be provided: {self}"
+            )
 
 
 @dataclass(frozen=True)
-class MaterializedClasspath:
-    """A fully fetched and merged classpath, ready to hand to a JVM process invocation.
-
-    TODO: Consider renaming to reflect the fact that this is always a 3rdparty classpath.
-    """
+class ToolClasspath:
+    """A fully fetched and merged classpath for running a JVM tool."""
 
     content: Snapshot
 
@@ -713,33 +716,62 @@ class MaterializedClasspath:
 
 
 @rule(level=LogLevel.DEBUG)
-async def materialize_classpath(request: MaterializedClasspathRequest) -> MaterializedClasspath:
-    """Resolve, fetch, and merge various classpath types to a single `Digest` and metadata."""
-
-    artifact_requirements_lockfiles = await MultiGet(
-        Get(CoursierResolvedLockfile, ArtifactRequirements, artifact_requirements)
-        for artifact_requirements in request.artifact_requirements
-    )
-
-    lockfile_and_requirements_classpath_entries = await MultiGet(
-        Get(
-            ResolvedClasspathEntries,
-            CoursierResolvedLockfile,
-            lockfile,
+async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolClasspath:
+    if request.artifact_requirements:
+        resolution = await Get(
+            CoursierResolvedLockfile, ArtifactRequirements, request.artifact_requirements
         )
-        for lockfile in (*request.lockfiles, *artifact_requirements_lockfiles)
-    )
+    else:
+        lockfile_req = request.lockfile
+        assert lockfile_req is not None
+        regen_command = f"`{GenerateLockfilesSubsystem.name} --resolve={lockfile_req.resolve_name}`"
+        if lockfile_req.lockfile_dest == DEFAULT_TOOL_LOCKFILE:
+            lockfile_bytes = importlib.resources.read_binary(
+                *lockfile_req.default_lockfile_resource
+            )
+            resolution = CoursierResolvedLockfile.from_serialized(lockfile_bytes)
+        else:
+            lockfile_snapshot = await Get(Snapshot, PathGlobs([lockfile_req.lockfile_dest]))
+            if not lockfile_snapshot.files:
+                raise ValueError(
+                    f"No lockfile found at {lockfile_req.lockfile_dest}, which is configured "
+                    f"by the option {lockfile_req.lockfile_option_name}."
+                    f"Run {regen_command} to generate it."
+                )
+
+            resolution = await Get(
+                CoursierResolvedLockfile,
+                CoursierResolveKey(
+                    name=lockfile_req.resolve_name,
+                    path=lockfile_req.lockfile_dest,
+                    digest=lockfile_snapshot.digest,
+                ),
+            )
+
+        # Validate that the lockfile is correct.
+        lockfile_inputs = await Get(
+            ArtifactRequirements,
+            GatherJvmCoordinatesRequest(
+                lockfile_req.artifact_inputs, lockfile_req.artifact_option_name
+            ),
+        )
+        if resolution.metadata and not resolution.metadata.is_valid_for(
+            lockfile_inputs, LockfileContext.TOOL
+        ):
+            raise ValueError(
+                f"The lockfile {lockfile_req.lockfile_dest} (configured by the option "
+                f"{lockfile_req.lockfile_option_name}) was generated with different requirements "
+                f"than are currently set via {lockfile_req.artifact_option_name}. Run "
+                f"{regen_command} to regenerate the lockfile."
+            )
+
+    classpath_entries = await Get(ResolvedClasspathEntries, CoursierResolvedLockfile, resolution)
     merged_snapshot = await Get(
-        Snapshot,
-        MergeDigests(
-            classpath_entry.digest
-            for classpath_entries in lockfile_and_requirements_classpath_entries
-            for classpath_entry in classpath_entries
-        ),
+        Snapshot, MergeDigests(classpath_entry.digest for classpath_entry in classpath_entries)
     )
     if request.prefix is not None:
         merged_snapshot = await Get(Snapshot, AddPrefix(merged_snapshot.digest, request.prefix))
-    return MaterializedClasspath(content=merged_snapshot)
+    return ToolClasspath(merged_snapshot)
 
 
 def rules():

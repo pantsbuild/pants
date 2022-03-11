@@ -17,15 +17,6 @@ import sys
 import tokenize
 from io import open
 
-MIN_DOTS = os.environ["MIN_DOTS"]
-
-# This regex is used to infer imports from strings, e.g.
-#  `importlib.import_module("example.subdir.Foo")`.
-STRING_IMPORT_REGEX = re.compile(
-    r"^([a-z_][a-z_\d]*\.){" + MIN_DOTS + r",}[a-zA-Z_]\w*$",
-    re.UNICODE,
-)
-
 
 class AstVisitor(ast.NodeVisitor):
     def __init__(self, package_parts, contents):
@@ -39,18 +30,30 @@ class AstVisitor(ast.NodeVisitor):
         self.strong_imports = {}
         self.weak_imports = {}
         self._weaken_strong_imports = False
+        if os.environ["STRING_IMPORTS"] == "y":
+            # This regex is used to infer imports from strings, e.g .
+            #  `importlib.import_module("example.subdir.Foo")`.
+            self._string_import_regex = re.compile(
+                r"^([a-z_][a-z_\d]*\.){" + os.environ["MIN_DOTS"] + r",}[a-zA-Z_]\w*$", re.UNICODE
+            )
+        else:
+            self._string_import_regex = None
 
     def maybe_add_string_import(self, node, s):
-        if os.environ["STRING_IMPORTS"] == "y" and STRING_IMPORT_REGEX.match(s):
+        if self._string_import_regex and self._string_import_regex.match(s):
             self.weak_imports.setdefault(s, node.lineno)
 
     def add_strong_import(self, name, lineno):
         imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
         imports.setdefault(name, lineno)
 
-    @staticmethod
-    def _is_pragma_ignored(line):
-        return "# pants: no-infer-dep" in line
+    def _is_pragma_ignored(self, line_index):
+        """Return if the line at `line_index` (0-based) is pragma ignored."""
+        line_iter = itertools.dropwhile(
+            lambda line: line.endswith("\\"),
+            itertools.islice(self._contents_lines, line_index, None),
+        )
+        return "# pants: no-infer-dep" in next(line_iter)
 
     def _visit_import_stmt(self, node, import_prefix):
         # N.B. We only add imports whose line doesn't contain "# pants: no-infer-dep"
@@ -60,26 +63,20 @@ class AstVisitor(ast.NodeVisitor):
         node_lines_iter = itertools.islice(self._contents_lines, node.lineno - 1, None)
         token_iter = tokenize.generate_tokens(lambda: next(node_lines_iter))
 
-        def consume_until(string):
-            for token in token_iter:
-                if token[1] == string:
-                    return token
+        def find_token(string):
+            return next(itertools.dropwhile(lambda token: token[1] != string, token_iter))
 
-        consume_until("import")
+        find_token("import")
 
         # N.B. The names in this list are in the same order as the import statement
         for alias in node.names:
-            token = consume_until(alias.name.split(".")[-1])
+            token = find_token(alias.name.split(".")[-1])
+            lineno = token[3][0] + node.lineno - 1
 
-            # N.B. Keep consuming lines while they end in a line-continuation
-            #   (unfortunately `tokenize` doesn't capture this)
-            while token[4].endswith("\\"):
-                token = next(token_iter)
-
-            if not self._is_pragma_ignored(token[4]):
-                self.add_strong_import(import_prefix + alias.name, token[3][0] + node.lineno - 1)
+            if not self._is_pragma_ignored(lineno - 1):
+                self.add_strong_import(import_prefix + alias.name, lineno)
             if alias.asname and token[1] != alias.asname:
-                consume_until(alias.asname)
+                find_token(alias.asname)
 
     def visit_Import(self, node):
         self._visit_import_stmt(node, "")
@@ -139,7 +136,7 @@ class AstVisitor(ast.NodeVisitor):
 
             if name is not None:
                 lineno = node.args[0].lineno
-                if not self._is_pragma_ignored(self._contents_lines[lineno - 1]):
+                if not self._is_pragma_ignored(lineno - 1):
                     self.add_strong_import(name, lineno)
                 return
 

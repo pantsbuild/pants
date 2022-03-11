@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Tuple
 
+from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.platform import Platform
-from pants.engine.process import BinaryPathRequest, BinaryPaths, InteractiveProcess
+from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.meta import frozen_after_init
 

@@ -5,7 +5,8 @@
 
 These are always activated and cannot be disabled.
 """
-
+from pants.bsp.rules import rules as bsp_rules
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals import (
     check,
     export,
@@ -35,13 +36,13 @@ from pants.core.util_rules import (
     config_files,
     distdir,
     external_tool,
-    pants_bin,
     source_files,
     stripped_source_files,
     subprocess_environment,
+    system_binaries,
 )
+from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
-from pants.python import binaries as python_binaries
 from pants.source import source_root
 
 
@@ -60,19 +61,19 @@ def rules():
         *run.rules(),
         *tailor.rules(),
         *test.rules(),
+        *bsp_rules(),
         # util_rules
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
-        *python_binaries.rules(),
         *distdir.rules(),
         *external_tool.rules(),
-        *pants_bin.rules(),
         *source_files.rules(),
         *source_root.rules(),
         *stats_aggregator.rules(),
         *stripped_source_files.rules(),
         *subprocess_environment.rules(),
+        *system_binaries.rules(),
         *target_type_rules(),
     ]
 
@@ -87,3 +88,9 @@ def target_types():
         ResourcesGeneratorTarget,
         RelocatedFiles,
     ]
+
+
+def build_file_aliases():
+    return BuildFileAliases(
+        objects={"parametrize": Parametrize},
+    )

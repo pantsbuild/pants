@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -16,6 +17,7 @@ from pants.backend.scala.target_types import ScalaJunitTestsGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
+from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedFiles
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
@@ -23,6 +25,7 @@ from pants.engine.fs import FileDigest
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.jdk_rules import rules as java_util_rules
+from pants.jvm.non_jvm_dependencies import rules as non_jvm_dependencies_rules
 from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -56,10 +59,14 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *target_types_rules(),
             *util_rules(),
+            *non_jvm_dependencies_rules(),
             QueryRule(CoarsenedTargets, (Addresses,)),
             QueryRule(TestResult, (JunitTestFieldSet,)),
         ],
         target_types=[
+            FileTarget,
+            FilesGeneratorTarget,
+            RelocatedFiles,
             JvmArtifactTarget,
             JavaSourcesGeneratorTarget,
             JunitTestsGeneratorTarget,
@@ -597,6 +604,101 @@ def test_jupiter_success_with_dep(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
+    assert test_result.exit_code == 0
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
+    assert re.search(r"1 tests successful", test_result.stdout) is not None
+    assert re.search(r"1 tests found", test_result.stdout) is not None
+
+
+def _write_file_dependencies(rule_runner: RuleRunner, junit_deps: Iterable[str], path_to_read: str):
+    junit_deps_str = ", ".join(f"'{i}'" for i in junit_deps)
+
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": JUNIT4_RESOLVED_LOCKFILE.serialize(
+                [ArtifactRequirement(coordinate=JUNIT_COORD)]
+            ),
+            "BUILD": dedent(
+                f"""\
+                jvm_artifact(
+                  name = 'junit_junit',
+                  group = '{JUNIT_COORD.group}',
+                  artifact = '{JUNIT_COORD.artifact}',
+                  version = '{JUNIT_COORD.version}',
+                )
+                junit_tests(
+                    name='example-test',
+                    dependencies= [
+                        ':junit_junit',
+                        {junit_deps_str}
+                    ],
+                )
+                file(
+                    name="duck",
+                    source="ducks.txt",
+                )
+                files(
+                    name="ducks",
+                    sources=["*.txt"],
+                )
+                relocated_files(
+                    name="relocated_ducks",
+                    files_targets=[":duck"],
+                    src="",
+                    dest="ducks",
+                )
+                """
+            ),
+            "SimpleTest.java": dedent(
+                f"""
+                package org.pantsbuild.example;
+
+                import junit.framework.TestCase;
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+
+                public class SimpleTest extends TestCase {{
+                   public void testHello() throws Exception {{
+                        assertEquals("lol ducks", Files.readString(Path.of("{path_to_read}")));
+                   }}
+                }}
+                """
+            ),
+            "ducks.txt": "lol ducks",
+        }
+    )
+
+
+@maybe_skip_jdk_test
+def test_vintage_file_dependency(rule_runner: RuleRunner) -> None:
+    _write_file_dependencies(rule_runner, [":duck"], "ducks.txt")
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
+    assert test_result.exit_code == 0
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
+    assert re.search(r"1 tests successful", test_result.stdout) is not None
+    assert re.search(r"1 tests found", test_result.stdout) is not None
+
+
+@maybe_skip_jdk_test
+def test_vintage_files_dependencies(rule_runner: RuleRunner) -> None:
+    _write_file_dependencies(rule_runner, [":ducks"], "ducks.txt")
+
+    test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
+
+    assert test_result.exit_code == 0
+    assert re.search(r"Finished:\s+testHello", test_result.stdout) is not None
+    assert re.search(r"1 tests successful", test_result.stdout) is not None
+    assert re.search(r"1 tests found", test_result.stdout) is not None
+
+
+@pytest.mark.skip  # TODO(14537) `relocated_files` doesn't presently work, un-skip when fixing that.
+@maybe_skip_jdk_test
+def test_vintage_relocated_files_dependency(rule_runner: RuleRunner) -> None:
+    _write_file_dependencies(rule_runner, [":relocated_ducks"], "ducks/ducks.txt")
 
     test_result = run_junit_test(rule_runner, "example-test", "SimpleTest.java")
 

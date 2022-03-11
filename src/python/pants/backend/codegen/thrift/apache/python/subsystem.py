@@ -1,12 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
-from typing import cast
-
-from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.rules import collect_rules
-from pants.option.custom_types import target_option
+from pants.option.option_types import BoolOption, StrListOption
 from pants.option.subsystem import Subsystem
 
 
@@ -14,40 +12,29 @@ class ThriftPythonSubsystem(Subsystem):
     options_scope = "python-thrift"
     help = "Options specific to generating Python from Thrift using Apache Thrift"
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--options",
-            type=list,
-            member_type=str,
-            help=(
-                "Code generation options specific to the Python code generator to pass to the "
-                "Apache `thift` binary via the `-gen py` argument. "
-                "See `thrift -help` for supported values."
-            ),
-        )
-        register(
-            "--runtime-dependencies",
-            type=list,
-            member_type=target_option,
-            help=(
-                "A list of addresses to `python_requirement` targets for the runtime "
-                "dependencies needed for generated Python code to work. For example, "
-                "`['3rdparty/python:thrift']`. These dependencies will "
-                "be automatically added to every `thrift_source` target. At the very least, "
-                "this option must be set to a `python_requirement` for the "
-                "`thrift` runtime library."
-            ),
-        )
-
-    @property
-    def gen_options(self) -> tuple[str, ...]:
-        return cast("tuple[str, ...]", tuple(self.options.options))
-
-    @property
-    def runtime_dependencies(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.options.runtime_dependencies, owning_address=None)
+    gen_options = StrListOption(
+        "--options",
+        help=(
+            "Code generation options specific to the Python code generator to pass to the "
+            "Apache `thift` binary via the `-gen py` argument. "
+            "See `thrift -help` for supported values."
+        ),
+    )
+    infer_runtime_dependency = BoolOption(
+        "--infer-runtime-dependency",
+        default=True,
+        help=(
+            "If True, will add a dependency on a `python_requirement` target exposing the `thrift` "
+            "module (usually from the `thrift` requirement).\n\n"
+            "If `[python].enable_resolves` is set, Pants will only infer dependencies on "
+            "`python_requirement` targets that use the same resolve as the particular "
+            "`thrift_source` / `thrift_source` target uses, which is set via its "
+            "`python_resolve` field.\n\n"
+            "Unless this option is disabled, Pants will error if no relevant target is found or "
+            "more than one is found which causes ambiguity."
+        ),
+        advanced=True,
+    )
 
 
 def rules():

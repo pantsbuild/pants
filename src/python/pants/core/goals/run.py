@@ -4,7 +4,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Mapping, Optional, Tuple, cast
+from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
@@ -21,9 +21,9 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
     WrappedTarget,
 )
-from pants.engine.unions import union
-from pants.option.custom_types import shell_str
+from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
+from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
@@ -77,34 +77,21 @@ class RunSubsystem(GoalSubsystem):
         "useful for server applications."
     )
 
-    required_union_implementations = (RunFieldSet,)
-
     @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            passthrough=True,
-            help="Arguments to pass directly to the executed target, e.g. "
-            '`--run-args="val1 val2 --debug"`',
-        )
-        register(
-            "--cleanup",
-            type=bool,
-            default=True,
-            help="Whether to clean up the temporary directory in which the binary is chrooted. "
-            "Set to false to retain the directory, e.g., for debugging.",
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return RunFieldSet in union_membership
 
-    @property
-    def args(self) -> Tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def cleanup(self) -> bool:
-        return cast(bool, self.options.cleanup)
+    args = ArgsListOption(
+        example="val1 val2 --debug",
+        tool_name="the executed target",
+        passthrough=True,
+    )
+    cleanup = BoolOption(
+        "--cleanup",
+        default=True,
+        help="Whether to clean up the temporary directory in which the binary is chrooted. "
+        "Set to false to retain the directory, e.g., for debugging.",
+    )
 
 
 class Run(Goal):

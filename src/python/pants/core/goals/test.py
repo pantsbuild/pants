@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, List, TypeVar, cast
+from typing import Any, ClassVar, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.distdir import DistDir
@@ -41,6 +41,8 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import BoolOption, EnumOption, StrListOption, StrOption
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -288,96 +290,62 @@ class TestSubsystem(GoalSubsystem):
     name = "test"
     help = "Run tests."
 
-    required_union_implementations = (TestFieldSet,)
-
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
     @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--debug",
-            type=bool,
-            default=False,
-            help=(
-                "Run tests sequentially in an interactive process. This is necessary, for "
-                "example, when you add breakpoints to your code."
-            ),
-        )
-        register(
-            "--force",
-            type=bool,
-            default=False,
-            help="Force the tests to run, even if they could be satisfied from cache.",
-        )
-        register(
-            "--output",
-            type=ShowOutput,
-            default=ShowOutput.FAILED,
-            help="Show stdout/stderr for these tests.",
-        )
-        register(
-            "--use-coverage",
-            type=bool,
-            default=False,
-            help="Generate a coverage report if the test runner supports it.",
-        )
-        register(
-            "--open-coverage",
-            type=bool,
-            default=False,
-            help=(
-                "If a coverage report file is generated, open it on the local system if the "
-                "system supports this."
-            ),
-        )
-        register(
-            "--xml-dir",
-            type=str,
-            metavar="<DIR>",
-            default=None,
-            advanced=True,
-            help=(
-                "Specifying a directory causes Junit XML result files to be emitted under "
-                "that dir for each test run that supports producing them."
-            ),
-        )
-        register(
-            "--extra-env-vars",
-            type=list,
-            member_type=str,
-            default=[],
-            help=(
-                "Additional environment variables to include in test processes. "
-                "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
-                "`ENV_VAR` to copy the value of a variable in Pants's own environment."
-            ),
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return TestFieldSet in union_membership
 
-    @property
-    def extra_env_vars(self) -> list[str]:
-        return cast(List[str], self.options.extra_env_vars)
-
-    @property
-    def debug(self) -> bool:
-        return cast(bool, self.options.debug)
-
-    @property
-    def force(self) -> bool:
-        return cast(bool, self.options.force)
-
-    @property
-    def output(self) -> ShowOutput:
-        return cast(ShowOutput, self.options.output)
-
-    @property
-    def use_coverage(self) -> bool:
-        return cast(bool, self.options.use_coverage)
-
-    @property
-    def open_coverage(self) -> bool:
-        return cast(bool, self.options.open_coverage)
+    debug = BoolOption(
+        "--debug",
+        default=False,
+        help=(
+            "Run tests sequentially in an interactive process. This is necessary, for "
+            "example, when you add breakpoints to your code."
+        ),
+    )
+    force = BoolOption(
+        "--force",
+        default=False,
+        help="Force the tests to run, even if they could be satisfied from cache.",
+    )
+    output = EnumOption(
+        "--output",
+        default=ShowOutput.FAILED,
+        help="Show stdout/stderr for these tests.",
+    )
+    use_coverage = BoolOption(
+        "--use-coverage",
+        default=False,
+        help="Generate a coverage report if the test runner supports it.",
+    )
+    open_coverage = BoolOption(
+        "--open-coverage",
+        default=False,
+        help=(
+            "If a coverage report file is generated, open it on the local system if the "
+            "system supports this."
+        ),
+    )
+    xml_dir = StrOption(
+        "--xml-dir",
+        metavar="<DIR>",
+        default=None,
+        advanced=True,
+        help=(
+            "Specifying a directory causes Junit XML result files to be emitted under "
+            "that dir for each test run that supports producing them."
+        ),
+    )
+    extra_env_vars = StrListOption(
+        "--extra-env-vars",
+        help=(
+            "Additional environment variables to include in test processes. "
+            "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
+            "`ENV_VAR` to copy the value of a variable in Pants's own environment."
+        ),
+    )
 
 
 class Test(Goal):
@@ -438,6 +406,8 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
+        if result.skipped:
+            continue
         if result.exit_code != 0:
             exit_code = cast(int, result.exit_code)
 
@@ -515,29 +485,26 @@ _SOURCE_MAP = {
 
 def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
     """Format the test summary printed to the console."""
-    if result.result_metadata:
-        if result.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "succeeded"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
-
-        source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-        source_print = f" ({source})" if source else ""
-
-        elapsed_print = ""
-        total_elapsed_ms = result.result_metadata.total_elapsed_ms
-        if total_elapsed_ms is not None:
-            elapsed_secs = total_elapsed_ms / 1000
-            elapsed_print = f"in {elapsed_secs:.2f}s"
-
-        suffix = f" {elapsed_print}{source_print}"
+    assert (
+        result.result_metadata is not None
+    ), "Skipped test results should not be outputted in the test summary"
+    if result.exit_code == 0:
+        sigil = console.sigil_succeeded()
+        status = "succeeded"
     else:
-        sigil = console.sigil_skipped()
-        status = "skipped"
-        suffix = ""
+        sigil = console.sigil_failed()
+        status = "failed"
 
+    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
+    source_print = f" ({source})" if source else ""
+
+    elapsed_print = ""
+    total_elapsed_ms = result.result_metadata.total_elapsed_ms
+    if total_elapsed_ms is not None:
+        elapsed_secs = total_elapsed_ms / 1000
+        elapsed_print = f"in {elapsed_secs:.2f}s"
+
+    suffix = f" {elapsed_print}{source_print}"
     return f"{sigil} {result.address} {status}{suffix}."
 
 
@@ -559,11 +526,11 @@ async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEn
 class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
     help = (
-        "Addresses to targets that can be built with the `./pants package` goal and whose "
+        f"Addresses to targets that can be built with the `{bin_name()} package` goal and whose "
         "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
-        "as if you had run `./pants package`. It will include the results in your test's chroot, "
+        f"as if you had run `{bin_name()} package`. It will include the results in your test's chroot, "
         "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
-        "`dist/`).\n\nYou can include anything that can be built by `./pants package`, e.g. a "
+        f"`dist/`).\n\nYou can include anything that can be built by `{bin_name()} package`, e.g. a "
         "`pex_binary`, `python_awslambda`, or an `archive`."
     )
 

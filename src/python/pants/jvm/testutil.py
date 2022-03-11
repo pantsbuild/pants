@@ -10,8 +10,8 @@ from dataclasses import dataclass
 import pytest
 
 from pants.build_graph.address import Address
-from pants.core.util_rules import archive
-from pants.core.util_rules.archive import UnzipBinary
+from pants.core.util_rules import system_binaries
+from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import Process, ProcessResult
@@ -93,7 +93,8 @@ async def render_classpath_entry(
 @rule
 async def render_classpath(classpath: Classpath) -> RenderedClasspath:
     rendered_classpaths = await MultiGet(
-        Get(RenderedClasspath, ClasspathEntry, cpe) for cpe in ClasspathEntry.closure(classpath)
+        Get(RenderedClasspath, ClasspathEntry, cpe)
+        for cpe in ClasspathEntry.closure(classpath.entries)
     )
     return RenderedClasspath({k: v for rc in rendered_classpaths for k, v in rc.content.items()})
 
@@ -101,7 +102,7 @@ async def render_classpath(classpath: Classpath) -> RenderedClasspath:
 def rules():
     return [
         *collect_rules(),
-        *archive.rules(),
+        *system_binaries.rules(),
         QueryRule(RenderedClasspath, (Classpath,)),
         QueryRule(RenderedClasspath, (ClasspathEntry,)),
         QueryRule(CoarsenedTargets, (Addresses,)),

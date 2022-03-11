@@ -6,6 +6,7 @@ from hashlib import sha256
 import pytest
 
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
 
@@ -27,7 +28,16 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
         "test:0.1.0",
         "test:latest",
     )
-    build_request = docker.build_image(tags, digest, dockerfile, extra_args=("--pull", "--squash"))
+    env = {"DOCKER_HOST": "tcp://127.0.0.1:1234"}
+    build_request = docker.build_image(
+        tags=tags,
+        digest=digest,
+        dockerfile=dockerfile,
+        build_args=DockerBuildArgs.from_strings("arg1=2"),
+        context_root="build/context",
+        env=env,
+        extra_args=("--pull", "--squash"),
+    )
 
     assert build_request == Process(
         argv=(
@@ -39,10 +49,13 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
             tags[0],
             "--tag",
             tags[1],
+            "--build-arg",
+            "arg1=2",
             "--file",
             dockerfile,
-            ".",
+            "build/context",
         ),
+        env=env,
         input_digest=digest,
         cache_scope=ProcessCacheScope.PER_SESSION,
         description="",  # The description field is marked `compare=False`

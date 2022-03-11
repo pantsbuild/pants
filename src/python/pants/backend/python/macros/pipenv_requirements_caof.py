@@ -16,6 +16,7 @@ from pants.backend.python.macros.caof_utils import (
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import normalize_module_mapping
 from pants.base.build_environment import get_buildroot
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 
 
 # TODO(#10655): add support for PEP 440 direct references (aka VCS style).
@@ -64,9 +65,9 @@ class PipenvRequirementsCAOF:
         else:
             requirements_file_target_name = source
             self._parse_context.create_object(
-                "_python_requirements_file",
+                TargetGeneratorSourcesHelperTarget.alias,
                 name=requirements_file_target_name,
-                source=source,
+                sources=[source],
             )
             requirements_dep = f":{requirements_file_target_name}"
 
@@ -79,7 +80,7 @@ class PipenvRequirementsCAOF:
 
         requirements = {**lock_info.get("default", {}), **lock_info.get("develop", {})}
         for req, info in requirements.items():
-            extras = [x for x in info.get("extras", [])]
+            extras = list(info.get("extras", []))
             extras_str = f"[{','.join(extras)}]" if extras else ""
             req_str = f"{req}{extras_str}{info.get('version','')}"
             if info.get("markers"):

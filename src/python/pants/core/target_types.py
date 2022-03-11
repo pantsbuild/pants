@@ -1,5 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from dataclasses import dataclass
 from textwrap import dedent
@@ -12,15 +13,7 @@ from pants.core.goals.package import (
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
 from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import (
-    AddPrefix,
-    Digest,
-    MergeDigests,
-    PathGlobs,
-    Paths,
-    RemovePrefix,
-    Snapshot,
-)
+from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -29,26 +22,22 @@ from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     GeneratedSources,
-    GeneratedTargets,
     GenerateSourcesRequest,
-    GenerateTargetsRequest,
     HydratedSources,
     HydrateSourcesRequest,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
     SourcesField,
-    SourcesPaths,
-    SourcesPathsRequest,
     SpecialCasedDependencies,
     StringField,
     Target,
+    TargetFilesGenerator,
     Targets,
     generate_file_based_overrides_field_help_message,
-    generate_file_level_targets,
 )
-from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
+from pants.engine.unions import UnionRule
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 # -----------------------------------------------------------------------------------------------
@@ -89,7 +78,7 @@ class FilesOverridesField(OverridesField):
     )
 
 
-class FilesGeneratorTarget(Target):
+class FilesGeneratorTarget(TargetFilesGenerator):
     alias = "files"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -97,42 +86,13 @@ class FilesGeneratorTarget(Target):
         FilesGeneratingSourcesField,
         FilesOverridesField,
     )
+    generated_target_cls = FileTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+    )
+    moved_fields = ()
     help = "Generate a `file` target for each file in the `sources` field."
-
-
-class GenerateTargetsFromFiles(GenerateTargetsRequest):
-    generate_from = FilesGeneratorTarget
-
-
-@rule
-async def generate_targets_from_files(
-    request: GenerateTargetsFromFiles,
-    union_membership: UnionMembership,
-    files_not_found_behavior: FilesNotFoundBehavior,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[FilesGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        FileTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=False,
-        overrides=all_overrides,
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -302,7 +262,7 @@ class ResourcesOverridesField(OverridesField):
     )
 
 
-class ResourcesGeneratorTarget(Target):
+class ResourcesGeneratorTarget(TargetFilesGenerator):
     alias = "resources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -310,11 +270,13 @@ class ResourcesGeneratorTarget(Target):
         ResourcesGeneratingSourcesField,
         ResourcesOverridesField,
     )
+    generated_target_cls = ResourceTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+    )
+    moved_fields = ()
     help = "Generate a `resource` target for each file in the `sources` field."
-
-
-class GenerateTargetsFromResources(GenerateTargetsRequest):
-    generate_from = ResourcesGeneratorTarget
 
 
 @dataclass(frozen=True)
@@ -329,37 +291,6 @@ class ResourcesGeneratorFieldSet(FieldSet):
     required_fields = (ResourcesGeneratingSourcesField,)
 
     sources: ResourcesGeneratingSourcesField
-
-
-@rule
-async def generate_targets_from_resources(
-    request: GenerateTargetsFromResources,
-    union_membership: UnionMembership,
-    files_not_found_behavior: FilesNotFoundBehavior,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[ResourcesGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        ResourceTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=False,
-        overrides=all_overrides,
-    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -378,6 +309,34 @@ class GenericTarget(Target):
 
 
 # -----------------------------------------------------------------------------------------------
+# `_target_generator_sources_helper` target
+# -----------------------------------------------------------------------------------------------
+
+
+class TargetGeneratorSourcesHelperSourcesField(MultipleSourcesField):
+    uses_source_roots = False
+    required = True
+
+
+class TargetGeneratorSourcesHelperTarget(Target):
+    """Target generators that work by reading in some source file(s) should also generate this
+    target and add it as a dependency to every generated target so that `--changed-since` works
+    properly.
+
+    See https://github.com/pantsbuild/pants/issues/13118 for discussion of why this is necessary and
+    alternatives considered.
+    """
+
+    alias = "_generator_sources_helper"
+    core_fields = (*COMMON_TARGET_FIELDS, TargetGeneratorSourcesHelperSourcesField)
+    help = (
+        "A private helper target type used by some target generators.\n\n"
+        "This tracks their `sources` field so that `--changed-since --changed-dependees` works "
+        "properly for generated targets."
+    )
+
+
+# -----------------------------------------------------------------------------------------------
 # `archive` target
 # -----------------------------------------------------------------------------------------------
 
@@ -385,11 +344,11 @@ class GenericTarget(Target):
 class ArchivePackagesField(SpecialCasedDependencies):
     alias = "packages"
     help = (
-        "Addresses to any targets that can be built with `./pants package`, e.g. "
-        '`["project:app"]`.\n\nPants will build the assets as if you had run `./pants package`. '
+        f"Addresses to any targets that can be built with `{bin_name()} package`, e.g. "
+        f'`["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`. '
         "It will include the results in your archive using the same name they would normally have, "
         "but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can "
-        "be built by `./pants package`, e.g. a `pex_binary`, `python_awslambda`, or even another "
+        f"be built by `{bin_name()} package`, e.g. a `pex_binary`, `python_awslambda`, or even another "
         "`archive`."
     )
 
@@ -497,8 +456,6 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromFiles),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromResources),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),
         UnionRule(PackageFieldSet, ArchiveFieldSet),
     )

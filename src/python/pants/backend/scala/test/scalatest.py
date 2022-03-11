@@ -8,10 +8,11 @@ from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import ScalatestTestSourceField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.target_types import FileSourceField
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.process import (
-    BashBinary,
     FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessRequest,
@@ -19,18 +20,15 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
-from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmJdkField
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -38,13 +36,18 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ScalatestTestFieldSet(TestFieldSet):
-    required_fields = (ScalatestTestSourceField,)
+    required_fields = (
+        ScalatestTestSourceField,
+        JvmJdkField,
+    )
 
     sources: ScalatestTestSourceField
+    jdk_version: JvmJdkField
+    dependencies: Dependencies
 
 
 class ScalatestToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = Scalatest.options_scope
+    resolve_name = Scalatest.options_scope
 
 
 @dataclass(frozen=True)
@@ -55,35 +58,41 @@ class TestSetupRequest:
 
 @dataclass(frozen=True)
 class TestSetup:
-    process: Process
+    process: JvmProcess
     reports_dir_prefix: str
 
 
 @rule(level=LogLevel.DEBUG)
 async def setup_scalatest_for_target(
     request: TestSetupRequest,
-    bash: BashBinary,
-    jdk_setup: JdkSetup,
     jvm: JvmSubsystem,
     scalatest: Scalatest,
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalatest))
+    jdk, dependencies = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)),
+        Get(Targets, DependenciesRequest(request.field_set.dependencies)),
+    )
 
-    classpath, scalatest_classpath = await MultiGet(
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalatestToolLockfileSentinel())
+    classpath, scalatest_classpath, files = await MultiGet(
         Get(Classpath, Addresses([request.field_set.address])),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(lockfiles=(lockfile,)),
+            SourceFiles,
+            SourceFilesRequest(
+                (dep.get(SourcesField) for dep in dependencies),
+                for_sources_types=(FileSourceField,),
+                enable_codegen=True,
+            ),
         ),
     )
 
-    merged_classpath_digest = await Get(Digest, MergeDigests(classpath.digests()))
+    input_digest = await Get(Digest, MergeDigests((*classpath.digests(), files.snapshot.digest)))
 
     toolcp_relpath = "__toolcp"
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+    extra_immutable_input_digests = {
         toolcp_relpath: scalatest_classpath.digest,
     }
 
@@ -102,15 +111,13 @@ async def setup_scalatest_for_target(
     if request.is_debug:
         extra_jvm_args.extend(jvm.debug_args)
 
-    process = Process(
+    process = JvmProcess(
+        jdk=jdk,
+        classpath_entries=[
+            *classpath.args(),
+            *scalatest_classpath.classpath_entries(toolcp_relpath),
+        ],
         argv=[
-            *jdk_setup.args(
-                bash,
-                [
-                    *classpath.args(),
-                    *scalatest_classpath.classpath_entries(toolcp_relpath),
-                ],
-            ),
             *extra_jvm_args,
             "org.scalatest.tools.Runner",
             # TODO: We currently give the entire user classpath to the JVM for startup (which
@@ -122,14 +129,13 @@ async def setup_scalatest_for_target(
             reports_dir,
             *scalatest.options.args,
         ],
-        input_digest=merged_classpath_digest,
-        immutable_input_digests=immutable_input_digests,
+        input_digest=input_digest,
+        extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
-        append_only_caches=jdk_setup.append_only_caches,
-        env=jdk_setup.env,
         description=f"Run Scalatest runner for {request.field_set.address}",
         level=LogLevel.DEBUG,
         cache_scope=cache_scope,
+        use_nailgun=False,
     )
     return TestSetup(process=process, reports_dir_prefix=reports_dir_prefix)
 
@@ -140,7 +146,7 @@ async def run_scalatest_test(
     field_set: ScalatestTestFieldSet,
 ) -> TestResult:
     test_setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
-    process_result = await Get(FallibleProcessResult, Process, test_setup.process)
+    process_result = await Get(FallibleProcessResult, JvmProcess, test_setup.process)
     reports_dir_prefix = test_setup.reports_dir_prefix
 
     xml_result_subset = await Get(
@@ -159,20 +165,20 @@ async def run_scalatest_test(
 @rule(level=LogLevel.DEBUG)
 async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
+
+    process = await Get(Process, JvmProcess, setup.process)
     interactive_process = await Get(
         InteractiveProcess,
-        InteractiveProcessRequest(
-            setup.process, forward_signals_to_process=False, restartable=True
-        ),
+        InteractiveProcessRequest(process, forward_signals_to_process=False, restartable=True),
     )
     return TestDebugRequest(interactive_process)
 
 
 @rule
-async def generate_scalatest_lockfile_request(
+def generate_scalatest_lockfile_request(
     _: ScalatestToolLockfileSentinel, scalatest: Scalatest
-) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(scalatest))
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(scalatest)
 
 
 def rules():

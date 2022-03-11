@@ -33,7 +33,7 @@ mod snapshot_ops;
 mod snapshot_ops_tests;
 #[cfg(test)]
 mod snapshot_tests;
-pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, StoreWrapper, SubsetParams};
+pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, SubsetParams};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
@@ -47,12 +47,15 @@ use std::time::{Duration, Instant};
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
-use fs::{default_cache_path, DigestEntry, FileContent, FileEntry, Permissions, RelativePath};
+use fs::{
+  default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
+  FileEntry, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
+};
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::status_to_str;
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -268,7 +271,7 @@ impl Store {
   }
 
   ///
-  /// A convenience method for storing a file.
+  /// A convenience method for storing small files.
   ///
   /// NB: This method should not be used for large blobs: prefer to stream them from their source
   /// using `store_file`.
@@ -280,7 +283,7 @@ impl Store {
   ) -> Result<Digest, String> {
     self
       .local
-      .store_bytes(EntryType::File, bytes, initial_lease)
+      .store_bytes(EntryType::File, None, bytes, initial_lease)
       .await
   }
 
@@ -330,7 +333,6 @@ impl Store {
     }
 
     Snapshot::from_path_stats(
-      self.clone(),
       Digester { digest },
       vec![fs::PathStat::File {
         path: name.clone().into(),
@@ -372,6 +374,32 @@ impl Store {
   }
 
   ///
+  /// Ensure that the recursive contents of the given DigestTrie are persisted in the local Store.
+  ///
+  pub async fn record_digest_trie(
+    &self,
+    tree: DigestTrie,
+    initial_lease: bool,
+  ) -> Result<DirectoryDigest, String> {
+    // Collect all Directory structs in the trie.
+    let mut directories = Vec::new();
+    tree.walk(&mut |_, entry| match entry {
+      directory::Entry::Directory(d) => {
+        directories.push((Some(d.digest()), d.as_remexec_directory().to_bytes()))
+      }
+      directory::Entry::File(_) => (),
+    });
+
+    // Then store them as a batch.
+    let local = self.local.clone();
+    let digests = local
+      .store_bytes_batch(EntryType::Directory, directories, initial_lease)
+      .await?;
+
+    Ok(DirectoryDigest::new(digests[0], tree))
+  }
+
+  ///
   /// Save the bytes of the Directory proto locally, without regard for any of the
   /// contents of any FileNodes or DirectoryNodes therein (i.e. does not require that its
   /// children are already stored).
@@ -383,8 +411,83 @@ impl Store {
   ) -> Result<Digest, String> {
     let local = self.local.clone();
     local
-      .store_bytes(EntryType::Directory, directory.to_bytes(), initial_lease)
+      .store_bytes(
+        EntryType::Directory,
+        None,
+        directory.to_bytes(),
+        initial_lease,
+      )
       .await
+  }
+
+  ///
+  /// Loads a DigestTree from the local store, back-filling from remote if necessary.
+  ///
+  /// TODO: Add a native implementation that skips creating PathStats and directly produces
+  /// a DigestTrie.
+  ///
+  pub async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String> {
+    if let Some(tree) = digest.tree {
+      // The DigestTrie is already loaded.
+      return Ok(tree);
+    }
+
+    // The DigestTrie needs to be loaded from the Store.
+    let path_stats_per_directory = self
+      .walk(digest.as_digest(), |_, path_so_far, _, directory| {
+        let mut path_stats = Vec::new();
+        path_stats.extend(directory.directories.iter().map(move |dir_node| {
+          let path = path_so_far.join(dir_node.name.clone());
+          (PathStat::dir(path.clone(), Dir(path)), None)
+        }));
+        path_stats.extend(directory.files.iter().map(move |file_node| {
+          let path = path_so_far.join(file_node.name.clone());
+          (
+            PathStat::file(
+              path.clone(),
+              File {
+                path: path.clone(),
+                is_executable: file_node.is_executable,
+              },
+            ),
+            Some((path, file_node.digest.as_ref().unwrap().try_into().unwrap())),
+          )
+        }));
+        future::ok(path_stats).boxed()
+      })
+      .await?;
+
+    let (path_stats, maybe_digests): (Vec<_>, Vec<_>) =
+      Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter)).unzip();
+    let file_digests = maybe_digests.into_iter().flatten().collect();
+
+    let tree = DigestTrie::from_path_stats(path_stats, &file_digests)?;
+    let computed_digest = tree.compute_root_digest();
+    if digest.as_digest() != computed_digest {
+      return Err(format!(
+        "Computed digest for Snapshot loaded from store mismatched: {:?} vs {:?}",
+        digest.as_digest(),
+        computed_digest
+      ));
+    }
+
+    Ok(tree)
+  }
+
+  ///
+  /// Loads the given directory Digest as a DirectoryDigest, eagerly fetching its tree from
+  /// storage. To convert non-eagerly, use `DirectoryDigest::from_persisted_digest`.
+  ///
+  /// In general, DirectoryDigests should be consumed lazily to avoid fetching from a remote
+  /// store unnecessarily, so this method is primarily useful for tests and benchmarks.
+  ///
+  pub async fn load_directory_digest(&self, digest: Digest) -> Result<DirectoryDigest, String> {
+    Ok(DirectoryDigest::new(
+      digest,
+      self
+        .load_digest_trie(DirectoryDigest::from_persisted_digest(digest))
+        .await?,
+    ))
   }
 
   ///
@@ -427,6 +530,21 @@ impl Store {
         },
       )
       .await
+  }
+
+  ///
+  /// Ensures that the directory entries of the given DirectoryDigest is persisted to disk.
+  ///
+  /// TODO: By the end of #13112, usage of this method should be limited to the writing of cache
+  /// entries.
+  ///
+  pub async fn ensure_directory_digest_persisted(
+    &self,
+    digest: DirectoryDigest,
+  ) -> Result<(), String> {
+    let tree = self.load_digest_trie(digest).await?;
+    let _ = self.record_digest_trie(tree, true).await?;
+    Ok(())
   }
 
   ///
@@ -474,7 +592,7 @@ impl Store {
         match maybe_bytes {
           Some(bytes) => {
             let value = f_remote(bytes.clone())?;
-            let stored_digest = local.store_bytes(entry_type, bytes, true).await?;
+            let stored_digest = local.store_bytes(entry_type, None, bytes, true).await?;
             if digest == stored_digest {
               Ok(Some(value))
             } else {
@@ -639,57 +757,29 @@ impl Store {
 
   ///
   /// Ensure that a directory is locally loadable, which will download it from the Remote store as
-  /// a sideeffect (if one is configured). Called only with the Digest of a Directory.
+  /// a sideeffect (if one is configured).
   ///
-  pub fn ensure_local_has_recursive_directory(
+  pub async fn ensure_local_has_recursive_directory(
     &self,
-    dir_digest: Digest,
-  ) -> BoxFuture<'static, Result<(), String>> {
-    let loaded_directory = {
-      let store = self.clone();
-      let res = async move { store.load_directory(dir_digest).await };
-      res.boxed()
-    };
+    dir_digest: DirectoryDigest,
+  ) -> Result<(), String> {
+    let mut file_digests = Vec::new();
+    self
+      .load_digest_trie(dir_digest)
+      .await?
+      .walk(&mut |_, entry| match entry {
+        directory::Entry::File(f) => file_digests.push(f.digest()),
+        directory::Entry::Directory(_) => (),
+      });
 
-    let store = self.clone();
-    loaded_directory
-      .and_then(move |directory_opt| {
-        future::ready(
-          directory_opt.ok_or_else(|| format!("Could not read dir with digest {:?}", dir_digest)),
-        )
-      })
-      .and_then(move |directory| {
-        // Traverse the files within directory
-        let file_futures = directory
-          .files
-          .iter()
-          .map(|file_node| {
-            // TODO(tonic): Find better idiom for these conversions.
-            let file_digest = try_future!(require_digest(file_node.digest.as_ref()));
-            let store = store.clone();
-            async move { store.ensure_local_has_file(file_digest).await }.boxed()
-          })
-          .collect::<Vec<_>>();
-
-        // Recursively call with sub-directories
-        let directory_futures = directory
-          .directories
-          .iter()
-          .map(move |child_dir| {
-            // TODO(tonic): Find better idiom for these conversions.
-            let child_digest = try_future!(require_digest(child_dir.digest.as_ref()));
-            store.ensure_local_has_recursive_directory(child_digest)
-          })
-          .collect::<Vec<_>>();
-
-        future::try_join(
-          future::try_join_all(file_futures),
-          future::try_join_all(directory_futures),
-        )
-        .map(|r| r.map(|_| ()))
-        .boxed()
-      })
-      .boxed()
+    let _ = future::try_join_all(
+      file_digests
+        .into_iter()
+        .map(|file_digest| self.ensure_local_has_file(file_digest))
+        .collect::<Vec<_>>(),
+    )
+    .await?;
+    Ok(())
   }
 
   /// Ensure that a file is locally loadable, which will download it from the Remote store as
@@ -721,17 +811,20 @@ impl Store {
     }
   }
 
-  /// Load a REv2 Tree from a remote CAS and cache the embedded Directory protos in the
-  /// local store. Tree is used by the REv2 protocol as an optimization for encoding the
-  /// the Directory protos that compromose the output directories from a remote
-  /// execution reported by an ActionResult.
+  /// Load a REv2 Tree from a remote CAS _without_ persisting the embedded Directory protos in
+  /// the local store. Tree is used by the REv2 protocol as an optimization for encoding the
+  /// the Directory protos that comprise the output directories from a remote execution
+  /// reported by an ActionResult.
   ///
-  /// Returns an Option<Digest> representing the `root` Directory within the Tree (if it
-  /// in fact exists in the remote CAS).
+  /// Returns an Option<DirectoryDigest> representing the `root` of the Tree (if it in fact
+  /// exists in the remote CAS).
   ///
-  /// This method requires that this Store be configured with a remote CAS (and will return
-  /// an error if this is not the case).
-  pub async fn load_tree_from_remote(&self, tree_digest: Digest) -> Result<Option<Digest>, String> {
+  /// This method requires that this Store be configured with a remote CAS, and will return an
+  /// error if this is not the case.
+  pub async fn load_tree_from_remote(
+    &self,
+    tree_digest: Digest,
+  ) -> Result<Option<DirectoryDigest>, String> {
     let remote = if let Some(ref remote) = self.remote {
       remote
     } else {
@@ -765,22 +858,8 @@ impl Store {
       None => return Ok(None),
     };
 
-    // Cache the returned `Directory` proto and the children `Directory` protos in
-    // the local store.
-    let root_directory = tree
-      .root
-      .ok_or_else(|| "corrupt tree, no root".to_owned())?;
-    let root_digest_fut = self.record_directory(&root_directory, true);
-    let children_futures = tree
-      .children
-      .iter()
-      .map(|directory| self.record_directory(directory, true));
-    let (root_digest, _) = futures::future::try_join(
-      root_digest_fut,
-      futures::future::try_join_all(children_futures),
-    )
-    .await?;
-    Ok(Some(root_digest))
+    let trie = DigestTrie::try_from(tree)?;
+    Ok(Some(trie.into()))
   }
 
   pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(
@@ -929,80 +1008,88 @@ impl Store {
   /// an existing destination directory, meaning that directory and file creation must be
   /// idempotent.
   ///
-  pub fn materialize_directory(
+  pub async fn materialize_directory(
     &self,
     destination: PathBuf,
-    digest: Digest,
+    digest: DirectoryDigest,
     perms: Permissions,
-  ) -> BoxFuture<'static, Result<(), String>> {
-    self.materialize_directory_helper(destination, true, digest, perms)
-  }
-
-  fn materialize_directory_helper(
-    &self,
-    destination: PathBuf,
-    is_root: bool,
-    digest: Digest,
-    perms: Permissions,
-  ) -> BoxFuture<'static, Result<(), String>> {
-    let store = self.clone();
-    async move {
-      let destination2 = destination.clone();
-      let directory_creation = store.local.executor().spawn_blocking(move || {
-        if is_root {
-          fs::safe_create_dir_all(&destination2)
-        } else {
-          fs::safe_create_dir(&destination2)
+  ) -> Result<(), String> {
+    // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
+    // parent path and its children.
+    let mut parent_to_child = HashMap::new();
+    self
+      .load_digest_trie(digest)
+      .await?
+      .walk(&mut |path, entry| {
+        if let Some(parent) = path.parent() {
+          parent_to_child
+            .entry(destination.join(parent))
+            .or_insert_with(Vec::new)
+            .push(entry.clone());
         }
       });
 
-      let (_, load_result) = future::try_join(
-        directory_creation.map_err(|e| {
+    self
+      .materialize_directory_helper(destination, true, &parent_to_child, perms)
+      .await
+  }
+
+  fn materialize_directory_helper<'a>(
+    &self,
+    destination: PathBuf,
+    is_root: bool,
+    parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
+    perms: Permissions,
+  ) -> BoxFuture<'a, Result<(), String>> {
+    let store = self.clone();
+    async move {
+      let destination2 = destination.clone();
+      store
+        .local
+        .executor()
+        .spawn_blocking(move || {
+          if is_root {
+            fs::safe_create_dir_all(&destination2)
+          } else {
+            fs::safe_create_dir(&destination2)
+          }
+        })
+        .map_err(|e| {
           format!(
             "Failed to create directory {}: {}",
             destination.display(),
             e
           )
-        }),
-        store.load_directory(digest),
-      )
-      .await?;
-      let directory =
-        load_result.ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
-
-      let file_futures = directory
-        .files
-        .iter()
-        .map(|file_node| {
-          let store = store.clone();
-          let path = destination.join(file_node.name.clone());
-          let digest = try_future!(require_digest(file_node.digest.as_ref()));
-          let mode = match perms {
-            Permissions::ReadOnly if file_node.is_executable => 0o544,
-            Permissions::ReadOnly => 0o444,
-            Permissions::Writable if file_node.is_executable => 0o744,
-            Permissions::Writable => 0o644,
-          };
-          store.materialize_file(path, digest, mode).boxed()
         })
-        .collect::<Vec<_>>();
-      let directory_futures = directory
-        .directories
-        .iter()
-        .map(|directory_node| {
-          let store = store.clone();
-          let path = destination.join(directory_node.name.clone());
-          let digest = try_future!(require_digest(directory_node.digest.as_ref()));
+        .await?;
 
-          store.materialize_directory_helper(path, false, digest, perms)
-        })
-        .collect::<Vec<_>>();
-      let _ = future::try_join(
-        future::try_join_all(file_futures),
-        future::try_join_all(directory_futures),
-      )
-      .map(|r| r.map(|_| ()))
-      .await?;
+      if let Some(children) = parent_to_child.get(&destination) {
+        let mut child_futures = Vec::new();
+        for child in children {
+          let path = destination.join(child.name().as_ref());
+          let store = store.clone();
+          child_futures.push(async move {
+            match child {
+              directory::Entry::File(f) => {
+                let mode = match perms {
+                  Permissions::ReadOnly if f.is_executable() => 0o555,
+                  Permissions::ReadOnly => 0o444,
+                  Permissions::Writable if f.is_executable() => 0o755,
+                  Permissions::Writable => 0o644,
+                };
+                store.materialize_file(path, f.digest(), mode).await
+              }
+              directory::Entry::Directory(_) => {
+                store
+                  .materialize_directory_helper(path, false, parent_to_child, perms)
+                  .await
+              }
+            }
+          });
+        }
+        let _ = future::try_join_all(child_futures).await?;
+      }
+
       if perms == Permissions::ReadOnly {
         tokio::fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o555))
           .await
@@ -1019,145 +1106,106 @@ impl Store {
     .boxed()
   }
 
-  fn materialize_file(
+  async fn materialize_file(
     &self,
     destination: PathBuf,
     digest: Digest,
     mode: u32,
-  ) -> BoxFuture<'static, Result<(), String>> {
-    let store = self.clone();
-    let res = async move {
-      let write_result = store
-        .load_file_bytes_with(digest, move |bytes| {
-          let mut f = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .mode(mode)
-            .open(&destination)
-            .map_err(|e| {
-              format!(
-                "Error opening file {} for writing: {:?}",
-                destination.display(),
-                e
-              )
-            })?;
-          f.write_all(bytes)
-            .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
-          Ok(())
-        })
-        .await?;
-      match write_result {
-        Some(Ok(())) => Ok(()),
-        Some(Err(e)) => Err(e),
-        None => Err(format!("File with digest {:?} not found", digest)),
-      }
-    };
-    res.boxed()
+  ) -> Result<(), String> {
+    let write_result = self
+      .load_file_bytes_with(digest, move |bytes| {
+        let mut f = OpenOptions::new()
+          .create(true)
+          .write(true)
+          .truncate(true)
+          .mode(mode)
+          .open(&destination)
+          .map_err(|e| {
+            format!(
+              "Error opening file {} for writing: {:?}",
+              destination.display(),
+              e
+            )
+          })?;
+        f.write_all(bytes)
+          .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
+        Ok(())
+      })
+      .await?;
+    match write_result {
+      Some(Ok(())) => Ok(()),
+      Some(Err(e)) => Err(e),
+      None => Err(format!("File with digest {:?} not found", digest)),
+    }
   }
 
   ///
   /// Returns files sorted by their path.
   ///
-  pub fn contents_for_directory(
+  pub async fn contents_for_directory(
     &self,
-    digest: Digest,
-  ) -> BoxFuture<'static, Result<Vec<FileContent>, String>> {
+    digest: DirectoryDigest,
+  ) -> Result<Vec<FileContent>, String> {
+    let mut files = Vec::new();
     self
-      .walk(digest, move |store, path_so_far, _, directory| {
-        future::try_join_all(
-          directory
-            .files
-            .iter()
-            .map(|file_node| {
-              let path = path_so_far.join(file_node.name.clone());
-              let is_executable = file_node.is_executable;
-              let file_node_digest = try_future!(require_digest(file_node.digest.as_ref()));
-              let store = store.clone();
-              let res = async move {
-                let maybe_bytes = store
-                  .load_file_bytes_with(file_node_digest, Bytes::copy_from_slice)
-                  .await?;
-                maybe_bytes
-                  .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                  .map(|content| FileContent {
-                    path,
-                    content,
-                    is_executable,
-                  })
-              };
-              res.boxed()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .boxed()
-      })
-      .map(|file_contents_per_directory| {
-        file_contents_per_directory.map(|xs| {
-          let mut vec = xs
-            .into_iter()
-            .flat_map(|x| x.into_iter())
-            .collect::<Vec<_>>();
-          vec.sort_by(|l, r| l.path.cmp(&r.path));
-          vec
-        })
-      })
-      .boxed()
+      .load_digest_trie(digest)
+      .await?
+      .walk(&mut |path, entry| match entry {
+        directory::Entry::File(f) => files.push((path.to_owned(), f.digest(), f.is_executable())),
+        directory::Entry::Directory(_) => (),
+      });
+
+    future::try_join_all(files.into_iter().map(|(path, digest, is_executable)| {
+      let store = self.clone();
+      async move {
+        let maybe_bytes = store
+          .load_file_bytes_with(digest, Bytes::copy_from_slice)
+          .await?;
+        maybe_bytes
+          .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
+          .map(|content| FileContent {
+            path,
+            content,
+            is_executable,
+          })
+      }
+    }))
+    .await
   }
 
   ///
   /// Returns indirect references to files in a Digest sorted by their path.
   ///
-  pub fn entries_for_directory(
+  pub async fn entries_for_directory(
     &self,
-    digest: Digest,
-  ) -> BoxFuture<'static, Result<Vec<DigestEntry>, String>> {
-    if digest == EMPTY_DIGEST {
-      return future::ready(Ok(vec![])).boxed();
+    digest: DirectoryDigest,
+  ) -> Result<Vec<DigestEntry>, String> {
+    if digest == *EMPTY_DIRECTORY_DIGEST {
+      return Ok(vec![]);
     }
 
+    let mut entries = Vec::new();
     self
-      .walk(digest, move |_, path_so_far, _, directory| {
-        if directory.files.is_empty() {
-          // Only report an empty directory if the directory is a leaf node. (The caller is
-          // expected to create parent directories for both files and empty leaf
-          // directories.)
-          if directory.directories.is_empty() {
-            future::ready(Ok(vec![DigestEntry::EmptyDirectory(path_so_far.into())])).boxed()
-          } else {
-            future::ready(Ok(vec![])).boxed()
-          }
-        } else {
-          future::ready(
-            directory
-              .files
-              .iter()
-              .map(|file_node| {
-                let path = path_so_far.join(file_node.name.clone());
-                let is_executable = file_node.is_executable;
-                let digest = require_digest(file_node.digest.as_ref())?;
-                Ok(DigestEntry::File(FileEntry {
-                  path,
-                  digest,
-                  is_executable,
-                }))
-              })
-              .collect::<Result<Vec<_>, String>>(),
-          )
-          .boxed()
+      .load_digest_trie(digest)
+      .await?
+      .walk(&mut |path, entry| match entry {
+        directory::Entry::File(f) => {
+          entries.push(DigestEntry::File(FileEntry {
+            path: path.to_owned(),
+            digest: f.digest(),
+            is_executable: f.is_executable(),
+          }));
         }
-      })
-      .map(|file_contents_per_directory| {
-        file_contents_per_directory.map(|xs| {
-          let mut vec = xs
-            .into_iter()
-            .flat_map(|x| x.into_iter())
-            .collect::<Vec<_>>();
-          vec.sort_by(|l, r| l.path().cmp(r.path()));
-          vec
-        })
-      })
-      .boxed()
+        directory::Entry::Directory(d) => {
+          // Only report a directory if it is a leaf node. (The caller is expected to create parent
+          // directories for both files and empty leaf directories.)
+          if d.tree().entries().is_empty() {
+            entries.push(DigestEntry::EmptyDirectory(path.to_owned()));
+          }
+        }
+      });
+
+    Ok(entries)
   }
 
   ///
@@ -1239,7 +1287,9 @@ impl Store {
           .await?;
           Ok(())
         }
-        None => Err(format!("Could not walk unknown directory: {:?}", digest)),
+        None => Err(format!(
+          "Could not walk unknown directory at {path_so_far:?}: {digest:?}"
+        )),
       }
     };
     res.boxed()
@@ -1262,21 +1312,29 @@ pub enum LocalMissingBehavior {
 }
 
 #[async_trait]
-impl StoreWrapper for Store {
+impl SnapshotOps for Store {
   async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, String> {
-    Ok(Store::load_file_bytes_with(self, digest, f).await?)
+    Store::load_file_bytes_with(self, digest, f).await
+  }
+
+  async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String> {
+    Store::load_digest_trie(self, digest).await
   }
 
   async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String> {
-    Ok(Store::load_directory(self, digest).await?)
+    Store::load_directory(self, digest).await
   }
 
   async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String> {
     Snapshot::get_directory_or_err(self.clone(), digest).await
+  }
+
+  async fn record_digest_trie(&self, tree: DigestTrie) -> Result<DirectoryDigest, String> {
+    Store::record_digest_trie(self, tree, true).await
   }
 
   async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String> {

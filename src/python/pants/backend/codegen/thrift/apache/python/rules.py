@@ -1,25 +1,28 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pathlib import PurePath
 
-from pants.backend.codegen.thrift.apache.python import additional_fields, subsystem
-from pants.backend.codegen.thrift.apache.python.additional_fields import PythonSourceRootField
+from __future__ import annotations
+
+from pants.backend.codegen.thrift.apache.python import subsystem
 from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.codegen.thrift.apache.rules import (
     GeneratedThriftSources,
     GenerateThriftSourcesRequest,
 )
 from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
-from pants.backend.python.target_types import PythonSourceField
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
+from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField, PythonSourceField
+from pants.engine.addresses import Address
 from pants.engine.fs import AddPrefix, Digest, Snapshot
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
     InjectDependenciesRequest,
     InjectedDependencies,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -46,18 +49,12 @@ async def generate_python_from_thrift(
         ),
     )
 
-    # We must do some path manipulation on the output digest for it to look like normal sources,
-    # including adding back a source root.
-    py_source_root = request.protocol_target.get(PythonSourceRootField).value
-    if py_source_root:
-        # Verify that the python source root specified by the target is in fact a source root.
-        source_root_request = SourceRootRequest(PurePath(py_source_root))
-    else:
-        # The target didn't specify a python source root, so use the thrift_source's source root.
-        source_root_request = SourceRootRequest.for_target(request.protocol_target)
-
-    source_root = await Get(SourceRoot, SourceRootRequest, source_root_request)
-
+    # We must add back the source root for Python imports to work properly. Note that the file
+    # paths will be different depending on whether `namespace py` was used. See the tests for
+    # examples.
+    source_root = await Get(
+        SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)
+    )
     source_root_restored = (
         await Get(Snapshot, AddPrefix(result.snapshot.digest, source_root.path))
         if source_root.path != "."
@@ -71,17 +68,35 @@ class InjectApacheThriftPythonDependencies(InjectDependenciesRequest):
 
 
 @rule
-async def inject_apache_thrift_java_dependencies(
-    _: InjectApacheThriftPythonDependencies, thrift_python: ThriftPythonSubsystem
+async def find_apache_thrift_python_requirement(
+    request: InjectApacheThriftPythonDependencies,
+    thrift_python: ThriftPythonSubsystem,
+    python_setup: PythonSetup,
+    # TODO(#12946): Make this a lazy Get once possible.
+    module_mapping: ThirdPartyPythonModuleMapping,
 ) -> InjectedDependencies:
-    addresses = await Get(Addresses, UnparsedAddressInputs, thrift_python.runtime_dependencies)
-    return InjectedDependencies(addresses)
+    if not thrift_python.infer_runtime_dependency:
+        return InjectedDependencies()
+
+    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    resolve = wrapped_tgt.target.get(PythonResolveField).normalized_value(python_setup)
+
+    addr = find_python_runtime_library_or_raise_error(
+        module_mapping,
+        request.dependencies_field.address,
+        "thrift",
+        resolve=resolve,
+        resolves_enabled=python_setup.enable_resolves,
+        recommended_requirement_name="thrift",
+        recommended_requirement_url="https://pypi.org/project/thrift/",
+        disable_inference_option=f"[{thrift_python.options_scope}].infer_runtime_dependency",
+    )
+    return InjectedDependencies([addr])
 
 
 def rules():
     return (
         *collect_rules(),
-        *additional_fields.rules(),
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromThriftRequest),
         UnionRule(InjectDependenciesRequest, InjectApacheThriftPythonDependencies),

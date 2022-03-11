@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import collections
 import collections.abc
+import gc
 import math
+from sys import getsizeof
 from typing import Any, Callable, Iterable, Iterator, MutableMapping, TypeVar
 
 from pants.engine.internals import native_engine
@@ -19,6 +21,22 @@ def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:
                 recursively_update(d[k], v)
                 continue
         d[k] = v
+
+
+def deep_getsizeof(o: Any, ids: set[int]) -> int:
+    """Find the memory footprint of the given object.
+
+    To avoid double-counting, `ids` should be a set of object ids which have been visited by
+    previous calls to this method.
+    """
+    if id(o) in ids:
+        return 0
+
+    d = deep_getsizeof
+    r = getsizeof(o)
+    ids.add(id(o))
+
+    return r + sum(d(x, ids) for x in gc.get_referents())
 
 
 _T = TypeVar("_T")

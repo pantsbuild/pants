@@ -6,18 +6,25 @@ from __future__ import annotations
 from abc import ABCMeta
 from typing import Optional
 
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.core.goals.package import OutputPathField
+from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
+    Dependencies,
     FieldSet,
     InvalidFieldException,
     InvalidTargetException,
     OptionalSingleSourceField,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
 )
+from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
 
 # -----------------------------------------------------------------------------------------------
@@ -25,23 +32,33 @@ from pants.util.docutil import git_url
 # -----------------------------------------------------------------------------------------------
 
 
-class JvmCompatibleResolvesField(StringSequenceField):
-    alias = "compatible_resolves"
-    required = False
-    help = (
-        "The set of resolves from `[jvm].resolves` that this target is compatible with.\n\n"
-        "If not defined, will default to `[jvm].default_resolve`.\n\n"
-        # TODO: Document expectations for dependencies once we validate that.
-    )
-
-
-class JvmResolveField(StringField):
+class JvmResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
     required = False
     help = (
         "The resolve from `[jvm].resolves` to use when compiling this target.\n\n"
         "If not defined, will default to `[jvm].default_resolve`.\n\n"
         # TODO: Document expectations for dependencies once we validate that.
+    )
+
+    def normalized_value(self, jvm_subsystem: JvmSubsystem) -> str:
+        """Get the value after applying the default and validating that the key is recognized."""
+        resolve = self.value or jvm_subsystem.default_resolve
+        if resolve not in jvm_subsystem.resolves:
+            raise UnrecognizedResolveNamesError(
+                [resolve],
+                jvm_subsystem.resolves.keys(),
+                description_of_origin=f"the field `{self.alias}` in the target {self.address}",
+            )
+        return resolve
+
+
+class JvmJdkField(StringField):
+    alias = "jdk"
+    required = False
+    help = (
+        "The major version of the JDK that this target should be built with. If not defined, "
+        "will default to `[jvm].default_source_jdk`."
     )
 
 
@@ -151,15 +168,28 @@ class JvmProvidesTypesField(StringSequenceField):
     )
 
 
-class JvmArtifactCompatibleResolvesField(JvmCompatibleResolvesField):
+class JvmArtifactExcludeDependenciesField(StringSequenceField):
+    alias = "excludes"
     help = (
-        "The resolves from `[jvm].resolves` that this artifact should be included in.\n\n"
+        "A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded "
+        "as dependencies when this artifact is resolved.\n\n"
+        "This does not prevent this artifact from being included in the resolve as a dependency "
+        "of other artifacts that depend on it, and is currently intended as a way to resolve "
+        "version conflicts in complex resolves.\n\n"
+        "These values are passed directly to Coursier, and if specified incorrectly will show a "
+        "parse error from Coursier."
+    )
+
+
+class JvmArtifactResolveField(JvmResolveField):
+    help = (
+        "The resolve from `[jvm].resolves` that this artifact should be included in.\n\n"
         "If not defined, will default to `[jvm].default_resolve`.\n\n"
         "When generating a lockfile for a particular resolve via the `coursier-resolve` goal, "
         "it will include all artifacts that are declared compatible with that resolve. First-party "
-        "targets like `java_source` and `scala_source` then declare which resolve(s) they use "
-        "via the `resolve` and `compatible_resolves` field; so, for your first-party code to use "
-        "a particular `jvm_artifact` target, that artifact must be included in the resolve(s) "
+        "targets like `java_source` and `scala_source` also declare which resolve they use "
+        "via the `resolve` field; so, for your first-party code to use "
+        "a particular `jvm_artifact` target, that artifact must be included in the resolve "
         "used by that code."
     )
 
@@ -186,14 +216,15 @@ class JvmArtifactTarget(Target):
         *JvmArtifactFieldSet.required_fields,
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
         JvmArtifactJarSourceField,
-        JvmArtifactCompatibleResolvesField,
+        JvmArtifactResolveField,
+        JvmArtifactExcludeDependenciesField,
     )
     help = (
         "A third-party JVM artifact, as identified by its Maven-compatible coordinate.\n\n"
         "That is, an artifact identified by its `group`, `artifact`, and `version` components.\n\n"
         "Each artifact is associated with one or more resolves (a logical name you give to a "
         "lockfile). For this artifact to be used by your first-party code, it must be "
-        "associated with the resolve(s) used by that code. See the `compatible_resolves` field."
+        "associated with the resolve(s) used by that code. See the `resolve` field."
     )
 
     def validate(self) -> None:
@@ -211,3 +242,74 @@ class JvmArtifactTarget(Target):
 
 class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
     """A marker that indicates that a source field represents a JUnit test."""
+
+
+# -----------------------------------------------------------------------------------------------
+# JAR support fields
+# -----------------------------------------------------------------------------------------------
+
+
+class JvmMainClassNameField(StringField):
+    alias = "main"
+    required = True
+    help = (
+        "`.`-separated name of the JVM class containing the `main()` method to be called when "
+        "executing this JAR."
+    )
+
+
+class DeployJarTarget(Target):
+    alias = "deploy_jar"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        OutputPathField,
+        JvmMainClassNameField,
+        JvmJdkField,
+        JvmResolveField,
+        RestartableField,
+    )
+    help = (
+        "A `jar` file with first and third-party code bundled for deploys.\n\n"
+        "The JAR will contain class files for both first-party code and "
+        "third-party dependencies, all in a common directory structure."
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `jvm_war` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class JvmWarDependenciesField(Dependencies):
+    pass
+
+
+class JvmWarDescriptorAddressField(SingleSourceField):
+    alias = "descriptor"
+    default = "web.xml"
+    help = "Path to a file containing the descriptor (i.e., web.xml) for this WAR file. Defaults to `web.xml`."
+
+
+class JvmWarContentField(SpecialCasedDependencies):
+    alias = "content"
+    help = (
+        "A list of addresses to `resources` and `files` targets with content to place in the "
+        "document root of this WAR file."
+    )
+
+
+class JvmWarTarget(Target):
+    alias = "jvm_war"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JvmResolveField,
+        JvmWarContentField,
+        JvmWarDependenciesField,
+        JvmWarDescriptorAddressField,
+        OutputPathField,
+    )
+    help = (
+        'A JSR 154 "web application archive" (or "war") with first-party and third-party code bundled for '
+        "deploys in Java Servlet containers."
+    )

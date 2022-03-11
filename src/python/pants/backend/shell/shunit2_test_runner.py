@@ -26,6 +26,12 @@ from pants.core.goals.test import (
 )
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.system_binaries import (
+    BinaryNotFoundError,
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+)
 from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
@@ -38,10 +44,6 @@ from pants.engine.fs import (
     MergeDigests,
 )
 from pants.engine.process import (
-    BinaryNotFoundError,
-    BinaryPath,
-    BinaryPathRequest,
-    BinaryPaths,
     FallibleProcessResult,
     InteractiveProcess,
     Process,
@@ -51,6 +53,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.strutil import create_path_env_var
 
@@ -132,7 +135,7 @@ async def determine_shunit2_shell(
                 f"Please either specify the `{Shunit2ShellField.alias}` field or add a "
                 f"shebang to {request.test_file_content.path} with one of the supported shells in "
                 f"the format `!#/path/to/shell` or `!#/path/to/env shell`"
-                f"(run `./pants help {Shunit2TestsGeneratorTarget.alias}` for valid shells)."
+                f"(run `{bin_name()} help {Shunit2TestsGeneratorTarget.alias}` for valid shells)."
             )
         tgt_shell = parse_result
 

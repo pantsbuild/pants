@@ -14,14 +14,18 @@ from pants.backend.python.macros.common_fields import (
     TypeStubsModuleMappingField,
 )
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
+    PythonRequirementResolveField,
     PythonRequirementsField,
-    PythonRequirementsFileSourcesField,
-    PythonRequirementsFileTarget,
     PythonRequirementTarget,
     PythonRequirementTypeStubModulesField,
     parse_requirements_file,
+)
+from pants.core.target_types import (
+    TargetGeneratorSourcesHelperSourcesField,
+    TargetGeneratorSourcesHelperTarget,
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
@@ -54,12 +58,14 @@ class PythonRequirementsTargetGenerator(Target):
         "Instead of pip-style VCS requirements, use direct references from PEP 440: "
         "https://www.python.org/dev/peps/pep-0440/#direct-references."
     )
+    # Note that this does not have a `dependencies` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ModuleMappingField,
         TypeStubsModuleMappingField,
         PythonRequirementsSourceField,
         RequirementsOverrideField,
+        PythonRequirementResolveField,
     )
 
 
@@ -69,14 +75,18 @@ class GenerateFromPythonRequirementsRequest(GenerateTargetsRequest):
 
 @rule(desc="Generate `python_requirement` targets from requirements.txt", level=LogLevel.DEBUG)
 async def generate_from_python_requirement(
-    request: GenerateFromPythonRequirementsRequest,
+    request: GenerateFromPythonRequirementsRequest, python_setup: PythonSetup
 ) -> GeneratedTargets:
     generator = request.generator
     requirements_rel_path = generator[PythonRequirementsSourceField].value
     requirements_full_path = generator[PythonRequirementsSourceField].file_path
+    overrides = {
+        canonicalize_project_name(k): v
+        for k, v in request.require_unparametrized_overrides().items()
+    }
 
-    file_tgt = PythonRequirementsFileTarget(
-        {PythonRequirementsFileSourcesField.alias: requirements_rel_path},
+    file_tgt = TargetGeneratorSourcesHelperTarget(
+        {TargetGeneratorSourcesHelperSourcesField.alias: [requirements_rel_path]},
         Address(
             generator.address.spec_path,
             target_name=generator.address.target_name,
@@ -99,9 +109,16 @@ async def generate_from_python_requirement(
         requirements, lambda parsed_req: parsed_req.project_name
     )
 
+    # Validate the resolve is legal.
+    generator[PythonRequirementResolveField].normalized_value(python_setup)
+
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
-    overrides = generator[RequirementsOverrideField].flatten_and_normalize()
+    inherited_fields = {
+        field.alias: field.value
+        for field in request.generator.field_values.values()
+        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementResolveField))
+    }
 
     def generate_tgt(
         project_name: str, parsed_reqs: Iterable[PipRequirement]
@@ -113,10 +130,9 @@ async def generate_from_python_requirement(
                 file_tgt.address.spec
             ]
 
-        # TODO: Consider letting you set metadata in the target generator and having it pass down
-        #  to all generated targets. Especially useful for compatible_resolves.
         return PythonRequirementTarget(
             {
+                **inherited_fields,
                 PythonRequirementsField.alias: list(parsed_reqs),
                 PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
                 PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(

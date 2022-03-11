@@ -11,7 +11,6 @@ from typing import List, Optional, Tuple
 import pytest
 
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
-from pants.base.build_environment import get_buildroot
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -304,7 +303,12 @@ class TestStreamingWorkunit(SchedulerTestBase):
     def _fixture_for_rules(
         self, tmp_path: Path, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
     ) -> Tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
-        scheduler = self.mk_scheduler(tmp_path, rules, include_trace_on_error=False)
+        scheduler = self.mk_scheduler(
+            tmp_path,
+            rules,
+            include_trace_on_error=False,
+            max_workunit_verbosity=max_workunit_verbosity,
+        )
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
             scheduler,
@@ -361,7 +365,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
         # Because of the artificial delay in rule_one, it should have time to be reported as
         # started but not yet finished.
         started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
-        assert len(list(item for item in started if item["name"] == "canonical_rule_one")) > 0
+        assert len([item for item in started if item["name"] == "canonical_rule_one"]) > 0
 
         assert {item["name"] for item in tracker.finished_workunit_chunks[1]} == {
             "canonical_rule_one"
@@ -649,7 +653,7 @@ class Output(EngineAwareReturnType):
         return {"snapshot_1": self.snapshot_1, "snapshot_2": self.snapshot_2}
 
 
-@rule(desc="a_rule")
+@rule(desc="a_rule", level=LogLevel.DEBUG)
 def a_rule(input: ComplicatedInput) -> Output:
     return Output(snapshot_1=input.snapshot_1, snapshot_2=input.snapshot_2)
 
@@ -663,6 +667,10 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, (Process,)),
         ],
         isolated_local_store=True,
+        # NB: The Sessions's configured verbosity is applied before a `StreamingWorkunitHandler`
+        # can poll, and prevents things from being stored at all. So in order to observe TRACE
+        # workunits in a poll, we must also configure TRACE on the Session.
+        max_workunit_verbosity=LogLevel.TRACE,
     )
 
 
@@ -693,13 +701,12 @@ def test_counters(rule_runner: RuleRunner, run_tracker: RunTracker) -> None:
                 )
             ],
         )
+        metrics_info = scheduler.get_metrics()
         histograms_info = scheduler.get_observation_histograms()
 
-    finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-    workunits_with_counters = [item for item in finished if "counters" in item]
-    assert workunits_with_counters[0]["counters"]["local_cache_requests"] == 1
-    assert workunits_with_counters[0]["counters"]["local_cache_requests_uncached"] == 1
-    assert workunits_with_counters[1]["counters"]["local_execution_requests"] == 1
+    assert metrics_info["local_cache_requests"] == 1
+    assert metrics_info["local_cache_requests_uncached"] == 1
+    assert metrics_info["local_execution_requests"] == 1
 
     assert histograms_info["version"] == 0
     assert "histograms" in histograms_info
@@ -901,9 +908,7 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
             "src/python/others/b.py": "print('')",
         }
     )
-    specs = SpecsParser(get_buildroot()).parse_specs(
-        ["src/python/somefiles::", "src/python/others/b.py"]
-    )
+    specs = SpecsParser().parse_specs(["src/python/somefiles::", "src/python/others/b.py"])
 
     class Callback(WorkunitsCallback):
         @property

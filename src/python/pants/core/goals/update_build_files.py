@@ -9,16 +9,17 @@ import os.path
 import tokenize
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from io import BytesIO
 from typing import DefaultDict, Mapping, cast
 
 from colors import green, red
 
 from pants.backend.python.lint.black.subsystem import Black
+from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -37,8 +38,9 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.option.option_types import BoolOption, EnumOption
 from pants.util.dirutil import recursive_dirname
-from pants.util.docutil import doc_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -55,6 +57,11 @@ class RewrittenBuildFile:
     path: str
     lines: tuple[str, ...]
     change_descriptions: tuple[str, ...]
+
+
+class Formatter(Enum):
+    YAPF = "yapf"
+    BLACK = "black"
 
 
 @union
@@ -104,67 +111,53 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         "project."
     )
 
-    required_union_implementations = (RewrittenBuildFileRequest,)
-
     @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--check",
-            type=bool,
-            default=False,
-            help=(
-                "Do not write changes to disk, only write back what would change. Return code "
-                "0 means there would be no changes, and 1 means that there would be. "
-            ),
-        )
-        register(
-            "--fmt",
-            type=bool,
-            default=True,
-            help=(
-                "Format BUILD files using Black.\n\n"
-                "Set `[black].args`, `[black].config`, and `[black].config_discovery` to change "
-                "Black's behavior. Set `[black].interpreter_constraints` and "
-                "`[python].interpreter_search_path` to change which interpreter is used to "
-                "run Black."
-            ),
-        )
-        register(
-            "--fix-safe-deprecations",
-            type=bool,
-            default=True,
-            help=(
-                "Automatically fix deprecations, such as target type renames, that are safe "
-                "because they do not change semantics."
-            ),
-        )
-        register(
-            "--fix-python-macros",
-            type=bool,
-            default=False,
-            help=(
-                "Update references to targets generated from `python_requirements` and "
-                "`poetry_requirements` from the old deprecated macro mechanism to the new target "
-                f"generation mechanism described at {doc_url('targets#target-generation')}.\n\n"
-            ),
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return RewrittenBuildFileRequest in union_membership
 
-    @property
-    def check(self) -> bool:
-        return cast(bool, self.options.check)
-
-    @property
-    def fmt(self) -> bool:
-        return cast(bool, self.options.fmt)
-
-    @property
-    def fix_safe_deprecations(self) -> bool:
-        return cast(bool, self.options.fix_safe_deprecations)
-
-    @property
-    def fix_python_macros(self) -> bool:
-        return cast(bool, self.options.fix_python_macros)
+    check = BoolOption(
+        "--check",
+        default=False,
+        help=(
+            "Do not write changes to disk, only write back what would change. Return code "
+            "0 means there would be no changes, and 1 means that there would be. "
+        ),
+    )
+    fmt = BoolOption(
+        "--fmt",
+        default=True,
+        help=(
+            "Format BUILD files using Black or Yapf.\n\n"
+            "Set `[black].args` / `[yapf].args`, `[black].config` / `[yapf].config` , "
+            "and `[black].config_discovery` / `[yapf].config_discovery` to change "
+            "Black's or Yapf's behavior. Set "
+            "`[black].interpreter_constraints` / `[yapf].interpreter_constraints` "
+            "and `[python].interpreter_search_path` to change which interpreter is "
+            "used to run the formatter."
+        ),
+    )
+    formatter = EnumOption(
+        "--formatter",
+        default=Formatter.BLACK,
+        help="Which formatter Pants should use to format BUILD files.",
+    )
+    fix_safe_deprecations = BoolOption(
+        "--fix-safe-deprecations",
+        default=True,
+        help=(
+            "Automatically fix deprecations, such as target type renames, that are safe "
+            "because they do not change semantics."
+        ),
+    )
+    fix_python_macros = BoolOption(
+        "--fix-python-macros",
+        default=False,
+        help=(
+            "Update references to targets generated from `python_requirements` and "
+            "`poetry_requirements` from the old deprecated macro mechanism to the new target "
+            f"generation mechanism described at {doc_url('targets#target-generation')}.\n\n"
+        ),
+    )
 
 
 class UpdateBuildFilesGoal(Goal):
@@ -178,7 +171,6 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
-    pants_bin: PantsBin,
 ) -> UpdateBuildFilesGoal:
     all_build_files = await Get(
         DigestContents,
@@ -192,8 +184,12 @@ async def update_build_files(
 
     rewrite_request_classes = []
     for request in union_membership[RewrittenBuildFileRequest]:
-        if issubclass(request, FormatWithBlackRequest):
-            if update_build_files_subsystem.fmt:
+        if issubclass(request, (FormatWithBlackRequest, FormatWithYapfRequest)):
+            is_chosen_formatter = issubclass(request, FormatWithBlackRequest) ^ (
+                update_build_files_subsystem.formatter == Formatter.YAPF
+            )
+
+            if update_build_files_subsystem.fmt and is_chosen_formatter:
                 rewrite_request_classes.append(request)
             else:
                 continue
@@ -260,10 +256,63 @@ async def update_build_files(
 
     if update_build_files_subsystem.check:
         console.print_stdout(
-            f"\nTo fix `update-build-files` failures, run `{pants_bin.name} update-build-files`."
+            f"\nTo fix `update-build-files` failures, run `{bin_name()} update-build-files`."
         )
 
     return UpdateBuildFilesGoal(exit_code=1 if update_build_files_subsystem.check else 0)
+
+
+# ------------------------------------------------------------------------------------------
+# Yapf formatter fixer
+# ------------------------------------------------------------------------------------------
+
+
+class FormatWithYapfRequest(RewrittenBuildFileRequest):
+    pass
+
+
+@rule
+async def format_build_file_with_yapf(
+    request: FormatWithYapfRequest, yapf: Yapf
+) -> RewrittenBuildFile:
+    yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
+    build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, yapf.config_request(recursive_dirname(request.path))
+    )
+    yapf_pex, build_file_digest, config_files = await MultiGet(
+        yapf_pex_get, build_file_digest_get, config_files_get
+    )
+
+    input_digest = await Get(
+        Digest, MergeDigests((build_file_digest, config_files.snapshot.digest))
+    )
+
+    argv = ["--in-place"]
+    if yapf.config:
+        argv.extend(["--config", yapf.config])
+    argv.extend(yapf.args)
+    argv.append(request.path)
+
+    yapf_result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            yapf_pex,
+            argv=argv,
+            input_digest=input_digest,
+            output_files=(request.path,),
+            description=f"Run Yapf on {request.path}.",
+            level=LogLevel.DEBUG,
+        ),
+    )
+
+    if yapf_result.output_digest == build_file_digest:
+        return RewrittenBuildFile(request.path, request.lines, change_descriptions=())
+
+    result_contents = await Get(DigestContents, Digest, yapf_result.output_digest)
+    assert len(result_contents) == 1
+    result_lines = tuple(result_contents[0].content.decode("utf-8").splitlines())
+    return RewrittenBuildFile(request.path, result_lines, change_descriptions=("Format with Yapf",))
 
 
 # ------------------------------------------------------------------------------------------
@@ -279,16 +328,7 @@ class FormatWithBlackRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
-    black_pex_get = Get(
-        VenvPex,
-        PexRequest(
-            output_filename="black.pex",
-            internal_only=True,
-            requirements=black.pex_requirements(),
-            interpreter_constraints=black.interpreter_constraints,
-            main=black.main,
-        ),
-    )
+    black_pex_get = Get(VenvPex, PexRequest, black.to_pex_request())
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, black.config_request(recursive_dirname(request.path))
@@ -539,7 +579,8 @@ def rules():
         *pex.rules(),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedFieldsRequest),
-        # NB: We want this to come at the end so that running Black happens after all our
-        # deprecation fixers.
+        # NB: We want this to come at the end so that running Black or Yapf happens
+        # after all our deprecation fixers.
         UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
+        UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
     )

@@ -13,7 +13,7 @@ from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
@@ -25,19 +25,14 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
-from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import ValidatedJvmToolLockfileRequest
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -56,12 +51,13 @@ class ScalafmtFieldSet(FieldSet):
         return tgt.get(SkipScalafmtField).value
 
 
-class ScalafmtRequest(FmtRequest, LintRequest):
+class ScalafmtRequest(FmtRequest, LintTargetsRequest):
     field_set_type = ScalafmtFieldSet
+    name = ScalafmtSubsystem.options_scope
 
 
 class ScalafmtToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = ScalafmtSubsystem.options_scope
+    resolve_name = ScalafmtSubsystem.options_scope
 
 
 @dataclass(frozen=True)
@@ -72,7 +68,7 @@ class SetupRequest:
 
 @dataclass(frozen=True)
 class Partition:
-    process: Process
+    process: JvmProcess
     description: str
 
 
@@ -95,9 +91,9 @@ class ScalafmtConfigFiles:
 
 @dataclass(frozen=True)
 class SetupScalafmtPartition:
+    classpath_entries: tuple[str, ...]
     merged_sources_digest: Digest
-    jdk_invoke_args: tuple[str, ...]
-    immutable_input_digests: FrozenDict[str, Digest]
+    extra_immutable_input_digests: FrozenDict[str, Digest]
     config_file: str
     files: tuple[str, ...]
     check_only: bool
@@ -153,7 +149,8 @@ async def gather_scalafmt_config_files(
 
 @rule
 async def setup_scalafmt_partition(
-    request: SetupScalafmtPartition, jdk_setup: JdkSetup
+    request: SetupScalafmtPartition,
+    jdk: InternalJdk,
 ) -> Partition:
     sources_digest = await Get(
         Digest,
@@ -169,7 +166,6 @@ async def setup_scalafmt_partition(
     )
 
     args = [
-        *request.jdk_invoke_args,
         "org.scalafmt.cli.Cli",
         f"--config={request.config_file}",
         "--non-interactive",
@@ -180,13 +176,15 @@ async def setup_scalafmt_partition(
         args.append("--quiet")
     args.extend(request.files)
 
-    process = Process(
+    process = JvmProcess(
+        jdk=jdk,
         argv=args,
+        classpath_entries=request.classpath_entries,
         input_digest=sources_digest,
         output_files=request.files,
-        append_only_caches=jdk_setup.append_only_caches,
-        immutable_input_digests=request.immutable_input_digests,
-        env=jdk_setup.env,
+        extra_immutable_input_digests=request.extra_immutable_input_digests,
+        # extra_nailgun_keys=request.extra_immutable_input_digests,
+        use_nailgun=False,
         description=f"Run `scalafmt` on {pluralize(len(request.files), 'file')}.",
         level=LogLevel.DEBUG,
     )
@@ -198,24 +196,16 @@ async def setup_scalafmt_partition(
 async def setup_scalafmt(
     setup_request: SetupRequest,
     tool: ScalafmtSubsystem,
-    jdk_setup: JdkSetup,
-    bash: BashBinary,
 ) -> Setup:
     toolcp_relpath = "__toolcp"
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(tool))
-
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafmtToolLockfileSentinel())
     source_files, tool_classpath = await MultiGet(
         Get(
             SourceFiles,
             SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
         ),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                lockfiles=(lockfile,),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
     )
 
     source_files_snapshot = (
@@ -229,16 +219,10 @@ async def setup_scalafmt(
     )
 
     merged_sources_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                source_files_snapshot.digest,
-                config_files.snapshot.digest,
-            ]
-        ),
+        Digest, MergeDigests([source_files_snapshot.digest, config_files.snapshot.digest])
     )
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
     }
 
@@ -250,14 +234,13 @@ async def setup_scalafmt(
             os.path.join(source_dir, name) for name in files_in_source_dir
         )
 
-    jdk_invoke_args = jdk_setup.args(bash, tool_classpath.classpath_entries(toolcp_relpath))
     partitions = await MultiGet(
         Get(
             Partition,
             SetupScalafmtPartition(
+                classpath_entries=tuple(tool_classpath.classpath_entries(toolcp_relpath)),
                 merged_sources_digest=merged_sources_digest,
-                immutable_input_digests=FrozenDict(immutable_input_digests),
-                jdk_invoke_args=jdk_invoke_args,
+                extra_immutable_input_digests=FrozenDict(extra_immutable_input_digests),
                 config_file=config_file,
                 files=tuple(sorted(files)),
                 check_only=setup_request.check_only,
@@ -270,12 +253,12 @@ async def setup_scalafmt(
 
 
 @rule(desc="Format with scalafmt", level=LogLevel.DEBUG)
-async def scalafmt_fmt(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> FmtResult:
+async def scalafmt_fmt(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> FmtResult:
     if tool.skip:
-        return FmtResult.skip(formatter_name="scalafmt")
-    setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
+        return FmtResult.skip(formatter_name=request.name)
+    setup = await Get(Setup, SetupRequest(request, check_only=False))
     results = await MultiGet(
-        Get(ProcessResult, Process, partition.process) for partition in setup.partitions
+        Get(ProcessResult, JvmProcess, partition.process) for partition in setup.partitions
     )
 
     def format(description: str, output) -> str:
@@ -304,31 +287,31 @@ async def scalafmt_fmt(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> 
         output=output_digest,
         stdout=stdout_content,
         stderr=stderr_content,
-        formatter_name="scalafmt",
+        formatter_name=request.name,
     )
     return fmt_result
 
 
 @rule(desc="Lint with scalafmt", level=LogLevel.DEBUG)
-async def scalafmt_lint(field_sets: ScalafmtRequest, tool: ScalafmtSubsystem) -> LintResults:
+async def scalafmt_lint(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> LintResults:
     if tool.skip:
-        return LintResults([], linter_name="scalafmt")
-    setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
+        return LintResults([], linter_name=request.name)
+    setup = await Get(Setup, SetupRequest(request, check_only=True))
     results = await MultiGet(
-        Get(FallibleProcessResult, Process, partition.process) for partition in setup.partitions
+        Get(FallibleProcessResult, JvmProcess, partition.process) for partition in setup.partitions
     )
     lint_results = [
         LintResult.from_fallible_process_result(result, partition_description=partition.description)
         for result, partition in zip(results, setup.partitions)
     ]
-    return LintResults(lint_results, linter_name="scalafmt")
+    return LintResults(lint_results, linter_name=request.name)
 
 
 @rule
-async def generate_scalafmt_lockfile_request(
+def generate_scalafmt_lockfile_request(
     _: ScalafmtToolLockfileSentinel, tool: ScalafmtSubsystem
-) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
@@ -336,6 +319,6 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(FmtRequest, ScalafmtRequest),
-        UnionRule(LintRequest, ScalafmtRequest),
+        UnionRule(LintTargetsRequest, ScalafmtRequest),
         UnionRule(GenerateToolLockfileSentinel, ScalafmtToolLockfileSentinel),
     ]

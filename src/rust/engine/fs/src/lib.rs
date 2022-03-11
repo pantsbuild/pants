@@ -25,12 +25,16 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+pub mod directory;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
 #[cfg(test)]
 mod posixfs_tests;
 
+pub use crate::directory::{
+  DigestTrie, DirectoryDigest, EMPTY_DIGEST_TREE, EMPTY_DIRECTORY_DIGEST,
+};
 pub use crate::glob_matching::{
   ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
   SINGLE_STAR_GLOB,
@@ -47,6 +51,7 @@ use std::{fmt, fs};
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use async_trait::async_trait;
 use bytes::Bytes;
+use deepsize::DeepSizeOf;
 use futures::future::{self, TryFutureExt};
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -80,7 +85,7 @@ pub enum Permissions {
   Writable,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize)]
+#[derive(Clone, Debug, DeepSizeOf, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize)]
 pub struct RelativePath(PathBuf);
 
 impl RelativePath {
@@ -143,7 +148,7 @@ impl From<RelativePath> for PathBuf {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub enum Stat {
   Link(Link),
   Dir(Dir),
@@ -171,19 +176,19 @@ impl Stat {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Link(pub PathBuf);
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Dir(pub PathBuf);
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct File {
   pub path: PathBuf,
   pub is_executable: bool,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub enum PathStat {
   Dir {
     // The symbolic name of some filesystem Path, which is context specific.
@@ -214,34 +219,9 @@ impl PathStat {
       &PathStat::File { ref path, .. } => path.as_path(),
     }
   }
-
-  ///
-  /// Sort and ensure that there were no duplicate entries.
-  ///
-  /// TODO: audit if this is even necessary? expand_globs() already sorts and dedupes, but, are
-  /// there other callers of this where we can't be confident the sorting happened? Maybe, we
-  /// should add a light wrapper around `Vec<PathStat>` that ensures it's sorted and deduped, as
-  /// we're now using the type a lot.
-  pub fn normalize_path_stats(mut path_stats: Vec<PathStat>) -> Result<Vec<PathStat>, String> {
-    #[allow(clippy::unnecessary_sort_by)]
-    path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-
-    // The helper assumes that if a Path has multiple children, it must be a directory.
-    // Proactively error if we run into identically named files, because otherwise we will treat
-    // them like empty directories.
-    let pre_dedupe_len = path_stats.len();
-    path_stats.dedup_by(|a, b| a.path() == b.path());
-    if path_stats.len() != pre_dedupe_len {
-      return Err(format!(
-        "Snapshots must be constructed from unique path stats; got duplicates in {:?}",
-        path_stats
-      ));
-    }
-    Ok(path_stats)
-  }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct DirectoryListing(pub Vec<Stat>);
 
 #[derive(Debug)]
@@ -340,7 +320,7 @@ impl GitignoreStyleExcludes {
   }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum StrictGlobMatching {
   // NB: the Error and Warn variants store a description of the origin of the PathGlob
   // request so that we can make the error message more helpful to users when globs fail to match.
@@ -378,7 +358,7 @@ impl StrictGlobMatching {
   }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum GlobExpansionConjunction {
   AllMatch,
   AnyMatch,
@@ -400,7 +380,7 @@ pub enum SymlinkBehavior {
   Oblivious,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, DeepSizeOf, Clone, Eq, PartialEq, Hash)]
 pub struct PathGlobs {
   globs: Vec<String>,
   strict_match_behavior: StrictGlobMatching,
@@ -566,15 +546,15 @@ impl PosixFS {
             if path_buf.is_absolute() {
               Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Absolute symlink: {:?}", link_abs),
+                format!("Absolute symlink: {:?}", path_buf),
               ))
             } else {
               link_parent
-                .map(|parent| parent.join(path_buf))
+                .map(|parent| parent.join(&path_buf))
                 .ok_or_else(|| {
                   io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Symlink without a parent?: {:?}", link_abs),
+                    format!("Symlink without a parent?: {:?}", path_buf),
                   )
                 })
             }

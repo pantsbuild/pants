@@ -3,11 +3,34 @@
 
 from pathlib import Path
 
+import pytest
+
 from pants.core.goals.check import CheckResult, CheckResults
-from pants.core.goals.style_request import write_reports
+from pants.core.goals.style_request import (
+    StyleRequest,
+    determine_specified_tool_names,
+    write_reports,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import EMPTY_DIGEST, Workspace
 from pants.testutil.rule_runner import RuleRunner
+
+
+def test_determine_specified_tool_names() -> None:
+    class StyleReq(StyleRequest):
+        name = "my-tool"
+
+    with pytest.raises(ValueError) as exc:
+        determine_specified_tool_names(
+            "fake-goal",
+            only_option=["bad"],
+            all_style_requests=[StyleReq],
+            extra_valid_names=["extra-tool"],
+        )
+    assert (
+        "Unrecognized name with the option `--fake-goal-only`: 'bad'\n\n"
+        "All valid names: ['extra-tool', 'my-tool']"
+    ) in str(exc.value)
 
 
 def test_write_reports() -> None:
@@ -36,7 +59,7 @@ def test_write_reports() -> None:
         checker_name="partition_duplicate",
     )
 
-    def get_tool_name(res: CheckResults) -> str:
+    def get_name(res: CheckResults) -> str:
         return res.checker_name
 
     write_reports(
@@ -51,7 +74,7 @@ def test_write_reports() -> None:
         Workspace(rule_runner.scheduler, _enforce_effects=False),
         DistDir(Path("dist")),
         goal_name="check",
-        get_tool_name=get_tool_name,
+        get_name=get_name,
     )
 
     check_dir = Path(rule_runner.build_root, "dist", "check")

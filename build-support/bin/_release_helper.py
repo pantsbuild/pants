@@ -390,8 +390,8 @@ MINIMUM_STALE_AGE = timedelta(days=180)
 PANTS_PKG = Package(
     "pantsbuild.pants",
     "src/python/pants:pants-packaged",
-    # TODO: See https://github.com/pypa/pypi-support/issues/1376.
-    20000,
+    # Increased from the default limit of 20GB via https://github.com/pypa/pypi-support/issues/1376.
+    40000,
     validate_pants_pkg,
 )
 TESTUTIL_PKG = Package(
@@ -1019,8 +1019,8 @@ def prompt_apple_silicon() -> None:
     input(
         f"We need to release for Apple Silicon. Please message Eric on Slack asking to release "
         f"for {CONSTANTS.pants_stable_version}.\n\n"
-        f"(You do not need to wait for Eric to finish his part. You can continue in the release "
-        f"process once you've messaged him.)"
+        f"(You do not need to wait for Eric to finish their part. You can continue in the release "
+        f"process once you've messaged them.)"
         f"\n\nHit enter when you've messaged Eric: "
     )
 

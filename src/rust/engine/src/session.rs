@@ -12,16 +12,15 @@ use crate::nodes::{NodeKey, Select};
 use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
-use futures::future::{self, AbortHandle, Abortable};
-use futures::FutureExt;
+use futures::future::{self, AbortHandle, Abortable, FutureExt};
 use graph::LastObserved;
 use log::warn;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use pyo3::prelude::*;
 use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
-use workunit_store::{format_workunit_duration, RunId, UserMetadataPyValue, WorkunitStore};
+use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
@@ -38,7 +37,7 @@ pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
 ///
 enum SessionDisplay {
   // The dynamic UI is enabled, and the ConsoleUI should interact with a TTY.
-  ConsoleUI(ConsoleUI),
+  ConsoleUI(Box<ConsoleUI>),
   // The dynamic UI is disabled, and we should use only logging.
   Logging {
     straggler_threshold: Duration,
@@ -50,10 +49,15 @@ impl SessionDisplay {
   fn new(
     workunit_store: &WorkunitStore,
     parallelism: usize,
-    should_render_ui: bool,
+    dynamic_ui: bool,
+    ui_use_prodash: bool,
   ) -> SessionDisplay {
-    if should_render_ui {
-      SessionDisplay::ConsoleUI(ConsoleUI::new(workunit_store.clone(), parallelism))
+    if dynamic_ui {
+      SessionDisplay::ConsoleUI(Box::new(ConsoleUI::new(
+        workunit_store.clone(),
+        parallelism,
+        ui_use_prodash,
+      )))
     } else {
       SessionDisplay::Logging {
         // TODO: This threshold should likely be configurable, but the interval we render at
@@ -85,7 +89,6 @@ struct SessionState {
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
   run_id: AtomicU32,
-  workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, PyObject>>,
 }
 
 ///
@@ -139,16 +142,27 @@ pub struct Session {
 impl Session {
   pub fn new(
     core: Arc<Core>,
-    should_render_ui: bool,
+    dynamic_ui: bool,
+    ui_use_prodash: bool,
+    mut max_workunit_level: log::Level,
     build_id: String,
     session_values: PyObject,
     cancelled: AsyncLatch,
   ) -> Result<Session, String> {
-    let workunit_store = WorkunitStore::new(!should_render_ui);
+    // We record workunits with the maximum level of:
+    // 1. the given `max_workunit_verbosity`, which should be computed from:
+    //     * the log level, to ensure that workunit events are logged
+    //     * the levels required by any consumers who will call `with_latest_workunits`.
+    // 2. the level required by the ConsoleUI (if any): currently, DEBUG.
+    if dynamic_ui {
+      max_workunit_level = std::cmp::max(max_workunit_level, log::Level::Debug);
+    }
+    let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level);
     let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &workunit_store,
       core.local_parallelism,
-      should_render_ui,
+      dynamic_ui,
+      ui_use_prodash,
     ));
 
     let handle = Arc::new(SessionHandle {
@@ -169,7 +183,6 @@ impl Session {
         workunit_store,
         session_values: Mutex::new(session_values),
         run_id: AtomicU32::new(run_id.0),
-        workunit_metadata_map: RwLock::new(HashMap::new()),
       }),
     })
   }
@@ -185,6 +198,7 @@ impl Session {
     let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &self.state.workunit_store,
       self.state.core.local_parallelism,
+      false,
       false,
     ));
     let handle = Arc::new(SessionHandle {
@@ -223,13 +237,6 @@ impl Session {
   ///
   pub async fn cancelled(&self) {
     self.handle.cancelled.triggered().await;
-  }
-
-  pub fn with_metadata_map<F, T>(&self, f: F) -> T
-  where
-    F: FnOnce(&mut HashMap<UserMetadataPyValue, PyObject>) -> T,
-  {
-    f(&mut self.state.workunit_metadata_map.write())
   }
 
   pub fn roots_extend(&self, new_roots: Vec<(Root, Option<LastObserved>)>) {
@@ -305,18 +312,18 @@ impl Session {
 
   pub async fn maybe_display_teardown(&self) {
     let teardown = match *self.handle.display.lock().await {
-      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().boxed(),
+      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown(),
       SessionDisplay::Logging {
         ref mut straggler_deadline,
         ..
       } => {
         *straggler_deadline = None;
-        async { Ok(()) }.boxed()
+        futures::future::ready(()).boxed()
       }
     };
-    if let Err(e) = teardown.await {
-      warn!("{}", e);
-    }
+    // NB: We await teardown outside of the display lock to remove a lock interleaving. See
+    // `ConsoleUI::teardown`.
+    teardown.await;
   }
 
   pub fn maybe_display_render(&self) {
@@ -346,7 +353,11 @@ impl Session {
               "Long running tasks:\n  {}",
               straggling_workunits
                 .into_iter()
-                .map(|(duration, desc)| format!("{}\t{}", format_workunit_duration(duration), desc))
+                .map(|(duration, desc)| format!(
+                  "{}\t{}",
+                  format_workunit_duration_ms!(duration.as_millis()),
+                  desc
+                ))
                 .collect::<Vec<_>>()
                 .join("\n  ")
             );

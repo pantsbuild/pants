@@ -15,9 +15,13 @@ from itertools import chain
 from textwrap import dedent
 from typing import DefaultDict, Dict, Generator, Optional, Tuple, cast
 
-from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModuleOwners,
+    PythonModuleOwnersRequest,
+)
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
 from pants.backend.python.goals.setup_py import InvalidEntryPoint
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
     PexBinariesGeneratorTarget,
@@ -28,15 +32,9 @@ from pants.backend.python.target_types import (
     PythonDistributionDependenciesField,
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
+    PythonFilesGeneratorSettingsRequest,
     PythonProvidesField,
-    PythonSourcesGeneratingSourcesField,
-    PythonSourcesGeneratorTarget,
-    PythonSourceTarget,
-    PythonTestsGeneratingSourcesField,
-    PythonTestsGeneratorTarget,
-    PythonTestTarget,
-    PythonTestUtilsGeneratingSourcesField,
-    PythonTestUtilsGeneratorTarget,
+    PythonResolveField,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
@@ -55,137 +53,35 @@ from pants.engine.target import (
     InjectedDependencies,
     InvalidFieldException,
     OverridesField,
-    SourcesPaths,
-    SourcesPathsRequest,
+    TargetFilesGeneratorSettings,
+    TargetFilesGeneratorSettingsRequest,
     Targets,
     WrappedTarget,
-    generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 
 
+@rule
+def python_files_generator_settings(
+    _: PythonFilesGeneratorSettingsRequest,
+    python_infer: PythonInferSubsystem,
+) -> TargetFilesGeneratorSettings:
+    return TargetFilesGeneratorSettings(add_dependencies_on_all_siblings=not python_infer.imports)
+
+
 # -----------------------------------------------------------------------------------------------
-# `python_sources`, `python_tests`, and `python_test_utils` target generation rules
+# `pex_binary` target generation rules
 # -----------------------------------------------------------------------------------------------
-
-
-class GenerateTargetsFromPythonTests(GenerateTargetsRequest):
-    generate_from = PythonTestsGeneratorTarget
-
-
-@rule
-async def generate_targets_from_python_tests(
-    request: GenerateTargetsFromPythonTests,
-    files_not_found_behavior: FilesNotFoundBehavior,
-    python_infer: PythonInferSubsystem,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[PythonTestsGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        PythonTestTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=not python_infer.imports,
-        overrides=all_overrides,
-    )
-
-
-class GenerateTargetsFromPythonSources(GenerateTargetsRequest):
-    generate_from = PythonSourcesGeneratorTarget
-
-
-@rule
-async def generate_targets_from_python_sources(
-    request: GenerateTargetsFromPythonSources,
-    python_infer: PythonInferSubsystem,
-    files_not_found_behavior: FilesNotFoundBehavior,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[PythonSourcesGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        PythonSourceTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=not python_infer.imports,
-        overrides=all_overrides,
-    )
-
-
-class GenerateTargetsFromPythonTestUtils(GenerateTargetsRequest):
-    generate_from = PythonTestUtilsGeneratorTarget
-
-
-@rule
-async def generate_targets_from_python_test_utils(
-    request: GenerateTargetsFromPythonTestUtils,
-    python_infer: PythonInferSubsystem,
-    files_not_found_behavior: FilesNotFoundBehavior,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[PythonTestUtilsGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        PythonSourceTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=not python_infer.imports,
-        overrides=all_overrides,
-    )
 
 
 class GenerateTargetsFromPexBinaries(GenerateTargetsRequest):
+    # TODO: This can be deprecated in favor of `parametrize`.
     generate_from = PexBinariesGeneratorTarget
 
 
@@ -196,21 +92,24 @@ async def generate_targets_from_pex_binaries(
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
     entry_points_field = request.generator[PexEntryPointsField].value or []
-    overrides = request.generator[OverridesField].flatten()
+    overrides = request.require_unparametrized_overrides()
+    inherited_fields = {
+        field.alias: field.value
+        for field in request.generator.field_values.values()
+        if not isinstance(field, (PexEntryPointsField, OverridesField))
+    }
 
     # Note that we don't check for overlap because it seems unlikely to be a problem.
     # If it does, we should add this check. (E.g. `path.to.app` and `path/to/app.py`)
 
     def create_pex_binary(entry_point_spec: str) -> PexBinary:
-        target_fields = {
-            field.alias: field.value
-            for field in request.generator.field_values.values()
-            if not isinstance(field, (PexEntryPointsField, OverridesField))
-        }
-        target_fields.update(overrides.pop(entry_point_spec, {}))
-
         return PexBinary(
-            {PexEntryPointField.alias: entry_point_spec, **target_fields},
+            {
+                PexEntryPointField.alias: entry_point_spec,
+                **inherited_fields,
+                # Note that overrides comes last to make sure that it indeed overrides.
+                **overrides.pop(entry_point_spec, {}),
+            },
             # ":" is a forbidden character in target names
             generator_addr.create_generated(entry_point_spec.replace(":", "-")),
             union_membership,
@@ -236,7 +135,7 @@ async def generate_targets_from_pex_binaries(
 # -----------------------------------------------------------------------------------------------
 
 
-@rule(desc="Determining the entry point for a `pex_binary` target", level=LogLevel.DEBUG)
+@rule(desc="Determining the entry point for a `pex_binary` target")
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
     ep_val = request.entry_point_field.value
     if ep_val is None:
@@ -293,7 +192,9 @@ class InjectPexBinaryEntryPointDependency(InjectDependenciesRequest):
 
 @rule(desc="Inferring dependency from the pex_binary `entry_point` field")
 async def inject_pex_binary_entry_point_dependency(
-    request: InjectPexBinaryEntryPointDependency, python_infer_subsystem: PythonInferSubsystem
+    request: InjectPexBinaryEntryPointDependency,
+    python_infer_subsystem: PythonInferSubsystem,
+    python_setup: PythonSetup,
 ) -> InjectedDependencies:
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
@@ -308,7 +209,14 @@ async def inject_pex_binary_entry_point_dependency(
     )
     if entry_point.val is None:
         return InjectedDependencies()
-    owners = await Get(PythonModuleOwners, PythonModule(entry_point.val.module))
+
+    owners = await Get(
+        PythonModuleOwners,
+        PythonModuleOwnersRequest(
+            entry_point.val.module,
+            resolve=original_tgt.target[PythonResolveField].normalized_value(python_setup),
+        ),
+    )
     address = original_tgt.target.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
@@ -357,7 +265,7 @@ def _classify_entry_points(
             )
 
 
-@rule(desc="Determining the entry points for a `python_distribution` target", level=LogLevel.DEBUG)
+@rule(desc="Determining the entry points for a `python_distribution` target")
 async def resolve_python_distribution_entry_points(
     request: ResolvePythonDistributionEntryPointsRequest,
 ) -> ResolvedPythonDistributionEntryPoints:
@@ -501,7 +409,7 @@ async def inject_python_distribution_dependencies(
     ]
     all_module_owners = iter(
         await MultiGet(
-            Get(PythonModuleOwners, PythonModule(entry_point.module))
+            Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module, resolve=None))
             for _, _, entry_point in all_module_entry_points
         )
     )
@@ -535,9 +443,7 @@ def rules():
     return (
         *collect_rules(),
         *import_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTests),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonSources),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPythonTestUtils),
+        UnionRule(TargetFilesGeneratorSettingsRequest, PythonFilesGeneratorSettingsRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinaries),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),

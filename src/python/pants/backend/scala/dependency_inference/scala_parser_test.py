@@ -13,13 +13,11 @@ from pants.backend.scala.dependency_inference.scala_parser import (
 from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
-from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve import jvm_tool
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -30,9 +28,7 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *scala_parser.rules(),
-            *coursier_fetch_rules(),
-            *coursier_setup_rules(),
-            *external_tool_rules(),
+            *jvm_tool.rules(),
             *source_files.rules(),
             *jdk_rules.rules(),
             *target_types.rules(),
@@ -141,7 +137,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         ),
     )
 
-    assert sorted(list(analysis.provided_symbols)) == [
+    assert sorted(analysis.provided_symbols) == [
         "org.pantsbuild.example.ASubClass",
         "org.pantsbuild.example.ASubTrait",
         "org.pantsbuild.example.Functions",
@@ -173,7 +169,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.OuterTrait.NestedVar",
     ]
 
-    assert sorted(list(analysis.provided_symbols_encoded)) == [
+    assert sorted(analysis.provided_symbols_encoded) == [
         "org.pantsbuild.example.ASubClass",
         "org.pantsbuild.example.ASubTrait",
         "org.pantsbuild.example.Functions",

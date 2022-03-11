@@ -70,7 +70,11 @@ async def find_putative_go_targets(
     # Add `go_package` targets.
     unowned_go_files = set(all_go_files.files) - set(all_owned_sources)
     for dirname, filenames in group_by_dir(unowned_go_files).items():
-        if "testdata" in PurePath(dirname).parts:
+        # Ignore paths that have `testdata` or `vendor` in them.
+        # From `go help packages`: Note, however, that a directory named vendor that itself contains code
+        # is not a vendored package: cmd/vendor would be a command named vendor.
+        dirname_parts = PurePath(dirname).parts
+        if "testdata" in dirname_parts or "vendor" in dirname_parts[0:-1]:
             continue
         putative_targets.append(
             PutativeTarget.for_target_type(

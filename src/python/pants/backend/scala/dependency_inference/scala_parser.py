@@ -21,18 +21,12 @@ from pants.engine.fs import (
     RemovePrefix,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import (
-    BashBinary,
-    FallibleProcessResult,
-    Process,
-    ProcessExecutionFailure,
-    ProcessResult,
-)
+from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.jdk_rules import JdkSetup
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -192,7 +186,7 @@ class ScalaSourceDependencyAnalysis:
                 for key, values in self.imports_by_scope.items()
             },
             "consumed_symbols_by_scope": {
-                k: sorted(list(v)) for k, v in self.consumed_symbols_by_scope.items()
+                k: sorted(v) for k, v in self.consumed_symbols_by_scope.items()
             },
             "scopes": list(self.scopes),
         }
@@ -209,8 +203,7 @@ class ScalaParserCompiledClassfiles(ClasspathEntry):
 
 @rule(level=LogLevel.DEBUG)
 async def analyze_scala_source_dependencies(
-    bash: BashBinary,
-    jdk_setup: JdkSetup,
+    jdk: InternalJdk,
     processor_classfiles: ScalaParserCompiledClassfiles,
     source_files: SourceFiles,
 ) -> FallibleScalaSourceDependencyAnalysisResult:
@@ -229,16 +222,13 @@ async def analyze_scala_source_dependencies(
 
     (tool_classpath, prefixed_source_files_digest,) = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                artifact_requirements=(SCALA_PARSER_ARTIFACT_REQUIREMENTS,),
-            ),
+            ToolClasspath,
+            ToolClasspathRequest(artifact_requirements=SCALA_PARSER_ARTIFACT_REQUIREMENTS),
         ),
         Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
     )
 
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
         processorcp_relpath: processor_classfiles.digest,
     }
@@ -247,21 +237,21 @@ async def analyze_scala_source_dependencies(
 
     process_result = await Get(
         FallibleProcessResult,
-        Process(
+        JvmProcess(
+            jdk=jdk,
+            classpath_entries=[
+                *tool_classpath.classpath_entries(toolcp_relpath),
+                processorcp_relpath,
+            ],
             argv=[
-                *jdk_setup.args(
-                    bash, [*tool_classpath.classpath_entries(toolcp_relpath), processorcp_relpath]
-                ),
                 "org.pantsbuild.backend.scala.dependency_inference.ScalaParser",
                 analysis_output_path,
                 source_path,
             ],
             input_digest=prefixed_source_files_digest,
-            immutable_input_digests=immutable_input_digests,
+            extra_immutable_input_digests=extra_immutable_input_digests,
             output_files=(analysis_output_path,),
-            use_nailgun=immutable_input_digests.keys(),
-            append_only_caches=jdk_setup.append_only_caches,
-            env=jdk_setup.env,
+            extra_nailgun_keys=extra_immutable_input_digests,
             description=f"Analyzing {source_files.files[0]}",
             level=LogLevel.DEBUG,
         ),
@@ -294,9 +284,7 @@ async def resolve_fallible_result_to_analysis(
 
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
-async def setup_scala_parser_classfiles(
-    bash: BashBinary, jdk_setup: JdkSetup
-) -> ScalaParserCompiledClassfiles:
+async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiledClassfiles:
     dest_dir = "classfiles"
 
     parser_source_content = pkgutil.get_data(
@@ -309,47 +297,37 @@ async def setup_scala_parser_classfiles(
 
     tool_classpath, parser_classpath, source_digest = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__toolcp",
-                artifact_requirements=(
-                    ArtifactRequirements.from_coordinates(
-                        [
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-compiler",
-                                version=PARSER_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-library",
-                                version=PARSER_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-reflect",
-                                version=PARSER_SCALA_VERSION,
-                            ),
-                        ]
-                    ),
+                artifact_requirements=ArtifactRequirements.from_coordinates(
+                    [
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-compiler",
+                            version=PARSER_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-library",
+                            version=PARSER_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-reflect",
+                            version=PARSER_SCALA_VERSION,
+                        ),
+                    ]
                 ),
             ),
         ),
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__parsercp", artifact_requirements=(SCALA_PARSER_ARTIFACT_REQUIREMENTS,)
+            ToolClasspath,
+            ToolClasspathRequest(
+                prefix="__parsercp", artifact_requirements=SCALA_PARSER_ARTIFACT_REQUIREMENTS
             ),
         ),
-        Get(
-            Digest,
-            CreateDigest(
-                [
-                    parser_source,
-                    Directory(dest_dir),
-                ]
-            ),
-        ),
+        Get(Digest, CreateDigest([parser_source, Directory(dest_dir)])),
     )
 
     merged_digest = await Get(
@@ -363,12 +341,12 @@ async def setup_scala_parser_classfiles(
         ),
     )
 
-    # NB: We do not use nailgun for this process, since it is launched exactly once.
     process_result = await Get(
         ProcessResult,
-        Process(
+        JvmProcess(
+            jdk=jdk,
+            classpath_entries=tool_classpath.classpath_entries(),
             argv=[
-                *jdk_setup.args(bash, tool_classpath.classpath_entries()),
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries()),
@@ -379,12 +357,11 @@ async def setup_scala_parser_classfiles(
                 parser_source.path,
             ],
             input_digest=merged_digest,
-            append_only_caches=jdk_setup.append_only_caches,
-            immutable_input_digests=jdk_setup.immutable_input_digests,
-            env=jdk_setup.env,
             output_directories=(dest_dir,),
             description="Compile Scala parser for dependency inference with scalac",
             level=LogLevel.DEBUG,
+            # NB: We do not use nailgun for this process, since it is launched exactly once.
+            use_nailgun=False,
         ),
     )
     stripped_classfiles_digest = await Get(

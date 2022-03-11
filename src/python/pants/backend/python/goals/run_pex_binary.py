@@ -4,7 +4,6 @@
 import os
 
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinaryDefaults,
     ResolvedPexEntryPoint,
@@ -32,10 +31,7 @@ from pants.util.logging import LogLevel
 
 @rule(level=LogLevel.DEBUG)
 async def create_pex_binary_run_request(
-    field_set: PexBinaryFieldSet,
-    pex_binary_defaults: PexBinaryDefaults,
-    pex_env: PexEnvironment,
-    python_setup: PythonSetup,
+    field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults, pex_env: PexEnvironment
 ) -> RunRequest:
     entry_point, transitive_targets = await MultiGet(
         Get(
@@ -50,17 +46,21 @@ async def create_pex_binary_run_request(
         InterpreterConstraints, InterpreterConstraintsRequest(addresses)
     )
 
+    pex_filename = (
+        field_set.address.generated_name.replace(".", "_")
+        if field_set.address.generated_name
+        else field_set.address.target_name
+    )
     pex_get = Get(
         Pex,
         PexFromTargetsRequest(
             [field_set.address],
-            output_filename=f"{field_set.address.target_name}.pex",
+            output_filename=f"{pex_filename}.pex",
             internal_only=True,
             include_source_files=False,
             # Note that the file for first-party entry points is not in the PEX itself. In that
             # case, it's loaded by setting `PEX_EXTRA_SYS_PATH`.
             main=entry_point.val or field_set.script.value,
-            resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
             additional_args=(
                 *field_set.generate_additional_args(pex_binary_defaults),
                 # N.B.: Since we cobble together the runtime environment via PEX_EXTRA_SYS_PATH

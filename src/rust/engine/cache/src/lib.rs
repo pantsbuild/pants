@@ -71,8 +71,15 @@ impl PersistentCache {
   }
 
   pub async fn store(&self, key: &CacheKey, value: Bytes) -> Result<(), String> {
+    // NB: This is an unusual usage of the ShardedLmdb interface. In order for this to be a cache,
+    // rather than storing the value under its _own_ Fingerprint, the value is stored under the
+    // Fingerprint of the CacheKey.
     let fingerprint = Digest::of_bytes(&key.to_bytes()).hash;
-    self.store.store_bytes(fingerprint, value, false).await
+    self
+      .store
+      .store_bytes(Some(fingerprint), value, false)
+      .await?;
+    Ok(())
   }
 
   pub async fn load(&self, key: &CacheKey) -> Result<Option<Bytes>, String> {

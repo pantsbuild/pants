@@ -9,7 +9,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.lint import REPORT_DIR, LintRequest, LintResult, LintResults
+from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
@@ -20,8 +20,9 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-class BanditRequest(LintRequest):
+class BanditRequest(LintTargetsRequest):
     field_set_type = BanditFieldSet
+    name = Bandit.options_scope
 
 
 @dataclass(frozen=True)
@@ -44,13 +45,8 @@ async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> L
 
     bandit_pex_get = Get(
         VenvPex,
-        PexRequest(
-            output_filename="bandit.pex",
-            internal_only=True,
-            requirements=bandit.pex_requirements(),
-            interpreter_constraints=partition.interpreter_constraints,
-            main=bandit.main,
-        ),
+        PexRequest,
+        bandit.to_pex_request(interpreter_constraints=partition.interpreter_constraints),
     )
 
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, bandit.config_request)
@@ -95,7 +91,7 @@ async def bandit_lint(
     request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
 ) -> LintResults:
     if bandit.skip:
-        return LintResults([], linter_name="Bandit")
+        return LintResults([], linter_name=request.name)
 
     # NB: Bandit output depends upon which Python interpreter version it's run with
     # ( https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit). We
@@ -108,8 +104,8 @@ async def bandit_lint(
         Get(LintResult, BanditPartition(partition_field_sets, partition_compatibility))
         for partition_compatibility, partition_field_sets in constraints_to_field_sets.items()
     )
-    return LintResults(partitioned_results, linter_name="Bandit")
+    return LintResults(partitioned_results, linter_name=request.name)
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintRequest, BanditRequest), *pex.rules()]
+    return [*collect_rules(), UnionRule(LintTargetsRequest, BanditRequest), *pex.rules()]

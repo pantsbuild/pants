@@ -2,27 +2,23 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
     BoolField,
     Dependencies,
-    GeneratedTargets,
-    GenerateTargetsRequest,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
-    SourcesPaths,
-    SourcesPathsRequest,
     Target,
+    TargetFilesGenerator,
+    TargetFilesGeneratorSettings,
+    TargetFilesGeneratorSettingsRequest,
     Targets,
     generate_file_based_overrides_field_help_message,
-    generate_file_level_targets,
 )
-from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import FilesNotFoundBehavior
+from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 
@@ -76,6 +72,20 @@ class ProtobufSourceTarget(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+class GeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
+    pass
+
+
+@rule
+def generator_settings(
+    _: GeneratorSettingsRequest,
+    protoc: Protoc,
+) -> TargetFilesGeneratorSettings:
+    return TargetFilesGeneratorSettings(
+        add_dependencies_on_all_siblings=not protoc.dependency_inference
+    )
+
+
 class ProtobufSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.proto",)
     expected_file_extensions = (".proto",)
@@ -94,56 +104,26 @@ class ProtobufSourcesOverridesField(OverridesField):
     )
 
 
-class ProtobufSourcesGeneratorTarget(Target):
+class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "protobuf_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ProtobufDependenciesField,
         ProtobufSourcesGeneratingSourcesField,
-        ProtobufGrpcToggleField,
         ProtobufSourcesOverridesField,
     )
+    generated_target_cls = ProtobufSourceTarget
+    copied_fields = (
+        *COMMON_TARGET_FIELDS,
+        ProtobufDependenciesField,
+    )
+    moved_fields = (ProtobufGrpcToggleField,)
+    settings_request_cls = GeneratorSettingsRequest
     help = "Generate a `protobuf_source` target for each file in the `sources` field."
 
 
-class GenerateTargetsFromProtobufSources(GenerateTargetsRequest):
-    generate_from = ProtobufSourcesGeneratorTarget
-
-
-@rule
-async def generate_targets_from_protobuf_sources(
-    request: GenerateTargetsFromProtobufSources,
-    files_not_found_behavior: FilesNotFoundBehavior,
-    protoc: Protoc,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[ProtobufSourcesGeneratingSourcesField])
-    )
-
-    all_overrides = {}
-    overrides_field = request.generator[OverridesField]
-    if overrides_field.value:
-        _all_override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs)
-            for path_globs in overrides_field.to_path_globs(files_not_found_behavior)
-        )
-        all_overrides = overrides_field.flatten_paths(
-            dict(zip(_all_override_paths, overrides_field.value.values()))
-        )
-
-    return generate_file_level_targets(
-        ProtobufSourceTarget,
-        request.generator,
-        sources_paths.files,
-        union_membership,
-        add_dependencies_on_all_siblings=not protoc.dependency_inference,
-        overrides=all_overrides,
-    )
-
-
 def rules():
-    return (
+    return [
         *collect_rules(),
-        UnionRule(GenerateTargetsRequest, GenerateTargetsFromProtobufSources),
-    )
+        UnionRule(TargetFilesGeneratorSettingsRequest, GeneratorSettingsRequest),
+    ]

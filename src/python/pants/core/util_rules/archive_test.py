@@ -8,8 +8,9 @@ from io import BytesIO
 
 import pytest
 
-from pants.core.util_rules.archive import ArchiveFormat, CreateArchive, ExtractedArchive
-from pants.core.util_rules.archive import rules as archive_rules
+from pants.core.util_rules import archive, system_binaries
+from pants.core.util_rules.archive import CreateArchive, ExtractedArchive
+from pants.core.util_rules.system_binaries import ArchiveFormat
 from pants.engine.fs import Digest, DigestContents, FileContent
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -18,7 +19,8 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *archive_rules(),
+            *archive.rules(),
+            *system_binaries.rules(),
             QueryRule(Digest, [CreateArchive]),
             QueryRule(ExtractedArchive, [Digest]),
         ],

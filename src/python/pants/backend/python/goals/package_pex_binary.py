@@ -5,9 +5,9 @@ import logging
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinaryDefaults,
+    PexCompletePlatformsField,
     PexEmitWarningsField,
     PexEntryPointField,
     PexExecutionMode,
@@ -18,18 +18,15 @@ from pants.backend.python.target_types import (
     PexInheritPathField,
     PexLayout,
     PexLayoutField,
-)
-from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.target_types import (
+    PexPlatformsField,
     PexResolveLocalPlatformsField,
     PexScriptField,
     PexShebangField,
     PexStripEnvField,
-    PythonResolveField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import Pex, PexPlatforms
+from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
 from pants.core.goals.package import (
     BuiltPackage,
@@ -65,13 +62,13 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     inherit_path: PexInheritPathField
     shebang: PexShebangField
     strip_env: PexStripEnvField
-    platforms: PythonPlatformsField
+    platforms: PexPlatformsField
+    complete_platforms: PexCompletePlatformsField
     resolve_local_platforms: PexResolveLocalPlatformsField
     layout: PexLayoutField
     execution_mode: PexExecutionModeField
     include_requirements: PexIncludeRequirementsField
     include_tools: PexIncludeToolsField
-    resolve: PythonResolveField
 
     @property
     def _execution_mode(self) -> PexExecutionMode:
@@ -102,7 +99,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 async def package_pex_binary(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
-    python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> BuiltPackage:
     resolved_entry_point, transitive_targets = await MultiGet(
@@ -129,6 +125,10 @@ async def package_pex_binary(
 
     output_filename = field_set.output_path.value_or_default(file_ending="pex")
 
+    complete_platforms = await Get(
+        CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
+    )
+
     pex = await Get(
         Pex,
         PexFromTargetsRequest(
@@ -136,7 +136,7 @@ async def package_pex_binary(
             internal_only=False,
             main=resolved_entry_point.val or field_set.script.value,
             platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
-            resolve_and_lockfile=field_set.resolve.resolve_and_lockfile(python_setup),
+            complete_platforms=complete_platforms,
             output_filename=output_filename,
             layout=PexLayout(field_set.layout.value),
             additional_args=field_set.generate_additional_args(pex_binary_defaults),

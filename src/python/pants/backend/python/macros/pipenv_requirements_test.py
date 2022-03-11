@@ -8,13 +8,12 @@ from json import dumps
 import pytest
 
 from pants.backend.python.macros import pipenv_requirements
-from pants.backend.python.macros.pipenv_requirements import (
-    GenerateFromPipenvRequirementsRequest,
-    PipenvRequirementsTargetGenerator,
-)
-from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
+from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTargetGenerator
+from pants.backend.python.target_types import PythonRequirementTarget
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
-from pants.engine.target import GeneratedTargets, Target
+from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -23,7 +22,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
             *pipenv_requirements.rules(),
-            QueryRule(GeneratedTargets, [GenerateFromPipenvRequirementsRequest]),
+            QueryRule(_TargetParametrizations, [Address]),
         ),
         target_types=[PipenvRequirementsTargetGenerator],
     )
@@ -37,11 +36,8 @@ def assert_pipenv_requirements(
     expected_targets: set[Target],
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, "Pipfile.lock": dumps(pipfile_lock)})
-    generator = rule_runner.get_target(Address("", target_name="reqs"))
-    result = rule_runner.request(
-        GeneratedTargets, [GenerateFromPipenvRequirementsRequest(generator)]
-    )
-    assert set(result.values()) == expected_targets
+    result = rule_runner.request(_TargetParametrizations, [Address("", target_name="reqs")])
+    assert set(result.parametrizations.values()) == expected_targets
 
 
 def test_pipfile_lock(rule_runner: RuleRunner) -> None:
@@ -83,6 +79,6 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="reqs", generated_name="cachetools"),
             ),
-            PythonRequirementsFileTarget({"source": "Pipfile.lock"}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"sources": ["Pipfile.lock"]}, file_addr),
         },
     )

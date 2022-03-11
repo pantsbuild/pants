@@ -30,21 +30,23 @@ extern crate derivative;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use async_semaphore::AsyncSemaphore;
 use async_trait::async_trait;
 use concrete_time::{Duration, TimeSpan};
-use fs::RelativePath;
+use deepsize::DeepSizeOf;
+use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use futures::future::try_join_all;
 use futures::try_join;
 use hashing::Digest;
-use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
 use store::{SnapshotOps, SnapshotOpsError, Store};
-use workunit_store::{in_workunit, RunId, RunningWorkunit, WorkunitMetadata, WorkunitStore};
+use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
+
+pub mod bounded;
+#[cfg(test)]
+mod bounded_tests;
 
 pub mod cache;
 #[cfg(test)]
@@ -77,7 +79,9 @@ pub use crate::immutable_inputs::ImmutableInputs;
 pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
-#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(
+  PartialOrd, Ord, Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq, Hash, Serialize, Deserialize,
+)]
 #[allow(non_camel_case_types)]
 pub enum Platform {
   Macos_x86_64,
@@ -148,7 +152,7 @@ impl TryFrom<String> for Platform {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq, Hash, Serialize)]
 pub enum ProcessCacheScope {
   // Cached in all locations, regardless of success or failure.
   Always,
@@ -195,20 +199,20 @@ pub struct WorkdirSymlink {
 /// The `complete` and `nailgun` Digests are the computed union of various inputs.
 ///
 /// TODO: See `crate::local::prepare_workdir` regarding validation of overlapping inputs.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq, Serialize)]
 pub struct InputDigests {
   /// All of the input Digests, merged and relativized. Runners without the ability to consume the
   /// Digests individually should directly consume this value.
-  pub complete: Digest,
+  pub complete: DirectoryDigest,
 
   /// The merged Digest of any `use_nailgun`-relevant Digests.
-  pub nailgun: Digest,
+  pub nailgun: DirectoryDigest,
 
   /// The input files for the process execution, which will be materialized as mutable inputs in a
   /// sandbox for the process.
   ///
   /// TODO: Rename to `inputs` for symmetry with `immutable_inputs`.
-  pub input_files: Digest,
+  pub input_files: DirectoryDigest,
 
   /// Immutable input digests to make available in the input root.
   ///
@@ -224,7 +228,7 @@ pub struct InputDigests {
   ///
   /// Assumes the build action does not modify the Digest as made available. This may be
   /// enforced by an executor, for example by bind mounting the directory read-only.
-  pub immutable_inputs: BTreeMap<RelativePath, Digest>,
+  pub immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
 
   /// If non-empty, use nailgun in supported runners, using the specified `immutable_inputs` keys
   /// as server inputs. All other keys (and the input_files) will be client inputs.
@@ -234,15 +238,15 @@ pub struct InputDigests {
 impl InputDigests {
   pub async fn new(
     store: &Store,
-    input_files: Digest,
-    immutable_inputs: BTreeMap<RelativePath, Digest>,
+    input_files: DirectoryDigest,
+    immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
     use_nailgun: Vec<RelativePath>,
   ) -> Result<Self, SnapshotOpsError> {
     // Collect all digests into `complete`.
     let mut complete_digests = try_join_all(
       immutable_inputs
         .iter()
-        .map(|(path, digest)| store.add_prefix(*digest, path))
+        .map(|(path, digest)| store.add_prefix(digest.clone(), path))
         .collect::<Vec<_>>(),
     )
     .await?;
@@ -252,29 +256,29 @@ impl InputDigests {
       .zip(complete_digests.iter())
       .filter_map(|(path, digest)| {
         if use_nailgun.contains(path) {
-          Some(*digest)
+          Some(digest.clone())
         } else {
           None
         }
       })
       .collect::<Vec<_>>();
-    complete_digests.push(input_files);
+    complete_digests.push(input_files.clone());
 
     let (complete, nailgun) =
       try_join!(store.merge(complete_digests), store.merge(nailgun_digests),)?;
     Ok(Self {
-      complete,
-      nailgun,
+      complete: complete,
+      nailgun: nailgun,
       input_files,
       immutable_inputs,
       use_nailgun,
     })
   }
 
-  pub fn with_input_files(input_files: Digest) -> Self {
+  pub fn with_input_files(input_files: DirectoryDigest) -> Self {
     Self {
-      complete: input_files,
-      nailgun: hashing::EMPTY_DIGEST,
+      complete: input_files.clone(),
+      nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
       input_files,
       immutable_inputs: BTreeMap::new(),
       use_nailgun: Vec::new(),
@@ -297,17 +301,17 @@ impl InputDigests {
       // Client.
       InputDigests {
         // TODO: See method doc.
-        complete: hashing::EMPTY_DIGEST,
-        nailgun: hashing::EMPTY_DIGEST,
-        input_files: self.input_files,
+        complete: EMPTY_DIRECTORY_DIGEST.clone(),
+        nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
+        input_files: self.input_files.clone(),
         immutable_inputs: client,
         use_nailgun: vec![],
       },
       // Server.
       InputDigests {
-        complete: self.nailgun,
-        nailgun: hashing::EMPTY_DIGEST,
-        input_files: hashing::EMPTY_DIGEST,
+        complete: self.nailgun.clone(),
+        nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
+        input_files: EMPTY_DIRECTORY_DIGEST.clone(),
         immutable_inputs: server,
         use_nailgun: vec![],
       },
@@ -318,9 +322,9 @@ impl InputDigests {
 impl Default for InputDigests {
   fn default() -> Self {
     Self {
-      complete: hashing::EMPTY_DIGEST,
-      nailgun: hashing::EMPTY_DIGEST,
-      input_files: hashing::EMPTY_DIGEST,
+      complete: EMPTY_DIRECTORY_DIGEST.clone(),
+      nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
+      input_files: EMPTY_DIRECTORY_DIGEST.clone(),
       immutable_inputs: BTreeMap::new(),
       use_nailgun: Vec::new(),
     }
@@ -330,7 +334,7 @@ impl Default for InputDigests {
 ///
 /// A process to be executed.
 ///
-#[derive(Derivative, Clone, Debug, Eq, Serialize)]
+#[derive(DeepSizeOf, Derivative, Clone, Debug, Eq, Serialize)]
 #[derivative(PartialEq, Hash)]
 pub struct Process {
   ///
@@ -367,8 +371,20 @@ pub struct Process {
 
   pub timeout: Option<std::time::Duration>,
 
-  /// If not None, then if a BoundedCommandRunner executes this Process
+  /// If not None, then a bounded::CommandRunner executing this Process will set an environment
+  /// variable with this name containing a unique execution slot number.
   pub execution_slot_variable: Option<String>,
+
+  /// If non-zero, the amount of parallelism that this process is capable of given its inputs. This
+  /// value does not directly set the number of cores allocated to the process: that is computed
+  /// based on availability, and provided as a template value in the arguments of the process.
+  ///
+  /// When set, a `{pants_concurrency}` variable will be templated into the `argv` of the process.
+  ///
+  /// Processes which set this value may be preempted (i.e. canceled and restarted) for a short
+  /// period after starting if available resources have changed (because other processes have
+  /// started or finished).
+  pub concurrency_available: usize,
 
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
@@ -433,6 +449,7 @@ impl Process {
       jdk_home: None,
       platform_constraint: None,
       execution_slot_variable: None,
+      concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
     }
   }
@@ -488,13 +505,13 @@ pub struct ProcessMetadata {
 ///
 /// The result of running a process.
 ///
-#[derive(Derivative, Clone, Debug, Eq)]
+#[derive(DeepSizeOf, Derivative, Clone, Debug, Eq)]
 #[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
   pub stdout_digest: Digest,
   pub stderr_digest: Digest,
   pub exit_code: i32,
-  pub output_directory: hashing::Digest,
+  pub output_directory: DirectoryDigest,
   pub platform: Platform,
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub metadata: ProcessResultMetadata,
@@ -502,7 +519,7 @@ pub struct FallibleProcessResultWithPlatform {
 
 /// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
 /// conversion is lossy, but the interesting parts are preserved.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct ProcessResultMetadata {
   /// The time from starting to completion, including preparing the chroot and cleanup.
   /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
@@ -602,7 +619,7 @@ impl From<ProcessResultMetadata> for ExecutedActionMetadata {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum ProcessResultSource {
   RanLocally,
   RanRemotely,
@@ -631,7 +648,7 @@ pub struct Context {
 impl Default for Context {
   fn default() -> Self {
     Context {
-      workunit_store: WorkunitStore::new(false),
+      workunit_store: WorkunitStore::new(false, log::Level::Debug),
       build_id: String::default(),
       run_id: RunId(0),
     }
@@ -667,68 +684,6 @@ pub fn digest(process: &Process, metadata: &ProcessMetadata) -> Digest {
   let (_, _, execute_request) =
     crate::remote::make_execute_request(process, metadata.clone()).unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
-}
-
-///
-/// A CommandRunner wrapper that limits the number of concurrent requests.
-///
-#[derive(Clone)]
-pub struct BoundedCommandRunner {
-  inner: Arc<(Box<dyn CommandRunner>, AsyncSemaphore)>,
-}
-
-impl BoundedCommandRunner {
-  pub fn new(inner: Box<dyn CommandRunner>, bound: usize) -> BoundedCommandRunner {
-    BoundedCommandRunner {
-      inner: Arc::new((inner, AsyncSemaphore::new(bound))),
-    }
-  }
-}
-
-#[async_trait]
-impl CommandRunner for BoundedCommandRunner {
-  async fn run(
-    &self,
-    context: Context,
-    workunit: &mut RunningWorkunit,
-    mut process: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let semaphore_acquisition = self.inner.1.acquire();
-    let permit = in_workunit!(
-      context.workunit_store.clone(),
-      "acquire_command_runner_slot".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        ..WorkunitMetadata::default()
-      },
-      |workunit| async move {
-        let _blocking_token = workunit.blocking();
-        semaphore_acquisition.await
-      }
-    )
-    .await;
-
-    log::debug!(
-      "Running {} under semaphore with concurrency id: {}",
-      process.description,
-      permit.concurrency_slot()
-    );
-
-    if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
-      process.env.insert(
-        execution_slot_env_var.clone(),
-        format!("{}", permit.concurrency_slot()),
-      );
-    }
-
-    self.inner.0.run(context, workunit, process).await
-  }
-}
-
-impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
-  fn from(command_runner: Box<BoundedCommandRunner>) -> Arc<dyn CommandRunner> {
-    Arc::new(*command_runner)
-  }
 }
 
 #[cfg(test)]

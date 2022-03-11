@@ -27,7 +27,7 @@ class SingletonMetaclass(type):
         return cls.instance
 
 
-class ClassPropertyDescriptor:
+class _ClassPropertyDescriptor:
     """Define a readable attribute on a class, given a function."""
 
     # The current solution is preferred as it doesn't require any modifications to the class
@@ -85,44 +85,9 @@ def classproperty(func: Callable[..., T]) -> T:
         # we need to use TypeVars for the call sites of this decorator to work properly.
         func = classmethod(func)  # type: ignore[assignment]
 
-    # If we properly annotated this function as returning a ClassPropertyDescriptor, then MyPy would
+    # If we properly annotated this function as returning a _ClassPropertyDescriptor, then MyPy would
     # no longer work correctly at call sites for this decorator.
-    return ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
-
-
-def staticproperty(func: Callable[..., T]) -> T:
-    """Use as a decorator on a method definition to make it a class-level attribute (without
-    binding).
-
-    This decorator can be applied to a method or a staticmethod. This decorator does not bind any
-    arguments.
-
-    Usage:
-    >>> other_x = 'value'
-    >>> class Foo:
-    ...   @staticproperty
-    ...   def x():
-    ...     return other_x
-    ...
-    >>> Foo.x
-    'value'
-
-    Setting or deleting the attribute of this name will overwrite this property.
-
-    The docstring of the classproperty `x` for a class `C` can be obtained by
-    `C.__dict__['x'].__doc__`.
-    """
-    doc = func.__doc__
-
-    if not isinstance(func, staticmethod):
-        # MyPy complains about converting a Callable -> staticmethod. We use a Callable in the first
-        # place because there is no typing.staticmethod, i.e. a type that takes generic arguments, and
-        # we need to use TypeVars for the call sites of this decorator to work properly.
-        func = staticmethod(func)  # type: ignore[assignment]
-
-    # If we properly annotated this function as returning a ClassPropertyDescriptor, then MyPy would
-    # no longer work correctly at call sites for this decorator.
-    return ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
+    return _ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
 
 
 class _ClassDecoratorWithSentinelAttribute(ABC):
@@ -142,29 +107,6 @@ class _ClassDecoratorWithSentinelAttribute(ABC):
         return getattr(obj, "_decorated_type_checkable_type", None) is type(self)
 
 
-def decorated_type_checkable(
-    decorator: Callable[[Type], Type]
-) -> _ClassDecoratorWithSentinelAttribute:
-    """Wraps a class decorator to add a "sentinel attribute" to decorated classes.
-
-    A "sentinel attribute" is an attribute added to the wrapped class decorator's result with
-    `.define_instance_of()`. The wrapped class decorator can then be imported and used to check
-    whether some class object was wrapped with that decorator with `.is_instance()`.
-
-    When used on a class decorator method, the method should return
-    `<method name>.define_instance_of(cls)`, where `cls` is the class object that the decorator would
-    otherwise return.
-    """
-
-    class WrappedFunction(_ClassDecoratorWithSentinelAttribute):
-        @wraps(decorator)
-        def __call__(self, cls: Type) -> Type:
-            return decorator(cls)
-
-    return WrappedFunction()
-
-
-@decorated_type_checkable
 def frozen_after_init(cls: C) -> C:
     """Class decorator to freeze any modifications to the object after __init__() is done.
 

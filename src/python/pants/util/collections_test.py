@@ -94,9 +94,7 @@ def test_partition_sequentially(size_target: int) -> None:
     # item becomes a boundary) buckets in the output.
 
     def partitioned_buckets(items: list[str]) -> set[tuple[str, ...]]:
-        return set(
-            tuple(p) for p in partition_sequentially(items, key=str, size_target=size_target)
-        )
+        return {tuple(p) for p in partition_sequentially(items, key=str, size_target=size_target)}
 
     # We start with base items containing every other element from a sorted sequence.
     all_items = sorted((f"item{i}" for i in range(0, 1024)))

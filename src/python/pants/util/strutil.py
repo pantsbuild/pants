@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 import shlex
 import textwrap
-from typing import Iterable, Sequence
+from typing import Iterable
 
 
 def ensure_binary(text_or_binary: bytes | str) -> bytes:
@@ -144,7 +144,7 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     return re.sub(r"/.*/process-execution[a-zA-Z0-9]+/", "", v)
 
 
-def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> Sequence[str]:
+def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> list[str]:
     """Hard wrap a string while still preserving any prior hard wrapping (new lines).
 
     This works well when the input uses soft wrapping, e.g. via Python's implicit string
@@ -160,14 +160,25 @@ def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> Sequence[str]:
     ]
 
 
-def bullet_list(elements: Iterable[str]) -> str:
+def bullet_list(elements: Iterable[str], max_elements: int = -1) -> str:
     """Format a bullet list with padding.
 
     Callers should normally use `\n\n` before and (if relevant) after this so that the bullets
     appear as a distinct section.
+
+    The `max_elements` may be used to limit the number of bullet rows to output, and instead leave a
+    last bullet item with "* ... and N more".
     """
     if not elements:
         return ""
+
+    if max_elements > 0:
+        elements = tuple(elements)
+        if len(elements) > max_elements:
+            elements = elements[: max_elements - 1] + (
+                f"... and {len(elements)-max_elements+1} more",
+            )
+
     sep = "\n  * "
     return f"  * {sep.join(elements)}"
 

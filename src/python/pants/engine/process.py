@@ -4,24 +4,13 @@
 from __future__ import annotations
 
 import dataclasses
-import hashlib
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from textwrap import dedent
 from typing import Iterable, Mapping
 
-from pants.engine.collection import DeduplicatedCollection
-from pants.engine.engine_aware import EngineAwareReturnType, SideEffecting
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    FileContent,
-    FileDigest,
-    MergeDigests,
-)
+from pants.engine.engine_aware import SideEffecting
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, FileDigest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
@@ -30,8 +19,6 @@ from pants.option.global_options import ProcessCleanupOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +61,7 @@ class Process:
     timeout_seconds: int | float
     jdk_home: str | None
     execution_slot_variable: str | None
+    concurrency_available: int
     cache_scope: ProcessCacheScope
     platform: str | None
 
@@ -94,6 +82,7 @@ class Process:
         timeout_seconds: int | float | None = None,
         jdk_home: str | None = None,
         execution_slot_variable: str | None = None,
+        concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         platform: Platform | None = None,
     ) -> None:
@@ -140,6 +129,7 @@ class Process:
         self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
         self.jdk_home = jdk_home
         self.execution_slot_variable = execution_slot_variable
+        self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
         self.platform = platform.value if platform is not None else None
 
@@ -405,271 +395,6 @@ async def interactive_process_from_process(req: InteractiveProcessRequest) -> In
         forward_signals_to_process=req.forward_signals_to_process,
         restartable=req.restartable,
         append_only_caches=req.process.append_only_caches,
-    )
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class BinaryPathTest:
-    args: tuple[str, ...]
-    fingerprint_stdout: bool
-
-    def __init__(self, args: Iterable[str], fingerprint_stdout: bool = True) -> None:
-        self.args = tuple(args)
-        self.fingerprint_stdout = fingerprint_stdout
-
-
-class SearchPath(DeduplicatedCollection[str]):
-    """The search path for binaries; i.e.: the $PATH."""
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class BinaryPathRequest:
-    """Request to find a binary of a given name.
-
-    If `check_file_entries` is `True` a BinaryPathRequest will consider any entries in the
-    `search_path` that are file paths in addition to traditional directory paths.
-
-    If a `test` is specified all binaries that are found will be executed with the test args and
-    only those binaries whose test executions exit with return code 0 will be retained.
-    Additionally, if test execution includes stdout content, that will be used to fingerprint the
-    binary path so that upgrades and downgrades can be detected. A reasonable test for many programs
-    might be `BinaryPathTest(args=["--version"])` since it will both ensure the program runs and
-    also produce stdout text that changes upon upgrade or downgrade of the binary at the discovered
-    path.
-    """
-
-    search_path: SearchPath
-    binary_name: str
-    check_file_entries: bool
-    test: BinaryPathTest | None
-
-    def __init__(
-        self,
-        *,
-        search_path: Iterable[str],
-        binary_name: str,
-        check_file_entries: bool = False,
-        test: BinaryPathTest | None = None,
-    ) -> None:
-        self.search_path = SearchPath(search_path)
-        self.binary_name = binary_name
-        self.check_file_entries = check_file_entries
-        self.test = test
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class BinaryPath:
-    path: str
-    fingerprint: str
-
-    def __init__(self, path: str, fingerprint: str | None = None) -> None:
-        self.path = path
-        self.fingerprint = self._fingerprint() if fingerprint is None else fingerprint
-
-    @staticmethod
-    def _fingerprint(content: bytes | bytearray | memoryview | None = None) -> str:
-        hasher = hashlib.sha256() if content is None else hashlib.sha256(content)
-        return hasher.hexdigest()
-
-    @classmethod
-    def fingerprinted(
-        cls, path: str, representative_content: bytes | bytearray | memoryview
-    ) -> BinaryPath:
-        return cls(path, fingerprint=cls._fingerprint(representative_content))
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class BinaryPaths(EngineAwareReturnType):
-    binary_name: str
-    paths: tuple[BinaryPath, ...]
-
-    def __init__(self, binary_name: str, paths: Iterable[BinaryPath] | None = None):
-        self.binary_name = binary_name
-        self.paths = tuple(OrderedSet(paths) if paths else ())
-
-    def message(self) -> str:
-        if not self.paths:
-            return f"failed to find {self.binary_name}"
-        found_msg = f"found {self.binary_name} at {self.paths[0]}"
-        if len(self.paths) > 1:
-            found_msg = f"{found_msg} and {pluralize(len(self.paths) - 1, 'other location')}"
-        return found_msg
-
-    @property
-    def first_path(self) -> BinaryPath | None:
-        """Return the first path to the binary that was discovered, if any."""
-        return next(iter(self.paths), None)
-
-    def first_path_or_raise(self, request: BinaryPathRequest, *, rationale: str) -> BinaryPath:
-        """Return the first path to the binary that was discovered, if any."""
-        first_path = self.first_path
-        if not first_path:
-            raise BinaryNotFoundError.from_request(request, rationale=rationale)
-        return first_path
-
-
-class BinaryNotFoundError(EnvironmentError):
-    @classmethod
-    def from_request(
-        cls,
-        request: BinaryPathRequest,
-        *,
-        rationale: str | None = None,
-        alternative_solution: str | None = None,
-    ) -> BinaryNotFoundError:
-        """When no binary is found via `BinaryPaths`, and it is not recoverable.
-
-        :param rationale: A short description of why this binary is needed, e.g.
-            "download the tools Pants needs" or "run Python programs".
-        :param alternative_solution: A description of what else users can do to fix the issue,
-            beyond installing the program. For example, "Alternatively, you can set the option
-            `--python-bootstrap-search-path` to change the paths searched."
-        """
-        msg = (
-            f"Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`. Please "
-            "ensure that it is installed"
-        )
-        msg += f" so that Pants can {rationale}." if rationale else "."
-        if alternative_solution:
-            msg += f"\n\n{alternative_solution}"
-        return BinaryNotFoundError(msg)
-
-
-class BashBinary(BinaryPath):
-    """The `bash` binary."""
-
-    DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
-
-
-@dataclass(frozen=True)
-class BashBinaryRequest:
-    search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
-
-
-@rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
-async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
-    request = BinaryPathRequest(
-        binary_name="bash",
-        search_path=bash_request.search_path,
-        test=BinaryPathTest(args=["--version"]),
-    )
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path
-    if not first_path:
-        raise BinaryNotFoundError.from_request(request)
-    return BashBinary(first_path.path, first_path.fingerprint)
-
-
-@rule
-async def get_bash() -> BashBinary:
-    # Expose bash to external consumers.
-    return await Get(BashBinary, BashBinaryRequest())
-
-
-@rule
-async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
-    # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
-    # our shebang. This avoids mixing locations that we would search for bash into the search paths
-    # of the request we are servicing.
-    # TODO(#10769): Replace this script with a statically linked native binary so we don't
-    #  depend on either /bin/bash being available on the Process host.
-    if request.binary_name == "bash":
-        shebang = "#!/usr/bin/env bash"
-    else:
-        bash = await Get(BashBinary, BashBinaryRequest())
-        shebang = f"#!{bash.path}"
-
-    script_path = "./find_binary.sh"
-    script_header = dedent(
-        f"""\
-        {shebang}
-
-        set -euox pipefail
-
-        CHECK_FILE_ENTRIES={'1' if request.check_file_entries else ''}
-        """
-    )
-    script_body = dedent(
-        """\
-        for path in ${PATH//:/ }; do
-            if [[ -d "${path}" ]]; then
-                # Handle traditional directory PATH element.
-                maybe_exe="${path}/$1"
-            elif [[ -n "${CHECK_FILE_ENTRIES}" ]]; then
-                # Handle PATH elements that are filenames to allow for precise selection.
-                maybe_exe="${path}"
-            else
-                maybe_exe=
-            fi
-            if [[ "$1" == "${maybe_exe##*/}" && -f "${maybe_exe}" && -x "${maybe_exe}" ]]
-            then
-                echo "${maybe_exe}"
-            fi
-        done
-        """
-    )
-    script_content = script_header + script_body
-    script_digest = await Get(
-        Digest,
-        CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
-    )
-
-    # Some subtle notes about executing this script:
-    #
-    #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
-    #      can catch bugs in the script itself, given an earlier silent failure.
-    #  - We set `ProcessCacheScope.PER_RESTART_SUCCESSFUL` to force re-run since any binary found
-    #      on the host system today could be gone tomorrow. Ideally we'd only do this for local
-    #      processes since all known remoting configurations include a static container image as
-    #      part of their cache key which automatically avoids this problem. See #10769 for a
-    #      solution that is less of a tradeoff.
-    search_path = create_path_env_var(request.search_path)
-    result = await Get(
-        ProcessResult,
-        Process(
-            description=f"Searching for `{request.binary_name}` on PATH={search_path}",
-            level=LogLevel.DEBUG,
-            input_digest=script_digest,
-            argv=[script_path, request.binary_name],
-            env={"PATH": search_path},
-            cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL,
-        ),
-    )
-
-    binary_paths = BinaryPaths(binary_name=request.binary_name)
-    found_paths = result.stdout.decode().splitlines()
-    if not request.test:
-        return dataclasses.replace(binary_paths, paths=[BinaryPath(path) for path in found_paths])
-
-    results = await MultiGet(
-        Get(
-            FallibleProcessResult,
-            Process(
-                description=f"Test binary {path}.",
-                level=LogLevel.DEBUG,
-                argv=[path, *request.test.args],
-                # NB: Since a failure is a valid result for this script, we always cache it for
-                # `pantsd`'s lifetime, regardless of success or failure.
-                cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS,
-            ),
-        )
-        for path in found_paths
-    )
-    return dataclasses.replace(
-        binary_paths,
-        paths=[
-            (
-                BinaryPath.fingerprinted(path, result.stdout)
-                if request.test.fingerprint_stdout
-                else BinaryPath(path, result.stdout.decode())
-            )
-            for path, result in zip(found_paths, results)
-            if result.exit_code == 0
-        ],
     )
 
 

@@ -8,22 +8,26 @@ import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
-from pants.build_graph.build_configuration import BuildConfiguration
 from pants.option.alias import CliAlias
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import BootstrapOptions, GlobalOptions
+from pants.option.option_types import collect_options_info
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
+from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
+
+if TYPE_CHECKING:
+    from pants.build_graph.build_configuration import BuildConfiguration
 
 
 @dataclass(frozen=True)
@@ -95,11 +99,12 @@ class OptionsBootstrapper:
             args=args,
         )
 
-        def register_global(*args, **kwargs):
+        for options_info in collect_options_info(BootstrapOptions):
             # Only use of Options.register?
-            bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
+            bootstrap_options.register(
+                GLOBAL_SCOPE, *options_info.flag_names, **options_info.flag_options
+            )
 
-        GlobalOptions.register_bootstrap_options(register_global)
         return bootstrap_options
 
     @classmethod
@@ -159,13 +164,26 @@ class OptionsBootstrapper:
 
             env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
 
-            # Finally, we expand any aliases and re-populates the bootstrap args, in case there was
-            # any from an alias.
+            # Finally, we expand any aliases and re-populate the bootstrap args, in case there
+            # were any from aliases.
             # stuhood: This could potentially break the rust client when aliases are used:
             # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
-            alias = CliAlias.from_dict(post_bootstrap_config.get("cli", "alias", dict, {}))
+            alias_dict = parse_expression(
+                name="cli.alias",
+                val=post_bootstrap_config.get("cli", "alias") or "{}",
+                acceptable_types=dict,
+            )
+            alias = CliAlias.from_dict(alias_dict)
+
             args = alias.expand_args(tuple(args))
             bargs = cls._get_bootstrap_args(args)
+
+            # We need to set this env var to allow various static help strings to reference the
+            # right name (via `pants.util.docutil`), and we need to do it as early as possible to
+            # avoid needing to lazily import code to avoid chicken-and-egg-problems. This is the
+            # earliest place it makes sense to do so and is generically used by both the local and
+            # remote pants runners.
+            os.environ["PANTS_BIN_NAME"] = bootstrap_option_values.pants_bin_name
 
             return cls(
                 env_tuples=env_tuples,
@@ -192,7 +210,7 @@ class OptionsBootstrapper:
         # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
         # Stop before '--' since args after that are pass-through and may have duplicate names to our
         # bootstrap options.
-        bargs = ("./pants",) + tuple(
+        bargs = ("<ignored>",) + tuple(
             filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
         )
         return bargs

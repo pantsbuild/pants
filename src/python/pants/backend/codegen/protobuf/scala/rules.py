@@ -32,7 +32,7 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
@@ -45,15 +45,10 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile, GenerateJvmLockfileFromTool
-from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import (
-    CoursierResolvedLockfile,
-    MaterializedClasspath,
-    MaterializedClasspathRequest,
-)
-from pants.jvm.resolve.jvm_tool import GatherJvmCoordinatesRequest, ValidatedJvmToolLockfileRequest
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess
+from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -65,7 +60,7 @@ class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
 
 
 class ScalapbcToolLockfileSentinel(GenerateToolLockfileSentinel):
-    options_scope = ScalaPBSubsystem.options_scope
+    resolve_name = ScalaPBSubsystem.options_scope
 
 
 class ScalaPBShimCompiledClassfiles(ClasspathEntry):
@@ -80,7 +75,7 @@ class MaterializeJvmPluginRequest:
 @dataclass(frozen=True)
 class MaterializedJvmPlugin:
     name: str
-    classpath: MaterializedClasspath
+    classpath: ToolClasspath
 
     def setup_arg(self, plugin_relpath: str) -> str:
         classpath_arg = ":".join(self.classpath.classpath_entries(plugin_relpath))
@@ -107,8 +102,7 @@ async def generate_scala_from_protobuf(
     protoc: Protoc,
     scalapb: ScalaPBSubsystem,
     shim_classfiles: ScalaPBShimCompiledClassfiles,
-    jdk_setup: JdkSetup,
-    bash: BashBinary,
+    jdk: InternalJdk,
 ) -> GeneratedSources:
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
@@ -116,8 +110,7 @@ async def generate_scala_from_protobuf(
     plugins_relpath = "__plugins"
     protoc_relpath = "__protoc"
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
-
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalapbcToolLockfileSentinel())
     (
         downloaded_protoc_binary,
         tool_classpath,
@@ -126,12 +119,7 @@ async def generate_scala_from_protobuf(
         inherit_env,
     ) = await MultiGet(
         Get(DownloadedExternalTool, ExternalToolRequest, protoc.get_request(Platform.current)),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                lockfiles=(lockfile,),
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
         Get(Digest, CreateDigest([Directory(output_dir)])),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.protocol_target.address])),
         # Need PATH so that ScalaPB can invoke `mkfifo`.
@@ -168,8 +156,7 @@ async def generate_scala_from_protobuf(
             f"--{plugin.name}_out={output_dir}" for plugin in materialized_jvm_plugins.plugins
         )
 
-    immutable_input_digests = {
-        **jdk_setup.immutable_input_digests,
+    extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
         shimcp_relpath: shim_classfiles.digest,
         plugins_relpath: merged_jvm_plugins_digest,
@@ -177,22 +164,15 @@ async def generate_scala_from_protobuf(
     }
 
     input_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                all_sources_stripped.snapshot.digest,
-                empty_output_dir,
-            ]
-        ),
+        Digest, MergeDigests([all_sources_stripped.snapshot.digest, empty_output_dir])
     )
 
     result = await Get(
         ProcessResult,
-        Process(
+        JvmProcess(
+            jdk=jdk,
+            classpath_entries=[*tool_classpath.classpath_entries(toolcp_relpath), shimcp_relpath],
             argv=[
-                *jdk_setup.args(
-                    bash, [*tool_classpath.classpath_entries(toolcp_relpath), shimcp_relpath]
-                ),
                 "org.pantsbuild.backend.scala.scalapb.ScalaPBShim",
                 f"--protoc={os.path.join(protoc_relpath, downloaded_protoc_binary.exe)}",
                 *maybe_jvm_plugins_setup_args,
@@ -201,13 +181,12 @@ async def generate_scala_from_protobuf(
                 *target_sources_stripped.snapshot.files,
             ],
             input_digest=input_digest,
-            immutable_input_digests=immutable_input_digests,
-            use_nailgun=immutable_input_digests,
+            extra_immutable_input_digests=extra_immutable_input_digests,
+            extra_nailgun_keys=extra_immutable_input_digests,
             description=f"Generating Scala sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
-            env={**jdk_setup.env, **inherit_env},
-            append_only_caches=jdk_setup.append_only_caches,
+            extra_env=inherit_env,
         ),
     )
 
@@ -242,20 +221,17 @@ async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> Materi
         ArtifactRequirements,
         GatherJvmCoordinatesRequest(
             artifact_inputs=FrozenOrderedSet([request.plugin.artifact]),
-            option_name="--scalapb-plugin-artifacts",
+            option_name="[scalapb].jvm_plugins",
         ),
     )
-    classpath = await Get(
-        MaterializedClasspath, MaterializedClasspathRequest(artifact_requirements=(requirements,))
-    )
-    return MaterializedJvmPlugin(
-        name=request.plugin.name,
-        classpath=classpath,
-    )
+    classpath = await Get(ToolClasspath, ToolClasspathRequest(artifact_requirements=requirements))
+    return MaterializedJvmPlugin(name=request.plugin.name, classpath=classpath)
 
 
 @rule
-async def materialize_jvm_plugins(request: MaterializeJvmPluginsRequest) -> MaterializedJvmPlugins:
+async def materialize_jvm_plugins(
+    request: MaterializeJvmPluginsRequest,
+) -> MaterializedJvmPlugins:
     materialized_plugins = await MultiGet(
         Get(MaterializedJvmPlugin, MaterializeJvmPluginRequest(plugin))
         for plugin in request.plugins
@@ -273,7 +249,8 @@ SHIM_SCALA_VERSION = "2.13.7"
 # TODO(13879): Consolidate compilation of wrapper binaries to common rules.
 @rule
 async def setup_scalapb_shim_classfiles(
-    scalapb: ScalaPBSubsystem, jdk_setup: JdkSetup, bash: BashBinary
+    scalapb: ScalaPBSubsystem,
+    jdk: InternalJdk,
 ) -> ScalaPBShimCompiledClassfiles:
     dest_dir = "classfiles"
 
@@ -285,71 +262,47 @@ async def setup_scalapb_shim_classfiles(
 
     scalapb_shim_source = FileContent("ScalaPBShim.scala", scalapb_shim_content)
 
-    lockfile = await Get(CoursierResolvedLockfile, ValidatedJvmToolLockfileRequest(scalapb))
-
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalapbcToolLockfileSentinel())
     tool_classpath, shim_classpath, source_digest = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__toolcp",
-                artifact_requirements=(
-                    ArtifactRequirements.from_coordinates(
-                        [
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-compiler",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-library",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                            Coordinate(
-                                group="org.scala-lang",
-                                artifact="scala-reflect",
-                                version=SHIM_SCALA_VERSION,
-                            ),
-                        ]
-                    ),
+                artifact_requirements=ArtifactRequirements.from_coordinates(
+                    [
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-compiler",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-library",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-reflect",
+                            version=SHIM_SCALA_VERSION,
+                        ),
+                    ]
                 ),
             ),
         ),
-        Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__shimcp",
-                lockfiles=(lockfile,),
-            ),
-        ),
-        Get(
-            Digest,
-            CreateDigest(
-                [
-                    scalapb_shim_source,
-                    Directory(dest_dir),
-                ]
-            ),
-        ),
+        Get(ToolClasspath, ToolClasspathRequest(prefix="__shimcp", lockfile=lockfile_request)),
+        Get(Digest, CreateDigest([scalapb_shim_source, Directory(dest_dir)])),
     )
 
     merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            (
-                tool_classpath.digest,
-                shim_classpath.digest,
-                source_digest,
-            )
-        ),
+        Digest, MergeDigests((tool_classpath.digest, shim_classpath.digest, source_digest))
     )
 
-    # NB: We do not use nailgun for this process, since it is launched exactly once.
     process_result = await Get(
         ProcessResult,
-        Process(
+        JvmProcess(
+            jdk=jdk,
+            classpath_entries=tool_classpath.classpath_entries(),
             argv=[
-                *jdk_setup.args(bash, tool_classpath.classpath_entries()),
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries()),
@@ -360,12 +313,11 @@ async def setup_scalapb_shim_classfiles(
                 scalapb_shim_source.path,
             ],
             input_digest=merged_digest,
-            append_only_caches=jdk_setup.append_only_caches,
-            immutable_input_digests=jdk_setup.immutable_input_digests,
-            env=jdk_setup.env,
             output_directories=(dest_dir,),
             description="Compile ScalaPB shim with scalac",
             level=LogLevel.DEBUG,
+            # NB: We do not use nailgun for this process, since it is launched exactly once.
+            use_nailgun=False,
         ),
     )
     stripped_classfiles_digest = await Get(
@@ -375,10 +327,10 @@ async def setup_scalapb_shim_classfiles(
 
 
 @rule
-async def generate_scalapbc_lockfile_request(
+def generate_scalapbc_lockfile_request(
     _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
-) -> GenerateJvmLockfile:
-    return await Get(GenerateJvmLockfile, GenerateJvmLockfileFromTool(tool))
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():

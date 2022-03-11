@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.docker.goals import package_image
 from pants.backend.docker.subsystems import dockerfile_parser
-from pants.backend.docker.target_types import DockerDependenciesField, DockerImageTarget
+from pants.backend.docker.target_types import DockerImageDependenciesField, DockerImageTarget
 from pants.backend.docker.util_rules import dockerfile
 from pants.backend.docker.util_rules.dependencies import (
     InjectDockerDependencies,
@@ -69,7 +69,7 @@ def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("project/image/test", target_name="image"))
     injected = rule_runner.request(
         InjectedDependencies,
-        [InjectDockerDependencies(tgt[DockerDependenciesField])],
+        [InjectDockerDependencies(tgt[DockerImageDependenciesField])],
     )
     assert injected == InjectedDependencies(
         [

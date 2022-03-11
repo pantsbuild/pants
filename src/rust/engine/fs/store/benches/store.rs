@@ -35,10 +35,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fs::{
-  File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat, Permissions, PosixFS,
-  PreparedPathGlobs, StrictGlobMatching,
+  DirectoryDigest, File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat, Permissions,
+  PosixFS, PreparedPathGlobs, StrictGlobMatching,
 };
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::EMPTY_DIGEST;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use task_executor::Executor;
 use tempfile::TempDir;
@@ -70,7 +70,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
               let dest = new_temp.path().to_path_buf();
               std::mem::forget(new_temp);
               let _ = executor
-                .block_on(store.materialize_directory(dest, digest, perms))
+                .block_on(store.materialize_directory(dest, digest.clone(), perms))
                 .unwrap();
             })
           },
@@ -80,7 +80,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 }
 
 ///
-/// NB: More accurately, this benchmarks `Snapshot::digest_from_path_stats`, which avoids
+/// NB: More accurately, this benchmarks `Snapshot::from_path_stats`, which avoids
 /// filesystem traversal overheads and focuses on digesting/capturing.
 ///
 pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
@@ -115,8 +115,7 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
         b.iter(|| {
           for _ in 0..captures {
             let _ = executor
-              .block_on(Snapshot::digest_from_path_stats(
-                store.clone(),
+              .block_on(Snapshot::from_path_stats(
                 OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone(), immutable),
                 path_stats.clone(),
               ))
@@ -140,7 +139,7 @@ pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
     .bench_function("wildcard", |b| {
       b.iter(|| {
         let get_subset = store.subset(
-          digest,
+          digest.clone(),
           SubsetParams {
             globs: PreparedPathGlobs::create(
               vec!["**/*".to_string()],
@@ -160,12 +159,15 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
   let num_files: usize = 4000;
   let (store, _tempdir, digest) = snapshot(&executor, num_files, 100);
 
-  let directory = executor
-    .block_on(store.load_directory(digest))
-    .unwrap()
-    .unwrap();
   // Modify half of the files in the top-level directory by setting them to have the empty
   // fingerprint (zero content).
+  executor
+    .block_on(store.ensure_directory_digest_persisted(digest.clone()))
+    .unwrap();
+  let directory = executor
+    .block_on(store.load_directory(digest.as_digest()))
+    .unwrap()
+    .unwrap();
   let mut all_file_nodes = directory.files.to_vec();
   let mut file_nodes_to_modify = all_file_nodes.split_off(all_file_nodes.len() / 2);
   for file_node in file_nodes_to_modify.iter_mut() {
@@ -205,6 +207,15 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
     .block_on(store.record_directory(&bazel_removed_files_directory, true))
     .unwrap();
 
+  // NB: We benchmark with trees that are already held in memory, since that's the expected case in
+  // production.
+  let removed_digest = executor
+    .block_on(store.load_directory_digest(removed_digest))
+    .unwrap();
+  let modified_digest = executor
+    .block_on(store.load_directory_digest(modified_digest))
+    .unwrap();
+
   let mut cgroup = c.benchmark_group("snapshot_merge");
 
   cgroup
@@ -213,13 +224,13 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
     .bench_function("snapshot_merge", |b| {
       b.iter(|| {
         // Merge the old and the new snapshot together, allowing any file to be duplicated.
-        let old_first: Digest = executor
-          .block_on(store.merge(vec![removed_digest, modified_digest]))
+        let old_first = executor
+          .block_on(store.merge(vec![removed_digest.clone(), modified_digest.clone()]))
           .unwrap();
 
         // Test the performance of either ordering of snapshots.
-        let new_first: Digest = executor
-          .block_on(store.merge(vec![modified_digest, removed_digest]))
+        let new_first = executor
+          .block_on(store.merge(vec![modified_digest.clone(), removed_digest.clone()]))
           .unwrap();
 
         assert_eq!(old_first, new_first);
@@ -321,7 +332,7 @@ fn snapshot(
   executor: &Executor,
   max_files: usize,
   file_target_size: usize,
-) -> (Store, TempDir, Digest) {
+) -> (Store, TempDir, DirectoryDigest) {
   // NB: We create the files in a tempdir rather than in memory in order to allow for more
   // realistic benchmarking involving large files. The tempdir is dropped at the end of this method
   // (after everything has been captured out of it).
@@ -338,14 +349,14 @@ fn snapshot(
         executor.clone(),
       )
       .unwrap();
-      Snapshot::digest_from_path_stats(
-        store2.clone(),
+      Snapshot::from_path_stats(
         OneOffStoreFileByDigest::new(store2, Arc::new(posix_fs), true),
         path_stats,
       )
       .await
     })
-    .unwrap();
+    .unwrap()
+    .into();
 
   (store, storedir, digest)
 }

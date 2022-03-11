@@ -84,30 +84,41 @@ def test_generate_lockfile(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_multiple_resolves(rule_runner: RuleRunner) -> None:
+    # TODO: Adjust to use https://github.com/pantsbuild/pants/pull/14408 for the
+    # duplicated artifact.
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
                 jvm_artifact(
-                    name='hamcrest',
+                    name='hamcrest_a',
                     group='org.hamcrest',
                     artifact='hamcrest-core',
                     version="1.3",
-                    compatible_resolves=["a", "b"],
+                    resolve="a",
                 )
+                jvm_artifact(
+                    name='hamcrest_b',
+                    group='org.hamcrest',
+                    artifact='hamcrest-core',
+                    version="1.3",
+                    resolve="b",
+                )
+
                 jvm_artifact(
                     name='opentest4j',
                     group='org.opentest4j',
                     artifact='opentest4j',
                     version='1.2.0',
-                    compatible_resolves=["a"],
+                    resolve="a",
                 )
+
                 jvm_artifact(
                     name='apiguardian-api',
                     group='org.apiguardian',
                     artifact='apiguardian-api',
                     version='1.1.0',
-                    compatible_resolves=["b"],
+                    resolve="b",
                 )
                 """
             ),

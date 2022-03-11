@@ -20,8 +20,8 @@ resolver = "2"
 # (e.g. fs_util) won't be included when we build/test things.
 members = [
   ".",
+  "address",
   "async_latch",
-  "async_semaphore",
   "async_value",
   "cache",
   "client",
@@ -61,8 +61,8 @@ members = [
 # On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
 default-members = [
   ".",
+  "address",
   "async_latch",
-  "async_semaphore",
   "async_value",
   "cache",
   "client",
@@ -104,8 +104,8 @@ extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
+address = { path = "address" }
 async_latch = { path = "async_latch" }
-async_semaphore = { path = "async_semaphore" }
 # Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
 async-trait = "=0.1.42"
 protos = { path = "protos" }
@@ -113,9 +113,10 @@ bytes = "1.0"
 cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
-either = "1.6"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.3"
@@ -123,7 +124,8 @@ futures-core = "^0.3.0"
 graph = { path = "graph" }
 grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
-indexmap = "1.4"
+indexmap = "1.8"
+internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
 libc = "0.2.112"
@@ -131,15 +133,15 @@ log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
 num_enum = "0.5"
-parking_lot = "0.11"
+parking_lot = "0.12"
 petgraph = "0.5"
 process_execution = { path = "process_execution" }
-pyo3 = "0.15.1"
+pyo3 = "0.16"
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-smallvec = "0.6"
+smallvec = "1"
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
 serde_json = "1.0"
@@ -147,7 +149,7 @@ task_executor = { path = "task_executor" }
 tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.3"
-tokio = { version = "1.4", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
 tokio-util = { version = "0.6", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
@@ -161,4 +163,4 @@ fs = { path = "./fs" }
 env_logger = "0.5.4"
 
 [build-dependencies]
-pyo3-build-config = "0.15.1"
+pyo3-build-config = "0.16"

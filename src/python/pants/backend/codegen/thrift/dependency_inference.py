@@ -3,23 +3,21 @@
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict
 
+from pants.backend.codegen.thrift import thrift_parser
 from pants.backend.codegen.thrift.subsystem import ThriftSubsystem
 from pants.backend.codegen.thrift.target_types import AllThriftTargets, ThriftSourceField
+from pants.backend.codegen.thrift.thrift_parser import ParsedThrift, ParsedThriftRequest
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    HydratedSources,
-    HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
     WrappedTarget,
@@ -27,7 +25,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import OrderedSet
 
 
 @dataclass(frozen=True)
@@ -67,16 +65,6 @@ async def map_thrift_files(thrift_targets: AllThriftTargets) -> ThriftMapping:
     )
 
 
-QUOTE_CHAR = r"(?:'|\")"
-FILE_NAME = r"(.+?\.thrift)"
-# NB: We don't specify what a valid file name looks like to avoid accidentally breaking unicode.
-IMPORT_REGEX = re.compile(rf"include\s*{QUOTE_CHAR}{FILE_NAME}{QUOTE_CHAR}\s*")
-
-
-def parse_thrift_imports(file_content: str) -> FrozenOrderedSet[str]:
-    return FrozenOrderedSet(IMPORT_REGEX.findall(file_content))
-
-
 class InferThriftDependencies(InferDependenciesRequest):
     infer_from = ThriftSourceField
 
@@ -90,16 +78,13 @@ async def infer_thrift_dependencies(
 
     address = request.sources_field.address
     wrapped_tgt = await Get(WrappedTarget, Address, address)
-    explicitly_provided_deps, hydrated_sources = await MultiGet(
+    explicitly_provided_deps, parsed_thrift = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
-        Get(HydratedSources, HydrateSourcesRequest(request.sources_field)),
+        Get(ParsedThrift, ParsedThriftRequest(request.sources_field)),
     )
-    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
-    assert len(digest_contents) == 1
-    file_content = digest_contents[0]
 
     result: OrderedSet[Address] = OrderedSet()
-    for import_path in parse_thrift_imports(file_content.content.decode()):
+    for import_path in parsed_thrift.imports:
         unambiguous = thrift_mapping.mapping.get(import_path)
         ambiguous = thrift_mapping.ambiguous_modules.get(import_path)
         if unambiguous:
@@ -111,7 +96,7 @@ async def infer_thrift_dependencies(
                 import_reference="file",
                 context=(
                     f"The target {address} imports `{import_path}` in the file "
-                    f"{file_content.path}"
+                    f"{wrapped_tgt.target[ThriftSourceField].file_path}"
                 ),
             )
             maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)
@@ -121,4 +106,8 @@ async def infer_thrift_dependencies(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(InferDependenciesRequest, InferThriftDependencies))
+    return (
+        *collect_rules(),
+        *thrift_parser.rules(),
+        UnionRule(InferDependenciesRequest, InferThriftDependencies),
+    )

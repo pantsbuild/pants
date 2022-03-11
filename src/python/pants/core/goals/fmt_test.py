@@ -8,8 +8,6 @@ from pathlib import Path
 from textwrap import dedent
 from typing import List, Type
 
-import pytest
-
 from pants.core.goals.fmt import Fmt, FmtRequest, FmtResult
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
@@ -42,6 +40,7 @@ class FortranFieldSet(FieldSet):
 
 class FortranFmtRequest(FmtRequest):
     field_set_type = FortranFieldSet
+    name = "FortranConditionallyDidChange"
 
 
 @rule
@@ -52,11 +51,7 @@ async def fortran_fmt(request: FortranFmtRequest) -> FmtResult:
         else EMPTY_DIGEST
     )
     return FmtResult(
-        input=EMPTY_DIGEST,
-        output=output,
-        stdout="",
-        stderr="",
-        formatter_name="FortranConditionallyDidChange",
+        input=EMPTY_DIGEST, output=output, stdout="", stderr="", formatter_name=request.name
     )
 
 
@@ -78,27 +73,29 @@ class SmalltalkFieldSet(FieldSet):
 
 class SmalltalkNoopRequest(FmtRequest):
     field_set_type = SmalltalkFieldSet
+    name = "SmalltalkDidNotChange"
 
 
 @rule
-async def smalltalk_noop(_: SmalltalkNoopRequest) -> FmtResult:
+async def smalltalk_noop(request: SmalltalkNoopRequest) -> FmtResult:
     result_digest = await Get(Digest, CreateDigest([SMALLTALK_FILE]))
     return FmtResult(
         input=result_digest,
         output=result_digest,
         stdout="",
         stderr="",
-        formatter_name="SmalltalkDidNotChange",
+        formatter_name=request.name,
     )
 
 
 class SmalltalkSkipRequest(FmtRequest):
     field_set_type = SmalltalkFieldSet
+    name = "SmalltalkSkipped"
 
 
 @rule
-def smalltalk_skip(_: SmalltalkSkipRequest) -> FmtResult:
-    return FmtResult.skip(formatter_name="SmalltalkSkipped")
+def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
+    return FmtResult.skip(formatter_name=request.name)
 
 
 def fmt_rule_runner(
@@ -126,25 +123,19 @@ def merged_digest(rule_runner: RuleRunner) -> Digest:
     ).digest
 
 
-def run_fmt(rule_runner: RuleRunner, *, target_specs: List[str], per_file_caching: bool) -> str:
+def run_fmt(
+    rule_runner: RuleRunner, *, target_specs: List[str], only: list[str] | None = None
+) -> str:
     result = rule_runner.run_goal_rule(
-        Fmt, args=[f"--fmt-per-file-caching={per_file_caching!r}", *target_specs]
+        Fmt,
+        args=[f"--only={repr(only or [])}", *target_specs],
     )
     assert result.exit_code == 0
     assert not result.stdout
     return result.stderr
 
 
-@pytest.mark.parametrize("per_file_caching", [True, False])
-def test_summary(per_file_caching: bool) -> None:
-    """Tests that the final summary is correct.
-
-    This checks that we:
-    * Merge multiple results for the same formatter together (when you use
-        `--per-file-caching`).
-    * Correctly distinguish between skipped, changed, and did not change.
-    """
-
+def test_summary() -> None:
     rule_runner = fmt_rule_runner(
         target_types=[FortranTarget, SmalltalkTarget],
         fmt_request_types=[FortranFmtRequest, SmalltalkNoopRequest, SmalltalkSkipRequest],
@@ -163,18 +154,13 @@ def test_summary(per_file_caching: bool) -> None:
         },
     )
 
-    stderr = run_fmt(
-        rule_runner,
-        target_specs=["//:f1", "//:needs_formatting", "//:s1", "//:s2"],
-        per_file_caching=per_file_caching,
-    )
+    stderr = run_fmt(rule_runner, target_specs=["//:f1", "//:needs_formatting", "//:s1", "//:s2"])
 
     assert stderr == dedent(
         """\
 
         + FortranConditionallyDidChange made changes.
         ✓ SmalltalkDidNotChange made no changes.
-        - SmalltalkSkipped skipped.
         """
     )
 
@@ -183,6 +169,13 @@ def test_summary(per_file_caching: bool) -> None:
     assert fortran_file.is_file()
     assert fortran_file.read_text() == FORTRAN_FILE.content.decode()
     assert not smalltalk_file.is_file()
+
+    stderr = run_fmt(
+        rule_runner,
+        target_specs=["//:f1", "//:needs_formatting", "//:s1", "//:s2"],
+        only=[SmalltalkNoopRequest.name],
+    )
+    assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
 
 
 def test_streaming_output_skip() -> None:

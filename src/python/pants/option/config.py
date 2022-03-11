@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import configparser
 import getpass
 import itertools
 import os
@@ -18,8 +17,13 @@ import toml
 from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
+from pants.option.errors import (
+    ConfigError,
+    InterpolationMissingOptionError,
+    NoOptionError,
+    NoSectionError,
+)
 from pants.option.ranked_value import Value
-from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
 
 # A dict with optional override seed values for buildroot, pants_workdir, and pants_distdir.
@@ -50,13 +54,7 @@ class Config(ABC):
     replaced with the value of var_name.
     """
 
-    DEFAULT_SECTION: ClassVar[str] = configparser.DEFAULTSECT
-
-    class ConfigError(Exception):
-        pass
-
-    class ConfigValidationError(ConfigError):
-        pass
+    DEFAULT_SECTION: ClassVar[str] = "DEFAULT"
 
     @classmethod
     def load(
@@ -81,7 +79,7 @@ class Config(ABC):
                     file_content.content.decode(), normalized_seed_values
                 )
             except Exception as e:
-                raise cls.ConfigError(
+                raise ConfigError(
                     f"Config file {file_content.path} could not be parsed as TOML:\n  {e}"
                 )
 
@@ -131,25 +129,15 @@ class Config(ABC):
 
         return all_seed_values
 
-    def get(self, section, option, type_=str, default=None):
-        """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as
-        type.
+    def get(self, section, option) -> str | None:
+        """Retrieves option from the specified section (or 'DEFAULT').
 
         If the specified section does not exist or is missing a definition for the option, the value
-        is looked up in the DEFAULT section.  If there is still no definition found, the default
-        value supplied is returned.
+        is looked up in the DEFAULT section.  If there is still no definition found, returns None.
         """
         if not self.has_option(section, option):
-            return default
-
-        raw_value = self.get_value(section, option)
-        if issubclass(type_, str):
-            return raw_value
-
-        key = f"{section}.{option}"
-        return parse_expression(
-            name=key, val=raw_value, acceptable_types=type_, raise_type=self.ConfigError
-        )
+            return None
+        return self.get_value(section, option)
 
     @abstractmethod
     def configs(self) -> Sequence[_SingleFileConfig]:
@@ -172,9 +160,12 @@ class Config(ABC):
         """Returns whether this config specified a value for the option."""
 
     @abstractmethod
-    def get_value(self, section: str, option: str) -> str | None:
-        """Returns the value of the option in this config as a string, or None if no value
-        specified."""
+    def get_value(self, section: str, option: str) -> str:
+        """Returns the value of the option in this config as a string.
+
+        Raises NoSectionError if the section doesn't exist. Raises NoOptionError if the option
+        doesn't exist in the section.
+        """
 
     @abstractmethod
     def get_source_for_option(self, section: str, option: str) -> str | None:
@@ -231,7 +222,7 @@ class _ConfigValues:
                 return new_style_format_str.format(**possible_interpolations)
             except KeyError as e:
                 bad_reference = e.args[0]
-                raise configparser.InterpolationMissingOptionError(
+                raise InterpolationMissingOptionError(
                     option,
                     section,
                     raw_value,
@@ -239,8 +230,7 @@ class _ConfigValues:
                 )
 
         def recursively_format_str(value: str) -> str:
-            # It's possible to interpolate with a value that itself has an interpolation. We must
-            # fully evaluate all expressions for parity with configparser.
+            # It's possible to interpolate with a value that itself has an interpolation.
             match = re.search(r"%\(([a-zA-Z_0-9]*)\)s", value)
             if not match:
                 return value
@@ -258,12 +248,8 @@ class _ConfigValues:
         interpolate: bool = True,
         list_prefix: str | None = None,
     ) -> str:
-        """For parity with configparser, we convert all values back to strings, which allows us to
-        avoid upstream changes to files like parser.py.
-
-        This is clunky. If we drop INI support, we should remove this and use native values
-        (although we must still support interpolation).
-        """
+        # We convert all values to strings, which allows us to treat them uniformly with
+        # env vars and cmd-line flags in parser.py.
         possibly_interpolate = partial(
             self._possibly_interpolate_value,
             option=option,
@@ -307,10 +293,10 @@ class _ConfigValues:
             return False
         return option in self.values[section] or option in self.defaults
 
-    def get_value(self, section: str, option: str) -> str | None:
+    def get_value(self, section: str, option: str) -> str:
         section_values = self.values.get(section)
         if section_values is None:
-            raise configparser.NoSectionError(section)
+            raise NoSectionError(section)
 
         stringify = partial(
             self._stringify_val,
@@ -322,7 +308,7 @@ class _ConfigValues:
         if option not in section_values:
             if option in self.defaults:
                 return stringify(raw_value=self.defaults[option])
-            raise configparser.NoOptionError(option, section)
+            raise NoOptionError(option, section)
 
         option_value = section_values[option]
         if not isinstance(option_value, dict):
@@ -336,8 +322,8 @@ class _ConfigValues:
         if not has_add and not has_remove:
             return stringify(option_value)
 
-        add_val = stringify(option_value["add"], list_prefix="+") if has_add else None
-        remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else None
+        add_val = stringify(option_value["add"], list_prefix="+") if has_add else "[]"
+        remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else "[]"
         if has_add and has_remove:
             return f"{add_val},{remove_val}"
         if has_add:
@@ -347,7 +333,7 @@ class _ConfigValues:
     def options(self, section: str) -> list[str]:
         section_values = self.values.get(section)
         if section_values is None:
-            raise configparser.NoSectionError(section)
+            raise NoSectionError(section)
         return [
             *section_values.keys(),
             *(
@@ -388,7 +374,7 @@ class _SingleFileConfig(Config):
     def has_option(self, section: str, option: str) -> bool:
         return self.values.has_option(section, option)
 
-    def get_value(self, section: str, option: str) -> str | None:
+    def get_value(self, section: str, option: str) -> str:
         return self.values.get_value(section, option)
 
     def get_source_for_option(self, section: str, option: str) -> str | None:
@@ -444,15 +430,15 @@ class _ChainedConfig(Config):
                 return True
         return False
 
-    def get_value(self, section: str, option: str) -> str | None:
+    def get_value(self, section: str, option: str) -> str:
         for cfg in self._configs:
             try:
                 return cfg.get_value(section, option)
-            except (configparser.NoSectionError, configparser.NoOptionError):
+            except (NoSectionError, NoOptionError):
                 pass
         if not self.has_section(section):
-            raise configparser.NoSectionError(section)
-        raise configparser.NoOptionError(option, section)
+            raise NoSectionError(section)
+        raise NoOptionError(option, section)
 
     def get_source_for_option(self, section: str, option: str) -> str | None:
         for cfg in self._configs:

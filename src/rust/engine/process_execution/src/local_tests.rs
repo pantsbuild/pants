@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
 
-use hashing::EMPTY_DIGEST;
+use fs::EMPTY_DIRECTORY_DIGEST;
 use maplit::hashset;
 use shell_quote::bash;
 use spectral::{assert_that, string::StrAssertions};
@@ -39,7 +39,7 @@ async fn stdout() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
 #[tokio::test]
@@ -56,7 +56,7 @@ async fn stdout_and_stderr_and_exit_code() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "bar".as_bytes());
   assert_eq!(result.original.exit_code, 1);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
 #[tokio::test]
@@ -74,7 +74,7 @@ async fn capture_exit_code_signal() {
   assert_eq!(result.stdout_bytes, "".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, -15);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
@@ -145,7 +145,7 @@ async fn output_files_none() {
   assert_eq!(result.stdout_bytes, "".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
 #[tokio::test]
@@ -166,7 +166,7 @@ async fn output_files_one() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -194,7 +194,7 @@ async fn output_dirs() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::recursive().digest()
+    TestDirectory::recursive().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -221,7 +221,7 @@ async fn output_files_many() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::recursive().digest()
+    TestDirectory::recursive().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -247,7 +247,7 @@ async fn output_files_execution_failure() {
   assert_eq!(result.original.exit_code, 1);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -274,7 +274,7 @@ async fn output_files_partial_output() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -298,7 +298,7 @@ async fn output_overlapping_file_and_dir() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::nested().digest()
+    TestDirectory::nested().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -319,7 +319,7 @@ async fn append_only_cache_created() {
   assert_eq!(result.stdout_bytes, format!("{}\n", name).as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
@@ -343,7 +343,7 @@ async fn jdk_symlink() {
   assert_eq!(result.stdout_bytes, roland);
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
@@ -379,7 +379,8 @@ async fn test_directory_preservation() {
 
   let mut process =
     Process::new(argv.clone()).output_files(relative_paths(&["roland.ext"]).collect());
-  process.input_digests = InputDigests::with_input_files(TestDirectory::nested().digest());
+  process.input_digests =
+    InputDigests::with_input_files(TestDirectory::nested().directory_digest());
   process.working_directory = Some(RelativePath::new("cats").unwrap());
 
   let result = run_command_locally_in_dir(
@@ -479,7 +480,7 @@ async fn all_containing_directories_for_outputs_are_created() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::nested_dir_and_file().digest()
+    TestDirectory::nested_dir_and_file().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -502,7 +503,7 @@ async fn output_empty_dir() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_falcons_dir().digest()
+    TestDirectory::containing_falcons_dir().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -555,7 +556,8 @@ async fn working_directory() {
   let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
   process.working_directory = Some(RelativePath::new("cats").unwrap());
   process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
-  process.input_digests = InputDigests::with_input_files(TestDirectory::nested().digest());
+  process.input_digests =
+    InputDigests::with_input_files(TestDirectory::nested().directory_digest());
   process.timeout = one_second();
   process.description = "confused-cat".to_string();
 
@@ -575,7 +577,7 @@ async fn working_directory() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -606,12 +608,12 @@ async fn immutable_inputs() {
   let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
   process.input_digests = InputDigests::new(
     &store,
-    TestDirectory::containing_falcons_dir().digest(),
+    TestDirectory::containing_falcons_dir().directory_digest(),
     {
       let mut map = BTreeMap::new();
       map.insert(
         RelativePath::new("cats").unwrap(),
-        TestDirectory::containing_roland().digest(),
+        TestDirectory::containing_roland().directory_digest(),
       );
       map
     },

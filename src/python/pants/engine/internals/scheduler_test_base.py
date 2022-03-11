@@ -10,12 +10,13 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
+from pants.util.logging import LogLevel
 
 
 class SchedulerTestBase:
-    """A mixin for classes (tests, presumably) which need to create temporary schedulers.
+    """A mixin for classes which need to create temporary schedulers.
 
-    TODO: In the medium term, this should be part of pants_test.test_base.TestBase.
+    TODO: In the medium term, this should be removed in favor of RuleRunner.
     """
 
     _executor = PyExecutor(core_threads=2, max_threads=4)
@@ -25,6 +26,7 @@ class SchedulerTestBase:
         tmp_path: Path,
         rules,
         include_trace_on_error: bool = True,
+        max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
     ) -> SchedulerSession:
         """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
 
@@ -49,6 +51,7 @@ class SchedulerTestBase:
         )
         return scheduler.new_session(
             build_id="buildid_for_test",
+            max_workunit_level=max_workunit_verbosity,
         )
 
     def execute(self, scheduler, product, *subjects):
@@ -60,7 +63,7 @@ class SchedulerTestBase:
             with temporary_file_path(cleanup=False, suffix=".dot") as dot_file:
                 scheduler.visualize_graph_to_file(dot_file)
                 raise ValueError(f"At least one root failed: {throws}. Visualized as {dot_file}")
-        return list(state.value for _, state in returns)
+        return [state.value for _, state in returns]
 
     def execute_expecting_one_result(self, scheduler, product, subject):
         request = scheduler.execution_request([product], [subject])
