@@ -42,13 +42,13 @@ pub fn setup() -> (
 
 #[tokio::test]
 async fn snapshot_one_file() {
-  let (store, dir, posix_fs, digester) = setup();
+  let (_, dir, posix_fs, digester) = setup();
 
   let file_name = PathBuf::from("roland");
   make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let snapshot = Snapshot::from_path_stats(store, digester, path_stats)
+  let snapshot = Snapshot::from_path_stats(digester, path_stats)
     .await
     .unwrap();
   assert_eq!(
@@ -69,7 +69,7 @@ async fn snapshot_one_file() {
 
 #[tokio::test]
 async fn snapshot_recursive_directories() {
-  let (store, dir, posix_fs, digester) = setup();
+  let (_, dir, posix_fs, digester) = setup();
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
@@ -77,7 +77,7 @@ async fn snapshot_recursive_directories() {
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let snapshot = Snapshot::from_path_stats(store, digester, path_stats)
+  let snapshot = Snapshot::from_path_stats(digester, path_stats)
     .await
     .unwrap();
   assert_eq!(
@@ -109,34 +109,40 @@ async fn snapshot_from_digest() {
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let expected_snapshot = Snapshot::from_path_stats(store.clone(), digester, path_stats)
+  let expected_snapshot = Snapshot::from_path_stats(digester, path_stats)
     .await
     .unwrap();
 
   // Confirm that the digest can be loaded either from memory (using a DirectoryDigest with a
-  // tree attached), or from disk (using one without.)
+  // tree attached), or from disk (using one without).
+
+  // From memory.
   assert_eq!(
     expected_snapshot,
-    // From disk.
+    Snapshot::from_digest(store.clone(), expected_snapshot.clone().into())
+      .await
+      .unwrap()
+  );
+
+  // From disk.
+  store
+    .ensure_directory_digest_persisted(expected_snapshot.clone().into())
+    .await
+    .unwrap();
+  assert_eq!(
+    expected_snapshot,
     Snapshot::from_digest(
-      store.clone(),
+      store,
       DirectoryDigest::from_persisted_digest(expected_snapshot.digest)
     )
     .await
     .unwrap()
   );
-  assert_eq!(
-    expected_snapshot,
-    // From memory.
-    Snapshot::from_digest(store, expected_snapshot.clone().into())
-      .await
-      .unwrap()
-  );
 }
 
 #[tokio::test]
 async fn snapshot_recursive_directories_including_empty() {
-  let (store, dir, posix_fs, digester) = setup();
+  let (_, dir, posix_fs, digester) = setup();
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
@@ -150,7 +156,7 @@ async fn snapshot_recursive_directories_including_empty() {
   let sorted_path_stats = expand_all_sorted(posix_fs).await;
   let mut unsorted_path_stats = sorted_path_stats.clone();
   unsorted_path_stats.reverse();
-  let snapshot = Snapshot::from_path_stats(store, digester, unsorted_path_stats)
+  let snapshot = Snapshot::from_path_stats(digester, unsorted_path_stats)
     .await
     .unwrap();
   assert_eq!(
@@ -193,12 +199,15 @@ async fn merge_directories_two_files() {
     .expect("Storing treats directory");
 
   let result = store
-    .merge(vec![containing_treats.digest(), containing_roland.digest()])
+    .merge(vec![
+      containing_treats.directory_digest(),
+      containing_roland.directory_digest(),
+    ])
     .await;
 
   assert_eq!(
     result,
-    Ok(TestDirectory::containing_roland_and_treats().digest())
+    Ok(TestDirectory::containing_roland_and_treats().directory_digest())
   );
 }
 
@@ -220,8 +229,8 @@ async fn merge_directories_clashing_files() {
 
   let err = store
     .merge(vec![
-      containing_roland.digest(),
-      containing_wrong_roland.digest(),
+      containing_roland.directory_digest(),
+      containing_wrong_roland.directory_digest(),
     ])
     .await
     .expect_err("Want error merging");
@@ -251,14 +260,14 @@ async fn merge_directories_same_files() {
 
   let result = store
     .merge(vec![
-      containing_roland.digest(),
-      containing_roland_and_treats.digest(),
+      containing_roland.directory_digest(),
+      containing_roland_and_treats.directory_digest(),
     ])
     .await;
 
   assert_eq!(
     result,
-    Ok(TestDirectory::containing_roland_and_treats().digest())
+    Ok(TestDirectory::containing_roland_and_treats().directory_digest())
   );
 }
 
@@ -283,24 +292,27 @@ async fn snapshot_merge_two_files() {
     true,
   );
 
-  let snapshot1 = Snapshot::from_path_stats(
-    store.clone(),
-    digester.clone(),
-    vec![dir.clone(), file1.clone()],
-  )
-  .await
-  .unwrap();
-
-  let snapshot2 =
-    Snapshot::from_path_stats(store.clone(), digester, vec![dir.clone(), file2.clone()])
-      .await
-      .unwrap();
-
-  let merged = store
-    .merge(vec![snapshot1.digest, snapshot2.digest])
+  let snapshot1 = Snapshot::from_path_stats(digester.clone(), vec![dir.clone(), file1.clone()])
     .await
     .unwrap();
-  let merged_root_directory = store.load_directory(merged).await.unwrap().unwrap();
+
+  let snapshot2 = Snapshot::from_path_stats(digester, vec![dir.clone(), file2.clone()])
+    .await
+    .unwrap();
+
+  let merged = store
+    .merge(vec![snapshot1.into(), snapshot2.into()])
+    .await
+    .unwrap();
+  store
+    .ensure_directory_digest_persisted(merged.clone())
+    .await
+    .unwrap();
+  let merged_root_directory = store
+    .load_directory(merged.as_digest())
+    .await
+    .unwrap()
+    .unwrap();
 
   assert_eq!(merged_root_directory.files.len(), 0);
   assert_eq!(merged_root_directory.directories.len(), 1);
@@ -339,18 +351,18 @@ async fn snapshot_merge_same_file() {
   );
 
   // When the file is the exact same, merging should succeed.
-  let snapshot1 = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file.clone()])
+  let snapshot1 = Snapshot::from_path_stats(digester.clone(), vec![file.clone()])
     .await
     .unwrap();
-  let snapshot1_cloned = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file])
+  let snapshot1_cloned = Snapshot::from_path_stats(digester.clone(), vec![file])
     .await
     .unwrap();
 
   let merged_res = store
-    .merge(vec![snapshot1.digest, snapshot1_cloned.digest])
+    .merge(vec![snapshot1.clone().into(), snapshot1_cloned.into()])
     .await;
 
-  assert_eq!(merged_res, Ok(snapshot1.digest));
+  assert_eq!(merged_res, Ok(snapshot1.into()));
 }
 
 #[tokio::test]
@@ -359,7 +371,7 @@ async fn snapshot_merge_colliding() {
 
   make_file(&tempdir.path().join("roland"), STR.as_bytes(), 0o600);
   let path_stats1 = expand_all_sorted(posix_fs).await;
-  let snapshot1 = Snapshot::from_path_stats(store.clone(), digester.clone(), path_stats1)
+  let snapshot1 = Snapshot::from_path_stats(digester.clone(), path_stats1)
     .await
     .unwrap();
 
@@ -367,11 +379,11 @@ async fn snapshot_merge_colliding() {
   let (_store2, tempdir2, posix_fs2, digester2) = setup();
   make_file(&tempdir2.path().join("roland"), STR2.as_bytes(), 0o600);
   let path_stats2 = expand_all_sorted(posix_fs2).await;
-  let snapshot2 = Snapshot::from_path_stats(store.clone(), digester2, path_stats2)
+  let snapshot2 = Snapshot::from_path_stats(digester2, path_stats2)
     .await
     .unwrap();
 
-  let merged_res = store.merge(vec![snapshot1.digest, snapshot2.digest]).await;
+  let merged_res = store.merge(vec![snapshot1.into(), snapshot2.into()]).await;
 
   match merged_res {
     Err(ref msg)
@@ -388,22 +400,7 @@ async fn snapshot_merge_colliding() {
 }
 
 #[tokio::test]
-async fn strip_empty_prefix() {
-  let (store, _, _, _) = setup();
-
-  let dir = TestDirectory::nested();
-  store
-    .record_directory(&dir.directory(), false)
-    .await
-    .expect("Error storing directory");
-
-  let prefix = RelativePath::new(PathBuf::from("")).unwrap();
-  let result = store.strip_prefix(dir.digest(), prefix).await;
-  assert_eq!(result, Ok(dir.digest()));
-}
-
-#[tokio::test]
-async fn strip_non_empty_prefix() {
+async fn strip_empty_and_non_empty_prefix() {
   let (store, _, _, _) = setup();
 
   let dir = TestDirectory::nested();
@@ -416,9 +413,18 @@ async fn strip_non_empty_prefix() {
     .await
     .expect("Error storing directory");
 
+  // Empty.
+  let prefix = RelativePath::new(PathBuf::from("")).unwrap();
+  let result = store.strip_prefix(dir.directory_digest(), &prefix).await;
+  assert_eq!(result, Ok(dir.directory_digest()));
+
+  // Non-empty.
   let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
-  let result = store.strip_prefix(dir.digest(), prefix).await;
-  assert_eq!(result, Ok(TestDirectory::containing_roland().digest()));
+  let result = store.strip_prefix(dir.directory_digest(), &prefix).await;
+  assert_eq!(
+    result,
+    Ok(TestDirectory::containing_roland().directory_digest())
+  );
 }
 
 #[tokio::test]
@@ -432,35 +438,22 @@ async fn strip_prefix_empty_subdir() {
     .expect("Error storing directory");
 
   let prefix = RelativePath::new(PathBuf::from("falcons/peregrine")).unwrap();
-  let result = store.strip_prefix(dir.digest(), prefix).await;
-  assert_eq!(result, Ok(TestDirectory::empty().digest()));
+  let result = store.strip_prefix(dir.directory_digest(), &prefix).await;
+  assert_eq!(result, Ok(TestDirectory::empty().directory_digest()));
 }
 
 #[tokio::test]
 async fn strip_dir_not_in_store() {
   let (store, _, _, _) = setup();
-  let digest = TestDirectory::nested().digest();
+  let digest = TestDirectory::nested().directory_digest();
   let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
-  let result = store.strip_prefix(digest, prefix).await;
-  assert_eq!(result, Err(format!("{:?} was not known", digest).into()));
-}
-
-#[tokio::test]
-async fn strip_subdir_not_in_store() {
-  let (store, _, _, _) = setup();
-  let dir = TestDirectory::nested();
-  store
-    .record_directory(&dir.directory(), false)
-    .await
-    .expect("Error storing directory");
-  let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
-  let result = store.strip_prefix(dir.digest(), prefix).await;
+  let result = store.strip_prefix(digest.clone(), &prefix).await;
   assert_eq!(
     result,
     Err(
       format!(
-        "{:?} was not known",
-        TestDirectory::containing_roland().digest()
+        "Could not walk unknown directory at \"\": {:?}",
+        digest.as_digest()
       )
       .into()
     )
@@ -481,28 +474,55 @@ async fn strip_prefix_non_matching_file() {
     .await
     .expect("Error storing directory");
   let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
-  let result = store.strip_prefix(dir.digest(), prefix).await;
+  let result = store.strip_prefix(dir.directory_digest(), &prefix).await;
 
-  assert_eq!(result, Err(format!("Cannot strip prefix cats from root directory (Digest with hash {:?}) - root directory contained non-matching file named: treats.ext", dir.digest().hash).into()));
+  assert_eq!(
+    result,
+    Err(
+      format!(
+        "Cannot strip prefix cats from root directory (Digest with hash {:?}) - \
+         root directory contained non-matching file named: treats.ext",
+        dir.digest().hash
+      )
+      .into()
+    )
+  );
 }
 
 #[tokio::test]
 async fn strip_prefix_non_matching_dir() {
   let (store, _, _, _) = setup();
   let dir = TestDirectory::double_nested_dir_and_file();
-  let child_dir = TestDirectory::nested_dir_and_file();
   store
     .record_directory(&dir.directory(), false)
     .await
     .expect("Error storing directory");
   store
-    .record_directory(&child_dir.directory(), false)
+    .record_directory(&TestDirectory::nested_dir_and_file().directory(), false)
+    .await
+    .expect("Error storing directory");
+  store
+    .record_directory(&TestDirectory::containing_falcons_dir().directory(), false)
+    .await
+    .expect("Error storing directory");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), false)
     .await
     .expect("Error storing directory");
   let prefix = RelativePath::new(PathBuf::from("animals/cats")).unwrap();
-  let result = store.strip_prefix(dir.digest(), prefix).await;
+  let result = store.strip_prefix(dir.directory_digest(), &prefix).await;
 
-  assert_eq!(result, Err(format!("Cannot strip prefix animals/cats from root directory (Digest with hash {:?}) - subdirectory animals contained non-matching directory named: birds", dir.digest().hash).into()));
+  assert_eq!(
+    result,
+    Err(
+      format!(
+        "Cannot strip prefix animals/cats from root directory (Digest with hash {:?}) - \
+         subdirectory animals contained non-matching directory named: birds",
+        dir.digest().hash
+      )
+      .into()
+    )
+  );
 }
 
 #[tokio::test]
@@ -518,8 +538,19 @@ async fn strip_subdir_not_in_dir() {
     .await
     .expect("Error storing directory");
   let prefix = RelativePath::new(PathBuf::from("cats/ugly")).unwrap();
-  let result = store.strip_prefix(dir.digest(), prefix).await;
-  assert_eq!(result, Err(format!("Cannot strip prefix cats/ugly from root directory (Digest with hash {:?}) - subdirectory cats didn't contain a directory named ugly but did contain file named: roland.ext", dir.digest().hash).into()));
+  let result = store.strip_prefix(dir.directory_digest(), &prefix).await;
+  assert_eq!(
+    result,
+    Err(
+      format!(
+        "Cannot strip prefix cats/ugly from root directory (Digest with hash {:?}) - \
+         subdirectory cats didn't contain a directory named ugly \
+         but did contain file named: roland.ext",
+        dir.digest().hash
+      )
+      .into()
+    )
+  );
 }
 
 fn make_dir_stat(root: &Path, relpath: &Path) -> PathStat {

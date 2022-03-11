@@ -16,7 +16,9 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # ty
 
 from pants.bsp.context import BSPContext
 from pants.bsp.spec.task import BSPNotification
+from pants.engine.fs import Workspace
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.selectors import Params
 from pants.engine.unions import UnionMembership, union
 
 try:
@@ -67,6 +69,8 @@ def _make_error_future(exc: Exception) -> Future:
 
 class BSPConnection:
     _INITIALIZE_METHOD_NAME = "build/initialize"
+    _SHUTDOWN_METHOD_NAME = "build/shutdown"
+    _EXIT_NOTIFCATION_NAME = "build/exit"
 
     def __init__(
         self,
@@ -122,6 +126,20 @@ class BSPConnection:
                 )
             )
 
+        # Handle the `build/shutdown` method and `build/exit` notification.
+        if method_name == self._SHUTDOWN_METHOD_NAME:
+            # Return no-op success for the `build/shutdown` method. This doesn't actually cause the server to
+            # exit. That will occur once the client sends the `build/exit` notification.
+            return None
+        elif method_name == self._EXIT_NOTIFCATION_NAME:
+            # The `build/exit` notification directs the BSP server to immediately exit.
+            # The read-dispatch loop will exit once it notices that the inbound handle is closed. So close the
+            # inbound handle (and outbound handle for completeness) and then return to the dispatch loop
+            # to trigger the exit.
+            self._inbound.close()
+            self._outbound.close()
+            return None
+
         method_mapping = self._handler_mappings.get(method_name)
         if not method_mapping:
             return _make_error_future(JsonRpcMethodNotFound.of(method_name))
@@ -130,10 +148,11 @@ class BSPConnection:
             request = method_mapping.request_type.from_json_dict(params)
         except Exception:
             return _make_error_future(JsonRpcInvalidRequest())
-
+        workspace = Workspace(self._scheduler_session)
+        params = Params(request, workspace)
         execution_request = self._scheduler_session.execution_request(
             products=[method_mapping.response_type],
-            subjects=[request],
+            subjects=[params],
         )
         returns, throws = self._scheduler_session.execute(execution_request)
         if len(returns) == 1 and len(throws) == 0:

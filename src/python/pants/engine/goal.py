@@ -30,8 +30,8 @@ class GoalSubsystem(Subsystem):
     ```
     @rule
     def list(console: Console, list_subsystem: ListSubsystem) -> List:
-      transitive = list_subsystem.options.transitive
-      documented = list_subsystem.options.documented
+      transitive = list_subsystem.transitive
+      documented = list_subsystem.documented
       ...
     ```
     """
@@ -117,8 +117,8 @@ class Outputting:
     @contextmanager
     def output_sink(self, console: "Console") -> Iterator:
         stdout_file = None
-        if self.options.output_file:  # type: ignore[attr-defined]
-            stdout_file = open(self.options.output_file, "w")  # type: ignore[attr-defined]
+        if self.output_file:
+            stdout_file = open(self.output_file, "w")
             output_sink = stdout_file
         else:
             output_sink = console.stdout
@@ -145,6 +145,6 @@ class LineOriented(Outputting):
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
         """
-        sep = self.options.sep.encode().decode("unicode_escape")  # type: ignore[attr-defined]
+        sep = self.sep.encode().decode("unicode_escape")
         with self.output_sink(console) as output_sink:
             yield lambda msg: print(msg, file=output_sink, end=sep)

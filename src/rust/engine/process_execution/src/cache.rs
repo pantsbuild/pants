@@ -201,7 +201,8 @@ impl CommandRunner {
         .boxed(),
       self
         .file_store
-        .ensure_local_has_recursive_directory(result.output_directory),
+        .ensure_local_has_recursive_directory(result.output_directory.clone())
+        .boxed(),
     ])
     .await?;
 
@@ -216,11 +217,17 @@ impl CommandRunner {
     let stdout_digest = result.stdout_digest;
     let stderr_digest = result.stderr_digest;
 
+    // Ensure that the process output is persisted.
+    self
+      .file_store
+      .ensure_directory_digest_persisted(result.output_directory.clone())
+      .await?;
+
     let action_result = remexec::ActionResult {
       exit_code: result.exit_code,
       output_directories: vec![remexec::OutputDirectory {
         path: String::new(),
-        tree_digest: Some((&result.output_directory).into()),
+        tree_digest: Some((&result.output_directory.as_digest()).into()),
       }],
       stdout_digest: Some((&stdout_digest).into()),
       stderr_digest: Some((&stderr_digest).into()),

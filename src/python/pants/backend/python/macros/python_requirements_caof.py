@@ -16,6 +16,7 @@ from pants.backend.python.macros.caof_utils import (
 )
 from pants.backend.python.target_types import normalize_module_mapping, parse_requirements_file
 from pants.base.build_environment import get_buildroot
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 
 
 class PythonRequirementsCAOF:
@@ -68,9 +69,9 @@ class PythonRequirementsCAOF:
             `modules=["django"]`.
         """
         req_file_tgt = self._parse_context.create_object(
-            "_python_requirements_file",
+            TargetGeneratorSourcesHelperTarget.alias,
             name=source.replace(os.path.sep, "_"),
-            source=source,
+            sources=[source],
         )
         requirements_dep = f":{req_file_tgt.name}"
 

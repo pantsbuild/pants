@@ -255,7 +255,7 @@ async def build_docker_image(
             address=field_set.address,
             context_root=context_root,
             context=context,
-            colors=global_options.options.colors,
+            colors=global_options.colors,
         )
         if maybe_msg:
             logger.warning(maybe_msg)

@@ -6,19 +6,28 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union, cast, overload
+from typing import Any, Callable, Generic, Iterator, TypeVar, Union, cast, overload
 
 from pants.option import custom_types
 from pants.util.docutil import bin_name
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass(frozen=True)
 class OptionsInfo:
     flag_names: tuple[str, ...]
     flag_options: dict[str, Any]
+
+
+def collect_options_info(cls: type) -> Iterator[OptionsInfo]:
+    """Yields the ordered options info from the MRO of the provided class."""
+    # NB: Since registration ordering matters (it impacts `help` output), we register these in
+    # class attribute order, starting from the base class down.
+    for class_ in reversed(inspect.getmro(cls)):
+        for attrname in class_.__dict__.keys():
+            # NB: We use attrname and getattr to trigger descriptors
+            attr = getattr(cls, attrname)
+            if isinstance(attr, OptionsInfo):
+                yield attr
 
 
 # The type of the option.
@@ -40,6 +49,9 @@ _DynamicDefaultT = Callable[[_SubsystemType], Any]
 _MaybeDynamicT = Union[_DynamicDefaultT, _DefaultT]
 # The type of the `help` parameter for each option.
 _HelpT = _MaybeDynamicT[str]
+# NB: Ideally this would be `Callable[[_SubsystemType], bool]`, however where this type is used is
+# generally provided untyped lambdas.
+_RegisterIfFuncT = Callable[[_SubsystemType], Any]
 
 
 def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
@@ -59,7 +71,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     _flag_names: tuple[str, ...]
     _default: _MaybeDynamicT[_DefaultT]
     _help: _HelpT
-    _register_if: Callable[[_SubsystemType], bool]
+    _register_if: _RegisterIfFuncT
     _extra_kwargs: dict[str, Any]
 
     # NB: We define `__new__` rather than `__init__` because some subclasses need to define
@@ -69,7 +81,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         *flag_names: str,
         default: _MaybeDynamicT[_DefaultT],
         help: _HelpT,
-        register_if: Callable[[_SubsystemType], bool] | None = None,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -163,7 +175,7 @@ class _ListOptionBase(
         *flag_names: str,
         default: _MaybeDynamicT[list[_ListMemberT]] = [],
         help: _HelpT,
-        register_if: Callable[[_SubsystemType], bool] | None = None,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -376,7 +388,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         *flag_names: str,
         default: _EnumT,
         help: _HelpT,
-        register_if: Callable[[_SubsystemType], bool] | None = None,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -398,7 +410,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
-        register_if: Callable[[_SubsystemType], bool] | None = None,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -420,7 +432,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type: type[_EnumT],
         default: None,
         help: _HelpT,
-        register_if: Callable[[_SubsystemType], bool] | None = None,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = None,
         daemon: bool | None = None,
@@ -506,7 +518,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         *flag_names: str,
         default: list[_EnumT],
         help: _HelpT,
-        register_if: Callable[[_SubsystemType], bool] | None = None,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = ...,
         daemon: bool | None = ...,
@@ -528,7 +540,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
-        register_if: Callable[[_SubsystemType], bool] | None = None,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = ...,
         daemon: bool | None = ...,
@@ -549,7 +561,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         *flag_names: str,
         enum_type: type[_EnumT],
         help: _HelpT,
-        register_if: Callable[[_SubsystemType], bool] | None = None,
+        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
         advanced: bool | None = ...,
         daemon: bool | None = ...,
@@ -648,7 +660,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         *flag_names,
         default: _MaybeDynamicT[dict[str, _ValueT]] = {},
         help,
-        register_if: Callable[[_SubsystemType], bool] | None = None,
+        register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
         daemon: bool | None = None,
         default_help_repr: str | None = None,

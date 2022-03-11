@@ -20,10 +20,10 @@ use crate::types::Types;
 use crate::Failure;
 
 use fs::{
-  safe_create_dir_all_ioerror, DirectoryDigest, Permissions, PreparedPathGlobs, RelativePath,
+  safe_create_dir_all_ioerror, DirectoryDigest, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
-use hashing::{Digest, EMPTY_DIGEST};
+use hashing::Digest;
 use indexmap::IndexMap;
 use process_execution::{CacheName, ManagedChild, NamedCaches};
 use pyo3::{PyRef, Python};
@@ -219,11 +219,7 @@ fn process_request_to_process_result(
         externs::store_bytes(py, &stderr_bytes),
         Snapshot::store_file_digest(py, result.stderr_digest).map_err(throw)?,
         externs::store_i64(py, result.exit_code.into()),
-        Snapshot::store_directory_digest(
-          py,
-          DirectoryDigest::todo_from_digest(result.output_directory),
-        )
-        .map_err(throw)?,
+        Snapshot::store_directory_digest(py, result.output_directory).map_err(throw)?,
         externs::unsafe_call(
           py,
           context.core.types.platform,
@@ -258,17 +254,16 @@ fn directory_digest_to_digest_contents(
       lift_directory_digest(py_digest)
     })
     .map_err(throw)?;
-    let snapshot = context
+
+    let digest_contents = context
       .core
       .store()
-      .contents_for_directory(digest.todo_as_digest())
+      .contents_for_directory(digest)
       .await
-      .and_then(move |digest_contents| {
-        let gil = Python::acquire_gil();
-        Snapshot::store_digest_contents(gil.python(), &context, &digest_contents)
-      })
       .map_err(throw)?;
-    Ok(snapshot)
+
+    let gil = Python::acquire_gil();
+    Snapshot::store_digest_contents(gil.python(), &context, &digest_contents).map_err(throw)
   }
   .boxed()
 }
@@ -286,7 +281,7 @@ fn directory_digest_to_digest_entries(
     let snapshot = context
       .core
       .store()
-      .entries_for_directory(digest.todo_as_digest())
+      .entries_for_directory(digest)
       .await
       .and_then(move |digest_entries| {
         let gil = Python::acquire_gil();
@@ -310,18 +305,17 @@ fn remove_prefix_request_to_digest(
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_remove_prefix.prefix)
         .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-      let res: NodeResult<(Digest, RelativePath)> = Ok((py_remove_prefix.digest, prefix));
+      let res: NodeResult<_> = Ok((py_remove_prefix.digest.clone(), prefix));
       res
     })?;
     let digest = context
       .core
       .store()
-      .strip_prefix(digest, prefix)
+      .strip_prefix(digest, &prefix)
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -338,7 +332,8 @@ fn add_prefix_request_to_digest(
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_add_prefix.prefix)
         .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
-      let res: NodeResult<(Digest, RelativePath)> = Ok((py_add_prefix.digest, prefix));
+      let res: NodeResult<(DirectoryDigest, RelativePath)> =
+        Ok((py_add_prefix.digest.clone(), prefix));
       res
     })?;
     let digest = context
@@ -348,8 +343,7 @@ fn add_prefix_request_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -388,8 +382,7 @@ fn merge_digests_request_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -400,10 +393,9 @@ fn download_file_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from_py_err)?;
-    let digest = context.get(DownloadedFile(key)).await?;
+    let snapshot = context.get(DownloadedFile(key)).await?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), snapshot.into()).map_err(throw)
   }
   .boxed()
 }
@@ -478,6 +470,9 @@ fn create_digest_to_digest(
       .collect()
   };
 
+  // TODO: Rather than creating independent Digests and then merging them, this should use
+  // `DigestTrie::from_path_stats`.
+  //   see https://github.com/pantsbuild/pants/pull/14569#issuecomment-1057286943
   let digest_futures: Vec<_> = items
     .into_iter()
     .map(|item| {
@@ -489,14 +484,14 @@ fn create_digest_to_digest(
             let snapshot = store
               .snapshot_of_one_file(path, digest, is_executable)
               .await?;
-            let res: Result<_, String> = Ok(snapshot.digest);
+            let res: Result<DirectoryDigest, String> = Ok(snapshot.into());
             res
           }
           CreateDigestItem::FileEntry(path, digest, is_executable) => {
             let snapshot = store
               .snapshot_of_one_file(path, digest, is_executable)
               .await?;
-            let res: Result<_, String> = Ok(snapshot.digest);
+            let res: Result<_, String> = Ok(snapshot.into());
             res
           }
           CreateDigestItem::Dir(path) => store
@@ -516,8 +511,7 @@ fn create_digest_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -532,11 +526,9 @@ fn digest_subset_to_digest(
       let py_digest_subset = (*args[0]).as_ref(py);
       let py_path_globs = externs::getattr(py_digest_subset, "globs").unwrap();
       let py_digest = externs::getattr(py_digest_subset, "digest").unwrap();
-      let res: NodeResult<(PreparedPathGlobs, Digest)> = Ok((
+      let res: NodeResult<_> = Ok((
         Snapshot::lift_prepared_path_globs(py_path_globs).map_err(throw)?,
-        lift_directory_digest(py_digest)
-          .map_err(throw)?
-          .todo_as_digest(),
+        lift_directory_digest(py_digest).map_err(throw)?,
       ));
       res
     })?;
@@ -546,8 +538,7 @@ fn digest_subset_to_digest(
       .await
       .map_err(|e| throw(format!("{:?}", e)))?;
     let gil = Python::acquire_gil();
-    Snapshot::store_directory_digest(gil.python(), DirectoryDigest::todo_from_digest(digest))
-      .map_err(throw)
+    Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
   .boxed()
 }
@@ -577,7 +568,7 @@ fn interactive_process(
       let run_in_workspace: bool = externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
       let restartable: bool = externs::getattr(py_interactive_process, "restartable").unwrap();
       let py_input_digest = externs::getattr(py_interactive_process, "input_digest").unwrap();
-      let input_digest: Digest = lift_directory_digest(py_input_digest)?.todo_as_digest();
+      let input_digest = lift_directory_digest(py_input_digest)?;
       let env: BTreeMap<String, String> = externs::getattr_from_str_frozendict(py_interactive_process, "env");
 
       let append_only_caches = externs::getattr_from_str_frozendict::<&str>(py_interactive_process, "append_only_caches")
@@ -603,7 +594,7 @@ fn interactive_process(
       Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
     };
 
-    if input_digest != EMPTY_DIGEST {
+    if input_digest != *EMPTY_DIRECTORY_DIGEST {
       if run_in_workspace {
         return Err(
           "Local interactive process should not attempt to materialize files when run in workspace.".to_owned().into()

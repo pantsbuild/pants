@@ -134,6 +134,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(single_file_digests_to_bytes, m)?)?;
   m.add_function(wrap_pyfunction!(ensure_remote_has_recursive, m)?)?;
+  m.add_function(wrap_pyfunction!(ensure_directory_digest_persisted, m)?)?;
 
   m.add_function(wrap_pyfunction!(scheduler_execute, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_metrics, m)?)?;
@@ -665,7 +666,6 @@ async fn workunit_to_py_value(
   workunit_store: &WorkunitStore,
   workunit: &Workunit,
   core: &Arc<Core>,
-  session: &Session,
 ) -> PyO3Result<Value> {
   let mut dict_entries = {
     let gil = Python::acquire_gil();
@@ -749,11 +749,18 @@ async fn workunit_to_py_value(
         crate::nodes::Snapshot::store_file_digest(gil.python(), *digest)
           .map_err(PyException::new_err)?
       }
-      ArtifactOutput::Snapshot(digest) => {
-        let snapshot =
-          store::Snapshot::from_digest(store, DirectoryDigest::todo_from_digest(*digest))
-            .await
-            .map_err(PyException::new_err)?;
+      ArtifactOutput::Snapshot(digest_handle) => {
+        let digest = (&**digest_handle)
+          .as_any()
+          .downcast_ref::<DirectoryDigest>()
+          .ok_or_else(|| {
+            PyException::new_err(format!(
+              "Failed to convert {digest_handle:?} to a DirectoryDigest."
+            ))
+          })?;
+        let snapshot = store::Snapshot::from_digest(store, digest.clone())
+          .await
+          .map_err(PyException::new_err)?;
         let gil = Python::acquire_gil();
         let py = gil.python();
         crate::nodes::Snapshot::store_snapshot(py, snapshot).map_err(PyException::new_err)?
@@ -775,18 +782,13 @@ async fn workunit_to_py_value(
     let value = match user_metadata_item {
       UserMetadataItem::ImmediateString(v) => v.into_py(py),
       UserMetadataItem::ImmediateInt(n) => n.into_py(py),
-      UserMetadataItem::PyValue(py_val_handle) => {
-        match session.with_metadata_map(|map| map.get(py_val_handle).cloned()) {
-          None => {
-            log::warn!(
-              "Workunit metadata() value not found for key: {}",
-              user_metadata_key
-            );
-            continue;
-          }
-          Some(v) => v,
-        }
-      }
+      UserMetadataItem::PyValue(py_val_handle) => (&**py_val_handle)
+        .as_any()
+        .downcast_ref::<Value>()
+        .ok_or_else(|| {
+          PyException::new_err(format!("Failed to convert {py_val_handle:?} to a Value."))
+        })?
+        .to_object(py),
     };
     user_metadata_entries.push((
       externs::store_utf8(py, user_metadata_key.as_str()),
@@ -849,11 +851,10 @@ async fn workunits_to_py_tuple_value(
   workunit_store: &WorkunitStore,
   workunits: Vec<Workunit>,
   core: &Arc<Core>,
-  session: &Session,
 ) -> PyO3Result<Value> {
   let mut workunit_values = Vec::new();
   for workunit in workunits {
-    let py_value = workunit_to_py_value(workunit_store, &workunit, core, session).await?;
+    let py_value = workunit_to_py_value(workunit_store, &workunit, core).await?;
     workunit_values.push(py_value);
   }
 
@@ -902,14 +903,12 @@ fn session_poll_workunits(
         &workunit_store,
         started,
         &core,
-        &session,
       ))?;
       let completed_val = core.executor.block_on(workunits_to_py_tuple_value(
         py,
         &workunit_store,
         completed,
         &core,
-        &session,
       ))?;
       Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
     })
@@ -1455,7 +1454,7 @@ fn ensure_remote_has_recursive(
       .iter()
       .map(|value| {
         crate::nodes::lift_directory_digest(value)
-          .map(|dd| dd.todo_as_digest())
+          .map(|dd| dd.as_digest())
           .or_else(|_| crate::nodes::lift_file_digest(value))
       })
       .collect::<Result<Vec<Digest>, _>>()
@@ -1465,6 +1464,26 @@ fn ensure_remote_has_recursive(
       core
         .executor
         .block_on(core.store().ensure_remote_has_recursive(digests))
+    })
+    .map_err(PyException::new_err)?;
+    Ok(())
+  })
+}
+
+#[pyfunction]
+fn ensure_directory_digest_persisted(
+  py: Python,
+  py_scheduler: &PyScheduler,
+  py_digest: &PyAny,
+) -> PyO3Result<()> {
+  let core = &py_scheduler.0.core;
+  core.executor.enter(|| {
+    let digest = crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
+
+    py.allow_threads(|| {
+      core
+        .executor
+        .block_on(core.store().ensure_directory_digest_persisted(digest))
     })
     .map_err(PyException::new_err)?;
     Ok(())
@@ -1526,12 +1545,15 @@ fn write_digest(
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
 
-    block_in_place_and_wait(py, || {
-      core.store().materialize_directory(
-        destination.clone(),
-        lifted_digest.todo_as_digest(),
-        fs::Permissions::Writable,
-      )
+    block_in_place_and_wait(py, || async move {
+      core
+        .store()
+        .materialize_directory(
+          destination.clone(),
+          lifted_digest,
+          fs::Permissions::Writable,
+        )
+        .await
     })
     .map_err(PyValueError::new_err)
   })

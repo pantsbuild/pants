@@ -58,7 +58,8 @@ func matchTag(ctxt *build.Context, name string, allTags map[string]bool) bool {
 			return true
 		}
 	}
-	for _, tag := range ctxt.ToolTags {
+	toolTags := extractToolTags(ctxt)
+	for _, tag := range toolTags {
 		if tag == name {
 			return true
 		}

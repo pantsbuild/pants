@@ -134,10 +134,10 @@ def filter_targets(
 
     anded_filter: TargetFilter = and_filters(
         [
-            *(create_filters(filter_subsystem.options.target_type, filter_target_type)),
-            *(create_filters(filter_subsystem.options.address_regex, filter_address_regex)),
-            *(create_filters(filter_subsystem.options.tag_regex, filter_tag_regex)),
-            filter_granularity(filter_subsystem.options.granularity),
+            *(create_filters(filter_subsystem.target_type, filter_target_type)),
+            *(create_filters(filter_subsystem.address_regex, filter_address_regex)),
+            *(create_filters(filter_subsystem.tag_regex, filter_tag_regex)),
+            filter_granularity(filter_subsystem.granularity),
         ]
     )
     addresses = sorted(target.address for target in targets if anded_filter(target))
