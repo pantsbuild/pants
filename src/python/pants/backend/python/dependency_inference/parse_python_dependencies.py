@@ -32,7 +32,7 @@ class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
     """All the discovered imports from a Python source file mapped to the relevant info."""
 
 
-class ParsedPythonAssets(DeduplicatedCollection[str]):
+class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     """All the discovered possible assets from a Python source file."""
 
     # N.B. Don't set `sort_input`, as the input is already sorted
@@ -41,7 +41,7 @@ class ParsedPythonAssets(DeduplicatedCollection[str]):
 @dataclass(frozen=True)
 class ParsedPythonDependencies:
     imports: ParsedPythonImports
-    assets: ParsedPythonAssets
+    assets: ParsedPythonAssetPaths
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,7 @@ async def parse_python_dependencies(
         imports=ParsedPythonImports(
             (key, ParsedPythonImportInfo(**val)) for key, val in output.get("imports", {}).items()
         ),
-        assets=ParsedPythonAssets(output.get("assets", [])),
+        assets=ParsedPythonAssetPaths(output.get("assets", [])),
     )
 
 

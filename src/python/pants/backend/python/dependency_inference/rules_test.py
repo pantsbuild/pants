@@ -27,7 +27,7 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import ancestor_files
-from pants.core.target_types import ResourcesGeneratorTarget
+from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -170,6 +170,7 @@ def test_infer_python_assets(caplog) -> None:
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
             ResourcesGeneratorTarget,
+            FilesGeneratorTarget,
         ],
     )
     rule_runner.write_files(
@@ -178,10 +179,12 @@ def test_infer_python_assets(caplog) -> None:
             "src/python/data/db.json": "",
             "src/python/data/db2.json": "",
             "src/python/data/flavors.txt": "",
+            "configs/prod.txt": "",
             "src/python/app.py": dedent(
                 """\
                 pkgutil.get_data(__name__, "data/db.json")
                 pkgutil.get_data(__name__, "data/db2.json")
+                open("configs/prod.txt")
                 """
             ),
             "src/python/f.py": dedent(
@@ -197,6 +200,14 @@ def test_infer_python_assets(caplog) -> None:
                 resources(
                     name="txtfiles",
                     sources=["data/*.txt"],
+                )
+                """
+            ),
+            "configs/BUILD": dedent(
+                """\
+                files(
+                    name="configs",
+                    sources=["prod.txt"],
                 )
                 """
             ),
@@ -220,6 +231,7 @@ def test_infer_python_assets(caplog) -> None:
         [
             Address("src/python/data", target_name="jsonfiles", relative_file_path="db.json"),
             Address("src/python/data", target_name="jsonfiles", relative_file_path="db2.json"),
+            Address("configs", target_name="configs", relative_file_path="prod.txt"),
         ],
     )
 
@@ -241,6 +253,7 @@ def test_infer_python_assets(caplog) -> None:
                 """\
                     resources(name='jsonfiles', sources=['*.json'])
                     resources(name='also_jsonfiles', sources=['*.json'])
+                    resources(name='txtfiles', sources=['*.txt'])
                 """
             ),
             "src/python/data/ambiguous.json": "",
@@ -259,6 +272,11 @@ def test_infer_python_assets(caplog) -> None:
                 )
                 """
             ),
+            # Both a resource relative to the module and file with conspicuously similar paths
+            "src/python/data/both_file_and_resource.txt": "",
+            "data/both_file_and_resource.txt": "",
+            "data/BUILD": "files(name='txtfiles', sources=['*.txt'])",
+            "src/python/assets_bag.py": "ImAPathType('data/both_file_and_resource.txt')",
         }
     )
     assert run_dep_inference(
@@ -279,6 +297,20 @@ def test_infer_python_assets(caplog) -> None:
         in caplog.text
     )
     assert "disambiguated_with_bang.py" not in caplog.text
+
+    caplog.clear()
+    assert run_dep_inference(
+        Address("src/python", target_name="main", relative_file_path="assets_bag.py")
+    ) == InferredDependencies([])
+    assert len(caplog.records) == 1
+    assert (
+        "The target src/python/assets_bag.py:main uses `data/both_file_and_resource.txt`"
+        in caplog.text
+    )
+    assert (
+        "['data/both_file_and_resource.txt:txtfiles', 'src/python/data/both_file_and_resource.txt:txtfiles']"
+        in caplog.text
+    )
 
 
 def test_infer_python_inits() -> None:

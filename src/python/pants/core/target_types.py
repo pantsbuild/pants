@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import PurePath
 from textwrap import dedent
 
 from pants.core.goals.package import (
@@ -39,6 +41,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 # -----------------------------------------------------------------------------------------------
@@ -337,6 +340,31 @@ def find_all_assets(
         if tgt.has_field(FileSourceField):
             files.append(tgt)
     return AllAssetTargets(tuple(resources), tuple(files))
+
+
+@dataclass(frozen=True)
+class AllAssetTargetsByPath:
+    resources: FrozenDict[PurePath, frozenset[Target]]
+    files: FrozenDict[PurePath, frozenset[Target]]
+
+
+@rule(desc="Mapping assets by path")
+def map_assets_to_path(
+    all_asset_targets: AllAssetTargets,
+) -> AllAssetTargetsByPath:
+    resources_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
+    for resource_tgt in all_asset_targets.resources:
+        path = PurePath(resource_tgt[ResourceSourceField].file_path)
+        resources_by_path[path].add(resource_tgt)
+
+    files_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
+    for file_tgt in all_asset_targets.files:
+        files_by_path[PurePath(file_tgt[FileSourceField].file_path)].add(file_tgt)
+
+    return AllAssetTargetsByPath(
+        FrozenDict((key, frozenset(values)) for key, values in resources_by_path.items()),
+        FrozenDict((key, frozenset(values)) for key, values in files_by_path.items()),
+    )
 
 
 # -----------------------------------------------------------------------------------------------

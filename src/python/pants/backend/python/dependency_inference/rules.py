@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import itertools
 import logging
-from collections import defaultdict
 from enum import Enum
 from pathlib import PurePath
 from typing import Iterable, Iterator, cast
@@ -19,7 +18,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwnersRequest,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsedPythonAssets,
+    ParsedPythonAssetPaths,
     ParsedPythonDependencies,
     ParsedPythonImports,
     ParsePythonDependenciesRequest,
@@ -34,12 +33,7 @@ from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core import target_types
-from pants.core.target_types import (
-    AllAssetTargets,
-    AllAssetTargetsRequest,
-    FileSourceField,
-    ResourceSourceField,
-)
+from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllAssetTargetsRequest
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -50,7 +44,6 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferDependenciesRequest,
     InferredDependencies,
-    Target,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -165,22 +158,18 @@ class InferPythonImportDependencies(InferDependenciesRequest):
 def _get_inferred_asset_deps(
     address: Address,
     request_file_path: str,
-    all_asset_targets: AllAssetTargets,
-    assets: ParsedPythonAssets,
+    assets_by_path: AllAssetTargetsByPath,
+    assets: ParsedPythonAssetPaths,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
 ) -> Iterator[Address]:
-    assets_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
-    for file_tgt in all_asset_targets.files:
-        assets_by_path[PurePath(file_tgt[FileSourceField].file_path)].add(file_tgt)
-    for resource_tgt in all_asset_targets.resources:
-        path = PurePath(resource_tgt[ResourceSourceField].file_path)
-        assets_by_path[path].add(resource_tgt)
-
     for filepath in assets:
         resource_path = PurePath(request_file_path).parent / filepath
-        inferred_resource_tgt = assets_by_path.get(resource_path)
-        if inferred_resource_tgt:
-            possible_addresses = tuple(tgt.address for tgt in inferred_resource_tgt)
+        inferred_resource_tgts = assets_by_path.resources.get(resource_path, frozenset())
+        inferred_file_tgts = assets_by_path.files.get(PurePath(filepath), frozenset())
+        inferred_tgts = inferred_resource_tgts | inferred_file_tgts
+
+        if inferred_tgts:
+            possible_addresses = tuple(tgt.address for tgt in inferred_tgts)
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 possible_addresses,
                 address,
@@ -300,11 +289,12 @@ async def infer_python_dependencies_via_source(
 
     if parsed_assets:
         all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
+        assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
         inferred_deps.update(
             _get_inferred_asset_deps(
                 tgt.address,
                 request.sources_field.file_path,
-                all_asset_targets,
+                assets_by_path,
                 parsed_assets,
                 explicitly_provided_deps,
             )
