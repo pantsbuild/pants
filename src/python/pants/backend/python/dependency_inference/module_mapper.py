@@ -176,13 +176,21 @@ async def merge_first_party_module_mappings(
         )
         for marker_cls in union_membership.get(FirstPartyPythonMappingImplMarker)
     )
-    # TODO: merge this
-    modules_to_providers: DefaultDict[str, list[ModuleProvider]] = defaultdict(list)
+    resolves_to_modules_to_providers: dict[ResolveName, DefaultDict[str, list[ModuleProvider]]] = {}
     for mapping_impl in all_mappings:
-        for module, providers in mapping_impl.items():
-            modules_to_providers[module].extend(providers)
+        for resolve, modules_to_providers in mapping_impl.items():
+            if resolve not in resolves_to_modules_to_providers:
+                resolves_to_modules_to_providers[resolve] = defaultdict(list)
+            for module, providers in modules_to_providers.items():
+                resolves_to_modules_to_providers[resolve][module].extend(providers)
     return FirstPartyPythonModuleMapping(
-        (k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items())
+        (
+            resolve,
+            FrozenDict(
+                (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
+            ),
+        )
+        for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
     )
 
 
