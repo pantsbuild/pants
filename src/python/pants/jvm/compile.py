@@ -129,12 +129,15 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
         """
 
         for (input, request_types) in jvm_request_types.code_generator_requests.items():
+            if not component.representative.has_field(input):
+                continue
             if len(request_types) > 1:
-                # TODO: filter usable generators by acceptable languages
-                pass
+                raise ClasspathSourceAmbiguity(
+                    f"More than one code generator ({request_types}) was compatible with the "
+                    f"inputs:\n{component.bullet_list()}"
+                )
             request_type = request_types[0]
-            if component.representative.has_field(input):
-                return request_type(component, resolve, None)
+            return request_type(component, resolve, None)
 
         compatible = []
         partial = []
