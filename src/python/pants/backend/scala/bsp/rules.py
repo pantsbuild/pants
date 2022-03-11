@@ -47,7 +47,6 @@ from pants.jvm.compile import (
     ClasspathEntryRequestFactory,
     FallibleClasspathEntry,
 )
-from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.key import CoursierResolveKey
