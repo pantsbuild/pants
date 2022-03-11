@@ -36,9 +36,9 @@ class BuildFileOptions:
 @rule
 def extract_build_file_options(global_options: GlobalOptions) -> BuildFileOptions:
     return BuildFileOptions(
-        patterns=tuple(global_options.build_patterns),
-        ignores=tuple(global_options.build_ignore),
-        prelude_globs=tuple(global_options.build_file_prelude_globs),
+        patterns=global_options.build_patterns,
+        ignores=global_options.build_ignore,
+        prelude_globs=global_options.build_file_prelude_globs,
     )
 
 
