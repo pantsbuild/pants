@@ -647,7 +647,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     # to build a PEX with a requirement.
     lock_content = PythonLockfileMetadata.new(
         InterpreterConstraints(), set()
-    ).add_header_to_lockfile(b"", regenerate_command="regen")
+    ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 
     lockfile = Lockfile(

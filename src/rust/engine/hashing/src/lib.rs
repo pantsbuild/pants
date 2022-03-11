@@ -25,7 +25,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Write};
 use std::str::FromStr;

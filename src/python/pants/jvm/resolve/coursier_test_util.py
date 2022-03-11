@@ -25,7 +25,9 @@ class TestCoursierWrapper:
         return (
             JVMLockfileMetadata.new(requirements)
             .add_header_to_lockfile(
-                self.lockfile.to_serialized(), regenerate_command=f"{bin_name()} generate-lockfiles"
+                self.lockfile.to_serialized(),
+                regenerate_command=f"{bin_name()} generate-lockfiles",
+                delimeter="#",
             )
             .decode()
         )

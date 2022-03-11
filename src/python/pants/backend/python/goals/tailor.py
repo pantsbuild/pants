@@ -135,7 +135,7 @@ async def find_putative_targets(
                     type_alias="python_requirements",
                     triggering_sources=[req_file],
                     owned_sources=[req_file],
-                    addressable=not global_options.options.use_deprecated_python_macros,
+                    addressable=not global_options.use_deprecated_python_macros,
                     kwargs={} if name == "requirements.txt" else {"source": name},
                 )
             )

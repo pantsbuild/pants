@@ -1551,7 +1551,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     @memoized_property
     def named_caches_dir(self) -> PurePath:
-        return Path(self.options.named_caches_dir).resolve()
+        return Path(self._named_caches_dir).resolve()
 
 
 @dataclass(frozen=True)

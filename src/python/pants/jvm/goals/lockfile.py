@@ -67,7 +67,9 @@ async def generate_jvm_lockfile(
     resolved_lockfile_contents = resolved_lockfile.to_serialized()
     metadata = JVMLockfileMetadata.new(request.artifacts)
     resolved_lockfile_contents = metadata.add_header_to_lockfile(
-        resolved_lockfile_contents, regenerate_command=f"{bin_name()} generate-lockfiles"
+        resolved_lockfile_contents,
+        regenerate_command=f"{bin_name()} generate-lockfiles",
+        delimeter="#",
     )
 
     lockfile_digest = await Get(

@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
   fn from(d: &'a hashing::Digest) -> Self {
     Self {

@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
-use std::ffi::OsString;
 use std::fmt;
 use std::hash;
 use std::iter::Iterator;
@@ -58,7 +57,6 @@ impl Snapshot {
     S: StoreFileByDigest<Error> + Sized + Clone + Send + 'static,
     Error: fmt::Debug + 'static + Send,
   >(
-    store: Store,
     file_digester: S,
     path_stats: Vec<PathStat>,
   ) -> Result<Snapshot, String> {
@@ -84,12 +82,8 @@ impl Snapshot {
       .collect::<HashMap<_, _>>();
 
     let tree = DigestTrie::from_path_stats(path_stats, &file_digests_map)?;
-    // TODO: When "enough" intrinsics are ported to directly producing/consuming DirectoryDigests
-    // this call to persist the tree to the store should be removed, and the tree will be in-memory
-    // only (as allowed by the DirectoryDigest contract). See #13112.
-    let directory_digest = store.record_digest_trie(tree.clone(), true).await?;
     Ok(Self {
-      digest: directory_digest.as_digest(),
+      digest: tree.compute_root_digest(),
       tree,
     })
   }
@@ -99,35 +93,6 @@ impl Snapshot {
       digest: digest.as_digest(),
       tree: store.load_digest_trie(digest).await?,
     })
-  }
-
-  pub fn directories_and_files(directories: &[String], files: &[String]) -> String {
-    format!(
-      "{}{}{}",
-      if directories.is_empty() {
-        String::new()
-      } else {
-        format!(
-          "director{} named: {}",
-          if directories.len() == 1 { "y" } else { "ies" },
-          directories.join(", ")
-        )
-      },
-      if !directories.is_empty() && !files.is_empty() {
-        " and "
-      } else {
-        ""
-      },
-      if files.is_empty() {
-        String::new()
-      } else {
-        format!(
-          "file{} named: {}",
-          if files.len() == 1 { "" } else { "s" },
-          files.join(", ")
-        )
-      },
-    )
   }
 
   pub async fn get_directory_or_err(
@@ -181,7 +146,6 @@ impl Snapshot {
         .await
         .map_err(|err| format!("Error expanding globs: {}", err))?;
       Snapshot::from_path_stats(
-        store.clone(),
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )
@@ -244,12 +208,6 @@ impl From<Snapshot> for DirectoryDigest {
   fn from(s: Snapshot) -> Self {
     Self::new(s.digest, s.tree)
   }
-}
-
-pub fn osstring_as_utf8(path: OsString) -> Result<String, String> {
-  path
-    .into_string()
-    .map_err(|p| format!("{:?}'s file_name is not representable in UTF8", p))
 }
 
 // StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be

@@ -121,7 +121,7 @@ async def run(
     restartable = wrapped_target.target.get(RestartableField).value
 
     with temporary_dir(
-        root_dir=global_options.options.pants_workdir, cleanup=run_subsystem.cleanup
+        root_dir=global_options.pants_workdir, cleanup=run_subsystem.cleanup
     ) as tmpdir:
         if not run_subsystem.cleanup:
             logger.info(f"Preserving running binary chroot {tmpdir}")

@@ -83,7 +83,7 @@ class Yapf(PythonToolBase):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
-            discovery=self.options.config_discovery,
+            discovery=self.config_discovery,
             check_existence=check_existence,
             check_content=check_content,
         )

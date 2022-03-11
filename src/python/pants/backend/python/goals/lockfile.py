@@ -239,6 +239,7 @@ async def generate_lockfile(
             generate_lockfiles_subsystem.custom_command
             or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
         ),
+        delimeter="#",
     )
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])

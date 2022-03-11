@@ -48,17 +48,6 @@ class JVMLockfileMetadata(LockfileMetadata):
 
         return JVMLockfileMetadataV1.from_artifact_requirements(requirements)
 
-    @classmethod
-    def from_lockfile(
-        cls, lockfile: bytes, lockfile_path: str | None = None, resolve_name: str | None = None
-    ) -> JVMLockfileMetadataV1:
-        return cast(
-            JVMLockfileMetadataV1,
-            LockfileMetadata.from_lockfile_for_scope(
-                LockfileScope.JVM, lockfile, lockfile_path, resolve_name
-            ),
-        )
-
     def is_valid_for(
         self,
         requirements: Iterable[ArtifactRequirement] | None,

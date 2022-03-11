@@ -98,7 +98,7 @@ class PyTest(PythonToolBase):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
     )
-    juint_family = StrOption(
+    junit_family = StrOption(
         "--junit-family",
         default="xunit2",
         advanced=True,
