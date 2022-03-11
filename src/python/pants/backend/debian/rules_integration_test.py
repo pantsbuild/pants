@@ -1,8 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
+import shutil
 import subprocess
-import sys
 from textwrap import dedent
 
 import pytest
@@ -37,7 +37,10 @@ def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackag
     return result
 
 
-@pytest.mark.skipif(sys.platform != "linux", reason="Test requires dpkg so only works on Linux")
+@pytest.mark.skipif(
+    shutil.which("dpkg") is None,
+    reason="Test requires dpkg so only works on Debian-based Linux distributions.",
+)
 def test_create_debian_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
