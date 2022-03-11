@@ -1165,6 +1165,126 @@ def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
     )
 
 
+def test_parametrize_partial_atom(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="t2"),
+        dedent(
+            """\
+            generated(
+              name='t1',
+              resolve=parametrize('a', 'b'),
+              source='f1.ext',
+            )
+            generated(
+              name='t2',
+              resolve=parametrize('a', 'b'),
+              source='f2.ext',
+              dependencies=[':t1'],
+            )
+            """
+        ),
+        ["f1.ext", "f2.ext"],
+        {
+            MockGeneratedTarget(
+                {
+                    SingleSourceField.alias: "f2.ext",
+                    ResolveField.alias: "a",
+                    Dependencies.alias: [":t1"],
+                },
+                Address("demo", target_name="t2", parameters={"resolve": "a"}),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {
+                    SingleSourceField.alias: "f2.ext",
+                    ResolveField.alias: "b",
+                    Dependencies.alias: [":t1"],
+                },
+                Address("demo", target_name="t2", parameters={"resolve": "b"}),
+                residence_dir="demo",
+            ),
+        },
+        dependencies={
+            "demo:t1@resolve=a": set(),
+            "demo:t1@resolve=b": set(),
+            "demo:t2@resolve=a": {"demo:t1@resolve=a"},
+            "demo:t2@resolve=b": {"demo:t1@resolve=b"},
+        },
+    )
+
+
+def test_parametrize_partial_generator(generated_targets_rule_runner: RuleRunner) -> None:
+    assert_generated(
+        generated_targets_rule_runner,
+        Address("demo", target_name="t2"),
+        dedent(
+            """\
+            generator(
+              name='t1',
+              resolve=parametrize('a', 'b'),
+              sources=['f1.ext'],
+            )
+            generator(
+              name='t2',
+              resolve=parametrize('a', 'b'),
+              sources=['f2.ext'],
+              dependencies=[':t1'],
+            )
+            """
+        ),
+        ["f1.ext", "f2.ext"],
+        {
+            MockGeneratedTarget(
+                {
+                    SingleSourceField.alias: "f2.ext",
+                    ResolveField.alias: "a",
+                    Dependencies.alias: [":t1"],
+                },
+                Address(
+                    "demo",
+                    relative_file_path="f2.ext",
+                    target_name="t2",
+                    parameters={"resolve": "a"},
+                ),
+                residence_dir="demo",
+            ),
+            MockGeneratedTarget(
+                {
+                    SingleSourceField.alias: "f2.ext",
+                    ResolveField.alias: "b",
+                    Dependencies.alias: [":t1"],
+                },
+                Address(
+                    "demo",
+                    relative_file_path="f2.ext",
+                    target_name="t2",
+                    parameters={"resolve": "b"},
+                ),
+                residence_dir="demo",
+            ),
+        },
+        dependencies={
+            "demo/f1.ext:t1@resolve=a": set(),
+            "demo/f1.ext:t1@resolve=b": set(),
+            "demo/f2.ext:t2@resolve=a": {"demo:t1@resolve=a"},
+            "demo/f2.ext:t2@resolve=b": {"demo:t1@resolve=b"},
+            "demo:t1@resolve=a": {
+                "demo/f1.ext:t1@resolve=a",
+            },
+            "demo:t1@resolve=b": {
+                "demo/f1.ext:t1@resolve=b",
+            },
+            "demo:t2@resolve=a": {
+                "demo/f2.ext:t2@resolve=a",
+            },
+            "demo:t2@resolve=b": {
+                "demo/f2.ext:t2@resolve=b",
+            },
+        },
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # Test FieldSets. Also see `engine/target_test.py`.
 # -----------------------------------------------------------------------------------------------
