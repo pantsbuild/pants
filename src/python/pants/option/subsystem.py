@@ -8,6 +8,7 @@ import inspect
 import re
 from abc import ABCMeta
 from typing import Any, ClassVar, TypeVar
+from pants.base.deprecated import deprecated
 
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
@@ -96,6 +97,10 @@ class Subsystem(metaclass=ABCMeta):
         return cls.create_scope_info(scope=cls.options_scope, subsystem_cls=cls)
 
     @classmethod
+    @deprecated(
+        removal_version="2.12.0.dev0",
+        hint="Declare class attributes using the types in pants/option.option_types.py",
+    )
     def register_options(cls, register):
         """Register options for this Subsystem.
 
@@ -110,7 +115,9 @@ class Subsystem(metaclass=ABCMeta):
 
         Subclasses should not generally need to override this method.
         """
-        cls.register_options(options.registration_function_for_subsystem(cls))
+        register = options.registration_function_for_subsystem(cls)
+        for options_info in collect_options_info(cls):
+            register(*options_info.flag_names, **options_info.flag_options)
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()

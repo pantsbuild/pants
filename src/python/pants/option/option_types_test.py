@@ -37,6 +37,7 @@ from pants.option.option_types import (
     TargetOption,
 )
 from pants.option.subsystem import Subsystem
+from pants.option.options import Options
 
 if TYPE_CHECKING:
     from mypy_typing_asserts import assert_type
@@ -92,8 +93,8 @@ def test_option_typeclasses(option_type, default, option_value, expected_registe
         dyn_help = "Dynamic Help"
         dyn_default = default
 
-    register = Mock()
-    MySubsystem.register_options(register)
+    #register = Mock()
+    #MySubsystem.register_options_on_scope(register)
     my_subsystem = MySubsystem()
     default_if_not_given: Any | None = [] if expected_register_kwargs["type"] is list else None
     transform_opt: Any = tuple if expected_register_kwargs["type"] is list else lambda x: x  # type: ignore
