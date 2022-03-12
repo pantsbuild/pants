@@ -469,6 +469,89 @@ def test_requirement_constraints(rule_runner: RuleRunner) -> None:
     } == set(constrained_pex_info["distributions"].keys())
 
 
+def test_lockfiles(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--python-invalid-lockfile-behavior=ignore"])
+    rule_runner.write_files(
+        {
+            "pex_lock.json": textwrap.dedent(
+                """\
+                // Some Pants header
+                // blah blah
+                {
+                  "allow_builds": true,
+                  "allow_prereleases": false,
+                  "allow_wheels": true,
+                  "build_isolation": true,
+                  "constraints": [],
+                  "locked_resolves": [
+                    {
+                      "locked_requirements": [
+                        {
+                          "artifacts": [
+                            {
+                              "algorithm": "sha256",
+                              "hash": "00d2dde5a675579325902536738dd27e4fac1fd68f773fe36c21044eb559e187",
+                              "url": "https://files.pythonhosted.org/packages/53/18/a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/ansicolors-1.1.8-py2.py3-none-any.whl"
+                            },
+                            {
+                              "algorithm": "sha256",
+                              "hash": "99f94f5e3348a0bcd43c82e5fc4414013ccc19d70bd939ad71e0133ce9c372e0",
+                              "url": "https://files.pythonhosted.org/packages/76/31/7faed52088732704523c259e24c26ce6f2f33fbeff2ff59274560c27628e/ansicolors-1.1.8.zip"
+                            }
+                          ],
+                          "project_name": "ansicolors",
+                          "requires_dists": [],
+                          "requires_python": null,
+                          "version": "1.1.8"
+                        }
+                      ],
+                      "platform_tag": [
+                        "cp39",
+                        "cp39",
+                        "macosx_11_0_arm64"
+                      ]
+                    }
+                  ],
+                  "pex_version": "2.1.70",
+                  "prefer_older_binary": false,
+                  "requirements": [
+                    "ansicolors"
+                  ],
+                  "requires_python": [],
+                  "resolver_version": "pip-2020-resolver",
+                  "style": "universal",
+                  "transitive": true,
+                  "use_pep517": null
+                }
+                """
+            ),
+            "reqs_lock.txt": textwrap.dedent(
+                """\
+                ansicolors==1.1.8 \
+                    --hash=sha256:00d2dde5a675579325902536738dd27e4fac1fd68f773fe36c21044eb559e187 \
+                    --hash=sha256:99f94f5e3348a0bcd43c82e5fc4414013ccc19d70bd939ad71e0133ce9c372e0
+                """
+            ),
+        }
+    )
+
+    def create_lock(path: str) -> None:
+        lock = Lockfile(
+            path,
+            file_path_description_of_origin="foo",
+            resolve_name="a",
+            req_strings=FrozenOrderedSet(["ansicolors"]),
+        )
+        create_pex_and_get_pex_info(
+            rule_runner,
+            requirements=lock,
+            additional_pants_args=("--python-invalid-lockfile-behavior=ignore",),
+        )
+
+    create_lock("pex_lock.json")
+    create_lock("reqs_lock.txt")
+
+
 def test_entry_point(rule_runner: RuleRunner) -> None:
     entry_point = "pydoc"
     pex_info = create_pex_and_get_pex_info(rule_runner, main=EntryPoint(entry_point))
