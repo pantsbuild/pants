@@ -13,9 +13,9 @@ from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     ToolCustomLockfile,
     ToolDefaultLockfile,
-    maybe_validate_metadata,
+    should_validate_metadata,
+    validate_metadata,
 )
-from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import FileContent
 from pants.testutil.option_util import create_subsystem
 from pants.util.ordered_set import FrozenOrderedSet
@@ -59,28 +59,18 @@ def create_python_setup(
     )
 
 
-def test_invalid_lockfile_behavior_option(caplog) -> None:
+def test_invalid_lockfile_behavior_option() -> None:
     """Test that you can toggle between warnings, errors, and ignoring."""
 
-    def validate(behavior: InvalidLockfileBehavior) -> None:
-        maybe_validate_metadata(
-            lambda: METADATA,
-            METADATA.valid_for_interpreter_constraints,
-            create_tool_lock(["bad-req"]),
-            create_python_setup(behavior),
-        )
-
-    caplog.clear()
-    validate(InvalidLockfileBehavior.ignore)
-    assert not caplog.records
-
-    validate(InvalidLockfileBehavior.warn)
-    assert caplog.records
-    assert "./pants generate-lockfiles" in caplog.text
-    caplog.clear()
-
-    with pytest.raises(InvalidLockfileError, match="./pants generate-lockfiles"):
-        validate(InvalidLockfileBehavior.error)
+    assert not should_validate_metadata(
+        create_tool_lock([]), create_python_setup(InvalidLockfileBehavior.ignore)
+    )
+    assert should_validate_metadata(
+        create_tool_lock([]), create_python_setup(InvalidLockfileBehavior.warn)
+    )
+    assert should_validate_metadata(
+        create_tool_lock([]), create_python_setup(InvalidLockfileBehavior.error)
+    )
 
 
 @pytest.mark.parametrize(
@@ -114,8 +104,8 @@ def test_validate_tool_lockfiles(
         uses_source_plugins=uses_source_plugins,
         uses_project_interpreter_constraints=uses_project_ic,
     )
-    maybe_validate_metadata(
-        lambda: METADATA,
+    validate_metadata(
+        METADATA,
         runtime_interpreter_constraints,
         requirements,
         create_python_setup(InvalidLockfileBehavior.warn),
@@ -182,16 +172,12 @@ def test_validate_user_lockfiles(
     )
 
     # Ignore validation if resolves are manually managed.
-    maybe_validate_metadata(
-        lambda: METADATA,
-        runtime_interpreter_constraints,
-        lockfile,
-        create_python_setup(InvalidLockfileBehavior.warn, enable_resolves=False),
+    assert not should_validate_metadata(
+        lockfile, create_python_setup(InvalidLockfileBehavior.warn, enable_resolves=False)
     )
-    assert not caplog.text
 
-    maybe_validate_metadata(
-        lambda: METADATA,
+    validate_metadata(
+        METADATA,
         runtime_interpreter_constraints,
         lockfile,
         create_python_setup(InvalidLockfileBehavior.warn),

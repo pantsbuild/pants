@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Iterable, Iterator
+from typing import TYPE_CHECKING, Iterable, Iterator
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
@@ -106,21 +106,24 @@ class PexRequirements:
         return bool(self.req_strings)
 
 
-def maybe_validate_metadata(
-    parse_metadata: Callable[[], PythonLockfileMetadata],
+def should_validate_metadata(
+    lockfile: Lockfile | LockfileContent,
+    python_setup: PythonSetup,
+):
+    if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.ignore:
+        return False
+    is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
+    return is_tool or python_setup.resolves_generate_lockfiles
+
+
+def validate_metadata(
+    metadata: PythonLockfileMetadata,
     interpreter_constraints: InterpreterConstraints,
     lockfile: Lockfile | LockfileContent,
     python_setup: PythonSetup,
 ) -> None:
-    is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
-    if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.ignore or not (
-        is_tool or python_setup.resolves_generate_lockfiles
-    ):
-        return
-
     # TODO(#12314): Improve the exception if invalid strings
     user_requirements = {PipRequirement.parse(i) for i in lockfile.req_strings}
-    metadata = parse_metadata()
     validation = metadata.is_valid_for(
         is_tool=isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile)),
         expected_invalidation_digest=lockfile.lockfile_hex_digest,
@@ -138,6 +141,7 @@ def maybe_validate_metadata(
         user_interpreter_constraints=interpreter_constraints,
         user_requirements=user_requirements,
     )
+    is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
     msg_iter = (
         _invalid_tool_lockfile_error(**error_msg_kwargs)  # type: ignore[arg-type]
         if is_tool
