@@ -86,7 +86,7 @@ class Console(SideEffecting):
 
     def sigil_failed(self) -> str:
         """Sigil for a failed item."""
-        return self.red("𐄂")
+        return self.red("✕")
 
     def sigil_skipped(self) -> str:
         """Sigil for a skipped item."""
