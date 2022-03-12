@@ -168,8 +168,8 @@ def test_summary() -> None:
     assert stderr == dedent(
         """\
 
-        𐄂 ConditionallySucceedsChecker failed.
-        𐄂 FailingChecker failed.
+        ✕ ConditionallySucceedsChecker failed.
+        ✕ FailingChecker failed.
         ✓ SuccessfulChecker succeeded.
         """
     )
@@ -180,7 +180,7 @@ def test_summary() -> None:
     assert stderr == dedent(
         """\
 
-        𐄂 FailingChecker failed.
+        ✕ FailingChecker failed.
         ✓ SuccessfulChecker succeeded.
         """
     )
