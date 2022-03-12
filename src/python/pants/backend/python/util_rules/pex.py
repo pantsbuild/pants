@@ -437,7 +437,9 @@ async def build_pex(
             header_delimiter = "//"
             requirements_file_digest = await Get(
                 Digest,
-                CreateDigest([lock_path, _strip_comments_from_pex_json_lockfile(lock_bytes)]),
+                CreateDigest(
+                    [FileContent(lock_path, _strip_comments_from_pex_json_lockfile(lock_bytes))]
+                ),
             )
             requirement_count = _pex_lockfile_requirement_count(lock_bytes)
             argv.extend(["--lock", lock_path])
