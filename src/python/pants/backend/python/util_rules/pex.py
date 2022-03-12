@@ -435,11 +435,13 @@ async def build_pex(
 
         is_pex_json_lock = False  # TODO: calculate via inspection of lock_bytes and maybe lock_path
         if is_pex_json_lock:
+            header_delimiter = "//"
             requirements_file_digest = requirements_file_digest  # TODO: strip the Pants header
 
             requirement_count = _pex_lockfile_requirement_count(lock_bytes.decode())
             argv.extend(["--lock", lock_path])
         else:
+            header_delimiter = "#"
             # Note: this is a very naive heuristic. It will overcount because entries often
             # have >1 line due to `--hash`.
             requirement_count = len(lock_bytes.decode().splitlines())
@@ -450,7 +452,7 @@ async def build_pex(
                 lock_bytes,
                 **(dict() if synthetic_lock else dict(lockfile_path=lock_path)),
                 resolve_name=resolve_name,
-                delimeter="#",
+                delimeter=header_delimiter,
             )
 
             validate_metadata(

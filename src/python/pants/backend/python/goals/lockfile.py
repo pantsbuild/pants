@@ -147,6 +147,7 @@ async def generate_lockfile(
     python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
     if req.use_pex:
+        header_delimiter = "//"
         result = await Get(
             ProcessResult,
             PexCliProcess(
@@ -183,6 +184,7 @@ async def generate_lockfile(
             ),
         )
     else:
+        header_delimiter = "#"
         await Get(MaybeWarnPythonRepos, MaybeWarnPythonReposRequest())
         _pyproject_toml = create_pyproject_toml(
             req.requirements, req.interpreter_constraints
@@ -239,7 +241,7 @@ async def generate_lockfile(
             generate_lockfiles_subsystem.custom_command
             or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
         ),
-        delimeter="#",
+        delimeter=header_delimiter,
     )
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
