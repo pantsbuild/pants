@@ -22,6 +22,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
+from pants.option.option_types import BoolOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.util.docutil import bin_name
@@ -38,38 +39,32 @@ class BSPGoal(BuiltinGoal):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return False
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--server",
-            type=bool,
-            default=False,
-            advanced=True,
-            help=(
-                "Run the Build Server Protocol server. Pants will receive BSP RPC requests via the console. "
-                "This should only ever be invoked via the IDE."
-            ),
-        )
-        register(
-            "--runner-env-vars",
-            type=list,
-            member_type=str,
-            default=["PATH"],
-            help=(
-                "Environment variables to set in the BSP runner script when setting up BSP in a repository. "
-                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-                f"or just `ENV_VAR` to copy the value from Pants' own environment when the {cls.name} goal was run.\n\n"
-                "This option only takes effect when the BSP runner script is written. If the option changes, you "
-                f"must run `{bin_name()} {cls.name}` again to write a new copy of the BSP runner script.\n\n"
-                "Note: The environment variables passed to the Pants BSP server will be those set for your IDE "
-                "and not your shell. For example, on macOS, the IDE is generally launched by `launchd` after "
-                "clicking on a Dock icon, and not from the shell. Thus, any environment variables set for your "
-                "shell will likely not be seen by the Pants BSP server. At the very least, on macOS consider "
-                "writing an explicit PATH into the BSP runner script via this option."
-            ),
-            advanced=True,
-        )
+    server = BoolOption(
+        "--server",
+        default=False,
+        advanced=True,
+        help=(
+            "Run the Build Server Protocol server. Pants will receive BSP RPC requests via the console. "
+            "This should only ever be invoked via the IDE."
+        ),
+    )
+    runner_env_vars = StrListOption(
+        "--runner-env-vars",
+        default=["PATH"],
+        help=(
+            "Environment variables to set in the BSP runner script when setting up BSP in a repository. "
+            "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
+            f"or just `ENV_VAR` to copy the value from Pants' own environment when the {name} goal was run.\n\n"
+            "This option only takes effect when the BSP runner script is written. If the option changes, you "
+            f"must run `{bin_name()} {name}` again to write a new copy of the BSP runner script.\n\n"
+            "Note: The environment variables passed to the Pants BSP server will be those set for your IDE "
+            "and not your shell. For example, on macOS, the IDE is generally launched by `launchd` after "
+            "clicking on a Dock icon, and not from the shell. Thus, any environment variables set for your "
+            "shell will likely not be seen by the Pants BSP server. At the very least, on macOS consider "
+            "writing an explicit PATH into the BSP runner script via this option."
+        ),
+        advanced=True,
+    )
 
     def run(
         self,
