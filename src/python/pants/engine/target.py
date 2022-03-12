@@ -1033,10 +1033,13 @@ def _generate_file_level_targets(
 
     def gen_tgt(address: Address, full_fp: str, generated_target_fields: dict[str, Any]) -> Target:
         if add_dependencies_on_all_siblings:
-            if not generator.has_field(Dependencies):
+            if union_membership and not generated_target_cls.class_has_field(
+                Dependencies, union_membership
+            ):
                 raise AssertionError(
-                    f"The `{generator.alias}` target {template_address.spec} does "
-                    "not have a `dependencies` field, and thus cannot "
+                    f"The {type(generator).__name__} target class generates "
+                    f"{generated_target_cls.__name__} targets, which do not "
+                    f"have a `{Dependencies.alias}` field, and thus cannot "
                     "`add_dependencies_on_all_siblings`."
                 )
             original_deps = generated_target_fields.get(Dependencies.alias, ())

@@ -108,16 +108,15 @@ class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "protobuf_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ProtobufDependenciesField,
         ProtobufSourcesGeneratingSourcesField,
         ProtobufSourcesOverridesField,
     )
     generated_target_cls = ProtobufSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        ProtobufGrpcToggleField,
         ProtobufDependenciesField,
     )
-    moved_fields = (ProtobufGrpcToggleField,)
     settings_request_cls = GeneratorSettingsRequest
     help = "Generate a `protobuf_source` target for each file in the `sources` field."
 

@@ -99,6 +99,7 @@ from pants.source.filespec import matches_filespec
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize
 
@@ -127,6 +128,7 @@ def target_types_to_generate_targets_requests(
     )
 
 
+@memoized
 def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     assert tgt_type.deprecated_alias_removal_version is not None
     warn_or_error(
@@ -139,6 +141,7 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     )
 
 
+@memoized
 def warn_deprecated_field_type(field_type: type[Field]) -> None:
     assert field_type.deprecated_alias_removal_version is not None
     warn_or_error(
@@ -149,6 +152,27 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
             "update-build-files` to automatically fix your BUILD files."
         ),
     )
+
+
+@memoized
+def maybe_warn_dependencies_as_copied_field(tgt_type: type[TargetGenerator]) -> None:
+    copied_dependencies_field_types = [
+        field_type.__name__
+        for field_type in tgt_type.copied_fields
+        if issubclass(field_type, Dependencies)
+    ]
+    if copied_dependencies_field_types:
+        warn_or_error(
+            removal_version="2.12.0.dev0",
+            entity=(
+                f"using a `Dependencies` field subclass ({copied_dependencies_field_types}) "
+                "as a `TargetGenerator.copied_field`"
+            ),
+            hint=(
+                "`Dependencies` fields should be `TargetGenerator.moved_field`s, to avoid "
+                "redundant graph edges."
+            ),
+        )
 
 
 @rule
@@ -183,6 +207,7 @@ async def resolve_target_parametrizations(
         template_fields = {}
         # TODO: Require for all instances before landing.
         if issubclass(target_type, TargetGenerator):
+            maybe_warn_dependencies_as_copied_field(target_type)
             copied_fields = (
                 *target_type.copied_fields,
                 *target_type._find_plugin_fields(union_membership),

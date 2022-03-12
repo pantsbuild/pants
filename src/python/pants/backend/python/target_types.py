@@ -683,6 +683,7 @@ class SkipPythonTestsField(BoolField):
 
 _PYTHON_TEST_MOVED_FIELDS = (
     *COMMON_TARGET_FIELDS,
+    PythonTestsDependenciesField,
     PythonResolveField,
     PythonTestsTimeoutField,
     RuntimePackageDependenciesField,
@@ -744,16 +745,12 @@ class PythonTestsOverrideField(OverridesField):
 class PythonTestsGeneratorTarget(TargetFilesGenerator):
     alias = "python_tests"
     core_fields = (
-        PythonTestsDependenciesField,
         PythonTestsGeneratingSourcesField,
         InterpreterConstraintsField,
         PythonTestsOverrideField,
     )
     generated_target_cls = PythonTestTarget
-    copied_fields = (
-        PythonTestsDependenciesField,
-        InterpreterConstraintsField,
-    )
+    copied_fields = (InterpreterConstraintsField,)
     moved_fields = _PYTHON_TEST_MOVED_FIELDS
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = "Generate a `python_test` target for each file in the `sources` field."
@@ -806,17 +803,18 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     # Keep in sync with `PythonSourcesGeneratorTarget`, outside of the `sources` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         PythonTestUtilsGeneratingSourcesField,
         PythonSourcesOverridesField,
     )
     generated_target_cls = PythonSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         InterpreterConstraintsField,
     )
-    moved_fields = (PythonResolveField,)
+    moved_fields = (
+        PythonResolveField,
+        Dependencies,
+    )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
@@ -834,7 +832,6 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
     # Keep in sync with `PythonTestUtilsGeneratorTarget`, outside of the `sources` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         PythonSourcesGeneratingSourcesField,
         InterpreterConstraintsField,
         PythonSourcesOverridesField,
@@ -842,10 +839,12 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = PythonSourceTarget
     copied_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         InterpreterConstraintsField,
     )
-    moved_fields = (PythonResolveField,)
+    moved_fields = (
+        PythonResolveField,
+        Dependencies,
+    )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"

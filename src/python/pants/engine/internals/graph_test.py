@@ -121,10 +121,10 @@ class MockGeneratedTarget(Target):
 
 class MockTargetGenerator(TargetFilesGenerator):
     alias = "generator"
-    core_fields = (Dependencies, MultipleSourcesField, OverridesField)
+    core_fields = (MultipleSourcesField, OverridesField)
     generated_target_cls = MockGeneratedTarget
-    copied_fields = (Dependencies,)
-    moved_fields = (Tags, ResolveField)
+    copied_fields = ()
+    moved_fields = (Dependencies, Tags, ResolveField)
 
 
 @pytest.fixture
@@ -1814,10 +1814,10 @@ class SmalltalkLibrary(Target):
 class SmalltalkLibraryGenerator(TargetFilesGenerator):
     alias = "smalltalk_libraries"
     # Note that we use MockDependencies so that we support transitive excludes (`!!`).
-    core_fields = (MockDependencies, MultipleSourcesField)
+    core_fields = (MultipleSourcesField,)
     generated_target_cls = SmalltalkLibrary
-    copied_fields = (MockDependencies,)
-    moved_fields = ()
+    copied_fields = ()
+    moved_fields = (MockDependencies,)
 
 
 class InferSmalltalkDependencies(InferDependenciesRequest):
