@@ -98,7 +98,7 @@ class PythonInferSubsystem(Subsystem):
     )
     assets = BoolOption(
         "--assets",
-        default=True,
+        default=False,
         help=(
             "Infer a target's asset dependencies based on strings that look like Posix "
             "filepaths, such as those given to `open` or `pkgutil.get_data`. To ignore any "

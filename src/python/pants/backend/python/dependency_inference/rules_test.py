@@ -215,7 +215,10 @@ def test_infer_python_assets(caplog) -> None:
     )
 
     def run_dep_inference(address: Address) -> InferredDependencies:
-        args = ["--source-root-patterns=src/python"]
+        args = [
+            "--source-root-patterns=src/python",
+            "--python-infer-assets",
+        ]
         rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
         target = rule_runner.get_target(address)
         return rule_runner.request(
