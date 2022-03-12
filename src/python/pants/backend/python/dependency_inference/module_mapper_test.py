@@ -10,6 +10,9 @@ import pytest
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.codegen.protobuf.python import python_protobuf_module_mapper
+from pants.backend.codegen.protobuf.python.additional_fields import (
+    rules as protobuf_additional_fields_rules,
+)
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_type_rules
 from pants.backend.python import target_types_rules
@@ -78,17 +81,27 @@ def test_first_party_modules_mapping() -> None:
         Address("tests/python/project_test", relative_file_path="test.py"), ModuleProviderType.IMPL
     )
     mapping = FirstPartyPythonModuleMapping(
-        {
-            "root": (root_provider,),
-            "util.strutil": (util_provider, util_stubs_provider),
-            "project_test.test": (test_provider,),
-            "ambiguous": (root_provider, util_provider),
-            "util.ambiguous": (util_provider, test_provider),
-        }
+        FrozenDict(
+            {
+                "default": FrozenDict(
+                    {
+                        "root": (root_provider,),
+                        "util.strutil": (util_provider, util_stubs_provider),
+                        "project_test.test": (test_provider,),
+                        "ambiguous": (root_provider, util_provider),
+                        "util.ambiguous": (util_provider, test_provider),
+                        "two_resolves": (root_provider,),
+                    }
+                ),
+                "another": FrozenDict({"two_resolves": (test_provider,)}),
+            }
+        )
     )
 
-    def assert_addresses(mod: str, expected: tuple[ModuleProvider, ...]) -> None:
-        assert mapping.providers_for_module(mod) == expected
+    def assert_addresses(
+        mod: str, expected: tuple[ModuleProvider, ...], *, resolve: str | None = None
+    ) -> None:
+        assert mapping.providers_for_module(mod, resolve=resolve) == expected
 
     assert_addresses("root", (root_provider,))
     assert_addresses("root.func", (root_provider,))
@@ -110,6 +123,12 @@ def test_first_party_modules_mapping() -> None:
     assert_addresses("util.ambiguous", (util_provider, test_provider))
     assert_addresses("util.ambiguous.Foo", (util_provider, test_provider))
     assert_addresses("util.ambiguous.Foo.method", ())
+
+    assert_addresses("two_resolves", (root_provider, test_provider), resolve=None)
+    assert_addresses("two_resolves.foo", (root_provider, test_provider), resolve=None)
+    assert_addresses("two_resolves.foo.bar", (), resolve=None)
+    assert_addresses("two_resolves", (root_provider,), resolve="default")
+    assert_addresses("two_resolves", (test_provider,), resolve="another")
 
 
 def test_third_party_modules_mapping() -> None:
@@ -168,14 +187,6 @@ def test_third_party_modules_mapping() -> None:
     assert_addresses("two_resolves.foo.bar", (colors_provider, pants_provider), resolve=None)
     assert_addresses("two_resolves", (colors_provider,), resolve="default-resolve")
     assert_addresses("two_resolves", (pants_provider,), resolve="another-resolve")
-    assert_addresses(
-        "two_resolves",
-        (
-            colors_provider,
-            pants_provider,
-        ),
-        resolve=None,
-    )
 
 
 @pytest.fixture
@@ -186,6 +197,7 @@ def rule_runner() -> RuleRunner:
             *module_mapper_rules(),
             *python_protobuf_module_mapper.rules(),
             *target_types_rules.rules(),
+            *protobuf_additional_fields_rules(),
             *protobuf_target_type_rules(),
             QueryRule(FirstPartyPythonModuleMapping, []),
             QueryRule(ThirdPartyPythonModuleMapping, []),
@@ -202,13 +214,17 @@ def rule_runner() -> RuleRunner:
 
 def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
-        ["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
+        [
+            "--source-root-patterns=['src/python', 'tests/python', 'build-support']",
+            "--python-enable-resolves",
+            "--python-resolves={'python-default': '', 'another-resolve': ''}",
+        ]
     )
     rule_runner.write_files(
         {
             "src/python/project/util/dirutil.py": "",
             "src/python/project/util/tarutil.py": "",
-            "src/python/project/util/BUILD": "python_sources()",
+            "src/python/project/util/BUILD": "python_sources(resolve='another-resolve')",
             # A module with multiple owners, including type stubs.
             "src/python/multiple_owners.py": "",
             "src/python/multiple_owners.pyi": "",
@@ -234,61 +250,77 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
 
     result = rule_runner.request(FirstPartyPythonModuleMapping, [])
     assert result == FirstPartyPythonModuleMapping(
-        {
-            "multiple_owners": (
-                ModuleProvider(
-                    Address("build-support", relative_file_path="multiple_owners.py"),
-                    ModuleProviderType.IMPL,
+        FrozenDict(
+            {
+                "another-resolve": FrozenDict(
+                    {
+                        "project.util.dirutil": (
+                            ModuleProvider(
+                                Address("src/python/project/util", relative_file_path="dirutil.py"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "project.util.tarutil": (
+                            ModuleProvider(
+                                Address("src/python/project/util", relative_file_path="tarutil.py"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                    }
                 ),
-                ModuleProvider(
-                    Address("src/python", relative_file_path="multiple_owners.py"),
-                    ModuleProviderType.IMPL,
+                "python-default": FrozenDict(
+                    {
+                        "multiple_owners": (
+                            ModuleProvider(
+                                Address("build-support", relative_file_path="multiple_owners.py"),
+                                ModuleProviderType.IMPL,
+                            ),
+                            ModuleProvider(
+                                Address("src/python", relative_file_path="multiple_owners.py"),
+                                ModuleProviderType.IMPL,
+                            ),
+                            ModuleProvider(
+                                Address("src/python", relative_file_path="multiple_owners.pyi"),
+                                ModuleProviderType.TYPE_STUB,
+                            ),
+                        ),
+                        "project_test.demo_test": (
+                            ModuleProvider(
+                                Address(
+                                    "tests/python/project_test/demo_test",
+                                    relative_file_path="__init__.py",
+                                ),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "protos.f1_pb2": (
+                            ModuleProvider(
+                                Address(
+                                    "src/python/protos",
+                                    relative_file_path="f1.proto",
+                                    target_name="protos",
+                                ),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                        "protos.f2_pb2": (
+                            ModuleProvider(
+                                Address("src/python/protos", target_name="py"),
+                                ModuleProviderType.IMPL,
+                            ),
+                            ModuleProvider(
+                                Address(
+                                    "src/python/protos",
+                                    relative_file_path="f2.proto",
+                                    target_name="protos",
+                                ),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
+                    }
                 ),
-                ModuleProvider(
-                    Address("src/python", relative_file_path="multiple_owners.pyi"),
-                    ModuleProviderType.TYPE_STUB,
-                ),
-            ),
-            "project.util.dirutil": (
-                ModuleProvider(
-                    Address("src/python/project/util", relative_file_path="dirutil.py"),
-                    ModuleProviderType.IMPL,
-                ),
-            ),
-            "project.util.tarutil": (
-                ModuleProvider(
-                    Address("src/python/project/util", relative_file_path="tarutil.py"),
-                    ModuleProviderType.IMPL,
-                ),
-            ),
-            "project_test.demo_test": (
-                ModuleProvider(
-                    Address(
-                        "tests/python/project_test/demo_test", relative_file_path="__init__.py"
-                    ),
-                    ModuleProviderType.IMPL,
-                ),
-            ),
-            "protos.f1_pb2": (
-                ModuleProvider(
-                    Address(
-                        "src/python/protos", relative_file_path="f1.proto", target_name="protos"
-                    ),
-                    ModuleProviderType.IMPL,
-                ),
-            ),
-            "protos.f2_pb2": (
-                ModuleProvider(
-                    Address("src/python/protos", target_name="py"), ModuleProviderType.IMPL
-                ),
-                ModuleProvider(
-                    Address(
-                        "src/python/protos", relative_file_path="f2.proto", target_name="protos"
-                    ),
-                    ModuleProviderType.IMPL,
-                ),
-            ),
-        }
+            }
+        )
     )
 
 
