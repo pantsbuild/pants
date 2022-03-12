@@ -417,7 +417,7 @@ def test_property_types() -> None:
         dict_opt5 = DictOption("--opt", default=dict(key="val"), help="")
         dict_opt6 = DictOption("--opt", default=dict(key=1), help="")
         dict_opt7 = DictOption("--opt", default=dict(key1=1, key2="str"), help="")
-        dyn_dict_opt = DictOption[str]("--opt", lambda cls: cls.default, help="")
+        dyn_dict_opt = DictOption[str]("--opt", default=lambda cls: cls.default, help="")
 
         # Specialized Opts
         skip_opt = SkipOption("fmt")

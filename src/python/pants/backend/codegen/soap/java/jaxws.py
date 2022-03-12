@@ -17,7 +17,3 @@ class JaxWsTools(JvmToolBase):
     )
     default_lockfile_path = "pants/backend/codegen/soap/java/jaxws.default.lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)

@@ -39,7 +39,10 @@ from pants.backend.python.util_rules.pex_requirements import Lockfile, LockfileC
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
 )
-from pants.backend.python.util_rules.pex_requirements import maybe_validate_metadata
+from pants.backend.python.util_rules.pex_requirements import (
+    should_validate_metadata,
+    validate_metadata,
+)
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
@@ -408,8 +411,11 @@ async def build_pex(
     requirement_count: int
 
     if isinstance(request.requirements, (Lockfile, LockfileContent)):
+        is_monolithic_resolve = True
         resolve_name = request.requirements.resolve_name
+
         if isinstance(request.requirements, Lockfile):
+            synthetic_lock = False
             lock_path = request.requirements.file_path
             requirements_file_digest = await Get(
                 Digest,
@@ -421,23 +427,11 @@ async def build_pex(
             )
             _digest_contents = await Get(DigestContents, Digest, requirements_file_digest)
             lock_bytes = _digest_contents[0].content
-
-            def parse_metadata() -> PythonLockfileMetadata:
-                return PythonLockfileMetadata.from_lockfile(
-                    lock_bytes, lock_path, resolve_name, delimeter="#"
-                )
-
         else:
+            synthetic_lock = True
             _fc = request.requirements.file_content
             lock_path, lock_bytes = (_fc.path, _fc.content)
             requirements_file_digest = await Get(Digest, CreateDigest([_fc]))
-
-            def parse_metadata() -> PythonLockfileMetadata:
-                return PythonLockfileMetadata.from_lockfile(
-                    lock_bytes, resolve_name=resolve_name, delimeter="#"
-                )
-
-        is_monolithic_resolve = True
 
         is_pex_json_lock = False  # TODO: calculate via inspection of lock_bytes and maybe lock_path
         if is_pex_json_lock:
@@ -451,9 +445,17 @@ async def build_pex(
             requirement_count = len(lock_bytes.decode().splitlines())
             argv.extend(["--requirement", lock_path, "--no-transitive"])
 
-        maybe_validate_metadata(
-            parse_metadata, request.interpreter_constraints, request.requirements, python_setup  # type: ignore[arg-type]
-        )
+        if should_validate_metadata(request.requirements, python_setup):  # type: ignore[arg-type]
+            metadata = PythonLockfileMetadata.from_lockfile(
+                lock_bytes,
+                **(dict() if synthetic_lock else dict(lockfile_path=lock_path)),
+                resolve_name=resolve_name,
+                delimeter="#",
+            )
+
+            validate_metadata(
+                metadata, request.interpreter_constraints, request.requirements, python_setup  # type: ignore[arg-type]
+            )
 
     else:
         assert isinstance(request.requirements, PexRequirements)

@@ -211,8 +211,8 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        𐄂 ConditionallySucceedsLinter failed.
-        𐄂 FailingLinter failed.
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
         ✓ SuccessfulLinter succeeded.
         """
@@ -228,7 +228,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        𐄂 FailingLinter failed.
+        ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
         """
     )
@@ -252,7 +252,7 @@ def test_batched(rule_runner: RuleRunner, batch_size: int) -> None:
         """\
 
         ✓ ConditionallySucceedsLinter succeeded.
-        𐄂 FailingLinter failed.
+        ✕ FailingLinter failed.
         ✓ SuccessfulLinter succeeded.
         """
     )

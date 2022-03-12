@@ -8,6 +8,7 @@ from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier
 from pants.bsp.spec.targets import (
+    DependencyModule,
     DependencyModulesItem,
     DependencyModulesParams,
     DependencyModulesResult,
@@ -23,9 +24,17 @@ from pants.bsp.spec.targets import (
     WorkspaceBuildTargetsResult,
 )
 from pants.build_graph.address import AddressInput
+from pants.engine.fs import Workspace
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import SourcesField, SourcesPaths, SourcesPathsRequest, WrappedTarget
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule
+from pants.engine.target import (
+    FieldSet,
+    SourcesField,
+    SourcesPaths,
+    SourcesPathsRequest,
+    WrappedTarget,
+)
 from pants.engine.unions import UnionMembership, UnionRule, union
 
 
@@ -40,6 +49,7 @@ class BSPBuildTargets:
     """Response type for a BSPBuildTargetsRequest."""
 
     targets: tuple[BuildTarget, ...] = ()
+    digest: Digest = EMPTY_DIGEST
 
 
 # -----------------------------------------------------------------------------------------------
@@ -54,9 +64,9 @@ class WorkspaceBuildTargetsHandlerMapping(BSPHandlerMapping):
     response_type = WorkspaceBuildTargetsResult
 
 
-@rule
+@_uncacheable_rule
 async def bsp_workspace_build_targets(
-    _: WorkspaceBuildTargetsParams, union_membership: UnionMembership
+    _: WorkspaceBuildTargetsParams, union_membership: UnionMembership, workspace: Workspace
 ) -> WorkspaceBuildTargetsResult:
     request_types = union_membership.get(BSPBuildTargetsRequest)
     responses = await MultiGet(
@@ -67,6 +77,8 @@ async def bsp_workspace_build_targets(
     for response in responses:
         result.extend(response.targets)
     result.sort(key=lambda btgt: btgt.id.uri)
+    output_digest = await Get(Digest, MergeDigests([r.digest for r in responses]))
+    workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
     return WorkspaceBuildTargetsResult(
         targets=tuple(result),
     )
@@ -163,18 +175,76 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 # -----------------------------------------------------------------------------------------------
 
 
+@union
+@dataclass(frozen=True)
+class BSPDependencyModulesFieldSet(FieldSet):
+    """FieldSet used to hook computing dependency modules."""
+
+
+@dataclass(frozen=True)
+class BSPDependencyModules:
+    modules: tuple[DependencyModule, ...]
+    digest: Digest = EMPTY_DIGEST
+
+
 class DependencyModulesHandlerMapping(BSPHandlerMapping):
     method_name = "buildTarget/dependencyModules"
     request_type = DependencyModulesParams
     response_type = DependencyModulesResult
 
 
+@dataclass(frozen=True)
+class ResolveOneDependencyModuleRequest:
+    bsp_target_id: BuildTargetIdentifier
+
+
+@dataclass(frozen=True)
+class ResolveOneDependencyModuleResult:
+    bsp_target_id: BuildTargetIdentifier
+    modules: tuple[DependencyModule, ...] = ()
+    digest: Digest = EMPTY_DIGEST
+
+
 @rule
-async def bsp_dependency_modules(request: DependencyModulesParams) -> DependencyModulesResult:
-    # TODO: This is a stub.
-    # Note: VSCode expects this endpoint to exist even if the capability bit for it is set `false`.
+async def resolve_one_dependency_module(
+    request: ResolveOneDependencyModuleRequest,
+    union_membership: UnionMembership,
+) -> ResolveOneDependencyModuleResult:
+    wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
+    target = wrapped_target.target
+
+    dep_module_field_sets = union_membership.get(BSPDependencyModulesFieldSet)
+    applicable_field_sets = [
+        fs.create(target) for fs in dep_module_field_sets if fs.is_applicable(target)
+    ]
+
+    if not applicable_field_sets:
+        return ResolveOneDependencyModuleResult(bsp_target_id=request.bsp_target_id)
+
+    # TODO: Handle multiple applicable field sets?
+    response = await Get(
+        BSPDependencyModules, BSPDependencyModulesFieldSet, applicable_field_sets[0]
+    )
+    return ResolveOneDependencyModuleResult(
+        bsp_target_id=request.bsp_target_id,
+        modules=response.modules,
+        digest=response.digest,
+    )
+
+
+# Note: VSCode expects this endpoint to exist even if the capability bit for it is set `false`.
+@_uncacheable_rule
+async def bsp_dependency_modules(
+    request: DependencyModulesParams, workspace: Workspace
+) -> DependencyModulesResult:
+    responses = await MultiGet(
+        Get(ResolveOneDependencyModuleResult, ResolveOneDependencyModuleRequest(btgt))
+        for btgt in request.targets
+    )
+    output_digest = await Get(Digest, MergeDigests([r.digest for r in responses]))
+    workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
     return DependencyModulesResult(
-        tuple(DependencyModulesItem(target=tgt, modules=()) for tgt in request.targets)
+        tuple(DependencyModulesItem(target=r.bsp_target_id, modules=r.modules) for r in responses)
     )
 
 
