@@ -31,6 +31,7 @@ from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries
+from pants.engine.internals.native_engine import MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -46,6 +47,8 @@ from pants.jvm.compile import (
     ClasspathEntryRequestFactory,
     FallibleClasspathEntry,
 )
+from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -69,17 +72,69 @@ class ResolveScalaBSPBuildTargetRequest:
     target: Target
 
 
+@dataclass(frozen=True)
+class ResolveScalaBSPBuildTargetResult:
+    build_target: BuildTarget
+    scala_runtime: Snapshot
+
+
+@dataclass(frozen=True)
+class MaterializeScalaRuntimeJarsRequest:
+    scala_version: str
+
+
+@dataclass(frozen=True)
+class MaterializeScalaRuntimeJarsResult:
+    content: Snapshot
+
+
+@rule
+async def materialize_scala_runtime_jars(
+    request: MaterializeScalaRuntimeJarsRequest,
+) -> MaterializeScalaRuntimeJarsResult:
+    tool_classpath = await Get(
+        ToolClasspath,
+        ToolClasspathRequest(
+            artifact_requirements=ArtifactRequirements.from_coordinates(
+                [
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-compiler",
+                        version=request.scala_version,
+                    ),
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-library",
+                        version=request.scala_version,
+                    ),
+                ]
+            ),
+        ),
+    )
+
+    materialized_classpath_digest = await Get(
+        Digest,
+        AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{request.scala_version}"),
+    )
+    materialized_classpath = await Get(Snapshot, Digest, materialized_classpath_digest)
+    return MaterializeScalaRuntimeJarsResult(materialized_classpath)
+
+
 @rule
 async def bsp_resolve_one_scala_build_target(
     request: ResolveScalaBSPBuildTargetRequest,
     jvm: JvmSubsystem,
     scala: ScalaSubsystem,
     union_membership: UnionMembership,
-) -> BuildTarget:
+    build_root: BuildRoot,
+) -> ResolveScalaBSPBuildTargetResult:
     resolve = request.target[JvmResolveField].normalized_value(jvm)
     scala_version = scala.version_for_resolve(resolve)
 
-    dep_addrs = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
+    dep_addrs, scala_runtime = await MultiGet(
+        Get(Addresses, DependenciesRequest(request.target[Dependencies])),
+        Get(MaterializeScalaRuntimeJarsResult, MaterializeScalaRuntimeJarsRequest(scala_version)),
+    )
     impls = union_membership.get(BSPCompileFieldSet)
 
     reported_deps = []
@@ -94,7 +149,11 @@ async def bsp_resolve_one_scala_build_target(
                 reported_deps.append(BuildTargetIdentifier.from_address(dep_tgt.address))
                 break
 
-    return BuildTarget(
+    scala_jar_uris = tuple(
+        build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
+        for p in scala_runtime.content.files
+    )
+    bsp_target = BuildTarget(
         id=BuildTargetIdentifier.from_address(request.target.address),
         display_name=str(request.target.address),
         base_directory=None,
@@ -110,10 +169,10 @@ async def bsp_resolve_one_scala_build_target(
             scala_version=scala_version,
             scala_binary_version=".".join(scala_version.split(".")[0:2]),
             platform=ScalaPlatform.JVM,
-            # TODO: These are the jars for the scalac tool.
-            jars=(),
+            jars=scala_jar_uris,
         ),
     )
+    return ResolveScalaBSPBuildTargetResult(bsp_target, scala_runtime=scala_runtime.content)
 
 
 @rule
@@ -125,9 +184,13 @@ async def bsp_resolve_all_scala_build_targets(
     if LANGUAGE_ID not in bsp_context.client_params.capabilities.language_ids:
         return BSPBuildTargets()
     build_targets = await MultiGet(
-        Get(BuildTarget, ResolveScalaBSPBuildTargetRequest(tgt)) for tgt in all_scala_targets
+        Get(ResolveScalaBSPBuildTargetResult, ResolveScalaBSPBuildTargetRequest(tgt))
+        for tgt in all_scala_targets
     )
-    return BSPBuildTargets(targets=tuple(build_targets))
+    output_digest = await Get(Digest, MergeDigests([d.scala_runtime.digest for d in build_targets]))
+    return BSPBuildTargets(
+        targets=tuple(btgt.build_target for btgt in build_targets), digest=output_digest
+    )
 
 
 # -----------------------------------------------------------------------------------------------
