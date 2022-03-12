@@ -351,6 +351,7 @@ async def build_pex(
         *python_setup.manylinux_pex_args,
         *request.additional_args,
     ]
+    should_resolve = True
 
     repository_pex = (
         request.requirements.repository_pex
@@ -358,9 +359,8 @@ async def build_pex(
         else None
     )
     if repository_pex:
+        should_resolve = False
         argv.extend(["--pex-repository", repository_pex.name])
-    else:
-        argv.extend([*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"])
 
     python: PythonExecutable | None = None
 
@@ -434,6 +434,7 @@ async def build_pex(
             requirements_file_digest = await Get(Digest, CreateDigest([_fc]))
 
         if _is_probably_pex_json_lockfile(lock_bytes):
+            should_resolve = False
             header_delimiter = "//"
             requirements_file_digest = await Get(
                 Digest,
@@ -506,6 +507,9 @@ async def build_pex(
         output_files = [request.output_filename]
     else:
         output_directories = [request.output_filename]
+
+    if should_resolve:
+        argv.extend([*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"])
 
     process = await Get(
         Process,
