@@ -433,8 +433,7 @@ async def build_pex(
             lock_path, lock_bytes = (_fc.path, _fc.content)
             requirements_file_digest = await Get(Digest, CreateDigest([_fc]))
 
-        is_pex_json_lock = False  # TODO: calculate via inspection of lock_bytes and maybe lock_path
-        if is_pex_json_lock:
+        if _is_probably_pex_json_lockfile(lock_bytes):
             header_delimiter = "//"
             requirements_file_digest = requirements_file_digest  # TODO: strip the Pants header
 
@@ -570,6 +569,14 @@ def _build_pex_description(request: PexRequest) -> str:
                 f"{', '.join(request.requirements.req_strings)}"
             )
     return f"Building {request.output_filename} {desc_suffix}"
+
+
+def _is_probably_pex_json_lockfile(lockfile_bytes: bytes) -> bool:
+    for line in lockfile_bytes.splitlines():
+        if line and not line.startswith(b"//"):
+            # Note that pip/Pex complain if a requirements.txt style starts with `{`.
+            return line.lstrip().startswith(b"{")
+    return False
 
 
 def _pex_lockfile_requirement_count(lock_content: str) -> int:

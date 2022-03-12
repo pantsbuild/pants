@@ -31,6 +31,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
+    _is_probably_pex_json_lockfile,
     _pex_lockfile_requirement_count,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
@@ -666,6 +667,50 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     )
     with engine_error(InvalidLockfileError):
         create_pex_and_get_all_data(rule_runner, requirements=lockfile_content)
+
+
+def test_is_probably_pex_json_lockfile():
+    def is_pex(lock: str) -> bool:
+        return _is_probably_pex_json_lockfile(lock.encode())
+
+    for s in (
+        "{}",
+        textwrap.dedent(
+            """\
+            // Special comment
+            {}
+            """
+        ),
+        textwrap.dedent(
+            """\
+            // Next line has extra space
+             {"key": "val"}
+            """
+        ),
+        textwrap.dedent(
+            """\
+            {
+                "key": "val",
+            }
+            """
+        ),
+    ):
+        assert is_pex(s)
+
+    for s in (
+        "",
+        "# foo",
+        "# {",
+        "cheesey",
+        "cheesey==10.0",
+        textwrap.dedent(
+            """\
+            # Special comment
+            cheesey==10.0
+            """
+        ),
+    ):
+        assert not is_pex(s)
 
 
 def test_pex_lockfile_requirement_count() -> None:
