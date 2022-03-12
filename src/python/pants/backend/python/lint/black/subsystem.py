@@ -88,7 +88,9 @@ async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not black.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(black)
+        return GeneratePythonLockfile.from_tool(
+            black, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
@@ -100,7 +102,9 @@ async def setup_black_lockfile(
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints
 
-    return GeneratePythonLockfile.from_tool(black, constraints)
+    return GeneratePythonLockfile.from_tool(
+        black, constraints, use_pex=python_setup.generate_lockfiles_with_pex
+    )
 
 
 def rules():

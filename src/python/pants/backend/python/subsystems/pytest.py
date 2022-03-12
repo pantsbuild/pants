@@ -189,7 +189,9 @@ async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not pytest.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(pytest)
+        return GeneratePythonLockfile.from_tool(
+            pytest, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # Even though we run each python_tests target in isolation, we need a single lockfile that
     # works with them all (and their transitive deps).
@@ -210,7 +212,9 @@ async def setup_pytest_lockfile(
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return GeneratePythonLockfile.from_tool(
-        pytest, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        pytest,
+        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 
