@@ -18,7 +18,7 @@
 #     "ijson==3.1.4",
 #     "mypy-typing-asserts==0.1.1",
 #     "packaging==21.3",
-#     "pex==2.1.70",
+#     "pex==2.1.71",
 #     "psutil==5.9.0",
 #     "pydevd-pycharm==203.5419.8",
 #     "pytest<8,>=6.2.4",
@@ -145,9 +145,9 @@ mypy-typing-asserts==0.1.1; python_version >= "3.7" and python_version < "4.0" \
 packaging==21.3; python_version >= "3.6" \
     --hash=sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522 \
     --hash=sha256:dd47c42927d89ab911e606518907cc2d3a1f38bbd026385970643f9c5b8ecfeb
-pex==2.1.70; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0" and python_version < "3.11") \
-    --hash=sha256:83801a1006b7f42bef9abf5b96dbbd676cc739fcffc7f604f80cc6f9d0d9c703 \
-    --hash=sha256:bddf329765bfe1db7d2ce8336de2f99b73bacb789fcc1c78882fa52183cc5bfd
+pex==2.1.71; (python_version >= "2.7" and python_full_version < "3.0.0") or (python_full_version >= "3.5.0" and python_version < "3.11") \
+    --hash=sha256:7b65897566bb5bcbc2d3c62adaad61db3a2a100244250ec61dcd59a3e4f5fe1f \
+    --hash=sha256:8c9ec9e2ea432f55f512eb7591459d26edc88769a178d16dd3023e41364c2a8c
 pluggy==1.0.0; python_version >= "3.6" \
     --hash=sha256:74134bbf457f031a36d68416e1509f34bd5ccc019f0bcc952c7b909d06b37bd3 \
     --hash=sha256:4224373bacce55f955a878bf9cfa763c1e360858e330072059e10bad68531159
