@@ -413,10 +413,9 @@ async def build_pex(
     if isinstance(request.requirements, (Lockfile, LockfileContent)):
         is_monolithic_resolve = True
         resolve_name = request.requirements.resolve_name
-        synthetic_lock = True
         if isinstance(request.requirements, Lockfile):
-            lock_path = request.requirements.file_path
             synthetic_lock = False
+            lock_path = request.requirements.file_path
             requirements_file_digest = await Get(
                 Digest,
                 PathGlobs(
@@ -429,6 +428,7 @@ async def build_pex(
             lock_bytes = _digest_contents[0].content
 
         else:
+            synthetic_lock = True
             _fc = request.requirements.file_content
             lock_path, lock_bytes = (_fc.path, _fc.content)
             requirements_file_digest = await Get(Digest, CreateDigest([_fc]))
