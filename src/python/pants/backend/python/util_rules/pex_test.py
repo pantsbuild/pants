@@ -33,6 +33,7 @@ from pants.backend.python.util_rules.pex import (
     _build_pex_description,
     _is_probably_pex_json_lockfile,
     _pex_lockfile_requirement_count,
+    _strip_comments_from_pex_json_lockfile,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_cli import PexPEX
@@ -713,8 +714,48 @@ def test_is_probably_pex_json_lockfile():
         assert not is_pex(s)
 
 
+def test_strip_comments_from_pex_json_lockfile() -> None:
+    def assert_stripped(lock: str, expected: str) -> None:
+        assert _strip_comments_from_pex_json_lockfile(lock.encode()).decode() == expected
+
+    assert_stripped("{}", "{}")
+    assert_stripped(
+        textwrap.dedent(
+            """\
+            { // comment
+                "key": "foo",
+            }
+            """
+        ),
+        textwrap.dedent(
+            """\
+            { // comment
+                "key": "foo",
+            }"""
+        ),
+    )
+    assert_stripped(
+        textwrap.dedent(
+            """\
+            // header
+               // more header
+              {
+                "key": "foo",
+            }
+            // footer
+            """
+        ),
+        textwrap.dedent(
+            """\
+              {
+                "key": "foo",
+            }"""
+        ),
+    )
+
+
 def test_pex_lockfile_requirement_count() -> None:
-    assert _pex_lockfile_requirement_count("empty") == 2
+    assert _pex_lockfile_requirement_count(b"empty") == 2
     assert (
         _pex_lockfile_requirement_count(
             textwrap.dedent(
@@ -761,7 +802,7 @@ def test_pex_lockfile_requirement_count() -> None:
               "use_pep517": null
             }
             """
-            )
+            ).encode()
         )
         == 3
     )

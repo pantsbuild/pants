@@ -435,9 +435,11 @@ async def build_pex(
 
         if _is_probably_pex_json_lockfile(lock_bytes):
             header_delimiter = "//"
-            requirements_file_digest = requirements_file_digest  # TODO: strip the Pants header
-
-            requirement_count = _pex_lockfile_requirement_count(lock_bytes.decode())
+            requirements_file_digest = await Get(
+                Digest,
+                CreateDigest([lock_path, _strip_comments_from_pex_json_lockfile(lock_bytes)]),
+            )
+            requirement_count = _pex_lockfile_requirement_count(lock_bytes)
             argv.extend(["--lock", lock_path])
         else:
             header_delimiter = "#"
@@ -571,6 +573,17 @@ def _build_pex_description(request: PexRequest) -> str:
     return f"Building {request.output_filename} {desc_suffix}"
 
 
+def _strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
+    """Pex does not like the header Pants adds to lockfiles, as it violates JSON.
+
+    Note that we only strip lines starting with `//`, which is all that Pants will ever add. If
+    users add their own comments, things will fail.
+    """
+    return b"\n".join(
+        line for line in lockfile_bytes.splitlines() if not line.lstrip().startswith(b"//")
+    )
+
+
 def _is_probably_pex_json_lockfile(lockfile_bytes: bytes) -> bool:
     for line in lockfile_bytes.splitlines():
         if line and not line.startswith(b"//"):
@@ -579,13 +592,13 @@ def _is_probably_pex_json_lockfile(lockfile_bytes: bytes) -> bool:
     return False
 
 
-def _pex_lockfile_requirement_count(lock_content: str) -> int:
+def _pex_lockfile_requirement_count(lockfile_bytes: bytes) -> int:
     # TODO: this is a very naive heuristic that will overcount, and also relies on Pants
     #  setting `--indent` when generating lockfiles. More robust would be parsing the JSON
     #  and getting the len(locked_resolves.locked_requirements.project_name), but we risk
     #  if Pex ever changes its lockfile format.
 
-    num_lines = len(lock_content.splitlines())
+    num_lines = len(lockfile_bytes.splitlines())
     # These are very naive estimates, and they bias towards overcounting. For example, requirements
     # often are 20+ lines.
     num_lines_for_options = 10
