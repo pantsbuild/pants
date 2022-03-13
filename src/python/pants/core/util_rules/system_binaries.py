@@ -529,5 +529,98 @@ async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBin
     return tar_binary
 
 
+# -------------------------------------------------------------------------------------------
+# Binary shims
+# Creates a Digest with a shim for each requested binary in a directory suitable for PATH.
+# -------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class BinaryShimsRequest:
+    requests: tuple[BinaryPathRequest, ...]
+    rationale: str
+    output_directory: str
+
+    @classmethod
+    def for_binaries(
+        cls, *names: str, rationale: str, output_directory: str, search_path: Sequence[str]
+    ) -> BinaryShimsRequest:
+        return cls(
+            requests=tuple(
+                BinaryPathRequest(binary_name=binary_name, search_path=search_path)
+                for binary_name in names
+            ),
+            rationale=rationale,
+            output_directory=output_directory,
+        )
+
+
+@dataclass(frozen=True)
+class BinaryShims:
+    bin_directory: str
+    digest: Digest
+
+
+def create_shim(bash: str, binary: str) -> str:
+    """The binary shim script to be placed in the output directory for the digest."""
+    return dedent(
+        f"""\
+        #!{bash}
+        exec "{binary}" "$@"
+        """
+    )
+
+
+@rule
+async def create_binary_shims(
+    binary_shims_request: BinaryShimsRequest, bash: BashBinary
+) -> BinaryShims:
+    """Creates a bin directory with shims for all requested binaries."""
+    _bootstrap_tools = ("chmod", "mkdir", "printf")
+    script_tools_requests = [
+        BinaryPathRequest(
+            binary_name=binary,
+            search_path=SEARCH_PATHS,
+        )
+        for binary in _bootstrap_tools
+    ]
+    all_requests = (*script_tools_requests, *binary_shims_request.requests)
+    all_binary_paths = await MultiGet(
+        Get(BinaryPaths, BinaryPathRequest, request) for request in all_requests
+    )
+    binary_paths = [
+        binary_paths.first_path_or_raise(request, rationale=binary_shims_request.rationale).path
+        for binary_paths, request in zip(all_binary_paths, all_requests)
+    ]
+    chmod, mkdir, printf = binary_paths[: len(_bootstrap_tools)]
+    bin_relpath = binary_shims_request.output_directory
+    script = ";".join(
+        (
+            f"{mkdir} -p {bin_relpath}",
+            *(
+                " && ".join(
+                    [
+                        (
+                            f"{printf} '{create_shim(bash.path, binary)}'"
+                            f" > '{bin_relpath}/{os.path.basename(binary)}'"
+                        ),
+                        f"{chmod} +x '{bin_relpath}/{os.path.basename(binary)}'",
+                    ]
+                )
+                for binary in binary_paths[len(_bootstrap_tools) :]
+            ),
+        )
+    )
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=(bash.path, "-c", script),
+            description=f"Setup binary shims so that Pants can {binary_shims_request.rationale}.",
+            output_directories=(bin_relpath,),
+        ),
+    )
+    return BinaryShims(bin_relpath, result.output_digest)
+
+
 def rules():
     return [*collect_rules(), *python_bootstrap.rules()]
