@@ -8,8 +8,8 @@ import inspect
 import re
 from abc import ABCMeta
 from typing import Any, ClassVar, TypeVar
-from pants.base.deprecated import deprecated
 
+from pants.base.deprecated import deprecated
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import collect_options_info
@@ -99,15 +99,16 @@ class Subsystem(metaclass=ABCMeta):
     @classmethod
     @deprecated(
         removal_version="2.12.0.dev0",
-        hint="Declare class attributes using the types in pants/option.option_types.py",
+        hint=(
+            "Options are now registered by declaring class attributes using the types in "
+            "pants/option.option_types.py"
+        ),
     )
     def register_options(cls, register):
         """Register options for this Subsystem.
 
         Subclasses may override and call register(*args, **kwargs).
         """
-        for options_info in collect_options_info(cls):
-            register(*options_info.flag_names, **options_info.flag_options)
 
     @classmethod
     def register_options_on_scope(cls, options):
@@ -118,6 +119,10 @@ class Subsystem(metaclass=ABCMeta):
         register = options.registration_function_for_subsystem(cls)
         for options_info in collect_options_info(cls):
             register(*options_info.flag_names, **options_info.flag_options)
+
+        # NB: Still call `register_options` for classes which haven't switched
+        if cls.register_options is not Subsystem.register_options:
+            cls.register_options(register)
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()
