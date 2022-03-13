@@ -1726,7 +1726,7 @@ def test_ambiguous_codegen_implementations_exception() -> None:
         pass
 
     # Test when all generators have the same input and output.
-    exc = AmbiguousCodegenImplementationsException(
+    exc = AmbiguousCodegenImplementationsException.create(
         [SmalltalkGenerator1, SmalltalkGenerator2], for_sources_types=[SmalltalkSource]
     )
     assert "can generate SmalltalkSource from AvroSources" in str(exc)
@@ -1735,7 +1735,7 @@ def test_ambiguous_codegen_implementations_exception() -> None:
 
     # Test when the generators have different input and output, which usually happens because
     # the call site used too expansive of a `for_sources_types` argument.
-    exc = AmbiguousCodegenImplementationsException(
+    exc = AmbiguousCodegenImplementationsException.create(
         [SmalltalkGenerator1, AdaGenerator],
         for_sources_types=[SmalltalkSource, AdaSources, IrrelevantSources],
     )

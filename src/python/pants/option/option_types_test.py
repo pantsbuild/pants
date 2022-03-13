@@ -30,6 +30,7 @@ from pants.option.option_types import (
     MemorySizeOption,
     ShellStrListOption,
     ShellStrOption,
+    SkipOption,
     StrListOption,
     StrOption,
     TargetListOption,
@@ -83,10 +84,13 @@ def test_option_typeclasses(option_type, default, option_value, expected_registe
             prop_no_default = option_type("--opt-no-default", help="")
         else:
             prop_no_default = option_type("--opt-no-default", default=None, help="")
-        dyn_prop = option_type("--dyn-opt", default=default, help=lambda cls: cls.dyn_help)
+        dyn_prop = option_type(
+            "--dyn-opt", default=lambda cls: cls.dyn_default, help=lambda cls: cls.dyn_help
+        )
 
     class MySubsystem(MyBaseSubsystem):
         dyn_help = "Dynamic Help"
+        dyn_default = default
 
     register = Mock()
     MySubsystem.register_options(register)
@@ -104,63 +108,162 @@ def test_option_typeclasses(option_type, default, option_value, expected_registe
     assert my_subsystem.dyn_prop == transform_opt(option_value)
 
 
-def test_other_options():
-    class MySubsystem(Subsystem):
+def test_other_options() -> None:
+    class MyBaseSubsystem(Subsystem):
         def __init__(self):
             self.options = SimpleNamespace()
-            self.options.dict_opt = {"key1": "val1"}
             self.options.enum_opt = MyEnum.Val2
             self.options.optional_enum_opt = MyEnum.Val2
+            self.options.dyn_enum_opt = MyEnum.Val2
             self.options.enum_list_opt = [MyEnum.Val2]
+            self.options.dyn_enum_list_opt = [MyEnum.Val2]
             self.options.defaultless_enum_list_opt = [MyEnum.Val2]
-            self.options.args = ["--arg1"]
+            self.options.dict_opt = {"key1": "val1"}
 
-        dict_prop = DictOption[Any]("--dict-opt", help="")
         enum_prop = EnumOption("--enum-opt", default=MyEnum.Val1, help="")
+        dyn_enum_prop = EnumOption(
+            "--dyn-enum-opt",
+            default=lambda cls: cls.dyn_default,
+            enum_type=MyEnum,
+            help=lambda cls: f"{cls.dyn_help}",
+        )
         optional_enum_prop = EnumOption(
             "--optional-enum-opt", enum_type=MyEnum, default=None, help=""
         )
         enum_list_prop = EnumListOption("--enum-list-opt", default=[MyEnum.Val1], help="")
+        dyn_enum_list_prop = EnumListOption(
+            "--dyn-enum-list-opt",
+            enum_type=MyEnum,
+            default=lambda cls: cls.dyn_default_list,
+            help=lambda cls: f"{cls.dyn_help}",
+        )
         defaultless_enum_list_prop = EnumListOption(
             "--defaultless-enum-list-opt", enum_type=MyEnum, help=""
         )
-        args_prop = ArgsListOption(help="")
+        dict_prop = DictOption[Any]("--dict-opt", help="")
+
+    class MySubsystem(MyBaseSubsystem):
+        dyn_help = "Dynamic Help"
+        dyn_default = MyEnum.Val1
+        dyn_default_list = [MyEnum.Val1]
 
     register = Mock()
     MySubsystem.register_options(register)
     my_subsystem = MySubsystem()
 
     assert register.call_args_list == [
-        call("--dict-opt", default={}, help="", type=dict),
         call("--enum-opt", default=MyEnum.Val1, help="", type=MyEnum),
+        call("--dyn-enum-opt", default=MyEnum.Val1, type=MyEnum, help="Dynamic Help"),
         call("--optional-enum-opt", default=None, help="", type=MyEnum),
         call("--enum-list-opt", default=[MyEnum.Val1], help="", type=list, member_type=MyEnum),
+        call(
+            "--dyn-enum-list-opt",
+            default=[MyEnum.Val1],
+            help="Dynamic Help",
+            type=list,
+            member_type=MyEnum,
+        ),
         call("--defaultless-enum-list-opt", default=[], help="", type=list, member_type=MyEnum),
-        call("--args", default=[], help="", type=list, member_type=shell_str),
+        call("--dict-opt", default={}, help="", type=dict),
     ]
-    assert my_subsystem.dict_prop == {"key1": "val1"}
     assert my_subsystem.enum_prop == MyEnum.Val2
+    assert my_subsystem.dyn_enum_prop == MyEnum.Val2
     assert my_subsystem.optional_enum_prop == MyEnum.Val2
     assert my_subsystem.enum_list_prop == (MyEnum.Val2,)
+    assert my_subsystem.dyn_enum_list_prop == (MyEnum.Val2,)
     assert my_subsystem.defaultless_enum_list_prop == (MyEnum.Val2,)
-    assert my_subsystem.args_prop == ("--arg1",)
+    assert my_subsystem.dict_prop == {"key1": "val1"}
 
 
-def test_builder_methods():
+def test_specialized_options() -> None:
+    class MySubsystem(Subsystem):
+        options_scope = "my-subsystem"
+        name = "Wrench"
+
+        def __init__(self):
+            self.options = SimpleNamespace()
+            self.options.skip = True
+            self.options.args = ["--arg1"]
+
+        skip_prop1 = SkipOption("fmt", "lint")
+        skip_prop2 = SkipOption("fmt")
+        args_prop1 = ArgsListOption(example="--foo")
+        args_prop2 = ArgsListOption(example="--bar", tool_name="Drill")
+        args_prop3 = ArgsListOption(example="--baz", extra_help="Swing it!")
+
+    class SubsystemWithName(Subsystem):
+        options_scope = "other-subsystem"
+        name = "Hammer"
+        skip_prop1 = SkipOption("fmt")
+        args_prop1 = ArgsListOption(example="--nail")
+        args_prop2 = ArgsListOption(example="--screw", tool_name="Screwdriver")
+
+    register = Mock()
+    MySubsystem.register_options(register)
+    SubsystemWithName.register_options(register)
+
+    def expected_skip_call(help: str):
+        return call(
+            "--skip",
+            help=help,
+            default=False,
+            type=bool,
+        )
+
+    def expected_args_call(help: str):
+        return call(
+            "--args",
+            member_type=shell_str,
+            help=help,
+            default=[],
+            type=list,
+        )
+
+    assert register.call_args_list == [
+        expected_skip_call("Don't use Wrench when running `./pants fmt` and `./pants lint`."),
+        expected_skip_call("Don't use Wrench when running `./pants fmt`."),
+        expected_args_call(
+            "Arguments to pass directly to Wrench, e.g. `--my-subsystem-args='--foo'`."
+        ),
+        expected_args_call(
+            "Arguments to pass directly to Drill, e.g. `--my-subsystem-args='--bar'`."
+        ),
+        expected_args_call(
+            "Arguments to pass directly to Wrench, e.g. `--my-subsystem-args='--baz'`.\n\nSwing it!"
+        ),
+        expected_skip_call("Don't use Hammer when running `./pants fmt`."),
+        expected_args_call(
+            "Arguments to pass directly to Hammer, e.g. `--other-subsystem-args='--nail'`."
+        ),
+        expected_args_call(
+            "Arguments to pass directly to Screwdriver, e.g. `--other-subsystem-args='--screw'`."
+        ),
+    ]
+
+    # Choose an arbitrary prop, they all point to the same option attr
+    my_subsystem = MySubsystem()
+    assert my_subsystem.args_prop1 == ("--arg1",)
+    assert my_subsystem.skip_prop1
+
+
+def test_advanced_params():
     class MySubsystem(Subsystem):
         def __init__(self):
             self.options = SimpleNamespace()
 
-        prop = (
-            StrOption("--opt", default=None, help="")
-            .advanced()
-            .metavar("META")
-            .from_file()
-            .mutually_exclusive_group("group")
-            .default_help_repr("Help!")
-            .deprecated(removal_version="99.9.9", hint="it's purple")
-            .daemoned()
-            .non_fingerprinted()
+        prop = StrOption(
+            "--opt",
+            default=None,
+            help="",
+            advanced=True,
+            daemon=True,
+            default_help_repr="Help!",
+            fingerprint=False,
+            fromfile=True,
+            metavar="META",
+            mutually_exclusive_group="group",
+            removal_hint="it's purple",
+            removal_version="99.9.9",
         )
 
     flag_options = MySubsystem.prop.flag_options
@@ -193,6 +296,61 @@ def test_subsystem_option_ordering() -> None:
         call("--b", type=str, default=None, help=""),
         call("--a", type=str, default=None, help=""),
     ]
+
+
+@pytest.mark.parametrize(
+    "cls",
+    [
+        StrOption,
+        IntOption,
+        FloatOption,
+        BoolOption,
+        TargetOption,
+        DirOption,
+        FileOption,
+        ShellStrOption,
+        MemorySizeOption,
+        StrListOption,
+        IntListOption,
+        FloatListOption,
+        BoolListOption,
+        TargetListOption,
+        DirListOption,
+        FileListOption,
+        ShellStrListOption,
+        MemorySizeListOption,
+        EnumOption,
+        EnumListOption,
+        DictOption,
+    ],
+)
+def test_register_if(cls) -> None:
+    extra_kwargs = {"enum_type": MyEnum} if cls in {EnumOption, EnumListOption} else {}
+
+    class MySubsystemBase(Subsystem):
+        registered_prop = cls(
+            "--registered",
+            register_if=lambda cls: cls.truthy,
+            default=None,
+            **extra_kwargs,
+            help="",
+        )
+        not_registered_prop = cls(
+            "--not-registered",
+            register_if=lambda cls: cls.falsey,
+            default=None,
+            **extra_kwargs,
+            help="",
+        )
+
+    class MySubsystem(MySubsystemBase):
+        truthy = True
+        falsey = False
+
+    register = Mock()
+    MySubsystem.register_options(register)
+    assert len(register.call_args_list) == 1
+    assert register.call_args_list[0][0] == ("--registered",)
 
 
 def test_property_types() -> None:
@@ -231,14 +389,22 @@ def test_property_types() -> None:
         file_list_opt = FileListOption("--opt", help="")
         shellstr_list_opt = ShellStrListOption("--opt", help="")
         memorysize_list_opt = MemorySizeListOption("--opt", help="")
+        # And just test one dynamic default
+        dyn_str_list_opt = StrListOption("--opt", default=lambda cls: cls.default, help="")
 
         # Enum opts
         enum_opt = EnumOption("--opt", default=MyEnum.Val1, help="")
         optional_enum_opt = EnumOption("--opt", enum_type=MyEnum, default=None, help="")
+        dyn_enum_opt = EnumOption(
+            "--opt", enum_type=MyEnum, default=lambda cls: cls.default, help=""
+        )
         # mypy correctly complains about not matching any possibilities
         enum_opt_bad = EnumOption("--opt", default=None, help="")  # type: ignore[call-overload]
         enum_list_opt1 = EnumListOption("--opt", default=[MyEnum.Val1], help="")
         enum_list_opt2 = EnumListOption("--opt", enum_type=MyEnum, help="")
+        dyn_enum_list_opt = EnumListOption(
+            "--opt", enum_type=MyEnum, default=lambda cls: cls.default_list, help=""
+        )
         # mypy correctly complains about needing a type annotation
         enum_list_bad_opt = EnumListOption("--opt", default=[], help="")  # type: ignore[var-annotated]
 
@@ -251,6 +417,11 @@ def test_property_types() -> None:
         dict_opt5 = DictOption("--opt", default=dict(key="val"), help="")
         dict_opt6 = DictOption("--opt", default=dict(key=1), help="")
         dict_opt7 = DictOption("--opt", default=dict(key1=1, key2="str"), help="")
+        dyn_dict_opt = DictOption[str]("--opt", default=lambda cls: cls.default, help="")
+
+        # Specialized Opts
+        skip_opt = SkipOption("fmt")
+        args_opt = ArgsListOption(example="--whatever")
 
     my_subsystem = MySubsystem()
     if TYPE_CHECKING:
@@ -282,12 +453,15 @@ def test_property_types() -> None:
         assert_type["tuple[str, ...]"](my_subsystem.file_list_opt)
         assert_type["tuple[str, ...]"](my_subsystem.shellstr_list_opt)
         assert_type["tuple[int, ...]"](my_subsystem.memorysize_list_opt)
+        assert_type["tuple[str, ...]"](my_subsystem.dyn_str_list_opt)
 
         assert_type["MyEnum"](my_subsystem.enum_opt)
         assert_type["MyEnum | None"](my_subsystem.optional_enum_opt)
+        assert_type["MyEnum"](my_subsystem.dyn_enum_opt)
         assert_type["Any"](my_subsystem.enum_opt_bad)
         assert_type["tuple[MyEnum, ...]"](my_subsystem.enum_list_opt1)
         assert_type["tuple[MyEnum, ...]"](my_subsystem.enum_list_opt2)
+        assert_type["tuple[MyEnum, ...]"](my_subsystem.dyn_enum_list_opt)
         assert_type["tuple[Any, ...]"](my_subsystem.enum_list_bad_opt)
 
         assert_type["dict[str, str]"](my_subsystem.dict_opt1)
@@ -297,3 +471,7 @@ def test_property_types() -> None:
         assert_type["dict[str, str]"](my_subsystem.dict_opt5)
         assert_type["dict[str, int]"](my_subsystem.dict_opt6)
         assert_type["dict[str, object]"](my_subsystem.dict_opt7)
+        assert_type["dict[str, str]"](my_subsystem.dyn_dict_opt)
+
+        assert_type["bool"](my_subsystem.skip_opt)
+        assert_type["tuple[str, ...]"](my_subsystem.args_opt)

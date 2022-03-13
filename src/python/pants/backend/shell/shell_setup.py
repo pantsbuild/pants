@@ -16,24 +16,23 @@ class ShellSetup(Subsystem):
     options_scope = "shell-setup"
     help = "Options for Pants's Shell support."
 
-    _executable_search_path = (
-        StrListOption(
-            "--executable-search-paths",
-            default=["<PATH>"],
-            help=(
-                "The PATH value that will be used to find shells and to run certain processes "
-                "like the shunit2 test runner.\n\n"
-                'The special string "<PATH>" will expand to the contents of the PATH env var.'
-            ),
-        )
-        .advanced()
-        .metavar("<binary-paths>")
+    _executable_search_path = StrListOption(
+        "--executable-search-paths",
+        default=["<PATH>"],
+        help=(
+            "The PATH value that will be used to find shells and to run certain processes "
+            "like the shunit2 test runner.\n\n"
+            'The special string "<PATH>" will expand to the contents of the PATH env var.'
+        ),
+        advanced=True,
+        metavar="<binary-paths>",
     )
     dependency_inference = BoolOption(
         "--dependency-inference",
         default=True,
         help="Infer Shell dependencies on other Shell files by analyzing `source` statements.",
-    ).advanced()
+        advanced=True,
+    )
 
     @memoized_method
     def executable_search_path(self, env: Environment) -> tuple[str, ...]:

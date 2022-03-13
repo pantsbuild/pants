@@ -127,7 +127,7 @@ async def setup_scalatest_for_target(
             "-o",
             "-u",
             reports_dir,
-            *scalatest.options.args,
+            *scalatest.args,
         ],
         input_digest=input_digest,
         extra_immutable_input_digests=extra_immutable_input_digests,

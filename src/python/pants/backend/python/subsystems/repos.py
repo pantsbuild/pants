@@ -24,7 +24,8 @@ class PythonRepos(Subsystem):
             "URLs of code repositories to look for requirements. In Pip and Pex, this option "
             "corresponds to the `--find-links` option."
         ),
-    ).advanced()
+        advanced=True,
+    )
     indexes = StrListOption(
         "--indexes",
         default=[pypi_index],
@@ -33,7 +34,8 @@ class PythonRepos(Subsystem):
             "list, then Pex will use no indices (meaning it will not use PyPI). The values "
             "should be compliant with PEP 503."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     @property
     def pex_args(self) -> Iterator[str]:

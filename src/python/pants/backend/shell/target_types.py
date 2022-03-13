@@ -9,7 +9,7 @@ from textwrap import dedent
 
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField
-from pants.engine.process import BinaryPathTest
+from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,

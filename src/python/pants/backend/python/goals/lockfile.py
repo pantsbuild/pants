@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
-    use_pex: bool = False
+    use_pex: bool
 
     @classmethod
     def from_tool(
@@ -63,6 +63,7 @@ class GeneratePythonLockfile(GenerateLockfile):
         subsystem: PythonToolRequirementsBase,
         interpreter_constraints: InterpreterConstraints | None = None,
         *,
+        use_pex: bool,
         extra_requirements: Iterable[str] = (),
     ) -> GeneratePythonLockfile:
         """Create a request for a dedicated lockfile for the tool.
@@ -77,6 +78,7 @@ class GeneratePythonLockfile(GenerateLockfile):
                 interpreter_constraints=InterpreterConstraints(),
                 resolve_name=subsystem.options_scope,
                 lockfile_dest=subsystem.lockfile,
+                use_pex=use_pex,
             )
         return cls(
             requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
@@ -87,6 +89,7 @@ class GeneratePythonLockfile(GenerateLockfile):
             ),
             resolve_name=subsystem.options_scope,
             lockfile_dest=subsystem.lockfile,
+            use_pex=use_pex,
         )
 
     @property
@@ -114,14 +117,18 @@ def maybe_warn_python_repos(
 ) -> MaybeWarnPythonRepos:
     def warn_python_repos(option: str) -> None:
         logger.warning(
-            f"The option `[python-repos].{option}` is configured, but it does not currently work "
-            "with lockfile generation. Lockfile generation will fail if the relevant requirements "
-            "cannot be located on PyPI.\n\n"
-            "If lockfile generation fails, you can disable lockfiles by setting "
+            f"The option `[python-repos].{option}` is configured, but it does not work when using "
+            "Poetry for lockfile generation. Lockfile generation will fail if the relevant "
+            "requirements cannot be located on PyPI.\n\n"
+            "Instead, you can use Pex to generate lockfiles by setting "
+            "`[python].lockfile_generator = 'pex'.\n\n"
+            "Alternatively, you can disable lockfiles by setting "
             "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
             "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
             "`[tool].lockfile` option to the path you manually generated. When manually "
-            "maintaining lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'."
+            "maintaining lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'. For user "
+            "lockfiles from `[python].resolves`, set "
+            "`[python].resolves_generate_lockfiles = false`."
         )
 
     if python_repos.repos:
@@ -140,6 +147,7 @@ async def generate_lockfile(
     python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
     if req.use_pex:
+        header_delimiter = "//"
         result = await Get(
             ProcessResult,
             PexCliProcess(
@@ -176,6 +184,7 @@ async def generate_lockfile(
             ),
         )
     else:
+        header_delimiter = "#"
         await Get(MaybeWarnPythonRepos, MaybeWarnPythonReposRequest())
         _pyproject_toml = create_pyproject_toml(
             req.requirements, req.interpreter_constraints
@@ -232,6 +241,7 @@ async def generate_lockfile(
             generate_lockfiles_subsystem.custom_command
             or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
         ),
+        delimeter=header_delimiter,
     )
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
@@ -262,7 +272,7 @@ def determine_python_user_resolves(
 async def setup_user_lockfile_requests(
     requested: RequestedPythonUserResolveNames, all_targets: AllTargets, python_setup: PythonSetup
 ) -> UserGenerateLockfiles:
-    if not python_setup.enable_resolves:
+    if not (python_setup.enable_resolves and python_setup.resolves_generate_lockfiles):
         return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)
@@ -285,6 +295,7 @@ async def setup_user_lockfile_requests(
             ),
             resolve_name=resolve,
             lockfile_dest=python_setup.resolves[resolve],
+            use_pex=python_setup.generate_lockfiles_with_pex,
         )
         for resolve in requested
     )

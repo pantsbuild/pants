@@ -73,7 +73,7 @@ class DockerOptions(Subsystem):
     options_scope = "docker"
     help = "Options for interacting with Docker."
 
-    _registries = DictOption[Any]("--registries", help=registries_help).from_file()
+    _registries = DictOption[Any]("--registries", help=registries_help, fromfile=True)
     default_repository = StrOption(
         "--default-repository",
         help=default_repository_help,
@@ -135,7 +135,8 @@ class DockerOptions(Subsystem):
             "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
             "or just `ENV_VAR` to copy the value from Pants's own environment."
         ),
-    ).advanced()
+        advanced=True,
+    )
     run_args = ShellStrListOption(
         "--run-args",
         default=["--interactive", "--tty"] if sys.stdout.isatty() else [],
@@ -152,18 +153,16 @@ class DockerOptions(Subsystem):
             "Defaults to `--interactive --tty` when stdout is connected to a terminal."
         ),
     )
-    _executable_search_paths = (
-        StrListOption(
-            "--executable-search-paths",
-            default=["<PATH>"],
-            help=(
-                "The PATH value that will be used to find the Docker client and any tools required."
-                "\n\n"
-                'The special string `"<PATH>"` will expand to the contents of the PATH env var.'
-            ),
-        )
-        .advanced()
-        .metavar("<binary-paths>")
+    _executable_search_paths = StrListOption(
+        "--executable-search-paths",
+        default=["<PATH>"],
+        help=(
+            "The PATH value that will be used to find the Docker client and any tools required."
+            "\n\n"
+            'The special string `"<PATH>"` will expand to the contents of the PATH env var.'
+        ),
+        advanced=True,
+        metavar="<binary-paths>",
     )
 
     @property

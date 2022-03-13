@@ -172,7 +172,7 @@ impl super::CommandRunner for CommandRunner {
         let exclusive_spawn = prepare_workdir(
           nailgun_process.workdir_path().to_owned(),
           &client_req,
-          client_req.input_digests.input_files,
+          client_req.input_digests.input_files.clone(),
           context.clone(),
           self.inner.store.clone(),
           self.executor.clone(),

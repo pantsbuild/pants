@@ -320,6 +320,10 @@ impl TestDirectory {
   pub fn digest(&self) -> hashing::Digest {
     hashing::Digest::of_bytes(&self.bytes())
   }
+
+  pub fn directory_digest(&self) -> fs::DirectoryDigest {
+    fs::DirectoryDigest::from_persisted_digest(self.digest())
+  }
 }
 
 pub struct TestTree {
@@ -334,9 +338,35 @@ impl TestTree {
   pub fn robin_at_root() -> TestTree {
     TestDirectory::containing_robin().into()
   }
+
+  pub fn nested() -> TestTree {
+    TestTree::new(
+      TestDirectory::nested().directory(),
+      vec![TestDirectory::containing_roland().directory()],
+    )
+  }
+
+  pub fn double_nested() -> TestTree {
+    TestTree::new(
+      TestDirectory::double_nested().directory(),
+      vec![
+        TestDirectory::nested().directory(),
+        TestDirectory::containing_roland().directory(),
+      ],
+    )
+  }
 }
 
 impl TestTree {
+  pub fn new(root: remexec::Directory, children: Vec<remexec::Directory>) -> Self {
+    Self {
+      tree: remexec::Tree {
+        root: Some(root),
+        children,
+      },
+    }
+  }
+
   pub fn bytes(&self) -> bytes::Bytes {
     self.tree.to_bytes()
   }
@@ -348,14 +378,14 @@ impl TestTree {
   pub fn digest(&self) -> hashing::Digest {
     hashing::Digest::of_bytes(&self.bytes())
   }
+
+  pub fn digest_trie(&self) -> fs::DigestTrie {
+    self.tree.clone().try_into().unwrap()
+  }
 }
 
 impl From<TestDirectory> for TestTree {
   fn from(dir: TestDirectory) -> Self {
-    let tree = remexec::Tree {
-      root: Some(dir.directory),
-      ..remexec::Tree::default()
-    };
-    TestTree { tree }
+    Self::new(dir.directory(), vec![])
   }
 }

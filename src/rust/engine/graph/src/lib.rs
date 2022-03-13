@@ -773,18 +773,6 @@ impl<N: Node> Graph<N> {
       f(n, v);
     }
   }
-
-  ///
-  /// Executes an operation while all access to the Graph is prevented (by acquiring the Graph's
-  /// lock).
-  ///
-  pub fn with_exclusive<F, T>(&self, f: F) -> T
-  where
-    F: FnOnce() -> T,
-  {
-    let _inner = self.inner.lock();
-    f()
-  }
 }
 
 ///

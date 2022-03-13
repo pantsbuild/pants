@@ -11,6 +11,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter
 from pants.option.config import Config
+from pants.option.errors import ConfigValidationError
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.parser import Parser
@@ -229,7 +230,7 @@ class Options:
                 try:
                     valid_options_under_scope = set(self.for_scope(scope, check_deprecations=False))
                 # Only catch ConfigValidationError. Other exceptions will be raised directly.
-                except Config.ConfigValidationError:
+                except ConfigValidationError:
                     error_log.append(f"Invalid scope [{section}] in {config.config_path}")
                 else:
                     # All the options specified under [`section`] in `config` excluding bootstrap defaults.
@@ -245,9 +246,9 @@ class Options:
         if error_log:
             for error in error_log:
                 logger.error(error)
-            raise Config.ConfigValidationError(
-                "Invalid config entries detected. See log for details on which entries to update or "
-                "remove.\n(Specify --no-verify-config to disable this check.)"
+            raise ConfigValidationError(
+                "Invalid config entries detected. See log for details on which entries to update "
+                "or remove.\n(Specify --no-verify-config to disable this check.)"
             )
 
     def is_known_scope(self, scope: str) -> bool:
@@ -283,7 +284,7 @@ class Options:
         try:
             return self._parser_by_scope[scope]
         except KeyError:
-            raise Config.ConfigValidationError(f"No such options scope: {scope}")
+            raise ConfigValidationError(f"No such options scope: {scope}")
 
     def _check_and_apply_deprecations(self, scope, values):
         """Checks whether a ScopeInfo has options specified in a deprecated scope.

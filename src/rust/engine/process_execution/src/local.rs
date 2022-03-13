@@ -16,8 +16,8 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
-  self, safe_create_dir_all_ioerror, GlobExpansionConjunction, GlobMatching, PathGlobs,
-  Permissions, RelativePath, StrictGlobMatching,
+  self, safe_create_dir_all_ioerror, DirectoryDigest, GlobExpansionConjunction, GlobMatching,
+  PathGlobs, Permissions, RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
@@ -120,7 +120,6 @@ impl CommandRunner {
         .map_err(|err| format!("Error expanding output globs: {}", err))
         .await?;
       Snapshot::from_path_stats(
-        store.clone(),
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )
@@ -297,7 +296,7 @@ impl super::CommandRunner for CommandRunner {
         let exclusive_spawn = prepare_workdir(
           workdir_path.clone(),
           &req,
-          req.input_digests.input_files,
+          req.input_digests.input_files.clone(),
           context.clone(),
           self.store.clone(),
           self.executor.clone(),
@@ -549,7 +548,7 @@ pub trait CapturedWorkdir {
           stdout_digest,
           stderr_digest,
           exit_code: child_results.exit_code,
-          output_directory: output_snapshot.digest,
+          output_directory: output_snapshot.into(),
           platform,
           metadata: result_metadata,
         })
@@ -566,7 +565,7 @@ pub trait CapturedWorkdir {
           stdout_digest,
           stderr_digest: hashing::EMPTY_DIGEST,
           exit_code: -libc::SIGTERM,
-          output_directory: hashing::EMPTY_DIGEST,
+          output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
           platform,
           metadata: result_metadata,
         })
@@ -617,7 +616,7 @@ pub trait CapturedWorkdir {
 pub async fn prepare_workdir(
   workdir_path: PathBuf,
   req: &Process,
-  materialized_input_digest: hashing::Digest,
+  materialized_input_digest: DirectoryDigest,
   context: Context,
   store: Store,
   executor: task_executor::Executor,
@@ -651,7 +650,7 @@ pub async fn prepare_workdir(
     context.workunit_store.clone(),
     "setup_sandbox".to_owned(),
     WorkunitMetadata {
-      level: Level::Trace,
+      level: Level::Debug,
       ..WorkunitMetadata::default()
     },
     |_workunit| async move {

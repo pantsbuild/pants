@@ -1,16 +1,17 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::context::Context;
-use crate::externs;
-use crate::nodes::{lift_directory_digest, lift_file_digest};
+use std::sync::Arc;
 
+use crate::externs;
 use crate::externs::fs::PyFileDigest;
+use crate::nodes::{lift_directory_digest, lift_file_digest};
+use crate::Value;
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use workunit_store::{
-  ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue,
-};
+
+use workunit_store::{ArtifactOutput, Level, RunningWorkunit, UserMetadataItem};
 
 // Note: these functions should not panic, but we also don't preserve errors (e.g. to log) because
 // we rely on MyPy to catch TypeErrors with using the APIs incorrectly. So we convert errors to
@@ -25,12 +26,12 @@ pub(crate) struct EngineAwareReturnType {
 }
 
 impl EngineAwareReturnType {
-  pub(crate) fn from_task_result(task_result: &PyAny, context: &Context) -> Self {
+  pub(crate) fn from_task_result(task_result: &PyAny) -> Self {
     Self {
       level: Self::level(task_result),
       message: Self::message(task_result),
       artifacts: Self::artifacts(task_result).unwrap_or_else(Vec::new),
-      metadata: metadata(context, task_result).unwrap_or_else(Vec::new),
+      metadata: metadata(task_result).unwrap_or_else(Vec::new),
     }
   }
 
@@ -73,11 +74,11 @@ impl EngineAwareReturnType {
 
     for kv_pair in artifacts_dict.items().into_iter() {
       let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
-      let artifact_output = if value.is_instance::<PyFileDigest>().unwrap_or(false) {
+      let artifact_output = if value.is_instance_of::<PyFileDigest>().unwrap_or(false) {
         lift_file_digest(value).map(ArtifactOutput::FileDigest)
       } else {
         let digest_value = value.getattr("digest").ok()?;
-        lift_directory_digest(digest_value).map(ArtifactOutput::Snapshot)
+        lift_directory_digest(digest_value).map(|dd| ArtifactOutput::Snapshot(Arc::new(dd)))
       }
       .ok()?;
       output.push((key, artifact_output));
@@ -101,12 +102,12 @@ impl EngineAwareParameter {
     hint.extract().ok()
   }
 
-  pub fn metadata(context: &Context, obj: &PyAny) -> Vec<(String, UserMetadataItem)> {
-    metadata(context, obj).unwrap_or_else(Vec::new)
+  pub fn metadata(obj: &PyAny) -> Vec<(String, UserMetadataItem)> {
+    metadata(obj).unwrap_or_else(Vec::new)
   }
 }
 
-fn metadata(context: &Context, obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
+fn metadata(obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
   let metadata_val = obj.call_method0("metadata").ok()?;
   if metadata_val.is_none() {
     return None;
@@ -116,13 +117,9 @@ fn metadata(context: &Context, obj: &PyAny) -> Option<Vec<(String, UserMetadataI
   let metadata_dict = metadata_val.cast_as::<PyDict>().ok()?;
 
   for kv_pair in metadata_dict.items().into_iter() {
-    let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
-    let py_value_handle = UserMetadataPyValue::new();
-    let umi = UserMetadataItem::PyValue(py_value_handle.clone());
-    context.session.with_metadata_map(|map| {
-      map.insert(py_value_handle.clone(), value.into());
-    });
-    output.push((key, umi));
+    let (key, py_any): (String, &PyAny) = kv_pair.extract().ok()?;
+    let value: Value = Value::new(py_any.into());
+    output.push((key, UserMetadataItem::PyValue(Arc::new(value))));
   }
   Some(output)
 }

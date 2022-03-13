@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -23,8 +22,8 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.option.custom_types import file_option, shell_str
-from pants.util.docutil import bin_name, git_url
+from pants.option.option_types import ArgsListOption, FileOption, SkipOption
+from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
 
@@ -42,6 +41,7 @@ class BanditFieldSet(FieldSet):
 
 class Bandit(PythonToolBase):
     options_scope = "bandit"
+    name = "Bandit"
     help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
 
     # When upgrading, check if Bandit has started using PEP 517 (a `pyproject.toml` file). If so,
@@ -61,46 +61,17 @@ class Bandit(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/lint/bandit/lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=f"Don't use Bandit when running `{bin_name()} lint`",
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help=(
-                f"Arguments to pass directly to Bandit, e.g. "
-                f'`--{cls.options_scope}-args="--skip B101,B308 --confidence"`'
-            ),
-        )
-        register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help=(
-                "Path to a Bandit YAML config file "
-                "(https://bandit.readthedocs.io/en/latest/config.html)."
-            ),
-        )
-
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
-
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="--skip B101,B308 --confidence")
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help=(
+            "Path to a Bandit YAML config file "
+            "(https://bandit.readthedocs.io/en/latest/config.html)."
+        ),
+    )
 
     @property
     def config_request(self) -> ConfigFilesRequest:
@@ -126,7 +97,9 @@ async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not bandit.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(bandit)
+        return GeneratePythonLockfile.from_tool(
+            bandit, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # While Bandit will run in partitions, we need a single lockfile that works with every
     # partition.
@@ -141,7 +114,9 @@ async def setup_bandit_lockfile(
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return GeneratePythonLockfile.from_tool(
-        bandit, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        bandit,
+        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

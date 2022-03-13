@@ -15,6 +15,7 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
+from pants.option.option_types import BoolOption
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
@@ -31,21 +32,17 @@ class IPython(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/python/subsystems/ipython_lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--ignore-cwd",
-            type=bool,
-            advanced=True,
-            default=True,
-            help="Whether to tell IPython not to put the CWD on the import path.\n\n"
-            "Normally you want this to be True, so that imports come from the hermetic "
-            "environment Pants creates.\n\nHowever IPython<7.13.0 doesn't support this option, "
-            "so if you're using an earlier version (e.g., because you have Python 2.7 code) "
-            "then you will need to set this to False, and you may have issues with imports "
-            "from your CWD shading the hermetic environment.",
-        )
+    ignore_cwd = BoolOption(
+        "--ignore-cwd",
+        advanced=True,
+        default=True,
+        help="Whether to tell IPython not to put the CWD on the import path.\n\n"
+        "Normally you want this to be True, so that imports come from the hermetic "
+        "environment Pants creates.\n\nHowever IPython<7.13.0 doesn't support this option, "
+        "so if you're using an earlier version (e.g., because you have Python 2.7 code) "
+        "then you will need to set this to False, and you may have issues with imports "
+        "from your CWD shading the hermetic environment.",
+    )
 
 
 class IPythonLockfileSentinel(GenerateToolLockfileSentinel):
@@ -63,7 +60,9 @@ async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not ipython.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(ipython)
+        return GeneratePythonLockfile.from_tool(
+            ipython, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # IPython is often run against the whole repo (`./pants repl ::`), but it is possible to run
     # on subsets of the codebase with disjoint interpreter constraints, such as
@@ -82,7 +81,9 @@ async def setup_ipython_lockfile(
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return GeneratePythonLockfile.from_tool(
-        ipython, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        ipython,
+        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

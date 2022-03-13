@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
+from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
@@ -160,6 +161,7 @@ async def compute_first_party_package_import_path(
 async def analyze_first_party_package(
     request: FirstPartyPkgAnalysisRequest,
     analyzer: PackageAnalyzerSetup,
+    golang_subsystem: GolangSubsystem,
 ) -> FallibleFirstPartyPkgAnalysis:
     wrapped_target, import_path_info, owning_go_mod = await MultiGet(
         Get(WrappedTarget, Address, request.address),
@@ -181,6 +183,7 @@ async def analyze_first_party_package(
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
+            env={"CGO_ENABLED": "0"},
         ),
     )
     if result.exit_code != 0:
@@ -211,7 +214,7 @@ async def analyze_first_party_package(
             f"The first-party package {request.address} includes `CgoFiles`, which Pants does "
             "not yet support. Please open a feature request at "
             "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
-            "prioritize adding support."
+            "prioritize adding support.\n\n"
         )
 
     analysis = FirstPartyPkgAnalysis(

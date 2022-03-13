@@ -8,6 +8,7 @@ remote_cache_warnings = "backoff"
 
 [stats]
 log = true
+memory_summary = true
 
 [test]
 use_coverage = true

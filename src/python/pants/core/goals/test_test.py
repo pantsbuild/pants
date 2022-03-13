@@ -271,7 +271,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
         """\
 
         ✓ //:good succeeded in 1.00s (memoized).
-        𐄂 //:bad failed in 1.00s (memoized).
+        ✕ //:bad failed in 1.00s (memoized).
         """
     )
 

@@ -8,10 +8,10 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 
 use bytes::{Bytes, BytesMut};
-use fs::{DigestEntry, FileEntry, Permissions};
+use fs::{DigestEntry, FileEntry, Permissions, EMPTY_DIRECTORY_DIGEST};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
@@ -106,7 +106,7 @@ async fn load_file_prefers_local() {
   let testdata = TestData::roland();
 
   crate::local_tests::new_store(dir.path())
-    .store_bytes(EntryType::File, testdata.bytes(), false)
+    .store_bytes(EntryType::File, None, testdata.bytes(), false)
     .await
     .expect("Store failed");
 
@@ -125,7 +125,7 @@ async fn load_directory_prefers_local() {
   let testdir = TestDirectory::containing_roland();
 
   crate::local_tests::new_store(dir.path())
-    .store_bytes(EntryType::Directory, testdir.bytes(), false)
+    .store_bytes(EntryType::Directory, None, testdir.bytes(), false)
     .await
     .expect("Store failed");
 
@@ -203,7 +203,7 @@ async fn load_recursive_directory() {
   let testdir_directory = testdir.directory();
   let recursive_testdir = TestDirectory::recursive();
   let recursive_testdir_directory = recursive_testdir.directory();
-  let recursive_testdir_digest = recursive_testdir.digest();
+  let recursive_testdir_digest = recursive_testdir.directory_digest();
 
   let cas = StubCAS::builder()
     .file(&roland)
@@ -213,7 +213,7 @@ async fn load_recursive_directory() {
     .build();
 
   new_store(dir.path(), &cas.address())
-    .ensure_local_has_recursive_directory(recursive_testdir_digest)
+    .ensure_local_has_recursive_directory(recursive_testdir_digest.clone())
     .await
     .expect("Downloading recursive directory should have succeeded.");
 
@@ -235,7 +235,7 @@ async fn load_recursive_directory() {
   );
   assert_eq!(
     new_local_store(dir.path())
-      .load_directory(recursive_testdir_digest,)
+      .load_directory(recursive_testdir_digest.as_digest())
       .await
       .unwrap()
       .unwrap(),
@@ -1003,7 +1003,7 @@ async fn materialize_missing_directory() {
   store
     .materialize_directory(
       materialize_dir.path().to_owned(),
-      TestDirectory::recursive().digest(),
+      TestDirectory::recursive().directory_digest(),
       Permissions::Writable,
     )
     .await
@@ -1035,7 +1035,7 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
   store
     .materialize_directory(
       materialize_dir.path().to_owned(),
-      recursive_testdir.digest(),
+      recursive_testdir.directory_digest(),
       perms,
     )
     .await
@@ -1101,7 +1101,7 @@ async fn contents_for_directory_empty() {
   let store = new_local_store(store_dir.path());
 
   let file_contents = store
-    .contents_for_directory(TestDirectory::empty().digest())
+    .contents_for_directory(TestDirectory::empty().directory_digest())
     .await
     .expect("Getting FileContents");
 
@@ -1135,7 +1135,7 @@ async fn contents_for_directory() {
     .expect("Error saving catnip file bytes");
 
   let file_contents = store
-    .contents_for_directory(recursive_testdir.digest())
+    .contents_for_directory(recursive_testdir.directory_digest())
     .await
     .expect("Getting FileContents");
 
@@ -1223,7 +1223,7 @@ async fn entries_for_directory() {
     .expect("Error saving catnip file bytes");
 
   let digest_entries = store
-    .entries_for_directory(recursive_testdir.digest())
+    .entries_for_directory(recursive_testdir.directory_digest())
     .await
     .expect("Getting FileContents");
 
@@ -1244,7 +1244,7 @@ async fn entries_for_directory() {
   );
 
   let empty_digest_entries = store
-    .entries_for_directory(EMPTY_DIGEST)
+    .entries_for_directory(EMPTY_DIRECTORY_DIGEST.clone())
     .await
     .expect("Getting EMTPY_DIGEST");
 
@@ -1504,7 +1504,7 @@ async fn explicitly_overwrites_already_existing_file() {
   let _ = store
     .materialize_directory(
       dir_to_write_to.path().to_owned(),
-      contents_dir.digest(),
+      contents_dir.directory_digest(),
       Permissions::Writable,
     )
     .await

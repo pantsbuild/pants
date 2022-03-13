@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 protos = { path = "../../protos" }
-clap = "2"
+clap = "3"
 dirs-next = "2"
 env_logger = "0.5.4"
 errno = "0.2.8"
@@ -18,7 +18,7 @@ hashing = { path = "../../hashing" }
 libc = "0.2.112"
 log = "0.4.1"
 parking_lot = "0.12"
-protobuf = { version = "2.25.2", features = ["with-bytes"] }
+protobuf = { version = "2.27.1", features = ["with-bytes"] }
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 time = "0.3"

@@ -26,7 +26,8 @@ class SubprocessEnvironment(Subsystem):
             "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
             "or just `ENV_VAR` to copy the value from Pants's own environment."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     @property
     def env_vars_to_pass_to_subprocesses(self) -> Tuple[str, ...]:

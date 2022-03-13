@@ -252,14 +252,14 @@ async def setup_pytest_for_target(
         ),
     )
 
-    add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
+    add_opts = [f"--color={'yes' if global_options.colors else 'no'}"]
     output_files = []
 
     results_file_name = None
     if not request.is_debug:
         results_file_name = f"{request.field_set.address.path_safe_spec}.xml"
         add_opts.extend(
-            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.options.junit_family}")
+            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
         )
         output_files.append(results_file_name)
 
@@ -301,13 +301,13 @@ async def setup_pytest_for_target(
         Process,
         VenvPexProcess(
             pytest_runner_pex,
-            argv=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
+            argv=(*pytest.args, *coverage_args, *field_set_source_files.files),
             extra_env=extra_env,
             input_digest=input_digest,
             output_directories=(_EXTRA_OUTPUT_DIR,),
             output_files=output_files,
             timeout_seconds=request.field_set.timeout.calculate_from_global_options(pytest),
-            execution_slot_variable=pytest.options.execution_slot_var,
+            execution_slot_variable=pytest.execution_slot_var,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
             cache_scope=cache_scope,

@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import os
 import sys
 from textwrap import dedent
 
@@ -16,6 +17,7 @@ from pants.core.util_rules import distdir
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -64,10 +66,27 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
         all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets)])
 
         for result in all_results:
-            assert len(result.symlinks) == 1
-            symlink = result.symlinks[0]
-            assert symlink.link_rel_path == current_interpreter
-            assert "named_caches/pex_root/venvs/" in symlink.source_path
+            assert len(result.post_processing_cmds) == 2
+
+            ppc0 = result.post_processing_cmds[0]
+            assert ppc0.argv == (
+                os.path.join("{digest_root}", ".", "pex"),
+                os.path.join("{digest_root}", "requirements.pex"),
+                "venv",
+                "--pip",
+                "--collisions-ok",
+                "--remove=all",
+                f"{{digest_root}}/{current_interpreter}",
+            )
+            assert ppc0.extra_env == FrozenDict({"PEX_MODULE": "pex.tools"})
+
+            ppc1 = result.post_processing_cmds[1]
+            assert ppc1.argv == (
+                "rm",
+                "-f",
+                os.path.join("{digest_root}", ".", "pex"),
+            )
+            assert ppc1.extra_env == FrozenDict()
 
         return all_results
 

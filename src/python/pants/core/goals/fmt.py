@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TypeVar, cast
+from typing import TypeVar
 
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -23,6 +23,7 @@ from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
@@ -135,31 +136,16 @@ class FmtSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return FmtRequest in union_membership
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--only",
-            type=list,
-            member_type=str,
-            default=[],
-            help=only_option_help("fmt", "formatter", "isort", "shfmt"),
-        )
-        register(
-            "--batch-size",
-            advanced=True,
-            type=int,
-            default=128,
-            help=style_batch_size_help(uppercase="Formatter", lowercase="formatter"),
-        )
-
-    @property
-    def only(self) -> tuple[str, ...]:
-        return tuple(self.options.only)
-
-    @property
-    def batch_size(self) -> int:
-        return cast(int, self.options.batch_size)
+    only = StrListOption(
+        "--only",
+        help=only_option_help("fmt", "formatter", "isort", "shfmt"),
+    )
+    batch_size = IntOption(
+        "--batch-size",
+        advanced=True,
+        default=128,
+        help=style_batch_size_help(uppercase="Formatter", lowercase="formatter"),
+    )
 
 
 class Fmt(Goal):

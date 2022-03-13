@@ -166,7 +166,7 @@ async def create_ipython_repl_request(
     args = list(
         complete_pex_env.create_argv(request.in_chroot(ipython_pex.name), python=ipython_pex.python)
     )
-    if ipython.options.ignore_cwd:
+    if ipython.ignore_cwd:
         args.append("--ignore-cwd")
 
     chrooted_source_roots = [request.in_chroot(sr) for sr in sources.source_roots]

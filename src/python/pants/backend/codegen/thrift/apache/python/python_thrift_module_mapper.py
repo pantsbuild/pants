@@ -15,7 +15,10 @@ from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyPythonMappingImplMarker,
     ModuleProvider,
     ModuleProviderType,
+    ResolveName,
 )
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonResolveField
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -33,22 +36,26 @@ class PythonThriftMappingMarker(FirstPartyPythonMappingImplMarker):
 @rule(desc="Creating map of Thrift targets to generated Python modules", level=LogLevel.DEBUG)
 async def map_thrift_to_python_modules(
     thrift_targets: AllThriftTargets,
+    python_setup: PythonSetup,
     _: PythonThriftMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
     parsed_files = await MultiGet(
         Get(ParsedThrift, ParsedThriftRequest(tgt[ThriftSourceField])) for tgt in thrift_targets
     )
-    modules_to_providers: DefaultDict[str, list[ModuleProvider]] = defaultdict(list)
+
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
     for tgt, parsed in zip(thrift_targets, parsed_files):
+        resolve = tgt[PythonResolveField].normalized_value(python_setup)
         provider = ModuleProvider(tgt.address, ModuleProviderType.IMPL)
         m1, m2 = thrift_path_to_py_modules(
             source_path=tgt[ThriftSourceField].file_path, namespace=parsed.namespaces.get("py")
         )
-        modules_to_providers[m1].append(provider)
-        modules_to_providers[m2].append(provider)
-    return FirstPartyPythonMappingImpl(
-        (k, tuple(sorted(v))) for k, v in sorted(modules_to_providers.items())
-    )
+        resolves_to_modules_to_providers[resolve][m1].append(provider)
+        resolves_to_modules_to_providers[resolve][m2].append(provider)
+
+    return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
 
 
 def rules():

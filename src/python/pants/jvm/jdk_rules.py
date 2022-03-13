@@ -13,10 +13,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar, Iterable, Mapping
 
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTarget
 from pants.jvm.compile import ClasspathEntry

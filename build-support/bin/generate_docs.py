@@ -203,6 +203,7 @@ def run_pants_help_all() -> dict[str, Any]:
     # List all (stable enough) backends here.
     backends = [
         "pants.backend.awslambda.python",
+        "pants.backend.codegen.protobuf.lint.buf",
         "pants.backend.codegen.protobuf.python",
         "pants.backend.codegen.thrift.apache.python",
         "pants.backend.docker",
@@ -213,6 +214,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.python",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
+        "pants.backend.experimental.python.packaging.pyoxidizer",
         "pants.backend.experimental.scala",
         "pants.backend.experimental.scala.lint.scalafmt",
         "pants.backend.google_cloud_function.python",

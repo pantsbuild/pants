@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from pants.bsp.spec import BuildTargetIdentifier, Uri
+from pants.bsp.spec.base import BuildTargetIdentifier, Uri
 from pants.jvm.bsp.spec import JvmBuildTarget
 
 # -----------------------------------------------------------------------------------------------

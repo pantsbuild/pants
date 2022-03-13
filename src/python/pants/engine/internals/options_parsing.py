@@ -50,13 +50,12 @@ def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
 
 @rule
 def log_level(global_options: GlobalOptions) -> LogLevel:
-    log_level: LogLevel = global_options.options.level
-    return log_level
+    return global_options.level
 
 
 @rule
 def extract_process_cleanup_option(global_options: GlobalOptions) -> ProcessCleanupOption:
-    return ProcessCleanupOption(global_options.options.process_cleanup)
+    return ProcessCleanupOption(global_options.process_cleanup)
 
 
 @rule
