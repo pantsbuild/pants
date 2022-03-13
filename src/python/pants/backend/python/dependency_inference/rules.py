@@ -163,9 +163,23 @@ def _get_inferred_asset_deps(
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
 ) -> Iterator[Address]:
     for filepath in assets:
+        # NB: Resources in Python's ecosystem are loaded relative to a package, so we only try and
+        # query for a resource relative to requesting module's path
+        # (I.e. we assume the user is doing something like `pkgutil.get_data(__file__, "foo/bar")`)
+        # See https://docs.python.org/3/library/pkgutil.html#pkgutil.get_data
+        # and Pants' own docs on resources.
+        #
+        # Files in Pants are always loaded relative to the build root without any source root
+        # stripping, so we use the full filepath to query for files.
+        # (I.e. we assume the user is doing something like `open("src/python/configs/prod.json")`)
+        #
+        # In either case we could also try and query based on the others' key, however this will
+        # almost always lead to a false positive.
         resource_path = PurePath(request_file_path).parent / filepath
+        file_path = PurePath(filepath)
+
         inferred_resource_tgts = assets_by_path.resources.get(resource_path, frozenset())
-        inferred_file_tgts = assets_by_path.files.get(PurePath(filepath), frozenset())
+        inferred_file_tgts = assets_by_path.files.get(file_path, frozenset())
         inferred_tgts = inferred_resource_tgts | inferred_file_tgts
 
         if inferred_tgts:
