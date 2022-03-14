@@ -232,7 +232,6 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         dedent(
             """\
             python_sources(
-                sources=[],
                 dependencies=[":thirdparty"],
                 skip_mypy=True,
             )

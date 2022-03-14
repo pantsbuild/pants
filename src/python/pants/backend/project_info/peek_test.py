@@ -85,7 +85,6 @@ from pants.testutil.rule_runner import RuleRunner
                     "address": "example:files_target",
                     "target_type": "files",
                     "dependencies": [],
-                    "dependencies_raw": null,
                     "description": null,
                     "overrides": null,
                     "sources": [],

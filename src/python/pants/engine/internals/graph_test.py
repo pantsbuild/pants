@@ -343,8 +343,8 @@ def test_transitive_targets_tolerates_generated_target_cycles(
     assert len(result.roots) == 1
     assert result.roots[0].address == Address("", target_name="t2")
     assert [tgt.address for tgt in result.dependencies] == [
-        Address("", relative_file_path="t1.txt", target_name="t1"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
+        Address("", relative_file_path="t1.txt", target_name="t1"),
         Address("", relative_file_path="dep.txt", target_name="dep"),
     ]
 
@@ -393,7 +393,6 @@ def test_coarsened_targets(transitive_targets_rule_runner: RuleRunner) -> None:
         Address("", target_name="t1"),
         [Address("", target_name="t1")],
         [
-            Address("", relative_file_path="dep.txt", target_name="dep"),
             Address("", relative_file_path="t1.txt", target_name="t1"),
             Address("", relative_file_path="t2.txt", target_name="t2"),
         ],
@@ -514,11 +513,12 @@ def test_dep_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> None:
 def test_dep_no_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> None:
     transitive_targets_rule_runner.write_files(
         {
+            "t1.txt": "",
             "t2.txt": "",
             # TODO(#12871): Stop relying on only generated targets having cycle tolerance.
             "BUILD": dedent(
                 """\
-                generator(name='t1', dependencies=['t2.txt:t2'])
+                generator(name='t1', dependencies=['t2.txt:t2'], sources=['t1.txt'])
                 generator(name='t2', dependencies=[':t1'], sources=['t2.txt'])
                 """
             ),
@@ -531,7 +531,7 @@ def test_dep_no_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> No
     assert len(result.roots) == 1
     assert result.roots[0].address == Address("", target_name="t1")
     assert {tgt.address for tgt in result.dependencies} == {
-        Address("", target_name="t1"),
+        Address("", relative_file_path="t1.txt", target_name="t1"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
     }
 
@@ -1813,10 +1813,10 @@ class SmalltalkLibrary(Target):
 
 class SmalltalkLibraryGenerator(TargetFilesGenerator):
     alias = "smalltalk_libraries"
-    # Note that we use MockDependencies so that we support transitive excludes (`!!`).
     core_fields = (MultipleSourcesField,)
     generated_target_cls = SmalltalkLibrary
     copied_fields = ()
+    # Note that we use MockDependencies so that we support transitive excludes (`!!`).
     moved_fields = (MockDependencies,)
 
 
@@ -1852,7 +1852,7 @@ def dependencies_rule_runner() -> RuleRunner:
             UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
             UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         ],
-        target_types=[SmalltalkLibraryGenerator],
+        target_types=[SmalltalkLibraryGenerator, MockTarget],
     )
 
 
@@ -1863,7 +1863,7 @@ def assert_dependencies_resolved(
     expected: Iterable[Address],
 ) -> None:
     target = rule_runner.get_target(requested_address)
-    result = rule_runner.request(Addresses, [DependenciesRequest(target[Dependencies])])
+    result = rule_runner.request(Addresses, [DependenciesRequest(target.get(Dependencies))])
     assert sorted(result) == sorted(expected)
 
 
@@ -1880,7 +1880,7 @@ def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) 
             "a/b/c/BUILD": "smalltalk_libraries()",
             "demo/subdir/BUILD": dedent(
                 """\
-                smalltalk_libraries(
+                target(
                     dependencies=[
                         'a/b/c',
                         '!a/b/c',
@@ -1909,11 +1909,11 @@ def test_explicitly_provided_dependencies(dependencies_rule_runner: RuleRunner) 
 def test_normal_resolution(dependencies_rule_runner: RuleRunner) -> None:
     dependencies_rule_runner.write_files(
         {
-            "src/smalltalk/BUILD": "smalltalk_libraries(dependencies=['//:dep1', '//:dep2', ':sibling'])",
-            "no_deps/BUILD": "smalltalk_libraries()",
+            "src/smalltalk/BUILD": "target(dependencies=['//:dep1', '//:dep2', ':sibling'])",
+            "no_deps/BUILD": "target()",
             # An ignore should override an include.
             "ignore/BUILD": (
-                "smalltalk_libraries(dependencies=['//:dep1', '!//:dep1', '//:dep2', '!!//:dep2'])"
+                "target(dependencies=['//:dep1', '!//:dep1', '//:dep2', '!!//:dep2'])"
             ),
         }
     )
@@ -1940,7 +1940,7 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
             "src/smalltalk/util/BUILD": "smalltalk_libraries(sources=['*.st'])",
             "src/smalltalk/BUILD": dedent(
                 """\
-                smalltalk_libraries(
+                target(
                   dependencies=[
                     './util/f1.st',
                     'src/smalltalk/util/f2.st',
@@ -2045,8 +2045,6 @@ def test_dependency_inference(dependencies_rule_runner: RuleRunner) -> None:
         dependencies_rule_runner,
         Address("demo"),
         expected=[
-            Address("", target_name="inferred_and_provided1"),
-            Address("", target_name="inferred_and_provided2"),
             Address("demo", relative_file_path="f1.st"),
             Address("demo", relative_file_path="f2.st"),
         ],

@@ -273,14 +273,16 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
 
     rule_runner.write_files(
         {
+            "util.py": "",
+            "app.py": "",
             "BUILD": dedent(
                 f"""
                 python_requirement(name="foo", requirements=["foo-bar>=0.1.2"])
                 python_requirement(name="bar", requirements=["bar==5.5.5"])
                 python_requirement(name="baz", requirements=["baz"])
                 python_requirement(name="foorl", requirements=["{url_req}"])
-                python_sources(name="util", sources=[], dependencies=[":foo", ":bar"])
-                python_sources(name="app", sources=[], dependencies=[":util", ":baz", ":foorl"])
+                python_sources(name="util", sources=["util.py"], dependencies=[":foo", ":bar"])
+                python_sources(name="app", sources=["app.py"], dependencies=[":util", ":baz", ":foorl"])
                 """
             ),
             "constraints1.txt": dedent(
@@ -415,11 +417,12 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "constraints.txt": "\n".join(constraints),
+            "a.py": "",
             "BUILD": dedent(
                 """
                 python_requirement(name="foo",requirements=["foo"])
                 python_requirement(name="bar",requirements=["bar"])
-                python_sources(name="lib",sources=[],dependencies=[":foo"])
+                python_sources(name="lib",dependencies=[":foo"])
                 """
             ),
         }
@@ -434,7 +437,8 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
         [
             "--python-requirement-constraints=constraints.txt",
             "--python-resolve-all-constraints",
-        ]
+        ],
+        env_inherit={"PATH"},
     )
     result = rule_runner.request(PexRequest, [request])
 
