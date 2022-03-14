@@ -2,11 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
+import os.path
 from dataclasses import dataclass
+from typing import ClassVar
 
 from pants.base.build_root import BuildRoot
+from pants.base.specs import AddressSpecs, Specs
+from pants.base.specs_parser import SpecsParser
+from pants.bsp.goal import BSPGoal
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier
+from pants.bsp.spec.base import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
 from pants.bsp.spec.targets import (
     DependencyModule,
     DependencyModulesItem,
@@ -33,15 +39,25 @@ from pants.engine.target import (
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
+    Targets,
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.util.frozendict import FrozenDict
+
+
+_logger = logging.getLogger(__name__)
 
 
 @union
-class BSPBuildTargetsRequest:
-    """Request language backends to provide BSP `BuildTarget` instances for their managed target
-    types."""
+@dataclass(frozen=True)
+class BSPBuildTargetsFieldSet:
+    language_id: ClassVar[str]
+
+
+@dataclass(frozen=True)
+class BSPBuildTargetsNew:
+    targets_mapping: FrozenDict[str, Specs]
 
 
 @dataclass(frozen=True)
@@ -50,6 +66,30 @@ class BSPBuildTargets:
 
     targets: tuple[BuildTarget, ...] = ()
     digest: Digest = EMPTY_DIGEST
+
+
+@dataclass(frozen=True)
+class _ParseOneBSPMappingRequest:
+    raw_specs: tuple[str, ...]
+
+
+@rule
+async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> Specs:
+    specs_parser = SpecsParser()
+    specs = specs_parser.parse_specs(request.raw_specs)
+    return specs
+
+
+@rule
+async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargetsNew:
+    specs_for_keys = await MultiGet(
+        Get(Specs, _ParseOneBSPMappingRequest(tuple(value))) for value in bsp_goal.target_mapping.values()
+    )
+    addr_specs = {
+        key: specs_for_key
+        for key, specs_for_key in zip(bsp_goal.target_mapping.keys(), specs_for_keys)
+    }
+    return BSPBuildTargetsNew(FrozenDict(addr_specs))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -66,19 +106,64 @@ class WorkspaceBuildTargetsHandlerMapping(BSPHandlerMapping):
 
 @_uncacheable_rule
 async def bsp_workspace_build_targets(
-    _: WorkspaceBuildTargetsParams, union_membership: UnionMembership, workspace: Workspace
+    _: WorkspaceBuildTargetsParams,
+    bsp_build_targets: BSPBuildTargetsNew,
+    union_membership: UnionMembership,
+    workspace: Workspace,
+    build_root: BuildRoot,
 ) -> WorkspaceBuildTargetsResult:
-    request_types = union_membership.get(BSPBuildTargetsRequest)
-    responses = await MultiGet(
-        Get(BSPBuildTargets, BSPBuildTargetsRequest, request_type())
-        for request_type in request_types
-    )
+    # metadata_field_set_types = union_membership.get(BSPBuildTargetsFieldSet)
+
     result: list[BuildTarget] = []
-    for response in responses:
-        result.extend(response.targets)
-    result.sort(key=lambda btgt: btgt.id.uri)
-    output_digest = await Get(Digest, MergeDigests([r.digest for r in responses]))
-    workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
+    for bsp_target_name, specs in bsp_build_targets.targets_mapping.items():
+        targets = await Get(Targets, AddressSpecs, specs.address_specs)
+        targets_with_sources = [tgt for tgt in targets if tgt.has_field(SourcesField)]
+        # TODO:  What about literal specs?
+
+        # applicable_field_sets: dict[Target, list[Type[BSPBuildTargetsFieldSet]]] = defaultdict(list)
+        # for tgt in targets:
+        #     for field_set_type in metadata_field_set_types:
+        #         if field_set_type.is_applicable(tgt):
+        #             applicable_field_sets[tgt].append(field_set_type)
+
+        sources_paths = await MultiGet(
+            Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField])) for tgt in targets_with_sources
+        )
+        merged_sources_dirs: set[str] = set()
+        for sp in sources_paths:
+            merged_sources_dirs.update(sp.dirs)
+
+        base_dir = build_root.pathlib_path
+        if merged_sources_dirs:
+            common_path = os.path.commonpath(list(merged_sources_dirs))
+            if common_path:
+                base_dir = base_dir.joinpath(common_path)
+
+        result.append(
+            BuildTarget(
+                id=BuildTargetIdentifier(f"pants:{bsp_target_name}"),
+                display_name=bsp_target_name,
+                base_directory=base_dir.as_uri(),
+                tags=(),
+                capabilities=BuildTargetCapabilities(
+                    can_compile=True,
+                ),
+                language_ids=("java", "scala"),
+                dependencies=(),
+                data_kind=None,
+                data=None,
+            )
+        )
+    # responses = await MultiGet(
+    #     Get(BSPBuildTargets, BSPBuildTargetsFieldSet, request_type())
+    #     for request_type in request_types
+    # )
+    # for response in responses:
+    #     result.extend(response.targets)
+    # result.sort(key=lambda btgt: btgt.id.uri)
+    # output_digest = await Get(Digest, MergeDigests([r.digest for r in responses]))
+    # workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
+
     return WorkspaceBuildTargetsResult(
         targets=tuple(result),
     )
@@ -110,31 +195,57 @@ class MaterializeBuildTargetSourcesResult:
 async def materialize_bsp_build_target_sources(
     request: MaterializeBuildTargetSourcesRequest,
     build_root: BuildRoot,
+    bsp_build_targets: BSPBuildTargetsNew,
 ) -> MaterializeBuildTargetSourcesResult:
-    wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
-    target = wrapped_target.target
+    bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
+    if bsp_target_name not in bsp_build_targets.targets_mapping:
+        raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
+    targets = await Get(
+        Targets, AddressSpecs, bsp_build_targets.targets_mapping[bsp_target_name].address_specs
+    )
+    targets_with_sources = [tgt for tgt in targets if tgt.has_field(SourcesField)]
 
-    if not target.has_field(SourcesField):
-        raise AssertionError(
-            f"BSP only handles targets with sources: uri={request.bsp_target_id.uri}"
-        )
+    # wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
+    # target = wrapped_target.target
+    #
+    # if not target.has_field(SourcesField):
+    #     raise AssertionError(
+    #         f"BSP only handles targets with sources: uri={request.bsp_target_id.uri}"
+    #     )
+    #
+    # sources_paths = await Get(SourcesPaths, SourcesPathsRequest(target[SourcesField]))
+    # sources_full_paths = [
+    #     build_root.pathlib_path.joinpath(src_path) for src_path in sources_paths.files
+    # ]
 
-    sources_paths = await Get(SourcesPaths, SourcesPathsRequest(target[SourcesField]))
-    sources_full_paths = [
-        build_root.pathlib_path.joinpath(src_path) for src_path in sources_paths.files
-    ]
+    sources_paths = await MultiGet(
+        Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField])) for tgt in targets_with_sources
+    )
+    merged_sources_dirs: set[str] = set()
+    merged_sources_files: set[str] = set()
+    for sp in sources_paths:
+        merged_sources_dirs.update(sp.dirs)
+        merged_sources_files.update(sp.files)
+    _logger.info(f"merged_sources_dirs={merged_sources_dirs}")
+    _logger.info(f"merged_sources_files={merged_sources_files}")
+
+    base_dir = build_root.pathlib_path
+    if merged_sources_dirs:
+        common_path = os.path.commonpath(list(merged_sources_dirs))
+        if common_path:
+            base_dir = base_dir.joinpath(common_path)
 
     sources_item = SourcesItem(
         target=request.bsp_target_id,
         sources=tuple(
             SourceItem(
-                uri=src_full_path.as_uri(),
+                uri=build_root.pathlib_path.joinpath(filename).as_uri(),
                 kind=SourceItemKind.FILE,
                 generated=False,
             )
-            for src_full_path in sources_full_paths
+            for filename in sorted(merged_sources_files)
         ),
-        roots=(),
+        roots=(base_dir.as_uri(),),
     )
 
     return MaterializeBuildTargetSourcesResult(sources_item)

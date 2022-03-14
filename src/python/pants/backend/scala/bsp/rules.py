@@ -27,7 +27,7 @@ from pants.bsp.spec.base import (
 )
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
-from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
+from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsFieldSet
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries
@@ -63,7 +63,7 @@ class ScalaBSPLanguageSupport(BSPLanguageSupport):
     can_compile = True
 
 
-class ScalaBSPBuildTargetsRequest(BSPBuildTargetsRequest):
+class ScalaBSPBuildTargetsFieldSet(BSPBuildTargetsFieldSet):
     pass
 
 
@@ -177,7 +177,7 @@ async def bsp_resolve_one_scala_build_target(
 
 @rule
 async def bsp_resolve_all_scala_build_targets(
-    _: ScalaBSPBuildTargetsRequest,
+    _: ScalaBSPBuildTargetsFieldSet,
     all_scala_targets: AllScalaTargets,
     bsp_context: BSPContext,
 ) -> BSPBuildTargets:
@@ -299,7 +299,7 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
-        UnionRule(BSPBuildTargetsRequest, ScalaBSPBuildTargetsRequest),
+        UnionRule(BSPBuildTargetsFieldSet, ScalaBSPBuildTargetsFieldSet),
         UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
         UnionRule(BSPCompileFieldSet, ScalaBSPCompileFieldSet),
     )
