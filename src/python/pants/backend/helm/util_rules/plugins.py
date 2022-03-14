@@ -47,6 +47,9 @@ class HelmPluginMissingCommand(ValueError):
 class HelmPluginSubsystem(Subsystem, metaclass=ABCMeta):
     plugin_name: ClassVar[str]
 
+    def map_platform(self, platform: Platform) -> HelmPluginPlatform:
+        pass
+
 
 class ExternalHelmPlugin(HelmPluginSubsystem, TemplatedExternalTool, metaclass=ABCMeta):
     pass
@@ -61,6 +64,13 @@ class HelmPluginPlatformCommand:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> HelmPluginPlatformCommand:
         return cls(**snake_case_attr_dict(d))
+
+    def supports_platform(self, plugin_platform: HelmPluginPlatform) -> bool:
+        return self.os == plugin_platform and self.arch == plugin_platform.arch
+
+    @property
+    def platform(self) -> HelmPluginPlatform:
+        return HelmPluginPlatform(os=self.os, arch=self.arch)
 
 
 @dataclass(frozen=True)
@@ -172,6 +182,18 @@ async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> H
     metadata = HelmPluginMetadata.from_bytes(metadata_content[0].content)
     if not metadata.command and not metadata.platform_command:
         raise HelmPluginMissingCommand(request.plugin_name)
+
+    if metadata.platform_command:
+        current_helm_platf = request.subsystem.map_platform(Platform.current)
+        supported_cmds = [
+            cmd for cmd in metadata.platform_command if cmd.supports_platform(current_helm_platf)
+        ]
+        if len(supported_cmds) == 0:
+            raise HelmPluginPlatformNotSupported(
+                request.subsystem.plugin_name,
+                Platform.current,
+                [f"{cmd.platform}" for cmd in metadata.platform_command],
+            )
 
     return HelmPlugin(metadata=metadata, digest=downloaded_tool.digest)
 
