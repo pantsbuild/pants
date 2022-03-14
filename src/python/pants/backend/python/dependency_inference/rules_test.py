@@ -27,6 +27,8 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import ancestor_files
+from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
+from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule
@@ -39,6 +41,7 @@ def test_infer_python_imports(caplog) -> None:
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
@@ -155,11 +158,167 @@ def test_infer_python_imports(caplog) -> None:
     assert "disambiguated_via_ignores.py" not in caplog.text
 
 
+def test_infer_python_assets(caplog) -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *import_rules(),
+            *target_types_rules.rules(),
+            *core_target_types_rules(),
+            QueryRule(InferredDependencies, [InferPythonImportDependencies]),
+        ],
+        target_types=[
+            PythonSourcesGeneratorTarget,
+            PythonRequirementTarget,
+            ResourcesGeneratorTarget,
+            FilesGeneratorTarget,
+        ],
+    )
+    rule_runner.write_files(
+        {
+            "src/python/data/BUILD": "resources(name='jsonfiles', sources=['*.json'])",
+            "src/python/data/db.json": "",
+            "src/python/data/db2.json": "",
+            "src/python/data/flavors.txt": "",
+            "configs/prod.txt": "",
+            "src/python/app.py": dedent(
+                """\
+                pkgutil.get_data(__name__, "data/db.json")
+                pkgutil.get_data(__name__, "data/db2.json")
+                open("configs/prod.txt")
+                """
+            ),
+            "src/python/f.py": dedent(
+                """\
+                idk_kinda_looks_resourcey = "data/db.json"
+                CustomResourceType("data/flavors.txt")
+                """
+            ),
+            "src/python/BUILD": dedent(
+                """\
+                python_sources()
+                # Also test assets declared from parent dir
+                resources(
+                    name="txtfiles",
+                    sources=["data/*.txt"],
+                )
+                """
+            ),
+            "configs/BUILD": dedent(
+                """\
+                files(
+                    name="configs",
+                    sources=["prod.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    def run_dep_inference(address: Address) -> InferredDependencies:
+        args = [
+            "--source-root-patterns=src/python",
+            "--python-infer-assets",
+        ]
+        rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+        target = rule_runner.get_target(address)
+        return rule_runner.request(
+            InferredDependencies, [InferPythonImportDependencies(target[PythonSourceField])]
+        )
+
+    assert run_dep_inference(
+        Address("src/python", relative_file_path="app.py")
+    ) == InferredDependencies(
+        [
+            Address("src/python/data", target_name="jsonfiles", relative_file_path="db.json"),
+            Address("src/python/data", target_name="jsonfiles", relative_file_path="db2.json"),
+            Address("configs", target_name="configs", relative_file_path="prod.txt"),
+        ],
+    )
+
+    assert run_dep_inference(
+        Address("src/python", relative_file_path="f.py")
+    ) == InferredDependencies(
+        [
+            Address("src/python/data", target_name="jsonfiles", relative_file_path="db.json"),
+            Address("src/python", target_name="txtfiles", relative_file_path="data/flavors.txt"),
+        ],
+    )
+
+    # Test handling of ambiguous assets. We should warn on the ambiguous dependency, but not warn
+    # on the disambiguated one and should infer a dep.
+    caplog.clear()
+    rule_runner.write_files(
+        {
+            "src/python/data/BUILD": dedent(
+                """\
+                    resources(name='jsonfiles', sources=['*.json'])
+                    resources(name='also_jsonfiles', sources=['*.json'])
+                    resources(name='txtfiles', sources=['*.txt'])
+                """
+            ),
+            "src/python/data/ambiguous.json": "",
+            "src/python/data/disambiguated_with_bang.json": "",
+            "src/python/app.py": dedent(
+                """\
+                pkgutil.get_data(__name__, "data/ambiguous.json")
+                pkgutil.get_data(__name__, "data/disambiguated_with_bang.json")
+                """
+            ),
+            "src/python/BUILD": dedent(
+                """\
+                python_sources(
+                    name="main",
+                    dependencies=['!./data/disambiguated_with_bang.json:also_jsonfiles'],
+                )
+                """
+            ),
+            # Both a resource relative to the module and file with conspicuously similar paths
+            "src/python/data/both_file_and_resource.txt": "",
+            "data/both_file_and_resource.txt": "",
+            "data/BUILD": "files(name='txtfiles', sources=['*.txt'])",
+            "src/python/assets_bag.py": "ImAPathType('data/both_file_and_resource.txt')",
+        }
+    )
+    assert run_dep_inference(
+        Address("src/python", target_name="main", relative_file_path="app.py")
+    ) == InferredDependencies(
+        [
+            Address(
+                "src/python/data",
+                target_name="jsonfiles",
+                relative_file_path="disambiguated_with_bang.json",
+            ),
+        ],
+    )
+    assert len(caplog.records) == 1
+    assert "The target src/python/app.py:main uses `data/ambiguous.json`" in caplog.text
+    assert (
+        "['src/python/data/ambiguous.json:also_jsonfiles', 'src/python/data/ambiguous.json:jsonfiles']"
+        in caplog.text
+    )
+    assert "disambiguated_with_bang.py" not in caplog.text
+
+    caplog.clear()
+    assert run_dep_inference(
+        Address("src/python", target_name="main", relative_file_path="assets_bag.py")
+    ) == InferredDependencies([])
+    assert len(caplog.records) == 1
+    assert (
+        "The target src/python/assets_bag.py:main uses `data/both_file_and_resource.txt`"
+        in caplog.text
+    )
+    assert (
+        "['data/both_file_and_resource.txt:txtfiles', 'src/python/data/both_file_and_resource.txt:txtfiles']"
+        in caplog.text
+    )
+
+
 def test_infer_python_inits() -> None:
     rule_runner = RuleRunner(
         rules=[
             *ancestor_files.rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             infer_python_init_dependencies,
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
@@ -212,6 +371,7 @@ def test_infer_python_conftests() -> None:
         rules=[
             *ancestor_files.rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             infer_python_conftest_dependencies,
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
@@ -260,6 +420,7 @@ def test_infer_python_strict(caplog) -> None:
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             *python_requirements.rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],

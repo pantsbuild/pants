@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import PurePath
 from textwrap import dedent
 
 from pants.core.goals.package import (
@@ -17,6 +19,7 @@ from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snaps
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     Dependencies,
     FieldSet,
     FieldSetsPerTarget,
@@ -38,6 +41,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 # -----------------------------------------------------------------------------------------------
@@ -305,6 +309,61 @@ class GenericTarget(Target):
         'A generic target with no specific type.\n\nThis can be used as a generic "bag of '
         'dependencies", i.e. you can group several different targets into one single target so '
         "that your other targets only need to depend on one thing."
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `Asset` targets (resources and files)
+# -----------------------------------------------------------------------------------------------
+
+
+class AllAssetTargetsRequest:
+    pass
+
+
+@dataclass(frozen=True)
+class AllAssetTargets:
+    resources: tuple[Target, ...]
+    files: tuple[Target, ...]
+
+
+@rule(desc="Find all assets in project")
+def find_all_assets(
+    all_targets: AllTargets,
+    _: AllAssetTargetsRequest,
+) -> AllAssetTargets:
+    resources = []
+    files = []
+    for tgt in all_targets:
+        if tgt.has_field(ResourceSourceField):
+            resources.append(tgt)
+        if tgt.has_field(FileSourceField):
+            files.append(tgt)
+    return AllAssetTargets(tuple(resources), tuple(files))
+
+
+@dataclass(frozen=True)
+class AllAssetTargetsByPath:
+    resources: FrozenDict[PurePath, frozenset[Target]]
+    files: FrozenDict[PurePath, frozenset[Target]]
+
+
+@rule(desc="Mapping assets by path")
+def map_assets_by_path(
+    all_asset_targets: AllAssetTargets,
+) -> AllAssetTargetsByPath:
+    resources_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
+    for resource_tgt in all_asset_targets.resources:
+        path = PurePath(resource_tgt[ResourceSourceField].file_path)
+        resources_by_path[path].add(resource_tgt)
+
+    files_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
+    for file_tgt in all_asset_targets.files:
+        files_by_path[PurePath(file_tgt[FileSourceField].file_path)].add(file_tgt)
+
+    return AllAssetTargetsByPath(
+        FrozenDict((key, frozenset(values)) for key, values in resources_by_path.items()),
+        FrozenDict((key, frozenset(values)) for key, values in files_by_path.items()),
     )
 
 
