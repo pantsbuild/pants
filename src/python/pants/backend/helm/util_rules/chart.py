@@ -35,6 +35,7 @@ from pants.engine.target import (
     Target,
     Targets,
 )
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize
 
@@ -63,6 +64,27 @@ class AmbiguousChartMetadataException(Exception):
     pass
 
 
+def _as_python_attribute_name(str: str) -> str:
+    base_string = str.replace("-", "_")
+
+    result = ""
+    idx = 0
+    for c in base_string:
+        char_to_add = c
+        if char_to_add.isupper():
+            char_to_add = c.lower()
+            if idx > 0:
+                result += "_"
+        result += char_to_add
+        idx += 1
+
+    return result
+
+
+def _attr_dict(d: dict[str, Any]) -> dict[str, Any]:
+    return {_as_python_attribute_name(name): value for name, value in d.items()}
+
+
 @dataclass(frozen=True)
 class HelmChartDependency:
     name: str
@@ -70,55 +92,99 @@ class HelmChartDependency:
     version: str | None = None
     alias: str | None = None
     condition: str | None = None
+    tags: tuple[str, ...] = field(default_factory=tuple)
+    import_values: tuple[str, ...] = field(default_factory=tuple)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> HelmChartDependency:
-        return cls(
-            name=d["name"],
-            repository=d.get("repository"),
-            alias=d.get("alias"),
-            condition=d.get("condition"),
-            version=d.get("version"),
-        )
+        return cls(**_attr_dict(d))
+
+    def to_json_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {"name": self.name}
+        if self.repository:
+            d["repository"] = self.repository
+        if self.version:
+            d["version"] = self.version
+        if self.alias:
+            d["alias"] = self.alias
+        if self.condition:
+            d["condition"] = self.condition
+        if self.tags:
+            d["tags"] = list(self.tags)
+        if self.import_values:
+            d["import-values"] = list(self.import_values)
+        return d
 
 
-_DEFAULT_API_VERSION = "v1"
+@dataclass(frozen=True)
+class HelmChartMaintainer:
+    name: str
+    email: str | None = None
+    url: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> HelmChartMaintainer:
+        return cls(**d)
+
+    def to_json_dict(self) -> dict[str, Any]:
+        d = {"name": self.name}
+        if self.email:
+            d["email"] = self.email
+        if self.url:
+            d["url"] = self.url
+        return d
+
+
+DEFAULT_API_VERSION = "v2"
 
 
 @dataclass(frozen=True)
 class HelmChartMetadata:
     name: str
     version: str
-    api_version: str = _DEFAULT_API_VERSION
+    api_version: str = DEFAULT_API_VERSION
     type: ChartType = ChartType.APPLICATION
     kube_version: str | None = None
     app_version: str | None = None
     icon: str | None = None
     description: str | None = None
     dependencies: tuple[HelmChartDependency, ...] = field(default_factory=tuple)
+    keywords: tuple[str, ...] = field(default_factory=tuple)
+    sources: tuple[str, ...] = field(default_factory=tuple)
+    home: str | None = None
+    maintainers: tuple[HelmChartMaintainer, ...] = field(default_factory=tuple)
+    deprecated: bool | None = None
+    annotations: FrozenDict[str, str] = field(default_factory=FrozenDict)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> HelmChartMetadata:
-        deps = d.get("dependencies", [])
-
         chart_type: ChartType | None = None
-        type_str = d.get("type")
+        type_str = d.pop("type", None)
         if type_str:
             try:
                 chart_type = ChartType(type_str)
             except KeyError:
                 raise InvalidChartTypeValueError(type_str)
 
+        # If the `apiVersion` is missing in the original `dict`, then we assume we are dealing with `v1` charts
+        api_version = d.pop("apiVersion", "v1")
+        dependencies = [HelmChartDependency.from_dict(d) for d in d.pop("dependencies", [])]
+        maintainers = [HelmChartMaintainer.from_dict(d) for d in d.pop("maintainers", [])]
+        keywords = d.pop("keywords", [])
+        sources = d.pop("sources", [])
+        annotations = d.pop("annotations", {})
+
+        attrs = _attr_dict(d)
+
         return cls(
-            api_version=d.get("apiVersion", _DEFAULT_API_VERSION),
-            name=d["name"],
-            version=d["version"],
-            icon=d.get("icon"),
-            app_version=d.get("appVersion"),
-            kube_version=d.get("kubeVersion"),
-            description=d.get("description"),
-            dependencies=tuple([HelmChartDependency.from_dict(dep) for dep in deps]),
+            api_version=api_version,
+            dependencies=tuple(dependencies),
+            maintainers=tuple(maintainers),
+            keywords=tuple(keywords),
             type=chart_type or ChartType.APPLICATION,
+            annotations=FrozenDict(annotations),
+            sources=tuple(sources),
+            **attrs,
         )
 
     @classmethod
@@ -130,8 +196,9 @@ class HelmChartMetadata:
             "apiVersion": self.api_version,
             "name": self.name,
             "version": self.version,
-            "type": self.type.value,
         }
+        if self.api_version != "v1":
+            d["type"] = self.type.value
         if self.icon:
             d["icon"] = self.icon
         if self.description:
@@ -141,7 +208,19 @@ class HelmChartMetadata:
         if self.kube_version:
             d["kubeVersion"] = self.kube_version
         if self.dependencies:
-            d["dependencies"] = list(self.dependencies)
+            d["dependencies"] = [item.to_json_dict() for item in self.dependencies]
+        if self.maintainers:
+            d["maintainers"] = [item.to_json_dict() for item in self.maintainers]
+        if self.annotations:
+            d["annotations"] = {key: value for key, value in self.annotations.items()}
+        if self.keywords:
+            d["keywords"] = list(self.keywords)
+        if self.sources:
+            d["sources"] = list(self.sources)
+        if self.home:
+            d["home"] = self.home
+        if self.deprecated:
+            d["deprecated"] = self.deprecated
         return d
 
     def to_yaml(self) -> str:

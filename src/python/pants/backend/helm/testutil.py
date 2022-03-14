@@ -47,6 +47,80 @@ HELM_CHART_WITH_DEPENDENCIES_FILE = dedent(
     """
 )
 
+HELM_CHART_FILE_V1_FULL = dedent(
+    """\
+  name: foo
+  version: 0.1.0
+  kubeVersion: 1.17
+  description: The foo chart
+  keywords:
+  - foo
+  - chart
+  home: https://example.com
+  sources:
+  - https://example.com/git
+  dependencies:
+  - name: bar
+    version: 0.2.0
+    repository: https://example.com/repo
+    condition: bar.enabled
+    tags:
+    - foo
+    - bar
+    import-values:
+    - data
+    alias: bar-alias
+  maintainers:
+  - name: foo
+    email: bar@example.com
+    url: https://example.com/foo
+  icon: https://example.com/icon.png
+  appVersion: 0.1.0
+  deprecated: true
+  annotations:
+    example: yes
+    name: foo
+  """
+)
+
+HELM_CHART_FILE_V2_FULL = dedent(
+    """\
+  apiVersion: v2
+  name: quxx
+  version: 0.1.0
+  kubeVersion: 1.17
+  description: The foo chart
+  type: library
+  keywords:
+  - foo
+  - chart
+  home: https://example.com
+  sources:
+  - https://example.com/git
+  dependencies:
+  - name: bar
+    version: 0.2.0
+    repository: https://example.com/repo
+    condition: bar.enabled
+    tags:
+    - foo
+    - bar
+    import-values:
+    - data
+    alias: bar-alias
+  maintainers:
+  - name: foo
+    email: bar@example.com
+    url: https://example.com/foo
+  icon: https://example.com/icon.png
+  appVersion: 0.1.0
+  deprecated: true
+  annotations:
+    example: yes
+    name: quxx
+  """
+)
+
 K8S_SERVICE_FILE = dedent(
     """\
   apiVersion: v1
