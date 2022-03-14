@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.helm.util_rules.chart import ChartType, DEFAULT_API_VERSION
+from pants.backend.helm.util_rules.chart import DEFAULT_API_VERSION, ChartType
 
 
 def gen_chart_file(
@@ -26,7 +26,7 @@ def gen_chart_file(
     """
     )
     if description:
-      metadata_yaml += f"description: {description}\n"
+        metadata_yaml += f"description: {description}\n"
     if icon:
         metadata_yaml += f"icon: {icon}\n"
     return metadata_yaml

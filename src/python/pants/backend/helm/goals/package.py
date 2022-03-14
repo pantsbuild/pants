@@ -1,3 +1,6 @@
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 import logging
@@ -8,7 +11,7 @@ from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartOutputPa
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartMetadata, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
@@ -31,8 +34,10 @@ class BuiltHelmArtifact(BuiltPackageArtifact):
             extra_log_lines=(f"Built Helm chart artifact: {path}",),
         )
 
+
 def _helm_artifact_filename(chart_metadata: HelmChartMetadata) -> str:
-  return f"{chart_metadata.artifact_name}.tgz"
+    return f"{chart_metadata.artifact_name}.tgz"
+
 
 @dataclass(frozen=True)
 class HelmPackageFieldSet(HelmChartFieldSet, PackageFieldSet):
