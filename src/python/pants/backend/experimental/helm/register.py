@@ -2,13 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.helm.goals import lint, package
-from pants.backend.helm.target_types import HelmChartTarget
+from pants.backend.helm.target_types import HelmChartTarget, HelmUnitTestTestTarget, HelmUnitTestTestsGeneratorTarget
+from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.util_rules import chart, sources, tool
 
 
 def target_types():
-    return [HelmChartTarget]
+    return [HelmChartTarget, HelmUnitTestTestTarget, HelmUnitTestTestsGeneratorTarget]
 
 
 def rules():
-    return [*chart.rules(), *lint.rules(), *package.rules(), *sources.rules(), *tool.rules()]
+    return [*chart.rules(), *lint.rules(), *package.rules(), *sources.rules(), *tool.rules(), *target_types_rules()]

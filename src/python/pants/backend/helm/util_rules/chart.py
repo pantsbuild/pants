@@ -12,6 +12,7 @@ import yaml
 
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartMetaSourceField
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
+from pants.backend.helm.util_rules.yaml_utils import yaml_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.addresses import Address
 from pants.engine.fs import (
@@ -64,27 +65,6 @@ class AmbiguousChartMetadataException(Exception):
     pass
 
 
-def _as_python_attribute_name(str: str) -> str:
-    base_string = str.replace("-", "_")
-
-    result = ""
-    idx = 0
-    for c in base_string:
-        char_to_add = c
-        if char_to_add.isupper():
-            char_to_add = c.lower()
-            if idx > 0:
-                result += "_"
-        result += char_to_add
-        idx += 1
-
-    return result
-
-
-def _attr_dict(d: dict[str, Any]) -> dict[str, Any]:
-    return {_as_python_attribute_name(name): value for name, value in d.items()}
-
-
 @dataclass(frozen=True)
 class HelmChartDependency:
     name: str
@@ -97,7 +77,7 @@ class HelmChartDependency:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> HelmChartDependency:
-        return cls(**_attr_dict(d))
+        return cls(**yaml_attr_dict(d))
 
     def to_json_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"name": self.name}
@@ -174,7 +154,7 @@ class HelmChartMetadata:
         sources = d.pop("sources", [])
         annotations = d.pop("annotations", {})
 
-        attrs = _attr_dict(d)
+        attrs = yaml_attr_dict(d)
 
         return cls(
             api_version=api_version,

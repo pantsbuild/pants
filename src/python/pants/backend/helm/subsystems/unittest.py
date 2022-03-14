@@ -1,6 +1,10 @@
-from pants.backend.helm.util_rules.plugins import HelmPluginSubsystem
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from enum import Enum
 from typing import cast
+
+from pants.backend.helm.util_rules.plugins import HelmPluginSubsystem
 from pants.engine.platform import Platform
 
 
