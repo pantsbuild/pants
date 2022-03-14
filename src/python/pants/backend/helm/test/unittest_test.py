@@ -5,7 +5,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.helm.dependency_inference.unittest import rules as unittest_dependency_rules
 from pants.backend.helm.target_types import HelmChartTarget, HelmUnitTestTestTarget
 from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.test.unittest import HelmUnitTestFieldSet
@@ -36,7 +35,6 @@ def rule_runner() -> RuleRunner:
             *test_rules(),
             *stripped_source_files.rules(),
             *source_root_rules(),
-            *unittest_dependency_rules(),
             *target_types_rules(),
             QueryRule(TestResult, (HelmUnitTestFieldSet,)),
         ],

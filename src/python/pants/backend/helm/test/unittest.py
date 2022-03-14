@@ -4,6 +4,7 @@
 import logging
 from dataclasses import dataclass
 
+from pants.backend.helm.dependency_inference.unittest import rules as dependency_rules
 from pants.backend.helm.subsystems.unittest import HelmUnitTestSubsystem
 from pants.backend.helm.subsystems.unittest import rules as subsystem_rules
 from pants.backend.helm.target_types import (
@@ -148,4 +149,9 @@ async def generate_helm_unittest_debug_request(field_set: HelmUnitTestFieldSet) 
 
 
 def rules():
-    return [*collect_rules(), *subsystem_rules(), UnionRule(TestFieldSet, HelmUnitTestFieldSet)]
+    return [
+        *collect_rules(),
+        *subsystem_rules(),
+        *dependency_rules(),
+        UnionRule(TestFieldSet, HelmUnitTestFieldSet),
+    ]
