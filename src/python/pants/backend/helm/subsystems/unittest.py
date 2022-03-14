@@ -4,7 +4,7 @@
 from enum import Enum
 from typing import cast
 
-from pants.backend.helm.util_rules.plugins import HelmPluginSubsystem
+from pants.backend.helm.util_rules.plugins import HelmPluginPlatform, HelmPluginSubsystem
 from pants.engine.platform import Platform
 
 
@@ -48,6 +48,10 @@ class HelmUnitTestPlugin(HelmPluginSubsystem):
 
     def generate_exe(self, _: Platform) -> str:
         return "./untt"
+
+    def map_platform(self, platf: Platform) -> HelmPluginPlatform:
+        mapped_platf_parts = self.default_url_platform_mapping[platf.name].split("-")
+        return HelmPluginPlatform(os=mapped_platf_parts[0], arch=mapped_platf_parts[1])
 
     @property
     def output_type(self) -> HelmUnitTestReportFormat:
