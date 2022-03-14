@@ -158,7 +158,10 @@ async def link_assembly_post_compilation(
     request: AssemblyPostCompilationRequest,
 ) -> AssemblyPostCompilation:
     merged_digest, asm_tool_id = await MultiGet(
-        Get(Digest, MergeDigests([request.compilation_result, *request.assembly_digests])),
+        Get(
+            Digest,
+            MergeDigests([request.compilation_result, *request.assembly_digests]),
+        ),
         # Use `go tool asm` tool ID since `go tool pack` does not have a version argument.
         Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
     )
@@ -179,7 +182,7 @@ async def link_assembly_post_compilation(
             env={
                 "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
             },
-            description=f"Link assembly files to Go package archive for {request.dir_path}",
+            description=f"Link assembly objects to Go package archive for {request.dir_path}",
             output_files=("__pkg__.a",),
         ),
     )

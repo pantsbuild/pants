@@ -10,8 +10,10 @@ from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
+from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import pkg_analyzer
+from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.go_mod import (
     GoModInfo,
@@ -74,6 +76,7 @@ class FirstPartyPkgAnalysis:
     `FirstPartyPkgDigest` for the source files and embed config.
     """
 
+    name: str
     import_path: str
     name: str
     dir_path: str
@@ -83,8 +86,11 @@ class FirstPartyPkgAnalysis:
     xtest_imports: tuple[str, ...]
 
     go_files: tuple[str, ...]
+    cgo_files: tuple[str, ...]
     test_go_files: tuple[str, ...]
     xtest_go_files: tuple[str, ...]
+
+    cgo_flags: CGoCompilerFlags
 
     s_files: tuple[str, ...]
 
@@ -149,29 +155,26 @@ class FallibleFirstPartyPkgAnalysis:
                 error += "\n"
             return cls(analysis=None, import_path=import_path, exit_code=1, stderr=error)
 
-        if "CgoFiles" in metadata:
-            return cls(
-                analysis=None,
-                import_path=import_path,
-                exit_code=1,
-                stderr=(
-                    f"The {description_of_source} includes `CgoFiles`, which Pants does "
-                    "not yet support. Please open a feature request at "
-                    "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
-                    "prioritize adding support.\n\n"
-                ),
-            )
-
         analysis = FirstPartyPkgAnalysis(
             dir_path=dir_path,
+            name=metadata.get("Name"),
             import_path=import_path,
             name=metadata["Name"],
             imports=tuple(metadata.get("Imports", [])),
             test_imports=tuple(metadata.get("TestImports", [])),
             xtest_imports=tuple(metadata.get("XTestImports", [])),
             go_files=tuple(metadata.get("GoFiles", [])),
+            cgo_files=tuple(metadata.get("CgoFiles", [])),
             test_go_files=tuple(metadata.get("TestGoFiles", [])),
             xtest_go_files=tuple(metadata.get("XTestGoFiles", [])),
+            cgo_flags=CGoCompilerFlags(
+                cflags=tuple(metadata.get("CgoCFLAGS", [])),
+                cppflags=tuple(metadata.get("CgoCPPFLAGS", [])),
+                cxxflags=tuple(metadata.get("CgoCXXFLAGS", [])),
+                fflags=tuple(metadata.get("CgoFFLAGS", [])),
+                ldflags=tuple(metadata.get("CgoLDFLAGS", [])),
+                pkg_config=tuple(metadata.get("CgoPkgConfig", [])),
+            ),
             s_files=tuple(metadata.get("SFiles", [])),
             minimum_go_version=minimum_go_version,
             embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
@@ -237,7 +240,9 @@ async def compute_first_party_package_import_path(
 
 @rule
 async def analyze_first_party_package(
-    request: FirstPartyPkgAnalysisRequest, analyzer: PackageAnalyzerSetup
+    request: FirstPartyPkgAnalysisRequest,
+    analyzer: PackageAnalyzerSetup,
+    golang_subsystem: GolangSubsystem,
 ) -> FallibleFirstPartyPkgAnalysis:
     wrapped_target, import_path_info, owning_go_mod = await MultiGet(
         Get(
@@ -264,7 +269,7 @@ async def analyze_first_party_package(
             input_digest=input_digest,
             description=f"Determine metadata for {request.address}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "0"},
+            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0"},
         ),
     )
     return FallibleFirstPartyPkgAnalysis.from_process_result(

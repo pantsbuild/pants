@@ -4,9 +4,13 @@
 from __future__ import annotations
 
 import logging
+import os
 
+from pants.engine.environment import Environment
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
+from pants.util.memo import memoized_method
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -93,6 +97,52 @@ class GolangSubsystem(Subsystem):
         advanced=True,
     )
 
+    cgo_enabled = BoolOption(
+        "--cgo-enabled",
+        default=False,
+        help=softwrap(
+            """\
+            Enable Cgo, which allows calling C code from Go.
+
+            See https://go.dev/blog/cgo and https://pkg.go.dev/cmd/cgo for additional information.
+            """
+        ),
+    )
+
+    _cgo_tool_search_paths = StrListOption(
+        default=["<PATH>"],
+        help=softwrap(
+            """
+            A list of paths to search for tools needed by CGo (e.g., gcc, g++).
+
+            Specify absolute paths to directories with tools needed by CGo , e.g. `/usr/bin`.
+            Earlier entries will be searched first.
+
+            The following special strings are supported:
+
+              * `<PATH>`, the contents of the PATH environment variable
+            """
+        ),
+    )
+
+    cgo_gcc_binary_name = StrOption(
+        default="gcc",
+        advanced=True,
+        help="Name of the tool to use to compile C code included via CGo in a Go package.",
+    )
+
+    cgo_gxx_binary_name = StrOption(
+        default="g++",
+        advanced=True,
+        help="Name of the tool to use to compile C++ code included via CGo in a Go package.",
+    )
+
+    cgo_fortran_binary_name = StrOption(
+        default="gfortran",
+        advanced=True,
+        help="Name of the tool to use to compile fortran code included via CGo in a Go package.",
+    )
+
     asdf_tool_name = StrOption(
         default="go-sdk",
         help=softwrap(
@@ -125,3 +175,16 @@ class GolangSubsystem(Subsystem):
     @property
     def env_vars_to_pass_to_subprocesses(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._subprocess_env_vars)))
+
+    @memoized_method
+    def cgo_tool_search_paths(self, env: Environment) -> tuple[str, ...]:
+        def iter_path_entries():
+            for entry in self._cgo_tool_search_paths:
+                if entry == "<PATH>":
+                    path = env.get("PATH")
+                    if path:
+                        yield from path.split(os.pathsep)
+                else:
+                    yield entry
+
+        return tuple(OrderedSet(iter_path_entries()))
