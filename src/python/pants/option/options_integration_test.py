@@ -55,6 +55,8 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
 
             deprecated = StrOption(
                 "--deprecated",
+                default=None,
+                help="doens't matter",
                 removal_version="999.99.9.dev0",
                 removal_hint="blah",
             )
