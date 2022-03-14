@@ -28,7 +28,10 @@ from pants.util.docutil import bin_name
 class HelmSkipPushField(BoolField):
     alias = "skip_push"
     default = False
-    help = f"If set to true, do not push this helm chart to registries when running `{bin_name()} publish`."
+    help = (
+        "If set to true, do not push this helm chart "
+        f"to registries when running `{bin_name()} publish`."
+    )
 
 
 # -----------------------------------------------------------------------------------------------
