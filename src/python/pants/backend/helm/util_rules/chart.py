@@ -11,6 +11,7 @@ from typing import Any, cast
 import yaml
 
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartMetaSourceField
+from pants.backend.helm.util_rules import sources
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
 from pants.backend.helm.util_rules.yaml_utils import yaml_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -343,4 +344,4 @@ async def get_helm_chart(request: HelmChartRequest) -> HelmChart:
 
 
 def rules():
-    return collect_rules()
+    return [*collect_rules(), *sources.rules()]
