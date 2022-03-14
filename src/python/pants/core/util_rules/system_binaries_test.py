@@ -170,10 +170,10 @@ def test_binary_shims(rule_runner: RuleRunner) -> None:
         BinaryShims,
         [
             BinaryShimsRequest.for_binaries(
-                "printf",
+                "ls",
                 rationale="test the binary shims feature",
                 output_directory=".bin",
-                search_path=("/usr/bin", "/bin", "/usr/local/bin"),
+                search_path=("/usr/bin", "/bin"),
             )
         ],
     )
@@ -183,15 +183,15 @@ def test_binary_shims(rule_runner: RuleRunner) -> None:
     contents = rule_runner.request(DigestContents, [result.digest])
     assert len(contents) == 1
 
-    printf_shim = contents[0]
-    assert printf_shim.path == ".bin/printf"
-    assert printf_shim.is_executable
+    binary_shim = contents[0]
+    assert binary_shim.path == ".bin/ls"
+    assert binary_shim.is_executable
     assert re.match(
         dedent(
             """\
             #!(/usr)?/bin/bash
-            exec "/usr/bin/printf" "\\$@"
+            exec "(/usr)?/bin/ls" "\\$@"
             """
         ),
-        printf_shim.content.decode(),
+        binary_shim.content.decode(),
     )
