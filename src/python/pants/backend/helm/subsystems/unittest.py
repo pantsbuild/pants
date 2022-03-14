@@ -4,8 +4,15 @@
 from enum import Enum
 from typing import cast
 
-from pants.backend.helm.util_rules.plugins import HelmPluginPlatform, HelmPluginSubsystem
+from pants.backend.helm.util_rules.plugins import (
+    GlobalHelmPlugin,
+    HelmPluginPlatform,
+    HelmPluginRequest,
+    HelmPluginSubsystem,
+)
 from pants.engine.platform import Platform
+from pants.engine.rules import SubsystemRule, collect_rules, rule
+from pants.engine.unions import UnionRule
 
 
 class HelmUnitTestReportFormat(Enum):
@@ -16,7 +23,7 @@ class HelmUnitTestReportFormat(Enum):
     JUNIT = "JUnit"
 
 
-class HelmUnitTestPlugin(HelmPluginSubsystem):
+class HelmUnitTestSubsystem(HelmPluginSubsystem):
     options_scope = "helm-unittest"
     plugin_name = "unittest"
     help = "BDD styled unit test framework for Kubernetes Helm charts as a Helm plugin."
@@ -56,3 +63,24 @@ class HelmUnitTestPlugin(HelmPluginSubsystem):
     @property
     def output_type(self) -> HelmUnitTestReportFormat:
         return cast(HelmUnitTestReportFormat, self.options.output_type)
+
+
+class HelmUnitTestGlobalPlugin(GlobalHelmPlugin[HelmUnitTestSubsystem]):
+    plugin_subsystem_cls = HelmUnitTestSubsystem
+
+
+@rule
+def download_plugin_request(
+    _: HelmUnitTestGlobalPlugin, subsystem: HelmUnitTestSubsystem
+) -> HelmPluginRequest:
+    return HelmPluginRequest(
+        plugin_name=subsystem.plugin_name, tool_request=subsystem.get_request(Platform.current)
+    )
+
+
+def rules():
+    return [
+        *collect_rules(),
+        SubsystemRule(HelmUnitTestSubsystem),
+        UnionRule(GlobalHelmPlugin, HelmUnitTestGlobalPlugin),
+    ]

@@ -9,9 +9,13 @@ from dataclasses import dataclass
 from typing import Iterable, Mapping
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
+from pants.backend.helm.subsystems.helm import rules as helm_rules
+from pants.backend.helm.util_rules.plugins import HelmPlugins
+from pants.backend.helm.util_rules.plugins import rules as plugins_rules
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import CreateDigest, Digest, Directory, RemovePrefix
+from pants.engine.fs import CreateDigest, Digest, DigestSubset, Directory, PathGlobs, RemovePrefix
+from pants.engine.internals.native_engine import AddPrefix, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -78,49 +82,68 @@ class HelmProcess:
         self.cache_scope = cache_scope
 
 
-def _build_helm_env(cache_dir: str, config_dir: str, data_dir: str) -> FrozenDict[str, str]:
-    return FrozenDict(
-        {
-            "HELM_CACHE_HOME": cache_dir,
-            "HELM_CONFIG_HOME": config_dir,
-            "HELM_DATA_HOME": data_dir,
-        }
-    )
-
-
 @rule(desc="Download and configure Helm", level=LogLevel.DEBUG)
-async def setup_helm(helm_subsytem: HelmSubsystem) -> HelmBinary:
+async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) -> HelmBinary:
     cache_dir = "__cache"
     config_dir = "__config"
     data_dir = "__data"
 
-    downloaded_binary, cache_digest, config_digest, data_digest = await MultiGet(
+    downloaded_binary, empty_dirs_digest = await MultiGet(
         Get(
             DownloadedExternalTool, ExternalToolRequest, helm_subsytem.get_request(Platform.current)
         ),
-        Get(Digest, CreateDigest([Directory(cache_dir)])),
-        Get(Digest, CreateDigest([Directory(config_dir)])),
-        Get(Digest, CreateDigest([Directory(data_dir)])),
+        Get(
+            Digest,
+            CreateDigest(
+                [
+                    Directory(cache_dir),
+                    Directory(config_dir),
+                    Directory(data_dir),
+                ]
+            ),
+        ),
     )
 
     tool_relpath = "__helm"
     immutable_input_digests = {tool_relpath: downloaded_binary.digest}
-    helm_path = os.path.join(tool_relpath, downloaded_binary.exe)
-    helm_env = _build_helm_env(cache_dir, config_dir, data_dir)
 
-    # TODO Install Global Helm plugins
+    helm_path = os.path.join(tool_relpath, downloaded_binary.exe)
+    helm_env = {
+        "HELM_CACHE_HOME": cache_dir,
+        "HELM_CONFIG_HOME": config_dir,
+        "HELM_DATA_HOME": data_dir,
+    }
+
+    # Create a digest that will get mutated during the setup process
+    mutable_input_digest = empty_dirs_digest
+
+    # Install all global Helm plugins
+    if global_plugins:
+        prefixed_plugins_digests = await MultiGet(
+            Get(Digest, AddPrefix(plugin.digest, os.path.join(data_dir, "plugins", plugin.name)))
+            for plugin in global_plugins
+        )
+        mutable_input_digest = await Get(
+            Digest, MergeDigests([mutable_input_digest, *prefixed_plugins_digests])
+        )
+
     # TODO Configure Helm classic repositories
 
+    updated_cache_digest, updated_config_digest, updated_data_digest = await MultiGet(
+        Get(Digest, DigestSubset(mutable_input_digest, PathGlobs([f"{cache_dir}/**"]))),
+        Get(Digest, DigestSubset(mutable_input_digest, PathGlobs([f"{config_dir}/**"]))),
+        Get(Digest, DigestSubset(mutable_input_digest, PathGlobs([f"{data_dir}/**"]))),
+    )
     cache_subset_digest, config_subset_digest, data_subset_digest = await MultiGet(
-        Get(Digest, RemovePrefix(cache_digest, cache_dir)),
-        Get(Digest, RemovePrefix(config_digest, config_dir)),
-        Get(Digest, RemovePrefix(data_digest, data_dir)),
+        Get(Digest, RemovePrefix(updated_cache_digest, cache_dir)),
+        Get(Digest, RemovePrefix(updated_config_digest, config_dir)),
+        Get(Digest, RemovePrefix(updated_data_digest, data_dir)),
     )
 
     setup_immutable_digests = {
         **immutable_input_digests,
-        cache_dir: cache_subset_digest,
         config_dir: config_subset_digest,
+        cache_dir: cache_subset_digest,
         data_dir: data_subset_digest,
     }
 
@@ -156,4 +179,4 @@ def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
 
 
 def rules():
-    return collect_rules()
+    return [*collect_rules(), *helm_rules(), *plugins_rules()]

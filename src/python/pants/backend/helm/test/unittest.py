@@ -4,7 +4,8 @@
 import logging
 from dataclasses import dataclass
 
-from pants.backend.helm.subsystems.unittest import HelmUnitTestPlugin
+from pants.backend.helm.subsystems.unittest import HelmUnitTestSubsystem
+from pants.backend.helm.subsystems.unittest import rules as subsystem_rules
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
     HelmUnitTestChartField,
@@ -65,7 +66,7 @@ class HelmUnitTestFieldSet(TestFieldSet):
 async def run_helm_unittest(
     field_set: HelmUnitTestFieldSet,
     test_subsystem: TestSubsystem,
-    unittest_subsystem: HelmUnitTestPlugin,
+    unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
     chart_deps_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.chart, include_special_cased_deps=True)),
@@ -125,7 +126,7 @@ async def run_helm_unittest(
             description=f"Running Helm unittest on: {field_set.address}",
             input_digest=input_digest,
             cache_scope=cache_scope,
-            output_dirs=(reports_dir,),
+            output_directories=(reports_dir,),
         ),
     )
     xml_result_subset = await Get(
@@ -147,4 +148,4 @@ async def generate_helm_unittest_debug_request(field_set: HelmUnitTestFieldSet) 
 
 
 def rules():
-    return [*collect_rules(), UnionRule(TestFieldSet, HelmUnitTestFieldSet)]
+    return [*collect_rules(), *subsystem_rules(), UnionRule(TestFieldSet, HelmUnitTestFieldSet)]

@@ -1,7 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any
+from typing import Any, Mapping
 
 
 def _as_python_attribute_name(str: str) -> str:
@@ -21,5 +21,5 @@ def _as_python_attribute_name(str: str) -> str:
     return result
 
 
-def yaml_attr_dict(d: dict[str, Any]) -> dict[str, Any]:
+def yaml_attr_dict(d: Mapping[str, Any]) -> dict[str, Any]:
     return {_as_python_attribute_name(name): value for name, value in d.items()}

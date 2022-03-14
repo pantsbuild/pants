@@ -8,6 +8,7 @@ from typing import cast
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
+from pants.engine.rules import SubsystemRule
 
 
 class HelmSubsystem(TemplatedExternalTool):
@@ -44,3 +45,7 @@ class HelmSubsystem(TemplatedExternalTool):
     @property
     def lint_strict(self) -> bool:
         return cast("bool", self.options.lint_strict)
+
+
+def rules():
+    return [SubsystemRule(HelmSubsystem)]
