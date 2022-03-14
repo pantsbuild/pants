@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -185,9 +186,12 @@ def test_binary_shims(rule_runner: RuleRunner) -> None:
     printf_shim = contents[0]
     assert printf_shim.path == ".bin/printf"
     assert printf_shim.is_executable
-    assert printf_shim.content.decode() == dedent(
-        """\
-        #!/bin/bash
-        exec "/usr/bin/printf" "$@"
-        """
+    assert re.match(
+        dedent(
+            """\
+            #!(/usr)?/bin/bash
+            exec "/usr/bin/printf" "\\$@"
+            """
+        ),
+        printf_shim.content.decode(),
     )
