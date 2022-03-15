@@ -37,17 +37,23 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
+from pants.util.strutil import softwrap
 
 
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "handler"
     required = True
     value: str
-    help = (
-        "Entry point to the AWS Lambda handler.\n\nYou can specify a full module like "
-        "'path.to.module:handler_func' or use a shorthand to specify a file name, using the same "
-        "syntax as the `sources` field, e.g. 'lambda.py:handler_func'.\n\nYou must use the file "
-        "name shorthand for file arguments to work with this target."
+    help = softwrap(
+        """
+        Entry point to the AWS Lambda handler.
+
+        You can specify a full module like 'path.to.module:handler_func' or use a shorthand to
+        specify a file name, using the same syntax as the `sources` field, e.g.
+        'lambda.py:handler_func'.
+
+        You must use the file name shorthand for file arguments to work with this target.
+        """
     )
 
     @classmethod
@@ -55,8 +61,12 @@ class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMi
         value = cast(str, super().compute_value(raw_value, address))
         if ":" not in value:
             raise InvalidFieldException(
-                f"The `{cls.alias}` field in target at {address} must end in the "
-                f"format `:my_handler_func`, but was {value}."
+                softwrap(
+                    f"""
+                    The `{cls.alias}` field in target at {address} must end in the format
+                    `:my_handler_func`, but was {value}.
+                    """
+                )
             )
         return value
 
@@ -108,9 +118,15 @@ async def resolve_python_aws_handler(
     # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
     if len(handler_paths.files) != 1:
         raise InvalidFieldException(
-            f"Multiple files matched for the `{field_alias}` {repr(handler_val)} for the target "
-            f"{address}, but only one file expected. Are you using a glob, rather than a file "
-            f"name?\n\nAll matching files: {list(handler_paths.files)}."
+            softwrap(
+                f"""
+                Multiple files matched for the `{field_alias}` {repr(handler_val)} for the target
+                {address}, but only one file expected.
+                Are you using a glob, rather than a file name?
+
+                All matching files: {list(handler_paths.files)}.
+                """
+            )
         )
     handler_path = handler_paths.files[0]
     source_root = await Get(
@@ -163,10 +179,12 @@ async def inject_lambda_handler_dependency(
         # live in the python_awslambda's directory or subdirectory, so the owners must be ancestors.
         owners_must_be_ancestors=handler.file_name_used,
         import_reference="module",
-        context=(
-            f"The python_awslambda target {address} has the field "
-            f"`handler={repr(original_tgt.target[PythonAwsLambdaHandlerField].value)}`, which maps "
-            f"to the Python module `{module}`"
+        context=softwrap(
+            f"""
+            The python_awslambda target {address} has the field
+            `handler={repr(original_tgt.target[PythonAwsLambdaHandlerField].value)}`,
+            which maps to the Python module `{module}`"
+            """
         ),
     )
     maybe_disambiguated = explicitly_provided_deps.disambiguated(
@@ -181,10 +199,12 @@ async def inject_lambda_handler_dependency(
 class PythonAwsLambdaIncludeRequirements(BoolField):
     alias = "include_requirements"
     default = True
-    help = (
-        "Whether to resolve requirements and include them in the Pex. This is "
-        "most useful with Lambda Layers to make code uploads smaller when "
-        "deps are in layers. https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html"
+    help = softwrap(
+        """
+        Whether to resolve requirements and include them in the Pex. This is most useful with Lambda
+        Layers to make code uploads smaller when deps are in layers.
+        https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html
+        """
     )
 
 
@@ -193,9 +213,11 @@ class PythonAwsLambdaRuntime(StringField):
 
     alias = "runtime"
     default = None
-    help = (
-        "The identifier of the AWS Lambda runtime to target (pythonX.Y). See "
-        "https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html."
+    help = softwrap(
+        """
+        The identifier of the AWS Lambda runtime to target (pythonX.Y).
+        See https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
+        """
     )
 
     @classmethod
@@ -205,8 +227,12 @@ class PythonAwsLambdaRuntime(StringField):
             return None
         if not re.match(cls.PYTHON_RUNTIME_REGEX, value):
             raise InvalidFieldException(
-                f"The `{cls.alias}` field in target at {address} must be of the form pythonX.Y, "
-                f"but was {value}."
+                softwrap(
+                    f"""
+                    The `{cls.alias}` field in target at {address} must be of the form pythonX.Y,
+                    but was {value}.
+                    """
+                )
             )
         return value
 
@@ -230,17 +256,25 @@ class PythonAWSLambda(Target):
         PexCompletePlatformsField,
         PythonResolveField,
     )
-    help = (
-        "A self-contained Python function suitable for uploading to AWS Lambda.\n\n"
-        f"See {doc_url('awslambda-python')}."
+    help = softwrap(
+        f"""
+        A self-contained Python function suitable for uploading to AWS Lambda.
+
+        See {doc_url('awslambda-python')}.
+        """
     )
 
     def validate(self) -> None:
         if self[PythonAwsLambdaRuntime].value is None and not self[PexCompletePlatformsField].value:
             raise InvalidTargetException(
-                f"The `{self.alias}` target {self.address} must specify either a "
-                f"`{self[PythonAwsLambdaRuntime].alias}` or "
-                f"`{self[PexCompletePlatformsField].alias}` or both."
+                softwrap(
+                    f"""
+                    The `{self.alias}` target {self.address} must specify either a
+                    `{self[PythonAwsLambdaRuntime].alias}` or
+                    `{self[PexCompletePlatformsField].alias}` or both.
+                    """
+                )
+
             )
 
 
