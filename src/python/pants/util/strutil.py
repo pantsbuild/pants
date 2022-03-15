@@ -202,6 +202,8 @@ def first_paragraph(s: str) -> str:
 #  (e.g., "CPython>=2.7,<3") and those are sometimes converted to paths.
 _non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
 
+_super_space_re = re.compile(r"(\S)  +(\S)")
+
 
 def path_safe(s: str) -> str:
     return _non_path_safe_re.sub("_", s)
@@ -224,6 +226,7 @@ def softwrap(s: str):
     # NB: collecting a list of strs and `"".join` is more performant than calling `+=` repeatedly.
     result_strs = []
     for i, line in enumerate(lines):
+        line = _super_space_re.sub(r"\1 \2", line)
         next_line = lines[i + 1] if i + 1 < len(lines) else None
         if "\n" in (line, next_line) or line.startswith(" "):
             result_strs.append(line)

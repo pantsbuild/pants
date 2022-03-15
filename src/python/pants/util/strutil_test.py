@@ -254,6 +254,11 @@ def test_softwrap_multiline() -> None:
                         - Dr. Egon Spengler
                         - Dr. Raymond Stantz
                         - Winston Zeddemore
+
+                        And not really a ghostbuster, but we need to test wrapped indentation
+                        - Louis (Vinz, Vinz Clortho,\
+                        Keymaster of Gozer. Volguus Zildrohar, Lord of\
+                            the Sebouillia)
                     ```
 
                 All here.
@@ -266,6 +271,11 @@ def test_softwrap_multiline() -> None:
             "        - Dr. Egon Spengler\n"
             "        - Dr. Raymond Stantz\n"
             "        - Winston Zeddemore\n"
+            "\n"
+            "        And not really a ghostbuster, but we need to test wrapped indentation\n"
+            # No \n at the end of this one
+            "        - Louis (Vinz, Vinz Clortho, Keymaster of Gozer. Volguus Zildrohar, Lord of "
+            "the Sebouillia)\n"
             "    ```\n"
             "\nAll here."
         )
