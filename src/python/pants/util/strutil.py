@@ -214,9 +214,13 @@ def softwrap(s: str) -> str:
 
     Applies the following rules:
         - Dedents the text (you also don't need to start your string with a backslash)
+        - Replaces all occurances of multiple spaces in a sentence with a single space
         - Replaces singular newlines with a space (to turn a paragraph into one long line)
         - Double-newlines are preserved
         - Extra indentation is preserved, and also preserves the indented line's ending
+            (If your indented line needs to be continued due to it being longer than the suggested
+            width, use trailing backlashes to line-continue the line. Because we squash multiple
+            spaces, this will "just work".)
     """
     # If callers didnt use a leading "\" thats OK.
     if s[0] == "\n":
