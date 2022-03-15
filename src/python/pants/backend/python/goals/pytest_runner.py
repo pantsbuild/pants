@@ -239,13 +239,26 @@ async def setup_pytest_for_target(
     )
     pytest_runner_pex, config_files = await MultiGet(pytest_runner_pex_get, config_files_get)
 
+    # The coverage and pytest config may live in the same config file (e.g., setup.cfg, tox.ini
+    # or pyproject.toml), and wee may have rewritten those files to augment the coverage config,
+    # in which case we must ensure that the original and rewritten files don't collide.
+    pytest_config_digest = config_files.snapshot.digest
+    if coverage_config.path in config_files.snapshot.files:
+        subset_paths = list(config_files.snapshot.files)
+        # Remove the original file, and rely on the rewritten file, which contains all the
+        # pytest-related config unchanged.
+        subset_paths.remove(coverage_config.path)
+        pytest_config_digest = await Get(
+            Digest, DigestSubset(pytest_config_digest, PathGlobs(subset_paths))
+        )
+
     input_digest = await Get(
         Digest,
         MergeDigests(
             (
                 coverage_config.digest,
                 local_dists.remaining_sources.source_files.snapshot.digest,
-                config_files.snapshot.digest,
+                pytest_config_digest,
                 extra_output_directory_digest,
                 *(plugin_setup.digest for plugin_setup in plugin_setups),
             )
