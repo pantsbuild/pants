@@ -263,25 +263,6 @@ class CoverageConfig:
     path: str
 
 
-def _validate_and_update_config(
-    coverage_config: configparser.ConfigParser, config_path: str | None
-) -> None:
-    if not coverage_config.has_section("run"):
-        coverage_config.add_section("run")
-    run_section = coverage_config["run"]
-    relative_files_str = run_section.get("relative_files", "True")
-    if relative_files_str.lower() != "true":
-        raise ValueError(
-            "relative_files under the 'run' section must be set to True in the config "
-            f"file {config_path}"
-        )
-    coverage_config.set("run", "relative_files", "True")
-    omit_elements = [em for em in run_section.get("omit", "").split("\n")] or ["\n"]
-    if "pytest.pex/*" not in omit_elements:
-        omit_elements.append("pytest.pex/*")
-    run_section["omit"] = "\n".join(omit_elements)
-
-
 class InvalidCoverageConfigError(Exception):
     pass
 
@@ -363,6 +344,7 @@ async def create_or_update_coverage_config(coverage: CoverageSubsystem) -> Cover
         cp.set("run", "omit", "\npytest.pex/*")
         stream = StringIO()
         cp.write(stream)
+        # We know that .coveragerc doesn't exist, so it's fine to create one.
         file_content = FileContent(".coveragerc", stream.getvalue().encode())
     digest = await Get(Digest, CreateDigest([file_content]))
     return CoverageConfig(digest, file_content.path)
