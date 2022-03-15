@@ -336,8 +336,14 @@ def test_extra_output(rule_runner: RuleRunner) -> None:
 
 
 def test_coverage(rule_runner: RuleRunner) -> None:
+    # Note that we test that rewriting the pyproject.toml doesn't cause a collision
+    # between the two code paths by which we pick up that file (coverage and pytest).
     rule_runner.write_files(
-        {f"{PACKAGE}/tests.py": GOOD_TEST, f"{PACKAGE}/BUILD": "python_tests()"}
+        {
+            "pyproject.toml": "[tool.coverage.report]\n[tool.pytest.ini_options]",
+            f"{PACKAGE}/tests.py": GOOD_TEST,
+            f"{PACKAGE}/BUILD": "python_tests()",
+        }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
     result = run_pytest(rule_runner, tgt, extra_args=["--test-use-coverage"])
