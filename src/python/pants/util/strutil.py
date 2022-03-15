@@ -202,6 +202,11 @@ def first_paragraph(s: str) -> str:
 #  (e.g., "CPython>=2.7,<3") and those are sometimes converted to paths.
 _non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
 
+# TODO: This may be a bit too eager. Some strings might want to preserve multiple spaces in them
+# (e.g. a Python code block which has a comment in it would have 2 spaces before the "#", which
+# would be squashed by this eager regex). The challenge is that there's some overlap between prose
+# (which shouldn't need multiple spaces) and code (which might) for non-alphanumeric characters.
+# We can tighten as necessary.
 _super_space_re = re.compile(r"(\S)  +(\S)")
 
 
