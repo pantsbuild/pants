@@ -10,16 +10,17 @@ from typing import Mapping
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.core.util_rules.system_binaries import (
-    BinaryNotFoundError,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
+    BinaryShims,
+    BinaryShimsRequest,
 )
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -30,11 +31,17 @@ class DockerBinary(BinaryPath):
     """The `docker` binary."""
 
     extra_env: Mapping[str, str]
+    extra_input_digests: Mapping[str, Digest] | None
 
     def __init__(
-        self, path: str, fingerprint: str | None = None, extra_env: Mapping[str, str] | None = None
+        self,
+        path: str,
+        fingerprint: str | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        extra_input_digests: Mapping[str, Digest] | None = None,
     ) -> None:
         self.extra_env = {} if extra_env is None else extra_env
+        self.extra_input_digests = extra_input_digests
         super().__init__(path, fingerprint)
 
     def _get_process_environment(self, env: Mapping[str, str]) -> Mapping[str, str]:
@@ -80,6 +87,7 @@ class DockerBinary(BinaryPath):
             ),
             env=self._get_process_environment(env),
             input_digest=digest,
+            immutable_input_digests=self.extra_input_digests,
             cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
@@ -92,6 +100,7 @@ class DockerBinary(BinaryPath):
                 cache_scope=ProcessCacheScope.PER_SESSION,
                 description=f"Pushing docker image {tag}",
                 env=self._get_process_environment(env or {}),
+                immutable_input_digests=self.extra_input_digests,
             )
             for tag in tags
         )
@@ -109,6 +118,7 @@ class DockerBinary(BinaryPath):
             cache_scope=ProcessCacheScope.PER_SESSION,
             description=f"Running docker image {tag}",
             env=self._get_process_environment(env or {}),
+            immutable_input_digests=self.extra_input_digests,
         )
 
 
@@ -123,36 +133,36 @@ async def find_docker(
 ) -> DockerBinary:
     env = await Get(Environment, EnvironmentRequest(["PATH"]))
     search_path = docker_options.executable_search_path(env)
-    requests = [
-        BinaryPathRequest(
-            binary_name=tool,
-            search_path=search_path,
-            test=BinaryPathTest(args=["-v"]) if tool == "docker" else None,
-        )
-        for tool in {"docker", *docker_options.tools}
-    ]
-    binary_paths = await MultiGet(
-        Get(BinaryPaths, BinaryPathRequest, request) for request in requests
+    request = BinaryPathRequest(
+        binary_name="docker",
+        search_path=search_path,
+        test=BinaryPathTest(args=["-v"]),
     )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
 
-    found_paths = []
-    for binary, request in zip(binary_paths, requests):
-        if binary.first_path:
-            found_paths.append(binary.first_path)
-        else:
-            raise BinaryNotFoundError.from_request(
-                request,
-                rationale="interact with the docker daemon",
-            )
+    if not docker_options.tools:
+        return DockerBinary(first_path.path, first_path.fingerprint)
+
+    tools = await Get(
+        BinaryShims,
+        BinaryShimsRequest,
+        BinaryShimsRequest.for_binaries(
+            *docker_options.tools,
+            rationale="use docker",
+            output_directory="bin",
+            search_path=search_path,
+        ),
+    )
+    tools_path = ".shims"
+    extra_env = {"PATH": os.path.join(tools_path, tools.bin_directory)}
+    extra_input_digests = {tools_path: tools.digest}
 
     return DockerBinary(
-        found_paths[0].path,
-        found_paths[0].fingerprint,
-        extra_env=(
-            {"PATH": os.pathsep.join({os.path.dirname(found.path) for found in found_paths[1:]})}
-            if len(found_paths) > 1
-            else None
-        ),
+        first_path.path,
+        first_path.fingerprint,
+        extra_env=extra_env,
+        extra_input_digests=extra_input_digests,
     )
 
 
