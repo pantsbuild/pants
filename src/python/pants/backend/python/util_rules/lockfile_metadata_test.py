@@ -31,9 +31,11 @@ def test_metadata_header_round_trip() -> None:
         reqset("ansicolors==0.1.0"),
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
-        b"req1==1.0", regenerate_command="./pants lock"
+        b"req1==1.0", regenerate_command="./pants lock", delimeter="#"
     )
-    output_metadata = PythonLockfileMetadata.from_lockfile("a", serialized_lockfile)
+    output_metadata = PythonLockfileMetadata.from_lockfile(
+        serialized_lockfile, resolve_name="a", delimeter="#"
+    )
     assert input_metadata == output_metadata
 
 
@@ -68,7 +70,9 @@ dave==3.1.4 \\
     metadata = PythonLockfileMetadata.new(
         InterpreterConstraints([">=3.7"]), reqset("ansicolors==0.1.0")
     )
-    result = metadata.add_header_to_lockfile(input_lockfile, regenerate_command="./pants lock")
+    result = metadata.add_header_to_lockfile(
+        input_lockfile, regenerate_command="./pants lock", delimeter="#"
+    )
     assert line_by_line(result) == line_by_line(expected)
 
 

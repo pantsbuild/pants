@@ -23,6 +23,7 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -145,20 +146,10 @@ class CheckSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return CheckRequest in union_membership
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--only",
-            type=list,
-            member_type=str,
-            default=[],
-            help=only_option_help("check", "checkers", "mypy", "javac"),
-        )
-
-    @property
-    def only(self) -> tuple[str, ...]:
-        return tuple(self.options.only)
+    only = StrListOption(
+        "--only",
+        help=only_option_help("check", "checkers", "mypy", "javac"),
+    )
 
 
 class Check(Goal):

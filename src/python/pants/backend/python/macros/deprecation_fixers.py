@@ -10,11 +10,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict
 
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufSubsystem
-from pants.backend.codegen.thrift.apache.python.subsystem import ThriftPythonSubsystem
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.pylint.subsystem import Pylint
-from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.build_graph.address import AddressParseException, InvalidAddress
 from pants.core.goals.update_build_files import (
@@ -22,6 +20,10 @@ from pants.core.goals.update_build_files import (
     RewrittenBuildFile,
     RewrittenBuildFileRequest,
     UpdateBuildFilesSubsystem,
+)
+from pants.core.target_types import (
+    TargetGeneratorSourcesHelperSourcesField,
+    TargetGeneratorSourcesHelperTarget,
 )
 from pants.engine.addresses import (
     Address,
@@ -36,7 +38,6 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    SingleSourceField,
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionRule
@@ -104,12 +105,17 @@ async def determine_macro_changes(all_targets: AllTargets, _: MacroRenamesReques
         python_requirement_dependencies_fields, build_file_addresses_per_tgt, deps_per_tgt
     ):
         generator_tgt = next(
-            (tgt for tgt in deps if isinstance(tgt, PythonRequirementsFileTarget)), None
+            (tgt for tgt in deps if isinstance(tgt, TargetGeneratorSourcesHelperTarget)), None
         )
         if generator_tgt is None:
             continue
 
-        generator_source = generator_tgt[SingleSourceField].value
+        generator_sources = generator_tgt[TargetGeneratorSourcesHelperSourcesField].value
+        if not generator_sources or len(generator_sources) != 1:
+            continue
+        generator_source = generator_sources[0]
+        if "go." in generator_source:
+            continue
         if "Pipfile" in generator_source:
             generator_alias = "pipenv_requirements"
         elif "pyproject.toml" in generator_source:
@@ -201,8 +207,6 @@ class OptionsCheckerRequest:
 @rule(desc="Check option values for Python macro syntax vs. target generator", level=LogLevel.DEBUG)
 async def maybe_warn_options_macro_references(
     _: OptionsCheckerRequest,
-    python_protobuf: PythonProtobufSubsystem,
-    python_thrift: ThriftPythonSubsystem,
     flake8: Flake8,
     pylint: Pylint,
     mypy: MyPy,
@@ -218,8 +222,6 @@ async def maybe_warn_options_macro_references(
                 new_addr = new_addr_spec(runtime_dep, renames.generated[addr][0])
                 opt_to_renames[option].add((runtime_dep, new_addr))
 
-    check(python_protobuf.runtime_dependencies, "[python-protobuf].runtime_dependencies")
-    check(python_thrift.runtime_dependencies, "[python-thrift].runtime_dependencies")
     check(flake8.source_plugins, "[flake8].source_plugins")
     check(pylint.source_plugins, "[pylint].source_plugins")
     check(mypy.source_plugins, "[mypy].source_plugins")
@@ -252,7 +254,7 @@ async def maybe_update_macros_references(
     if not update_build_files_subsystem.fix_python_macros:
         return RewrittenBuildFile(request.path, request.lines, ())
 
-    if not global_options.options.use_deprecated_python_macros:
+    if not global_options.use_deprecated_python_macros:
         raise ValueError(
             "`--update-build-files-fix-python-macros` specified when "
             "`[GLOBAL].use_deprecated_python_macros` is already set to false, which means that "

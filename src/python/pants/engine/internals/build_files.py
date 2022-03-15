@@ -36,9 +36,9 @@ class BuildFileOptions:
 @rule
 def extract_build_file_options(global_options: GlobalOptions) -> BuildFileOptions:
     return BuildFileOptions(
-        patterns=tuple(global_options.options.build_patterns),
-        ignores=tuple(global_options.options.build_ignore),
-        prelude_globs=tuple(global_options.options.build_file_prelude_globs),
+        patterns=global_options.build_patterns,
+        ignores=global_options.build_ignore,
+        prelude_globs=global_options.build_file_prelude_globs,
     )
 
 
@@ -173,8 +173,9 @@ async def find_target_adaptor(address: Address) -> TargetAdaptor:
 
 @rule
 def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFilter:
-    opts = global_options.options
-    return AddressSpecsFilter(tags=opts.tag, exclude_target_regexps=opts.exclude_target_regexp)
+    return AddressSpecsFilter(
+        tags=global_options.tag, exclude_target_regexps=global_options.exclude_target_regexp
+    )
 
 
 @rule

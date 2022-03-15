@@ -32,6 +32,7 @@ from pants.option.global_options import DynamicRemoteOptions, DynamicUIRenderer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,14 @@ class LocalPantsRunner:
             ui_use_prodash=global_options.dynamic_ui_renderer
             == DynamicUIRenderer.experimental_prodash,
             use_colors=global_options.get("colors", True),
+            max_workunit_level=max(
+                global_options.streaming_workunits_level,
+                global_options.level,
+                *(
+                    LogLevel[level.upper()]
+                    for level in global_options.log_levels_by_target.values()
+                ),
+            ),
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
@@ -253,6 +262,7 @@ class LocalPantsRunner:
                 allow_async_completion=(
                     global_options.pantsd and global_options.streaming_workunits_complete_async
                 ),
+                max_workunit_verbosity=global_options.streaming_workunits_level,
             )
             with streaming_reporter:
                 engine_result = PANTS_FAILED_EXIT_CODE

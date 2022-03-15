@@ -8,6 +8,7 @@ target(
     name="plugins",
     dependencies=[
         "src/python/pants/backend/awslambda/python",
+        "src/python/pants/backend/codegen/protobuf/lint/buf",
         "src/python/pants/backend/codegen/protobuf/python",
         "src/python/pants/backend/codegen/thrift/apache/python",
         "src/python/pants/backend/docker",

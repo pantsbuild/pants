@@ -2,12 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.custom_types import shell_str
+from pants.option.option_types import ArgsListOption
 from pants.util.docutil import git_url
 
 
 class JUnit(JvmToolBase):
     options_scope = "junit"
+    name = "JUnit"
     help = "The JUnit test framework (https://junit.org)"
 
     default_version = "5.7.2"
@@ -20,14 +21,4 @@ class JUnit(JvmToolBase):
     default_lockfile_path = "src/python/pants/jvm/test/junit.default.lockfile.txt"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            passthrough=True,
-            help="Arguments to pass directly to JUnit, e.g. `--disable-ansi-colors`",
-        )
+    args = ArgsListOption(example="--disable-ansi-colors", passthrough=True)

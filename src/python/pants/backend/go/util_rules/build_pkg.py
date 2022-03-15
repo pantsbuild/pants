@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import os.path
 from dataclasses import dataclass
 
@@ -15,7 +16,7 @@ from pants.backend.go.util_rules.assembly import (
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
-from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
@@ -77,7 +78,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"digest={self.digest}, "
             f"dir_path={self.dir_path}, "
             f"go_file_names={self.go_file_names}, "
-            f"go_file_names={self.s_file_names}, "
+            f"s_file_names={self.s_file_names}, "
             f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "
@@ -196,6 +197,16 @@ class RenderedEmbedConfig:
     PATH = "./embedcfg"
 
 
+@dataclass(frozen=True)
+class GoCompileActionIdRequest:
+    build_request: BuildGoPackageRequest
+
+
+@dataclass(frozen=True)
+class GoCompileActionIdResult:
+    action_id: str
+
+
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
 @rule(desc="Compile with Go", level=LogLevel.DEBUG)
@@ -218,10 +229,11 @@ async def build_go_package(
         import_paths_to_pkg_a_files.update(dep.import_paths_to_pkg_a_files)
         dep_digests.append(dep.digest)
 
-    merged_deps_digest, import_config, embedcfg = await MultiGet(
+    merged_deps_digest, import_config, embedcfg, action_id_result = await MultiGet(
         Get(Digest, MergeDigests(dep_digests)),
         Get(ImportConfig, ImportConfigRequest(FrozenDict(import_paths_to_pkg_a_files))),
         Get(RenderedEmbedConfig, RenderEmbedConfigRequest(request.embed_config)),
+        Get(GoCompileActionIdResult, GoCompileActionIdRequest(request)),
     )
 
     input_digest = await Get(
@@ -251,6 +263,8 @@ async def build_go_package(
     compile_args = [
         "tool",
         "compile",
+        "-buildid",
+        action_id_result.action_id,
         "-o",
         "__pkg__.a",
         "-pack",
@@ -289,6 +303,7 @@ async def build_go_package(
             command=tuple(compile_args),
             description=f"Compile Go package: {request.import_path}",
             output_files=("__pkg__.a",),
+            env={"__PANTS_GO_COMPILE_ACTION_ID": action_id_result.action_id},
         ),
     )
     if compile_result.exit_code != 0:
@@ -352,6 +367,51 @@ async def render_embed_config(request: RenderEmbedConfigRequest) -> RenderedEmbe
             ),
         )
     return RenderedEmbedConfig(digest)
+
+
+# Compute a cache key for the compile action. This computation is intended to capture similar values to the
+# action ID computed by the `go` tool for its own cache.
+# For details, see https://github.com/golang/go/blob/21998413ad82655fef1f31316db31e23e0684b21/src/cmd/go/internal/work/exec.go#L216-L403
+@rule
+async def compute_compile_action_id(
+    request: GoCompileActionIdRequest, goroot: GoRoot
+) -> GoCompileActionIdResult:
+    bq = request.build_request
+
+    h = hashlib.sha256()
+
+    # All Go action IDs have the full version (as returned by `runtime.Version()` in the key.
+    # See https://github.com/golang/go/blob/master/src/cmd/go/internal/cache/hash.go#L32-L46
+    h.update(goroot.full_version.encode())
+
+    h.update("compile\n".encode())
+    if bq.minimum_go_version:
+        h.update(f"go {bq.minimum_go_version}\n".encode())
+    h.update(f"goos {goroot.goos} goarch {goroot.goarch}\n".encode())
+    h.update(f"import {bq.import_path}\n".encode())
+    # TODO: Consider what to do with this information from Go tool:
+    # fmt.Fprintf(h, "omitdebug %v standard %v local %v prefix %q\n", p.Internal.OmitDebug, p.Standard, p.Internal.Local, p.Internal.LocalPrefix)
+    # TODO: Inject cgo-related values here.
+    # TODO: Inject cover mode values here.
+    # TODO: Inject fuzz instrumentation values here.
+
+    compile_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("compile"))
+    h.update(f"compile {compile_tool_id.tool_id}\n".encode())
+    # TODO: Add compiler flags as per `go`'s algorithm. Need to figure out
+    if bq.s_file_names:
+        asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
+        h.update(f"asm {asm_tool_id.tool_id}\n".encode())
+        # TODO: Add asm flags as per `go`'s algorithm.
+    # TODO: Add micro-architecture into cache key (e.g., GOAMD64 setting).
+    if "GOEXPERIMENT" in goroot._raw_metadata:
+        h.update(f"GOEXPERIMENT={goroot._raw_metadata['GOEXPERIMENT']}".encode())
+    # TODO: Maybe handle go "magic" env vars: "GOCLOBBERDEADHASH", "GOSSAFUNC", "GOSSADIR", "GOSSAHASH" ?
+    # TODO: Handle GSHS_LOGFILE compiler debug option by breaking cache?
+
+    # Note: Input files are already part of cache key. Thus, this algorithm omits incorporating their
+    # content hashes into the action ID.
+
+    return GoCompileActionIdResult(h.hexdigest())
 
 
 def rules():

@@ -606,3 +606,27 @@ def test_user_repo_order_is_respected(rule_runner: RuleRunner) -> None:
             ArtifactRequirements.from_coordinates([jai_core]),
         ],
     )
+
+
+@maybe_skip_jdk_test
+def test_transitive_excludes(rule_runner: RuleRunner) -> None:
+    resolve = rule_runner.request(
+        CoursierResolvedLockfile,
+        [
+            ArtifactRequirements(
+                [
+                    Coordinate(
+                        group="com.fasterxml.jackson.core",
+                        artifact="jackson-databind",
+                        version="2.12.1",
+                    )
+                    .as_requirement()
+                    .with_extra_excludes("com.fasterxml.jackson.core:jackson-core")
+                ]
+            ),
+        ],
+    )
+
+    entries = resolve.entries
+    assert any(i for i in entries if i.coord.artifact == "jackson-databind")
+    assert not any(i for i in entries if i.coord.artifact == "jackson-core")

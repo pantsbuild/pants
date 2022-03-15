@@ -25,12 +25,12 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use std::convert::TryFrom;
 use std::fmt;
 use std::io::{self, Write};
 use std::str::FromStr;
 
 use byteorder::ByteOrder;
+use deepsize::DeepSizeOf;
 use digest::consts::U32;
 use generic_array::GenericArray;
 use serde::de::{MapAccess, Visitor};
@@ -49,7 +49,7 @@ pub const EMPTY_DIGEST: Digest = Digest {
 
 pub const FINGERPRINT_SIZE: usize = 32;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Copy, DeepSizeOf, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Fingerprint(pub [u8; FINGERPRINT_SIZE]);
 
 impl Fingerprint {
@@ -179,7 +179,7 @@ impl TryFrom<&str> for Fingerprint {
 /// It is equivalent to a Bazel Remote Execution Digest, but without the overhead (and awkward API)
 /// of needing to create an entire protobuf to pass around the two fields.
 ///
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Digest {
   pub hash: Fingerprint,
   pub size_bytes: usize,

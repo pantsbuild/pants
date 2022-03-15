@@ -9,14 +9,15 @@ from pants.option.subsystem import Subsystem
 
 class GoTestSubsystem(Subsystem):
     options_scope = "go-test"
+    name = "Go test binary"
     help = "Options for Go tests."
 
     args = ArgsListOption(
-        help=(
-            "Arguments to pass directly to the Go test binary, e.g. "
-            '`--go-test-args="-run TestFoo -v"`.\n\n'
+        example="-run TestFoo -v",
+        extra_help=(
             "Known Go test options will be transformed into the form expected by the test "
             "binary, e.g. `-v` becomes `-test.v`. Run `go help testflag` from the Go SDK to "
             "learn more about the options supported by Go test binaries."
         ),
-    ).passthrough()
+        passthrough=True,
+    )

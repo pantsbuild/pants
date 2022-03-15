@@ -11,8 +11,12 @@ from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
-from pants.engine.unions import UnionMembership, UnionRule
-from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
+from pants.engine.unions import UnionRule
+from pants.jvm.compile import (
+    ClasspathEntryRequest,
+    ClasspathEntryRequestFactory,
+    FallibleClasspathEntry,
+)
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
 
@@ -27,7 +31,7 @@ class JavacCheckRequest(CheckRequest):
 @rule(desc="Check javac compilation", level=LogLevel.DEBUG)
 async def javac_check(
     request: JavacCheckRequest,
-    union_membership: UnionMembership,
+    classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> CheckResults:
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses(field_set.address for field_set in request.field_sets)
@@ -43,7 +47,7 @@ async def javac_check(
         Get(
             FallibleClasspathEntry,
             ClasspathEntryRequest,
-            ClasspathEntryRequest.for_targets(union_membership, component=target, resolve=resolve),
+            classpath_entry_request.for_targets(component=target, resolve=resolve),
         )
         for target, resolve in zip(coarsened_targets, resolves)
     )

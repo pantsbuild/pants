@@ -9,10 +9,9 @@ use std::convert::TryInto;
 use std::fmt;
 
 use lazy_static::lazy_static;
-use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyTuple, PyType};
+use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
 use pyo3::{FromPyObject, ToPyObject};
 
 use logging::PythonLogLevel;
@@ -37,14 +36,10 @@ pub fn equals(h1: &PyAny, h2: &PyAny) -> bool {
   // between non-equal types to avoid legacy behavior like `assert True == 1`, which is very
   // surprising in interning, and would likely be surprising anywhere else in the engine where we
   // compare things.
-  if h1.get_type() != h2.get_type() {
+  if !h1.get_type().is(h2.get_type()) {
     return false;
   }
-  h1.rich_compare(h2, CompareOp::Eq)
-    .unwrap()
-    .cast_as::<PyBool>()
-    .unwrap()
-    .is_true()
+  h1.eq(h2).unwrap()
 }
 
 pub fn store_tuple(py: Python, values: Vec<Value>) -> Value {

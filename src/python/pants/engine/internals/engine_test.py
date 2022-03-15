@@ -303,7 +303,12 @@ class TestStreamingWorkunit(SchedulerTestBase):
     def _fixture_for_rules(
         self, tmp_path: Path, rules, max_workunit_verbosity: LogLevel = LogLevel.INFO
     ) -> Tuple[SchedulerSession, WorkunitTracker, StreamingWorkunitHandler]:
-        scheduler = self.mk_scheduler(tmp_path, rules, include_trace_on_error=False)
+        scheduler = self.mk_scheduler(
+            tmp_path,
+            rules,
+            include_trace_on_error=False,
+            max_workunit_verbosity=max_workunit_verbosity,
+        )
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
             scheduler,
@@ -648,7 +653,7 @@ class Output(EngineAwareReturnType):
         return {"snapshot_1": self.snapshot_1, "snapshot_2": self.snapshot_2}
 
 
-@rule(desc="a_rule")
+@rule(desc="a_rule", level=LogLevel.DEBUG)
 def a_rule(input: ComplicatedInput) -> Output:
     return Output(snapshot_1=input.snapshot_1, snapshot_2=input.snapshot_2)
 
@@ -662,6 +667,10 @@ def rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, (Process,)),
         ],
         isolated_local_store=True,
+        # NB: The Sessions's configured verbosity is applied before a `StreamingWorkunitHandler`
+        # can poll, and prevents things from being stored at all. So in order to observe TRACE
+        # workunits in a poll, we must also configure TRACE on the Session.
+        max_workunit_verbosity=LogLevel.TRACE,
     )
 
 

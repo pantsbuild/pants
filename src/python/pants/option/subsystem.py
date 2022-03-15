@@ -9,9 +9,10 @@ import re
 from abc import ABCMeta
 from typing import Any, ClassVar, TypeVar
 
+from pants.base.deprecated import deprecated
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
-from pants.option.option_types import OptionsInfo
+from pants.option.option_types import collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
 
@@ -96,19 +97,18 @@ class Subsystem(metaclass=ABCMeta):
         return cls.create_scope_info(scope=cls.options_scope, subsystem_cls=cls)
 
     @classmethod
+    @deprecated(
+        removal_version="2.12.0.dev0",
+        hint=(
+            "Options are now registered by declaring class attributes using the types in "
+            "pants/option.option_types.py"
+        ),
+    )
     def register_options(cls, register):
         """Register options for this Subsystem.
 
         Subclasses may override and call register(*args, **kwargs).
         """
-        # NB: Since registration ordering matters (it impacts `help` output), we register these in
-        # class attribute order, starting from the base class down.
-        for class_ in reversed(inspect.getmro(cls)):
-            for attrname in class_.__dict__.keys():
-                # NB: We use attrname and getattr to trigger descriptors
-                attr = getattr(cls, attrname)
-                if isinstance(attr, OptionsInfo):
-                    register(*attr.flag_names, **attr.flag_options)
 
     @classmethod
     def register_options_on_scope(cls, options):
@@ -116,7 +116,13 @@ class Subsystem(metaclass=ABCMeta):
 
         Subclasses should not generally need to override this method.
         """
-        cls.register_options(options.registration_function_for_subsystem(cls))
+        register = options.registration_function_for_subsystem(cls)
+        for options_info in collect_options_info(cls):
+            register(*options_info.flag_names, **options_info.flag_options)
+
+        # NB: Still call `register_options` for classes which haven't switched
+        if cls.register_options is not Subsystem.register_options:
+            cls.register_options(register)
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()

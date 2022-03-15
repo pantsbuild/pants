@@ -12,12 +12,19 @@ from typing import DefaultDict
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex import Pex, PexProcess
+from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
-from pants.core.goals.export import ExportError, ExportRequest, ExportResult, ExportResults, Symlink
+from pants.core.goals.export import (
+    ExportError,
+    ExportRequest,
+    ExportResult,
+    ExportResults,
+    PostProcessingCommand,
+)
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -45,7 +52,7 @@ class _ExportVenvRequest(EngineAwareParameter):
 
 @rule
 async def export_virtualenv(
-    request: _ExportVenvRequest, python_setup: PythonSetup, pex_env: PexEnvironment
+    request: _ExportVenvRequest, python_setup: PythonSetup, pex_pex: PexPEX
 ) -> ExportResult:
     if request.resolve:
         interpreter_constraints = InterpreterConstraints(
@@ -76,8 +83,8 @@ async def export_virtualenv(
         )
         raise ExportError(err_msg)
 
-    venv_pex = await Get(
-        VenvPex,
+    requirements_pex = await Get(
+        Pex,
         RequirementsPexRequest(
             (tgt.address for tgt in request.root_python_targets),
             internal_only=True,
@@ -85,18 +92,13 @@ async def export_virtualenv(
         ),
     )
 
-    complete_pex_env = pex_env.in_workspace()
-    venv_abspath = os.path.join(complete_pex_env.pex_root, venv_pex.venv_rel_dir)
-
-    # Run the venv_pex to get the full python version (including patch #), so we
-    # can use it in the symlink name.
+    # Get the full python version (including patch #), so we can use it as the venv name.
     res = await Get(
         ProcessResult,
-        VenvPexProcess(
-            venv_pex=venv_pex,
-            description="Create virtualenv",
+        PexProcess(
+            pex=requirements_pex,
+            description="Get interpreter version",
             argv=["-c", "import sys; print('.'.join(str(x) for x in sys.version_info[0:3]))"],
-            input_digest=venv_pex.digest,
         ),
     )
     py_version = res.stdout.strip().decode()
@@ -106,10 +108,28 @@ async def export_virtualenv(
         if request.resolve
         else os.path.join("python", "virtualenv")
     )
+
+    merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, requirements_pex.digest]))
+    pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
     return ExportResult(
         f"virtualenv for the resolve '{request.resolve}' (using {min_interpreter})",
         dest,
-        symlinks=[Symlink(venv_abspath, py_version)],
+        digest=merged_digest,
+        post_processing_cmds=[
+            PostProcessingCommand(
+                [
+                    pex_pex_path,
+                    os.path.join("{digest_root}", requirements_pex.name),
+                    "venv",
+                    "--pip",
+                    "--collisions-ok",
+                    "--remove=all",
+                    f"{{digest_root}}/{py_version}",
+                ],
+                {"PEX_MODULE": "pex.tools"},
+            ),
+            PostProcessingCommand(["rm", "-f", pex_pex_path]),
+        ],
     )
 
 

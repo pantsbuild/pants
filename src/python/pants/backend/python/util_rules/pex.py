@@ -39,8 +39,12 @@ from pants.backend.python.util_rules.pex_requirements import Lockfile, LockfileC
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
 )
-from pants.backend.python.util_rules.pex_requirements import maybe_validate_metadata
+from pants.backend.python.util_rules.pex_requirements import (
+    should_validate_metadata,
+    validate_metadata,
+)
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -58,7 +62,7 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process, ProcessCacheScope, ProcessResult
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
 from pants.util.frozendict import FrozenDict
@@ -347,6 +351,7 @@ async def build_pex(
         *python_setup.manylinux_pex_args,
         *request.additional_args,
     ]
+    should_resolve = True
 
     repository_pex = (
         request.requirements.repository_pex
@@ -354,9 +359,8 @@ async def build_pex(
         else None
     )
     if repository_pex:
+        should_resolve = False
         argv.extend(["--pex-repository", repository_pex.name])
-    else:
-        argv.extend([*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"])
 
     python: PythonExecutable | None = None
 
@@ -407,8 +411,11 @@ async def build_pex(
     requirement_count: int
 
     if isinstance(request.requirements, (Lockfile, LockfileContent)):
+        is_monolithic_resolve = True
         resolve_name = request.requirements.resolve_name
+
         if isinstance(request.requirements, Lockfile):
+            synthetic_lock = False
             lock_path = request.requirements.file_path
             requirements_file_digest = await Get(
                 Digest,
@@ -420,24 +427,41 @@ async def build_pex(
             )
             _digest_contents = await Get(DigestContents, Digest, requirements_file_digest)
             lock_bytes = _digest_contents[0].content
-
-            def parse_metadata() -> PythonLockfileMetadata:
-                return PythonLockfileMetadata.from_lockfile(resolve_name, lock_bytes, lock_path)
-
         else:
+            synthetic_lock = True
             _fc = request.requirements.file_content
             lock_path, lock_bytes = (_fc.path, _fc.content)
             requirements_file_digest = await Get(Digest, CreateDigest([_fc]))
 
-            def parse_metadata() -> PythonLockfileMetadata:
-                return PythonLockfileMetadata.from_lockfile(resolve_name, lock_bytes)
+        if _is_probably_pex_json_lockfile(lock_bytes):
+            should_resolve = False
+            header_delimiter = "//"
+            requirements_file_digest = await Get(
+                Digest,
+                CreateDigest(
+                    [FileContent(lock_path, _strip_comments_from_pex_json_lockfile(lock_bytes))]
+                ),
+            )
+            requirement_count = _pex_lockfile_requirement_count(lock_bytes)
+            argv.extend(["--lock", lock_path])
+        else:
+            header_delimiter = "#"
+            # Note: this is a very naive heuristic. It will overcount because entries often
+            # have >1 line due to `--hash`.
+            requirement_count = len(lock_bytes.decode().splitlines())
+            argv.extend(["--requirement", lock_path, "--no-transitive"])
 
-        is_monolithic_resolve = True
-        argv.extend(["--requirement", lock_path, "--no-transitive"])
-        requirement_count = len(lock_bytes.decode().splitlines())
-        maybe_validate_metadata(
-            parse_metadata, request.interpreter_constraints, request.requirements, python_setup  # type: ignore[arg-type]
-        )
+        if should_validate_metadata(request.requirements, python_setup):  # type: ignore[arg-type]
+            metadata = PythonLockfileMetadata.from_lockfile(
+                lock_bytes,
+                **(dict() if synthetic_lock else dict(lockfile_path=lock_path)),
+                resolve_name=resolve_name,
+                delimeter=header_delimiter,
+            )
+
+            validate_metadata(
+                metadata, request.interpreter_constraints, request.requirements, python_setup  # type: ignore[arg-type]
+            )
 
     else:
         assert isinstance(request.requirements, PexRequirements)
@@ -483,6 +507,9 @@ async def build_pex(
         output_files = [request.output_filename]
     else:
         output_directories = [request.output_filename]
+
+    if should_resolve:
+        argv.extend([*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"])
 
     process = await Get(
         Process,
@@ -550,6 +577,39 @@ def _build_pex_description(request: PexRequest) -> str:
                 f"{', '.join(request.requirements.req_strings)}"
             )
     return f"Building {request.output_filename} {desc_suffix}"
+
+
+def _strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
+    """Pex does not like the header Pants adds to lockfiles, as it violates JSON.
+
+    Note that we only strip lines starting with `//`, which is all that Pants will ever add. If
+    users add their own comments, things will fail.
+    """
+    return b"\n".join(
+        line for line in lockfile_bytes.splitlines() if not line.lstrip().startswith(b"//")
+    )
+
+
+def _is_probably_pex_json_lockfile(lockfile_bytes: bytes) -> bool:
+    for line in lockfile_bytes.splitlines():
+        if line and not line.startswith(b"//"):
+            # Note that pip/Pex complain if a requirements.txt style starts with `{`.
+            return line.lstrip().startswith(b"{")
+    return False
+
+
+def _pex_lockfile_requirement_count(lockfile_bytes: bytes) -> int:
+    # TODO: this is a very naive heuristic that will overcount, and also relies on Pants
+    #  setting `--indent` when generating lockfiles. More robust would be parsing the JSON
+    #  and getting the len(locked_resolves.locked_requirements.project_name), but we risk
+    #  if Pex ever changes its lockfile format.
+
+    num_lines = len(lockfile_bytes.splitlines())
+    # These are very naive estimates, and they bias towards overcounting. For example, requirements
+    # often are 20+ lines.
+    num_lines_for_options = 10
+    lines_per_req = 10
+    return max((num_lines - num_lines_for_options) // lines_per_req, 2)
 
 
 @rule

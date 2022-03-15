@@ -92,7 +92,7 @@ fn create_store(
     .iter()
     .map(|(span_id, _, _)| *span_id)
     .collect::<HashSet<_>>();
-  let ws = WorkunitStore::new(true);
+  let ws = WorkunitStore::new(true, log::Level::Debug);
 
   // Collect and sort by SpanId.
   let mut all = started

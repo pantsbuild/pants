@@ -10,4 +10,7 @@ python_tests(
         "3rdparty/python#pex"
     ],
     timeout=300,
+    overrides={
+        "pex_test.py": {"timeout": 330},
+    },
 )

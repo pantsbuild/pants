@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import importlib.resources
+import itertools
 import json
 import logging
 import os
@@ -22,15 +23,18 @@ from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     AddPrefix,
+    CreateDigest,
     Digest,
     DigestContents,
     DigestSubset,
+    FileContent,
     FileDigest,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, Target, Targets
@@ -248,7 +252,7 @@ class CoursierResolvedLockfile:
         entries = tuple(
             CoursierLockfileEntry.from_json_dict(entry) for entry in (contents["entries"])
         )
-        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes)
+        metadata = JVMLockfileMetadata.from_lockfile(lockfile_bytes, delimeter="#")
 
         return cls(
             entries=entries,
@@ -289,7 +293,16 @@ def classpath_dest_filename(coord: str, src_filename: str) -> str:
 @dataclass(frozen=True)
 class CoursierResolveInfo:
     coord_arg_strings: FrozenSet[str]
+    extra_args: tuple[str, ...]
     digest: Digest
+
+    @property
+    def argv(self) -> Iterable[str]:
+        """Return coursier arguments that can be used to compute or fetch this resolve.
+
+        Must be used in concert with `digest`.
+        """
+        return itertools.chain(self.coord_arg_strings, self.extra_args)
 
 
 @rule
@@ -300,6 +313,9 @@ async def prepare_coursier_resolve_info(
     # URLs, and put the files in the place specified by the URLs.
     no_jars: List[ArtifactRequirement] = []
     jars: List[Tuple[ArtifactRequirement, JvmArtifactJarSourceField]] = []
+    extra_args: List[str] = []
+
+    LOCAL_EXCLUDE_FILE = "PANTS_RESOLVE_EXCLUDES"
 
     for req in artifact_requirements:
         jar = req.jar
@@ -307,6 +323,23 @@ async def prepare_coursier_resolve_info(
             no_jars.append(req)
         else:
             jars.append((req, jar))
+
+    excludes = [
+        (req.coordinate, exclude)
+        for req in artifact_requirements
+        for exclude in (req.excludes or [])
+    ]
+
+    excludes_digest = EMPTY_DIGEST
+    if excludes:
+        excludes_file_content = FileContent(
+            LOCAL_EXCLUDE_FILE,
+            "\n".join(
+                f"{coord.group}:{coord.artifact}--{exclude}" for (coord, exclude) in excludes
+            ).encode("utf-8"),
+        )
+        excludes_digest = await Get(Digest, CreateDigest([excludes_file_content]))
+        extra_args += ["--local-exclude-file", LOCAL_EXCLUDE_FILE]
 
     jar_files = await Get(SourceFiles, SourceFilesRequest(i[1] for i in jars))
     jar_file_paths = jar_files.snapshot.files
@@ -320,9 +353,12 @@ async def prepare_coursier_resolve_info(
 
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
+    digest = await Get(Digest, MergeDigests([jar_files.snapshot.digest, excludes_digest]))
+
     return CoursierResolveInfo(
         coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
-        digest=jar_files.snapshot.digest,
+        digest=digest,
+        extra_args=tuple(extra_args),
     )
 
 
@@ -368,7 +404,7 @@ async def coursier_resolve_lockfile(
         CoursierFetchProcess(
             args=(
                 coursier_report_file_name,
-                *coursier_resolve_info.coord_arg_strings,
+                *coursier_resolve_info.argv,
             ),
             input_digest=coursier_resolve_info.digest,
             output_directories=("classpath",),
@@ -523,7 +559,7 @@ async def coursier_fetch_one_coord(
             args=(
                 coursier_report_file_name,
                 "--intransitive",
-                *coursier_resolve_info.coord_arg_strings,
+                *coursier_resolve_info.argv,
             ),
             input_digest=coursier_resolve_info.digest,
             output_directories=("classpath",),

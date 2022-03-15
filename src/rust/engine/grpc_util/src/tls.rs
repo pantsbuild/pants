@@ -1,6 +1,6 @@
-use rustls::{ClientConfig, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError};
-use std::convert::TryFrom;
 use std::sync::Arc;
+
+use rustls::{ClientConfig, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError};
 use webpki::DNSNameRef;
 
 #[derive(Default)]

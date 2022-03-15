@@ -62,7 +62,6 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -136,7 +135,7 @@ async def generate_targets_from_pex_binaries(
 # -----------------------------------------------------------------------------------------------
 
 
-@rule(desc="Determining the entry point for a `pex_binary` target", level=LogLevel.DEBUG)
+@rule(desc="Determining the entry point for a `pex_binary` target")
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
     ep_val = request.entry_point_field.value
     if ep_val is None:
@@ -266,7 +265,7 @@ def _classify_entry_points(
             )
 
 
-@rule(desc="Determining the entry points for a `python_distribution` target", level=LogLevel.DEBUG)
+@rule(desc="Determining the entry points for a `python_distribution` target")
 async def resolve_python_distribution_entry_points(
     request: ResolvePythonDistributionEntryPointsRequest,
 ) -> ResolvedPythonDistributionEntryPoints:

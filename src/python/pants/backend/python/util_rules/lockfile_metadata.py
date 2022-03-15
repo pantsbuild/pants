@@ -49,17 +49,6 @@ class PythonLockfileMetadata(LockfileMetadata):
         return PythonLockfileMetadataV2(valid_for_interpreter_constraints, requirements)
 
     @classmethod
-    def from_lockfile(
-        cls, resolve_name: str, lockfile: bytes, lockfile_path: str | None = None
-    ) -> PythonLockfileMetadata:
-        return cast(
-            PythonLockfileMetadata,
-            LockfileMetadata.from_lockfile_for_scope(
-                LockfileScope.PYTHON, lockfile, lockfile_path, resolve_name
-            ),
-        )
-
-    @classmethod
     def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
         instance = cast(PythonLockfileMetadata, instance)
         return {

@@ -10,20 +10,16 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import BoolOption
+from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name
 
 
 class TerraformValidateSubsystem(Subsystem):
     options_scope = "terraform-validate"
+    name = "`terraform validate`"
     help = """Terraform validate options."""
 
-    skip = BoolOption(
-        "--skip",
-        default=False,
-        help=f"Don't run `terraform validate` when running `{bin_name()} check`.",
-    )
+    skip = SkipOption("check")
 
 
 class TerraformCheckRequest(CheckRequest):

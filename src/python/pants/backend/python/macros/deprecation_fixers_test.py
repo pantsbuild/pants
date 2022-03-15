@@ -21,9 +21,9 @@ from pants.backend.python.macros.deprecation_fixers import (
 from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
 from pants.backend.python.macros.poetry_requirements_caof import PoetryRequirementsCAOF
 from pants.backend.python.macros.python_requirements_caof import PythonRequirementsCAOF
-from pants.backend.python.target_types import PythonRequirementsFileTarget, PythonRequirementTarget
+from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.goals.update_build_files import RewrittenBuildFile
-from pants.core.target_types import GenericTarget
+from pants.core.target_types import GenericTarget, TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(MacroRenames, [MacroRenamesRequest]),
             QueryRule(RewrittenBuildFile, [UpdatePythonMacrosRequest]),
         ),
-        target_types=[GenericTarget, PythonRequirementsFileTarget, PythonRequirementTarget],
+        target_types=[GenericTarget, TargetGeneratorSourcesHelperTarget, PythonRequirementTarget],
         context_aware_object_factories={
             "python_requirements": PythonRequirementsCAOF,
             "poetry_requirements": PoetryRequirementsCAOF,
@@ -267,15 +267,11 @@ def test_update_macro_references(rule_runner: RuleRunner) -> None:
 
 def test_check_options(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.write_files({"requirements.txt": "req", "BUILD": "python_requirements()"})
-    rule_runner.set_options(
-        ["--python-protobuf-runtime-dependencies=//:req", "--flake8-source-plugins=//:req"]
-    )
+    rule_runner.set_options(["--pylint-source-plugins=//:req", "--flake8-source-plugins=//:req"])
     rule_runner.request(OptionsChecker, [OptionsCheckerRequest()])
     assert "* [flake8].source_plugins: ['//:req -> //:reqs#req']" in caplog.text
-    assert "* [python-protobuf].runtime_dependencies: ['//:req -> //:reqs#req']" in caplog.text
-    assert "pylint" not in caplog.text
+    assert "* [pylint].source_plugins: ['//:req -> //:reqs#req']" in caplog.text
     assert "mypy" not in caplog.text
-    assert "python-thrift" not in caplog.text
 
 
 def test_invalid_address() -> None:

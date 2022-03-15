@@ -239,27 +239,40 @@ async def setup_pytest_for_target(
     )
     pytest_runner_pex, config_files = await MultiGet(pytest_runner_pex_get, config_files_get)
 
+    # The coverage and pytest config may live in the same config file (e.g., setup.cfg, tox.ini
+    # or pyproject.toml), and wee may have rewritten those files to augment the coverage config,
+    # in which case we must ensure that the original and rewritten files don't collide.
+    pytest_config_digest = config_files.snapshot.digest
+    if coverage_config.path in config_files.snapshot.files:
+        subset_paths = list(config_files.snapshot.files)
+        # Remove the original file, and rely on the rewritten file, which contains all the
+        # pytest-related config unchanged.
+        subset_paths.remove(coverage_config.path)
+        pytest_config_digest = await Get(
+            Digest, DigestSubset(pytest_config_digest, PathGlobs(subset_paths))
+        )
+
     input_digest = await Get(
         Digest,
         MergeDigests(
             (
                 coverage_config.digest,
                 local_dists.remaining_sources.source_files.snapshot.digest,
-                config_files.snapshot.digest,
+                pytest_config_digest,
                 extra_output_directory_digest,
                 *(plugin_setup.digest for plugin_setup in plugin_setups),
             )
         ),
     )
 
-    add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
+    add_opts = [f"--color={'yes' if global_options.colors else 'no'}"]
     output_files = []
 
     results_file_name = None
     if not request.is_debug:
         results_file_name = f"{request.field_set.address.path_safe_spec}.xml"
         add_opts.extend(
-            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.options.junit_family}")
+            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
         )
         output_files.append(results_file_name)
 
@@ -301,13 +314,13 @@ async def setup_pytest_for_target(
         Process,
         VenvPexProcess(
             pytest_runner_pex,
-            argv=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
+            argv=(*pytest.args, *coverage_args, *field_set_source_files.files),
             extra_env=extra_env,
             input_digest=input_digest,
             output_directories=(_EXTRA_OUTPUT_DIR,),
             output_files=output_files,
             timeout_seconds=request.field_set.timeout.calculate_from_global_options(pytest),
-            execution_slot_variable=pytest.options.execution_slot_var,
+            execution_slot_variable=pytest.execution_slot_var,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
             cache_scope=cache_scope,

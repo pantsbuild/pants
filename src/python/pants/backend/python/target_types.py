@@ -597,7 +597,8 @@ class PexBinaryDefaults(Subsystem):
             "\n\nCan be overridden by specifying the `emit_warnings` parameter of individual "
             "`pex_binary` targets"
         ),
-    ).advanced()
+        advanced=True,
+    )
     resolve_local_platforms = BoolOption(
         "--resolve-local-platforms",
         default=False,
@@ -609,7 +610,8 @@ class PexBinaryDefaults(Subsystem):
             "is found (or if this option is `False`), resolve for the platform by accepting "
             "only pre-built binary distributions (wheels)."
         ),
-    ).advanced()
+        advanced=True,
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -818,10 +820,12 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
-        "This target generator is intended for test utility files like `conftest.py`, although it "
-        "behaves identically to the `python_sources` target generator and you can safely use that "
-        "instead. This target only exists to help you better model and keep separate test support "
-        "files vs. production files."
+        "This target generator is intended for test utility files like `conftest.py` or "
+        "`my_test_utils.py`. Technically, it generates `python_source` targets in the exact same "
+        "way as the `python_sources` target generator does, only that the `sources` field has a "
+        "different default. So it is valid to use `python_sources` instead. However, this target "
+        "can be helpful to better model your code by keeping separate test support files vs. "
+        "production files."
     )
 
 
@@ -1032,11 +1036,6 @@ class PythonRequirementTarget(Target):
             )
 
 
-# -----------------------------------------------------------------------------------------------
-# `_python_requirements_file` target
-# -----------------------------------------------------------------------------------------------
-
-
 def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequirement]:
     """Parse all `PipRequirement` objects from a requirements.txt-style file.
 
@@ -1055,21 +1054,6 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
                     line, e, description_of_origin=f"{rel_path} at line {i + 1}"
                 )
             )
-
-
-class PythonRequirementsFileSourcesField(SingleSourceField):
-    uses_source_roots = False
-
-
-# This allows us to work around https://github.com/pantsbuild/pants/issues/13118. Because a
-# generated target does not depend on its target generator, `--changed-since --changed-dependees`
-# would not mark the generated targets as changing when the `requirements.txt` changes, even though
-# it may be impacted. Fixing that will be A Thing and requires design work, so instead we can
-# depend on this private target type that owns `requirements.txt` to get `--changed-since` working.
-class PythonRequirementsFileTarget(Target):
-    alias = "_python_requirements_file"
-    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSourcesField)
-    help = "A private helper target type used by `python_requirement` target generators."
 
 
 # -----------------------------------------------------------------------------------------------

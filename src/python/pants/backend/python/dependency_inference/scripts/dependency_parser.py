@@ -4,7 +4,7 @@
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
 # NB: If you're needing to debug this, an easy way is to just invoke it on a file.
-#   E.g. `MIN_DOTS=1 STRING_IMPORTS=N python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
+#   E.g. `STRING_IMPORTS=y ... python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
 
 from __future__ import print_function, unicode_literals
 
@@ -16,15 +16,6 @@ import re
 import sys
 import tokenize
 from io import open
-
-MIN_DOTS = os.environ["MIN_DOTS"]
-
-# This regex is used to infer imports from strings, e.g.
-#  `importlib.import_module("example.subdir.Foo")`.
-STRING_IMPORT_REGEX = re.compile(
-    r"^([a-z_][a-z_\d]*\.){" + MIN_DOTS + r",}[a-zA-Z_]\w*$",
-    re.UNICODE,
-)
 
 
 class AstVisitor(ast.NodeVisitor):
@@ -38,11 +29,37 @@ class AstVisitor(ast.NodeVisitor):
         #   weak/strong)
         self.strong_imports = {}
         self.weak_imports = {}
+        self.assets = set()
         self._weaken_strong_imports = False
+        if os.environ["STRING_IMPORTS"] == "y":
+            # This regex is used to infer imports from strings, e.g .
+            #  `importlib.import_module("example.subdir.Foo")`.
+            self._string_import_regex = re.compile(
+                r"^([a-z_][a-z_\d]*\.){"
+                + os.environ["STRING_IMPORTS_MIN_DOTS"]
+                + r",}[a-zA-Z_]\w*$",
+                re.UNICODE,
+            )
+        else:
+            self._string_import_regex = None
 
-    def maybe_add_string_import(self, node, s):
-        if os.environ["STRING_IMPORTS"] == "y" and STRING_IMPORT_REGEX.match(s):
+        if os.environ["ASSETS"] == "y":
+            # This regex is used to infer asset names from strings, e.g.
+            #  `load_resource("data/db1.json")
+            # Since Unix allows basically anything for filenames, we require some "sane" subset of
+            #  possibilities namely, word-character filenames and a mandatory extension.
+            self._asset_regex = re.compile(
+                r"^([\w]*\/){" + os.environ["ASSETS_MIN_SLASHES"] + r",}\w*(\.[^\/\.\n]+)+$",
+                re.UNICODE,
+            )
+        else:
+            self._asset_regex = None
+
+    def maybe_add_string_dependency(self, node, s):
+        if self._string_import_regex and self._string_import_regex.match(s):
             self.weak_imports.setdefault(s, node.lineno)
+        if self._asset_regex and self._asset_regex.match(s):
+            self.assets.add(s)
 
     def add_strong_import(self, name, lineno):
         imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
@@ -147,14 +164,14 @@ class AstVisitor(ast.NodeVisitor):
     def visit_Str(self, node):
         try:
             val = node.s.decode("utf8") if isinstance(node.s, bytes) else node.s
-            self.maybe_add_string_import(node, val)
+            self.maybe_add_string_dependency(node, val)
         except UnicodeError:
             pass
 
     # For Python 3.8+
     def visit_Constant(self, node):
         if isinstance(node.value, str):
-            self.maybe_add_string_import(node, node.value)
+            self.maybe_add_string_dependency(node, node.value)
 
 
 def main(filename):
@@ -174,18 +191,25 @@ def main(filename):
     buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
 
     # N.B. Start with weak and `update` with definitive so definite "wins"
-    result = {
+    imports_result = {
         module_name: {"lineno": lineno, "weak": True}
         for module_name, lineno in visitor.weak_imports.items()
     }
-    result.update(
+    imports_result.update(
         {
             module_name: {"lineno": lineno, "weak": False}
             for module_name, lineno in visitor.strong_imports.items()
         }
     )
 
-    buffer.write(json.dumps(result).encode("utf8"))
+    buffer.write(
+        json.dumps(
+            {
+                "imports": imports_result,
+                "assets": sorted(visitor.assets),
+            }
+        ).encode("utf8")
+    )
 
 
 if __name__ == "__main__":

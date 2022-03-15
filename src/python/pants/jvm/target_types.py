@@ -19,6 +19,7 @@ from pants.engine.target import (
     InvalidTargetException,
     OptionalSingleSourceField,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -167,6 +168,19 @@ class JvmProvidesTypesField(StringSequenceField):
     )
 
 
+class JvmArtifactExcludeDependenciesField(StringSequenceField):
+    alias = "excludes"
+    help = (
+        "A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded "
+        "as dependencies when this artifact is resolved.\n\n"
+        "This does not prevent this artifact from being included in the resolve as a dependency "
+        "of other artifacts that depend on it, and is currently intended as a way to resolve "
+        "version conflicts in complex resolves.\n\n"
+        "These values are passed directly to Coursier, and if specified incorrectly will show a "
+        "parse error from Coursier."
+    )
+
+
 class JvmArtifactResolveField(JvmResolveField):
     help = (
         "The resolve from `[jvm].resolves` that this artifact should be included in.\n\n"
@@ -203,6 +217,7 @@ class JvmArtifactTarget(Target):
         JvmArtifactUrlField,  # TODO: should `JvmArtifactFieldSet` have an `all_fields` field?
         JvmArtifactJarSourceField,
         JvmArtifactResolveField,
+        JvmArtifactExcludeDependenciesField,
     )
     help = (
         "A third-party JVM artifact, as identified by its Maven-compatible coordinate.\n\n"
@@ -258,4 +273,43 @@ class DeployJarTarget(Target):
         "A `jar` file with first and third-party code bundled for deploys.\n\n"
         "The JAR will contain class files for both first-party code and "
         "third-party dependencies, all in a common directory structure."
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `jvm_war` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class JvmWarDependenciesField(Dependencies):
+    pass
+
+
+class JvmWarDescriptorAddressField(SingleSourceField):
+    alias = "descriptor"
+    default = "web.xml"
+    help = "Path to a file containing the descriptor (i.e., web.xml) for this WAR file. Defaults to `web.xml`."
+
+
+class JvmWarContentField(SpecialCasedDependencies):
+    alias = "content"
+    help = (
+        "A list of addresses to `resources` and `files` targets with content to place in the "
+        "document root of this WAR file."
+    )
+
+
+class JvmWarTarget(Target):
+    alias = "jvm_war"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JvmResolveField,
+        JvmWarContentField,
+        JvmWarDependenciesField,
+        JvmWarDescriptorAddressField,
+        OutputPathField,
+    )
+    help = (
+        'A JSR 154 "web application archive" (or "war") with first-party and third-party code bundled for '
+        "deploys in Java Servlet containers."
     )

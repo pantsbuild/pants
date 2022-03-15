@@ -6,7 +6,7 @@ from __future__ import annotations
 import collections
 import json
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Iterable, cast
+from typing import Any, Iterable
 
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -22,6 +22,7 @@ from pants.engine.target import (
     Targets,
     UnexpandedTargets,
 )
+from pants.option.option_types import BoolOption
 
 
 class PeekSubsystem(Outputting, GoalSubsystem):
@@ -30,19 +31,11 @@ class PeekSubsystem(Outputting, GoalSubsystem):
     name = "peek"
     help = "Display BUILD target info"
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--exclude-defaults",
-            type=bool,
-            default=False,
-            help="Whether to leave off values that match the target-defined default values.",
-        )
-
-    @property
-    def exclude_defaults(self) -> bool:
-        return cast(bool, self.options.exclude_defaults)
+    exclude_defaults = BoolOption(
+        "--exclude-defaults",
+        default=False,
+        help="Whether to leave off values that match the target-defined default values.",
+    )
 
 
 class Peek(Goal):

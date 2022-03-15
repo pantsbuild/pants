@@ -16,11 +16,12 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.core.util_rules.system_binaries import PythonBinary
+from pants.core.util_rules.system_binaries import BashBinary, PythonBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, Process
+from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
@@ -39,6 +40,11 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     # times if the source is the same as well.
     classpath = dict()
     for dep in report['dependencies']:
+        if not dep.get('file'):
+            raise Exception(
+                f"No jar found for {dep['coord']}. Check that it's available in the "
+                "repositories configured in [coursier].repos in pants.toml."
+            )
         source = PurePath(dep['file'])
         dest_name = dep['coord'].replace(":", "_")
         _, ext = os.path.splitext(source)
@@ -117,25 +123,20 @@ class CoursierSubsystem(TemplatedExternalTool):
         "linux_x86_64": "x86_64-pc-linux",
     }
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--repos",
-            type=list,
-            member_type=str,
-            default=[
-                "https://maven-central.storage-download.googleapis.com/maven2",
-                "https://repo1.maven.org/maven2",
-            ],
-            help=(
-                "Maven style repositories to resolve artifacts from."
-                "\n\n"
-                "Coursier will resolve these repositories in the order in which they are "
-                "specifed, and re-ordering repositories will cause artifacts to be "
-                "re-downloaded. This can result in artifacts in lockfiles becoming invalid."
-            ),
-        )
+    repos = StrListOption(
+        "--repos",
+        default=[
+            "https://maven-central.storage-download.googleapis.com/maven2",
+            "https://repo1.maven.org/maven2",
+        ],
+        help=(
+            "Maven style repositories to resolve artifacts from."
+            "\n\n"
+            "Coursier will resolve these repositories in the order in which they are "
+            "specifed, and re-ordering repositories will cause artifacts to be "
+            "re-downloaded. This can result in artifacts in lockfiles becoming invalid."
+        ),
+    )
 
     def generate_exe(self, plat: Platform) -> str:
         archive_filename = os.path.basename(self.generate_url(plat))
@@ -239,8 +240,7 @@ async def setup_coursier(
     python: PythonBinary,
 ) -> Coursier:
     repos_args = (
-        " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.options.repos)
-        + " --no-default"
+        " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.repos) + " --no-default"
     )
     coursier_wrapper_script = COURSIER_FETCH_WRAPPER_SCRIPT.format(
         repos_args=repos_args,
@@ -294,7 +294,7 @@ async def setup_coursier(
                 ]
             ),
         ),
-        repos=FrozenOrderedSet(coursier_subsystem.options.repos),
+        repos=FrozenOrderedSet(coursier_subsystem.repos),
     )
 
 

@@ -13,11 +13,15 @@ from __future__ import annotations
 
 import textwrap
 from textwrap import dedent
-from typing import Sequence, cast
+from typing import Sequence, Type, cast
 
 import chevron
 import pytest
 
+from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
+from pants.backend.codegen.protobuf.java.rules import rules as protobuf_rules
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceField, ProtobufSourceTarget
+from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
@@ -33,17 +37,25 @@ from pants.backend.scala.dependency_inference.rules import rules as scala_dep_in
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.native_engine import FileDigest
-from pants.engine.target import CoarsenedTarget, Target, UnexpandedTargets
-from pants.engine.unions import UnionMembership
+from pants.engine.target import (
+    CoarsenedTarget,
+    GeneratedSources,
+    HydratedSources,
+    HydrateSourcesRequest,
+    SourcesField,
+    Target,
+    UnexpandedTargets,
+)
 from pants.jvm import classpath, jdk_rules, testutil
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
     ClasspathEntryRequest,
+    ClasspathEntryRequestFactory,
     ClasspathSourceAmbiguity,
     ClasspathSourceMissing,
 )
@@ -66,6 +78,7 @@ from pants.jvm.testutil import (
 )
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 DEFAULT_LOCKFILE = TestCoursierWrapper(
     CoursierResolvedLockfile(
@@ -125,11 +138,21 @@ def rule_runner() -> RuleRunner:
             *java_target_types_rules(),
             *util_rules(),
             *testutil.rules(),
+            *protobuf_rules(),
+            *stripped_source_files.rules(),
+            *protobuf_target_types_rules(),
             QueryRule(Classpath, (Addresses,)),
             QueryRule(RenderedClasspath, (Addresses,)),
             QueryRule(UnexpandedTargets, (Addresses,)),
+            QueryRule(HydratedSources, [HydrateSourcesRequest]),
+            QueryRule(GeneratedSources, [GenerateJavaFromProtobufRequest]),
         ],
-        target_types=[ScalaSourcesGeneratorTarget, JavaSourcesGeneratorTarget, JvmArtifactTarget],
+        target_types=[
+            JavaSourcesGeneratorTarget,
+            JvmArtifactTarget,
+            ProtobufSourceTarget,
+            ScalaSourcesGeneratorTarget,
+        ],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -182,6 +205,22 @@ def scala_main_source(extra_imports: Sequence[str] = ()) -> str:
     )
 
 
+def proto_source() -> str:
+    return dedent(
+        """\
+                syntax = "proto3";
+
+                package dir1;
+
+                message Person {
+                  string name = 1;
+                  int32 id = 2;
+                  string email = 3;
+                }
+                """
+    )
+
+
 class CompileMockSourceRequest(ClasspathEntryRequest):
     field_sets = (JavaFieldSet, JavaGeneratorFieldSet)
 
@@ -191,9 +230,12 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
     def classify(
         targets: Sequence[Target],
         members: Sequence[type[ClasspathEntryRequest]],
+        generators: FrozenDict[type[ClasspathEntryRequest], frozenset[type[SourcesField]]],
     ) -> tuple[type[ClasspathEntryRequest], type[ClasspathEntryRequest] | None]:
-        req = ClasspathEntryRequest.for_targets(
-            UnionMembership({ClasspathEntryRequest: members}),
+
+        factory = ClasspathEntryRequestFactory(tuple(members), generators)
+
+        req = factory.for_targets(
             CoarsenedTarget(targets, ()),
             CoursierResolveKey("example", "path", EMPTY_DIGEST),
         )
@@ -206,13 +248,15 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
                 scala_sources(name='scala')
                 java_sources(name='java')
                 jvm_artifact(name='jvm_artifact', group='ex', artifact='ex', version='0.0.0')
+                protobuf_source(name='proto', source="f.proto")
                 {DEFAULT_SCALA_LIBRARY_TARGET}
                 """
             ),
+            "f.proto": proto_source(),
             "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
         }
     )
-    scala, java, jvm_artifact = rule_runner.request(
+    scala, java, jvm_artifact, proto = rule_runner.request(
         UnexpandedTargets,
         [
             Addresses(
@@ -220,33 +264,41 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
                     Address("", target_name="scala"),
                     Address("", target_name="java"),
                     Address("", target_name="jvm_artifact"),
+                    Address("", target_name="proto"),
                 ]
             )
         ],
     )
     all_members = [CompileJavaSourceRequest, CompileScalaSourceRequest, CoursierFetchRequest]
+    generators = FrozenDict(
+        {
+            CompileJavaSourceRequest: frozenset([cast(Type[SourcesField], ProtobufSourceField)]),
+            CompileScalaSourceRequest: frozenset(),
+        }
+    )
 
     # Fully compatible.
-    assert (CompileJavaSourceRequest, None) == classify([java], all_members)
-    assert (CompileScalaSourceRequest, None) == classify([scala], all_members)
-    assert (CoursierFetchRequest, None) == classify([jvm_artifact], all_members)
+    assert (CompileJavaSourceRequest, None) == classify([java], all_members, generators)
+    assert (CompileScalaSourceRequest, None) == classify([scala], all_members, generators)
+    assert (CoursierFetchRequest, None) == classify([jvm_artifact], all_members, generators)
+    assert (CompileJavaSourceRequest, None) == classify([proto], all_members, generators)
 
     # Partially compatible.
     assert (CompileJavaSourceRequest, CompileScalaSourceRequest) == classify(
-        [java, scala], all_members
+        [java, scala], all_members, generators
     )
     with pytest.raises(ClasspathSourceMissing):
-        classify([java, jvm_artifact], all_members)
+        classify([java, jvm_artifact], all_members, generators)
 
     # None compatible.
     with pytest.raises(ClasspathSourceMissing):
-        classify([java], [])
+        classify([java], [], generators)
     with pytest.raises(ClasspathSourceMissing):
-        classify([scala, java, jvm_artifact], all_members)
+        classify([scala, java, jvm_artifact], all_members, generators)
 
     # Too many compatible.
     with pytest.raises(ClasspathSourceAmbiguity):
-        classify([java], [CompileJavaSourceRequest, CompileMockSourceRequest])
+        classify([java], [CompileJavaSourceRequest, CompileMockSourceRequest], generators)
 
 
 @maybe_skip_jdk_test

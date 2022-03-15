@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from pants.engine.fs import (
@@ -18,8 +16,6 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
-    BinaryPathRequest,
-    BinaryPaths,
     FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessRequest,
@@ -34,7 +30,6 @@ from pants.util.contextutil import environment_as
 def new_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            QueryRule(BinaryPaths, [BinaryPathRequest]),
             QueryRule(ProcessResult, [Process]),
             QueryRule(FallibleProcessResult, [Process]),
             QueryRule(InteractiveProcess, [InteractiveProcessRequest]),
@@ -289,89 +284,3 @@ def test_interactive_process_immutable_input_digests(rule_runner: RuleRunner) ->
     assert iproc.env == process.env
     snapshot = rule_runner.request(Snapshot, [iproc.input_digest])
     assert snapshot.files == ("file0", "prefix1/file1", "prefix2/file2", "prefix2/file3")
-
-
-def test_find_binary_non_existent(rule_runner: RuleRunner, tmp_path: Path) -> None:
-    binary_paths = rule_runner.request(
-        BinaryPaths, [BinaryPathRequest(binary_name="nonexistent-bin", search_path=[str(tmp_path)])]
-    )
-    assert binary_paths.first_path is None
-
-
-class MyBin:
-    binary_name = "mybin"
-
-    @classmethod
-    def create(cls, directory: Path) -> Path:
-        directory.mkdir(parents=True, exist_ok=True)
-        exe = directory / cls.binary_name
-        exe.touch(mode=0o755)
-        return exe
-
-
-def test_find_binary_on_path_without_bash(rule_runner: RuleRunner, tmp_path: Path) -> None:
-    # Test that locating a binary on a PATH which does not include bash works (by recursing to
-    # locate bash first).
-    binary_dir_abs = tmp_path / "bin"
-    binary_path_abs = MyBin.create(binary_dir_abs)
-
-    binary_paths = rule_runner.request(
-        BinaryPaths,
-        [BinaryPathRequest(binary_name=MyBin.binary_name, search_path=[str(binary_dir_abs)])],
-    )
-    assert binary_paths.first_path is not None
-    assert binary_paths.first_path.path == str(binary_path_abs)
-
-
-def test_find_binary_file_path(rule_runner: RuleRunner, tmp_path: Path) -> None:
-    binary_path_abs = MyBin.create(tmp_path)
-
-    binary_paths = rule_runner.request(
-        BinaryPaths,
-        [
-            BinaryPathRequest(
-                binary_name=MyBin.binary_name,
-                search_path=[str(binary_path_abs)],
-            )
-        ],
-    )
-    assert binary_paths.first_path is None, "By default, PATH file entries should not be checked."
-
-    binary_paths = rule_runner.request(
-        BinaryPaths,
-        [
-            BinaryPathRequest(
-                binary_name=MyBin.binary_name,
-                search_path=[str(binary_path_abs)],
-                check_file_entries=True,
-            )
-        ],
-    )
-    assert binary_paths.first_path is not None
-    assert binary_paths.first_path.path == str(binary_path_abs)
-
-
-def test_find_binary_respects_search_path_order(rule_runner: RuleRunner, tmp_path: Path) -> None:
-    binary_path_abs1 = MyBin.create(tmp_path / "bin1")
-    binary_path_abs2 = MyBin.create(tmp_path / "bin2")
-    binary_path_abs3 = MyBin.create(tmp_path / "bin3")
-
-    binary_paths = rule_runner.request(
-        BinaryPaths,
-        [
-            BinaryPathRequest(
-                binary_name=MyBin.binary_name,
-                search_path=[
-                    str(binary_path_abs1.parent),
-                    str(binary_path_abs2),
-                    str(binary_path_abs3.parent),
-                ],
-                check_file_entries=True,
-            )
-        ],
-    )
-    assert binary_paths.first_path is not None
-    assert binary_paths.first_path.path == str(binary_path_abs1)
-    assert [str(p) for p in (binary_path_abs1, binary_path_abs2, binary_path_abs3)] == [
-        binary_path.path for binary_path in binary_paths.paths
-    ]

@@ -1,10 +1,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, cast
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
+from pants.option.option_types import BoolOption
 
 
 class Protoc(TemplatedExternalTool):
@@ -29,26 +29,13 @@ class Protoc(TemplatedExternalTool):
         "macos_x86_64": "osx-x86_64",
     }
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--dependency-inference",
-            default=True,
-            type=bool,
-            help=(
-                "Infer Protobuf dependencies on other Protobuf files by analyzing import "
-                "statements."
-            ),
-        )
+    dependency_inference = BoolOption(
+        "--dependency-inference",
+        default=True,
+        help=(
+            "Infer Protobuf dependencies on other Protobuf files by analyzing import statements."
+        ),
+    )
 
     def generate_exe(self, plat: Platform) -> str:
         return "./bin/protoc"
-
-    @property
-    def runtime_targets(self) -> List[str]:
-        return cast(List[str], self.options.runtime_targets)
-
-    @property
-    def dependency_inference(self) -> bool:
-        return cast(bool, self.options.dependency_inference)
