@@ -15,6 +15,12 @@ jobs:
     name: Bootstrap Pants, test+lint Rust (Linux)
     runs-on: ubuntu-20.04
     steps:
+    - name: Print the env
+      run: 'env
+
+        exit 1
+
+        '
     - name: Check out code
       uses: actions/checkout@v2
       with:
@@ -165,6 +171,12 @@ jobs:
     name: Bootstrap Pants, test Rust (macOS)
     runs-on: macos-10.15
     steps:
+    - name: Print the env
+      run: 'env
+
+        exit 1
+
+        '
     - name: Check out code
       uses: actions/checkout@v2
       with:
@@ -288,6 +300,12 @@ jobs:
     name: Build wheels and fs_util (Linux)
     runs-on: ubuntu-20.04
     steps:
+    - name: Print the env
+      run: 'env
+
+        exit 1
+
+        '
     - name: Check out code
       uses: actions/checkout@v2
       with:
@@ -366,6 +384,12 @@ jobs:
     name: Build wheels and fs_util (macOS)
     runs-on: macos-10.15
     steps:
+    - name: Print the env
+      run: 'env
+
+        exit 1
+
+        '
     - name: Check out code
       uses: actions/checkout@v2
       with:
@@ -462,6 +486,12 @@ jobs:
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
     steps:
+    - name: Print the env
+      run: 'env
+
+        exit 1
+
+        '
     - name: Check out code
       uses: actions/checkout@v2
       with:
@@ -537,6 +567,12 @@ jobs:
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
     steps:
+    - name: Print the env
+      run: 'env
+
+        exit 1
+
+        '
     - name: Check out code
       uses: actions/checkout@v2
       with:
@@ -635,6 +671,12 @@ jobs:
     needs: bootstrap_pants_macos
     runs-on: macos-10.15
     steps:
+    - name: Print the env
+      run: 'env
+
+        exit 1
+
+        '
     - name: Check out code
       uses: actions/checkout@v2
       with:

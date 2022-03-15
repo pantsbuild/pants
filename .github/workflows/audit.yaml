@@ -8,6 +8,12 @@ jobs:
     if: ${{ github.repository_owner == 'pantsbuild' }}
     runs-on: ubuntu-latest
     steps:
+    - name: Print the env
+      run: 'env
+
+        exit 1
+
+        '
     - name: Check out code
       uses: actions/checkout@v2
       with:

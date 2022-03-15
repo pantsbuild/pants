@@ -70,6 +70,15 @@ IS_PANTS_OWNER = "${{ github.repository_owner == 'pantsbuild' }}"
 def checkout() -> Sequence[Step]:
     """Get prior commits and the commit message."""
     return [
+        {
+            "name": "Print the env",
+            "run": dedent(
+                """\
+                env
+                exit 1
+                """
+            )
+        },
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
         # for details on how we get the commit message here.
         # We need to fetch a few commits back, to be able to access HEAD^2 in the PR case.
