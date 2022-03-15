@@ -274,7 +274,6 @@ class PythonAWSLambda(Target):
                     `{self[PexCompletePlatformsField].alias}` or both.
                     """
                 )
-
             )
 
 
