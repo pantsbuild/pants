@@ -13,6 +13,7 @@ from pants.util.strutil import (
     hard_wrap,
     path_safe,
     pluralize,
+    softwrap,
     strip_prefix,
     strip_v2_chroot_path,
 )
@@ -159,4 +160,123 @@ def test_bullet_list_max_elements() -> None:
   * a
   * b
   * ... and 5 more"""
+    )
+
+
+def test_softwrap_multiline() -> None:
+    assert (
+        softwrap("The version of the prior release, e.g. `2.0.0.dev0` or `2.0.0rc1`.")
+        == "The version of the prior release, e.g. `2.0.0.dev0` or `2.0.0rc1`."
+    )
+    # Test with leading backslash
+    assert (
+        softwrap(
+            """\
+                Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,
+                spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster
+                and the theory of Atlantis?
+
+                Ah, if there's a steady paycheck in it,
+                I'll believe anything you say.
+
+                [From
+                Ghostbusters (1984)]
+            """
+        )
+        == (
+            "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance, "
+            "spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster "
+            "and the theory of Atlantis?"
+            "\n\n"
+            "Ah, if there's a steady paycheck in it, I'll believe anything you say."
+            "\n\n"
+            "[From Ghostbusters (1984)]"
+        )
+    )
+    # Test without leading backslash
+    assert (
+        softwrap(
+            """
+                Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,
+                spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster
+                and the theory of Atlantis?
+
+                Ah, if there's a steady paycheck in it,
+                I'll believe anything you say.
+
+                [From
+                Ghostbusters (1984)]
+            """
+        )
+        == (
+            "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance, "
+            "spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster "
+            "and the theory of Atlantis?"
+            "\n\n"
+            "Ah, if there's a steady paycheck in it, I'll believe anything you say."
+            "\n\n"
+            "[From Ghostbusters (1984)]"
+        )
+    )
+    assert (
+        softwrap(
+            """
+                Do you
+                believe in:
+
+                    UFOs
+                    astral projections
+                    mental telepathy
+                    ...
+
+                Ah, if there's a steady paycheck in it,
+                I'll believe anything you say.
+            """
+        )
+        == (
+            "Do you believe in:"
+            "\n\n"
+            "    UFOs\n"
+            "    astral projections\n"
+            "    mental telepathy\n"
+            "    ...\n"
+            "\n"
+            "Ah, if there's a steady paycheck in it, I'll believe anything you say."
+        )
+    )
+    assert (
+        softwrap(
+            """
+                Roll Call:
+
+                    ```
+                        - Dr. Peter Venkman
+                        - Dr. Egon Spengler
+                        - Dr. Raymond Stantz
+                        - Winston Zeddemore
+
+                        And not really a ghostbuster, but we need to test wrapped indentation
+                        - Louis (Vinz, Vinz Clortho,\
+                        Keymaster of Gozer. Volguus Zildrohar, Lord of\
+                            the Sebouillia)
+                    ```
+
+                All here.
+            """
+        )
+        == (
+            "Roll Call:\n\n"
+            "    ```\n"
+            "        - Dr. Peter Venkman\n"
+            "        - Dr. Egon Spengler\n"
+            "        - Dr. Raymond Stantz\n"
+            "        - Winston Zeddemore\n"
+            "\n"
+            "        And not really a ghostbuster, but we need to test wrapped indentation\n"
+            # No \n at the end of this one
+            "        - Louis (Vinz, Vinz Clortho, Keymaster of Gozer. Volguus Zildrohar, Lord of "
+            "the Sebouillia)\n"
+            "    ```\n"
+            "\nAll here."
+        )
     )
