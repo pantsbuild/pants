@@ -121,7 +121,7 @@ class Subsystem(metaclass=ABCMeta):
         for options_info in collect_options_info(cls):
             register(*options_info.flag_names, **options_info.flag_options)
 
-        # NB: Still call `register_options` for classes which haven't switched
+        # NB: If the class defined `register_options` we should call it
         if "register_options" in cls.__dict__:
             cls.register_options(register)
 
