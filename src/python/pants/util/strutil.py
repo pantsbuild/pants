@@ -209,7 +209,7 @@ def path_safe(s: str) -> str:
     return _non_path_safe_re.sub("_", s)
 
 
-def softwrap(s: str):
+def softwrap(s: str) -> str:
     """Turns a multiline string into a softwrapped string.
 
     Applies the following rules:
