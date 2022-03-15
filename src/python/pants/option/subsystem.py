@@ -15,6 +15,7 @@ from pants.option.errors import OptionsError
 from pants.option.option_types import collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
+from pants.util.docutil import doc_url
 
 
 class Subsystem(metaclass=ABCMeta):
@@ -101,7 +102,7 @@ class Subsystem(metaclass=ABCMeta):
         removal_version="2.12.0.dev0",
         hint=(
             "Options are now registered by declaring class attributes using the types in "
-            "pants/option.option_types.py"
+            f"pants/option/option_types.py. See {doc_url('plugin-upgrade-guide')}"
         ),
     )
     def register_options(cls, register):
@@ -121,7 +122,7 @@ class Subsystem(metaclass=ABCMeta):
             register(*options_info.flag_names, **options_info.flag_options)
 
         # NB: Still call `register_options` for classes which haven't switched
-        if cls.register_options is not Subsystem.register_options:
+        if "register_options" in cls.__dict__:
             cls.register_options(register)
 
     def __init__(self, options: OptionValueContainer) -> None:
