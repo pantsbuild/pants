@@ -9,9 +9,12 @@ from pants.backend.helm.subsystems.unittest import HelmUnitTestSubsystem
 from pants.backend.helm.subsystems.unittest import rules as subsystem_rules
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
+    HelmChartTarget,
     HelmUnitTestChartField,
     HelmUnitTestDependenciesField,
     HelmUnitTestSourceField,
+    HelmUnitTestTestsGeneratorTarget,
+    HelmUnitTestTestTarget,
 )
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
@@ -19,6 +22,7 @@ from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, Te
 from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     AddPrefix,
     Digest,
@@ -44,13 +48,13 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-class MissingUnitTestChartDependencyException(Exception):
-    """Indicates that no chart has been found as dependency of the `helm_unittest_test` or
-    `helm_unittest_tests` targets."""
+class MissingUnitTestChartDependency(Exception):
+    f"""Indicates that no chart has been found as dependency of the `{HelmUnitTestTestTarget.alias}` or
+    `{HelmUnitTestTestsGeneratorTarget.alias}` targets."""
 
-    def __init__(self, address) -> None:
+    def __init__(self, address: Address) -> None:
         super().__init__(
-            f"No valid `helm_chart` target has been found as a dependency for target at '{address}'."
+            f"No valid `{HelmChartTarget.alias}` target has been found as a dependency for target at '{address.spec}'."
         )
 
 
@@ -69,15 +73,13 @@ async def run_helm_unittest(
     test_subsystem: TestSubsystem,
     unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
-    chart_deps_targets, transitive_targets = await MultiGet(
+    chart_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.chart, include_special_cased_deps=True)),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
-    chart_targets = [
-        target for target in chart_deps_targets if HelmChartFieldSet.is_applicable(target)
-    ]
+    chart_targets = [target for target in chart_targets if HelmChartFieldSet.is_applicable(target)]
     if len(chart_targets) == 0:
-        raise MissingUnitTestChartDependencyException(field_set.address)
+        raise MissingUnitTestChartDependency(field_set.address)
 
     chart = await Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_targets[0]))
 

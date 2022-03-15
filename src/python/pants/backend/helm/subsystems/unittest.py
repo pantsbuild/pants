@@ -5,10 +5,9 @@ from enum import Enum
 from typing import cast
 
 from pants.backend.helm.util_rules.plugins import (
-    GlobalHelmPlugin,
-    HelmPluginPlatform,
+    ExternalHelmPlugin,
+    HelmPluginBinding,
     HelmPluginRequest,
-    HelmPluginSubsystem,
 )
 from pants.engine.platform import Platform
 from pants.engine.rules import SubsystemRule, collect_rules, rule
@@ -23,10 +22,10 @@ class HelmUnitTestReportFormat(Enum):
     JUNIT = "JUnit"
 
 
-class HelmUnitTestSubsystem(HelmPluginSubsystem):
+class HelmUnitTestSubsystem(ExternalHelmPlugin):
     options_scope = "helm-unittest"
     plugin_name = "unittest"
-    help = "BDD styled unit test framework for Kubernetes Helm charts as a Helm plugin."
+    help = "BDD styled unit test framework for Kubernetes Helm charts as a Helm plugin. (https://github.com/quintush/helm-unittest)"
 
     default_version = "0.2.8"
     default_known_versions = [
@@ -56,22 +55,18 @@ class HelmUnitTestSubsystem(HelmPluginSubsystem):
     def generate_exe(self, _: Platform) -> str:
         return "./untt"
 
-    def map_platform(self, platf: Platform) -> HelmPluginPlatform:
-        mapped_platf_parts = self.default_url_platform_mapping[platf.name].split("-")
-        return HelmPluginPlatform(os=mapped_platf_parts[0], arch=mapped_platf_parts[1])
-
     @property
     def output_type(self) -> HelmUnitTestReportFormat:
         return cast(HelmUnitTestReportFormat, self.options.output_type)
 
 
-class HelmUnitTestGlobalPlugin(GlobalHelmPlugin[HelmUnitTestSubsystem]):
+class HelmUnitTestPluginBinding(HelmPluginBinding[HelmUnitTestSubsystem]):
     plugin_subsystem_cls = HelmUnitTestSubsystem
 
 
 @rule
 def download_plugin_request(
-    _: HelmUnitTestGlobalPlugin, subsystem: HelmUnitTestSubsystem
+    _: HelmUnitTestPluginBinding, subsystem: HelmUnitTestSubsystem
 ) -> HelmPluginRequest:
     return HelmPluginRequest(
         plugin_name=subsystem.plugin_name, tool_request=subsystem.get_request(Platform.current)
@@ -82,5 +77,5 @@ def rules():
     return [
         *collect_rules(),
         SubsystemRule(HelmUnitTestSubsystem),
-        UnionRule(GlobalHelmPlugin, HelmUnitTestGlobalPlugin),
+        UnionRule(HelmPluginBinding, HelmUnitTestPluginBinding),
     ]

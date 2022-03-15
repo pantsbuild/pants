@@ -16,7 +16,12 @@ from pants.backend.helm.target_types import (
     HelmUnitTestTestTarget,
 )
 from pants.backend.helm.target_types import rules as target_types_rules
-from pants.backend.helm.testutil import HELM_CHART_FILE, HELM_VALUES_FILE, K8S_SERVICE_FILE
+from pants.backend.helm.testutil import (
+    HELM_CHART_FILE,
+    HELM_VALUES_FILE,
+    K8S_SERVICE_FILE,
+    gen_chart_file,
+)
 from pants.build_graph.address import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import InjectedDependencies
@@ -35,7 +40,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_injects_chart_as_special_dependency(rule_runner: RuleRunner) -> None:
+def test_injects_single_chart(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": textwrap.dedent(
@@ -64,3 +69,46 @@ def test_injects_chart_as_special_dependency(rule_runner: RuleRunner) -> None:
 
     assert len(injected_deps) == 1
     assert list(injected_deps)[0] == chart_tgt.address
+
+
+def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/chart1/BUILD": """helm_chart()""",
+            "src/chart1/Chart.yaml": gen_chart_file("chart1", version="0.1.0"),
+            "src/chart1/values.yaml": HELM_VALUES_FILE,
+            "src/chart1/templates/service.yaml": K8S_SERVICE_FILE,
+            "src/chart1/tests/BUILD": """helm_unittest_tests(sources=["*_test.yaml"])""",
+            "src/chart1/tests/service_test.yaml": "",
+            "src/chart2/BUILD": """helm_chart()""",
+            "src/chart2/Chart.yaml": gen_chart_file("chart2", version="0.1.0"),
+            "src/chart2/values.yaml": HELM_VALUES_FILE,
+            "src/chart2/templates/service.yaml": K8S_SERVICE_FILE,
+            "src/chart2/tests/BUILD": """helm_unittest_tests(sources=["*_test.yaml"])""",
+            "src/chart2/tests/service_test.yaml": "",
+        }
+    )
+
+    source_roots = ["src/*"]
+    rule_runner.set_options([f"--source-roots-patterns={repr(source_roots)}"])
+
+    chart1_tgt = rule_runner.get_target(Address("src/chart1", target_name="chart1"))
+    chart1_unittest_tgt = rule_runner.get_target(Address("src/chart1/tests", target_name="tests"))
+
+    chart2_tgt = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
+    chart2_unittest_tgt = rule_runner.get_target(Address("src/chart2/tests", target_name="tests"))
+
+    chart1_injected_deps = rule_runner.request(
+        InjectedDependencies,
+        [InjectHelmUnitTestChartDependencyRequest(chart1_unittest_tgt[HelmUnitTestChartField])],
+    )
+    chart2_injected_deps = rule_runner.request(
+        InjectedDependencies,
+        [InjectHelmUnitTestChartDependencyRequest(chart2_unittest_tgt[HelmUnitTestChartField])],
+    )
+
+    assert len(chart1_injected_deps) == 1
+    assert len(chart2_injected_deps) == 1
+
+    assert list(chart1_injected_deps)[0] == chart1_tgt.address
+    assert list(chart2_injected_deps)[0] == chart2_tgt.address

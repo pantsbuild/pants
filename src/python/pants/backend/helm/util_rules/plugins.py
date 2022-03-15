@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Generic, Iterable, Type, TypeVar, final
+from typing import Any, ClassVar, Generic, Type, TypeVar
 
 import yaml
+from typing_extensions import final
 
 from pants.backend.helm.util_rules.yaml_utils import yaml_attr_dict
 from pants.core.util_rules.external_tool import (
@@ -18,11 +19,10 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.collection import Collection
 from pants.engine.fs import Digest, DigestContents, DigestSubset, PathGlobs
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
+from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import bullet_list
 
 
 class HelmPluginMetadataFileNotFound(Exception):
@@ -37,27 +37,12 @@ class HelmPluginMissingCommand(ValueError):
         )
 
 
-class HelmPluginPlatformNotSupported(Exception):
-    def __init__(
-        self, plugin_name: str, current_platf: Platform, supported_platfs: Iterable[str]
-    ) -> None:
-        super().__init__(
-            f"Helm plugin `{plugin_name}` can not be used under current platform "
-            f"`{current_platf.value}`. Supported platforms are:\n{bullet_list(supported_platfs)}"
-        )
-
-
-@dataclass(frozen=True)
-class HelmPluginPlatform:
-    os: str
-    arch: str
-
-
-class HelmPluginSubsystem(TemplatedExternalTool, metaclass=ABCMeta):
+class HelmPluginSubsystem(Subsystem, metaclass=ABCMeta):
     plugin_name: ClassVar[str]
 
-    def map_platform(self, platform: Platform) -> HelmPluginPlatform:
-        pass
+
+class ExternalHelmPlugin(HelmPluginSubsystem, TemplatedExternalTool, metaclass=ABCMeta):
+    pass
 
 
 @dataclass(frozen=True)
@@ -69,13 +54,6 @@ class HelmPluginPlatformCommand:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> HelmPluginPlatformCommand:
         return cls(**yaml_attr_dict(d))
-
-    def supports_platform(self, plugin_platform: HelmPluginPlatform) -> bool:
-        return self.os == plugin_platform and self.arch == plugin_platform.arch
-
-    @property
-    def platform(self) -> HelmPluginPlatform:
-        return HelmPluginPlatform(os=self.os, arch=self.arch)
 
 
 @dataclass(frozen=True)
@@ -105,12 +83,12 @@ class HelmPluginMetadata:
 
 
 _HelmPluginSubsystem = TypeVar("_HelmPluginSubsystem", bound=HelmPluginSubsystem)
-_GHP = TypeVar("_GHP", bound="GlobalHelmPlugin")
+_GHP = TypeVar("_GHP", bound="HelmPluginBinding")
 
 
 @union
 @dataclass(frozen=True)
-class GlobalHelmPlugin(Generic[_HelmPluginSubsystem], metaclass=ABCMeta):
+class HelmPluginBinding(Generic[_HelmPluginSubsystem], metaclass=ABCMeta):
     plugin_subsystem_cls: ClassVar[Type[HelmPluginSubsystem]]
 
     name: str
@@ -143,16 +121,14 @@ class HelmPlugins(Collection[HelmPlugin]):
 
 @rule
 async def download_all_global_helm_plugins(union_membership: UnionMembership) -> HelmPlugins:
-    all_plugin_settings = union_membership.get(GlobalHelmPlugin)
-    requests = await MultiGet(
-        Get(HelmPluginRequest, GlobalHelmPlugin, plugin_settings.create())
-        for plugin_settings in all_plugin_settings
+    bindings = union_membership.get(HelmPluginBinding)
+    plugins = await MultiGet(
+        Get(HelmPlugin, HelmPluginBinding, binding.create()) for binding in bindings
     )
-    plugins = await MultiGet(Get(HelmPlugin, HelmPluginRequest, request) for request in requests)
     return HelmPlugins(plugins)
 
 
-@rule
+@rule(desc="Downloads a Helm plugin")
 async def download_helm_plugin(request: HelmPluginRequest) -> HelmPlugin:
     downloaded_tool = await Get(DownloadedExternalTool, ExternalToolRequest, request.tool_request)
 
@@ -166,19 +142,6 @@ async def download_helm_plugin(request: HelmPluginRequest) -> HelmPlugin:
     metadata = HelmPluginMetadata.from_bytes(metadata_content[0].content)
     if not metadata.command and not metadata.platform_command:
         raise HelmPluginMissingCommand(request.plugin_name)
-
-    # TODO
-    # if metadata.platform_command:
-    #     current_helm_platf = request.subsystem.map_platform(Platform.current)
-    #     supported_cmds = [
-    #         cmd for cmd in metadata.platform_command if cmd.supports_platform(current_helm_platf)
-    #     ]
-    #     if len(supported_cmds) == 0:
-    #         raise HelmPluginPlatformNotSupported(
-    #             request.plugin_name,
-    #             Platform.current,
-    #             [f"{cmd.platform}" for cmd in metadata.platform_command],
-    #         )
 
     return HelmPlugin(metadata=metadata, digest=downloaded_tool.digest)
 
