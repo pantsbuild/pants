@@ -205,3 +205,30 @@ _non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
 
 def path_safe(s: str) -> str:
     return _non_path_safe_re.sub("_", s)
+
+
+def softwrap(s: str):
+    """Turns a multiline string into a softwrapped string.
+
+    Applies the following rules:
+        - Dedents the text (you also don't need to start your string with a backslash)
+        - Exactly single newlines are replaced with a space (to turn a parapgraph into one long line)
+        - Double-newlines are preserved
+        - Extra-indentation is preserved, and also preserves the indented line's ending
+    """
+    # If callers didnt use a leading "\" thats OK.
+    if s[0] == "\n":
+        s = s[1:]
+
+    lines = textwrap.dedent(s).splitlines(keepends=True)
+    # NB: collecting a list of strs and `"".join` is more performant than calling `+=` repeatedly.
+    result_strs = []
+    for i, line in enumerate(lines):
+        next_line = lines[i + 1] if i + 1 < len(lines) else None
+        if "\n" in (line, next_line) or line.startswith(" "):
+            result_strs.append(line)
+        else:
+            result_strs.append(line.rstrip())
+            result_strs.append(" ")
+
+    return "".join(result_strs).rstrip()
