@@ -82,18 +82,53 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         *additional_flag_names: str,
         default: _MaybeDynamicT[_DefaultT],
         help: _HelpT,
-        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
+        register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
-        daemon: bool | None = None,
         default_help_repr: str | None = None,
-        fingerprint: bool | None = None,
         fromfile: bool | None = None,
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
-        removal_hint: str | None = None,
         removal_version: str | None = None,
+        removal_hint: str | None = None,
+        # Internal bells/whistles
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
     ):
+        """Construct a new Option descriptor.
+
+        :param flag_name: Either the long "--" or short "-" flag name (E.g. "--skip")
+        :param additional_flag_names: Additional flag names (if `flag_name` is set to the short
+            name).
+        :param default: The default value the property will return if unspecified by the user. Note
+            that for "scalar" option types (like StrOption and IntOption) this can either be an
+            instance of the scalar type or `None`, but __must__ be provided.
+            For Non-scalar types (like ListOption subclasses or DictOption) the default can't be
+            `None`, but does have an "empty" default value.
+        :param help: The help message to use when users run `./pants help` or
+            `./pants help-advanced`
+        :param register_if: A callable (usually a lambda) which, if provided, can be used to
+            specify if the option should be registered. This is useful for "Base" subsystem
+            classes, who might/might not want to register options based on information provided
+            by the subclass. The callable takes one parameter: the derived subsystem class.
+        :param advanced: If True, this option will only show up in `help-advanced`, and not
+            `help`. You should generally set this value if the option will primarily be used by
+            codebase administrators, such as setting up a config file.
+        :param default_help_repr: The string representation of the option's default value.
+            Useful when the default value doesn't have semantic meaning to the user.
+            (E.g. If the default is set to the number of cores, `default_help_repr` might be set
+            to "#cores")
+        :param fromfile: If True, allows the user to specify a string value (starting with "@")
+            which represents a file to read the option's value from.
+        :param metvar: Sets what users see in `./pants help` as possible values for the flag.
+            The default is based on the option type (E.g. "<str>" or "<int>").
+        :param mutually_exclusive_group: If specified disallows all other options using the same
+            value to also be specified by the user.
+        :param removal_version: If the option is deprecated, sets the version this option will
+            be removed in. You must also set `removal_hint`.
+        :param removal_hint: If the option is deprecated, provides a message to display to the
+            user when running `help`.
+        """
         self = super().__new__(cls)
         self._flag_names = (flag_name, *additional_flag_names)
         self._default = default
@@ -177,17 +212,18 @@ class _ListOptionBase(
         *additional_flag_names: str,
         default: _MaybeDynamicT[list[_ListMemberT]] = [],
         help: _HelpT,
-        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
+        register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
-        daemon: bool | None = None,
         default_help_repr: str | None = None,
-        fingerprint: bool | None = None,
         fromfile: bool | None = None,
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
-        removal_hint: str | None = None,
         removal_version: str | None = None,
+        removal_hint: str | None = None,
+        # Internal bells/whistles
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
     ):
         default = default or []
         instance = super().__new__(
@@ -392,17 +428,18 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         *additional_flag_names: str,
         default: _EnumT,
         help: _HelpT,
-        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
+        register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
-        daemon: bool | None = None,
         default_help_repr: str | None = None,
-        fingerprint: bool | None = None,
         fromfile: bool | None = None,
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
-        removal_hint: str | None = None,
         removal_version: str | None = None,
+        removal_hint: str | None = None,
+        # Internal bells/whistles
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
     ) -> EnumOption[_EnumT, _EnumT]:
         ...
 
@@ -415,17 +452,18 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
-        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
+        register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
-        daemon: bool | None = None,
         default_help_repr: str | None = None,
-        fingerprint: bool | None = None,
         fromfile: bool | None = None,
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
-        removal_hint: str | None = None,
         removal_version: str | None = None,
+        removal_hint: str | None = None,
+        # Internal bells/whistles
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
     ) -> EnumOption[_EnumT, _EnumT]:
         ...
 
@@ -438,17 +476,18 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type: type[_EnumT],
         default: None,
         help: _HelpT,
-        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
+        register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
-        daemon: bool | None = None,
         default_help_repr: str | None = None,
-        fingerprint: bool | None = None,
         fromfile: bool | None = None,
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
-        removal_hint: str | None = None,
         removal_version: str | None = None,
+        removal_hint: str | None = None,
+        # Internal bells/whistles
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
     ) -> EnumOption[_EnumT, None]:
         ...
 
@@ -459,17 +498,18 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         enum_type=None,
         default,
         help,
-        register_if=None,
         # Additional bells/whistles
+        register_if=None,
         advanced=None,
-        daemon=None,
         default_help_repr=None,
-        fingerprint=None,
         fromfile=None,
         metavar=None,
         mutually_exclusive_group=None,
-        removal_hint=None,
         removal_version=None,
+        removal_hint=None,
+        # Internal bells/whistles
+        daemon=None,
+        fingerprint=None,
     ):
         instance = super().__new__(
             cls,
@@ -479,14 +519,14 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
             help=help,
             register_if=register_if,
             advanced=advanced,
-            daemon=daemon,
             default_help_repr=default_help_repr,
-            fingerprint=fingerprint,
             fromfile=fromfile,
             metavar=metavar,
             mutually_exclusive_group=mutually_exclusive_group,
-            removal_hint=removal_hint,
             removal_version=removal_version,
+            removal_hint=removal_hint,
+            daemon=daemon,
+            fingerprint=fingerprint,
         )
         instance._enum_type = enum_type
         return instance
@@ -527,17 +567,18 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         *additional_flag_names: str,
         default: list[_EnumT],
         help: _HelpT,
-        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
-        advanced: bool | None = ...,
-        daemon: bool | None = ...,
-        default_help_repr: str | None = ...,
-        fingerprint: bool | None = ...,
-        fromfile: bool | None = ...,
-        metavar: str | None = ...,
-        mutually_exclusive_group: str | None = ...,
-        removal_hint: str | None = ...,
-        removal_version: str | None = ...,
+        register_if: _RegisterIfFuncT | None = None,
+        advanced: bool | None = None,
+        default_help_repr: str | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_version: str | None = None,
+        removal_hint: str | None = None,
+        # Internal bells/whistles
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
     ) -> EnumListOption[_EnumT]:
         ...
 
@@ -550,17 +591,18 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
-        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
-        advanced: bool | None = ...,
-        daemon: bool | None = ...,
-        default_help_repr: str | None = ...,
-        fingerprint: bool | None = ...,
-        fromfile: bool | None = ...,
-        metavar: str | None = ...,
-        mutually_exclusive_group: str | None = ...,
-        removal_hint: str | None = ...,
-        removal_version: str | None = ...,
+        register_if: _RegisterIfFuncT | None = None,
+        advanced: bool | None = None,
+        default_help_repr: str | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_version: str | None = None,
+        removal_hint: str | None = None,
+        # Internal bells/whistles
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
     ) -> EnumListOption[_EnumT]:
         ...
 
@@ -572,17 +614,18 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         *additional_flag_names: str,
         enum_type: type[_EnumT],
         help: _HelpT,
-        register_if: _RegisterIfFuncT | None = None,
         # Additional bells/whistles
-        advanced: bool | None = ...,
-        daemon: bool | None = ...,
-        default_help_repr: str | None = ...,
-        fingerprint: bool | None = ...,
-        fromfile: bool | None = ...,
-        metavar: str | None = ...,
-        mutually_exclusive_group: str | None = ...,
-        removal_hint: str | None = ...,
-        removal_version: str | None = ...,
+        register_if: _RegisterIfFuncT | None = None,
+        advanced: bool | None = None,
+        default_help_repr: str | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_version: str | None = None,
+        removal_hint: str | None = None,
+        # Internal bells/whistles
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
     ) -> EnumListOption[_EnumT]:
         ...
 
@@ -593,17 +636,18 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         enum_type=None,
         default=[],
         help,
-        register_if=None,
         # Additional bells/whistles
+        register_if=None,
         advanced=None,
-        daemon=None,
         default_help_repr=None,
-        fingerprint=None,
         fromfile=None,
         metavar=None,
         mutually_exclusive_group=None,
-        removal_hint=None,
         removal_version=None,
+        removal_hint=None,
+        # Internal bells/whistles
+        daemon=None,
+        fingerprint=None,
     ):
         instance = super().__new__(
             cls,
@@ -613,14 +657,14 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
             help=help,
             register_if=register_if,
             advanced=advanced,
-            daemon=daemon,
             default_help_repr=default_help_repr,
-            fingerprint=fingerprint,
             fromfile=fromfile,
             metavar=metavar,
             mutually_exclusive_group=mutually_exclusive_group,
-            removal_hint=removal_hint,
             removal_version=removal_version,
+            removal_hint=removal_hint,
+            daemon=daemon,
+            fingerprint=fingerprint,
         )
         instance._enum_type = enum_type
         return instance
@@ -674,16 +718,18 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         *additional_flag_names: str,
         default: _MaybeDynamicT[dict[str, _ValueT]] = {},
         help,
+        # Additional bells/whistles
         register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
-        daemon: bool | None = None,
         default_help_repr: str | None = None,
-        fingerprint: bool | None = None,
         fromfile: bool | None = None,
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
-        removal_hint: str | None = None,
         removal_version: str | None = None,
+        removal_hint: str | None = None,
+        # Internal bells/whistles
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
     ):
         return super().__new__(
             cls,  # type: ignore[arg-type]

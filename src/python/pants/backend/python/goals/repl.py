@@ -52,8 +52,9 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
                 f'Then, run `{bin_name()} peek :: | jq -r \'.[] | select(.resolve == "example") | '
                 f'.["address"]\' | xargs {bin_name()} repl`, where you replace "example" with the '
                 "resolve name, and possibly replace the specs `::` with what you were using "
-                "before. This will result in opening a REPL with only targets using the desired "
-                "resolve."
+                "before. If the resolve is the `[python].default_resolve`, use "
+                '`select(.resolve == "example" or .resolve == null)`. These queries will result in '
+                "opening a REPL with only targets using the desired resolve."
             ),
         )
 

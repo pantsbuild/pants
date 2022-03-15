@@ -1,10 +1,13 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pathlib import PurePath
+from typing import Sequence
 
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     DictStringToStringField,
+    InvalidFieldException,
     MultipleSourcesField,
     SpecialCasedDependencies,
     StringField,
@@ -13,13 +16,40 @@ from pants.engine.target import (
 from pants.util.docutil import bin_name, doc_url
 
 
-class DebianControlFile(MultipleSourcesField):
+class DebianSources(MultipleSourcesField):
     required = True
-    expected_num_files = 1
     help = (
-        "Path to a Debian control file for the package to be produced.\n\n"
-        "Paths are relative to the BUILD file's directory."
+        "Paths that will be included in the package to be produced such as Debian metadata files. "
+        "You must include a DEBIAN/control file.\n\n"
+        "Paths are relative to the BUILD file's directory and all paths must belong to the same parent directory. "
+        "For example, `sources=['dir/**']` is valid, but `sources=['top_level_file.txt']` "
+        "and `sources=['dir1/*', 'dir2/*']` are not."
     )
+
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        """Check that all files are coming from the same directory."""
+        super().validate_resolved_files(files)
+        if not files:
+            raise InvalidFieldException(
+                f"The `{self.alias}` field in target `{self.address}` must "
+                f"resolve to at least one file."
+            )
+
+        files_outside_dirs = [f for f in files if len(PurePath(f).parts) == 1]
+        if files_outside_dirs:
+            raise InvalidFieldException(
+                f"The `{self.alias}` field in target `{self.address}` must be paths to "
+                f"files in a single sources directory. Individual files "
+                f"were found: {files_outside_dirs}"
+            )
+
+        directory_prefixes = {PurePath(f).parts[0] for f in files}
+        if len(directory_prefixes) > 1:
+            raise InvalidFieldException(
+                f"The `{self.alias}` field in target `{self.address}` must be paths to "
+                f"files in a single sources directory. Multiple directories "
+                f"were found: {directory_prefixes}"
+            )
 
 
 class DebianSymlinks(DictStringToStringField):
@@ -53,7 +83,7 @@ class DebianPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        DebianControlFile,
+        DebianSources,
         DebianSymlinks,
         DebianInstallPrefix,
         DebianPackageDependencies,

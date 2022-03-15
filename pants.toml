@@ -59,6 +59,11 @@ build_ignore.add = [
   "testprojects/src/go/**",
 ]
 
+ignore_warnings.add = [
+  # TODO: `toolchain.pants.plugin==0.17.0` must still use the old options system
+  "DEPRECATED: pants.option.subsystem.register_options"
+]
+
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
 remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
@@ -88,7 +93,7 @@ root_patterns = [
 
 [tailor]
 build_file_header = """\
-# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """
 ignore_paths = [
@@ -114,6 +119,9 @@ interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 resolves = { python-default = "3rdparty/python/user_reqs.lockfile" }
 enable_resolves = true
+
+[python-infer]
+assets = true
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]

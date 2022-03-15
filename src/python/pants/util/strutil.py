@@ -202,6 +202,45 @@ def first_paragraph(s: str) -> str:
 #  (e.g., "CPython>=2.7,<3") and those are sometimes converted to paths.
 _non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
 
+# TODO: This may be a bit too eager. Some strings might want to preserve multiple spaces in them
+# (e.g. a Python code block which has a comment in it would have 2 spaces before the "#", which
+# would be squashed by this eager regex). The challenge is that there's some overlap between prose
+# (which shouldn't need multiple spaces) and code (which might) for non-alphanumeric characters.
+# We can tighten as necessary.
+_super_space_re = re.compile(r"(\S)  +(\S)")
+
 
 def path_safe(s: str) -> str:
     return _non_path_safe_re.sub("_", s)
+
+
+def softwrap(s: str) -> str:
+    """Turns a multiline string into a softwrapped string.
+
+    Applies the following rules:
+        - Dedents the text (you also don't need to start your string with a backslash)
+        - Replaces all occurances of multiple spaces in a sentence with a single space
+        - Replaces singular newlines with a space (to turn a paragraph into one long line)
+        - Double-newlines are preserved
+        - Extra indentation is preserved, and also preserves the indented line's ending
+            (If your indented line needs to be continued due to it being longer than the suggested
+            width, use trailing backlashes to line-continue the line. Because we squash multiple
+            spaces, this will "just work".)
+    """
+    # If callers didnt use a leading "\" thats OK.
+    if s[0] == "\n":
+        s = s[1:]
+
+    lines = textwrap.dedent(s).splitlines(keepends=True)
+    # NB: collecting a list of strs and `"".join` is more performant than calling `+=` repeatedly.
+    result_strs = []
+    for i, line in enumerate(lines):
+        line = _super_space_re.sub(r"\1 \2", line)
+        next_line = lines[i + 1] if i + 1 < len(lines) else None
+        if "\n" in (line, next_line) or line.startswith(" "):
+            result_strs.append(line)
+        else:
+            result_strs.append(line.rstrip())
+            result_strs.append(" ")
+
+    return "".join(result_strs).rstrip()

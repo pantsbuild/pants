@@ -9,11 +9,13 @@ import re
 from abc import ABCMeta
 from typing import Any, ClassVar, TypeVar
 
+from pants.base.deprecated import deprecated
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
+from pants.util.docutil import doc_url
 
 
 class Subsystem(metaclass=ABCMeta):
@@ -96,13 +98,18 @@ class Subsystem(metaclass=ABCMeta):
         return cls.create_scope_info(scope=cls.options_scope, subsystem_cls=cls)
 
     @classmethod
+    @deprecated(
+        removal_version="2.12.0.dev0",
+        hint=(
+            "Options are now registered by declaring class attributes using the types in "
+            f"pants/option/option_types.py. See {doc_url('plugin-upgrade-guide')}"
+        ),
+    )
     def register_options(cls, register):
         """Register options for this Subsystem.
 
         Subclasses may override and call register(*args, **kwargs).
         """
-        for options_info in collect_options_info(cls):
-            register(*options_info.flag_names, **options_info.flag_options)
 
     @classmethod
     def register_options_on_scope(cls, options):
@@ -110,7 +117,13 @@ class Subsystem(metaclass=ABCMeta):
 
         Subclasses should not generally need to override this method.
         """
-        cls.register_options(options.registration_function_for_subsystem(cls))
+        register = options.registration_function_for_subsystem(cls)
+        for options_info in collect_options_info(cls):
+            register(*options_info.flag_names, **options_info.flag_options)
+
+        # NB: If the class defined `register_options` we should call it
+        if "register_options" in cls.__dict__:
+            cls.register_options(register)
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()

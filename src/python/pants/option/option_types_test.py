@@ -6,7 +6,6 @@ from __future__ import annotations
 from enum import Enum
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
-from unittest.mock import Mock, call
 
 import pytest
 
@@ -28,6 +27,7 @@ from pants.option.option_types import (
     IntOption,
     MemorySizeListOption,
     MemorySizeOption,
+    OptionsInfo,
     ShellStrListOption,
     ShellStrOption,
     SkipOption,
@@ -35,6 +35,7 @@ from pants.option.option_types import (
     StrOption,
     TargetListOption,
     TargetOption,
+    collect_options_info,
 )
 from pants.option.subsystem import Subsystem
 
@@ -45,6 +46,13 @@ if TYPE_CHECKING:
 class MyEnum(Enum):
     Val1 = "val1"
     Val2 = "val2"
+
+
+def opt_info(*names, **options):
+    return OptionsInfo(
+        flag_names=names,
+        flag_options=options,
+    )
 
 
 @pytest.mark.parametrize(
@@ -92,17 +100,18 @@ def test_option_typeclasses(option_type, default, option_value, expected_registe
         dyn_help = "Dynamic Help"
         dyn_default = default
 
-    register = Mock()
-    MySubsystem.register_options(register)
-    my_subsystem = MySubsystem()
     default_if_not_given: Any | None = [] if expected_register_kwargs["type"] is list else None
-    transform_opt: Any = tuple if expected_register_kwargs["type"] is list else lambda x: x  # type: ignore
 
-    assert register.call_args_list == [
-        call("--opt", default=default, help="", **expected_register_kwargs),
-        call("--opt-no-default", default=default_if_not_given, help="", **expected_register_kwargs),
-        call("--dyn-opt", default=default, help="Dynamic Help", **expected_register_kwargs),
+    assert list(collect_options_info(MySubsystem)) == [
+        opt_info("--opt", default=default, help="", **expected_register_kwargs),
+        opt_info(
+            "--opt-no-default", default=default_if_not_given, help="", **expected_register_kwargs
+        ),
+        opt_info("--dyn-opt", default=default, help="Dynamic Help", **expected_register_kwargs),
     ]
+
+    my_subsystem = MySubsystem()
+    transform_opt: Any = tuple if expected_register_kwargs["type"] is list else lambda x: x  # type: ignore
     assert my_subsystem.prop == transform_opt(option_value)
     assert my_subsystem.prop_no_default == transform_opt(option_value)
     assert my_subsystem.dyn_prop == transform_opt(option_value)
@@ -147,25 +156,23 @@ def test_other_options() -> None:
         dyn_default = MyEnum.Val1
         dyn_default_list = [MyEnum.Val1]
 
-    register = Mock()
-    MySubsystem.register_options(register)
-    my_subsystem = MySubsystem()
-
-    assert register.call_args_list == [
-        call("--enum-opt", default=MyEnum.Val1, help="", type=MyEnum),
-        call("--dyn-enum-opt", default=MyEnum.Val1, type=MyEnum, help="Dynamic Help"),
-        call("--optional-enum-opt", default=None, help="", type=MyEnum),
-        call("--enum-list-opt", default=[MyEnum.Val1], help="", type=list, member_type=MyEnum),
-        call(
+    assert list(collect_options_info(MySubsystem)) == [
+        opt_info("--enum-opt", default=MyEnum.Val1, help="", type=MyEnum),
+        opt_info("--dyn-enum-opt", default=MyEnum.Val1, type=MyEnum, help="Dynamic Help"),
+        opt_info("--optional-enum-opt", default=None, help="", type=MyEnum),
+        opt_info("--enum-list-opt", default=[MyEnum.Val1], help="", type=list, member_type=MyEnum),
+        opt_info(
             "--dyn-enum-list-opt",
             default=[MyEnum.Val1],
             help="Dynamic Help",
             type=list,
             member_type=MyEnum,
         ),
-        call("--defaultless-enum-list-opt", default=[], help="", type=list, member_type=MyEnum),
-        call("--dict-opt", default={}, help="", type=dict),
+        opt_info("--defaultless-enum-list-opt", default=[], help="", type=list, member_type=MyEnum),
+        opt_info("--dict-opt", default={}, help="", type=dict),
     ]
+
+    my_subsystem = MySubsystem()
     assert my_subsystem.enum_prop == MyEnum.Val2
     assert my_subsystem.dyn_enum_prop == MyEnum.Val2
     assert my_subsystem.optional_enum_prop == MyEnum.Val2
@@ -198,20 +205,16 @@ def test_specialized_options() -> None:
         args_prop1 = ArgsListOption(example="--nail")
         args_prop2 = ArgsListOption(example="--screw", tool_name="Screwdriver")
 
-    register = Mock()
-    MySubsystem.register_options(register)
-    SubsystemWithName.register_options(register)
-
-    def expected_skip_call(help: str):
-        return call(
+    def expected_skip_opt_info(help: str):
+        return opt_info(
             "--skip",
             help=help,
             default=False,
             type=bool,
         )
 
-    def expected_args_call(help: str):
-        return call(
+    def expected_args_opt_info(help: str):
+        return opt_info(
             "--args",
             member_type=shell_str,
             help=help,
@@ -219,23 +222,25 @@ def test_specialized_options() -> None:
             type=list,
         )
 
-    assert register.call_args_list == [
-        expected_skip_call("Don't use Wrench when running `./pants fmt` and `./pants lint`."),
-        expected_skip_call("Don't use Wrench when running `./pants fmt`."),
-        expected_args_call(
+    assert list(collect_options_info(MySubsystem)) == [
+        expected_skip_opt_info("Don't use Wrench when running `./pants fmt` and `./pants lint`."),
+        expected_skip_opt_info("Don't use Wrench when running `./pants fmt`."),
+        expected_args_opt_info(
             "Arguments to pass directly to Wrench, e.g. `--my-subsystem-args='--foo'`."
         ),
-        expected_args_call(
+        expected_args_opt_info(
             "Arguments to pass directly to Drill, e.g. `--my-subsystem-args='--bar'`."
         ),
-        expected_args_call(
+        expected_args_opt_info(
             "Arguments to pass directly to Wrench, e.g. `--my-subsystem-args='--baz'`.\n\nSwing it!"
         ),
-        expected_skip_call("Don't use Hammer when running `./pants fmt`."),
-        expected_args_call(
+    ]
+    assert list(collect_options_info(SubsystemWithName)) == [
+        expected_skip_opt_info("Don't use Hammer when running `./pants fmt`."),
+        expected_args_opt_info(
             "Arguments to pass directly to Hammer, e.g. `--other-subsystem-args='--nail'`."
         ),
-        expected_args_call(
+        expected_args_opt_info(
             "Arguments to pass directly to Screwdriver, e.g. `--other-subsystem-args='--screw'`."
         ),
     ]
@@ -288,13 +293,11 @@ def test_subsystem_option_ordering() -> None:
         b_prop = StrOption("--b", default=None, help="")
         a_prop = StrOption("--a", default=None, help="")
 
-    register = Mock()
-    MySubsystem.register_options(register)
-    assert register.call_args_list == [
-        call("--z", type=str, default=None, help=""),
-        call("--y", type=str, default=None, help=""),
-        call("--b", type=str, default=None, help=""),
-        call("--a", type=str, default=None, help=""),
+    assert list(collect_options_info(MySubsystem)) == [
+        opt_info("--z", type=str, default=None, help=""),
+        opt_info("--y", type=str, default=None, help=""),
+        opt_info("--b", type=str, default=None, help=""),
+        opt_info("--a", type=str, default=None, help=""),
     ]
 
 
@@ -347,10 +350,9 @@ def test_register_if(cls) -> None:
         truthy = True
         falsey = False
 
-    register = Mock()
-    MySubsystem.register_options(register)
-    assert len(register.call_args_list) == 1
-    assert register.call_args_list[0][0] == ("--registered",)
+    options_info = list(collect_options_info(MySubsystem))
+    assert len(options_info) == 1
+    assert options_info[0].flag_names == ("--registered",)
 
 
 def test_property_types() -> None:
