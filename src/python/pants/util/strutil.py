@@ -212,7 +212,7 @@ def softwrap(s: str):
 
     Applies the following rules:
         - Dedents the text (you also don't need to start your string with a backslash)
-        - Exactly single newlines are replaced with a space (to turn a parapgraph into one long line)
+        - Replaces singular newlines with a space (to turn a parapgraph into one long line)
         - Double-newlines are preserved
         - Extra-indentation is preserved, and also preserves the indented line's ending
     """
