@@ -165,7 +165,7 @@ class PythonSetup(Subsystem):
             "--resolves",
             advanced=True,
             type=dict,
-            default={"python-default": "3rdparty/python/user_requirements.lock"},
+            default={"python-default": "3rdparty/python/default.lock"},
             help=(
                 "A mapping of logical names to lockfile paths used in your project.\n\n"
                 "Many organizations only need a single resolve for their whole project, which is "
