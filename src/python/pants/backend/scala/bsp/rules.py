@@ -66,7 +66,7 @@ class ScalaMetadataFieldSet(FieldSet):
 class ScalaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
     language_id = LANGUAGE_ID
     can_merge_metadata_from = ("java",)
-    field_set_type = ScalaSourceField
+    field_set_type = ScalaMetadataFieldSet
 
 
 @dataclass(frozen=True)
