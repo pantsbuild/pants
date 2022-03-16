@@ -147,7 +147,7 @@ args = ["-i 2", "-ci", "-sr"]
 [pytest]
 args = ["--no-header"]
 extra_requirements.add = [
-#  "ipdb",  # TODO: Add this back once Pex can handle its interpreter constraints for universal lock.
+  "ipdb",
   "pytest-html",
   "pytest-icdiff",
   "pygments",

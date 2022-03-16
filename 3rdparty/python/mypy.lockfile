@@ -299,7 +299,7 @@
       ]
     }
   ],
-  "pex_version": "2.1.71",
+  "pex_version": "2.1.72",
   "prefer_older_binary": false,
   "requirements": [
     "mypy-typing-asserts",

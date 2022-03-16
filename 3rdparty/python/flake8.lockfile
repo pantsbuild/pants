@@ -159,13 +159,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d16e8c1deb60de41b8e8ed21c1a7b947b0bc62fab7e1d470bcdf331cea2e6735",
-              "url": "https://files.pythonhosted.org/packages/70/76/a44cce0f66f73ec6d5d8138f47a16cd3f9e57f4720bce7492d372ef5c74f/importlib_metadata-4.11.2-py3-none-any.whl"
+              "hash": "1208431ca90a8cca1a6b8af391bb53c1a2db74e5d1cef6ddced95d4b2062edc6",
+              "url": "https://files.pythonhosted.org/packages/92/f2/c48787ca7d1e20daa185e1b6b2d4e16acd2fb5e0320bc50ffc89b91fa4d7/importlib_metadata-4.11.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b36ffa925fe3139b2f6ff11d6925ffd4fa7bc47870165e3ac260ac7b4f91e6ac",
-              "url": "https://files.pythonhosted.org/packages/73/0f/def168c6162596051dcc6acaffc4984ec742eb0c79ce02e51ddc11772b1c/importlib_metadata-4.11.2.tar.gz"
+              "hash": "ea4c597ebf37142f827b8f39299579e31685c31d3a438b59f469406afd0f2539",
+              "url": "https://files.pythonhosted.org/packages/3e/1d/964b27278cfa369fbe9041f604ab09c6e99556f8b7910781b4584b428c2f/importlib_metadata-4.11.3.tar.gz"
             }
           ],
           "project_name": "importlib-metadata",
@@ -190,7 +190,7 @@
             "zipp>=0.5"
           ],
           "requires_python": ">=3.7",
-          "version": "4.11.2"
+          "version": "4.11.3"
         },
         {
           "artifacts": [
@@ -321,7 +321,7 @@
       ]
     }
   ],
-  "pex_version": "2.1.71",
+  "pex_version": "2.1.72",
   "prefer_older_binary": false,
   "requirements": [
     "flake8-2020<1.7.0,>=1.6.0",
