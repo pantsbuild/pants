@@ -208,6 +208,7 @@ _non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
 # (which shouldn't need multiple spaces) and code (which might) for non-alphanumeric characters.
 # We can tighten as necessary.
 _super_space_re = re.compile(r"(\S)  +(\S)")
+_more_than_2_newlines = re.compile(r"\n{2}\n+")
 
 
 def path_safe(s: str) -> str:
@@ -220,6 +221,7 @@ def softwrap(s: str) -> str:
     Applies the following rules:
         - Dedents the text (you also don't need to start your string with a backslash)
         - Replaces all occurances of multiple spaces in a sentence with a single space
+        - Replaces all occurances of multiple newlines with exactly 2 newlines
         - Replaces singular newlines with a space (to turn a paragraph into one long line)
         - Double-newlines are preserved
         - Extra indentation is preserved, and also preserves the indented line's ending
@@ -231,6 +233,7 @@ def softwrap(s: str) -> str:
     if s[0] == "\n":
         s = s[1:]
 
+    s = _more_than_2_newlines.sub("\n\n", s)
     lines = textwrap.dedent(s).splitlines(keepends=True)
     # NB: collecting a list of strs and `"".join` is more performant than calling `+=` repeatedly.
     result_strs = []

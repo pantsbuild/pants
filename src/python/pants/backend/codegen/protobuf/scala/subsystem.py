@@ -8,6 +8,7 @@ from pants.engine.addresses import UnparsedAddressInputs
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.option_types import StrListOption, TargetListOption
 from pants.util.docutil import git_url
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -44,26 +45,31 @@ class ScalaPBSubsystem(JvmToolBase):
 
     _runtime_dependencies = TargetListOption(
         "--runtime-dependencies",
-        help=lambda cls: (
-            "A list of addresses to `jvm_artifact` targets for the runtime "
-            "dependencies needed for generated Scala code to work. For example, "
-            "`['3rdparty/jvm:scalapb-runtime']`. These dependencies will "
-            "be automatically added to every `protobuf_sources` target. At the very least, "
-            "this option must be set to a `jvm_artifact` for the "
-            f"`com.thesamet.scalapb:scalapb-runtime_SCALAVER:{cls.default_version}` runtime library."
+        help=lambda cls: softwrap(
+            f"""
+            A list of addresses to `jvm_artifact` targets for the runtime
+            dependencies needed for generated Scala code to work. For example,
+            `['3rdparty/jvm:scalapb-runtime']`. These dependencies will
+            be automatically added to every `protobuf_sources` target. At the very least,
+            this option must be set to a `jvm_artifact` for the
+            `com.thesamet.scalapb:scalapb-runtime_SCALAVER:{cls.default_version}` runtime library.
+            """
         ),
     )
     _jvm_plugins = StrListOption(
         "--jvm-plugins",
-        help=(
-            "A list of JVM-based `protoc` plugins to invoke when generating Scala code from protobuf files. "
-            "The format for each plugin specifier is `NAME=ARTIFACT` where NAME is the name of the "
-            "plugin and ARTIFACT is either the address of a `jvm_artifact` target or the colon-separated "
-            "Maven coordinate for the plugin's jar artifact.\n\n"
-            "For example, to invoke the fs2-grpc protoc plugin, the following option would work: "
-            "`--scalapb-jvm-plugins=fs2=org.typelevel:fs2-grpc-codegen_2.12:2.3.1`. "
-            "(Note: you would also need to set --scalapb-runtime-dependencies appropriately "
-            "to include the applicable runtime libraries for your chosen protoc plugins.)"
+        help=softwrap(
+            """
+            A list of JVM-based `protoc` plugins to invoke when generating Scala code from protobuf files.
+            The format for each plugin specifier is `NAME=ARTIFACT` where NAME is the name of the
+            plugin and ARTIFACT is either the address of a `jvm_artifact` target or the colon-separated
+            Maven coordinate for the plugin's jar artifact.
+
+            For example, to invoke the fs2-grpc protoc plugin, the following option would work:
+            `--scalapb-jvm-plugins=fs2=org.typelevel:fs2-grpc-codegen_2.12:2.3.1`.
+            (Note: you would also need to set --scalapb-runtime-dependencies appropriately
+            to include the applicable runtime libraries for your chosen protoc plugins.)
+            """
         ),
     )
 

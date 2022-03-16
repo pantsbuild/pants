@@ -280,3 +280,4 @@ def test_softwrap_multiline() -> None:
             "\nAll here."
         )
     )
+    assert softwrap("A\n\n\nB") == "A\n\nB"

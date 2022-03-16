@@ -6,6 +6,7 @@ from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.rules import collect_rules
 from pants.option.option_types import StrListOption, TargetListOption
 from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
 
 
 class ApacheThriftJavaSubsystem(Subsystem):
@@ -14,21 +15,24 @@ class ApacheThriftJavaSubsystem(Subsystem):
 
     gen_options = StrListOption(
         "--options",
-        help=(
-            "Code generation options specific to the Java code generator to pass to the "
-            "Apache `thrift` binary via the `-gen java` argument. "
-            "See `thrift -help` for supported values."
+        help=softwrap(
+            """
+            Code generation options specific to the Java code generator to pass to the
+            Apache `thrift` binary via the `-gen java` argument.
+            See `thrift -help` for supported values.
+            """
         ),
     )
     _runtime_dependencies = TargetListOption(
         "--runtime-dependencies",
-        help=(
-            "A list of addresses to `jvm_artifact` targets for the runtime "
-            "dependencies needed for generated Java code to work. For example, "
-            "`['3rdparty/jvm:libthrift']`. These dependencies will "
-            "be automatically added to every `thrift_source` target. At the very least, "
-            "this option must be set to a `jvm_artifact` for the "
-            "`org.apache.thrift:libthrift` runtime library."
+        help=softwrap(
+            """A list of addresses to `jvm_artifact` targets for the runtime
+            dependencies needed for generated Java code to work. For example,
+            `['3rdparty/jvm:libthrift']`. These dependencies will
+            be automatically added to every `thrift_source` target. At the very least,
+            this option must be set to a `jvm_artifact` for the
+            `org.apache.thrift:libthrift` runtime library.
+            """
         ),
     )
 

@@ -16,6 +16,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +68,12 @@ async def export_codegen(
             }
         )
         logger.warning(
-            "No codegen files/targets matched. All codegen target types: "
-            f"{', '.join(codegen_targets)}"
+            softwrap(
+                f"""
+                No codegen files/targets matched. All codegen target types:
+                {', '.join(codegen_targets)}
+                """
+            )
         )
         return ExportCodegen(exit_code=0)
 

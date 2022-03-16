@@ -64,6 +64,7 @@ from pants.source.source_root import (
 )
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class GoCodegenBuildProtobufRequest(GoCodegenBuildRequest):
@@ -250,11 +251,20 @@ async def setup_full_package_build_request(
     )
     if result.exit_code != 0:
         raise ValueError(
-            f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
-            f"stdout:\n{result.stdout.decode()}\n\n"
-            f"stderr:\n{result.stderr.decode()}\n\n"
-            "This may be a bug in Pants. Please report this issue at "
-            "https://github.com/pantsbuild/pants/issues/new/choose"
+            softwrap(
+                f"""
+                Failed to analyze Go sources generated from {request.import_path}.
+
+                stdout:
+                    {result.stdout.decode()}
+
+                stderr:
+                    {result.stderr.decode()}
+
+                This may be a bug in Pants. Please report this issue at
+                https://github.com/pantsbuild/pants/issues/new/choose
+                """
+            )
         )
 
     # Parse the metadata from the analysis.
@@ -272,10 +282,17 @@ async def setup_full_package_build_request(
             )
             error += "\n"
         raise ValueError(
-            f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
-            "This may be a bug in Pants. Please report this issue at "
-            "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
-            f"error:\n{error}"
+            softwrap(
+                f"""
+                Failed to analyze Go sources generated from {request.import_path}.
+
+                This may be a bug in Pants. Please report this issue at
+                https://github.com/pantsbuild/pants/issues/new/choose and include the following data:
+
+                error:
+                    {error}
+                """
+            )
         )
     analysis = FirstPartyPkgAnalysis(
         dir_path=gen_dir,
