@@ -174,9 +174,14 @@ class BinaryNotFoundError(EnvironmentError):
 class BinaryShimsRequest:
     """Request to create shims for one or more system binaries."""
 
-    requests: tuple[BinaryPathRequest, ...]
-    rationale: str = dataclasses.field(compare=False)
     output_directory: str
+    rationale: str = dataclasses.field(compare=False)
+
+    # Create shims for provided binary paths
+    paths: tuple[BinaryPath, ...] = tuple()
+
+    # Create shims for the provided binary names after looking up the paths.
+    requests: tuple[BinaryPathRequest, ...] = tuple()
 
     @classmethod
     def for_binaries(
@@ -190,6 +195,12 @@ class BinaryShimsRequest:
             rationale=rationale,
             output_directory=output_directory,
         )
+
+    @classmethod
+    def for_paths(
+        cls, *paths: BinaryPath, rationale: str, output_directory: str
+    ) -> BinaryShimsRequest:
+        return cls(paths=paths, rationale=rationale, output_directory=output_directory)
 
 
 @dataclass(frozen=True)
@@ -321,14 +332,19 @@ async def create_binary_shims(
 
     Useful as input digest for a Process to setup a `bin` directory for PATH.
     """
+    paths = binary_shims_request.paths
     requests = binary_shims_request.requests
-    all_binary_paths = await MultiGet(
-        Get(BinaryPaths, BinaryPathRequest, request) for request in requests
-    )
-    first_paths = [
-        binary_paths.first_path_or_raise(request, rationale=binary_shims_request.rationale).path
-        for binary_paths, request in zip(all_binary_paths, requests)
-    ]
+    if requests:
+        all_binary_paths = await MultiGet(
+            Get(BinaryPaths, BinaryPathRequest, request) for request in requests
+        )
+        first_paths = tuple(
+            binary_paths.first_path_or_raise(request, rationale=binary_shims_request.rationale)
+            for binary_paths, request in zip(all_binary_paths, requests)
+        )
+        paths += first_paths
+
+    all_paths = (binary.path for binary in paths)
     bin_relpath = binary_shims_request.output_directory
     script = ";".join(
         (
@@ -337,13 +353,14 @@ async def create_binary_shims(
                 " && ".join(
                     [
                         (
+                            # The `printf` cmd is a bash builtin, so always available.
                             f"printf '{_create_shim(bash.path, binary_path)}'"
                             f" > '{bin_relpath}/{os.path.basename(binary_path)}'"
                         ),
                         f"{chmod.path} +x '{bin_relpath}/{os.path.basename(binary_path)}'",
                     ]
                 )
-                for binary_path in first_paths
+                for binary_path in all_paths
             ),
         )
     )
