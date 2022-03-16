@@ -16,14 +16,16 @@ def test_build_ignore_list() -> None:
 
 def test_build_ignore_dependency() -> None:
     sources = {
-        "dir1/BUILD": "files(sources=[])",
-        "dir2/BUILD": "files(sources=[], dependencies=['{tmpdir}/dir1'])",
+        "dir1/f.txt": "",
+        "dir1/BUILD": "files(sources=['*.txt'])",
+        "dir2/f.txt": "",
+        "dir2/BUILD": "files(sources=['*.txt'], dependencies=['{tmpdir}/dir1'])",
     }
     with setup_tmpdir(sources) as tmpdir:
         ignore_result = run_pants(
-            [f"--build-ignore={tmpdir}/dir1", "dependencies", f"{tmpdir}/dir2"]
+            [f"--build-ignore={tmpdir}/dir1", "dependencies", f"{tmpdir}/dir2/f.txt"]
         )
-        no_ignore_result = run_pants(["dependencies", f"{tmpdir}/dir2"])
+        no_ignore_result = run_pants(["dependencies", f"{tmpdir}/dir2/f.txt"])
     ignore_result.assert_failure()
     assert f"{tmpdir}/dir1" in ignore_result.stderr
     no_ignore_result.assert_success()

@@ -206,21 +206,23 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
                 "src/python/python_targets/test_binary.py:binary_file",
                 "src/python/python_targets/test_library.py:test_library",
                 "src/python/python_targets:test_library",
+                "src/python/python_targets/test_direct_dependee.py:test_library_direct_dependee",
                 # NB: 'src/python/python_targets:test_binary' does not show up here because it is
                 # not a direct dependee of `test_library.py:test_library`; instead, it depends on
                 # `test_binary.py:binary_file`, which is itself a direct dependee.
             ],
             transitive=[
                 "src/python/python_targets/test_binary.py:binary_file",
+                "src/python/python_targets/test_direct_dependee.py:test_library_direct_dependee",
                 "src/python/python_targets/test_library.py:test_library",
+                "src/python/python_targets/test_library_transitive_dependee.py:test_library_transitive_dependee",
+                "src/python/python_targets/test_library_transitive_dependee_2.py:test_library_transitive_dependee_2",
                 "src/python/python_targets:binary_file",
                 "src/python/python_targets:test_binary",
                 "src/python/python_targets:test_library",
                 "src/python/python_targets:test_library_direct_dependee",
                 "src/python/python_targets:test_library_transitive_dependee",
                 "src/python/python_targets:test_library_transitive_dependee_2",
-                "src/python/python_targets:test_library_transitive_dependee_3",
-                "src/python/python_targets:test_library_transitive_dependee_4",
             ],
         ),
         # A `python_sources` with `sources=['file.name'] .
@@ -273,8 +275,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
         exclude_target_regexp = r"_[0-9]"
         excluded_set = {
             "src/python/python_targets:test_library_transitive_dependee_2",
-            "src/python/python_targets:test_library_transitive_dependee_3",
-            "src/python/python_targets:test_library_transitive_dependee_4",
+            "src/python/python_targets/test_library_transitive_dependee_2.py:test_library_transitive_dependee_2",
         }
         expected_set = set(self.TEST_MAPPING[changed_src]["transitive"]) - excluded_set
 
@@ -304,8 +305,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
         exclude_target_regexp = r"_[0-9]"
         excluded_set = {
             "src/python/python_targets:test_library_transitive_dependee_2",
-            "src/python/python_targets:test_library_transitive_dependee_3",
-            "src/python/python_targets:test_library_transitive_dependee_4",
+            "src/python/python_targets/test_library_transitive_dependee_2.py:test_library_transitive_dependee_2",
         }
         expected_set = set(self.TEST_MAPPING[changed_src]["transitive"]) - excluded_set
 

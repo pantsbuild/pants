@@ -391,26 +391,26 @@ def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
     # Neither //:t nor either of its source subtargets have explicitly provided deps
     assert (
         rule_runner.request(
-            ExplicitlyProvidedDependencies, [DependenciesRequest(target_t[Dependencies])]
+            ExplicitlyProvidedDependencies, [DependenciesRequest(target_t.get(Dependencies))]
         ).includes
         == FrozenOrderedSet()
     )
     assert (
         rule_runner.request(
-            ExplicitlyProvidedDependencies, [DependenciesRequest(target_a[Dependencies])]
+            ExplicitlyProvidedDependencies, [DependenciesRequest(target_a.get(Dependencies))]
         ).includes
         == FrozenOrderedSet()
     )
     assert (
         rule_runner.request(
-            ExplicitlyProvidedDependencies, [DependenciesRequest(target_b[Dependencies])]
+            ExplicitlyProvidedDependencies, [DependenciesRequest(target_b.get(Dependencies))]
         ).includes
         == FrozenOrderedSet()
     )
 
     # //:t has an automatic dependency on each of its subtargets
     assert rule_runner.request(
-        Addresses, [DependenciesRequest(target_t[Dependencies])]
+        Addresses, [DependenciesRequest(target_t.get(Dependencies))]
     ) == Addresses(
         [
             target_a.address,
@@ -420,13 +420,14 @@ def test_dependencies_from_inferred_deps(rule_runner: RuleRunner) -> None:
 
     # A.java has an inferred dependency on B.java
     assert rule_runner.request(
-        Addresses, [DependenciesRequest(target_a[Dependencies])]
+        Addresses, [DependenciesRequest(target_a.get(Dependencies))]
     ) == Addresses([target_b.address])
 
     # B.java does NOT have a dependency on A.java, as it would if we just had subtargets without
     # inferred dependencies.
     assert (
-        rule_runner.request(Addresses, [DependenciesRequest(target_b[Dependencies])]) == Addresses()
+        rule_runner.request(Addresses, [DependenciesRequest(target_b.get(Dependencies))])
+        == Addresses()
     )
 
 

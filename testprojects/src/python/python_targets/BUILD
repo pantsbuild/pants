@@ -7,28 +7,20 @@ pex_binary(name="test_binary", entry_point="test_binary.py", dependencies=[":bin
 
 python_sources(name="test_library", sources=["test_library.py"])
 
-python_sources(name="test_library_direct_dependee", sources=[], dependencies=[":test_library"])
+python_sources(
+    name="test_library_direct_dependee",
+    sources=["test_direct_dependee.py"],
+    dependencies=[":test_library"],
+)
 
 python_sources(
     name="test_library_transitive_dependee",
-    sources=[],
+    sources=["test_library_transitive_dependee.py"],
     dependencies=[":test_library_direct_dependee"],
 )
 
 python_sources(
     name="test_library_transitive_dependee_2",
-    sources=[],
+    sources=["test_library_transitive_dependee_2.py"],
     dependencies=[":test_library_transitive_dependee"],
-)
-
-python_sources(
-    name="test_library_transitive_dependee_3",
-    sources=[],
-    dependencies=[":test_library_transitive_dependee"],
-)
-
-python_sources(
-    name="test_library_transitive_dependee_4",
-    sources=[],
-    dependencies=[":test_library_transitive_dependee_3"],
 )

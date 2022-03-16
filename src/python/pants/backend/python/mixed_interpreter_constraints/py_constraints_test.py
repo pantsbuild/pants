@@ -38,10 +38,10 @@ def write_files(rule_runner: RuleRunner) -> None:
             "lib2/a.py": "",
             "lib2/b.py": "",
             "lib2/BUILD": "python_sources()",
+            "app/a.py": "",
             "app/BUILD": dedent(
                 """\
                 python_sources(
-                    sources=[],
                     dependencies=['lib1', 'lib2/a.py', 'lib2/b.py'],
                     interpreter_constraints=['==3.7.*'],
                 )
@@ -81,6 +81,7 @@ def test_render_constraints(rule_runner: RuleRunner) -> None:
 
         CPython==3.7.*
           app:app
+          app/a.py
 
         CPython>=3.6
           lib2/a.py
@@ -102,10 +103,11 @@ def test_constraints_summary(rule_runner: RuleRunner) -> None:
     assert result.stdout == dedent(
         """\
         Target,Constraints,Transitive Constraints,# Dependencies,# Dependees\r
-        app:app,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",3,0\r
-        lib1:lib1,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,1\r
+        app:app,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",4,0\r
+        app/a.py,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",3,1\r
+        lib1:lib1,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,2\r
         lib2:lib2,CPython>=3.6,CPython>=3.6,2,0\r
-        lib2/a.py,CPython>=3.6,CPython>=3.6,0,2\r
-        lib2/b.py,CPython>=3.6,CPython>=3.6,0,2\r
+        lib2/a.py,CPython>=3.6,CPython>=3.6,0,3\r
+        lib2/b.py,CPython>=3.6,CPython>=3.6,0,3\r
         """
     )

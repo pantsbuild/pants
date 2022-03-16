@@ -29,9 +29,11 @@ SUBPROJ_ROOT = "testprojects/src/python/subproject_test/subproject"
 
 
 BUILD_FILES = {
+    f"{SUBPROJ_SPEC}/a.py": "",
     f"{SUBPROJ_SPEC}/BUILD": (
         f"python_sources(dependencies = ['{SUBPROJ_ROOT}/src/python:helpers'])"
     ),
+    f"{SUBPROJ_ROOT}/src/python/a.py": "",
     f"{SUBPROJ_ROOT}/src/python/BUILD": dedent(
         """
         python_sources(
@@ -40,6 +42,7 @@ BUILD_FILES = {
         )
       """
     ),
+    f"{SUBPROJ_ROOT}/src/python/helpershelpers/a.py": "",
     f"{SUBPROJ_ROOT}/src/python/helpershelpers/BUILD": "python_sources()",
     f"{SUBPROJ_ROOT}/BUILD": dedent(
         """\
