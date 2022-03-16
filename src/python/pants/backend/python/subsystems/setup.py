@@ -165,7 +165,7 @@ class PythonSetup(Subsystem):
             "--resolves",
             advanced=True,
             type=dict,
-            default={"python-default": "3rdparty/python/default_lock.txt"},
+            default={"python-default": "3rdparty/python/default.lock"},
             help=(
                 "A mapping of logical names to lockfile paths used in your project.\n\n"
                 "Many organizations only need a single resolve for their whole project, which is "
@@ -193,6 +193,8 @@ class PythonSetup(Subsystem):
                 "If a target can work with multiple resolves, create a distinct target per "
                 "resolve. This will be made more ergonomic in an upcoming Pants release through a "
                 "new `parametrize` feature.\n\n"
+                "You can name the lockfile paths what you would like; Pants does not expect a "
+                "certain file extension or location.\n\n"
                 "Only applies if `[python].enable_resolves` is true."
             ),
         )
