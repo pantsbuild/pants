@@ -40,10 +40,8 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile_lockfile.txt")
-    default_lockfile_path = (
-        f"src/python/{_DOCKERFILE_PACKAGE.replace('.', '/')}/dockerfile_lockfile.txt"
-    )
+    default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile.lock")
+    default_lockfile_path = f"src/python/{_DOCKERFILE_PACKAGE.replace('.', '/')}/dockerfile.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
 
