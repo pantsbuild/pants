@@ -17,7 +17,6 @@ from pants.option.option_types import (
     StrListOption,
     StrOption,
 )
-from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
 from pants.util.memo import memoized_property
@@ -217,7 +216,7 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    lockfile_generator = EnumOption(
+    _lockfile_generator = EnumOption(
         "--lockfile-generator",
         default=LockfileGenerator.POETRY,
         help=(
@@ -315,9 +314,10 @@ class PythonSetup(Subsystem):
         "on Big Sur.",
     )
 
-    def __init__(self, options: OptionValueContainer) -> None:
-        super().__init__(options)
-        if options.is_default("lockfile_generator"):
+    @property
+    def generate_lockfiles_with_pex(self) -> bool:
+        """Else, generate with Poetry."""
+        if self.options.is_default("lockfile_generator"):
             warn_or_error(
                 "2.12.0.dev0",
                 "`[python].lockfile_generator` defaulting to 'poetry'",
@@ -325,8 +325,11 @@ class PythonSetup(Subsystem):
                     f"""
                     In Pants 2.12, Pants will default to using Pex to generate lockfiles
                     with the `generate-lockfiles` goal, rather than Poetry. Run
-                    `{bin_name()} help-advanced python` for more information on the benefits of
-                    switching to Pex.
+                    `{bin_name()} help-advanced python` for more information on the benefits and
+                    possible issues with switching to Pex.
+
+                    To keep using Poetry, set `[python].lockfile_generator = 'poetry'` in
+                    pants.toml. To try Pex, set to 'pex`.
 
                     Note that you can incrementally switch to Pex lockfiles if you want to reduce
                     risk while migrating. The option `[python].lockfile_generator` only impacts
@@ -339,10 +342,7 @@ class PythonSetup(Subsystem):
                 ),
             )
 
-    @property
-    def generate_lockfiles_with_pex(self) -> bool:
-        """Else, generate with Poetry."""
-        return self.lockfile_generator == LockfileGenerator.PEX
+        return self._lockfile_generator == LockfileGenerator.PEX
 
     @memoized_property
     def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
