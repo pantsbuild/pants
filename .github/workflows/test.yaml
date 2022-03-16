@@ -279,13 +279,13 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 40
-  build_wheels_linux:
+  build_wheels_linux_x86_64:
     container: quay.io/pypa/manylinux2014_x86_64:latest
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Build wheels and fs_util (Linux)
+    name: Build wheels and fs_util (Linux x86/64)
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
@@ -360,12 +360,12 @@ jobs:
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 65
-  build_wheels_macos:
+  build_wheels_macos_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Build wheels and fs_util (macOS)
+    name: Build wheels and fs_util (macOS x86/64)
     runs-on: macos-10.15
     steps:
     - name: Check out code
