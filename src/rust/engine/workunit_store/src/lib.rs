@@ -243,7 +243,7 @@ pub struct WorkunitStore {
   max_level: Level,
   sender: Sender<StoreMsg>,
   streaming_workunit_data: Arc<Mutex<StreamingWorkunitData>>,
-  heavy_hitters_data: HeavyHittersData,
+  heavy_hitters_data: Arc<Mutex<HeavyHittersData>>,
   metrics_data: Arc<MetricsData>,
 }
 
@@ -345,50 +345,49 @@ impl StreamingWorkunitData {
   }
 }
 
-#[derive(Clone)]
 struct HeavyHittersData {
-  // TODO: Remove indirection.
-  inner: Arc<Mutex<HeavyHittersInnerStore>>,
+  receiver: Receiver<StoreMsg>,
+  running_graph: RunningWorkunitGraph,
+  span_id_to_graph: HashMap<SpanId, NodeIndex<u32>>,
+  workunit_records: HashMap<SpanId, Workunit>,
 }
 
 impl HeavyHittersData {
   fn new(receiver: Receiver<StoreMsg>) -> HeavyHittersData {
     HeavyHittersData {
-      inner: Arc::new(Mutex::new(HeavyHittersInnerStore {
-        receiver,
-        running_graph: RunningWorkunitGraph::new(),
-        span_id_to_graph: HashMap::new(),
-        workunit_records: HashMap::new(),
-      })),
+      receiver,
+      running_graph: RunningWorkunitGraph::new(),
+      span_id_to_graph: HashMap::new(),
+      workunit_records: HashMap::new(),
     }
   }
 
-  fn add_started_workunit_to_store(started: Workunit, inner_store: &mut HeavyHittersInnerStore) {
+  fn add_started_workunit_to_store(&mut self, started: Workunit) {
     let span_id = started.span_id;
     let parent_id = started.parent_id;
 
-    inner_store.workunit_records.insert(span_id, started);
+    self.workunit_records.insert(span_id, started);
 
-    let child = inner_store.running_graph.add_node(span_id);
-    inner_store.span_id_to_graph.insert(span_id, child);
+    let child = self.running_graph.add_node(span_id);
+    self.span_id_to_graph.insert(span_id, child);
     if let Some(parent_id) = parent_id {
-      if let Some(parent) = inner_store.span_id_to_graph.get(&parent_id) {
-        inner_store.running_graph.add_edge(*parent, child, ());
+      if let Some(parent) = self.span_id_to_graph.get(&parent_id) {
+        self.running_graph.add_edge(*parent, child, ());
       }
     }
   }
 
   fn add_completed_workunit_to_store(
+    &mut self,
     span_id: SpanId,
     new_metadata: Option<WorkunitMetadata>,
     end_time: SystemTime,
-    inner_store: &mut HeavyHittersInnerStore,
   ) {
-    if let Some(node) = inner_store.span_id_to_graph.remove(&span_id) {
-      inner_store.running_graph.remove_node(node);
+    if let Some(node) = self.span_id_to_graph.remove(&span_id) {
+      self.running_graph.remove_node(node);
     }
 
-    match inner_store.workunit_records.entry(span_id) {
+    match self.workunit_records.entry(span_id) {
       Entry::Vacant(_) => {
         log::warn!("No previously-started workunit found for id: {}", span_id);
       }
@@ -410,10 +409,9 @@ impl HeavyHittersData {
     }
   }
 
-  fn refresh_store(&self) {
-    let mut inner = self.inner.lock();
+  fn refresh_store(&mut self) {
     loop {
-      let msg = match inner.receiver.try_recv() {
+      let msg = match self.receiver.try_recv() {
         Ok(msg) => msg,
         Err(TryRecvError::Closed | TryRecvError::Empty) => break,
         Err(TryRecvError::Lagged(skipped)) => {
@@ -427,32 +425,30 @@ impl HeavyHittersData {
         }
       };
       match msg {
-        StoreMsg::Started(started) => Self::add_started_workunit_to_store(started, &mut inner),
+        StoreMsg::Started(started) => self.add_started_workunit_to_store(started),
         StoreMsg::Completed(span_id, new_metadata, time) => {
-          Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner)
+          self.add_completed_workunit_to_store(span_id, new_metadata, time)
         }
         StoreMsg::Canceled(span_id) => {
-          inner.workunit_records.remove(&span_id);
-          if let Some(node) = inner.span_id_to_graph.remove(&span_id) {
-            inner.running_graph.remove_node(node);
+          self.workunit_records.remove(&span_id);
+          if let Some(node) = self.span_id_to_graph.remove(&span_id) {
+            self.running_graph.remove_node(node);
           }
         }
       }
     }
   }
 
-  fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
+  fn heavy_hitters(&mut self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
     self.refresh_store();
 
-    let inner = self.inner.lock();
-
     // Initialize the heap with the leaves of the running workunit graph, sorted oldest first.
-    let mut queue: BinaryHeap<(Reverse<SystemTime>, SpanId)> = inner
+    let mut queue: BinaryHeap<(Reverse<SystemTime>, SpanId)> = self
       .running_graph
       .externals(petgraph::Direction::Outgoing)
-      .map(|entry| inner.running_graph[entry])
+      .map(|entry| self.running_graph[entry])
       .flat_map(|span_id: SpanId| {
-        let workunit: &Workunit = inner.workunit_records.get(&span_id)?;
+        let workunit: &Workunit = self.workunit_records.get(&span_id)?;
         match workunit.state {
           WorkunitState::Started {
             ref blocked,
@@ -469,7 +465,7 @@ impl HeavyHittersData {
     while let Some((_dur, span_id)) = queue.pop() {
       // If the leaf is visible or has a visible parent, emit it.
       let parent_span_id = if let Some(span_id) = first_matched_parent(
-        &inner.workunit_records,
+        &self.workunit_records,
         Some(span_id),
         |wu| wu.state.completed(),
         Self::is_visible,
@@ -479,7 +475,7 @@ impl HeavyHittersData {
         continue;
       };
 
-      let workunit = inner.workunit_records.get(&parent_span_id).unwrap();
+      let workunit = self.workunit_records.get(&parent_span_id).unwrap();
       if let Some(effective_name) = workunit.metadata.desc.as_ref() {
         if let Some(start_time) = Self::start_time_for(workunit) {
           res.insert(parent_span_id, (effective_name.to_string(), start_time));
@@ -492,25 +488,24 @@ impl HeavyHittersData {
     res
   }
 
-  fn straggling_workunits(&self, duration_threshold: Duration) -> Vec<(Duration, String)> {
+  fn straggling_workunits(&mut self, duration_threshold: Duration) -> Vec<(Duration, String)> {
     self.refresh_store();
     let now = SystemTime::now();
-    let inner = self.inner.lock();
 
-    let matching_visible_parents = inner
+    let matching_visible_parents = self
       .running_graph
       .externals(petgraph::Direction::Outgoing)
-      .map(|entry| inner.running_graph[entry])
-      .flat_map(|span_id: SpanId| inner.workunit_records.get(&span_id))
+      .map(|entry| self.running_graph[entry])
+      .flat_map(|span_id: SpanId| self.workunit_records.get(&span_id))
       .filter_map(|workunit| match Self::duration_for(now, workunit) {
         Some(duration) if !workunit.state.blocked() && duration >= duration_threshold => {
           first_matched_parent(
-            &inner.workunit_records,
+            &self.workunit_records,
             Some(workunit.span_id),
             |wu| wu.state.completed(),
             Self::is_visible,
           )
-          .and_then(|span_id| inner.workunit_records.get(&span_id))
+          .and_then(|span_id| self.workunit_records.get(&span_id))
           .and_then(|wu| wu.metadata.desc.as_ref())
           .map(|desc| (desc.clone(), duration))
         }
@@ -547,13 +542,6 @@ impl HeavyHittersData {
   fn duration_for(now: SystemTime, workunit: &Workunit) -> Option<Duration> {
     now.duration_since(Self::start_time_for(workunit)?).ok()
   }
-}
-
-pub struct HeavyHittersInnerStore {
-  receiver: Receiver<StoreMsg>,
-  running_graph: RunningWorkunitGraph,
-  span_id_to_graph: HashMap<SpanId, NodeIndex<u32>>,
-  workunit_records: HashMap<SpanId, Workunit>,
 }
 
 fn first_matched_parent(
@@ -597,7 +585,7 @@ impl WorkunitStore {
       // installed.
       sender,
       streaming_workunit_data: Arc::new(Mutex::new(StreamingWorkunitData::new(receiver1))),
-      heavy_hitters_data: HeavyHittersData::new(receiver2),
+      heavy_hitters_data: Arc::new(Mutex::new(HeavyHittersData::new(receiver2))),
       metrics_data: Arc::default(),
     }
   }
@@ -618,7 +606,10 @@ impl WorkunitStore {
   /// in ascending order by their duration.
   ///
   pub fn straggling_workunits(&self, threshold: Duration) -> Vec<(Duration, String)> {
-    self.heavy_hitters_data.straggling_workunits(threshold)
+    self
+      .heavy_hitters_data
+      .lock()
+      .straggling_workunits(threshold)
   }
 
   ///
@@ -626,7 +617,7 @@ impl WorkunitStore {
   /// first visible parents.
   ///
   pub fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
-    self.heavy_hitters_data.heavy_hitters(k)
+    self.heavy_hitters_data.lock().heavy_hitters(k)
   }
 
   fn start_workunit(
