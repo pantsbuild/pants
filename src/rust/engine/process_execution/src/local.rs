@@ -633,13 +633,17 @@ pub async fn prepare_workdir(
 
   // Capture argv0 as the executable path so that we can test whether we have created it in the
   // sandbox.
-  let maybe_executable_path = RelativePath::new(&req.argv[0]).map(|relative_path| {
-    if let Some(working_directory) = &req.working_directory {
-      working_directory.join(relative_path)
+  let maybe_executable_path = {
+    let mut executable_path = PathBuf::from(&req.argv[0]);
+    if executable_path.is_relative() {
+      if let Some(working_directory) = &req.working_directory {
+        executable_path = working_directory.as_ref().join(executable_path)
+      }
+      Some(executable_path)
     } else {
-      relative_path
+      None
     }
-  });
+  };
 
   // Start with async materialization of input snapshots, followed by synchronous materialization
   // of other configured inputs. Note that we don't do this in parallel, as that might cause
