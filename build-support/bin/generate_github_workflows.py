@@ -487,7 +487,10 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "runs-on": LINUX_VERSION,
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
                     "timeout-minutes": 65,
-                    "env": DISABLE_REMOTE_CACHE_ENV,
+                    "env": {
+                        **DISABLE_REMOTE_CACHE_ENV,
+                        "PANTS_CA_CERTS_PATH": "/opt/_internal/certs.pem",
+                    },
                     "if": IS_PANTS_OWNER,
                     "steps": [
                         *checkout(),

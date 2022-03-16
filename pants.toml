@@ -117,7 +117,7 @@ venv_use_symlinks = true
 [python]
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
-resolves = { python-default = "3rdparty/python/lockfiles/user_reqs.txt" }
+resolves = { python-default = "3rdparty/python/user_reqs.lockfile" }
 enable_resolves = true
 
 [python-infer]
@@ -134,7 +134,7 @@ extra_requirements.add = [
   "flake8-no-implicit-concat",
   "flake8-comprehensions>=3.8.0,<4.0",
 ]
-lockfile = "3rdparty/python/lockfiles/flake8.txt"
+lockfile = "3rdparty/python/flake8.lockfile"
 source_plugins = ["build-support/flake8"]
 
 [shellcheck]
@@ -152,7 +152,7 @@ extra_requirements.add = [
   "pytest-icdiff",
   "pygments",
 ]
-lockfile = "3rdparty/python/lockfiles/pytest.txt"
+lockfile = "3rdparty/python/pytest.lockfile"
 timeout_default = 60
 
 [test]
@@ -172,7 +172,7 @@ interpreter_constraints = [">=3.7,<3.10"]
 extra_requirements.add = [
   "mypy-typing-asserts",
 ]
-lockfile = "3rdparty/python/lockfiles/mypy.txt"
+lockfile = "3rdparty/python/mypy.lockfile"
 
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
