@@ -23,8 +23,8 @@ pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
 type ParsedAddress<'a> = (
   &'a str,
   Option<&'a str>,
-  Vec<(&'a str, &'a str)>,
   Option<&'a str>,
+  Vec<(&'a str, &'a str)>,
 );
 
 /// Parses an Address spec into:
@@ -39,7 +39,7 @@ fn address_parse(spec: &str) -> PyResult<ParsedAddress> {
   Ok((
     address.path,
     address.target,
-    address.parameters,
     address.generated,
+    address.parameters,
   ))
 }
