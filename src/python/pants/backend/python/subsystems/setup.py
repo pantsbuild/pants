@@ -329,7 +329,7 @@ class PythonSetup(Subsystem):
                     possible issues with switching to Pex.
 
                     To keep using Poetry, set `[python].lockfile_generator = 'poetry'` in
-                    pants.toml. To try Pex, set to 'pex`.
+                    pants.toml. To try Pex, set to 'pex'.
 
                     Note that you can incrementally switch to Pex lockfiles if you want to reduce
                     risk while migrating. The option `[python].lockfile_generator` only impacts
