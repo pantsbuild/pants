@@ -30,7 +30,7 @@ from pants.bsp.spec.base import (
 )
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
-from pants.bsp.util_rules.targets import BSPBuildTargetsFieldSet, BSPBuildTargetsNew
+from pants.bsp.util_rules.targets import BSPBuildTargetsFieldSet, BSPBuildTargetsNew, BSPBuildTargetsMetadataRequest
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries
@@ -66,8 +66,10 @@ class ScalaBSPLanguageSupport(BSPLanguageSupport):
     can_compile = True
 
 
-class ScalaBSPBuildTargetsFieldSet(BSPBuildTargetsFieldSet):
-    pass
+class ScalaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
+    language_id = LANGUAGE_ID
+    compatible_language_ids = ("java",)
+    field_set_type = ScalaSourceField
 
 
 @dataclass(frozen=True)

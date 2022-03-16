@@ -121,13 +121,9 @@ class BuildTarget:
     # The direct upstream build target dependencies of this build target
     dependencies: tuple[BuildTargetIdentifier, ...]
 
-    # Kind of data to expect in the `data` field. If this field is not set, the kind of data is not specified.
-    data_kind: str | None
-
     # Language-specific metadata about this target.
     # See ScalaBuildTarget as an example.
-    # TODO: Figure out generic decode/encode of this field. Maybe use UnionRule to allow language backends to hook?
-    data: Any | None
+    data: BSPData | None
 
     @classmethod
     def from_json_dict(cls, d):
@@ -141,7 +137,7 @@ class BuildTarget:
             dependencies=tuple(
                 BuildTargetIdentifier.from_json_dict(x) for x in d.get("dependencies", [])
             ),
-            data_kind=d.get("dataKind"),
+            #data_kind=d.get("dataKind"),  # TODO: figure out generic decode, this is only used in tests!
             data=d.get("data"),
         )
 
@@ -157,13 +153,9 @@ class BuildTarget:
             result["displayName"] = self.display_name
         if self.base_directory is not None:
             result["baseDirectory"] = self.base_directory
-        if self.data_kind is not None:
-            result["dataKind"] = self.data_kind
         if self.data is not None:
-            if hasattr(self.data, "to_json_dict"):
-                result["data"] = self.data.to_json_dict()
-            else:
-                result["data"] = self.data
+            result["dataKind"] = self.data.DATA_KIND
+            result["data"] = self.data.to_json_dict()
         return result
 
 
