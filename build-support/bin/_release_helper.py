@@ -816,7 +816,12 @@ def build_pex(fetch: bool) -> None:
         dest = stable_dest
     green(f"Built {dest}")
 
-    subprocess.run([sys.executable, str(dest), "--no-pantsd", "--version"], env=env, check=True)
+    with TemporaryDirectory() as tmpdir:
+        validated_pex_path = Path(tmpdir, "pants.pex")
+        shutil.copyfile(dest, validated_pex_path)
+        validated_pex_path.chmod(0o777)
+        Path(tmpdir, "BUILD_ROOT").touch()
+        subprocess.run([validated_pex_path, "--version"], env=env, check=True, cwd=dest.parent)
     green(f"Validated {dest}")
 
 

@@ -1519,10 +1519,11 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         for glob in potentially_absolute_globs:
             # NB: We use `relpath` here because these paths are untrusted, and might need to be
             # normalized in addition to being relativized.
-            glob_relpath = os.path.relpath(glob, buildroot)
+            glob_relpath = os.path.relpath(glob or os.getcwd(), buildroot)
             if glob_relpath == "." or glob_relpath.startswith(".."):
                 logger.debug(
-                    f"Changes to {glob}, outside of the buildroot, will not be invalidated."
+                    f"Changes to {glob} will not be invalidated because it is outside of the "
+                    "build root."
                 )
             else:
                 invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
