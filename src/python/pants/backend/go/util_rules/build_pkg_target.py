@@ -117,8 +117,10 @@ async def setup_build_go_package_target_request(
 
     codegen_request = maybe_get_codegen_request_type(target, union_membership)
     if codegen_request:
-        codegen_result = await Get(BuildGoPackageRequest, GoCodegenBuildRequest, codegen_request)
-        return FallibleBuildGoPackageRequest(codegen_result, codegen_result.import_path)
+        codegen_result = await Get(
+            FallibleBuildGoPackageRequest, GoCodegenBuildRequest, codegen_request
+        )
+        return codegen_result
 
     embed_config: EmbedConfig | None = None
     if target.has_field(GoPackageSourcesField):
