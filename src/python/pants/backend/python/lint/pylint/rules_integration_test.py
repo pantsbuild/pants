@@ -188,7 +188,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert "invalid syntax (<string>, line 2) (syntax-error)" in batched_py2_result.stdout
 
     assert batched_py3_result.exit_code == 0
-    assert batched_py3_result.partition_description == "['CPython<3.8,>=3.6']"
+    assert batched_py3_result.partition_description == "['CPython<4,>=3.7']"
     assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
 
 
