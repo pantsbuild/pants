@@ -62,7 +62,7 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
             argv=["package", chart.path, "-d", result_dir],
             input_digest=input_digest,
             output_files=(process_output_file,),
-            description=f"Packaging Helm chart: {chart.metadata.name}",
+            description=f"Packaging Helm chart: {field_set.address.spec_path}",
         ),
     )
 
