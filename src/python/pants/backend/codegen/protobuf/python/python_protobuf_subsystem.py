@@ -62,7 +62,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_version = "mypy-protobuf==2.10"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = (

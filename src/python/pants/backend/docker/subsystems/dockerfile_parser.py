@@ -37,7 +37,7 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_version = "dockerfile==3.2.0"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile_lockfile.txt")
