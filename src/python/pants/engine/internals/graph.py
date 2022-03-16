@@ -154,27 +154,6 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
     )
 
 
-@memoized
-def maybe_warn_dependencies_as_copied_field(tgt_type: type[TargetGenerator]) -> None:
-    copied_dependencies_field_types = [
-        field_type.__name__
-        for field_type in tgt_type.copied_fields
-        if issubclass(field_type, Dependencies)
-    ]
-    if copied_dependencies_field_types:
-        warn_or_error(
-            removal_version="2.12.0.dev0",
-            entity=(
-                f"using a `Dependencies` field subclass ({copied_dependencies_field_types}) "
-                "as a `TargetGenerator.copied_field`"
-            ),
-            hint=(
-                "`Dependencies` fields should be `TargetGenerator.moved_field`s, to avoid "
-                "redundant graph edges."
-            ),
-        )
-
-
 @rule
 async def resolve_target_parametrizations(
     address: Address,
@@ -207,7 +186,6 @@ async def resolve_target_parametrizations(
         template_fields = {}
         # TODO: Require for all instances before landing.
         if issubclass(target_type, TargetGenerator):
-            maybe_warn_dependencies_as_copied_field(target_type)
             copied_fields = (
                 *target_type.copied_fields,
                 *target_type._find_plugin_fields(union_membership),
