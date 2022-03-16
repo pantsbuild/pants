@@ -596,11 +596,12 @@ def test_generate_long_description_field_from_non_existing_file(
 def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
     chroot_rule_runner.write_files(
         {
+            "src/python/invalid_binary/lib.py": "",
             "src/python/invalid_binary/app1.py": "",
             "src/python/invalid_binary/app2.py": "",
             "src/python/invalid_binary/BUILD": textwrap.dedent(
                 """\
-                python_sources(name='not_a_binary', sources=[])
+                python_sources(name='not_a_binary', sources=['lib.py'])
                 pex_binary(name='invalid_entrypoint_unowned1', entry_point='app1.py')
                 pex_binary(name='invalid_entrypoint_unowned2', entry_point='invalid_binary.app2')
                 python_distribution(
@@ -979,8 +980,8 @@ def test_owned_dependencies() -> None:
         {
             "src/python/foo/bar/baz/BUILD": textwrap.dedent(
                 """
-                python_sources(name='baz1', sources=[])
-                python_sources(name='baz2', sources=[])
+                python_sources(name='baz1')
+                python_sources(name='baz2')
                 """
             ),
             "src/python/foo/bar/resource.txt": "",
@@ -1103,8 +1104,8 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
         {
             "src/python/foo/bar/baz/BUILD": textwrap.dedent(
                 """
-                python_sources(name='baz1', sources=[])
-                python_sources(name='baz2', sources=[])
+                python_sources(name='baz1')
+                python_sources(name='baz2')
                 """
             ),
             "src/python/foo/bar/resource.ext": "",
@@ -1186,7 +1187,7 @@ def test_get_owner_siblings(exporting_owner_rule_runner: RuleRunner) -> None:
         {
             "src/python/siblings/BUILD": textwrap.dedent(
                 """
-                python_sources(name='sibling1', sources=[])
+                python_sources(name='sibling1')
                 python_distribution(
                     name='sibling2',
                     dependencies=['src/python/siblings:sibling1'],
@@ -1214,7 +1215,7 @@ def test_get_owner_not_an_ancestor(exporting_owner_rule_runner: RuleRunner) -> N
         {
             "src/python/notanancestor/aaa/BUILD": textwrap.dedent(
                 """
-                python_sources(name='aaa', sources=[])
+                python_sources(name='aaa')
                 """
             ),
             "src/python/notanancestor/bbb/BUILD": textwrap.dedent(
@@ -1242,7 +1243,7 @@ def test_get_owner_multiple_ancestor_generations(exporting_owner_rule_runner: Ru
         {
             "src/python/aaa/bbb/ccc/BUILD": textwrap.dedent(
                 """
-                python_sources(name='ccc', sources=[])
+                python_sources(name='ccc')
                 """
             ),
             "src/python/aaa/bbb/BUILD": textwrap.dedent(
