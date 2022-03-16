@@ -38,7 +38,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     default_version = "python-hcl2==3.0.3"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.terraform", "hcl2_lockfile.txt")

@@ -40,8 +40,8 @@ class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
 
-    default_interpreter_constraints = ["CPython>=3.6,<4"]
-    default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
+    default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
 
     interpreter_constraints = StrListOption(
         "--interpreter-constraints",
