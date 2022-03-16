@@ -892,7 +892,7 @@ fn session_poll_workunits(
       (py_scheduler.0.core.clone(), py_session.0.clone(), py_level)
     };
     core.executor.enter(|| {
-      let mut workunit_store = session.workunit_store();
+      let workunit_store = session.workunit_store();
       let (started, completed) = workunit_store.latest_workunits(py_level.into());
 
       let gil = Python::acquire_gil();

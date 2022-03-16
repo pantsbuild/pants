@@ -18,4 +18,4 @@ petgraph = "0.5"
 rand = "0.8"
 strum = "0.20"
 strum_macros = "0.23"
-tokio = { version = "1.16", features = ["rt"] }
+tokio = { version = "1.16", features = ["rt", "sync"] }
