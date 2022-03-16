@@ -40,7 +40,7 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
     def create_process(chart: HelmChart, field_set: HelmLintFieldSet) -> HelmProcess:
         argv = ["lint", chart.path]
 
-        strict = field_set.lint_strict or helm_subsystem.lint_strict
+        strict: bool = field_set.lint_strict.value or helm_subsystem.lint_strict
         if strict:
             argv.append("--strict")
 
