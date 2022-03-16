@@ -39,8 +39,8 @@ class Setuptools(PythonToolRequirementsBase):
     default_extra_requirements = ["wheel>=0.35.1,<0.38"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/setuptools_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/setuptools.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
 

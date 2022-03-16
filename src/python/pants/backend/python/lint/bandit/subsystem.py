@@ -57,8 +57,8 @@ class Bandit(PythonToolBase):
     default_main = ConsoleScript("bandit")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.bandit", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/bandit/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.bandit", "bandit.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/bandit/bandit.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("lint")

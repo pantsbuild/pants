@@ -80,8 +80,8 @@ class Pylint(PythonToolBase):
     default_main = ConsoleScript("pylint")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.pylint", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/pylint/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.pylint", "pylint.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/pylint/pylint.lock"
     default_lockfile_url = git_url(default_lockfile_path)
     uses_requirements_from_source_plugins = True
 
