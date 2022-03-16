@@ -172,7 +172,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_non_matching_build_target(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"some_name/BUILD": "files(sources=[])"})
+    rule_runner.write_files({"some_name/BUILD": "target()"})
     result = rule_runner.run_goal_rule(Peek, args=["other_name"])
     assert result.stdout == "[]\n"
 

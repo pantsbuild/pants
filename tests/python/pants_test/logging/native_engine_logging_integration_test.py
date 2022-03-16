@@ -10,7 +10,7 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 def test_native_logging() -> None:
     expected_msg = r"\[DEBUG\] Launching \d+ root"
 
-    with setup_tmpdir({"foo/BUILD": "files(sources=[])"}) as tmpdir:
+    with setup_tmpdir({"foo/BUILD": "target()"}) as tmpdir:
         pants_run = run_pants(
             ["-linfo", "--backend-packages=pants.backend.python", "list", f"{tmpdir}/foo::"]
         )
@@ -27,7 +27,7 @@ def test_native_logging() -> None:
 class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
     def test_pantsd_file_logging(self) -> None:
         with self.pantsd_successful_run_context("debug") as ctx:
-            with setup_tmpdir({"foo/BUILD": "files(sources=[])"}) as tmpdir:
+            with setup_tmpdir({"foo/BUILD": "target()"}) as tmpdir:
                 daemon_run = ctx.runner(
                     ["--backend-packages=pants.backend.python", "list", f"{tmpdir}/foo::"]
                 )

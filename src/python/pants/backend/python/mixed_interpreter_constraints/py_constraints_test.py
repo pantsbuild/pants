@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
 def write_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "lib1/BUILD": "python_sources(sources=[], interpreter_constraints=['==2.7.*', '>=3.5'])",
+            "lib1/BUILD": "python_sources(interpreter_constraints=['==2.7.*', '>=3.5'])",
             # We leave off `interpreter_constraints`, which results in using
             # `[python].interpreter_constraints` instead. Also, we create files so that we
             # can test how generated file-level targets render.
