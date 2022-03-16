@@ -6,7 +6,7 @@
 // {
 //   "version": 2,
 //   "valid_for_interpreter_constraints": [
-//     "CPython>=3.6"
+//     "CPython<4,>=3.7"
 //   ],
 //   "generated_with_requirements": [
 //     "mypy-protobuf==2.10"
@@ -63,11 +63,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "c438268eebb8cf039552897d78f402d734a404f1360592fef55297285f7f953f",
-              "url": "https://files.pythonhosted.org/packages/0f/1c/6b3b5b8c07e92b84cb7d4fb946a8bc72b98d93d8b7c8e8a8e45023745810/protobuf-3.19.4-cp36-cp36m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "7ca7da9c339ca8890d66958f5462beabd611eca6c958691a8fe6eccbd1eb0c6e",
               "url": "https://files.pythonhosted.org/packages/11/8f/3703b61ee707fbd9ea683d1642392af41338b8cd71d7fda76fc002a7e939/protobuf-3.19.4-cp38-cp38-win_amd64.whl"
             },
@@ -98,11 +93,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "835a9c949dc193953c319603b2961c5c8f4327957fe23d914ca80d982665e8ee",
-              "url": "https://files.pythonhosted.org/packages/57/29/8af49a610646f1d31dd11e53c51f85aedb134fe97d82abdeba38c3b08b08/protobuf-3.19.4-cp36-cp36m-win32.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "b38057450a0c566cbd04890a40edf916db890f2818e8682221611d78dc32ae26",
               "url": "https://files.pythonhosted.org/packages/5c/71/f54505f67e12ddfa96adce2ac889206ab218c5671a933429a56ae63d156f/protobuf-3.19.4-cp38-cp38-win32.whl"
             },
@@ -128,11 +118,6 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "4276cdec4447bd5015453e41bdc0c0c1234eda08420b7c9a18b8d647add51e4b",
-              "url": "https://files.pythonhosted.org/packages/89/2b/866f78fda94616d8e80227b12e56e6a21474a7b2f45582b04d13428cc428/protobuf-3.19.4-cp36-cp36m-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
               "hash": "36cecbabbda242915529b8ff364f2263cd4de7c46bbe361418b5ed859677ba58",
               "url": "https://files.pythonhosted.org/packages/93/c3/74ef6aec31eadfe54c1b5351d7dd59cb49e19e6d56ffd52b9f8e9589f911/protobuf-3.19.4-cp39-cp39-macosx_10_9_x86_64.whl"
             },
@@ -150,11 +135,6 @@
               "algorithm": "sha256",
               "hash": "cdc076c03381f5c1d9bb1abdcc5503d9ca8b53cf0a9d31a9f6754ec9e6c8af0f",
               "url": "https://files.pythonhosted.org/packages/b3/41/5e2dfb15fdae38be5dd62be30f9fd40c57e50bd56ee2c276f6230c57a3ad/protobuf-3.19.4-cp37-cp37m-win_amd64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "1c91ef4110fdd2c590effb5dca8fdbdcb3bf563eece99287019c4204f53d81a4",
-              "url": "https://files.pythonhosted.org/packages/c1/6b/e19b9d1bdd04ecfb6fa5442c155e7fdaa9fcc0c0a62d9747b0f45f0fc591/protobuf-3.19.4-cp36-cp36m-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -214,7 +194,7 @@
     "mypy-protobuf==2.10"
   ],
   "requires_python": [
-    ">=3.6"
+    "<4,>=3.7"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
