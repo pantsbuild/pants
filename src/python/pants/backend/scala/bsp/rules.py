@@ -1,11 +1,12 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import dataclasses
 import logging
 import os
 from dataclasses import dataclass
 
-from pants.backend.scala.bsp import util_rules
 from pants.backend.scala.bsp.spec import (
     ScalaBuildTarget,
     ScalacOptionsItem,
@@ -13,38 +14,26 @@ from pants.backend.scala.bsp.spec import (
     ScalacOptionsResult,
     ScalaPlatform,
 )
-from pants.backend.scala.bsp.util_rules import MaterializeScalaRuntimeJarsResult, MaterializeScalaRuntimeJarsRequest
-from pants.backend.scala.compile.scalac import compute_output_jar_filename
-from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.build_root import BuildRoot
 from pants.base.specs import AddressSpecs
-from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import (
-    BuildTarget,
-    BuildTargetCapabilities,
-    BuildTargetIdentifier,
-    StatusCode,
-)
+from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier, StatusCode
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
-from pants.bsp.util_rules.targets import BSPBuildTargetsFieldSet, BSPBuildTargetsNew, BSPBuildTargetsMetadataRequest
-from pants.build_graph.address import Address, AddressInput
+from pants.bsp.util_rules.targets import (
+    BSPBuildTargetsMetadataRequest,
+    BSPBuildTargetsMetadataResult,
+    BSPBuildTargetsNew,
+)
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries
-from pants.engine.internals.native_engine import MergeDigests, Snapshot
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    CoarsenedTargets,
-    Dependencies,
-    DependenciesRequest,
-    Target,
-    WrappedTarget, Targets,
-)
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.target import CoarsenedTargets, FieldSet, Target, Targets
+from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntryRequest,
     ClasspathEntryRequestFactory,
@@ -66,9 +55,17 @@ class ScalaBSPLanguageSupport(BSPLanguageSupport):
     can_compile = True
 
 
+@dataclass(frozen=True)
+class ScalaMetadataFieldSet(FieldSet):
+    required_fields = (ScalaSourceField, JvmResolveField)
+
+    source: ScalaSourceField
+    resolve: JvmResolveField
+
+
 class ScalaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
     language_id = LANGUAGE_ID
-    compatible_language_ids = ("java",)
+    can_merge_metadata_from = ("java",)
     field_set_type = ScalaSourceField
 
 
@@ -83,77 +80,81 @@ class ResolveScalaBSPBuildTargetResult:
     scala_runtime: Snapshot
 
 
+@dataclass(frozen=True)
+class MaterializeScalaRuntimeJarsRequest:
+    scala_version: str
+
+
+@dataclass(frozen=True)
+class MaterializeScalaRuntimeJarsResult:
+    content: Snapshot
+
+
 @rule
-async def bsp_resolve_one_scala_build_target(
-    request: ResolveScalaBSPBuildTargetRequest,
+async def materialize_scala_runtime_jars(
+    request: MaterializeScalaRuntimeJarsRequest,
+) -> MaterializeScalaRuntimeJarsResult:
+    tool_classpath = await Get(
+        ToolClasspath,
+        ToolClasspathRequest(
+            artifact_requirements=ArtifactRequirements.from_coordinates(
+                [
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-compiler",
+                        version=request.scala_version,
+                    ),
+                    Coordinate(
+                        group="org.scala-lang",
+                        artifact="scala-library",
+                        version=request.scala_version,
+                    ),
+                ]
+            ),
+        ),
+    )
+
+    materialized_classpath_digest = await Get(
+        Digest,
+        AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{request.scala_version}"),
+    )
+    materialized_classpath = await Get(Snapshot, Digest, materialized_classpath_digest)
+    return MaterializeScalaRuntimeJarsResult(materialized_classpath)
+
+
+@rule
+async def bsp_resolve_scala_metadata(
+    request: ScalaBSPBuildTargetsMetadataRequest,
     jvm: JvmSubsystem,
     scala: ScalaSubsystem,
-    union_membership: UnionMembership,
     build_root: BuildRoot,
-) -> ResolveScalaBSPBuildTargetResult:
-    resolve = request.target[JvmResolveField].normalized_value(jvm)
+) -> BSPBuildTargetsMetadataResult:
+    resolves = {fs.resolve.normalized_value(jvm) for fs in request.field_sets}
+    if len(resolves) > 1:
+        raise ValueError("Cannot provide Scala metadata for multiple resolves.")
+    resolve = list(resolves)[0]
     scala_version = scala.version_for_resolve(resolve)
 
-    dep_addrs, scala_runtime = await MultiGet(
-        Get(Addresses, DependenciesRequest(request.target[Dependencies])),
-        Get(MaterializeScalaRuntimeJarsResult, MaterializeScalaRuntimeJarsRequest(scala_version)),
+    scala_runtime = await Get(
+        MaterializeScalaRuntimeJarsResult, MaterializeScalaRuntimeJarsRequest(scala_version)
     )
-    impls = union_membership.get(BSPCompileFieldSet)
-
-    reported_deps = []
-    for dep_addr in dep_addrs:
-        if dep_addr == request.target.address:
-            continue
-
-        wrapped_dep_tgt = await Get(WrappedTarget, Address, dep_addr)
-        dep_tgt = wrapped_dep_tgt.target
-        for impl in impls:
-            if impl.is_applicable(dep_tgt):
-                reported_deps.append(BuildTargetIdentifier.from_address(dep_tgt.address))
-                break
 
     scala_jar_uris = tuple(
         build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
         for p in scala_runtime.content.files
     )
-    bsp_target = BuildTarget(
-        id=BuildTargetIdentifier.from_address(request.target.address),
-        display_name=str(request.target.address),
-        base_directory=None,
-        tags=(),
-        capabilities=BuildTargetCapabilities(
-            can_compile=True,
-        ),
-        language_ids=(LANGUAGE_ID,),
-        dependencies=tuple(reported_deps),
-        data_kind="scala",
-        data=ScalaBuildTarget(
-            scala_organization="unknown",
+
+    return BSPBuildTargetsMetadataResult(
+        metadata=ScalaBuildTarget(
+            scala_organization="org.scala-lang",
             scala_version=scala_version,
             scala_binary_version=".".join(scala_version.split(".")[0:2]),
             platform=ScalaPlatform.JVM,
             jars=scala_jar_uris,
         ),
+        can_compile=True,
+        digest=scala_runtime.content.digest,
     )
-    return ResolveScalaBSPBuildTargetResult(bsp_target, scala_runtime=scala_runtime.content)
-
-
-# @rule
-# async def bsp_resolve_all_scala_build_targets(
-#     _: ScalaBSPBuildTargetsFieldSet,
-#     all_scala_targets: AllScalaTargets,
-#     bsp_context: BSPContext,
-# ) -> BSPBuildTargets:
-#     if LANGUAGE_ID not in bsp_context.client_params.capabilities.language_ids:
-#         return BSPBuildTargets()
-#     build_targets = await MultiGet(
-#         Get(ResolveScalaBSPBuildTargetResult, ResolveScalaBSPBuildTargetRequest(tgt))
-#         for tgt in all_scala_targets
-#     )
-#     output_digest = await Get(Digest, MergeDigests([d.scala_runtime.digest for d in build_targets]))
-#     return BSPBuildTargets(
-#         targets=tuple(btgt.build_target for btgt in build_targets), digest=output_digest
-#     )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -188,7 +189,9 @@ async def handle_bsp_scalac_options_request(
     if bsp_target_name not in bsp_build_targets.targets_mapping:
         raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
     targets = await Get(
-        Targets, AddressSpecs, bsp_build_targets.targets_mapping[bsp_target_name].address_specs
+        Targets,
+        AddressSpecs,
+        bsp_build_targets.targets_mapping[bsp_target_name].specs.address_specs,
     )
     coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
     # assert len(coarsened_targets) == 1
@@ -268,9 +271,8 @@ async def bsp_scala_compile_request(
 def rules():
     return (
         *collect_rules(),
-        *util_rules.rules(),
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
-        # UnionRule(BSPBuildTargetsFieldSet, ScalaBSPBuildTargetsFieldSet),
+        UnionRule(BSPBuildTargetsMetadataRequest, ScalaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
         UnionRule(BSPCompileFieldSet, ScalaBSPCompileFieldSet),
     )

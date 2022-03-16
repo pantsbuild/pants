@@ -2,20 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import functools
 import logging
 import os.path
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, TypeVar
+from typing import ClassVar, Generic, Sequence, Type, TypeVar
 
-from pants.backend.scala.bsp.util_rules import ScalaBuildTargetInfo
 from pants.base.build_root import BuildRoot
 from pants.base.specs import AddressSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.bsp.goal import BSPGoal
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier, BSPData
+from pants.bsp.spec.base import BSPData, BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
 from pants.bsp.spec.targets import (
     DependencyModule,
     DependencyModulesItem,
@@ -43,12 +41,11 @@ from pants.engine.target import (
     SourcesPaths,
     SourcesPathsRequest,
     Targets,
-    WrappedTarget, Target,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.jvm.target_types import JvmResolveField
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 _logger = logging.getLogger(__name__)
 
@@ -57,19 +54,14 @@ _FS = TypeVar("_FS", bound=FieldSet)
 
 @union
 @dataclass(frozen=True)
-class BSPBuildTargetsMetadataRequest:
+class BSPBuildTargetsMetadataRequest(Generic[_FS]):
     """Hook to allow language backends to provide metadata for BSP build targets."""
+
     language_id: ClassVar[str]
-    compatible_language_ids: ClassVar[tuple[str, ...]]
-    field_set_type: ClassVar[type[_FS]]
+    can_merge_metadata_from: ClassVar[tuple[str, ...]]
+    field_set_type: ClassVar[Type[_FS]]
 
     field_sets: tuple[_FS, ...]
-
-
-class BSPBuildTargetMetadata(BSPData):
-    # Merge this `BuildTargetMetadata` with a `BuildTargetMetadata` from same or compatible language backend.
-    def merge(self, other: BSPBuildTargetMetadata) -> BSPBuildTargetMetadata:
-        raise NotImplementedError
 
 
 @dataclass(frozen=True)
@@ -77,7 +69,7 @@ class BSPBuildTargetsMetadataResult:
     """Response type for a BSPBuildTargetsMetadataRequest."""
 
     # Metadata for the `data` field of the final `BuildTarget`.
-    metadata: BSPBuildTargetMetadata
+    metadata: BSPData | None = None
 
     # Build capabilities
     can_compile: bool = False
@@ -115,10 +107,11 @@ async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> Specs:
 @rule
 async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargetsNew:
     specs_for_keys = await MultiGet(
-        Get(Specs, _ParseOneBSPMappingRequest(tuple(value))) for value in bsp_goal.target_mapping.values()
+        Get(Specs, _ParseOneBSPMappingRequest(tuple(value)))
+        for value in bsp_goal.target_mapping.values()
     )
     addr_specs = {
-        key: specs_for_key
+        key: BSPBuildTargetInternal(key, specs_for_key)
         for key, specs_for_key in zip(bsp_goal.target_mapping.keys(), specs_for_keys)
     }
     return BSPBuildTargetsNew(FrozenDict(addr_specs))
@@ -147,6 +140,28 @@ class GenerateOneBSPBuildTargetResult:
     digest: Digest = EMPTY_DIGEST
 
 
+def find_metadata_merge_order(
+    metadata_request_types: Sequence[Type[BSPBuildTargetsMetadataRequest]],
+) -> Sequence[Type[BSPBuildTargetsMetadataRequest]]:
+    if len(metadata_request_types) <= 1:
+        return metadata_request_types
+
+    # Naive algorithm (since we only support Java and Scala backends), find the metadata request type that cannot
+    # merge from another and put that first.
+    if len(metadata_request_types) != 2:
+        raise AssertionError(
+            "BSP core rules only support naive ordering of language-backend metadata. Contact Pants developers."
+        )
+    if not metadata_request_types[0].can_merge_metadata_from:
+        return metadata_request_types
+    elif not metadata_request_types[1].can_merge_metadata_from:
+        return list(reversed(metadata_request_types))
+    else:
+        raise AssertionError(
+            "BSP core rules only support naive ordering of language-backend metadata. Contact Pants developers."
+        )
+
+
 @rule
 async def generate_one_bsp_build_target_request(
     request: GenerateOneBSPBuildTargetRequest,
@@ -158,43 +173,47 @@ async def generate_one_bsp_build_target_request(
 
     # Classify the targets by the language backends that claim them to provide metadata for them.
     field_sets_by_lang_id: dict[str, OrderedSet[FieldSet]] = defaultdict(OrderedSet)
-    lang_ids_by_field_set: dict[FieldSet, set[str]] = defaultdict(set)
-    metadata_request_types = union_membership.get(BSPBuildTargetsMetadataRequest)
-    metadata_request_types_by_lang_id = {metadata_request_type.language_id: metadata_request_type for metadata_request_type in metadata_request_types}
+    # lang_ids_by_field_set: dict[Type[FieldSet], set[str]] = defaultdict(set)
+    metadata_request_types: FrozenOrderedSet[
+        Type[BSPBuildTargetsMetadataRequest]
+    ] = union_membership.get(BSPBuildTargetsMetadataRequest)
+    metadata_request_types_by_lang_id = {
+        metadata_request_type.language_id: metadata_request_type
+        for metadata_request_type in metadata_request_types
+    }
     for tgt in targets:
         for metadata_request_type in metadata_request_types:
-            if metadata_request_type.field_set_type.is_applicable(tgt):
-                field_sets_by_lang_id[metadata_request_type.language_id].add(metadata_request_type.field_set_type.create(tgt))
-                lang_ids_by_field_set[tgt].add(metadata_request_type.language_id)
-
-    # Ensure that metadata is being provided only by languages compatible with each other. This guarantees metadata
-    # can be merged to produce the final metadata for this BSP build target.
-    for current_lang_id in lang_ids_by_field_set.keys():
-        for other_lang_id, other_lang in metadata_request_types_by_lang_id.items():
-            if current_lang_id == other_lang_id:
-                continue
-            if current_lang_id not in other_lang.compatible_language_ids:
-                raise ValueError(
-                    f"BSP build target `{request.bsp_target.name}` resolves to an incompatible set of languages. "
-                    f"Language `{current_lang_id}` is not compatible with `{other_lang_id}`."
+            field_set_type: Type[FieldSet] = metadata_request_type.field_set_type
+            if field_set_type.is_applicable(tgt):
+                field_sets_by_lang_id[metadata_request_type.language_id].add(
+                    field_set_type.create(tgt)
                 )
+                # lang_ids_by_field_set[field_set_type].add(metadata_request_type.language_id)
 
-    # TODO: Provide a way to ensure that other compatibility criteria met. For example, JVM resolve.
+    # TODO: Consider how to check whether the provided languages are compatible or whether compatible resolves
+    # selected.
 
-    # Request each language backend to provide metadata.
+    # Request each language backend to provide metadata for the BuildTarget.
     metadata_results = await MultiGet(
         Get(
             BSPBuildTargetsMetadataResult,
             BSPBuildTargetsMetadataRequest,
-            metadata_request_types_by_lang_id[lang_id](
-                field_sets=tuple(field_sets)
-            )
+            metadata_request_types_by_lang_id[lang_id](field_sets=tuple(field_sets)),
         )
         for lang_id, field_sets in field_sets_by_lang_id.items()
     )
+    metadata_results_by_lang_id = {
+        lang_id: metadata_result
+        for lang_id, metadata_result in zip(field_sets_by_lang_id.keys(), metadata_results)
+    }
 
-    # Merge the metadata into a single piece of metadata.
-    metadata: BSPData = functools.reduce(lambda a, b: a.metadata.merge(b.metadata), metadata_results)
+    # Pretend to merge the metadata into a single piece of metadata, but really just choose the metadata
+    # from the last provider.
+    metadata_merge_order = find_metadata_merge_order(
+        [metadata_request_types_by_lang_id[lang_id] for lang_id in field_sets_by_lang_id.keys()]
+    )
+    # TODO: None if no metadata obtained.
+    metadata = metadata_results_by_lang_id[metadata_merge_order[-1].language_id].metadata
     digest = await Get(Digest, MergeDigests([r.digest for r in metadata_results]))
 
     # Determine base directory for this build target.
@@ -284,22 +303,11 @@ async def materialize_bsp_build_target_sources(
     if bsp_target_name not in bsp_build_targets.targets_mapping:
         raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
     targets = await Get(
-        Targets, AddressSpecs, bsp_build_targets.targets_mapping[bsp_target_name].address_specs
+        Targets,
+        AddressSpecs,
+        bsp_build_targets.targets_mapping[bsp_target_name].specs.address_specs,
     )
     targets_with_sources = [tgt for tgt in targets if tgt.has_field(SourcesField)]
-
-    # wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
-    # target = wrapped_target.target
-    #
-    # if not target.has_field(SourcesField):
-    #     raise AssertionError(
-    #         f"BSP only handles targets with sources: uri={request.bsp_target_id.uri}"
-    #     )
-    #
-    # sources_paths = await Get(SourcesPaths, SourcesPathsRequest(target[SourcesField]))
-    # sources_full_paths = [
-    #     build_root.pathlib_path.joinpath(src_path) for src_path in sources_paths.files
-    # ]
 
     sources_paths = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField])) for tgt in targets_with_sources

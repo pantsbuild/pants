@@ -6,43 +6,32 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.java.bsp.spec import JavacOptionsItem, JavacOptionsParams, JavacOptionsResult
-from pants.backend.java.compile.javac import compute_output_jar_filename
-from pants.backend.java.dependency_inference.symbol_mapper import AllJavaTargets
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.build_root import BuildRoot
 from pants.base.specs import AddressSpecs
-from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import (
-    BuildTarget,
-    BuildTargetCapabilities,
-    BuildTargetIdentifier,
-    StatusCode,
-)
+from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
-from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsFieldSet, BSPBuildTargetsNew
-from pants.build_graph.address import Address, AddressInput
+from pants.bsp.util_rules.targets import (
+    BSPBuildTargetsMetadataRequest,
+    BSPBuildTargetsMetadataResult,
+    BSPBuildTargetsNew,
+)
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, DigestEntries
 from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    CoarsenedTargets,
-    Dependencies,
-    DependenciesRequest,
-    Target,
-    WrappedTarget, Targets,
-)
-from pants.engine.unions import UnionMembership, UnionRule
-from pants.jvm.bsp.spec import JvmBuildTarget
+from pants.engine.target import CoarsenedTargets, FieldSet, Targets
+from pants.engine.unions import UnionRule
 from pants.jvm.compile import (
     ClasspathEntryRequest,
     ClasspathEntryRequestFactory,
     FallibleClasspathEntry,
 )
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.target_types import JvmResolveField
 
 LANGUAGE_ID = "java"
 
@@ -54,62 +43,27 @@ class JavaBSPLanguageSupport(BSPLanguageSupport):
     can_compile = True
 
 
-class JavaBSPBuildTargetsFieldSet(BSPBuildTargetsFieldSet):
-    pass
-
-
 @dataclass(frozen=True)
-class ResolveJavaBSPBuildTargetRequest:
-    target: Target
+class JavaMetadataFieldSet(FieldSet):
+    required_fields = (JavaSourceField, JvmResolveField)
+
+    source: JavaSourceField
+    resolve: JvmResolveField
+
+
+class JavaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
+    language_id = LANGUAGE_ID
+    can_merge_metadata_from = ()
+    field_set_type = JavaMetadataFieldSet
 
 
 @rule
-async def bsp_resolve_one_java_build_target(
-    request: ResolveJavaBSPBuildTargetRequest,
-    union_membership: UnionMembership,
-) -> BuildTarget:
-    dep_addrs = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
-    impls = union_membership.get(BSPCompileFieldSet)
-
-    reported_deps = []
-    for dep_addr in dep_addrs:
-        if dep_addr == request.target.address:
-            continue
-
-        wrapped_dep_tgt = await Get(WrappedTarget, Address, dep_addr)
-        dep_tgt = wrapped_dep_tgt.target
-        for impl in impls:
-            if impl.is_applicable(dep_tgt):
-                reported_deps.append(BuildTargetIdentifier.from_address(dep_tgt.address))
-                break
-
-    return BuildTarget(
-        id=BuildTargetIdentifier.from_address(request.target.address),
-        display_name=str(request.target.address),
-        base_directory=None,
-        tags=(),
-        capabilities=BuildTargetCapabilities(
-            can_compile=True,
-        ),
-        language_ids=(LANGUAGE_ID,),
-        dependencies=tuple(reported_deps),
-        data_kind="jvm",
-        data=JvmBuildTarget(),
+async def bsp_resolve_java_metadata(
+    _: JavaBSPBuildTargetsMetadataRequest,
+) -> BSPBuildTargetsMetadataResult:
+    return BSPBuildTargetsMetadataResult(
+        can_compile=True,
     )
-
-
-@rule
-async def bsp_resolve_all_java_build_targets(
-    _: JavaBSPBuildTargetsFieldSet,
-    all_java_targets: AllJavaTargets,
-    bsp_context: BSPContext,
-) -> BSPBuildTargets:
-    if LANGUAGE_ID not in bsp_context.client_params.capabilities.language_ids:
-        return BSPBuildTargets()
-    build_targets = await MultiGet(
-        Get(BuildTarget, ResolveJavaBSPBuildTargetRequest(tgt)) for tgt in all_java_targets
-    )
-    return BSPBuildTargets(targets=tuple(build_targets))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -144,7 +98,9 @@ async def handle_bsp_java_options_request(
     if bsp_target_name not in bsp_build_targets.targets_mapping:
         raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
     targets = await Get(
-        Targets, AddressSpecs, bsp_build_targets.targets_mapping[bsp_target_name].address_specs
+        Targets,
+        AddressSpecs,
+        bsp_build_targets.targets_mapping[bsp_target_name].specs.address_specs,
     )
 
     coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
@@ -225,7 +181,7 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(BSPLanguageSupport, JavaBSPLanguageSupport),
-        UnionRule(BSPBuildTargetsFieldSet, JavaBSPBuildTargetsFieldSet),
+        UnionRule(BSPBuildTargetsMetadataRequest, JavaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPHandlerMapping, JavacOptionsHandlerMapping),
         UnionRule(BSPCompileFieldSet, JavaBSPCompileFieldSet),
     )

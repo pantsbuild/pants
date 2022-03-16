@@ -137,7 +137,7 @@ class BuildTarget:
             dependencies=tuple(
                 BuildTargetIdentifier.from_json_dict(x) for x in d.get("dependencies", [])
             ),
-            #data_kind=d.get("dataKind"),  # TODO: figure out generic decode, this is only used in tests!
+            # data_kind=d.get("dataKind"),  # TODO: figure out generic decode, this is only used in tests!
             data=d.get("data"),
         )
 
