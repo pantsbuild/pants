@@ -55,7 +55,7 @@ class PythonProtobufSubsystem(Subsystem):
             `python_resolve` field.
 
             Unless this option is disabled, Pants will error if no relevant target is found or
-            if more than one is found which causes ambiguity."
+            if more than one is found which causes ambiguity.
             """
         ),
         advanced=True,
