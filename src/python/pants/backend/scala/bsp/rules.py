@@ -5,6 +5,7 @@ import logging
 import os
 from dataclasses import dataclass
 
+from pants.backend.scala.bsp import util_rules
 from pants.backend.scala.bsp.spec import (
     ScalaBuildTarget,
     ScalacOptionsItem,
@@ -12,11 +13,13 @@ from pants.backend.scala.bsp.spec import (
     ScalacOptionsResult,
     ScalaPlatform,
 )
+from pants.backend.scala.bsp.util_rules import MaterializeScalaRuntimeJarsResult, MaterializeScalaRuntimeJarsRequest
 from pants.backend.scala.compile.scalac import compute_output_jar_filename
 from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.base.build_root import BuildRoot
+from pants.base.specs import AddressSpecs
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import (
@@ -27,7 +30,7 @@ from pants.bsp.spec.base import (
 )
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
-from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsFieldSet
+from pants.bsp.util_rules.targets import BSPBuildTargetsFieldSet, BSPBuildTargetsNew
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries
@@ -39,7 +42,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     Target,
-    WrappedTarget,
+    WrappedTarget, Targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.compile import (
@@ -76,48 +79,6 @@ class ResolveScalaBSPBuildTargetRequest:
 class ResolveScalaBSPBuildTargetResult:
     build_target: BuildTarget
     scala_runtime: Snapshot
-
-
-@dataclass(frozen=True)
-class MaterializeScalaRuntimeJarsRequest:
-    scala_version: str
-
-
-@dataclass(frozen=True)
-class MaterializeScalaRuntimeJarsResult:
-    content: Snapshot
-
-
-@rule
-async def materialize_scala_runtime_jars(
-    request: MaterializeScalaRuntimeJarsRequest,
-) -> MaterializeScalaRuntimeJarsResult:
-    tool_classpath = await Get(
-        ToolClasspath,
-        ToolClasspathRequest(
-            artifact_requirements=ArtifactRequirements.from_coordinates(
-                [
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-compiler",
-                        version=request.scala_version,
-                    ),
-                    Coordinate(
-                        group="org.scala-lang",
-                        artifact="scala-library",
-                        version=request.scala_version,
-                    ),
-                ]
-            ),
-        ),
-    )
-
-    materialized_classpath_digest = await Get(
-        Digest,
-        AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{request.scala_version}"),
-    )
-    materialized_classpath = await Get(Snapshot, Digest, materialized_classpath_digest)
-    return MaterializeScalaRuntimeJarsResult(materialized_classpath)
 
 
 @rule
@@ -175,22 +136,22 @@ async def bsp_resolve_one_scala_build_target(
     return ResolveScalaBSPBuildTargetResult(bsp_target, scala_runtime=scala_runtime.content)
 
 
-@rule
-async def bsp_resolve_all_scala_build_targets(
-    _: ScalaBSPBuildTargetsFieldSet,
-    all_scala_targets: AllScalaTargets,
-    bsp_context: BSPContext,
-) -> BSPBuildTargets:
-    if LANGUAGE_ID not in bsp_context.client_params.capabilities.language_ids:
-        return BSPBuildTargets()
-    build_targets = await MultiGet(
-        Get(ResolveScalaBSPBuildTargetResult, ResolveScalaBSPBuildTargetRequest(tgt))
-        for tgt in all_scala_targets
-    )
-    output_digest = await Get(Digest, MergeDigests([d.scala_runtime.digest for d in build_targets]))
-    return BSPBuildTargets(
-        targets=tuple(btgt.build_target for btgt in build_targets), digest=output_digest
-    )
+# @rule
+# async def bsp_resolve_all_scala_build_targets(
+#     _: ScalaBSPBuildTargetsFieldSet,
+#     all_scala_targets: AllScalaTargets,
+#     bsp_context: BSPContext,
+# ) -> BSPBuildTargets:
+#     if LANGUAGE_ID not in bsp_context.client_params.capabilities.language_ids:
+#         return BSPBuildTargets()
+#     build_targets = await MultiGet(
+#         Get(ResolveScalaBSPBuildTargetResult, ResolveScalaBSPBuildTargetRequest(tgt))
+#         for tgt in all_scala_targets
+#     )
+#     output_digest = await Get(Digest, MergeDigests([d.scala_runtime.digest for d in build_targets]))
+#     return BSPBuildTargets(
+#         targets=tuple(btgt.build_target for btgt in build_targets), digest=output_digest
+#     )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -219,23 +180,30 @@ class HandleScalacOptionsResult:
 async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
+    bsp_build_targets: BSPBuildTargetsNew,
 ) -> HandleScalacOptionsResult:
-    wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
-    coarsened_targets = await Get(CoarsenedTargets, Addresses([wrapped_target.target.address]))
-    assert len(coarsened_targets) == 1
-    coarsened_target = coarsened_targets[0]
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
-    output_file = compute_output_jar_filename(coarsened_target)
+    bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
+    if bsp_target_name not in bsp_build_targets.targets_mapping:
+        raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
+    targets = await Get(
+        Targets, AddressSpecs, bsp_build_targets.targets_mapping[bsp_target_name].address_specs
+    )
+    coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
+    # assert len(coarsened_targets) == 1
+    # coarsened_target = coarsened_targets[0]
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
+    # output_file = compute_output_jar_filename(coarsened_target)
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
             options=(),
-            classpath=(
-                build_root.pathlib_path.joinpath(
-                    f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{output_file}"
-                ).as_uri(),
-            ),
+            # classpath=(
+            #     build_root.pathlib_path.joinpath(
+            #         f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{output_file}"
+            #     ).as_uri(),
+            # ),
+            classpath=(),
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/jvm/resolves/{resolve.name}/classes"
             ).as_uri(),
@@ -298,8 +266,9 @@ async def bsp_scala_compile_request(
 def rules():
     return (
         *collect_rules(),
+        *util_rules.rules(),
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
-        UnionRule(BSPBuildTargetsFieldSet, ScalaBSPBuildTargetsFieldSet),
+        # UnionRule(BSPBuildTargetsFieldSet, ScalaBSPBuildTargetsFieldSet),
         UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
         UnionRule(BSPCompileFieldSet, ScalaBSPCompileFieldSet),
     )

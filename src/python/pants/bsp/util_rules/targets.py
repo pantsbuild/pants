@@ -7,6 +7,7 @@ import os.path
 from dataclasses import dataclass
 from typing import ClassVar
 
+from pants.backend.scala.bsp.util_rules import ScalaBuildTargetInfo
 from pants.base.build_root import BuildRoot
 from pants.base.specs import AddressSpecs, Specs
 from pants.base.specs_parser import SpecsParser
@@ -43,6 +44,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.jvm.target_types import JvmResolveField
 from pants.util.frozendict import FrozenDict
 
 
@@ -113,13 +115,17 @@ async def bsp_workspace_build_targets(
     build_root: BuildRoot,
 ) -> WorkspaceBuildTargetsResult:
     # metadata_field_set_types = union_membership.get(BSPBuildTargetsFieldSet)
-
+    digest: Digest = EMPTY_DIGEST
     result: list[BuildTarget] = []
     for bsp_target_name, specs in bsp_build_targets.targets_mapping.items():
         targets = await Get(Targets, AddressSpecs, specs.address_specs)
         targets_with_sources = [tgt for tgt in targets if tgt.has_field(SourcesField)]
         # TODO:  What about literal specs?
 
+        # TODO: Check for conflicting resolves.
+        resolve_field = targets[0][JvmResolveField]
+        scala_info = await Get(ScalaBuildTargetInfo, JvmResolveField, resolve_field)
+        digest = await Get(Digest, MergeDigests([digest, scala_info.digest]))
         # applicable_field_sets: dict[Target, list[Type[BSPBuildTargetsFieldSet]]] = defaultdict(list)
         # for tgt in targets:
         #     for field_set_type in metadata_field_set_types:
@@ -150,8 +156,8 @@ async def bsp_workspace_build_targets(
                 ),
                 language_ids=("java", "scala"),
                 dependencies=(),
-                data_kind=None,
-                data=None,
+                data_kind="scala",
+                data=scala_info.btgt,
             )
         )
     # responses = await MultiGet(
@@ -163,6 +169,9 @@ async def bsp_workspace_build_targets(
     # result.sort(key=lambda btgt: btgt.id.uri)
     # output_digest = await Get(Digest, MergeDigests([r.digest for r in responses]))
     # workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
+
+    if digest != EMPTY_DIGEST:
+        workspace.write_digest(digest, path_prefix=".pants.d/bsp")
 
     return WorkspaceBuildTargetsResult(
         targets=tuple(result),

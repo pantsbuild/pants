@@ -10,6 +10,7 @@ from pants.backend.java.compile.javac import compute_output_jar_filename
 from pants.backend.java.dependency_inference.symbol_mapper import AllJavaTargets
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.build_root import BuildRoot
+from pants.base.specs import AddressSpecs
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import (
@@ -20,7 +21,7 @@ from pants.bsp.spec.base import (
 )
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
-from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsFieldSet
+from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsFieldSet, BSPBuildTargetsNew
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, DigestEntries
@@ -32,7 +33,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     Target,
-    WrappedTarget,
+    WrappedTarget, Targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.jvm.bsp.spec import JvmBuildTarget
@@ -137,23 +138,31 @@ class HandleJavacOptionsResult:
 async def handle_bsp_java_options_request(
     request: HandleJavacOptionsRequest,
     build_root: BuildRoot,
+    bsp_build_targets: BSPBuildTargetsNew,
 ) -> HandleJavacOptionsResult:
-    wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
-    coarsened_targets = await Get(CoarsenedTargets, Addresses([wrapped_target.target.address]))
-    assert len(coarsened_targets) == 1
-    coarsened_target = coarsened_targets[0]
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
-    output_file = compute_output_jar_filename(coarsened_target)
+    bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
+    if bsp_target_name not in bsp_build_targets.targets_mapping:
+        raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
+    targets = await Get(
+        Targets, AddressSpecs, bsp_build_targets.targets_mapping[bsp_target_name].address_specs
+    )
+
+    coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
+    # assert len(coarsened_targets) == 1
+    # coarsened_target = coarsened_targets[0]
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
+    # output_file = compute_output_jar_filename(coarsened_target)
 
     return HandleJavacOptionsResult(
         JavacOptionsItem(
             target=request.bsp_target_id,
             options=(),
-            classpath=(
-                build_root.pathlib_path.joinpath(
-                    f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{output_file}"
-                ).as_uri(),
-            ),
+            # classpath=(
+            #     build_root.pathlib_path.joinpath(
+            #         f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{output_file}"
+            #     ).as_uri(),
+            # ),
+            classpath=(),
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/jvm/resolves/{resolve.name}/classes"
             ).as_uri(),
