@@ -883,13 +883,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e4f30b9f84e5ab3decf945113119649fec09c1fc3507c6ebffec75646c56e62b",
-              "url": "https://files.pythonhosted.org/packages/3b/02/8d4d27b1cacaac2d129a27d17a22d92a2a5eedcb7817d4ed8ab0d4daf5c4/setuptools-60.9.3-py3-none-any.whl"
+              "hash": "782ef48d58982ddb49920c11a0c5c9c0b02e7d7d1c2ad0aa44e1a1e133051c96",
+              "url": "https://files.pythonhosted.org/packages/7c/5b/3d92b9f0f7ca1645cba48c080b54fe7d8b1033a4e5720091d1631c4266db/setuptools-60.10.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2347b2b432c891a863acadca2da9ac101eae6169b1d3dfee2ec605ecd50dbfe5",
-              "url": "https://files.pythonhosted.org/packages/14/74/54890935244ce053abcc4fa01ef4982a84743a8d128d4cf5eae56e2d156c/setuptools-60.9.3.tar.gz"
+              "hash": "6599055eeb23bfef457d5605d33a4d68804266e6cb430b0fb12417c5efeae36c",
+              "url": "https://files.pythonhosted.org/packages/af/e8/894c71e914dfbe01276a42dfad40025cd96119f2eefc39c554b6e8b9df86/setuptools-60.10.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -926,7 +926,6 @@
             "sphinx-favicon; extra == \"docs\"",
             "sphinx-inline-tabs; extra == \"docs\"",
             "sphinx; extra == \"docs\"",
-            "sphinx>=4.3.2; extra == \"testing\"",
             "sphinxcontrib-towncrier; extra == \"docs\"",
             "tomli; extra == \"testing-integration\"",
             "virtualenv>=13.0.0; extra == \"testing\"",
@@ -935,7 +934,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "60.9.3"
+          "version": "60.10"
         },
         {
           "artifacts": [
