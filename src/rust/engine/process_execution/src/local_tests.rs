@@ -1,25 +1,24 @@
-use std;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
 
-use hashing::EMPTY_DIGEST;
 use maplit::hashset;
 use shell_quote::bash;
 use spectral::{assert_that, string::StrAssertions};
-use store::Store;
-use tempfile;
 use tempfile::TempDir;
-use testutil;
+
+use hashing::EMPTY_DIGEST;
+use store::Store;
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-  CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  ImmutableInputs, InputDigests, NamedCaches, Platform, Process, RelativePath,
+  local, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
+  RelativePath,
 };
 
 #[derive(PartialEq, Debug)]
@@ -642,6 +641,77 @@ async fn immutable_inputs() {
   assert_eq!(result.original.exit_code, 0);
 }
 
+#[tokio::test]
+async fn prepare_workdir_exclusive_relative() {
+  // Test that we detect that we should should exclusive spawn when a relative path that points
+  // outside of a working directory is used.
+  let _ = WorkunitStore::setup_for_tests();
+
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+  let (_caches_dir, named_caches, immutable_inputs) =
+    named_caches_and_immutable_inputs(store.clone());
+
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .store_file_bytes(TestData::catnip().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::recursive().directory(), true)
+    .await
+    .expect("Error saving directory");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let work_dir = TempDir::new().unwrap();
+
+  // NB: This path is not marked executable, but that isn't (currently) relevant to the heuristic.
+  let mut process = Process::new(vec!["../treats.ext".to_owned()])
+    .working_directory(Some(RelativePath::new("cats").unwrap()));
+  process.input_digests = InputDigests::new(
+    &store,
+    TestDirectory::recursive().digest(),
+    BTreeMap::new(),
+    vec![],
+  )
+  .await
+  .unwrap();
+
+  let exclusive_spawn = local::prepare_workdir(
+    work_dir.path().to_owned(),
+    &process,
+    TestDirectory::recursive().digest(),
+    Context::default(),
+    store,
+    executor,
+    &named_caches,
+    &immutable_inputs,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(exclusive_spawn, true);
+}
+
+fn named_caches_and_immutable_inputs(store: Store) -> (TempDir, NamedCaches, ImmutableInputs) {
+  let root = TempDir::new().unwrap();
+  let root_path = root.path().to_owned();
+  let named_cache_dir = root_path.join("named");
+
+  (
+    root,
+    NamedCaches::new(named_cache_dir),
+    ImmutableInputs::new(store, &root_path).unwrap(),
+  )
+}
+
 async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
@@ -658,16 +728,17 @@ async fn run_command_locally_in_dir(
   executor: Option<task_executor::Executor>,
 ) -> Result<LocalTestResult, String> {
   let store_dir = TempDir::new().unwrap();
-  let named_cache_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
+  let (_caches_dir, named_caches, immutable_inputs) =
+    named_caches_and_immutable_inputs(store.clone());
   let runner = crate::local::CommandRunner::new(
     store.clone(),
     executor.clone(),
     dir.clone(),
-    NamedCaches::new(named_cache_dir.path().to_owned()),
-    ImmutableInputs::new(store.clone(), &dir)?,
+    named_caches,
+    immutable_inputs,
     cleanup,
   );
   let original = runner.run(Context::default(), workunit, req.into()).await?;
