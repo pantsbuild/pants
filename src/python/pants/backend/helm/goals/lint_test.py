@@ -124,7 +124,7 @@ def test_global_lint_strict_chart_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "helm_chart(name='mychart')",
-            "Chart.yaml": gen_chart_file("mychart", version="0.1.0", icon="wrong URL"),
+            "Chart.yaml": gen_chart_file("mychart", version="0.1.0", icon=None),
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "templates/ingress.yaml": K8S_INGRESS_FILE_WITH_LINT_WARNINGS,
@@ -143,9 +143,7 @@ def test_lint_strict_chart_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "helm_chart(name='mychart', lint_strict=True)",
-            "Chart.yaml": gen_chart_file(
-                "mychart", version="0.1.0", icon="http://wwww.example.com/icon.png"
-            ),
+            "Chart.yaml": gen_chart_file("mychart", version="0.1.0", icon=None),
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "templates/service.yaml": K8S_SERVICE_FILE,
