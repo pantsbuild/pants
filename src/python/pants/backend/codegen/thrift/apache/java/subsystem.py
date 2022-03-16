@@ -26,7 +26,8 @@ class ApacheThriftJavaSubsystem(Subsystem):
     _runtime_dependencies = TargetListOption(
         "--runtime-dependencies",
         help=softwrap(
-            """A list of addresses to `jvm_artifact` targets for the runtime
+            """
+            A list of addresses to `jvm_artifact` targets for the runtime
             dependencies needed for generated Java code to work. For example,
             `['3rdparty/jvm:libthrift']`. These dependencies will
             be automatically added to every `thrift_source` target. At the very least,

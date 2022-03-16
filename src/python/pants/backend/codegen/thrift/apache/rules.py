@@ -136,13 +136,13 @@ async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThrif
         raise BinaryNotFoundError(
             softwrap(
                 f"""
-            Cannot find any `thrift` binaries using the option
-            `[apache-thrift].thrift_search_paths`: {list(search_paths)}
+                Cannot find any `thrift` binaries using the option
+                `[apache-thrift].thrift_search_paths`: {list(search_paths)}
 
-            To fix, please install Apache Thrift (https://thrift.apache.org/) with the version
-            {apache_thrift.expected_version} (set by `[apache-thrift].expected_version`) and ensure
-            that it is discoverable via `[apache-thrift].thrift_search_paths`."
-            """
+                To fix, please install Apache Thrift (https://thrift.apache.org/) with the version
+                {apache_thrift.expected_version} (set by `[apache-thrift].expected_version`) and ensure
+                that it is discoverable via `[apache-thrift].thrift_search_paths`.
+                """
             )
         )
 
@@ -169,11 +169,11 @@ async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThrif
             raise AssertionError(
                 softwrap(
                     f"""
-                Failed to parse `thrift -version` output for {binary_path}. Please open a bug at
-                https://github.com/pantsbuild/pants/issues/new/choose with the below data:
+                    Failed to parse `thrift -version` output for {binary_path}. Please open a bug at
+                    https://github.com/pantsbuild/pants/issues/new/choose with the below data:
 
-                {version_result}
-                """
+                    {version_result}
+                    """
                 )
             )
 
@@ -206,7 +206,7 @@ async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThrif
 
             To fix, please install the expected version (https://thrift.apache.org/) and ensure
             that it is discoverable via the option `[apache-thrift].thrift_search_paths`, or change
-            `[apache-thrift].expected_version`."
+            `[apache-thrift].expected_version`.
             """
         )
     )

@@ -73,28 +73,32 @@ def find_python_runtime_library_or_raise_error(
         )
 
     alternative_solution = softwrap(
-        f"""
+        (
+            f"""
             Alternatively, change the resolve field for {codegen_address} to use a different resolve
             from `[python].resolves`.
             """
+        )
         if resolves_enabled
-        else f"""
+        else (
+            f"""
             Alternatively, if you do want to have multiple conflicting versions of the
             `{runtime_library_module}` requirement, set `{disable_inference_option} = false` in
             `pants.toml`. Then manually add a dependency on the relevant `python_requirement` target
             to each target that directly depends on this generated code (e.g. `python_source` targets).
             """
+        )
     )
     raise AmbiguousPythonCodegenRuntimeLibrary(
         softwrap(
             f"""
-        Multiple `python_requirement` targets were found with the module `{runtime_library_module}`
-        in your project{for_resolve_str}, so it is ambiguous which to use for the runtime library
-        for the Python code generated from the the target {codegen_address}:
-        {sorted(addr.spec for addr in addresses)}
+            Multiple `python_requirement` targets were found with the module `{runtime_library_module}`
+            in your project{for_resolve_str}, so it is ambiguous which to use for the runtime library
+            for the Python code generated from the the target {codegen_address}:
+            {sorted(addr.spec for addr in addresses)}
 
-        To fix, remove one of these `python_requirement` targets{for_resolve_str} so that
-        there is no ambiguity and Pants can infer a dependency. {alternative_solution}
-        """
+            To fix, remove one of these `python_requirement` targets{for_resolve_str} so that
+            there is no ambiguity and Pants can infer a dependency. {alternative_solution}
+            """
         )
     )
