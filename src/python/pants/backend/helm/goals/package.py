@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
-from pathlib import PurePath
 
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartOutputPathField
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartMetadata, HelmChartRequest
@@ -25,12 +25,12 @@ class BuiltHelmArtifact(BuiltPackageArtifact):
     metadata: HelmChartMetadata | None = None
 
     @classmethod
-    def create(cls, path_to_dir: PurePath, chart_metadata: HelmChartMetadata) -> BuiltHelmArtifact:
-        path = PurePath(path_to_dir, _helm_artifact_filename(chart_metadata))
+    def create(cls, path_to_dir: str, chart_metadata: HelmChartMetadata) -> BuiltHelmArtifact:
+        path = os.path.join(path_to_dir, _helm_artifact_filename(chart_metadata))
         return cls(
             name=chart_metadata.artifact_name,
             metadata=chart_metadata,
-            relpath=str(path),
+            relpath=path,
             extra_log_lines=(f"Built Helm chart artifact: {path}",),
         )
 
@@ -46,35 +46,33 @@ class HelmPackageFieldSet(HelmChartFieldSet, PackageFieldSet):
 
 @rule(desc="Package Helm chart", level=LogLevel.DEBUG)
 async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
-    output_dir = "__output_dir"
+    result_dir = "__out"
 
-    chart, output_digest = await MultiGet(
+    chart, result_digest = await MultiGet(
         Get(HelmChart, HelmChartRequest(field_set)),
-        Get(Digest, CreateDigest([Directory(output_dir)])),
+        Get(Digest, CreateDigest([Directory(result_dir)])),
     )
 
-    input_digest = await Get(Digest, MergeDigests([chart.snapshot.digest, output_digest]))
-
-    chart_output_path = PurePath(field_set.output_path.value_or_default(file_ending=None))
-    process_output_path = PurePath(output_dir, chart_output_path)
-    process_output_file = process_output_path.joinpath(_helm_artifact_filename(chart.metadata))
+    input_digest = await Get(Digest, MergeDigests([chart.snapshot.digest, result_digest]))
+    process_output_file = os.path.join(result_dir, _helm_artifact_filename(chart.metadata))
 
     process_result = await Get(
         ProcessResult,
         HelmProcess(
-            argv=["package", chart.path, "-d", output_dir],
+            argv=["package", chart.path, "-d", result_dir],
             input_digest=input_digest,
-            output_files=(str(process_output_file),),
+            output_files=(process_output_file,),
             description=f"Packaging Helm chart: {chart.metadata.name}",
         ),
     )
 
     stripped_output_digest = await Get(
-        Digest, RemovePrefix(process_result.output_digest, output_dir)
+        Digest, RemovePrefix(process_result.output_digest, result_dir)
     )
-    dest_digest = await Get(Digest, AddPrefix(stripped_output_digest, str(chart_output_path)))
 
-    return BuiltPackage(dest_digest, (BuiltHelmArtifact.create(chart_output_path, chart.metadata),))
+    artifact_path = field_set.output_path.value_or_default(file_ending=None)
+    dest_digest = await Get(Digest, AddPrefix(stripped_output_digest, artifact_path))
+    return BuiltPackage(dest_digest, (BuiltHelmArtifact.create(artifact_path, chart.metadata),))
 
 
 def rules():

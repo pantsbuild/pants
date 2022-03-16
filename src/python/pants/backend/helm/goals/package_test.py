@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pathlib import PurePath
+import os
 
 import pytest
 
@@ -22,7 +22,7 @@ from pants.backend.helm.util_rules.chart import HelmChartMetadata
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
-from pants.engine.fs import Digest, DigestEntries
+from pants.engine.fs import Snapshot
 from pants.engine.rules import QueryRule, SubsystemRule
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.rule_runner import RuleRunner
@@ -43,9 +43,31 @@ def rule_runner() -> RuleRunner:
             *sources.rules(),
             SubsystemRule(HelmSubsystem),
             QueryRule(BuiltPackage, [HelmPackageFieldSet]),
-            QueryRule(DigestEntries, (Digest,)),
         ],
     )
+
+
+def _assert_build_package(
+    rule_runner: RuleRunner, *, chart_name: str, chart_version: str, output_path: str = ""
+) -> None:
+    target = rule_runner.get_target(Address("", target_name=chart_name))
+    field_set = HelmPackageFieldSet.create(target)
+
+    expected_metadata = HelmChartMetadata(
+        name=chart_name,
+        version=chart_version,
+    )
+    expected_built_package = BuiltHelmArtifact.create(output_path, expected_metadata)
+
+    result = rule_runner.request(BuiltPackage, [field_set])
+    chart_snapshot = rule_runner.request(Snapshot, [result.digest])
+
+    assert len(result.artifacts) == 1
+    assert result.artifacts[0] == expected_built_package
+
+    if output_path != "":
+        assert chart_snapshot.dirs == (output_path,)
+    assert chart_snapshot.files == (os.path.join(output_path, f"{chart_name}-{chart_version}.tgz"),)
 
 
 def test_helm_package(rule_runner: RuleRunner) -> None:
@@ -54,7 +76,7 @@ def test_helm_package(rule_runner: RuleRunner) -> None:
 
     rule_runner.write_files(
         {
-            "BUILD": "helm_chart(name='mychart')",
+            "BUILD": f"helm_chart(name='{chart_name}')",
             "Chart.yaml": gen_chart_file(chart_name, version=chart_version),
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
@@ -62,20 +84,25 @@ def test_helm_package(rule_runner: RuleRunner) -> None:
         }
     )
 
-    target = rule_runner.get_target(Address("", target_name="mychart"))
-    field_set = HelmPackageFieldSet.create(target)
+    _assert_build_package(rule_runner, chart_name=chart_name, chart_version=chart_version)
 
-    expected_metadata = HelmChartMetadata(
-        name=chart_name,
-        version=chart_version,
+
+def test_helm_package_with_custom_output_path(rule_runner: RuleRunner) -> None:
+    chart_name = "bar"
+    chart_version = "0.2.0"
+
+    output_path = "charts"
+
+    rule_runner.write_files(
+        {
+            "BUILD": f"""helm_chart(name="{chart_name}", output_path="{output_path}")""",
+            "Chart.yaml": gen_chart_file(chart_name, version=chart_version),
+            "values.yaml": HELM_VALUES_FILE,
+            "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "templates/service.yaml": K8S_SERVICE_FILE,
+        }
     )
-    expected_built_package = BuiltHelmArtifact.create(PurePath("./"), expected_metadata)
 
-    result = rule_runner.request(BuiltPackage, [field_set])
-    chart_entries = rule_runner.request(DigestEntries, [result.digest])
-
-    assert len(result.artifacts) == 1
-    assert result.artifacts[0] == expected_built_package
-
-    assert len(chart_entries) == 1
-    assert chart_entries[0].path == f"{chart_name}-{chart_version}.tgz"
+    _assert_build_package(
+        rule_runner, chart_name=chart_name, chart_version=chart_version, output_path=output_path
+    )
