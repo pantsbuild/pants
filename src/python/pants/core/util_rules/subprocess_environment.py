@@ -20,9 +20,9 @@ class SubprocessEnvironment(Subsystem):
 
     _env_vars = StrListOption(
         "--env-vars",
-        default=["LANG", "LC_CTYPE", "LC_ALL"],
+        default=["LANG", "LC_CTYPE", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR"],
         help=(
-            "Environment variables to set for process invocations. "
+            "Environment variables to set for process invocations.\n\n"
             "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
             "or just `ENV_VAR` to copy the value from Pants's own environment."
         ),
