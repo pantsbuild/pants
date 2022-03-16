@@ -8,6 +8,7 @@ from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 
 
@@ -20,11 +21,13 @@ class SubprocessEnvironment(Subsystem):
 
     _env_vars = StrListOption(
         "--env-vars",
-        default=["LANG", "LC_CTYPE", "LC_ALL"],
+        default=["LANG", "LC_CTYPE", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR"],
         help=(
-            "Environment variables to set for process invocations. "
+            "Environment variables to set for process invocations.\n\n"
             "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-            "or just `ENV_VAR` to copy the value from Pants's own environment."
+            "or just `ENV_VAR` to copy the value from Pants's own environment.\n\n"
+            f"See {doc_url('options#addremove-semantics')} for how to add and remove Pants's "
+            "default for this option."
         ),
         advanced=True,
     )
