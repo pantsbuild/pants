@@ -463,6 +463,14 @@ impl Process {
   }
 
   ///
+  /// Replaces the working_directory for this process.
+  ///
+  pub fn working_directory(mut self, working_directory: Option<RelativePath>) -> Process {
+    self.working_directory = working_directory;
+    self
+  }
+
+  ///
   /// Replaces the output files for this process.
   ///
   pub fn output_files(mut self, output_files: BTreeSet<RelativePath>) -> Process {
