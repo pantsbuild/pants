@@ -151,12 +151,10 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/f.py": "'''docstring'''\nCONSTANT: str = ''\n",
-            # NB: Avoid Python 3.8+ for this test due to issues with astroid/ast.
-            # See https://github.com/pantsbuild/pants/issues/10547.
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_sources(name='py2', interpreter_constraints=['==2.7.*'])
-                python_sources(name='py3', interpreter_constraints=['CPython>=3.6,<3.8'])
+                python_sources(name='py3', interpreter_constraints=['CPython>=3.7,<4'])
                 """
             ),
         }
