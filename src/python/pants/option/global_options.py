@@ -1204,40 +1204,6 @@ class BootstrapOptions:
         "may not be enabled.",
     )
 
-    use_deprecated_python_macros = BoolOption(
-        "--use-deprecated-python-macros",
-        advanced=True,
-        default=False,
-        help=(
-            "If true, use Pants's deprecated macro system for "
-            "`python_requirements`, `poetry_requirements`, and `pipenv_requirements` "
-            "rather than target generation.\n\n"
-            "The address for macros is different. Rather than "
-            "`3rdparty/python#Django`, the address will look like `3rdparty/python:Django`. "
-            "The macro (`python_requirements` et al) also was not a proper target, meaning "
-            "that you could not give it a `name`. In contrast, if the target generator "
-            "sets its `name`, e.g. to `reqs`, generated targets will have an address like "
-            "`3rdparty/python:reqs#Django`."
-        ),
-        removal_version="2.12.0.dev0",
-        removal_hint=(
-            "In Pants 2.12, the deprecated Python macros like `python_requirements` will be "
-            "replaced with improved target generators, which are now enabled by "
-            "default.\n\n"
-            "If you already migrated by setting `use_deprecated_python_macros = false`, simply "
-            "delete the option.\n\n"
-            "Otherwise, when you are ready to upgrade, follow these steps:\n\n"
-            f"  1. Run `{bin_name()} update-build-files --fix-python-macros`\n"
-            "  2. Check the logs for an ERROR log to see if you have to manually add "
-            "`name=` anywhere.\n"
-            "  3. Remove `use_deprecated_python_macros = true` from `[GLOBAL]` in "
-            "pants.toml.\n\n"
-            "(Why upgrade from the old macro mechanism to target generation? Among other "
-            "benefits, it makes sure that the Pants daemon is properly invalidated when you "
-            "change `requirements.txt` and `pyproject.toml`.)"
-        ),
-    )
-
 
 # N.B. By subclassing BootstrapOptions, we inherit all of those options and are also able to extend
 # it with non-bootstrap options too.
@@ -1534,16 +1500,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         invalidation_globs.update(
             ("!*.pyc", "!__pycache__/", ".gitignore", *bootstrap_options.pantsd_invalidation_globs)
         )
-        if bootstrap_options.use_deprecated_python_macros:
-            invalidation_globs.update(
-                (
-                    "requirements.txt",
-                    "3rdparty/**/requirements.txt",
-                    "pyproject.toml",
-                    "3rdparty/**/pyproject.toml",
-                )
-            )
-
         return tuple(invalidation_globs)
 
     @memoized_classmethod
