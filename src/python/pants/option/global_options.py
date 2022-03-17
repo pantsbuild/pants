@@ -1576,19 +1576,17 @@ class GlobalOptions(Subsystem):
 
         # Explicitly specified globs are already relative, and are added verbatim.
         invalidation_globs.update(
-            (
-                "!*.pyc",
-                "!__pycache__/",
-                ".gitignore",
-                # TODO: This is a bandaid for https://github.com/pantsbuild/pants/issues/7022:
-                # macros should be adapted to allow this dependency to be automatically detected.
-                "requirements.txt",
-                "3rdparty/**/requirements.txt",
-                "pyproject.toml",
-                "3rdparty/**/pyproject.toml",
-                *bootstrap_options.pantsd_invalidation_globs,
-            )
+            ("!*.pyc", "!__pycache__/", ".gitignore", *bootstrap_options.pantsd_invalidation_globs)
         )
+        if bootstrap_options.use_deprecated_python_macros:
+            invalidation_globs.update(
+                (
+                    "requirements.txt",
+                    "3rdparty/**/requirements.txt",
+                    "pyproject.toml",
+                    "3rdparty/**/pyproject.toml",
+                )
+            )
 
         return tuple(invalidation_globs)
 
