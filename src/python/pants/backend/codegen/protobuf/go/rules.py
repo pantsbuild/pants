@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 import os
 import re
 from collections import defaultdict
@@ -23,7 +24,10 @@ from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
 )
-from pants.backend.go.util_rules.first_party_pkg import FallibleFirstPartyPkgAnalysis
+from pants.backend.go.util_rules.first_party_pkg import (
+    FallibleFirstPartyPkgAnalysis,
+    FirstPartyPkgAnalysisRequest,
+)
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
@@ -52,6 +56,8 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
+    InferDependenciesRequest,
+    InferredDependencies,
     SourcesPaths,
     SourcesPathsRequest,
     TransitiveTargets,
@@ -66,6 +72,8 @@ from pants.source.source_root import (
 )
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+
+_logger = logging.getLogger(__name__)
 
 
 class GoCodegenBuildProtobufRequest(GoCodegenBuildRequest):
@@ -555,9 +563,45 @@ async def setup_go_protoc_plugin(platform: Platform) -> _SetupGoProtocPlugin:
     return _SetupGoProtocPlugin(plugin_digest)
 
 
+class InferGoProtobufDependenciesRequest(InferDependenciesRequest):
+    infer_from = GoPackageSourcesField
+
+
+@rule(
+    desc="Infer dependencies on Protobuf sources for first-party Go packages", level=LogLevel.DEBUG
+)
+async def infer_go_dependencies(
+    request: InferGoProtobufDependenciesRequest,
+    go_protobuf_mapping: GoProtobufImportPathMapping,
+) -> InferredDependencies:
+    address = request.sources_field.address
+    maybe_pkg_analysis = await Get(
+        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(address)
+    )
+    if maybe_pkg_analysis.analysis is None:
+        _logger.error(
+            f"Failed to analyze {maybe_pkg_analysis.import_path} for dependency inference:\n"
+            f"{maybe_pkg_analysis.stderr}"
+        )
+        return InferredDependencies([])
+    pkg_analysis = maybe_pkg_analysis.analysis
+
+    inferred_dependencies: list[Address] = []
+    for import_path in (
+        *pkg_analysis.imports,
+        *pkg_analysis.test_imports,
+        *pkg_analysis.xtest_imports,
+    ):
+        candidate_addresses = go_protobuf_mapping.mapping.get(import_path, ())
+        inferred_dependencies.extend(candidate_addresses)
+
+    return InferredDependencies(inferred_dependencies)
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateGoFromProtobufRequest),
         UnionRule(GoCodegenBuildRequest, GoCodegenBuildProtobufRequest),
+        UnionRule(InferDependenciesRequest, InferGoProtobufDependenciesRequest),
     )
