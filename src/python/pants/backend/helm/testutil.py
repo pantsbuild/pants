@@ -5,26 +5,28 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.helm.util_rules.chart import ChartType
+from pants.backend.helm.util_rules.chart import DEFAULT_API_VERSION, ChartType
 
 
 def gen_chart_file(
     name: str,
     *,
     version: str,
+    description: str | None = None,
     type: ChartType = ChartType.APPLICATION,
-    api_version: str = "v2",
+    api_version: str = DEFAULT_API_VERSION,
     icon: str | None = None,
 ) -> str:
     metadata_yaml = dedent(
         f"""\
     apiVersion: {api_version}
     name: {name}
-    description: A Helm chart for Kubernetes
     version: {version}
     type: {type.value}
     """
     )
+    if description:
+        metadata_yaml += f"description: {description}\n"
     if icon:
         metadata_yaml += f"icon: {icon}\n"
     return metadata_yaml

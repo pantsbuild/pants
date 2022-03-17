@@ -83,9 +83,7 @@ def test_collects_single_chart_sources(
     expected_metadata = HelmChartMetadata(
         name=name,
         version=version,
-        api_version="v2",
         icon=icon,
-        description="A Helm chart for Kubernetes",
         type=type,
     )
 

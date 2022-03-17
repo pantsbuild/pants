@@ -52,6 +52,7 @@ class HelmProcess:
     extra_immutable_input_digests: FrozenDict[str, Digest]
     cache_scope: ProcessCacheScope | None
     output_directories: tuple[str, ...]
+    output_files: tuple[str, ...]
 
     def __init__(
         self,
@@ -61,6 +62,7 @@ class HelmProcess:
         description: str,
         level: LogLevel = LogLevel.INFO,
         output_directories: Iterable[str] | None = None,
+        output_files: Iterable[str] | None = None,
         extra_env: Mapping[str, str] | None = None,
         extra_immutable_input_digests: Mapping[str, Digest] | None = None,
         cache_scope: ProcessCacheScope | None = None,
@@ -70,6 +72,7 @@ class HelmProcess:
         self.description = description
         self.level = level
         self.output_directories = tuple(output_directories or ())
+        self.output_files = tuple(output_files or ())
         self.extra_env = FrozenDict(extra_env or {})
         self.extra_immutable_input_digests = FrozenDict(extra_immutable_input_digests or {})
         self.cache_scope = cache_scope
@@ -147,6 +150,7 @@ def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
         description=request.description,
         level=request.level,
         output_directories=request.output_directories,
+        output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 
