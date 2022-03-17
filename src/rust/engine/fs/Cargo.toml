@@ -24,7 +24,7 @@ log = "0.4"
 parking_lot = "0.12"
 protos = { path = "../protos" }
 rlimit = "0.3"
-serde = "1.0.104"
+serde = "1.0.136"
 task_executor = { path = "../task_executor" }
 workunit_store = { path = "../workunit_store" }
 
