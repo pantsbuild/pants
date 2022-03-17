@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import ClassVar, Generic, Sequence, Type, TypeVar
@@ -228,7 +227,9 @@ async def generate_one_bsp_build_target_request(
     for sp in sources_paths:
         merged_source_files.update(sp.files)
 
-    source_roots_result = await Get(SourceRootsResult, SourceRootsRequest, SourceRootsRequest.for_files(merged_source_files))
+    source_roots_result = await Get(
+        SourceRootsResult, SourceRootsRequest, SourceRootsRequest.for_files(merged_source_files)
+    )
     source_root_paths = {x.path for x in source_roots_result.path_to_root.values()}
     if len(source_root_paths) == 0:
         base_dir = build_root.pathlib_path
@@ -334,11 +335,16 @@ async def materialize_bsp_build_target_sources(
     _logger.info(f"merged_sources_dirs={merged_sources_dirs}")
     _logger.info(f"merged_sources_files={merged_sources_files}")
 
-    base_dir = build_root.pathlib_path
-    if merged_sources_dirs:
-        common_path = os.path.commonpath(list(merged_sources_dirs))
-        if common_path:
-            base_dir = base_dir.joinpath(common_path)
+    source_roots_result = await Get(
+        SourceRootsResult, SourceRootsRequest, SourceRootsRequest.for_files(merged_sources_files)
+    )
+    source_root_paths = {x.path for x in source_roots_result.path_to_root.values()}
+    if len(source_root_paths) == 0:
+        base_dir = build_root.pathlib_path
+    elif len(source_root_paths) == 1:
+        base_dir = build_root.pathlib_path.joinpath(list(source_root_paths)[0])
+    else:
+        raise ValueError("Multiple source roots not supported for BSP build target.")
 
     sources_item = SourcesItem(
         target=request.bsp_target_id,
