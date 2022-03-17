@@ -44,6 +44,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -222,15 +223,28 @@ async def generate_one_bsp_build_target_request(
     sources_paths = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField])) for tgt in targets_with_sources
     )
-    merged_sources_dirs: set[str] = set()
+    _logger.info(f"sources_paths = {sources_paths}")
+    merged_source_files: set[str] = set()
     for sp in sources_paths:
-        merged_sources_dirs.update(sp.dirs)
+        merged_source_files.update(sp.files)
 
-    base_dir = build_root.pathlib_path
-    if merged_sources_dirs:
-        common_path = os.path.commonpath(list(merged_sources_dirs))
-        if common_path:
-            base_dir = base_dir.joinpath(common_path)
+    source_roots_result = await Get(SourceRootsResult, SourceRootsRequest, SourceRootsRequest.for_files(merged_source_files))
+    source_root_paths = {x.path for x in source_roots_result.path_to_root.values()}
+    if len(source_root_paths) == 0:
+        base_dir = build_root.pathlib_path
+    elif len(source_root_paths) == 1:
+        base_dir = build_root.pathlib_path.joinpath(list(source_root_paths)[0])
+    else:
+        raise ValueError("Multiple source roots not supported for BSP build target.")
+
+    # base_dir = build_root.pathlib_path
+    # if merged_sources_dirs:
+    #     _logger.info(f"merged_sources_dirs = {merged_sources_dirs}")
+    #     common_path = os.path.commonpath(list(merged_sources_dirs))
+    #     _logger.info(f"common_path = {common_path}")
+    #     if common_path:
+    #         base_dir = base_dir.joinpath(common_path)
+    # _logger.info(f"base_dir = {base_dir}")
 
     return GenerateOneBSPBuildTargetResult(
         build_target=BuildTarget(
