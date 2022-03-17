@@ -332,6 +332,12 @@ class Address(EngineAwareParameter):
     def is_parametrized(self) -> bool:
         return bool(self.parameters)
 
+    def is_parametrized_subset_of(self, other: Address) -> bool:
+        """True if this Address is == to the given Address, but with a subset of its parameters."""
+        if not self._equal_without_parameters(other):
+            return False
+        return self.parameters.items() <= other.parameters.items()
+
     @property
     def filename(self) -> str:
         if self._relative_file_path is None:
@@ -453,16 +459,18 @@ class Address(EngineAwareParameter):
             relative_file_path=relative_file_path,
         )
 
-    def __eq__(self, other):
-        if not isinstance(other, Address):
-            return False
+    def _equal_without_parameters(self, other: Address) -> bool:
         return (
             self.spec_path == other.spec_path
             and self._target_name == other._target_name
-            and self.parameters == other.parameters
             and self.generated_name == other.generated_name
             and self._relative_file_path == other._relative_file_path
         )
+
+    def __eq__(self, other):
+        if not isinstance(other, Address):
+            return False
+        return self._equal_without_parameters(other) and self.parameters == other.parameters
 
     def __hash__(self):
         return self._hash
