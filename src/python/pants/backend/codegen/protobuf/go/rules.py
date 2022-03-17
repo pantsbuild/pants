@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import json
 import os
 import re
 from collections import defaultdict
@@ -24,7 +23,7 @@ from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
 )
-from pants.backend.go.util_rules.first_party_pkg import FirstPartyPkgAnalysis
+from pants.backend.go.util_rules.first_party_pkg import FallibleFirstPartyPkgAnalysis
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
@@ -263,60 +262,23 @@ async def setup_full_package_build_request(
             env={"CGO_ENABLED": "0"},
         ),
     )
-    if result.exit_code != 0:
-        return FallibleBuildGoPackageRequest(
-            request=None,
-            import_path=request.import_path,
-            exit_code=result.exit_code,
-            stderr=(
-                f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
-                f"stdout:\n{result.stdout.decode()}\n\n"
-                f"stderr:\n{result.stderr.decode()}\n\n"
-                "This may be a bug in Pants. Please report this issue at "
-                "https://github.com/pantsbuild/pants/issues/new/choose"
-            ),
-        )
 
     # Parse the metadata from the analysis.
-    # TODO: Refactor out a helper for this and `first_party_pkg` that just takes sources and not a target as
-    # `first_party_pkg` does.
-    metadata = json.loads(result.stdout)
-    if "Error" in metadata or "InvalidGoFiles" in metadata:
-        error = metadata.get("Error", "")
-        if error:
-            error += "\n"
-        if "InvalidGoFiles" in metadata:
-            error += "\n".join(
-                f"{filename}: {error}"
-                for filename, error in metadata.get("InvalidGoFiles", {}).items()
-            )
-            error += "\n"
+    fallible_analysis = FallibleFirstPartyPkgAnalysis.from_process_result(
+        result,
+        dir_path=gen_dir,
+        import_path=request.import_path,
+        minimum_go_version="",
+        description_of_source=f"Go package generated from protobuf targets `{', '.join(str(addr) for addr in request.addresses)}`",
+    )
+    if not fallible_analysis.analysis:
         return FallibleBuildGoPackageRequest(
             request=None,
             import_path=request.import_path,
-            exit_code=result.exit_code,
-            stderr=(
-                f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
-                "This may be a bug in Pants. Please report this issue at "
-                "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
-                f"error:\n{error}"
-            ),
+            exit_code=fallible_analysis.exit_code,
+            stderr=fallible_analysis.stderr,
         )
-    analysis = FirstPartyPkgAnalysis(
-        dir_path=gen_dir,
-        import_path=request.import_path,
-        imports=tuple(metadata.get("Imports", [])),
-        test_imports=tuple(metadata.get("TestImports", [])),
-        xtest_imports=tuple(metadata.get("XTestImports", [])),
-        go_files=tuple(metadata.get("GoFiles", [])),
-        test_files=tuple(metadata.get("TestGoFiles", [])),
-        xtest_files=tuple(metadata.get("XTestGoFiles", [])),
-        s_files=tuple(metadata.get("SFiles", [])),
-        minimum_go_version="",  # TODO: Get this from go.mod or elsewhere?
-        embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
-        test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
-        xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
-    )
+    analysis = fallible_analysis.analysis
 
     # Obtain build requests for third-party dependencies.
     # TODO: Consider how to merge this code with existing dependency inference code.
