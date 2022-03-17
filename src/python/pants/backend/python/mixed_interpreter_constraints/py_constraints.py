@@ -15,8 +15,8 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
+    AllTargets,
     AllTargetsRequest,
-    AllUnexpandedTargets,
     RegisteredTargetTypes,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -69,8 +69,7 @@ async def py_constraints(
             )
             return PyConstraintsGoal(exit_code=1)
 
-        # TODO: Stop including the target generator? I don't think it's relevant for this goal.
-        all_targets = await Get(AllUnexpandedTargets, AllTargetsRequest())
+        all_targets = await Get(AllTargets, AllTargetsRequest())
         all_python_targets = tuple(
             t for t in all_targets if t.has_field(InterpreterConstraintsField)
         )

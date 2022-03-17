@@ -744,14 +744,10 @@ class PythonTestsOverrideField(OverridesField):
 
 class PythonTestsGeneratorTarget(TargetFilesGenerator):
     alias = "python_tests"
-    core_fields = (
-        PythonTestsGeneratingSourcesField,
-        InterpreterConstraintsField,
-        PythonTestsOverrideField,
-    )
+    core_fields = (PythonTestsGeneratingSourcesField, PythonTestsOverrideField)
     generated_target_cls = PythonTestTarget
-    copied_fields = (InterpreterConstraintsField,)
-    moved_fields = _PYTHON_TEST_MOVED_FIELDS
+    copied_fields = ()
+    moved_fields = (*_PYTHON_TEST_MOVED_FIELDS, InterpreterConstraintsField)
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = "Generate a `python_test` target for each file in the `sources` field."
 
@@ -807,14 +803,8 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
         PythonSourcesOverridesField,
     )
     generated_target_cls = PythonSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
-    )
-    moved_fields = (
-        PythonResolveField,
-        Dependencies,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (PythonResolveField, Dependencies, InterpreterConstraintsField)
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
@@ -833,18 +823,11 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PythonSourcesGeneratingSourcesField,
-        InterpreterConstraintsField,
         PythonSourcesOverridesField,
     )
     generated_target_cls = PythonSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
-    )
-    moved_fields = (
-        PythonResolveField,
-        Dependencies,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (PythonResolveField, Dependencies, InterpreterConstraintsField)
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = (
         "Generate a `python_source` target for each file in the `sources` field.\n\n"
