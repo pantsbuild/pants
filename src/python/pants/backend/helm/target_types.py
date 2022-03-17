@@ -61,8 +61,8 @@ class HelmChartOutputPathField(OutputPathField):
     help = (
         "Where the built directory tree should be located.\n\n"
         "If undefined, this will use the path to the BUILD file, "
-        "For example, `src/charts/mychart:mychart` would be "
-        "`src.charts.mychart/mychart/`.\n\n"
+        "For example, `src/charts/mychart:tgt_name` would be "
+        "`src.charts.mychart/tgt_name/`.\n\n"
         "Regardless of whether you use the default or set this field, the path will end with "
         "Helms's file format of `<chart_name>-<chart_version>.tgz`, where "
         "`chart_name` and `chart_version` are the values extracted from the Chart.yaml file. "
