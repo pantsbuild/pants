@@ -46,6 +46,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Moran
 + Daniel Peebles
 + Daniel Wagner-Hall
 + Danny McClanahan
