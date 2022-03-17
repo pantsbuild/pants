@@ -7,7 +7,7 @@ from typing import Iterable
 
 import pytest
 
-from pants.backend.codegen.protobuf import target_types
+from pants.backend.codegen.protobuf import protobuf_dependency_inference, target_types
 from pants.backend.codegen.protobuf.go.rules import (
     GenerateGoFromProtobufRequest,
     parse_go_package_option,
@@ -52,6 +52,7 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *source_files.rules(),
             *protobuf_target_types_rules(),
+            *protobuf_dependency_inference.rules(),
             *stripped_source_files.rules(),
             *go_protobuf_rules(),
             *sdk.rules(),
@@ -171,7 +172,7 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
-            "src/protobuf/dir2/BUILD": "protobuf_sources(dependencies=['src/protobuf/dir1'])",
+            "src/protobuf/dir2/BUILD": "protobuf_sources()",
             # Test another source root.
             "tests/protobuf/test_protos/f.proto": dedent(
                 """\
@@ -184,13 +185,11 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
                 import "dir2/f.proto";
                 """
             ),
-            "tests/protobuf/test_protos/BUILD": (
-                "protobuf_sources(dependencies=['src/protobuf/dir2'])"
-            ),
+            "tests/protobuf/test_protos/BUILD": ("protobuf_sources()"),
             "src/go/people/BUILD": dedent(
                 """\
                 go_mod(name="mod")
-                go_package(name="pkg", dependencies=["src/protobuf/dir1", "src/protobuf/dir2"])
+                go_package(name="pkg")
                 """
             ),
             "src/go/people/go.mod": dedent(
