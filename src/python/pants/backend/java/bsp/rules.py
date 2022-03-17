@@ -104,20 +104,12 @@ async def handle_bsp_java_options_request(
     )
 
     coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
-    # assert len(coarsened_targets) == 1
-    # coarsened_target = coarsened_targets[0]
     resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
-    # output_file = compute_output_jar_filename(coarsened_target)
 
     return HandleJavacOptionsResult(
         JavacOptionsItem(
             target=request.bsp_target_id,
             options=(),
-            # classpath=(
-            #     build_root.pathlib_path.joinpath(
-            #         f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{output_file}"
-            #     ).as_uri(),
-            # ),
             classpath=(),
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/jvm/resolves/{resolve.name}/classes"

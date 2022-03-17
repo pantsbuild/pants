@@ -216,8 +216,7 @@ async def generate_one_bsp_build_target_request(
     metadata = metadata_results_by_lang_id[metadata_merge_order[-1].language_id].metadata
     digest = await Get(Digest, MergeDigests([r.digest for r in metadata_results]))
 
-    # Determine base directory for this build target.
-    # TODO: Use a source root?
+    # Determine base directory for this build target using source roots.
     targets_with_sources = [tgt for tgt in targets if tgt.has_field(SourcesField)]
     sources_paths = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField])) for tgt in targets_with_sources
@@ -237,15 +236,6 @@ async def generate_one_bsp_build_target_request(
         base_dir = build_root.pathlib_path.joinpath(list(source_root_paths)[0])
     else:
         raise ValueError("Multiple source roots not supported for BSP build target.")
-
-    # base_dir = build_root.pathlib_path
-    # if merged_sources_dirs:
-    #     _logger.info(f"merged_sources_dirs = {merged_sources_dirs}")
-    #     common_path = os.path.commonpath(list(merged_sources_dirs))
-    #     _logger.info(f"common_path = {common_path}")
-    #     if common_path:
-    #         base_dir = base_dir.joinpath(common_path)
-    # _logger.info(f"base_dir = {base_dir}")
 
     return GenerateOneBSPBuildTargetResult(
         build_target=BuildTarget(
