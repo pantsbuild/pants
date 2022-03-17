@@ -138,7 +138,7 @@ class PythonSetup(Subsystem):
     )
     resolves = DictOption[str](
         "--resolves",
-        default={"python-default": "3rdparty/python/default_lock.txt"},
+        default={"python-default": "3rdparty/python/default.lock"},
         help=(
             "A mapping of logical names to lockfile paths used in your project.\n\n"
             "Many organizations only need a single resolve for their whole project, which is "
@@ -169,6 +169,8 @@ class PythonSetup(Subsystem):
             "  5. Update any targets like `python_source` / `python_sources`, "
             "`python_test` / `python_tests`, and `pex_binary` which need to set a non-default "
             "resolve with the `resolve` field.\n\n"
+            "You can name the lockfile paths what you would like; Pants does not expect a "
+            "certain file extension or location.\n\n"
             "Only applies if `[python].enable_resolves` is true."
         ),
         advanced=True,

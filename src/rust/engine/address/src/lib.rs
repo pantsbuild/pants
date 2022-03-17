@@ -28,8 +28,8 @@
 pub struct AddressInput<'a> {
   pub path: &'a str,
   pub target: Option<&'a str>,
-  pub parameters: Vec<(&'a str, &'a str)>,
   pub generated: Option<&'a str>,
+  pub parameters: Vec<(&'a str, &'a str)>,
 }
 
 peg::parser! {
@@ -42,26 +42,26 @@ peg::parser! {
 
         rule target() -> &'input str = ":" s:target_name() { s }
 
-        rule parameters() -> Vec<(&'input str, &'input str)>
-            = "@" parameters:parameter() ++ "," { parameters }
-
-        rule parameter() -> (&'input str, &'input str)
-            = quiet!{ key:$([^'=']+) "=" value:$([^'#' | ',']+) { (key, value) } }
-            / expected!("one or more key=value pairs to follow a `@`.")
-
         rule generated_name() -> &'input str
-            = quiet!{ s:$([_]+) { s } }
+            = quiet!{ s:$([^'@']+) { s } }
             / expected!("a non-empty generated target name to follow a `#`.")
 
         rule generated() -> &'input str = "#" s:generated_name() { s }
 
+        rule parameters() -> Vec<(&'input str, &'input str)>
+            = "@" parameters:parameter() ++ "," { parameters }
+
+        rule parameter() -> (&'input str, &'input str)
+            = quiet!{ key:$([^'=']+) "=" value:$([^',']*) { (key, value) } }
+            / expected!("one or more key=value pairs to follow a `@`.")
+
         pub(crate) rule relative_address() -> AddressInput<'input>
-            = path:path() target:target()? parameters:parameters()? generated:generated()? {
+            = path:path() target:target()? generated:generated()? parameters:parameters()? {
                 AddressInput {
                     path,
                     target,
-                    parameters: parameters.unwrap_or_else(Vec::new),
                     generated,
+                    parameters: parameters.unwrap_or_else(Vec::new),
                 }
             }
     }

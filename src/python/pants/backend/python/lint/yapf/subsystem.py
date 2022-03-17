@@ -32,8 +32,8 @@ class Yapf(PythonToolBase):
     default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.yapf", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/yapf/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.yapf", "yapf.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/yapf/yapf.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")

@@ -11,7 +11,7 @@ python_sources(
     dependencies=[":dockerfile_tool", ":lockfile"],
 )
 
-resource(name="lockfile", source="dockerfile_lockfile.txt")
+resource(name="lockfile", source="dockerfile.lock")
 
 python_sources(name="dockerfile_tool", sources=["dockerfile_wrapper_script.py"])
 
