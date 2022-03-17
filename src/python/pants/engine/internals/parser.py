@@ -107,7 +107,13 @@ class Parser:
                 parse_state.add(target_adaptor)
                 return target_adaptor
 
-        symbols: dict[str, Any] = dict(object_aliases.objects)
+        class Cwd:
+            """Lets you call `cwd()` in a BUILD file to get the relative path."""
+
+            def __call__(self) -> str:
+                return parse_state.rel_path()
+
+        symbols: dict[str, Any] = {**object_aliases.objects, "cwd": Cwd()}
         symbols.update(
             (alias, Registrar(alias))
             for alias in target_type_aliases
