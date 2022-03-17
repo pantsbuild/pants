@@ -39,19 +39,18 @@ def rule_runner() -> RuleRunner:
 def write_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "lib1/a.py": "",
+            "lib1/f.py": "",
             "lib1/BUILD": "python_sources(interpreter_constraints=['==2.7.*', '>=3.5'])",
             # We leave off `interpreter_constraints`, which results in using
             # `[python].interpreter_constraints` instead.
-            "lib2/a.py": "",
-            "lib2/b.py": "",
+            "lib2/f.py": "",
             "lib2/BUILD": "python_sources()",
-            "app/a.py": "",
+            "app/f.py": "",
             "app/BUILD": dedent(
                 """\
                 python_sources(
-                    dependencies=['lib1', 'lib2/a.py', 'lib2/b.py'],
-                    interpreter_constraints=['==3.8.*'],
+                    dependencies=['lib1', 'lib2/f.py'],
+                    interpreter_constraints=['==3.7.*'],
                 )
                 """
             ),
@@ -63,8 +62,8 @@ def run_goal(rule_runner: RuleRunner, args: list[str]) -> GoalRuleResult:
     return rule_runner.run_goal_rule(
         PyConstraintsGoal,
         env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": "['>=3.6']"},
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         args=args,
+        global_args=["--no-python-infer-imports"],
     )
 
 
@@ -85,17 +84,16 @@ def test_render_constraints(rule_runner: RuleRunner) -> None:
     result = run_goal(rule_runner, ["app:app"])
     assert result.stdout == dedent(
         """\
-        Final merged constraints: CPython==2.7.*,==3.8.*,>=3.6 OR CPython==3.8.*,>=3.5,>=3.6
+        Final merged constraints: CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6
 
-        CPython==3.8.*
-          app/a.py
+        CPython==3.7.*
+          app/f.py
 
         CPython>=3.6
-          lib2/a.py
-          lib2/b.py
+          lib2/f.py
 
         CPython==2.7.* OR CPython>=3.5
-          lib1/a.py
+          lib1/f.py
         """
     )
 
@@ -110,9 +108,8 @@ def test_constraints_summary(rule_runner: RuleRunner) -> None:
     assert result.stdout == dedent(
         """\
         Target,Constraints,Transitive Constraints,# Dependencies,# Dependees\r
-        app/a.py,CPython==3.8.*,"CPython==2.7.*,==3.8.*,>=3.6 OR CPython==3.8.*,>=3.5,>=3.6",3,1\r
-        lib1/a.py,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,3\r
-        lib2/a.py,CPython>=3.6,CPython>=3.6,0,3\r
-        lib2/b.py,CPython>=3.6,CPython>=3.6,0,3\r
+        app/f.py,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",2,1\r
+        lib1/f.py,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,3\r
+        lib2/f.py,CPython>=3.6,CPython>=3.6,0,3\r
         """
     )
