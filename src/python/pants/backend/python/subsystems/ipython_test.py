@@ -27,12 +27,12 @@ def test_setup_lockfile_interpreter_constraints() -> None:
 
     global_constraint = "==3.9.*"
     rule_runner.set_options(
-        ["--ipython-lockfile=lockfile.txt"],
+        ["--ipython-lockfile=lockfile.txt", "--no-python-infer-imports"],
         env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
     )
 
     def assert_ics(build_file: str, expected: list[str]) -> None:
-        rule_runner.write_files({"project/BUILD": build_file})
+        rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
         lockfile_request = rule_runner.request(GeneratePythonLockfile, [IPythonLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 
