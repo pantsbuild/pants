@@ -68,12 +68,8 @@ async def export_codegen(
             }
         )
         logger.warning(
-            softwrap(
-                f"""
-                No codegen files/targets matched. All codegen target types:
-                {', '.join(codegen_targets)}
-                """
-            )
+            "No codegen files/targets matched. All codegen target types: "
+            f"{', '.join(codegen_targets)}"
         )
         return ExportCodegen(exit_code=0)
 
