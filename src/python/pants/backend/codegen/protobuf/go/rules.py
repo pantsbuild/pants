@@ -16,7 +16,10 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.go.target_type_rules import ImportPathToPackages
 from pants.backend.go.target_types import GoPackageSourcesField
-from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest
+from pants.backend.go.util_rules.build_pkg import (
+    BuildGoPackageRequest,
+    FallibleBuildGoPackageRequest,
+)
 from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
@@ -160,7 +163,7 @@ async def setup_full_package_build_request(
     package_mapping: ImportPathToPackages,
     go_protobuf_mapping: GoProtobufImportPathMapping,
     analyzer: PackageAnalyzerSetup,
-) -> BuildGoPackageRequest:
+) -> FallibleBuildGoPackageRequest:
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
     protoc_go_plugin_relpath = "__protoc_gen_go"
@@ -200,7 +203,7 @@ async def setup_full_package_build_request(
         ]
 
     gen_result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         Process(
             argv=[
                 os.path.join(protoc_relpath, downloaded_protoc_binary.exe),
@@ -224,15 +227,27 @@ async def setup_full_package_build_request(
             output_directories=(output_dir,),
         ),
     )
+    if gen_result.exit_code != 0:
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path=request.import_path,
+            exit_code=gen_result.exit_code,
+            stderr=gen_result.stderr.decode(),
+        )
 
     # Ensure that the generated files are in a single package directory.
     gen_sources = await Get(Snapshot, Digest, gen_result.output_digest)
     files_by_dir = group_by_dir(gen_sources.files)
     if len(files_by_dir) != 1:
-        raise AssertionError(
-            "Expected Go files generated from Protobuf sources to be output to a single directory.\n"
-            f"- import path: {request.import_path}\n"
-            f"- protobuf files: {', '.join(pkg_files)}"
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path=request.import_path,
+            exit_code=1,
+            stderr=(
+                "Expected Go files generated from Protobuf sources to be output to a single directory.\n"
+                f"- import path: {request.import_path}\n"
+                f"- protobuf files: {', '.join(pkg_files)}"
+            ),
         )
     gen_dir = list(files_by_dir.keys())[0]
 
@@ -249,12 +264,17 @@ async def setup_full_package_build_request(
         ),
     )
     if result.exit_code != 0:
-        raise ValueError(
-            f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
-            f"stdout:\n{result.stdout.decode()}\n\n"
-            f"stderr:\n{result.stderr.decode()}\n\n"
-            "This may be a bug in Pants. Please report this issue at "
-            "https://github.com/pantsbuild/pants/issues/new/choose"
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path=request.import_path,
+            exit_code=result.exit_code,
+            stderr=(
+                f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
+                f"stdout:\n{result.stdout.decode()}\n\n"
+                f"stderr:\n{result.stderr.decode()}\n\n"
+                "This may be a bug in Pants. Please report this issue at "
+                "https://github.com/pantsbuild/pants/issues/new/choose"
+            ),
         )
 
     # Parse the metadata from the analysis.
@@ -271,11 +291,16 @@ async def setup_full_package_build_request(
                 for filename, error in metadata.get("InvalidGoFiles", {}).items()
             )
             error += "\n"
-        raise ValueError(
-            f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
-            "This may be a bug in Pants. Please report this issue at "
-            "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
-            f"error:\n{error}"
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path=request.import_path,
+            exit_code=result.exit_code,
+            stderr=(
+                f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
+                "This may be a bug in Pants. Please report this issue at "
+                "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
+                f"error:\n{error}"
+            ),
         )
     analysis = FirstPartyPkgAnalysis(
         dir_path=gen_dir,
@@ -302,9 +327,14 @@ async def setup_full_package_build_request(
         if candidate_addresses:
             # TODO: Use explicit dependencies to disambiguate? This should never happen with Go backend though.
             if len(candidate_addresses) > 1:
-                raise ValueError(
-                    f"Multiple addresses match import of `{dep_import_path}`.\n"
-                    f"addresses: {', '.join(str(a) for a in candidate_addresses)}"
+                return FallibleBuildGoPackageRequest(
+                    request=None,
+                    import_path=request.import_path,
+                    exit_code=result.exit_code,
+                    stderr=(
+                        f"Multiple addresses match import of `{dep_import_path}`.\n"
+                        f"addresses: {', '.join(str(a) for a in candidate_addresses)}"
+                    ),
                 )
             dep_build_request_addrs.extend(candidate_addresses)
 
@@ -318,14 +348,17 @@ async def setup_full_package_build_request(
         for addr in dep_build_request_addrs
     )
 
-    return BuildGoPackageRequest(
+    return FallibleBuildGoPackageRequest(
+        request=BuildGoPackageRequest(
+            import_path=request.import_path,
+            digest=gen_sources.digest,
+            dir_path=analysis.dir_path,
+            go_file_names=analysis.go_files,
+            s_file_names=analysis.s_files,
+            direct_dependencies=dep_build_requests,
+            minimum_go_version=analysis.minimum_go_version,
+        ),
         import_path=request.import_path,
-        digest=gen_sources.digest,
-        dir_path=analysis.dir_path,
-        go_file_names=analysis.go_files,
-        s_file_names=analysis.s_files,
-        direct_dependencies=dep_build_requests,
-        minimum_go_version=analysis.minimum_go_version,
     )
 
 
@@ -333,33 +366,41 @@ async def setup_full_package_build_request(
 async def setup_build_go_package_request_for_protobuf(
     request: GoCodegenBuildProtobufRequest,
     protobuf_package_mapping: GoProtobufImportPathMapping,
-) -> BuildGoPackageRequest:
+) -> FallibleBuildGoPackageRequest:
     # Hydrate the protobuf source to parse for the Go import path.
     sources = await Get(HydratedSources, HydrateSourcesRequest(request.target[ProtobufSourceField]))
     sources_content = await Get(DigestContents, Digest, sources.snapshot.digest)
     assert len(sources_content) == 1
     import_path = parse_go_package_option(sources_content[0].content)
     if not import_path:
-        raise ValueError(
-            f"No import path was set in Protobuf file via `option go_package` directive for {request.target.address}."
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path="",
+            exit_code=1,
+            stderr=f"No import path was set in Protobuf file via `option go_package` directive for {request.target.address}.",
         )
 
     # Request the full build of the package. This indirection is necessary so that requests for two or more
     # Protobuf files in the same Go package result in a single cacheable rule invocation.
     protobuf_target_addrs_for_import_path = protobuf_package_mapping.mapping.get(import_path)
     if not protobuf_target_addrs_for_import_path:
-        raise ValueError(
-            f"No Protobuf files exists for import path `{import_path}`. "
-            "Consider whether the import path was set correctly via the `option go_package` directive."
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path=import_path,
+            exit_code=1,
+            stderr=(
+                f"No Protobuf files exists for import path `{import_path}`. "
+                "Consider whether the import path was set correctly via the `option go_package` directive."
+            ),
         )
-    build_request = await Get(
-        BuildGoPackageRequest,
+
+    return await Get(
+        FallibleBuildGoPackageRequest,
         _SetupGoProtobufPackageBuildRequest(
             addresses=protobuf_target_addrs_for_import_path,
             import_path=import_path,
         ),
     )
-    return build_request
 
 
 @rule(desc="Generate Go source files from Protobuf", level=LogLevel.DEBUG)
