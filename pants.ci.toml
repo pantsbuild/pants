@@ -6,6 +6,9 @@ remote_cache_write = true
 # We want to continue to get logs when remote caching errors.
 remote_cache_warnings = "backoff"
 
+# TODO: We use the remote cache, and don't do anything to save/restore the local cache.
+local_cache = true
+
 [stats]
 log = true
 memory_summary = true
