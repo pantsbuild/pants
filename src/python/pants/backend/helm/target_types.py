@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
-from textwrap import dedent
 
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
@@ -60,17 +58,22 @@ class HelmChartDependenciesField(Dependencies):
 
 
 class HelmChartOutputPathField(OutputPathField):
-    help = dedent(
-        """\
-        The destination folder where the final packaged chart will be located.\n
-        The final package name will still follow Helm convention, this output path will only affect the destination folder where can be found.
-        """
+    help = (
+        "Where the built directory tree should be located.\n\n"
+        "If undefined, this will use the path to the BUILD file, "
+        "For example, `src/charts/mychart:mychart` would be "
+        "`src.charts.mychart/mychart/`.\n\n"
+        "Regardless of whether you use the default or set this field, the path will end with "
+        "Helms's file format of `<chart_name>-<chart_version>.tgz`, where "
+        "`chart_name` and `chart_version` are the values extracted from the Chart.yaml file. "
+        "So, using the default for this field, the target "
+        "`src/charts/mychart` might have a final path like "
+        "`src.charts.mychart/mychart-0.1.0.tgz`.\n\n"
+        f"When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. "
+        "`dist/`).\n\n"
+        "Warning: setting this value risks naming collisions with other package targets you may "
+        "have."
     )
-
-    def value_or_default(self, *, file_ending: str | None) -> str:
-        if self.value:
-            return self.value
-        return os.path.join(self.address.spec_path.replace(os.sep, "."))
 
 
 class HelmChartLintStrictField(TriBoolField):

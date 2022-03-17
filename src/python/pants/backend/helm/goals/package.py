@@ -11,32 +11,25 @@ from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartOutputPa
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartMetadata, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
+from pants.engine.fs import (
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    Directory,
+    MergeDigests,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class BuiltHelmArtifact(BuiltPackageArtifact):
-    name: str | None = None
-    metadata: HelmChartMetadata | None = None
-
-    @classmethod
-    def create(cls, path_to_dir: str, chart_metadata: HelmChartMetadata) -> BuiltHelmArtifact:
-        path = os.path.join(path_to_dir, _helm_artifact_filename(chart_metadata))
-        return cls(
-            name=chart_metadata.artifact_name,
-            metadata=chart_metadata,
-            relpath=path,
-            extra_log_lines=(f"Built Helm chart artifact: {path}",),
-        )
-
-
 def _helm_artifact_filename(chart_metadata: HelmChartMetadata) -> str:
-    return f"{chart_metadata.artifact_name}.tgz"
+    return f"{chart_metadata.name}-{chart_metadata.version}.tgz"
 
 
 @dataclass(frozen=True)
@@ -70,10 +63,18 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
         Digest, RemovePrefix(process_result.output_digest, result_dir)
     )
 
-    artifact_path = field_set.output_path.value_or_default(file_ending=None)
-    dest_digest = await Get(Digest, AddPrefix(stripped_output_digest, artifact_path))
-    return BuiltPackage(dest_digest, (BuiltHelmArtifact.create(artifact_path, chart.metadata),))
+    final_snapshot = await Get(
+        Snapshot,
+        AddPrefix(stripped_output_digest, field_set.output_path.value_or_default(file_ending=None)),
+    )
+    return BuiltPackage(
+        final_snapshot.digest,
+        artifacts=tuple(
+            BuiltPackageArtifact(file, extra_log_lines=(f"Built Helm chart artifact: {file}",))
+            for file in final_snapshot.files
+        ),
+    )
 
 
 def rules():
-    return collect_rules()
+    return [*collect_rules(), UnionRule(PackageFieldSet, HelmPackageFieldSet)]

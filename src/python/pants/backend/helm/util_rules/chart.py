@@ -191,10 +191,6 @@ class HelmChartMetadata:
     def from_bytes(cls, content: bytes) -> HelmChartMetadata:
         return cls.from_dict(yaml.safe_load(content))
 
-    @property
-    def artifact_name(self) -> str:
-        return f"{self.name}-{self.version}"
-
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
             "apiVersion": self.api_version,
