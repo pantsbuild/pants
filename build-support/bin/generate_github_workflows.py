@@ -510,7 +510,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 "build_wheels_macos": {
                     "name": "Build wheels and fs_util (macOS)",
                     "runs-on": MACOS_VERSION,
-                    "timeout-minutes": 65,
+                    "timeout-minutes": 80,
                     "env": DISABLE_REMOTE_CACHE_ENV,
                     "if": IS_PANTS_OWNER,
                     "steps": [
