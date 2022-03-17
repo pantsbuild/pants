@@ -455,6 +455,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         ./build-support/bin/release.sh build-wheels
                         USE_PY38=true ./build-support/bin/release.sh build-wheels
                         USE_PY39=true ./build-support/bin/release.sh build-wheels
+                        ./build-support/bin/release.sh build-local-pex
                         ./build-support/bin/release.sh build-fs-util
                         """
                     ),
