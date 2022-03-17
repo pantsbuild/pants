@@ -688,18 +688,14 @@ _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsTimeoutField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
+    InterpreterConstraintsField,
     SkipPythonTestsField,
 )
 
 
 class PythonTestTarget(Target):
     alias = "python_test"
-    core_fields = (
-        *_PYTHON_TEST_MOVED_FIELDS,
-        PythonTestsDependenciesField,
-        PythonTestSourceField,
-        InterpreterConstraintsField,
-    )
+    core_fields = (*_PYTHON_TEST_MOVED_FIELDS, PythonTestsDependenciesField, PythonTestSourceField)
     help = (
         "A single Python test file, written in either Pytest style or unittest style.\n\n"
         "All test util code, including `conftest.py`, should go into a dedicated `python_source` "
@@ -747,7 +743,7 @@ class PythonTestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (PythonTestsGeneratingSourcesField, PythonTestsOverrideField)
     generated_target_cls = PythonTestTarget
     copied_fields = ()
-    moved_fields = (*_PYTHON_TEST_MOVED_FIELDS, InterpreterConstraintsField)
+    moved_fields = _PYTHON_TEST_MOVED_FIELDS
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = "Generate a `python_test` target for each file in the `sources` field."
 
