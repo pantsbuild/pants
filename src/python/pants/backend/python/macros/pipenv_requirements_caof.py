@@ -66,6 +66,7 @@ class PipenvRequirementsCAOF:
             requirements_file_target_name = source
             self._parse_context.create_object(
                 TargetGeneratorSourcesHelperTarget.alias,
+                __ignore_deprecation=True,
                 name=requirements_file_target_name,
                 sources=[source],
             )
@@ -90,6 +91,7 @@ class PipenvRequirementsCAOF:
             normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
             self._parse_context.create_object(
                 "python_requirement",
+                __ignore_deprecation=True,
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 dependencies=[

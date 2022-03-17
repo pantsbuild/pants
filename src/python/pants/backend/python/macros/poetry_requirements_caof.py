@@ -69,6 +69,7 @@ class PoetryRequirementsCAOF:
         """
         req_file_tgt = self._parse_context.create_object(
             TargetGeneratorSourcesHelperTarget.alias,
+            __ignore_deprecation=True,
             name=source.replace(os.path.sep, "_"),
             sources=[source],
         )
@@ -88,6 +89,7 @@ class PoetryRequirementsCAOF:
             normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
             self._parse_context.create_object(
                 "python_requirement",
+                __ignore_deprecation=True,
                 name=parsed_req.project_name,
                 requirements=[parsed_req],
                 modules=normalized_module_mapping.get(normalized_proj_name),

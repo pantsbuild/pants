@@ -5,6 +5,10 @@ from typing import Any, Mapping
 
 from typing_extensions import Protocol
 
+from pants.base.deprecated import warn_or_error
+from pants.util.docutil import doc_url
+from pants.util.strutil import softwrap
+
 
 class RelPathOracle(Protocol):
     def rel_path(self) -> str:
@@ -32,7 +36,9 @@ class ParseContext:
         self._type_aliases = type_aliases
         self._rel_path_oracle = rel_path_oracle
 
-    def create_object(self, alias: str, *args: Any, **kwargs: Any) -> Any:
+    def create_object(
+        self, alias: str, *args: Any, __ignore_deprecation: bool = False, **kwargs: Any
+    ) -> Any:
         """Constructs the type with the given alias using the given args and kwargs.
 
         :API: public
@@ -42,6 +48,32 @@ class ParseContext:
         :param kwargs: These pass through to the underlying callable object.
         :returns: The created object.
         """
+        if not __ignore_deprecation:
+            warn_or_error(
+                "2.12.0.dev0",
+                "the method `ParseContext.create_object()`",
+                softwrap(
+                    f"""
+                    `ParseContext.create_object()` has been replaced by newer APIs that better
+                    integrate with the Target and Rules APIs:
+
+                    - Target generators plugin hook.
+                    - Light-weight macros: {doc_url('macros')}
+                    - `setup_py` plugin hooK: {doc_url('plugins-setup-py')}
+
+                    We've found that it's too easy to accidentally break the engine's caching
+                    using `ParseContext.create_object()`, so are planning to remove it. Please
+                    reach out on Slack or GitHub if you have a use case that cannot be replaced:
+                    {doc_url('getting-help')}
+
+                    Note that we recently added a `cwd()` symbol to BUILD files, so if your
+                    context-aware object factory relies on `ParseContext.rel_path` +
+                    `ParseContext.create_object`, you may be able to combine `cwd` with a
+                    light-weight macro.
+                    """
+                ),
+            )
+
         object_type = self._type_aliases.get(alias)
         if object_type is None:
             raise KeyError(f"There is no type registered for alias {alias}")

@@ -70,6 +70,7 @@ class PythonRequirementsCAOF:
         """
         req_file_tgt = self._parse_context.create_object(
             TargetGeneratorSourcesHelperTarget.alias,
+            __ignore_deprecation=True,
             name=source.replace(os.path.sep, "_"),
             sources=[source],
         )
@@ -92,6 +93,7 @@ class PythonRequirementsCAOF:
             normalized_proj_name = canonicalize_project_name(project_name)
             self._parse_context.create_object(
                 "python_requirement",
+                __ignore_deprecation=True,
                 name=project_name,
                 requirements=list(parsed_reqs_),
                 modules=normalized_module_mapping.get(normalized_proj_name),
