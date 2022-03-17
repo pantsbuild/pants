@@ -81,8 +81,8 @@ class FirstPartyPkgAnalysis:
     xtest_imports: tuple[str, ...]
 
     go_files: tuple[str, ...]
-    test_files: tuple[str, ...]
-    xtest_files: tuple[str, ...]
+    test_go_files: tuple[str, ...]
+    xtest_go_files: tuple[str, ...]
 
     s_files: tuple[str, ...]
 
@@ -167,8 +167,8 @@ class FallibleFirstPartyPkgAnalysis:
             test_imports=tuple(metadata.get("TestImports", [])),
             xtest_imports=tuple(metadata.get("XTestImports", [])),
             go_files=tuple(metadata.get("GoFiles", [])),
-            test_files=tuple(metadata.get("TestGoFiles", [])),
-            xtest_files=tuple(metadata.get("XTestGoFiles", [])),
+            test_go_files=tuple(metadata.get("TestGoFiles", [])),
+            xtest_go_files=tuple(metadata.get("XTestGoFiles", [])),
             s_files=tuple(metadata.get("SFiles", [])),
             minimum_go_version=minimum_go_version,
             embed_patterns=tuple(metadata.get("EmbedPatterns", [])),

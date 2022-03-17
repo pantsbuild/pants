@@ -167,8 +167,8 @@ def test_package_analysis(rule_runner: RuleRunner) -> None:
         assert analysis.test_imports == tuple(test_imports)
         assert analysis.xtest_imports == tuple(xtest_imports)
         assert analysis.go_files == tuple(go_files)
-        assert analysis.test_files == tuple(test_files)
-        assert analysis.xtest_files == tuple(xtest_files)
+        assert analysis.test_go_files == tuple(test_files)
+        assert analysis.xtest_go_files == tuple(xtest_files)
         assert not analysis.s_files
 
         assert analysis.minimum_go_version == "1.16"
