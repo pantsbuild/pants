@@ -203,7 +203,7 @@ async def setup_full_package_build_request(
         ]
 
     gen_result = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         Process(
             argv=[
                 os.path.join(protoc_relpath, downloaded_protoc_binary.exe),
@@ -227,15 +227,27 @@ async def setup_full_package_build_request(
             output_directories=(output_dir,),
         ),
     )
+    if gen_result.exit_code != 0:
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path=request.import_path,
+            exit_code=gen_result.exit_code,
+            stderr=gen_result.stderr.decode(),
+        )
 
     # Ensure that the generated files are in a single package directory.
     gen_sources = await Get(Snapshot, Digest, gen_result.output_digest)
     files_by_dir = group_by_dir(gen_sources.files)
     if len(files_by_dir) != 1:
-        raise AssertionError(
-            "Expected Go files generated from Protobuf sources to be output to a single directory.\n"
-            f"- import path: {request.import_path}\n"
-            f"- protobuf files: {', '.join(pkg_files)}"
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path=request.import_path,
+            exit_code=1,
+            stderr=(
+                "Expected Go files generated from Protobuf sources to be output to a single directory.\n"
+                f"- import path: {request.import_path}\n"
+                f"- protobuf files: {', '.join(pkg_files)}"
+            ),
         )
     gen_dir = list(files_by_dir.keys())[0]
 
@@ -252,12 +264,17 @@ async def setup_full_package_build_request(
         ),
     )
     if result.exit_code != 0:
-        raise ValueError(
-            f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
-            f"stdout:\n{result.stdout.decode()}\n\n"
-            f"stderr:\n{result.stderr.decode()}\n\n"
-            "This may be a bug in Pants. Please report this issue at "
-            "https://github.com/pantsbuild/pants/issues/new/choose"
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path=request.import_path,
+            exit_code=result.exit_code,
+            stderr=(
+                f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
+                f"stdout:\n{result.stdout.decode()}\n\n"
+                f"stderr:\n{result.stderr.decode()}\n\n"
+                "This may be a bug in Pants. Please report this issue at "
+                "https://github.com/pantsbuild/pants/issues/new/choose"
+            ),
         )
 
     # Parse the metadata from the analysis.
@@ -274,11 +291,16 @@ async def setup_full_package_build_request(
                 for filename, error in metadata.get("InvalidGoFiles", {}).items()
             )
             error += "\n"
-        raise ValueError(
-            f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
-            "This may be a bug in Pants. Please report this issue at "
-            "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
-            f"error:\n{error}"
+        return FallibleBuildGoPackageRequest(
+            request=None,
+            import_path=request.import_path,
+            exit_code=result.exit_code,
+            stderr=(
+                f"Failed to analyze Go sources generated from {request.import_path}.\n\n"
+                "This may be a bug in Pants. Please report this issue at "
+                "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
+                f"error:\n{error}"
+            ),
         )
     analysis = FirstPartyPkgAnalysis(
         dir_path=gen_dir,
@@ -305,9 +327,14 @@ async def setup_full_package_build_request(
         if candidate_addresses:
             # TODO: Use explicit dependencies to disambiguate? This should never happen with Go backend though.
             if len(candidate_addresses) > 1:
-                raise ValueError(
-                    f"Multiple addresses match import of `{dep_import_path}`.\n"
-                    f"addresses: {', '.join(str(a) for a in candidate_addresses)}"
+                return FallibleBuildGoPackageRequest(
+                    request=None,
+                    import_path=request.import_path,
+                    exit_code=result.exit_code,
+                    stderr=(
+                        f"Multiple addresses match import of `{dep_import_path}`.\n"
+                        f"addresses: {', '.join(str(a) for a in candidate_addresses)}"
+                    ),
                 )
             dep_build_request_addrs.extend(candidate_addresses)
 
