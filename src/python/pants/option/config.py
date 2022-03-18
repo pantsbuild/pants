@@ -302,12 +302,6 @@ class _ConfigValues:
             return add_val
         return remove_val
 
-    def options(self, section: str) -> set[str] | None:
-        section_values = self.section_to_values.get(section)
-        if section_values is None:
-            return None
-        return set(section_values.keys()) | set(self.defaults.keys())
-
     @property
     def defaults(self) -> dict[str, str]:
         return {
