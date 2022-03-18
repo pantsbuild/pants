@@ -351,9 +351,18 @@ class Target:
             valid_aliases.add(field_type.alias)
             aliases_to_field_types[field_type.alias] = field_type
             if field_type.deprecated_alias is not None:
+                valid_aliases.add(field_type.deprecated_alias)
                 aliases_to_field_types[field_type.deprecated_alias] = field_type
+
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
+                if isinstance(self, TargetGenerator):
+                    # Even though moved_fields don't live on the target generator, they are valid
+                    # for users to specify.
+                    for field_type in self.moved_fields:
+                        valid_aliases.add(field_type.alias)
+                        if field_type.deprecated_alias is not None:
+                            valid_aliases.add(field_type.deprecated_alias)
                 raise InvalidFieldException(
                     f"Unrecognized field `{alias}={value}` in target {address}. Valid fields for "
                     f"the target type `{self.alias}`: {sorted(valid_aliases)}.",
