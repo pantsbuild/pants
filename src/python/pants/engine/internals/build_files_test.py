@@ -245,7 +245,7 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
                         "helloworld/util",
                         "helloworld/util:tests",
                     ],
-                    cwd_test=f"cwd is: {cwd()}"
+                    build_file_dir=f"build file's dir is: {build_file_dir()}"
                 )
                 """
             )
@@ -264,7 +264,7 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
     # when encountering this, but it's fine at this stage.
     assert target_adaptor.kwargs["fake_field"] == 42
-    assert target_adaptor.kwargs["cwd_test"] == "cwd is: helloworld/dir"
+    assert target_adaptor.kwargs["build_file_dir"] == "build file's dir is: helloworld/dir"
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:

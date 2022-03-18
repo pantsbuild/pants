@@ -9,6 +9,7 @@ import tokenize
 from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
+from pathlib import PurePath
 from typing import Any, Iterable
 
 from pants.base.exceptions import MappingError
@@ -107,7 +108,10 @@ class Parser:
                 parse_state.add(target_adaptor)
                 return target_adaptor
 
-        symbols: dict[str, Any] = {**object_aliases.objects, "cwd": parse_state.rel_path}
+        symbols: dict[str, Any] = {
+            **object_aliases.objects,
+            "build_file_dir": lambda: PurePath(parse_state.rel_path()),
+        }
         symbols.update(
             (alias, Registrar(alias))
             for alias in target_type_aliases

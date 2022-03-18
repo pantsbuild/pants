@@ -257,7 +257,7 @@ async def resolve_target_parametrizations(
     else:
         first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
         if rest:
-            # The target was parametrized, and so the original target is not addressable.
+            # The target was parametrized, and so the original Target does not exist.
             generated = FrozenDict(
                 (
                     parameterized_address,
@@ -1083,7 +1083,23 @@ async def resolve_dependencies(
         parametrizations = await Get(
             _TargetParametrizations, Address, tgt.address.maybe_convert_to_target_generator()
         )
-        generated_addresses = tuple(parametrizations.parametrization_for(tgt.address).keys())
+        generated_addresses = tuple(parametrizations.generated_for(tgt.address).keys())
+
+    # If the target is parametrized, see whether any explicitly provided dependencies are also
+    # parametrized, but with partial/no parameters. If so, fill them in.
+    explicitly_provided_includes: Iterable[Address] = explicitly_provided.includes
+    if request.field.address.is_parametrized and explicitly_provided_includes:
+        explicit_dependency_parametrizations = await MultiGet(
+            Get(_TargetParametrizations, Address, address.maybe_convert_to_target_generator())
+            for address in explicitly_provided_includes
+        )
+
+        explicitly_provided_includes = [
+            parametrizations.get_subset(address, tgt).address
+            for address, parametrizations in zip(
+                explicitly_provided_includes, explicit_dependency_parametrizations
+            )
+        ]
 
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
@@ -1117,7 +1133,7 @@ async def resolve_dependencies(
         addr
         for addr in (
             *generated_addresses,
-            *explicitly_provided.includes,
+            *explicitly_provided_includes,
             *itertools.chain.from_iterable(injected),
             *itertools.chain.from_iterable(inferred),
             *special_cased,
