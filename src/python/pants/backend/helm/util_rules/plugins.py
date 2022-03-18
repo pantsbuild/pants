@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from abc import ABCMeta
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Generic, Type, TypeVar
@@ -23,6 +24,10 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
+from pants.util.strutil import bullet_list, pluralize
+
+logger = logging.getLogger(__name__)
 
 
 class HelmPluginMetadataFileNotFound(Exception):
@@ -83,12 +88,12 @@ class HelmPluginMetadata:
 
 
 _HelmPluginSubsystem = TypeVar("_HelmPluginSubsystem", bound=HelmPluginSubsystem)
-_GHP = TypeVar("_GHP", bound="HelmPluginBinding")
+_GHP = TypeVar("_GHP", bound="ExternalHelmPluginBinding")
 
 
 @union
 @dataclass(frozen=True)
-class HelmPluginBinding(Generic[_HelmPluginSubsystem], metaclass=ABCMeta):
+class ExternalHelmPluginBinding(Generic[_HelmPluginSubsystem], metaclass=ABCMeta):
     plugin_subsystem_cls: ClassVar[Type[HelmPluginSubsystem]]
 
     name: str
@@ -100,7 +105,7 @@ class HelmPluginBinding(Generic[_HelmPluginSubsystem], metaclass=ABCMeta):
 
 
 @dataclass(frozen=True)
-class HelmPluginRequest:
+class ExternalHelmPluginRequest:
     plugin_name: str
     tool_request: ExternalToolRequest
 
@@ -114,22 +119,31 @@ class HelmPlugin:
     def name(self) -> str:
         return self.metadata.name
 
+    @property
+    def version(self) -> str:
+        return self.metadata.version
+
 
 class HelmPlugins(Collection[HelmPlugin]):
     pass
 
 
 @rule
-async def download_all_global_helm_plugins(union_membership: UnionMembership) -> HelmPlugins:
-    bindings = union_membership.get(HelmPluginBinding)
-    plugins = await MultiGet(
-        Get(HelmPlugin, HelmPluginBinding, binding.create()) for binding in bindings
+async def all_helm_plugins(union_membership: UnionMembership) -> HelmPlugins:
+    bindings = union_membership.get(ExternalHelmPluginBinding)
+    external_plugins = await MultiGet(
+        Get(HelmPlugin, ExternalHelmPluginBinding, binding.create()) for binding in bindings
     )
-    return HelmPlugins(plugins)
+    if logger.isEnabledFor(LogLevel.DEBUG.level):
+        plugins_desc = [f"{p.name}, version: {p.version}" for p in external_plugins]
+        logger.debug(
+            f"Downloaded {pluralize(len(external_plugins), 'external Helm plugin')}:\n{bullet_list(plugins_desc)}"
+        )
+    return HelmPlugins(external_plugins)
 
 
-@rule(desc="Downloads a Helm plugin")
-async def download_helm_plugin(request: HelmPluginRequest) -> HelmPlugin:
+@rule(desc="Download an external Helm plugin", level=LogLevel.DEBUG)
+async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> HelmPlugin:
     downloaded_tool = await Get(DownloadedExternalTool, ExternalToolRequest, request.tool_request)
 
     metadata_file = await Get(

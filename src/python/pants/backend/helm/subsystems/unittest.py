@@ -6,8 +6,8 @@ from typing import cast
 
 from pants.backend.helm.util_rules.plugins import (
     ExternalHelmPlugin,
-    HelmPluginBinding,
-    HelmPluginRequest,
+    ExternalHelmPluginBinding,
+    ExternalHelmPluginRequest,
 )
 from pants.engine.platform import Platform
 from pants.engine.rules import SubsystemRule, collect_rules, rule
@@ -60,15 +60,15 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         return cast(HelmUnitTestReportFormat, self.options.output_type)
 
 
-class HelmUnitTestPluginBinding(HelmPluginBinding[HelmUnitTestSubsystem]):
+class HelmUnitTestPluginBinding(ExternalHelmPluginBinding[HelmUnitTestSubsystem]):
     plugin_subsystem_cls = HelmUnitTestSubsystem
 
 
 @rule
 def download_plugin_request(
     _: HelmUnitTestPluginBinding, subsystem: HelmUnitTestSubsystem
-) -> HelmPluginRequest:
-    return HelmPluginRequest(
+) -> ExternalHelmPluginRequest:
+    return ExternalHelmPluginRequest(
         plugin_name=subsystem.plugin_name, tool_request=subsystem.get_request(Platform.current)
     )
 
@@ -77,5 +77,5 @@ def rules():
     return [
         *collect_rules(),
         SubsystemRule(HelmUnitTestSubsystem),
-        UnionRule(HelmPluginBinding, HelmUnitTestPluginBinding),
+        UnionRule(ExternalHelmPluginBinding, HelmUnitTestPluginBinding),
     ]

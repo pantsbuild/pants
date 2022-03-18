@@ -73,11 +73,11 @@ async def run_helm_unittest(
     test_subsystem: TestSubsystem,
     unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
-    chart_targets, transitive_targets = await MultiGet(
+    chart_deps_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.chart, include_special_cased_deps=True)),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
-    chart_targets = [target for target in chart_targets if HelmChartFieldSet.is_applicable(target)]
+    chart_targets = [tgt for tgt in chart_deps_targets if HelmChartFieldSet.is_applicable(tgt)]
     if len(chart_targets) == 0:
         raise MissingUnitTestChartDependency(field_set.address)
 

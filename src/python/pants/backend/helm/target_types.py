@@ -181,13 +181,13 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
     alias = "helm_unittest_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        HelmUnitTestGeneratingSourcesField,
         HelmUnitTestDependenciesField,
         HelmUnitTestChartField,
-        HelmUnitTestGeneratingSourcesField,
     )
     generated_target_cls = HelmUnitTestTestTarget
-    copied_fields = (*COMMON_TARGET_FIELDS, HelmUnitTestChartField, HelmUnitTestDependenciesField)
-    moved_fields = ()
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (HelmUnitTestDependenciesField, HelmUnitTestChartField)
     help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field"
 
 
