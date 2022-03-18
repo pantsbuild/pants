@@ -47,6 +47,7 @@ DEFAULT_MODULE_MAPPING = {
     "azure-storage-queue": ("azure.storage.queue",),
     "beautifulsoup4": ("bs4",),
     "bitvector": ("BitVector",),
+    "cattrs": ("cattr",),
     "django-cors-headers": ("corsheaders",),
     "django-debug-toolbar": ("debug_toolbar",),
     "django-filter": ("django_filters",),
