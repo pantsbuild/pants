@@ -22,7 +22,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -134,11 +134,16 @@ async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThrif
     )
     if not all_thrift_binary_paths.paths:
         raise BinaryNotFoundError(
-            "Cannot find any `thrift` binaries using the option "
-            f"`[apache-thrift].thrift_search_paths`: {list(search_paths)}\n\n"
-            "To fix, please install Apache Thrift (https://thrift.apache.org/) with the version "
-            f"{apache_thrift.expected_version} (set by `[apache-thrift].expected_version`) and ensure "
-            "that it is discoverable via `[apache-thrift].thrift_search_paths`."
+            softwrap(
+                f"""
+                Cannot find any `thrift` binaries using the option
+                `[apache-thrift].thrift_search_paths`: {list(search_paths)}
+
+                To fix, please install Apache Thrift (https://thrift.apache.org/) with the version
+                {apache_thrift.expected_version} (set by `[apache-thrift].expected_version`) and ensure
+                that it is discoverable via `[apache-thrift].thrift_search_paths`.
+                """
+            )
         )
 
     version_results = await MultiGet(
@@ -162,19 +167,27 @@ async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThrif
             version = f"{_version_components[0]}.{_version_components[1]}"
         except IndexError:
             raise AssertionError(
-                f"Failed to parse `thrift -version` output for {binary_path}. Please open a bug at "
-                f"https://github.com/pantsbuild/pants/issues/new/choose with the below data:"
-                f"\n\n"
-                f"{version_result}"
+                softwrap(
+                    f"""
+                    Failed to parse `thrift -version` output for {binary_path}. Please open a bug at
+                    https://github.com/pantsbuild/pants/issues/new/choose with the below data:
+
+                    {version_result}
+                    """
+                )
             )
 
         if version == apache_thrift.expected_version:
             return ApacheThriftSetup(binary_path.path)
 
         logger.debug(
-            f"The Thrift binary at {binary_path.path} has version {version}, but this "
-            f"project is using {apache_thrift.expected_version} "
-            "(set by `[apache-thrift].expected_version`). Ignoring."
+            softwrap(
+                f"""
+                The Thrift binary at {binary_path.path} has version {version}, but this
+                project is using {apache_thrift.expected_version}
+                (set by `[apache-thrift].expected_version`). Ignoring.
+                """
+            )
         )
         invalid_versions.append((binary_path.path, version))
 
@@ -182,13 +195,20 @@ async def setup_thrift_tool(apache_thrift: ApacheThriftSubsystem) -> ApacheThrif
         f"{path}: {version}" for path, version in sorted(invalid_versions)
     )
     raise BinaryNotFoundError(
-        "Cannot find a `thrift` binary with the expected version of "
-        f"{apache_thrift.expected_version} (set by `[apache-thrift].expected_version`).\n\n"
-        f"Found these `thrift` binaries, but they had different versions:\n\n"
-        f"{invalid_versions_str}\n\n"
-        "To fix, please install the expected version (https://thrift.apache.org/) and ensure "
-        "that it is discoverable via the option `[apache-thrift].thrift_search_paths`, or change "
-        "`[apache-thrift].expected_version`."
+        softwrap(
+            f"""
+            Cannot find a `thrift` binary with the expected version of
+            {apache_thrift.expected_version} (set by `[apache-thrift].expected_version`).
+
+            Found these `thrift` binaries, but they had different versions:
+
+            {invalid_versions_str}
+
+            To fix, please install the expected version (https://thrift.apache.org/) and ensure
+            that it is discoverable via the option `[apache-thrift].thrift_search_paths`, or change
+            `[apache-thrift].expected_version`.
+            """
+        )
     )
 
 
