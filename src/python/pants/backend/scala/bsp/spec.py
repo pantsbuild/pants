@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from pants.bsp.spec.base import BuildTargetIdentifier, Uri
+from pants.bsp.spec.base import BSPData, BuildTargetIdentifier, Uri
 from pants.jvm.bsp.spec import JvmBuildTarget
 
 # -----------------------------------------------------------------------------------------------
@@ -21,7 +21,9 @@ class ScalaPlatform:
 
 
 @dataclass(frozen=True)
-class ScalaBuildTarget:
+class ScalaBuildTarget(BSPData):
+    DATA_KIND = "scala"
+
     # The Scala organization that is used for a target.
     scala_organization: str
 

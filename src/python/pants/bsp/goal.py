@@ -8,7 +8,7 @@ import os
 import shlex
 import sys
 import textwrap
-from typing import Mapping
+from typing import Any, Mapping
 
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -22,7 +22,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
-from pants.option.option_types import BoolOption, StrListOption
+from pants.option.option_types import BoolOption, DictOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.util.docutil import bin_name
@@ -64,6 +64,15 @@ class BSPGoal(BuiltinGoal):
             "writing an explicit PATH into the BSP runner script via this option."
         ),
         advanced=True,
+    )
+
+    target_mapping = DictOption[Any](
+        "--target-mapping",
+        help=(
+            'Defines how Pants maps targets to "build targets" that are exposed to IDEs via the '
+            'Build Server Protocol ("BSP"). The key for each entry is the ID to be used in the BSP protocol. '
+            'The value of each entry is a list of Pants addresses specs; for example, `["src/python::"]`.'
+        ),
     )
 
     def run(
