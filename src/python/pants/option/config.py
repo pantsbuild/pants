@@ -144,20 +144,13 @@ class Config:
         """Returns the sources of this config as a list of filenames."""
         return [vals.path for vals in self.values]
 
-    def get_source_for_option(self, section: str, option: str) -> str | None:
-        """Returns the path(s) to the source file(s) the given option was defined in.
-
-        If an option was defined in multiple files, returns a comma-separated list.
-
-        :param section: the scope of the option.
-        :param option: the name of the option.
-        :returns: the path(s) to the config file(s), or None.
-        """
+    def get_sources_for_option(self, section: str, option: str) -> list[str]:
+        """Returns the path(s) to the source file(s) the given option was defined in."""
         paths = []
         for vals in reversed(self.values):
             if vals.get_value(section, option) is not None:
-                paths.append(vals.path)
-        return ", ".join(paths) or None
+                paths.append(os.path.relpath(vals.path))
+        return paths
 
 
 _TomlPrimitive = Union[bool, int, float, str]

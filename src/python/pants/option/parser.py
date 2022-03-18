@@ -6,7 +6,6 @@ from __future__ import annotations
 import copy
 import inspect
 import json
-import os
 import re
 import typing
 from collections import defaultdict
@@ -587,12 +586,11 @@ class Parser:
         config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
         config_default_val_or_str = expand(self._config.get(DEFAULT_SECTION, dest))
         config_val_or_str = expand(self._config.get(config_section, dest))
-        config_source_file = self._config.get_source_for_option(
+        config_source_files = self._config.get_sources_for_option(
             config_section, dest
-        ) or self._config.get_source_for_option(DEFAULT_SECTION, dest)
-        if config_source_file is not None:
-            config_source_file = os.path.relpath(config_source_file)
-            config_details = f"from {config_source_file}"
+        ) or self._config.get_sources_for_option(DEFAULT_SECTION, dest)
+        if config_source_files:
+            config_details = f"from {', '.join(config_source_files)}"
 
         # Get value from environment, and capture details about its derivation.
         env_vars = self.get_env_var_names(self._scope, dest)
