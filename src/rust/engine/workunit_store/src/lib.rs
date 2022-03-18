@@ -28,7 +28,6 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::cmp::Reverse;
-use std::collections::hash_map::Entry;
 use std::collections::{BinaryHeap, HashMap};
 use std::fmt::Debug;
 use std::future::Future;
@@ -323,22 +322,22 @@ pub struct WorkunitStore {
 
 struct StreamingWorkunitData {
   receiver: Receiver<StoreMsg>,
-  workunit_records: HashMap<SpanId, Workunit>,
+  running_graph: RunningWorkunitGraph,
 }
 
 impl StreamingWorkunitData {
   fn new(receiver: Receiver<StoreMsg>) -> StreamingWorkunitData {
     StreamingWorkunitData {
       receiver,
-      workunit_records: HashMap::new(),
+      running_graph: RunningWorkunitGraph::default(),
     }
   }
 
   pub fn latest_workunits(&mut self, max_verbosity: log::Level) -> (Vec<Workunit>, Vec<Workunit>) {
     let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
-    let mut started_messages = vec![];
-    let mut completed_messages = vec![];
 
+    let mut started_workunits = Vec::new();
+    let mut completed_workunits = Vec::new();
     loop {
       let msg = match self.receiver.try_recv() {
         Ok(msg) => msg,
@@ -354,67 +353,37 @@ impl StreamingWorkunitData {
         }
       };
       match msg {
-        StoreMsg::Started(started) => started_messages.push(started),
-        StoreMsg::Completed(span, metadata, time) => {
-          completed_messages.push((span, metadata, time))
+        StoreMsg::Started(mut started) => {
+          self.running_graph.add(started.clone());
+
+          if should_emit(&started) {
+            started.parent_id = self
+              .running_graph
+              .first_matched_parent(started.parent_id, |_| false, should_emit)
+              .map(|wu| wu.span_id);
+            started_workunits.push(started);
+          }
+        }
+        StoreMsg::Completed(span_id, new_metadata, end_time) => {
+          let parent_id = self
+            .running_graph
+            .entries
+            .get(&span_id)
+            .and_then(|(_, wu)| wu.parent_id);
+          if let Some(mut workunit) = self.running_graph.complete(span_id, new_metadata, end_time) {
+            if should_emit(&workunit) {
+              workunit.parent_id = self
+                .running_graph
+                .first_matched_parent(parent_id, |_| false, should_emit)
+                .map(|wu| wu.span_id);
+              completed_workunits.push(workunit);
+            }
+          }
         }
         StoreMsg::Canceled(..) => (),
       }
     }
 
-    let mut started_workunits: Vec<Workunit> = vec![];
-    for mut started in started_messages.into_iter() {
-      let span_id = started.span_id;
-      self.workunit_records.insert(span_id, started.clone());
-
-      if should_emit(&started) {
-        started.parent_id = first_matched_parent(
-          &self.workunit_records,
-          started.parent_id,
-          |_| false,
-          should_emit,
-        );
-        started_workunits.push(started);
-      }
-    }
-
-    let mut completed_workunits: Vec<Workunit> = vec![];
-    for (span_id, new_metadata, end_time) in completed_messages.into_iter() {
-      match self.workunit_records.entry(span_id) {
-        Entry::Vacant(_) => {
-          log::warn!("No previously-started workunit found for id: {}", span_id);
-          continue;
-        }
-        Entry::Occupied(o) => {
-          let (span_id, mut workunit) = o.remove_entry();
-          let time_span = match workunit.state {
-            WorkunitState::Completed { .. } => {
-              log::warn!("Workunit {} was already completed", span_id);
-              continue;
-            }
-            WorkunitState::Started { start_time, .. } => {
-              TimeSpan::from_start_and_end_systemtime(&start_time, &end_time)
-            }
-          };
-          let new_state = WorkunitState::Completed { time_span };
-          workunit.state = new_state;
-          if let Some(metadata) = new_metadata {
-            workunit.metadata = metadata;
-          }
-          self.workunit_records.insert(span_id, workunit.clone());
-
-          if should_emit(&workunit) {
-            workunit.parent_id = first_matched_parent(
-              &self.workunit_records,
-              workunit.parent_id,
-              |_| false,
-              should_emit,
-            );
-            completed_workunits.push(workunit);
-          }
-        }
-      }
-    }
     (started_workunits, completed_workunits)
   }
 }
@@ -560,33 +529,6 @@ impl HeavyHittersData {
   fn duration_for(now: SystemTime, workunit: &Workunit) -> Option<Duration> {
     now.duration_since(Self::start_time_for(workunit)?).ok()
   }
-}
-
-fn first_matched_parent(
-  workunit_records: &HashMap<SpanId, Workunit>,
-  mut span_id: Option<SpanId>,
-  is_terminal: impl Fn(&Workunit) -> bool,
-  is_visible: impl Fn(&Workunit) -> bool,
-) -> Option<SpanId> {
-  while let Some(current_span_id) = span_id {
-    let workunit = workunit_records.get(&current_span_id);
-
-    if let Some(workunit) = workunit {
-      // Should we continue visiting parents?
-      if is_terminal(workunit) {
-        break;
-      }
-
-      // Is the current workunit visible?
-      if is_visible(workunit) {
-        return Some(current_span_id);
-      }
-    }
-
-    // If not, try its parent.
-    span_id = workunit.and_then(|workunit| workunit.parent_id);
-  }
-  None
 }
 
 impl WorkunitStore {
