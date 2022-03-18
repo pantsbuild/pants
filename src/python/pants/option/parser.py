@@ -19,7 +19,7 @@ import yaml
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
-from pants.option.config import Config
+from pants.option.config import DEFAULT_SECTION, Config
 from pants.option.custom_types import (
     DictValueComponent,
     ListValueComponent,
@@ -585,11 +585,11 @@ class Parser:
         # Get value from config files, and capture details about its derivation.
         config_details = None
         config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
-        config_default_val_or_str = expand(self._config.get(Config.DEFAULT_SECTION, dest))
+        config_default_val_or_str = expand(self._config.get(DEFAULT_SECTION, dest))
         config_val_or_str = expand(self._config.get(config_section, dest))
         config_source_file = self._config.get_source_for_option(
             config_section, dest
-        ) or self._config.get_source_for_option(Config.DEFAULT_SECTION, dest)
+        ) or self._config.get_source_for_option(DEFAULT_SECTION, dest)
         if config_source_file is not None:
             config_source_file = os.path.relpath(config_source_file)
             config_details = f"from {config_source_file}"
