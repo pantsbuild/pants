@@ -128,17 +128,18 @@ class Config:
 
         return all_seed_values
 
-    def get(self, section, option) -> str | None:
-        """Retrieves option from the specified section (or 'DEFAULT').
+    def get(self, section, option) -> list[str]:
+        """Retrieves the option value from the specified section (or 'DEFAULT').
 
         If the specified section does not exist or is missing a definition for the option, the value
         is looked up in the DEFAULT section.  If there is still no definition found, returns None.
         """
-        for vals in reversed(self.values):
+        available_vals = []
+        for vals in self.values:
             val = vals.get_value(section, option)
             if val is not None:
-                return val
-        return None
+                available_vals.append(val)
+        return available_vals
 
     def sources(self) -> list[str]:
         """Returns the sources of this config as a list of filenames."""
