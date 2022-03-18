@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
 from dataclasses import dataclass
 
 from pants.backend.helm.dependency_inference.unittest import rules as dependency_rules
@@ -23,15 +24,7 @@ from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
-from pants.engine.fs import (
-    AddPrefix,
-    Digest,
-    DigestSubset,
-    MergeDigests,
-    PathGlobs,
-    RemovePrefix,
-    Snapshot,
-)
+from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
@@ -62,7 +55,7 @@ class MissingUnitTestChartDependency(Exception):
 class HelmUnitTestFieldSet(TestFieldSet):
     required_fields = (HelmUnitTestSourceField, HelmUnitTestChartField)
 
-    sources: HelmUnitTestSourceField
+    source: HelmUnitTestSourceField
     chart: HelmUnitTestChartField
     dependencies: HelmUnitTestDependenciesField
 
@@ -73,14 +66,13 @@ async def run_helm_unittest(
     test_subsystem: TestSubsystem,
     unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
-    chart_deps_targets, transitive_targets = await MultiGet(
+    chart_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.chart, include_special_cased_deps=True)),
         Get(
             TransitiveTargets,
             TransitiveTargetsRequest([field_set.address], include_special_cased_deps=False),
         ),
     )
-    chart_targets = [tgt for tgt in chart_deps_targets if HelmChartFieldSet.is_applicable(tgt)]
     if len(chart_targets) == 0:
         raise MissingUnitTestChartDependency(field_set.address)
 
@@ -90,7 +82,7 @@ async def run_helm_unittest(
         StrippedSourceFiles,
         SourceFilesRequest(
             sources_fields=[
-                field_set.sources,
+                field_set.source,
                 *(
                     tgt.get(SourcesField)
                     for tgt in transitive_targets.dependencies
@@ -106,7 +98,7 @@ async def run_helm_unittest(
     )
 
     reports_dir = "__reports_dir"
-    reports_file = f"{reports_dir}/{field_set.address.path_safe_spec}.xml"
+    reports_file = os.path.join(reports_dir, f"{field_set.address.path_safe_spec}.xml")
 
     input_digest = await Get(
         Digest, MergeDigests([chart.snapshot.digest, prefixed_test_files_digest])
@@ -135,10 +127,7 @@ async def run_helm_unittest(
             output_directories=(reports_dir,),
         ),
     )
-    xml_result_subset = await Get(
-        Digest, DigestSubset(process_result.output_digest, PathGlobs([f"{reports_dir}/**"]))
-    )
-    xml_results = await Get(Snapshot, RemovePrefix(xml_result_subset, reports_dir))
+    xml_results = await Get(Snapshot, RemovePrefix(process_result.output_digest, reports_dir))
 
     return TestResult.from_fallible_process_result(
         process_result,
