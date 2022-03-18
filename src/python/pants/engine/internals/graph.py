@@ -99,6 +99,7 @@ from pants.source.filespec import matches_filespec
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize
 
@@ -127,6 +128,7 @@ def target_types_to_generate_targets_requests(
     )
 
 
+@memoized
 def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     assert tgt_type.deprecated_alias_removal_version is not None
     warn_or_error(
@@ -139,6 +141,7 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     )
 
 
+@memoized
 def warn_deprecated_field_type(field_type: type[Field]) -> None:
     assert field_type.deprecated_alias_removal_version is not None
     warn_or_error(

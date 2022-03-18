@@ -134,7 +134,7 @@ logging = { path = "logging" }
 nailgun = { path = "nailgun" }
 num_enum = "0.5"
 parking_lot = "0.12"
-petgraph = "0.5"
+petgraph = "0.6"
 process_execution = { path = "process_execution" }
 pyo3 = "0.16"
 rand = "0.8"

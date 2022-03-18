@@ -98,6 +98,6 @@ def test_files_without_owners(rule_runner: RuleRunner) -> None:
 
 def test_no_sources_exits_gracefully(rule_runner: RuleRunner) -> None:
     py_dir = "src/py/foo"
-    rule_runner.write_files({f"{py_dir}/BUILD": "python_sources(sources=[])"})
+    rule_runner.write_files({f"{py_dir}/BUILD": "python_sources()"})
     result = rule_runner.run_goal_rule(CountLinesOfCode, args=[py_dir])
     assert result == GoalRuleResult.noop()

@@ -86,16 +86,12 @@ class FilesGeneratorTarget(TargetFilesGenerator):
     alias = "files"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         FilesGeneratingSourcesField,
         FilesOverridesField,
     )
     generated_target_cls = FileTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-    )
-    moved_fields = ()
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (Dependencies,)
     help = "Generate a `file` target for each file in the `sources` field."
 
 
@@ -270,16 +266,12 @@ class ResourcesGeneratorTarget(TargetFilesGenerator):
     alias = "resources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         ResourcesGeneratingSourcesField,
         ResourcesOverridesField,
     )
     generated_target_cls = ResourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-    )
-    moved_fields = ()
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (Dependencies,)
     help = "Generate a `resource` target for each file in the `sources` field."
 
 

@@ -45,9 +45,9 @@ class Peek(Goal):
 @dataclass(frozen=True)
 class TargetData:
     target: Target
-    # These fields may not be registered on the target, so we have nothing to expand.
+    # Sources may not be registered on the target, so we'll have nothing to expand.
     expanded_sources: tuple[str, ...] | None
-    expanded_dependencies: tuple[str, ...] | None
+    expanded_dependencies: tuple[str, ...]
 
 
 class TargetDatas(Collection[TargetData]):
@@ -109,12 +109,9 @@ async def get_target_data(
 ) -> TargetDatas:
     sorted_targets = sorted(targets, key=lambda tgt: tgt.address)
 
-    # We "hydrate" these field with the engine, but not every target has them registered.
-    targets_with_dependencies = []
+    # We "hydrate" sources fields with the engine, but not every target has them registered.
     targets_with_sources = []
     for tgt in sorted_targets:
-        if tgt.has_field(Dependencies):
-            targets_with_dependencies.append(tgt)
         if tgt.has_field(SourcesField):
             targets_with_sources.append(tgt)
 
@@ -124,17 +121,17 @@ async def get_target_data(
             Targets,
             DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
         )
-        for tgt in targets_with_dependencies
+        for tgt in sorted_targets
     )
     hydrated_sources_per_target = await MultiGet(
         Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
         for tgt in targets_with_sources
     )
 
-    expanded_dependencies_map = {
-        tgt.address: tuple(dep.address.spec for dep in deps)
-        for tgt, deps in zip(targets_with_dependencies, dependencies_per_target)
-    }
+    expanded_dependencies = [
+        tuple(dep.address.spec for dep in deps)
+        for tgt, deps in zip(sorted_targets, dependencies_per_target)
+    ]
     expanded_sources_map = {
         tgt.address: hs.snapshot.files
         for tgt, hs in zip(targets_with_sources, hydrated_sources_per_target)
@@ -143,10 +140,10 @@ async def get_target_data(
     return TargetDatas(
         TargetData(
             tgt,
-            expanded_dependencies=expanded_dependencies_map.get(tgt.address),
+            expanded_dependencies=expanded_deps,
             expanded_sources=expanded_sources_map.get(tgt.address),
         )
-        for tgt in sorted_targets
+        for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )
 
 

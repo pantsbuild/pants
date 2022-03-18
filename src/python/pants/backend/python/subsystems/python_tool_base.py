@@ -20,7 +20,7 @@ from pants.engine.fs import Digest, FileContent
 from pants.option.errors import OptionsError
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, doc_url
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -87,11 +87,10 @@ class PythonToolRequirementsBase(Subsystem):
             "To use a custom lockfile, set this option to a file path relative to the "
             f"build root, then run `{bin_name()} generate-lockfiles "
             f"--resolve={cls.options_scope}`.\n\n"
-            "Lockfile generation currently does not wire up the `[python-repos]` options. "
-            "If lockfile generation fails, you can manually generate a lockfile, such as "
-            "by using pip-compile or `pip freeze`. Set this option to the path to your "
-            "manually generated lockfile. When manually maintaining lockfiles, set "
-            "`[python].invalid_lockfile_behavior = 'ignore'`."
+            f"As explained at {doc_url('python-third-party-dependencies')}, lockfile generation "
+            "via `generate-lockfiles` does not always work and you may want to manually generate "
+            "the lockfile. You will want to set `[python].invalid_lockfile_behavior = 'ignore'` so "
+            "that Pants does not complain about missing lockfile headers."
         ),
     )
 
@@ -144,7 +143,7 @@ class PythonToolRequirementsBase(Subsystem):
             assert self.default_lockfile_resource is not None
             return ToolDefaultLockfile(
                 file_content=FileContent(
-                    f"{self.options_scope}_default_lockfile.txt",
+                    f"{self.options_scope}_default.lock",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
                 lockfile_hex_digest=hex_digest,

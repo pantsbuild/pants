@@ -53,7 +53,7 @@ def confirm_eventual_success(log_dest: str) -> None:
 
 
 def test_list() -> None:
-    run(["list", "{tmpdir}/foo::"], files={"foo/BUILD": "files(sources=[])"})
+    run(["list", "{tmpdir}/foo::"], files={"foo/BUILD": "target()"})
 
 
 def test_help() -> None:

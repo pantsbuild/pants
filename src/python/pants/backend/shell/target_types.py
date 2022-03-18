@@ -182,15 +182,12 @@ class Shunit2TestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Shunit2TestsGeneratorSourcesField,
-        Shunit2TestDependenciesField,
         Shunit2TestsOverrideField,
     )
     generated_target_cls = Shunit2TestTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        Shunit2TestDependenciesField,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        Shunit2TestDependenciesField,
         Shunit2TestTimeoutField,
         SkipShunit2TestsField,
         Shunit2ShellField,
@@ -231,16 +228,12 @@ class ShellSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "shell_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         ShellSourcesGeneratingSourcesField,
         ShellSourcesOverridesField,
     )
     generated_target_cls = ShellSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-    )
-    moved_fields = ()
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (Dependencies,)
     help = "Generate a `shell_source` target for each file in the `sources` field."
 
 

@@ -107,7 +107,7 @@ class Parser:
                 parse_state.add(target_adaptor)
                 return target_adaptor
 
-        symbols: dict[str, Any] = dict(object_aliases.objects)
+        symbols: dict[str, Any] = {**object_aliases.objects, "cwd": parse_state.rel_path}
         symbols.update(
             (alias, Registrar(alias))
             for alias in target_type_aliases

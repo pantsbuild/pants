@@ -1844,7 +1844,7 @@ async fn extract_execute_response_other_status() {
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let (mut workunit_store, _) = WorkunitStore::setup_for_tests();
+  let (workunit_store, _) = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();

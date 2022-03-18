@@ -11,10 +11,10 @@ async-trait = "=0.1.42"
 async_value = { path = "../async_value" }
 fnv = "1.0.5"
 futures = "0.3"
-fixedbitset = "0.2"
+fixedbitset = "0.4"
 log = "0.4"
 parking_lot = "0.12"
-petgraph = "0.5"
+petgraph = "0.6"
 task_executor = { path = "../task_executor" }
 tokio = { version = "1.16", features = ["time", "parking_lot"] }
 

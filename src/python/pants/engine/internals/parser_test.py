@@ -40,7 +40,7 @@ def test_unrecogonized_symbol() -> None:
             "If you expect to see more symbols activated in the below list,"
             f" refer to {doc_url('enabling-backends')} for all available"
             " backends to activate.\n\n"
-            f"All registered symbols: ['caof', {fmt_extra_sym}'obj', 'prelude', 'tgt']"
+            f"All registered symbols: ['caof', 'cwd', {fmt_extra_sym}'obj', 'prelude', 'tgt']"
         )
 
     test_targs = ["fake1", "fake2", "fake3", "fake4", "fake5"]

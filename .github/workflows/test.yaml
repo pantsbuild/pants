@@ -337,6 +337,8 @@ jobs:
 
         USE_PY39=true ./build-support/bin/release.sh build-wheels
 
+        ./build-support/bin/release.sh build-local-pex
+
         ./build-support/bin/release.sh build-fs-util
 
         '
@@ -434,6 +436,8 @@ jobs:
 
         USE_PY39=true ./build-support/bin/release.sh build-wheels
 
+        ./build-support/bin/release.sh build-local-pex
+
         ./build-support/bin/release.sh build-fs-util
 
         '
@@ -455,7 +459,7 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 65
+    timeout-minutes: 80
   lint_python:
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Lint Python and Shell

@@ -35,11 +35,11 @@ class TwineSubsystem(PythonToolBase):
     default_extra_requirements = ["colorama>=0.4.3"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.subsystems", "twine_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/twine_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "twine.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/twine.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("publish")

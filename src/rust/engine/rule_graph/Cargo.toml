@@ -11,7 +11,7 @@ deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443f
 indexmap = "1.8"
 internment = "0.6"
 log = "0.4"
-petgraph = "0.5"
+petgraph = "0.6"
 
 [dev-dependencies]
 env_logger = "0.5.4"

@@ -455,6 +455,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         ./build-support/bin/release.sh build-wheels
                         USE_PY38=true ./build-support/bin/release.sh build-wheels
                         USE_PY39=true ./build-support/bin/release.sh build-wheels
+                        ./build-support/bin/release.sh build-local-pex
                         ./build-support/bin/release.sh build-fs-util
                         """
                     ),
@@ -510,7 +511,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 "build_wheels_macos": {
                     "name": "Build wheels and fs_util (macOS)",
                     "runs-on": MACOS_VERSION,
-                    "timeout-minutes": 65,
+                    "timeout-minutes": 80,
                     "env": DISABLE_REMOTE_CACHE_ENV,
                     "if": IS_PANTS_OWNER,
                     "steps": [

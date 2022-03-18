@@ -20,14 +20,11 @@ class Lambdex(PythonToolBase):
     default_main = ConsoleScript("lambdex")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6,<3.10"]
+    default_interpreter_constraints = ["CPython>=3.7,<3.10"]
 
     register_lockfile = True
-    default_lockfile_resource = (
-        "pants.backend.python.subsystems",
-        "lambdex_lockfile.txt",
-    )
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/lambdex_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "lambdex.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/lambdex.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
 

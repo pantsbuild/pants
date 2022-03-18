@@ -1519,29 +1519,30 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         for glob in potentially_absolute_globs:
             # NB: We use `relpath` here because these paths are untrusted, and might need to be
             # normalized in addition to being relativized.
-            glob_relpath = os.path.relpath(glob, buildroot)
+            glob_relpath = (
+                os.path.relpath(glob, buildroot) if os.path.isabs(glob) else os.path.normpath(glob)
+            )
             if glob_relpath == "." or glob_relpath.startswith(".."):
                 logger.debug(
                     f"Changes to {glob}, outside of the buildroot, will not be invalidated."
                 )
-            else:
-                invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
+                continue
+
+            invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
 
         # Explicitly specified globs are already relative, and are added verbatim.
         invalidation_globs.update(
-            (
-                "!*.pyc",
-                "!__pycache__/",
-                ".gitignore",
-                # TODO: This is a bandaid for https://github.com/pantsbuild/pants/issues/7022:
-                # macros should be adapted to allow this dependency to be automatically detected.
-                "requirements.txt",
-                "3rdparty/**/requirements.txt",
-                "pyproject.toml",
-                "3rdparty/**/pyproject.toml",
-                *bootstrap_options.pantsd_invalidation_globs,
-            )
+            ("!*.pyc", "!__pycache__/", ".gitignore", *bootstrap_options.pantsd_invalidation_globs)
         )
+        if bootstrap_options.use_deprecated_python_macros:
+            invalidation_globs.update(
+                (
+                    "requirements.txt",
+                    "3rdparty/**/requirements.txt",
+                    "pyproject.toml",
+                    "3rdparty/**/pyproject.toml",
+                )
+            )
 
         return tuple(invalidation_globs)
 

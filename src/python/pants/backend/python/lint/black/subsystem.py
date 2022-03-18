@@ -32,11 +32,11 @@ class Black(PythonToolBase):
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6.2"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/black/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/black/black.lock"
     default_lockfile_url = git_url(default_lockfile_path)
     default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 

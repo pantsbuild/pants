@@ -96,16 +96,12 @@ class ThriftSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "thrift_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ThriftDependenciesField,
         ThriftSourcesGeneratingSourcesField,
         ThriftSourcesOverridesField,
     )
     generated_target_cls = ThriftSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        ThriftDependenciesField,
-    )
-    moved_fields = ()
+    copied_fields = (*COMMON_TARGET_FIELDS,)
+    moved_fields = (ThriftDependenciesField,)
     settings_request_cls = GeneratorSettingsRequest
     help = "Generate a `thrift_source` target for each file in the `sources` field."
 

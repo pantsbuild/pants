@@ -78,16 +78,12 @@ class AvroSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "avro_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        AvroDependenciesField,
         AvroSourcesGeneratingSourcesField,
         AvroSourcesOverridesField,
     )
     generated_target_cls = AvroSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        AvroDependenciesField,
-    )
-    moved_fields = ()
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (AvroDependenciesField,)
     help = "Generate a `avro_source` target for each file in the `sources` field."
 
 

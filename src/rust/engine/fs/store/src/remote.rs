@@ -282,7 +282,6 @@ impl ByteStore {
 
     let mut client = self.byte_stream_client.as_ref().clone();
 
-    let resource_name = resource_name.clone();
     let chunk_size_bytes = store.chunk_size_bytes;
 
     let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
@@ -358,9 +357,9 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes
     );
-    let workunit_name = format!("load_bytes_with({})", resource_name.clone());
     let workunit_metadata = WorkunitMetadata {
-      level: Level::Debug,
+      level: Level::Trace,
+      desc: Some(format!("Loading bytes at: {resource_name}")),
       ..WorkunitMetadata::default()
     };
     let resource_name = resource_name.clone();
@@ -444,7 +443,7 @@ impl ByteStore {
       );
       in_workunit!(
         workunit_store_handle.store,
-        workunit_name,
+        "load_bytes_with".to_owned(),
         workunit_metadata,
         |workunit| async move {
           let result = result_future.await;

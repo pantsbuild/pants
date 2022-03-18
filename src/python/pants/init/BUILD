@@ -16,6 +16,7 @@ target(
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/go",
         "src/python/pants/backend/experimental/go/lint/vet",
+        "src/python/pants/backend/experimental/helm",
         "src/python/pants/backend/experimental/java",
         "src/python/pants/backend/experimental/java/debug_goals",
         "src/python/pants/backend/experimental/java/lint/google_java_format",
