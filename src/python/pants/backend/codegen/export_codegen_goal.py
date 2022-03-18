@@ -16,7 +16,6 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionMembership
-from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
