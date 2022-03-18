@@ -75,7 +75,10 @@ async def run_helm_unittest(
 ) -> TestResult:
     chart_deps_targets, transitive_targets = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.chart, include_special_cased_deps=True)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
+        Get(
+            TransitiveTargets,
+            TransitiveTargetsRequest([field_set.address], include_special_cased_deps=False),
+        ),
     )
     chart_targets = [tgt for tgt in chart_deps_targets if HelmChartFieldSet.is_applicable(tgt)]
     if len(chart_targets) == 0:

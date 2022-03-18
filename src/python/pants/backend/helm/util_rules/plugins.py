@@ -20,6 +20,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.collection import Collection
 from pants.engine.fs import Digest, DigestContents, DigestSubset, PathGlobs
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.option.subsystem import Subsystem
@@ -87,14 +88,14 @@ class HelmPluginMetadata:
         return HelmPluginMetadata.from_dict(yaml.safe_load(content))
 
 
-_HelmPluginSubsystem = TypeVar("_HelmPluginSubsystem", bound=HelmPluginSubsystem)
+_ExternalHelmPlugin = TypeVar("_ExternalHelmPlugin", bound=ExternalHelmPlugin)
 _GHP = TypeVar("_GHP", bound="ExternalHelmPluginBinding")
 
 
 @union
 @dataclass(frozen=True)
-class ExternalHelmPluginBinding(Generic[_HelmPluginSubsystem], metaclass=ABCMeta):
-    plugin_subsystem_cls: ClassVar[Type[HelmPluginSubsystem]]
+class ExternalHelmPluginBinding(Generic[_ExternalHelmPlugin], metaclass=ABCMeta):
+    plugin_subsystem_cls: ClassVar[Type[ExternalHelmPlugin]]
 
     name: str
 
@@ -108,6 +109,12 @@ class ExternalHelmPluginBinding(Generic[_HelmPluginSubsystem], metaclass=ABCMeta
 class ExternalHelmPluginRequest:
     plugin_name: str
     tool_request: ExternalToolRequest
+
+    @classmethod
+    def from_subsystem(cls, subsystem: ExternalHelmPlugin) -> ExternalHelmPluginRequest:
+        return cls(
+            plugin_name=subsystem.plugin_name, tool_request=subsystem.get_request(Platform.current)
+        )
 
 
 @dataclass(frozen=True)

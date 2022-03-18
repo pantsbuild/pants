@@ -68,9 +68,7 @@ class HelmUnitTestPluginBinding(ExternalHelmPluginBinding[HelmUnitTestSubsystem]
 def download_plugin_request(
     _: HelmUnitTestPluginBinding, subsystem: HelmUnitTestSubsystem
 ) -> ExternalHelmPluginRequest:
-    return ExternalHelmPluginRequest(
-        plugin_name=subsystem.plugin_name, tool_request=subsystem.get_request(Platform.current)
-    )
+    return ExternalHelmPluginRequest.from_subsystem(subsystem)
 
 
 def rules():
