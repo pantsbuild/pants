@@ -50,10 +50,13 @@ DEFAULT_MODULE_MAPPING = {
     "cattrs": ("cattr",),
     "django-cors-headers": ("corsheaders",),
     "django-debug-toolbar": ("debug_toolbar",),
+    "django-dotenv": ("dotenv",),
     "django-filter": ("django_filters",),
+    "django-safedelete": ("safedelete",),
     "django-simple-history": ("simple_history",),
     "djangorestframework": ("rest_framework",),
     "enum34": ("enum",),
+    "factory-boy": ("factory",),
     "fluent-logger": ("fluent",),
     "gitpython": ("git",),
     # See https://github.com/googleapis/google-cloud-python#libraries for all Google cloud
