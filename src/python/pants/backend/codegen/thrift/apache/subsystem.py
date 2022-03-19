@@ -22,7 +22,6 @@ class ApacheThriftSubsystem(Subsystem):
             """
             A list of paths to search for Thrift.
 
-
             Specify absolute paths to directories with the `thrift` binary, e.g. `/usr/bin`.
             Earlier entries will be searched first.
 
@@ -37,7 +36,7 @@ class ApacheThriftSubsystem(Subsystem):
             """
             The major/minor version of Apache Thrift that  you are using, such as `0.15`.
 
-            Pants will only use Thrift binaries from `--thrift-search-paths` that have the "
+            Pants will only use Thrift binaries from `--thrift-search-paths` that have the
             expected version, and it will error if none are found.
 
             Do not include the patch version.

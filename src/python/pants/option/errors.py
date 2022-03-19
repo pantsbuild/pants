@@ -136,16 +136,6 @@ class ConfigValidationError(ConfigError):
     """A config file is invalid."""
 
 
-class NoSectionError(ConfigError):
-    def __init__(self, section: str):
-        super().__init__(f"No section: {section}")
-
-
-class NoOptionError(ConfigError):
-    def __init__(self, option: str, section: str):
-        super().__init__(f"No option {option} in section {section}")
-
-
 class InterpolationMissingOptionError(ConfigError):
     def __init__(self, option, section, rawval, reference):
         super().__init__(

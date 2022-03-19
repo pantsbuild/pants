@@ -37,9 +37,11 @@ class PythonProtobufSubsystem(Subsystem):
     mypy_plugin = BoolOption(
         "--mypy-plugin",
         default=False,
-        help=(
-            "Use the `mypy-protobuf` plugin (https://github.com/dropbox/mypy-protobuf) to "
-            "also generate .pyi type stubs."
+        help=softwrap(
+            """
+            Use the `mypy-protobuf` plugin (https://github.com/dropbox/mypy-protobuf) to also
+            generate .pyi type stubs.
+            """
         ),
     )
 

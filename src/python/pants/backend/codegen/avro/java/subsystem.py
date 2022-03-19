@@ -25,11 +25,10 @@ class AvroSubsystem(JvmToolBase):
         "--runtime-dependencies",
         help=lambda cls: softwrap(
             f"""
-            A list of addresses to `jvm_artifact` targets for the runtime
-            dependencies needed for generated Java code to work. For example,
-            `['3rdparty/jvm:avro-runtime']`. These dependencies will
-            be automatically added to every `avro_sources` target. At the very least,
-            this option must be set to a `jvm_artifact` for the
+            A list of addresses to `jvm_artifact` targets for the runtime dependencies needed for
+            generated Java code to work. For example, `['3rdparty/jvm:avro-runtime']`.
+            These dependencies will be automatically added to every `avro_sources` target.
+            At the very least, this option must be set to a `jvm_artifact` for the
             `org.apache.avro:avro:{cls.default_version}` runtime library.
             """
         ),
