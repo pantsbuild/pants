@@ -664,9 +664,10 @@ fn scheduler_create(
 
 async fn workunit_to_py_value(
   workunit_store: &WorkunitStore,
-  workunit: &Workunit,
+  workunit: Workunit,
   core: &Arc<Core>,
 ) -> PyO3Result<Value> {
+  let has_parent_ids = !workunit.parent_ids.is_empty();
   let mut dict_entries = {
     let gil = Python::acquire_gil();
     let py = gil.python();
@@ -685,12 +686,20 @@ async fn workunit_to_py_value(
       ),
     ];
 
-    if let Some(parent_id) = workunit.parent_id {
-      dict_entries.push((
-        externs::store_utf8(py, "parent_id"),
-        externs::store_utf8(py, &format!("{}", parent_id)),
-      ));
+    let parent_ids = workunit
+      .parent_ids
+      .into_iter()
+      .map(|parent_id| externs::store_utf8(py, &parent_id.to_string()))
+      .collect::<Vec<_>>();
+
+    if has_parent_ids {
+      // TODO: Remove the single-valued `parent_id` field around version 2.16.0.dev0.
+      dict_entries.push((externs::store_utf8(py, "parent_id"), parent_ids[0].clone()));
     }
+    dict_entries.push((
+      externs::store_utf8(py, "parent_ids"),
+      externs::store_tuple(py, parent_ids),
+    ));
 
     match workunit.state {
       WorkunitState::Started { start_time, .. } => {
@@ -823,7 +832,7 @@ async fn workunit_to_py_value(
   // TODO: Temporarily attaching the global counters to the "root" workunit. Callers should
   // switch to consuming `StreamingWorkunitContext.get_metrics`.
   // Remove this deprecation after 2.14.0.dev0.
-  if workunit.parent_id.is_none() {
+  if !has_parent_ids {
     let mut metrics = workunit_store.get_metrics();
 
     metrics.insert("DEPRECATED_ConsumeGlobalCountersInstead", 0);
@@ -854,7 +863,7 @@ async fn workunits_to_py_tuple_value(
 ) -> PyO3Result<Value> {
   let mut workunit_values = Vec::new();
   for workunit in workunits {
-    let py_value = workunit_to_py_value(workunit_store, &workunit, core).await?;
+    let py_value = workunit_to_py_value(workunit_store, workunit, core).await?;
     workunit_values.push(py_value);
   }
 
