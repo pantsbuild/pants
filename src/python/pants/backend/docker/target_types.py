@@ -153,8 +153,7 @@ class DockerImageTargetStageField(StringField):
         to only selectively build a certain stage. See also the `--docker-build-target-stage`
         option.
 
-        Read more about [multi-stage Docker builds]
-        (https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)"
+        Read more about [multi-stage Docker builds](https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)
         """
     )
 
@@ -182,7 +181,7 @@ class DockerImageRegistriesField(StringSequenceField):
             # pants.toml
             [docker.registries.my-registry-alias]
             address = "myregistrydomain:port"
-            default = false  # optional
+            default = false # optional
 
             # example/BUILD
             docker_image(
@@ -315,8 +314,8 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
 
             RUN --mount=type=ssh ...
 
-        See [Docker documentation](https://docs.docker.com/develop/develop-images
-        /build_enhancements/#using-ssh-to-access-private-data-in-builds) for more information.
+        See [Docker documentation](https://docs.docker.com/develop/develop-images/build_enhancements/#using-ssh-to-access-private-data-in-builds)
+        for more information.
         """
     )
 
