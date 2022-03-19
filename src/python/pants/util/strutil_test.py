@@ -280,4 +280,22 @@ def test_softwrap_multiline() -> None:
             "\nAll here."
         )
     )
+    assert (
+        softwrap(
+            f"""
+                Roll Call:
+
+                {bullet_list(["Dr. Peter Venkman", "Dr. Egon Spengler", "Dr. Raymond Stantz"])}
+
+                All here.
+            """
+        )
+        == (
+            "Roll Call:\n\n"
+            "  * Dr. Peter Venkman\n"
+            "  * Dr. Egon Spengler\n"
+            "  * Dr. Raymond Stantz\n"
+            "\nAll here."
+        )
+    )
     assert softwrap("A\n\n\nB") == "A\n\nB"

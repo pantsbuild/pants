@@ -69,7 +69,8 @@ class ThriftSourceTarget(Target):
         ThriftSourceField,
     )
     help = softwrap(
-        f"""A single Thrift file used to generate various languages.
+        f"""
+        A single Thrift file used to generate various languages.
 
         See {doc_url('thrift')}.
         """

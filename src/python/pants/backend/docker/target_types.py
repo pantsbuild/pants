@@ -119,10 +119,10 @@ class DockerImageInstructionsField(StringSequenceField):
 
             # example/BUILD
             docker_image(
-                instructions=[
+              instructions=[
                 "FROM base/image:1.0",
                 "RUN echo example",
-                ],
+              ],
             )
         """
     )
