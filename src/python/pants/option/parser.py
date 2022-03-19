@@ -586,9 +586,7 @@ class Parser:
         config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
         config_default_val_or_str = expand(self._config.get(DEFAULT_SECTION, dest))
         config_val_or_str = expand(self._config.get(config_section, dest))
-        config_source_files = self._config.get_sources_for_option(
-            config_section, dest
-        ) or self._config.get_sources_for_option(DEFAULT_SECTION, dest)
+        config_source_files = self._config.get_sources_for_option(config_section, dest)
         if config_source_files:
             config_details = f"from {', '.join(config_source_files)}"
 

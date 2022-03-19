@@ -262,6 +262,8 @@ class _ConfigValues:
         section_values = self.section_to_values.get(section)
         if section_values is None:
             return None
+        if option not in section_values:
+            return None
 
         stringify = partial(
             self._stringify_val,
@@ -269,11 +271,6 @@ class _ConfigValues:
             section=section,
             section_values=section_values,
         )
-
-        if option not in section_values:
-            if option in self.defaults:
-                return stringify(raw_value=self.defaults[option])
-            return None
 
         option_value = section_values[option]
         if not isinstance(option_value, dict):
