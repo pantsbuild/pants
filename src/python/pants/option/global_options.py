@@ -1145,7 +1145,7 @@ class BootstrapOptions:
         help=softwrap(
             """
             Path to a PEM file containing CA certificates used for verifying secure
-            "connections to `--remote-execution-address` and `--remote-store-address`.
+            connections to `--remote-execution-address` and `--remote-store-address`.
 
             If unspecified, Pants will attempt to auto-discover root CA certificates when TLS
             is enabled with remote execution and caching.
