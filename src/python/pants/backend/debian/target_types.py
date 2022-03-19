@@ -14,16 +14,20 @@ from pants.engine.target import (
     Target,
 )
 from pants.util.docutil import bin_name, doc_url
+from pants.util.strutil import softwrap
 
 
 class DebianSources(MultipleSourcesField):
     required = True
-    help = (
-        "Paths that will be included in the package to be produced such as Debian metadata files. "
-        "You must include a DEBIAN/control file.\n\n"
-        "Paths are relative to the BUILD file's directory and all paths must belong to the same parent directory. "
-        "For example, `sources=['dir/**']` is valid, but `sources=['top_level_file.txt']` "
-        "and `sources=['dir1/*', 'dir2/*']` are not."
+    help = softwrap(
+        """
+        Paths that will be included in the package to be produced such as Debian metadata files.
+        You must include a DEBIAN/control file.
+
+        Paths are relative to the BUILD file's directory and all paths must belong to the same parent directory.
+        For example, `sources=['dir/**']` is valid, but `sources=['top_level_file.txt']`
+        and `sources=['dir1/*', 'dir2/*']` are not.
+        """
     )
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
@@ -54,9 +58,12 @@ class DebianSources(MultipleSourcesField):
 
 class DebianSymlinks(DictStringToStringField):
     alias = "symlinks"
-    help = (
-        "Symlinks to create for each target being packaged.\n\n"
-        "For example, you could set symlinks={'command-name': 'entrypoint-name'}."
+    help = softwrap(
+        """
+        Symlinks to create for each target being packaged.
+
+        For example, you could set symlinks={'command-name': 'entrypoint-name'}.
+        """
     )
 
 
@@ -69,12 +76,18 @@ class DebianInstallPrefix(StringField):
 class DebianPackageDependencies(SpecialCasedDependencies):
     alias = "packages"
     required = True
-    help = (
-        f"Addresses to any targets that can be built with `{bin_name()} package`, e.g. "
-        f'`["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`. '
-        "It will include the results in your Debian package using the same name they would normally have, "
-        "but without the `--distdir` prefix (e.g. `dist/`).\n\nYou can include anything that can "
-        f"be built by `{bin_name()} package`, e.g. a `pex_binary`, a `python_distribution`, or an `archive`."
+    help = softwrap(
+        f"""
+        Addresses to any targets that can be built with `{bin_name()} package`, e.g.
+        `["project:app"]`.
+
+        Pants will build the assets as if you had run `{bin_name()} package`.
+        It will include the results in your Debian package using the same name they would normally have,
+        but without the `--distdir` prefix (e.g. `dist/`).
+
+        You can include anything that can be uilt by `{bin_name()} package`, e.g. a `pex_binary`,
+        a `python_distribution`, or an `archive`.
+        """
     )
 
 
@@ -88,9 +101,13 @@ class DebianPackage(Target):
         DebianInstallPrefix,
         DebianPackageDependencies,
     )
-    help = (
-        "A Debian package containing an artifact.\n\n"
-        "This will not install the package, only create a .deb file "
-        "that you can then distribute and install, e.g. via dpkg.\n\n"
-        f"See {doc_url('debian-package')}."
+    help = softwrap(
+        f""""
+        A Debian package containing an artifact.
+
+        This will not install the package, only create a .deb file
+        that you can then distribute and install, e.g. via dpkg.
+
+        "See {doc_url('debian-package')}.
+        """
     )

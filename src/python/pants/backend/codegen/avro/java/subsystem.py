@@ -3,6 +3,7 @@
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.option_types import TargetListOption
 from pants.util.docutil import git_url
+from pants.util.strutil import softwrap
 
 
 class AvroSubsystem(JvmToolBase):
@@ -22,12 +23,14 @@ class AvroSubsystem(JvmToolBase):
 
     runtime_dependencies = TargetListOption(
         "--runtime-dependencies",
-        help=lambda cls: (
-            "A list of addresses to `jvm_artifact` targets for the runtime "
-            "dependencies needed for generated Java code to work. For example, "
-            "`['3rdparty/jvm:avro-runtime']`. These dependencies will "
-            "be automatically added to every `avro_sources` target. At the very least, "
-            "this option must be set to a `jvm_artifact` for the "
-            f"`org.apache.avro:avro:{cls.default_version}` runtime library."
+        help=lambda cls: softwrap(
+            f"""
+            A list of addresses to `jvm_artifact` targets for the runtime
+            dependencies needed for generated Java code to work. For example,
+            `['3rdparty/jvm:avro-runtime']`. These dependencies will
+            be automatically added to every `avro_sources` target. At the very least,
+            this option must be set to a `jvm_artifact` for the
+            `org.apache.avro:avro:{cls.default_version}` runtime library.
+            """
         ),
     )

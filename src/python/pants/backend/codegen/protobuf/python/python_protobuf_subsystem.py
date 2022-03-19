@@ -21,11 +21,18 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url, git_url
+from pants.util.strutil import softwrap
 
 
 class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"
-    help = f"Options related to the Protobuf Python backend.\n\nSee {doc_url('protobuf')}."
+    help = softwrap(
+        f"""
+        Options related to the Protobuf Python backend.
+
+        See {doc_url('protobuf')}.
+        """
+    )
 
     mypy_plugin = BoolOption(
         "--mypy-plugin",
@@ -39,17 +46,21 @@ class PythonProtobufSubsystem(Subsystem):
     infer_runtime_dependency = BoolOption(
         "--infer-runtime-dependency",
         default=True,
-        help=(
-            "If True, will add a dependency on a `python_requirement` target exposing the "
-            "`protobuf` module (usually from the `protobuf` requirement). If the `protobuf_source` "
-            "target sets `grpc=True`, will also add a dependency on the `python_requirement` "
-            "target exposing the `grpcio` module.\n\n"
-            "If `[python].enable_resolves` is set, Pants will only infer dependencies on "
-            "`python_requirement` targets that use the same resolve as the particular "
-            "`protobuf_source` / `protobuf_sources` target uses, which is set via its "
-            "`python_resolve` field.\n\n"
-            "Unless this option is disabled, Pants will error if no relevant target is found or "
-            "if more than one is found which causes ambiguity."
+        help=softwrap(
+            """
+            If True, will add a dependency on a `python_requirement` target exposing the
+            `protobuf` module (usually from the `protobuf` requirement). If the `protobuf_source`
+            target sets `grpc=True`, will also add a dependency on the `python_requirement`
+            target exposing the `grpcio` module.
+
+            If `[python].enable_resolves` is set, Pants will only infer dependencies on
+            `python_requirement` targets that use the same resolve as the particular
+            `protobuf_source` / `protobuf_sources` target uses, which is set via its
+            `python_resolve` field.
+
+            Unless this option is disabled, Pants will error if no relevant target is found or
+            if more than one is found which causes ambiguity.
+            """
         ),
         advanced=True,
     )
