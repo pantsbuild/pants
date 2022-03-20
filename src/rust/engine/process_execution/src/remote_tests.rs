@@ -1071,6 +1071,7 @@ async fn extract_response_with_digest_stdout() {
 
 #[tokio::test]
 async fn extract_response_with_digest_stderr() {
+  let _ = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -1098,6 +1099,7 @@ async fn extract_response_with_digest_stderr() {
 
 #[tokio::test]
 async fn extract_response_with_digest_stdout_osx_remote() {
+  let _ = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -2022,6 +2024,7 @@ async fn extract_output_files_from_response_two_files_nested() {
 
 #[tokio::test]
 async fn extract_output_files_from_response_just_directory() {
+  let _ = WorkunitStore::setup_for_tests();
   let test_tree: TestTree = TestDirectory::containing_roland().into();
 
   let execute_response = remexec::ExecuteResponse {
@@ -2048,6 +2051,7 @@ async fn extract_output_files_from_response_directories_and_files() {
   // /pets/cats/roland.ext
   // /pets/dogs/robin.ext
 
+  let _ = WorkunitStore::setup_for_tests();
   let execute_response = remexec::ExecuteResponse {
     result: Some(remexec::ActionResult {
       exit_code: 0,
@@ -2085,6 +2089,7 @@ async fn extract_output_files_from_response_directories_and_files() {
 
 #[tokio::test]
 async fn extract_output_files_from_response_no_prefix() {
+  let _ = WorkunitStore::setup_for_tests();
   let execute_response = remexec::ExecuteResponse {
     result: Some(remexec::ActionResult {
       exit_code: 0,

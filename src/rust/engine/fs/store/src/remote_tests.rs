@@ -6,6 +6,7 @@ use grpc_util::tls;
 use hashing::Digest;
 use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
+use workunit_store::WorkunitStore;
 
 use crate::remote::ByteStore;
 use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
@@ -26,6 +27,7 @@ async fn loads_file() {
 
 #[tokio::test]
 async fn missing_file() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
 
   assert_eq!(
@@ -47,6 +49,7 @@ async fn load_directory() {
 
 #[tokio::test]
 async fn missing_directory() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
 
   assert_eq!(
@@ -61,6 +64,7 @@ async fn missing_directory() {
 
 #[tokio::test]
 async fn load_file_grpc_error() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::always_errors();
 
   let error = load_file_bytes(&new_byte_store(&cas), TestData::roland().digest())
@@ -75,6 +79,7 @@ async fn load_file_grpc_error() {
 
 #[tokio::test]
 async fn load_directory_grpc_error() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::always_errors();
 
   let error = load_directory_proto_bytes(
@@ -148,6 +153,7 @@ async fn write_file_one_chunk() {
 
 #[tokio::test]
 async fn write_file_multiple_chunks() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
 
   let store = ByteStore::new(
@@ -263,6 +269,7 @@ async fn list_missing_digests_none_missing() {
 
 #[tokio::test]
 async fn list_missing_digests_some_missing() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
@@ -282,6 +289,7 @@ async fn list_missing_digests_some_missing() {
 
 #[tokio::test]
 async fn list_missing_digests_error() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::always_errors();
 
   let store = new_byte_store(&cas);
