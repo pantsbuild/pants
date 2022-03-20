@@ -145,16 +145,10 @@ class ConfigTest(unittest.TestCase):
         # Check the DEFAULT section
         for option, value in {**self.default_seed_values, **FILE_1.default_values}.items():
             assert self.config.get(section="DEFAULT", option=option) == value
-        # Check the combined values, including that each section has the default seed values
+        # Check the combined values.
         for section, section_values in self.expected_combined_values.items():
-            for option, value in {**section_values, **self.default_seed_values}.items():
+            for option, value in section_values.items():
                 assert self.config.get(section=section, option=option) == value
-        # Check that each section from file1 also has file1's default values, unless that section
-        # explicitly overrides the default
-        for section, section_values in FILE_1.expected_options.items():
-            for option, default_value in FILE_1.default_values.items():
-                expected = default_value if option not in section_values else section_values[option]
-                assert self.config.get(section=section, option=option) == expected
 
     def test_empty(self) -> None:
         config = Config.load([])
