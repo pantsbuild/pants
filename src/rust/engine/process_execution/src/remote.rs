@@ -799,13 +799,10 @@ impl crate::CommandRunner for CommandRunner {
     let context2 = context.clone();
     in_workunit!(
       "run_execute_request",
-      WorkunitMetadata {
-        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-        // renders at the Process's level.
-        level: request.level,
-        desc: Some(request.description.clone()),
-        ..WorkunitMetadata::default()
-      },
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      request.level,
+      desc = Some(request.description.clone()),
       |workunit| async move {
         workunit.increment_counter(Metric::RemoteExecutionRequests, 1);
         let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
@@ -1331,11 +1328,8 @@ pub async fn check_action_cache(
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
   in_workunit!(
     "check_action_cache",
-    WorkunitMetadata {
-      level: Level::Debug,
-      desc: Some(format!("Remote cache lookup for: {}", command_description)),
-      ..WorkunitMetadata::default()
-    },
+    Level::Debug,
+    desc = Some(format!("Remote cache lookup for: {}", command_description)),
     |workunit| async move {
       workunit.increment_counter(Metric::RemoteCacheRequests, 1);
 
@@ -1383,11 +1377,8 @@ pub async fn check_action_cache(
             let response = response.clone();
             in_workunit!(
               "eager_fetch_action_cache",
-              WorkunitMetadata {
-                level: Level::Trace,
-                desc: Some("eagerly fetching after action cache hit".to_owned()),
-                ..WorkunitMetadata::default()
-              },
+              Level::Trace,
+              desc = Some("eagerly fetching after action cache hit".to_owned()),
               |_workunit| async move {
                 future::try_join_all(vec![
                   store.ensure_local_has_file(response.stdout_digest).boxed(),
@@ -1456,11 +1447,8 @@ pub async fn ensure_action_uploaded(
 ) -> Result<(), String> {
   in_workunit!(
     "ensure_action_uploaded",
-    WorkunitMetadata {
-      level: Level::Trace,
-      desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
-      ..WorkunitMetadata::default()
-    },
+    Level::Trace,
+    desc = Some(format!("ensure action uploaded for {:?}", action_digest)),
     |_workunit| async move {
       let mut digests = vec![command_digest, action_digest];
       if let Some(input_files) = input_files {

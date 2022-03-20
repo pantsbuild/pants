@@ -848,13 +848,19 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
 /// propagate state between threads.
 #[macro_export]
 macro_rules! in_workunit {
-  ($workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| $f: expr $(,)?) => {{
+  ($workunit_name: expr, $workunit_level: expr $(, $workunit_field_name:ident = $workunit_field_value:expr)*, |$workunit: ident| $f: expr $(,)?) => {{
     use futures::future::FutureExt;
     let mut store_handle = $crate::expect_workunit_store_handle();
-    // TODO: Move Level out of the metadata to allow skipping construction if disabled.
-    let workunit_metadata = $workunit_metadata;
-    if store_handle.store.max_level() >= workunit_metadata.level {
+    let level: log::Level  = $workunit_level;
+    if store_handle.store.max_level() >= level {
       let mut $workunit = {
+        let workunit_metadata = $crate::WorkunitMetadata {
+          level,
+          $(
+                $workunit_field_name: $workunit_field_value,
+          )*
+          ..Default::default()
+        };
         let span_id = $crate::SpanId::new();
         let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
         let workunit =

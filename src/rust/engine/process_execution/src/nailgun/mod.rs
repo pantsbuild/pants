@@ -10,7 +10,7 @@ use nails::execution::{self, child_channel, ChildInput, Command};
 use store::Store;
 use task_executor::Executor;
 use tokio::net::TcpStream;
-use workunit_store::{in_workunit, Metric, RunningWorkunit, WorkunitMetadata};
+use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use crate::{Context, FallibleProcessResultWithPlatform, InputDigests, Platform, Process};
@@ -123,13 +123,10 @@ impl super::CommandRunner for CommandRunner {
 
     in_workunit!(
       "run_nailgun_process",
-      WorkunitMetadata {
-        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-        // renders at the Process's level.
-        level: req.level,
-        desc: Some(req.description.clone()),
-        ..WorkunitMetadata::default()
-      },
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      req.level,
+      desc = Some(req.description.clone()),
       |workunit| async move {
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
 

@@ -30,7 +30,7 @@ use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tryfuture::try_future;
-use workunit_store::{in_workunit, Level, Metric, RunningWorkunit, WorkunitMetadata};
+use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
@@ -256,13 +256,10 @@ impl super::CommandRunner for CommandRunner {
     let req_debug_repr = format!("{:#?}", req);
     in_workunit!(
       "run_local_process",
-      WorkunitMetadata {
-        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-        // renders at the Process's level.
-        level: req.level,
-        desc: Some(req.description.clone()),
-        ..WorkunitMetadata::default()
-      },
+      req.level,
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      desc = Some(req.description.clone()),
       |workunit| async move {
         // Set up a temporary workdir, which will optionally be preserved.
         let (workdir_path, maybe_workdir) = {
@@ -647,22 +644,15 @@ pub async fn prepare_workdir(
   // non-determinism when paths overlap: see the method doc.
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
-  in_workunit!(
-    "setup_sandbox",
-    WorkunitMetadata {
-      level: Level::Debug,
-      ..WorkunitMetadata::default()
-    },
-    |_workunit| async move {
-      store2
-        .materialize_directory(
-          workdir_path_2,
-          materialized_input_digest,
-          Permissions::Writable,
-        )
-        .await
-    },
-  )
+  in_workunit!("setup_sandbox", Level::Debug, |_workunit| async move {
+    store2
+      .materialize_directory(
+        workdir_path_2,
+        materialized_input_digest,
+        Permissions::Writable,
+      )
+      .await
+  },)
   .await?;
 
   let workdir_path2 = workdir_path.clone();

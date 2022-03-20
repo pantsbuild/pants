@@ -284,10 +284,7 @@ impl CommandRunner {
     // We speculate between reading from the remote cache vs. running locally.
     in_workunit!(
       "remote_cache_read_speculation",
-      WorkunitMetadata {
-        level: Level::Trace,
-        ..WorkunitMetadata::default()
-      },
+      Level::Trace,
       |workunit| async move {
         tokio::select! {
           cache_result = cache_read_future => {
@@ -458,13 +455,9 @@ impl crate::CommandRunner for CommandRunner {
     if !hit_cache && (result.exit_code == 0 || write_failures_to_cache) && self.cache_write {
       let command_runner = self.clone();
       let result = result.clone();
-      // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
       let _write_join = self.executor.spawn(in_workunit!(
         "remote_cache_write",
-        WorkunitMetadata {
-          level: Level::Trace,
-          ..WorkunitMetadata::default()
-        },
+        Level::Trace,
         |workunit| async move {
           workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
           let write_result = command_runner

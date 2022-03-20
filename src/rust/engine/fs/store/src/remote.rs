@@ -22,7 +22,7 @@ use remexec::{
   ServerCapabilities,
 };
 use tonic::{Code, Request, Status};
-use workunit_store::{in_workunit, Metric, ObservationMetric, WorkunitMetadata};
+use workunit_store::{in_workunit, Metric, ObservationMetric};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -273,11 +273,7 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes,
     );
-    let workunit_metadata = WorkunitMetadata {
-      level: Level::Trace,
-      desc: Some(format!("Storing bytes at: {resource_name}")),
-      ..WorkunitMetadata::default()
-    };
+    let workunit_desc = format!("Storing bytes at: {resource_name}");
     let store = self.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
@@ -319,13 +315,18 @@ impl ByteStore {
       }
     });
 
-    in_workunit!("store_bytes", workunit_metadata, |workunit| async move {
-      let result = result_future.await;
-      if result.is_ok() {
-        workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
-      }
-      result
-    },)
+    in_workunit!(
+      "store_bytes",
+      Level::Trace,
+      desc = Some(workunit_desc),
+      |workunit| async move {
+        let result = result_future.await;
+        if result.is_ok() {
+          workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
+        }
+        result
+      },
+    )
     .await
   }
 
@@ -347,12 +348,7 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes
     );
-    let workunit_metadata = WorkunitMetadata {
-      level: Level::Trace,
-      desc: Some(format!("Loading bytes at: {resource_name}")),
-      ..WorkunitMetadata::default()
-    };
-    let resource_name = resource_name.clone();
+    let workunit_desc = format!("Loading bytes at: {resource_name}");
     let f = f.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
@@ -363,7 +359,7 @@ impl ByteStore {
       let stream_result = client
         .read({
           protos::gen::google::bytestream::ReadRequest {
-            resource_name: resource_name.clone(),
+            resource_name,
             read_offset: 0,
             // 0 means no limit.
             read_limit: 0,
@@ -428,7 +424,8 @@ impl ByteStore {
 
     in_workunit!(
       "load_bytes_with",
-      workunit_metadata,
+      Level::Trace,
+      desc = Some(workunit_desc),
       |workunit| async move {
         workunit.record_observation(
           ObservationMetric::RemoteStoreReadBlobTimeMicros,
@@ -456,35 +453,32 @@ impl ByteStore {
     request: remexec::FindMissingBlobsRequest,
   ) -> impl Future<Output = Result<HashSet<Digest>, String>> {
     let store = self.clone();
-    let workunit_metadata = WorkunitMetadata {
-      level: Level::Debug,
-      ..WorkunitMetadata::default()
-    };
-    let result_future = async move {
-      let store2 = store.clone();
-      let client = store2.cas_client.as_ref().clone();
-      let response = retry_call(
-        client,
-        move |mut client| {
-          let request = request.clone();
-          async move { client.find_missing_blobs(request).await }
-        },
-        status_is_retryable,
-      )
-      .await
-      .map_err(status_to_str)?;
-
-      response
-        .into_inner()
-        .missing_blob_digests
-        .iter()
-        .map(|digest| digest.try_into())
-        .collect::<Result<HashSet<_>, _>>()
-    };
     async {
-      in_workunit!("list_missing_digests", workunit_metadata, |_workunit| {
-        result_future
-      },)
+      in_workunit!(
+        "list_missing_digests",
+        Level::Debug,
+        |_workunit| async move {
+          let store2 = store.clone();
+          let client = store2.cas_client.as_ref().clone();
+          let response = retry_call(
+            client,
+            move |mut client| {
+              let request = request.clone();
+              async move { client.find_missing_blobs(request).await }
+            },
+            status_is_retryable,
+          )
+          .await
+          .map_err(status_to_str)?;
+
+          response
+            .into_inner()
+            .missing_blob_digests
+            .iter()
+            .map(|digest| digest.try_into())
+            .collect::<Result<HashSet<_>, _>>()
+        }
+      )
       .await
     }
   }

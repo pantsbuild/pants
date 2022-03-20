@@ -64,7 +64,7 @@ use remexec::{ServerCapabilities, Tree};
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tryfuture::try_future;
-use workunit_store::{in_workunit, Level, Metric, WorkunitMetadata};
+use workunit_store::{in_workunit, Level, Metric};
 
 use crate::remote::ByteStoreError;
 
@@ -794,10 +794,7 @@ impl Store {
         log::debug!("Missing file digest from remote store: {:?}", file_digest);
         in_workunit!(
           "missing_file_counter",
-          WorkunitMetadata {
-            level: Level::Trace,
-            ..WorkunitMetadata::default()
-          },
+          Level::Trace,
           |workunit| async move {
             workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
           },
