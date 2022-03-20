@@ -255,7 +255,6 @@ impl super::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let req_debug_repr = format!("{:#?}", req);
     in_workunit!(
-      context.workunit_store.clone(),
       "run_local_process".to_owned(),
       WorkunitMetadata {
         // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
@@ -297,7 +296,6 @@ impl super::CommandRunner for CommandRunner {
           workdir_path.clone(),
           &req,
           req.input_digests.input_files.clone(),
-          context.clone(),
           self.store.clone(),
           self.executor.clone(),
           &self.named_caches,
@@ -617,7 +615,6 @@ pub async fn prepare_workdir(
   workdir_path: PathBuf,
   req: &Process,
   materialized_input_digest: DirectoryDigest,
-  context: Context,
   store: Store,
   executor: task_executor::Executor,
   named_caches: &NamedCaches,
@@ -651,7 +648,6 @@ pub async fn prepare_workdir(
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
   in_workunit!(
-    context.workunit_store.clone(),
     "setup_sandbox".to_owned(),
     WorkunitMetadata {
       level: Level::Debug,

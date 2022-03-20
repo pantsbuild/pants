@@ -69,7 +69,6 @@ impl crate::CommandRunner for CommandRunner {
     let context2 = context.clone();
     let key2 = key.clone();
     let cache_read_result = in_workunit!(
-      context.workunit_store.clone(),
       "local_cache_read".to_owned(),
       WorkunitMetadata {
         level: Level::Trace,
@@ -127,7 +126,6 @@ impl crate::CommandRunner for CommandRunner {
     if result.exit_code == 0 || write_failures_to_cache {
       let result = result.clone();
       in_workunit!(
-        context.workunit_store.clone(),
         "local_cache_write".to_owned(),
         WorkunitMetadata {
           level: Level::Trace,

@@ -788,7 +788,6 @@ impl crate::CommandRunner for CommandRunner {
 
     // Upload the action (and related data, i.e. the embedded command and input files).
     ensure_action_uploaded(
-      &context,
       &self.store,
       command_digest,
       action_digest,
@@ -799,7 +798,6 @@ impl crate::CommandRunner for CommandRunner {
     // Submit the execution request to the RE server for execution.
     let context2 = context.clone();
     in_workunit!(
-      context.workunit_store.clone(),
       "run_execute_request".to_owned(),
       WorkunitMetadata {
         // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
@@ -1338,7 +1336,6 @@ pub async fn check_action_cache(
   timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
   in_workunit!(
-    context.workunit_store.clone(),
     "check_action_cache".to_owned(),
     WorkunitMetadata {
       level: Level::Debug,
@@ -1391,7 +1388,6 @@ pub async fn check_action_cache(
           if eager_fetch {
             let response = response.clone();
             in_workunit!(
-              context.workunit_store.clone(),
               "eager_fetch_action_cache".to_owned(),
               WorkunitMetadata {
                 level: Level::Trace,
@@ -1459,14 +1455,12 @@ pub async fn ensure_action_stored_locally(
 /// whether we are in a remote execution context, or a pure cache-usage context) are uploaded.
 ///
 pub async fn ensure_action_uploaded(
-  context: &Context,
   store: &Store,
   command_digest: Digest,
   action_digest: Digest,
   input_files: Option<DirectoryDigest>,
 ) -> Result<(), String> {
   in_workunit!(
-    context.workunit_store.clone(),
     "ensure_action_uploaded".to_owned(),
     WorkunitMetadata {
       level: Level::Trace,

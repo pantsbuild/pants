@@ -63,7 +63,6 @@ impl crate::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let semaphore_acquisition = self.sema.acquire(process.concurrency_available);
     let permit = in_workunit!(
-      context.workunit_store.clone(),
       "acquire_command_runner_slot".to_owned(),
       WorkunitMetadata {
         // TODO: The UI uses the presence of a blocked workunit below a parent as an indication that

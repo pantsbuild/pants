@@ -109,7 +109,7 @@ fn create_store(
       if let Some(parent_id) = parent_id {
         assert!(span_id > parent_id);
       }
-      ws.start_workunit(span_id, format!("{}", span_id.0), parent_id, metadata)
+      ws._start_workunit(span_id, format!("{}", span_id.0), parent_id, metadata)
     })
     .collect::<Vec<_>>();
 

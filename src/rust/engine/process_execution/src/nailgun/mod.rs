@@ -122,7 +122,6 @@ impl super::CommandRunner for CommandRunner {
     debug!("Running request under nailgun:\n {:?}", req);
 
     in_workunit!(
-      context.workunit_store.clone(),
       "run_nailgun_process".to_owned(),
       WorkunitMetadata {
         // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
@@ -161,7 +160,6 @@ impl super::CommandRunner for CommandRunner {
           .nailgun_pool
           .acquire(
             server_req,
-            context.clone(),
             self.inner.named_caches(),
             self.inner.immutable_inputs(),
           )
@@ -173,7 +171,6 @@ impl super::CommandRunner for CommandRunner {
           nailgun_process.workdir_path().to_owned(),
           &client_req,
           client_req.input_digests.input_files.clone(),
-          context.clone(),
           self.inner.store.clone(),
           self.executor.clone(),
           self.inner.named_caches(),

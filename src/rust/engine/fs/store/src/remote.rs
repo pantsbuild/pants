@@ -319,24 +319,14 @@ impl ByteStore {
       }
     });
 
-    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-      let workunit_store = workunit_store_handle.store;
-      in_workunit!(
-        workunit_store,
-        workunit_name,
-        workunit_metadata,
-        |workunit| async move {
-          let result = result_future.await;
-          if result.is_ok() {
-            workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
-          }
-          result
-        },
-      )
-      .await
-    } else {
-      result_future.await
-    }
+    in_workunit!(workunit_name, workunit_metadata, |workunit| async move {
+      let result = result_future.await;
+      if result.is_ok() {
+        workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
+      }
+      result
+    },)
+    .await
   }
 
   pub async fn load_bytes_with<
@@ -436,30 +426,25 @@ impl ByteStore {
       }
     };
 
-    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-      workunit_store_handle.store.record_observation(
-        ObservationMetric::RemoteStoreReadBlobTimeMicros,
-        start.elapsed().as_micros() as u64,
-      );
-      in_workunit!(
-        workunit_store_handle.store,
-        "load_bytes_with".to_owned(),
-        workunit_metadata,
-        |workunit| async move {
-          let result = result_future.await;
-          if result.is_ok() {
-            workunit.increment_counter(
-              Metric::RemoteStoreBlobBytesDownloaded,
-              digest.size_bytes as u64,
-            );
-          }
-          result
-        },
-      )
-      .await
-    } else {
-      result_future.await
-    }
+    in_workunit!(
+      "load_bytes_with".to_owned(),
+      workunit_metadata,
+      |workunit| async move {
+        workunit.record_observation(
+          ObservationMetric::RemoteStoreReadBlobTimeMicros,
+          start.elapsed().as_micros() as u64,
+        );
+        let result = result_future.await;
+        if result.is_ok() {
+          workunit.increment_counter(
+            Metric::RemoteStoreBlobBytesDownloaded,
+            digest.size_bytes as u64,
+          );
+        }
+        result
+      },
+    )
+    .await
   }
 
   ///
@@ -500,19 +485,7 @@ impl ByteStore {
         .map(|digest| digest.try_into())
         .collect::<Result<HashSet<_>, _>>()
     };
-    async {
-      if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-        in_workunit!(
-          workunit_store_handle.store,
-          workunit_name,
-          workunit_metadata,
-          |_workunit| result_future,
-        )
-        .await
-      } else {
-        result_future.await
-      }
-    }
+    async { in_workunit!(workunit_name, workunit_metadata, |_workunit| result_future,).await }
   }
 
   pub fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(

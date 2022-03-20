@@ -1358,8 +1358,6 @@ impl Node for NodeKey {
   type Error = Failure;
 
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
-    let workunit_store_handle = workunit_store::expect_workunit_store_handle();
-
     let workunit_name = self.workunit_name();
     let user_facing_name = self.user_facing_name();
     let engine_aware_params: Vec<_> = match &self {
@@ -1402,129 +1400,124 @@ impl Node for NodeKey {
       ..WorkunitMetadata::default()
     };
 
-    in_workunit!(
-      workunit_store_handle.store,
-      self.workunit_name(),
-      metadata,
-      |workunit| async move {
-        // To avoid races, we must ensure that we have installed a watch for the subject before
-        // executing the node logic. But in case of failure, we wait to see if the Node itself
-        // fails, and prefer that error message if so (because we have little control over the
-        // error messages of the watch API).
-        let maybe_watch = if let Some(path) = self.fs_subject() {
-          if let Some(watcher) = &context.core.watcher {
-            let abs_path = context.core.build_root.join(path);
-            watcher
-              .watch(abs_path)
-              .map_err(|e| Context::mk_error(&e))
-              .await
-          } else {
-            Ok(())
-          }
+    in_workunit!(self.workunit_name(), metadata, |workunit| async move {
+      // To avoid races, we must ensure that we have installed a watch for the subject before
+      // executing the node logic. But in case of failure, we wait to see if the Node itself
+      // fails, and prefer that error message if so (because we have little control over the
+      // error messages of the watch API).
+      let maybe_watch = if let Some(path) = self.fs_subject() {
+        if let Some(watcher) = &context.core.watcher {
+          let abs_path = context.core.build_root.join(path);
+          watcher
+            .watch(abs_path)
+            .map_err(|e| Context::mk_error(&e))
+            .await
         } else {
           Ok(())
-        };
-
-        let mut result = match self {
-          NodeKey::DigestFile(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::FileDigest)
-              .await
-          }
-          NodeKey::DownloadedFile(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
-          NodeKey::ExecuteProcess(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
-              .await
-          }
-          NodeKey::ReadLink(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::LinkDest)
-              .await
-          }
-          NodeKey::Scandir(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::DirectoryListing)
-              .await
-          }
-          NodeKey::Select(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
-          NodeKey::Snapshot(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
-          NodeKey::Paths(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Paths)
-              .await
-          }
-          NodeKey::SessionValues(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
-          NodeKey::RunId(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
-          NodeKey::Task(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
-        };
-
-        // If both the Node and the watch failed, prefer the Node's error message.
-        match (&result, maybe_watch) {
-          (Ok(_), Ok(_)) => {}
-          (Err(_), _) => {}
-          (Ok(_), Err(e)) => {
-            result = Err(e);
-          }
         }
+      } else {
+        Ok(())
+      };
 
-        // If the node failed, expand the Failure with a new frame.
-        result = result.map_err(|failure| {
-          let name = workunit_name;
-          let displayable_param_names: Vec<_> = {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
-            engine_aware_params
-              .into_iter()
-              .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
-              .collect()
-          };
-          let failure_name = if displayable_param_names.is_empty() {
-            name
-          } else if displayable_param_names.len() == 1 {
-            format!(
-              "{} ({})",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          } else {
-            format!(
-              "{} {}",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          };
+      let mut result = match self {
+        NodeKey::DigestFile(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::FileDigest)
+            .await
+        }
+        NodeKey::DownloadedFile(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::Snapshot)
+            .await
+        }
+        NodeKey::ExecuteProcess(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
+            .await
+        }
+        NodeKey::ReadLink(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::LinkDest)
+            .await
+        }
+        NodeKey::Scandir(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::DirectoryListing)
+            .await
+        }
+        NodeKey::Select(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::Value)
+            .await
+        }
+        NodeKey::Snapshot(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::Snapshot)
+            .await
+        }
+        NodeKey::Paths(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::Paths)
+            .await
+        }
+        NodeKey::SessionValues(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::Value)
+            .await
+        }
+        NodeKey::RunId(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::Value)
+            .await
+        }
+        NodeKey::Task(n) => {
+          n.run_wrapped_node(context, workunit)
+            .map_ok(NodeOutput::Value)
+            .await
+        }
+      };
 
-          failure.with_pushed_frame(&failure_name)
-        });
-
-        result
+      // If both the Node and the watch failed, prefer the Node's error message.
+      match (&result, maybe_watch) {
+        (Ok(_), Ok(_)) => {}
+        (Err(_), _) => {}
+        (Ok(_), Err(e)) => {
+          result = Err(e);
+        }
       }
-    )
+
+      // If the node failed, expand the Failure with a new frame.
+      result = result.map_err(|failure| {
+        let name = workunit_name;
+        let displayable_param_names: Vec<_> = {
+          let gil = Python::acquire_gil();
+          let py = gil.python();
+          engine_aware_params
+            .into_iter()
+            .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
+            .collect()
+        };
+        let failure_name = if displayable_param_names.is_empty() {
+          name
+        } else if displayable_param_names.len() == 1 {
+          format!(
+            "{} ({})",
+            name,
+            display_sorted_in_parens(displayable_param_names.iter())
+          )
+        } else {
+          format!(
+            "{} {}",
+            name,
+            display_sorted_in_parens(displayable_param_names.iter())
+          )
+        };
+
+        failure.with_pushed_frame(&failure_name)
+      });
+
+      result
+    })
     .await
   }
 
