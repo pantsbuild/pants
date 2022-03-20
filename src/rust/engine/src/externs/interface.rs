@@ -673,7 +673,7 @@ async fn workunit_to_py_value(
     let mut dict_entries = vec![
       (
         externs::store_utf8(py, "name"),
-        externs::store_utf8(py, &workunit.name),
+        externs::store_utf8(py, workunit.name),
       ),
       (
         externs::store_utf8(py, "span_id"),
@@ -964,7 +964,7 @@ fn scheduler_live_items<'py>(
   py: Python<'py>,
   py_scheduler: &'py PyScheduler,
   py_session: &'py PySession,
-) -> (Vec<PyObject>, HashMap<String, (usize, usize)>) {
+) -> (Vec<PyObject>, HashMap<&'static str, (usize, usize)>) {
   let (items, sizes) = py_scheduler
     .0
     .core

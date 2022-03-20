@@ -22,7 +22,7 @@ use task_executor::Executor;
 use tempfile::TempDir;
 
 use crate::local::prepare_workdir;
-use crate::{Context, ImmutableInputs, NamedCaches, Process, ProcessMetadata};
+use crate::{ImmutableInputs, NamedCaches, Process, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -86,7 +86,6 @@ impl NailgunPool {
   pub async fn acquire(
     &self,
     server_process: Process,
-    context: Context,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
   ) -> Result<BorrowedNailgunProcess, String> {
@@ -129,7 +128,6 @@ impl NailgunPool {
         name.clone(),
         server_process,
         &self.workdir_base,
-        context,
         &self.store,
         self.executor.clone(),
         named_caches,
@@ -337,7 +335,6 @@ impl NailgunProcess {
     name: String,
     startup_options: Process,
     workdir_base: &Path,
-    context: Context,
     store: &Store,
     executor: Executor,
     named_caches: &NamedCaches,
@@ -357,7 +354,6 @@ impl NailgunProcess {
       workdir.path().to_owned(),
       &startup_options,
       startup_options.input_digests.input_files.clone(),
-      context.clone(),
       store.clone(),
       executor.clone(),
       named_caches,
