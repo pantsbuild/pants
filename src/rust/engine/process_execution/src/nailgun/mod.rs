@@ -122,7 +122,7 @@ impl super::CommandRunner for CommandRunner {
     debug!("Running request under nailgun:\n {:?}", req);
 
     in_workunit!(
-      "run_nailgun_process".to_owned(),
+      "run_nailgun_process",
       WorkunitMetadata {
         // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
         // renders at the Process's level.

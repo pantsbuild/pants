@@ -97,7 +97,7 @@ type RunningWorkunitGraph = StableDiGraph<SpanId, (), u32>;
 ///
 #[derive(Clone, Debug)]
 pub struct Workunit {
-  pub name: String,
+  pub name: &'static str,
   pub span_id: SpanId,
   pub parent_id: Option<SpanId>,
   pub state: WorkunitState,
@@ -119,7 +119,7 @@ impl Workunit {
     let identifier = if let Some(ref s) = self.metadata.desc {
       s.as_str()
     } else {
-      self.name.as_str()
+      self.name
     };
 
     /* This length calculation doesn't treat multi-byte unicode charcters identically
@@ -626,7 +626,7 @@ impl WorkunitStore {
   pub fn _start_workunit(
     &self,
     span_id: SpanId,
-    name: String,
+    name: &'static str,
     parent_id: Option<SpanId>,
     metadata: WorkunitMetadata,
   ) -> Workunit {
@@ -689,7 +689,7 @@ impl WorkunitStore {
 
   pub fn add_completed_workunit(
     &self,
-    name: String,
+    name: &'static str,
     start_time: SystemTime,
     end_time: SystemTime,
     parent_id: Option<SpanId>,
@@ -785,12 +785,7 @@ impl WorkunitStore {
   pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
     let store = WorkunitStore::new(false, Level::Debug);
     store.init_thread_state(None);
-    let workunit = store._start_workunit(
-      SpanId(0),
-      "testing".to_owned(),
-      None,
-      WorkunitMetadata::default(),
-    );
+    let workunit = store._start_workunit(SpanId(0), "testing", None, WorkunitMetadata::default());
     (store.clone(), RunningWorkunit::new(store, Some(workunit)))
   }
 }

@@ -1303,19 +1303,19 @@ impl NodeKey {
   /// Provides the `name` field in workunits associated with this node. These names
   /// should be friendly to machine-parsing (i.e. "my_node" rather than "My awesome node!").
   ///
-  pub fn workunit_name(&self) -> String {
+  pub fn workunit_name(&self) -> &'static str {
     match self {
-      NodeKey::Task(ref task) => task.task.display_info.name.clone(),
-      NodeKey::ExecuteProcess(..) => "process".to_string(),
-      NodeKey::Snapshot(..) => "snapshot".to_string(),
-      NodeKey::Paths(..) => "paths".to_string(),
-      NodeKey::DigestFile(..) => "digest_file".to_string(),
-      NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
-      NodeKey::ReadLink(..) => "read_link".to_string(),
-      NodeKey::Scandir(..) => "scandir".to_string(),
-      NodeKey::Select(..) => "select".to_string(),
-      NodeKey::SessionValues(..) => "session_values".to_string(),
-      NodeKey::RunId(..) => "run_id".to_string(),
+      NodeKey::Task(ref task) => &task.task.as_ref().display_info.name,
+      NodeKey::ExecuteProcess(..) => "process",
+      NodeKey::Snapshot(..) => "snapshot",
+      NodeKey::Paths(..) => "paths",
+      NodeKey::DigestFile(..) => "digest_file",
+      NodeKey::DownloadedFile(..) => "downloaded_file",
+      NodeKey::ReadLink(..) => "read_link",
+      NodeKey::Scandir(..) => "scandir",
+      NodeKey::Select(..) => "select",
+      NodeKey::SessionValues(..) => "session_values",
+      NodeKey::RunId(..) => "run_id",
     }
   }
 
@@ -1400,7 +1400,7 @@ impl Node for NodeKey {
       ..WorkunitMetadata::default()
     };
 
-    in_workunit!(self.workunit_name(), metadata, |workunit| async move {
+    in_workunit!(workunit_name, metadata, |workunit| async move {
       // To avoid races, we must ensure that we have installed a watch for the subject before
       // executing the node logic. But in case of failure, we wait to see if the Node itself
       // fails, and prefer that error message if so (because we have little control over the
@@ -1498,7 +1498,7 @@ impl Node for NodeKey {
             .collect()
         };
         let failure_name = if displayable_param_names.is_empty() {
-          name
+          name.to_owned()
         } else if displayable_param_names.len() == 1 {
           format!(
             "{} ({})",

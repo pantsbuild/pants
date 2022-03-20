@@ -793,7 +793,7 @@ impl Store {
       None => {
         log::debug!("Missing file digest from remote store: {:?}", file_digest);
         in_workunit!(
-          "missing_file_counter".to_owned(),
+          "missing_file_counter",
           WorkunitMetadata {
             level: Level::Trace,
             ..WorkunitMetadata::default()

@@ -327,7 +327,7 @@ async fn main() {
   };
 
   let result = in_workunit!(
-    "process_executor".to_owned(),
+    "process_executor",
     WorkunitMetadata::default(),
     |workunit| async move { runner.run(Context::default(), workunit, request).await }
   )

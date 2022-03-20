@@ -273,9 +273,9 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes,
     );
-    let workunit_name = format!("store_bytes({})", resource_name.clone());
     let workunit_metadata = WorkunitMetadata {
-      level: Level::Debug,
+      level: Level::Trace,
+      desc: Some(format!("Storing bytes at: {resource_name}")),
       ..WorkunitMetadata::default()
     };
     let store = self.clone();
@@ -319,7 +319,7 @@ impl ByteStore {
       }
     });
 
-    in_workunit!(workunit_name, workunit_metadata, |workunit| async move {
+    in_workunit!("store_bytes", workunit_metadata, |workunit| async move {
       let result = result_future.await;
       if result.is_ok() {
         workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
@@ -427,7 +427,7 @@ impl ByteStore {
     };
 
     in_workunit!(
-      "load_bytes_with".to_owned(),
+      "load_bytes_with",
       workunit_metadata,
       |workunit| async move {
         workunit.record_observation(
@@ -456,10 +456,6 @@ impl ByteStore {
     request: remexec::FindMissingBlobsRequest,
   ) -> impl Future<Output = Result<HashSet<Digest>, String>> {
     let store = self.clone();
-    let workunit_name = format!(
-      "list_missing_digests({})",
-      store.instance_name.clone().unwrap_or_default()
-    );
     let workunit_metadata = WorkunitMetadata {
       level: Level::Debug,
       ..WorkunitMetadata::default()
@@ -485,7 +481,12 @@ impl ByteStore {
         .map(|digest| digest.try_into())
         .collect::<Result<HashSet<_>, _>>()
     };
-    async { in_workunit!(workunit_name, workunit_metadata, |_workunit| result_future,).await }
+    async {
+      in_workunit!("list_missing_digests", workunit_metadata, |_workunit| {
+        result_future
+      },)
+      .await
+    }
   }
 
   pub fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(

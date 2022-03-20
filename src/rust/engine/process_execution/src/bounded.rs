@@ -63,7 +63,7 @@ impl crate::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let semaphore_acquisition = self.sema.acquire(process.concurrency_available);
     let permit = in_workunit!(
-      "acquire_command_runner_slot".to_owned(),
+      "acquire_command_runner_slot",
       WorkunitMetadata {
         // TODO: The UI uses the presence of a blocked workunit below a parent as an indication that
         // the parent is blocked. If this workunit is filtered out, parents nodes which are waiting

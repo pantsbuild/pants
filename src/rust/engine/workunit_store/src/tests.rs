@@ -2,6 +2,8 @@ use std::collections::HashSet;
 use std::sync::atomic;
 use std::time::Duration;
 
+use internment::Intern;
+
 use crate::{SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[test]
@@ -109,7 +111,12 @@ fn create_store(
       if let Some(parent_id) = parent_id {
         assert!(span_id > parent_id);
       }
-      ws._start_workunit(span_id, format!("{}", span_id.0), parent_id, metadata)
+      ws._start_workunit(
+        span_id,
+        Intern::new(format!("{}", span_id.0)).as_ref(),
+        parent_id,
+        metadata,
+      )
     })
     .collect::<Vec<_>>();
 

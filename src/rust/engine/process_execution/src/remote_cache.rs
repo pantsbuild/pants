@@ -283,7 +283,7 @@ impl CommandRunner {
 
     // We speculate between reading from the remote cache vs. running locally.
     in_workunit!(
-      "remote_cache_read_speculation".to_owned(),
+      "remote_cache_read_speculation",
       WorkunitMetadata {
         level: Level::Trace,
         ..WorkunitMetadata::default()
@@ -460,7 +460,7 @@ impl crate::CommandRunner for CommandRunner {
       let result = result.clone();
       // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
       let _write_join = self.executor.spawn(in_workunit!(
-        "remote_cache_write".to_owned(),
+        "remote_cache_write",
         WorkunitMetadata {
           level: Level::Trace,
           ..WorkunitMetadata::default()

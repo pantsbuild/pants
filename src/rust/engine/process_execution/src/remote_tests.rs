@@ -1867,7 +1867,7 @@ async fn remote_workunits_are_stored() {
     .await
     .unwrap();
 
-  let got_workunit_items: HashSet<String> = workunit_store
+  let got_workunit_items: HashSet<&'static str> = workunit_store
     .latest_workunits(log::Level::Trace)
     .1
     .into_iter()
@@ -1875,10 +1875,10 @@ async fn remote_workunits_are_stored() {
     .collect();
 
   let wanted_workunit_items = hashset! {
-    String::from("remote execution action scheduling"),
-    String::from("remote execution worker input fetching"),
-    String::from("remote execution worker command executing"),
-    String::from("remote execution worker output uploading"),
+    "remote execution action scheduling",
+    "remote execution worker input fetching",
+    "remote execution worker command executing",
+    "remote execution worker output uploading",
   };
 
   assert!(got_workunit_items.is_superset(&wanted_workunit_items));

@@ -3998,6 +3998,7 @@ dependencies = [
  "deepsize",
  "hashing",
  "hdrhistogram",
+ "internment",
  "log",
  "parking_lot 0.12.0",
  "petgraph 0.5.1",

@@ -798,7 +798,7 @@ impl crate::CommandRunner for CommandRunner {
     // Submit the execution request to the RE server for execution.
     let context2 = context.clone();
     in_workunit!(
-      "run_execute_request".to_owned(),
+      "run_execute_request",
       WorkunitMetadata {
         // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
         // renders at the Process's level.
@@ -852,7 +852,7 @@ impl crate::CommandRunner for CommandRunner {
 
 fn maybe_add_workunit(
   result_cached: bool,
-  name: &str,
+  name: &'static str,
   time_span: concrete_time::TimeSpan,
   parent_id: Option<SpanId>,
   workunit_store: &WorkunitStore,
@@ -861,13 +861,7 @@ fn maybe_add_workunit(
   if !result_cached {
     let start_time: SystemTime = SystemTime::UNIX_EPOCH + time_span.start.into();
     let end_time: SystemTime = start_time + time_span.duration.into();
-    workunit_store.add_completed_workunit(
-      name.to_string(),
-      start_time,
-      end_time,
-      parent_id,
-      metadata,
-    );
+    workunit_store.add_completed_workunit(name, start_time, end_time, parent_id, metadata);
   }
 }
 
@@ -1336,7 +1330,7 @@ pub async fn check_action_cache(
   timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
   in_workunit!(
-    "check_action_cache".to_owned(),
+    "check_action_cache",
     WorkunitMetadata {
       level: Level::Debug,
       desc: Some(format!("Remote cache lookup for: {}", command_description)),
@@ -1388,7 +1382,7 @@ pub async fn check_action_cache(
           if eager_fetch {
             let response = response.clone();
             in_workunit!(
-              "eager_fetch_action_cache".to_owned(),
+              "eager_fetch_action_cache",
               WorkunitMetadata {
                 level: Level::Trace,
                 desc: Some("eagerly fetching after action cache hit".to_owned()),
@@ -1461,7 +1455,7 @@ pub async fn ensure_action_uploaded(
   input_files: Option<DirectoryDigest>,
 ) -> Result<(), String> {
   in_workunit!(
-    "ensure_action_uploaded".to_owned(),
+    "ensure_action_uploaded",
     WorkunitMetadata {
       level: Level::Trace,
       desc: Some(format!("ensure action uploaded for {:?}", action_digest)),

@@ -255,7 +255,7 @@ impl super::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let req_debug_repr = format!("{:#?}", req);
     in_workunit!(
-      "run_local_process".to_owned(),
+      "run_local_process",
       WorkunitMetadata {
         // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
         // renders at the Process's level.
@@ -648,7 +648,7 @@ pub async fn prepare_workdir(
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
   in_workunit!(
-    "setup_sandbox".to_owned(),
+    "setup_sandbox",
     WorkunitMetadata {
       level: Level::Debug,
       ..WorkunitMetadata::default()
