@@ -50,6 +50,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.osutil import CPU_COUNT
+from pants.util.strutil import softwrap
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
@@ -502,20 +503,25 @@ class BootstrapOptions:
     backend_packages = StrListOption(
         "--backend-packages",
         advanced=True,
-        help=(
-            "Register functionality from these backends.\n\nThe backend packages must be "
-            "present on the PYTHONPATH, typically because they are in the Pants core dist, in a "
-            "plugin dist, or available as sources in the repo."
+        help=softwrap(
+            """
+            Register functionality from these backends.
+
+            The backend packages must be present on the PYTHONPATH, typically because they are in
+            the Pants core dist, in a plugin dist, or available as sources in the repo.
+            """
         ),
     )
     plugins = StrListOption(
         "--plugins",
         advanced=True,
-        help=(
-            "Allow backends to be loaded from these plugins (usually released through PyPI). "
-            "The default backends for each plugin will be loaded automatically. Other backends "
-            "in a plugin can be loaded by listing them in `backend_packages` in the "
-            "`[GLOBAL]` scope."
+        help=softwrap(
+            """
+            Allow backends to be loaded from these plugins (usually released through PyPI).
+            The default backends for each plugin will be loaded automatically. Other backends
+            in a plugin can be loaded by listing them in `backend_packages` in the
+            `[GLOBAL]` scope.
+            """
         ),
     )
     plugins_force_resolve = BoolOption(
@@ -536,41 +542,51 @@ class BootstrapOptions:
         default=False,
         daemon=True,
         advanced=True,
-        help="Display the target where a log message originates in that log message's output. "
-        "This can be helpful when paired with --log-levels-by-target.",
+        help=softwrap(
+            """
+            Display the target where a log message originates in that log message's output.
+            This can be helpful when paired with --log-levels-by-target.
+            """
+        ),
     )
     log_levels_by_target = DictOption[str](
         "--log-levels-by-target",
         daemon=True,
         advanced=True,
-        help="Set a more specific logging level for one or more logging targets. The names of "
-        "logging targets are specified in log strings when the --show-log-target option is set. "
-        "The logging levels are one of: "
-        '"error", "warn", "info", "debug", "trace". '
-        "All logging targets not specified here use the global log level set with --level. For example, "
-        'you can set `--log-levels-by-target=\'{"workunit_store": "info", "pants.engine.rules": "warn"}\'`.',
+        help=softwrap(
+            """
+            Set a more specific logging level for one or more logging targets. The names of
+            logging targets are specified in log strings when the --show-log-target option is set.
+            The logging levels are one of: "error", "warn", "info", "debug", "trace".
+            All logging targets not specified here use the global log level set with --level. For example,
+            you can set `--log-levels-by-target='{"workunit_store": "info", "pants.engine.rules": "warn"}'`.
+            """
+        ),
     )
     log_show_rust_3rdparty = BoolOption(
         "--log-show-rust-3rdparty",
         default=False,
         daemon=True,
         advanced=True,
-        help="Whether to show/hide logging done by 3rdparty Rust crates used by the Pants "
-        "engine.",
+        help="Whether to show/hide logging done by 3rdparty Rust crates used by the Pants engine.",
     )
     ignore_warnings = StrListOption(
         "--ignore-warnings",
         daemon=True,
         advanced=True,
-        help=(
-            "Ignore logs and warnings matching these strings.\n\n"
-            "Normally, Pants will look for literal matches from the start of the log/warning "
-            "message, but you can prefix the ignore with `$regex$` for Pants to instead treat "
-            "your string as a regex pattern. For example:\n\n"
-            "    ignore_warnings = [\n"
-            "        \"DEPRECATED: option 'config' in scope 'flake8' will be removed\",\n"
-            "        '$regex$:No files\\s*'\n"
-            "    ]\n"
+        help=softwrap(
+            """
+            Ignore logs and warnings matching these strings.
+
+            Normally, Pants will look for literal matches from the start of the log/warning
+            message, but you can prefix the ignore with `$regex$` for Pants to instead treat
+            your string as a regex pattern. For example:
+
+                ignore_warnings = [
+                    "DEPRECATED: option 'config' in scope 'flake8' will be removed",
+                    '$regex$:No files\\s*'
+                ]
+            """
         ),
     )
     pants_version = StrOption(
@@ -578,12 +594,18 @@ class BootstrapOptions:
         advanced=True,
         default=pants_version(),
         daemon=True,
-        help="Use this Pants version. Note that Pants only uses this to verify that you are "
-        "using the requested version, as Pants cannot dynamically change the version it "
-        f"is using once the program is already running.\n\nIf you use the `{bin_name()}` script from "
-        f"{doc_url('installation')}, however, changing the value in your "
-        "`pants.toml` will cause the new version to be installed and run automatically.\n\n"
-        f"Run `{bin_name()} --version` to check what is being used.",
+        help=softwrap(
+            f"""
+            Use this Pants version. Note that Pants only uses this to verify that you are
+            using the requested version, as Pants cannot dynamically change the version it
+            is using once the program is already running.
+
+            If you use the `{bin_name()}` script from {doc_url('installation')}, however, changing
+            the value in your `pants.toml` will cause the new version to be installed and run automatically.
+
+            Run `{bin_name()} --version` to check what is being used.
+            """
+        ),
     )
     pants_bin_name = StrOption(
         "--pants-bin-name",
@@ -606,9 +628,13 @@ class BootstrapOptions:
         metavar="<dir>",
         default=None,
         daemon=True,
-        help="When set, a base directory in which to store `--pants-workdir` contents. "
-        "If this option is a set, the workdir will be created as symlink into a "
-        "per-workspace subdirectory.",
+        help=softwrap(
+            """
+            When set, a base directory in which to store `--pants-workdir` contents.
+            If this option is a set, the workdir will be created as symlink into a
+            per-workspace subdirectory.
+            """
+        ),
     )
     pants_distdir = StrOption(
         "--pants-distdir",
@@ -622,9 +648,13 @@ class BootstrapOptions:
         advanced=True,
         default=lambda _: os.path.join(get_buildroot(), ".pids"),
         daemon=True,
-        help="The directory to use for tracking subprocess metadata. This should "
-        "live outside of the dir used by `pants_workdir` to allow for tracking "
-        "subprocesses that outlive the workdir data.",
+        help=softwrap(
+            """
+            The directory to use for tracking subprocess metadata. This should
+            live outside of the dir used by `pants_workdir` to allow for tracking
+            subprocesses that outlive the workdir data.
+            """
+        ),
     )
     pants_config_files = StrListOption(
         "--pants-config-files",
@@ -633,10 +663,12 @@ class BootstrapOptions:
         # files independently affects fingerprints.
         fingerprint=False,
         default=lambda _: [get_default_pants_config_file()],
-        help=(
-            "Paths to Pants config files. This may only be set through the environment variable "
-            "`PANTS_CONFIG_FILES` and the command line argument `--pants-config-files`; it will "
-            "be ignored if in a config file like `pants.toml`."
+        help=softwrap(
+            """
+            Paths to Pants config files. This may only be set through the environment variable
+            `PANTS_CONFIG_FILES` and the command line argument `--pants-config-files`; it will
+            be ignored if in a config file like `pants.toml`.
+            """
         ),
     )
     pantsrc = BoolOption(
@@ -645,10 +677,7 @@ class BootstrapOptions:
         default=True,
         # NB: See `--pants-config-files`.
         fingerprint=False,
-        help=(
-            "Use pantsrc files located at the paths specified in the global option "
-            "`pantsrc_files`."
-        ),
+        help="Use pantsrc files located at the paths specified in the global option `pantsrc_files`.",
     )
     pantsrc_files = StrListOption(
         "--pantsrc-files",
@@ -657,17 +686,16 @@ class BootstrapOptions:
         # NB: See `--pants-config-files`.
         fingerprint=False,
         default=["/etc/pantsrc", "~/.pants.rc", ".pants.rc"],
-        help=(
-            "Override config with values from these files, using syntax matching that of "
-            "`--pants-config-files`."
-        ),
+        help="Override config with values from these files, using syntax matching that of `--pants-config-files`.",
     )
     pythonpath = StrListOption(
         "--pythonpath",
         advanced=True,
-        help=(
-            "Add these directories to PYTHONPATH to search for plugins. This does not impact "
-            "the PYTHONPATH used by Pants when running your Python code."
+        help=softwrap(
+            """
+            Add these directories to PYTHONPATH to search for plugins. This does not impact the
+            PYTHONPATH used by Pants when running your Python code.
+            """
         ),
     )
     spec_files = StrListOption(
@@ -675,9 +703,11 @@ class BootstrapOptions:
         # NB: We don't fingerprint spec files because the content of the files independently
         # affects fingerprints.
         fingerprint=False,
-        help=(
-            "Read additional specs (target addresses, files, and/or globs), one per line, "
-            "from these files."
+        help=softwrap(
+            """
+            Read additional specs (target addresses, files, and/or globs), one per line, from these
+            files.
+            """
         ),
     )
     verify_config = BoolOption(
@@ -690,31 +720,41 @@ class BootstrapOptions:
         "--stats-record-option-scopes",
         advanced=True,
         default=["*"],
-        help=(
-            "Option scopes to record in stats on run completion. "
-            "Options may be selected by joining the scope and the option with a ^ character, "
-            "i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`. "
-            "Add a '*' to the list to capture all known scopes."
+        help=softwrap(
+            """
+            Option scopes to record in stats on run completion.
+            Options may be selected by joining the scope and the option with a ^ character,
+            i.e. to get option `pantsd` in the GLOBAL scope, you'd pass `GLOBAL^pantsd`.
+            Add a '*' to the list to capture all known scopes.
+            """
         ),
     )
     pants_ignore = StrListOption(
         "--pants-ignore",
         advanced=True,
         default=[".*/", _default_rel_distdir],
-        help="Paths to ignore for all filesystem operations performed by pants "
-        "(e.g. BUILD file scanning, glob matching, etc). "
-        "Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). "
-        "The `pants_distdir` and `pants_workdir` locations are automatically ignored. "
-        "`pants_ignore` can be used in tandem with `pants_ignore_use_gitignore`; any rules "
-        "specified here are applied after rules specified in a .gitignore file.",
+        help=softwrap(
+            """
+            Paths to ignore for all filesystem operations performed by pants
+            (e.g. BUILD file scanning, glob matching, etc).
+            Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).
+            The `pants_distdir` and `pants_workdir` locations are automatically ignored.
+            `pants_ignore` can be used in tandem with `pants_ignore_use_gitignore`; any rules
+            specified here are applied after rules specified in a .gitignore file.
+            """
+        ),
     )
     pants_ignore_use_gitignore = BoolOption(
         "--pants-ignore-use-gitignore",
         advanced=True,
         default=True,
-        help="Make use of a root .gitignore file when determining whether to ignore filesystem "
-        "operations performed by Pants. If used together with `--pants-ignore`, any exclude/include "
-        "patterns specified there apply after .gitignore rules.",
+        help=softwrap(
+            """
+            Make use of a root .gitignore file when determining whether to ignore filesystem
+            operations performed by Pants. If used together with `--pants-ignore`, any exclude/include
+            patterns specified there apply after .gitignore rules.
+            """
+        ),
     )
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
@@ -731,10 +771,12 @@ class BootstrapOptions:
         "--pantsd",
         default=True,
         daemon=True,
-        help=(
-            "Enables use of the Pants daemon (pantsd). pantsd can significantly improve "
-            "runtime performance by lowering per-run startup cost, and by memoizing filesystem "
-            "operations and rule execution."
+        help=softwrap(
+            """
+            Enables use of the Pants daemon (pantsd). pantsd can significantly improve
+            runtime performance by lowering per-run startup cost, and by memoizing filesystem
+            operations and rule execution.
+            """
         ),
     )
     # Whether or not to make necessary arrangements to have concurrent runs in pants.
@@ -743,9 +785,13 @@ class BootstrapOptions:
     concurrent = BoolOption(
         "--concurrent",
         default=False,
-        help="Enable concurrent runs of Pants. Without this enabled, Pants will "
-        "start up all concurrent invocations (e.g. in other terminals) without pantsd. "
-        "Enabling this option requires parallel Pants invocations to block on the first.",
+        help=softwrap(
+            """
+            Enable concurrent runs of Pants. Without this enabled, Pants will
+            start up all concurrent invocations (e.g. in other terminals) without pantsd.
+            Enabling this option requires parallel Pants invocations to block on the first.
+            """
+        ),
     )
 
     # NB: We really don't want this option to invalidate the daemon, because different clients might have
@@ -755,27 +801,36 @@ class BootstrapOptions:
         "--pantsd-timeout-when-multiple-invocations",
         advanced=True,
         default=60.0,
-        help="The maximum amount of time to wait for the invocation to start until "
-        "raising a timeout exception. "
-        "Because pantsd currently does not support parallel runs, "
-        "any prior running Pants command must be finished for the current one to start. "
-        "To never timeout, use the value -1.",
+        help=softwrap(
+            """
+            The maximum amount of time to wait for the invocation to start until
+            raising a timeout exception.
+            Because pantsd currently does not support parallel runs,
+            any prior running Pants command must be finished for the current one to start.
+            To never timeout, use the value -1.
+            """
+        ),
     )
     pantsd_max_memory_usage = MemorySizeOption(
         "--pantsd-max-memory-usage",
         advanced=True,
         default=memory_size("1GiB"),
         default_help_repr="1GiB",
-        help=(
-            "The maximum memory usage of the pantsd process.\n\n"
-            "When the maximum memory is exceeded, the daemon will restart gracefully, "
-            "although all previous in-memory caching will be lost. Setting too low means that "
-            "you may miss out on some caching, whereas setting too high may over-consume "
-            "resources and may result in the operating system killing Pantsd due to memory "
-            "overconsumption (e.g. via the OOM killer).\n\n"
-            "You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g. "
-            "`2GiB` or `2.12GiB`. A bare number will be in bytes.\n\n"
-            "There is at most one pantsd process per workspace."
+        help=softwrap(
+            """
+            The maximum memory usage of the pantsd process.
+
+            When the maximum memory is exceeded, the daemon will restart gracefully,
+            although all previous in-memory caching will be lost. Setting too low means that
+            you may miss out on some caching, whereas setting too high may over-consume
+            resources and may result in the operating system killing Pantsd due to memory
+            overconsumption (e.g. via the OOM killer).
+
+            You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
+            `2GiB` or `2.12GiB`. A bare number will be in bytes.
+
+            There is at most one pantsd process per workspace.
+            """
         ),
     )
 
@@ -790,9 +845,11 @@ class BootstrapOptions:
         "--engine-visualize-to",
         advanced=True,
         default=None,
-        help=(
-            "A directory to write execution and rule graphs to as `dot` files. The contents "
-            "of the directory will be overwritten if any filenames collide."
+        help=softwrap(
+            """
+            A directory to write execution and rule graphs to as `dot` files. The contents
+            of the directory will be overwritten if any filenames collide.
+            """
         ),
     )
     # Pants Daemon options.
@@ -807,8 +864,12 @@ class BootstrapOptions:
         "--pantsd-invalidation-globs",
         advanced=True,
         daemon=True,
-        help="Filesystem events matching any of these globs will trigger a daemon restart. "
-        "Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.",
+        help=softwrap(
+            """
+            Filesystem events matching any of these globs will trigger a daemon restart.
+            Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.
+            """
+        ),
     )
 
     _rule_threads_core_flag = "--rule-threads-core"
@@ -820,37 +881,50 @@ class BootstrapOptions:
         default=max(2, CPU_COUNT // 2),
         default_help_repr="max(2, #cores/2)",
         advanced=True,
-        help=(
-            "The number of threads to keep active and ready to execute `@rule` logic (see "
-            f"also: `{_rule_threads_max_flag}`).\n\nValues less than 2 are not currently supported. "
-            "\n\nThis value is independent of the number of processes that may be spawned in "
-            f"parallel locally (controlled by `{_process_execution_local_parallelism_flag}`)."
+        help=softwrap(
+            f"""
+            The number of threads to keep active and ready to execute `@rule` logic (see
+            also: `{_rule_threads_max_flag}`).
+
+            Values less than 2 are not currently supported.
+
+            This value is independent of the number of processes that may be spawned in
+            parallel locally (controlled by `{_process_execution_local_parallelism_flag}`).
+            """
         ),
     )
     rule_threads_max = IntOption(
         _rule_threads_max_flag,
         default=None,
         advanced=True,
-        help=(
-            "The maximum number of threads to use to execute `@rule` logic. Defaults to "
-            f"a small multiple of `{_rule_threads_core_flag}`."
+        help=softwrap(
+            f"""
+            The maximum number of threads to use to execute `@rule` logic. Defaults to
+            a small multiple of `{_rule_threads_core_flag}`.
+            """
         ),
     )
 
     local_store_dir_flag = "--local-store-dir"
     local_store_shard_count_flag = "--local-store-shard-count"
     local_store_files_max_size_bytes_flag = "--local-store-files-max-size-bytes"
-    cache_instructions = (
-        "The path may be absolute or relative. If the directory is within the build root, be "
-        "sure to include it in `--pants-ignore`."
+    cache_instructions = softwrap(
+        """
+        The path may be absolute or relative. If the directory is within the build root, be
+        sure to include it in `--pants-ignore`.
+        """
     )
 
     local_store_dir = StrOption(
         local_store_dir_flag,
         advanced=True,
-        help=(
-            f"Directory to use for the local file store, which stores the results of "
-            f"subprocesses run by Pants.\n\n{cache_instructions}"
+        help=softwrap(
+            f"""
+            Directory to use for the local file store, which stores the results of
+            subprocesses run by Pants.
+
+            {cache_instructions}
+            """
         ),
         # This default is also hard-coded into the engine's rust code in
         # fs::Store::default_path so that tools using a Store outside of pants
@@ -860,106 +934,135 @@ class BootstrapOptions:
     local_store_shard_count = IntOption(
         local_store_shard_count_flag,
         advanced=True,
-        help=(
-            "The number of LMDB shards created for the local store. This setting also impacts "
-            f"the maximum size of stored files: see `{local_store_files_max_size_bytes_flag}` "
-            "for more information."
-            "\n\n"
-            "Because LMDB allows only one simultaneous writer per database, the store is split "
-            "into multiple shards to allow for more concurrent writers. The faster your disks "
-            "are, the fewer shards you are likely to need for performance."
-            "\n\n"
-            "NB: After changing this value, you will likely want to manually clear the "
-            f"`{local_store_dir_flag}` directory to clear the space used by old shard layouts."
+        help=softwrap(
+            f"""
+            The number of LMDB shards created for the local store. This setting also impacts
+            the maximum size of stored files: see `{local_store_files_max_size_bytes_flag}`
+            for more information.
+
+            Because LMDB allows only one simultaneous writer per database, the store is split
+            into multiple shards to allow for more concurrent writers. The faster your disks
+            are, the fewer shards you are likely to need for performance.
+
+            NB: After changing this value, you will likely want to manually clear the
+            `{local_store_dir_flag}` directory to clear the space used by old shard layouts.
+            """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.shard_count,
     )
     local_store_processes_max_size_bytes = IntOption(
         "--local-store-processes-max-size-bytes",
         advanced=True,
-        help=(
-            "The maximum size in bytes of the local store containing process cache entries. "
-            f"Stored below `{local_store_dir_flag}`."
+        help=softwrap(
+            f"""
+            The maximum size in bytes of the local store containing process cache entries.
+            Stored below `{local_store_dir_flag}`.
+            """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.processes_max_size_bytes,
     )
     local_store_files_max_size_bytes = IntOption(
         local_store_files_max_size_bytes_flag,
         advanced=True,
-        help=(
-            "The maximum size in bytes of the local store containing files. "
-            f"Stored below `{local_store_dir_flag}`."
-            "\n\n"
-            "NB: This size value bounds the total size of all files, but (due to sharding of the "
-            "store on disk) it also bounds the per-file size to (VALUE / "
-            f"`{local_store_shard_count_flag}`)."
-            "\n\n"
-            "This value doesn't reflect space allocated on disk, or RAM allocated (it "
-            "may be reflected in VIRT but not RSS). However, the default is lower than you "
-            "might otherwise choose because macOS creates core dumps that include MMAP'd "
-            "pages, and setting this too high might cause core dumps to use an unreasonable "
-            "amount of disk if they are enabled."
+        help=softwrap(
+            f"""
+            The maximum size in bytes of the local store containing files.
+            Stored below `{local_store_dir_flag}`.
+
+            NB: This size value bounds the total size of all files, but (due to sharding of the
+            store on disk) it also bounds the per-file size to (VALUE /
+            `{local_store_shard_count_flag}`).
+
+            This value doesn't reflect space allocated on disk, or RAM allocated (it
+            may be reflected in VIRT but not RSS). However, the default is lower than you
+            might otherwise choose because macOS creates core dumps that include MMAP'd
+            pages, and setting this too high might cause core dumps to use an unreasonable
+            amount of disk if they are enabled.
+            """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.files_max_size_bytes,
     )
     local_store_directories_max_size_bytes = IntOption(
         "--local-store-directories-max-size-bytes",
         advanced=True,
-        help=(
-            "The maximum size in bytes of the local store containing directories. "
-            f"Stored below `{local_store_dir_flag}`."
+        help=softwrap(
+            f"""
+            The maximum size in bytes of the local store containing directories.
+            Stored below `{local_store_dir_flag}`.
+            """
         ),
         default=DEFAULT_LOCAL_STORE_OPTIONS.directories_max_size_bytes,
     )
     _named_caches_dir = StrOption(
         "--named-caches-dir",
         advanced=True,
-        help=(
-            "Directory to use for named global caches for tools and processes with trusted, "
-            f"concurrency-safe caches.\n\n{cache_instructions}"
+        help=softwrap(
+            f"""
+            Directory to use for named global caches for tools and processes with trusted,
+            concurrency-safe caches.
+
+            {cache_instructions}
+            """
         ),
         default=os.path.join(get_pants_cachedir(), "named_caches"),
     )
     local_execution_root_dir = StrOption(
         "--local-execution-root-dir",
         advanced=True,
-        help=(f"Directory to use for local process execution sandboxing.\n\n{cache_instructions}"),
+        help=softwrap(
+            f"""
+            Directory to use for local process execution sandboxing.
+
+            {cache_instructions}
+            """
+        ),
         default=tempfile.gettempdir(),
     )
     local_cache = BoolOption(
         "--local-cache",
         default=DEFAULT_EXECUTION_OPTIONS.local_cache,
-        help=(
-            "Whether to cache process executions in a local cache persisted to disk at "
-            "`--local-store-dir`."
+        help=softwrap(
+            """
+            Whether to cache process executions in a local cache persisted to disk at
+            `--local-store-dir`.
+            """
         ),
     )
     process_cleanup = BoolOption(
         "--process-cleanup",
         default=DEFAULT_EXECUTION_OPTIONS.process_cleanup,
-        help=(
-            "If false, Pants will not clean up local directories used as chroots for running "
-            "processes. Pants will log their location so that you can inspect the chroot, and "
-            "run the `__run.sh` script to recreate the process using the same argv and "
-            "environment variables used by Pants. This option is useful for debugging."
+        help=softwrap(
+            """
+            If false, Pants will not clean up local directories used as chroots for running
+            processes. Pants will log their location so that you can inspect the chroot, and
+            run the `__run.sh` script to recreate the process using the same argv and
+            environment variables used by Pants. This option is useful for debugging.
+            """
         ),
     )
     ca_certs_path = StrOption(
         "--ca-certs-path",
         advanced=True,
         default=None,
-        help="Path to a file containing PEM-format CA certificates used for verifying secure "
-        "connections when downloading files required by a build.",
+        help=softwrap(
+            """
+            Path to a file containing PEM-format CA certificates used for verifying secure
+            connections when downloading files required by a build.
+            """
+        ),
     )
     process_execution_local_parallelism = IntOption(
         _process_execution_local_parallelism_flag,
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
         default_help_repr="#cores",
         advanced=True,
-        help=(
-            "Number of concurrent processes that may be executed locally.\n\n"
-            "This value is independent of the number of threads that may be used to "
-            f"execute the logic in `@rules` (controlled by `{_rule_threads_core_flag}`)."
+        help=softwrap(
+            f"""
+            Number of concurrent processes that may be executed locally.
+
+            This value is independent of the number of threads that may be used to
+            execute the logic in `@rules` (controlled by `{_rule_threads_core_flag}`).
+            """
         ),
     )
     process_execution_remote_parallelism = IntOption(
@@ -972,126 +1075,159 @@ class BootstrapOptions:
         "--process-execution-cache-namespace",
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.process_execution_cache_namespace),
-        help=(
-            "The cache namespace for process execution. "
-            "Change this value to invalidate every artifact's execution, or to prevent "
-            "process cache entries from being (re)used for different usecases or users."
+        help=softwrap(
+            """
+            The cache namespace for process execution.
+            Change this value to invalidate every artifact's execution, or to prevent
+            process cache entries from being (re)used for different usecases or users.
+            """
         ),
     )
     process_execution_local_enable_nailgun = BoolOption(
         "--process-execution-local-enable-nailgun",
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
-        help=(
-            "Whether or not to use nailgun to run JVM requests that are marked as "
-            "supporting nailgun."
-        ),
+        help="Whether or not to use nailgun to run JVM requests that are marked as supporting nailgun.",
         advanced=True,
     )
     remote_execution = BoolOption(
         "--remote-execution",
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
-        help=(
-            "Enables remote workers for increased parallelism. (Alpha)\n\nAlternatively, you "
-            "can use `--remote-cache-read` and `--remote-cache-write` to still run everything "
-            "locally, but to use a remote cache."
+        help=softwrap(
+            """
+            Enables remote workers for increased parallelism. (Alpha)
+
+            Alternatively, you can use `--remote-cache-read` and `--remote-cache-write` to still run
+            everything locally, but to use a remote cache.
+            """
         ),
     )
     remote_cache_read = BoolOption(
         "--remote-cache-read",
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read,
-        help=(
-            "Whether to enable reading from a remote cache.\n\nThis cannot be used at the same "
-            "time as `--remote-execution`."
+        help=softwrap(
+            """
+            Whether to enable reading from a remote cache.
+
+            This cannot be used at the same time as `--remote-execution`.
+            """
         ),
     )
     remote_cache_write = BoolOption(
         "--remote-cache-write",
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_write,
-        help=(
-            "Whether to enable writing results to a remote cache.\n\nThis cannot be used at "
-            "the same time as `--remote-execution`."
+        help=softwrap(
+            """
+            Whether to enable writing results to a remote cache.
+
+            This cannot be used at the same time as `--remote-execution`.
+            """
         ),
     )
     remote_instance_name = StrOption(
         "--remote-instance-name",
         default=None,
         advanced=True,
-        help=(
-            "Name of the remote instance to use by remote caching and remote execution.\n\n"
-            "This is used by some remote servers for routing. Consult your remote server for "
-            "whether this should be set.\n\nYou can also use `--remote-auth-plugin` to provide "
-            "a plugin to dynamically set this value."
+        help=softwrap(
+            """
+            Name of the remote instance to use by remote caching and remote execution.
+
+            This is used by some remote servers for routing. Consult your remote server for
+            whether this should be set.
+
+            You can also use `--remote-auth-plugin` to provide a plugin to dynamically set this value.
+            """
         ),
     )
     remote_ca_certs_path = StrOption(
         "--remote-ca-certs-path",
         default=None,
         advanced=True,
-        help=(
-            "Path to a PEM file containing CA certificates used for verifying secure "
-            "connections to `--remote-execution-address` and `--remote-store-address`.\n\nIf "
-            "unspecified, Pants will attempt to auto-discover root CA certificates when TLS "
-            "is enabled with remote execution and caching."
+        help=softwrap(
+            """
+            Path to a PEM file containing CA certificates used for verifying secure
+            connections to `--remote-execution-address` and `--remote-store-address`.
+
+            If unspecified, Pants will attempt to auto-discover root CA certificates when TLS
+            is enabled with remote execution and caching.
+            """
         ),
     )
     remote_oath_bearer_token_path = StrOption(
         "--remote-oauth-bearer-token-path",
         default=None,
         advanced=True,
-        help=(
-            "Path to a file containing an oauth token to use for gGRPC connections to "
-            "`--remote-execution-address` and `--remote-store-address`.\n\nIf specified, Pants will "
-            "add a header in the format `authorization: Bearer <token>`. You can also manually "
-            "add this header via `--remote-execution-headers` and `--remote-store-headers`, or "
-            "use `--remote-auth-plugin` to provide a plugin to dynamically set the relevant "
-            "headers. Otherwise, no authorization will be performed."
+        help=softwrap(
+            """
+            Path to a file containing an oauth token to use for gGRPC connections to
+            `--remote-execution-address` and `--remote-store-address`.
+
+            If specified, Pants will add a header in the format `authorization: Bearer <token>`.
+            You can also manually add this header via `--remote-execution-headers` and
+            `--remote-store-headers`, or use `--remote-auth-plugin` to provide a plugin to
+            dynamically set the relevant headers. Otherwise, no authorization will be performed.
+            """
         ),
     )
     remote_auth_plugin = StrOption(
         "--remote-auth-plugin",
         default=None,
         advanced=True,
-        help=(
-            "Path to a plugin to dynamically configure remote caching and execution "
-            "options.\n\n"
-            "Format: `path.to.module:my_func`. Pants will import your module and run your "
-            "function. Update the `--pythonpath` option to ensure your file is loadable.\n\n"
-            "The function should take the kwargs `initial_store_headers: dict[str, str]`, "
-            "`initial_execution_headers: dict[str, str]`, `options: Options` (from "
-            "pants.option.options), `env: dict[str, str]`, and "
-            "`prior_result: AuthPluginResult | None`. It should return an instance of "
-            "`AuthPluginResult` from `pants.option.global_options`.\n\n"
-            "Pants will replace the headers it would normally use with whatever your plugin "
-            "returns; usually, you should include the `initial_store_headers` and "
-            "`initial_execution_headers` in your result so that options like "
-            "`--remote-store-headers` still work.\n\n"
-            "If you return `instance_name`, Pants will replace `--remote-instance-name` "
-            "with this value.\n\n"
-            "If the returned auth state is `AuthPluginState.UNAVAILABLE`, Pants will disable "
-            "remote caching and execution.\n\n"
-            "If Pantsd is in use, `prior_result` will be the previous "
-            "`AuthPluginResult` returned by your plugin, which allows you to reuse the result. "
-            "Otherwise, if Pantsd has been restarted or is not used, the `prior_result` will "
-            "be `None`."
+        help=softwrap(
+            """
+            Path to a plugin to dynamically configure remote caching and execution options.
+
+            Format: `path.to.module:my_func`. Pants will import your module and run your
+            function. Update the `--pythonpath` option to ensure your file is loadable.
+
+            The function should take the kwargs `initial_store_headers: dict[str, str]`,
+            `initial_execution_headers: dict[str, str]`, `options: Options` (from
+            pants.option.options), `env: dict[str, str]`, and
+            `prior_result: AuthPluginResult | None`. It should return an instance of
+            `AuthPluginResult` from `pants.option.global_options`.
+
+            Pants will replace the headers it would normally use with whatever your plugin
+            returns; usually, you should include the `initial_store_headers` and
+            `initial_execution_headers` in your result so that options like
+            `--remote-store-headers` still work.
+
+            If you return `instance_name`, Pants will replace `--remote-instance-name`
+            with this value.
+
+            If the returned auth state is `AuthPluginState.UNAVAILABLE`, Pants will disable
+            remote caching and execution.
+
+            If Pantsd is in use, `prior_result` will be the previous
+            `AuthPluginResult` returned by your plugin, which allows you to reuse the result.
+            Otherwise, if Pantsd has been restarted or is not used, the `prior_result` will
+            be `None`.
+            """
         ),
     )
     remote_store_address = StrOption(
         "--remote-store-address",
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_store_address),
-        help=(
-            "The URI of a server used for the remote file store.\n\nFormat: "
-            "`scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC "
-            "with TLS enabled. If `grpc` is used, TLS will be disabled."
+        help=softwrap(
+            """
+            The URI of a server used for the remote file store.
+
+            Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
+            with TLS enabled. If `grpc` is used, TLS will be disabled.
+            """
         ),
     )
     remote_store_headers = DictOption(
         "--remote-store-headers",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_headers,
-        help=(
-            "Headers to set on remote store requests.\n\nFormat: header=value. Pants "
-            "may add additional headers.\n\nSee `--remote-execution-headers` as well."
+        help=softwrap(
+            """
+            Headers to set on remote store requests.
+
+            Format: header=value. Pants may add additional headers.
+
+            See `--remote-execution-headers` as well.
+            """
         ),
     )
     remote_store_chunk_bytes = IntOption(
@@ -1128,20 +1264,26 @@ class BootstrapOptions:
         "--remote-cache-warnings",
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_warnings,
         advanced=True,
-        help=(
-            "Whether to log remote cache failures at the `warn` log level.\n\n"
-            "All errors not logged at the `warn` level will instead be logged at the "
-            "`debug` level."
+        help=softwrap(
+            """
+            Whether to log remote cache failures at the `warn` log level.
+
+            All errors not logged at the `warn` level will instead be logged at the
+            `debug` level.
+            """
         ),
     )
     remote_cache_eager_fetch = BoolOption(
         "--remote-cache-eager-fetch",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_eager_fetch,
-        help=(
-            "Eagerly fetch relevant content from the remote store instead of lazily fetching."
-            "\n\nThis may result in worse performance, but reduce the frequency of errors "
-            "encountered by reducing the surface area of when remote caching is used."
+        help=softwrap(
+            """
+            Eagerly fetch relevant content from the remote store instead of lazily fetching.
+
+            This may result in worse performance, but reduce the frequency of errors
+            encountered by reducing the surface area of when remote caching is used.
+            """
         ),
     )
     remote_cache_rpc_concurrency = IntOption(
@@ -1160,28 +1302,40 @@ class BootstrapOptions:
         "--remote-execution-address",
         advanced=True,
         default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_execution_address),
-        help=(
-            "The URI of a server used as a remote execution scheduler.\n\nFormat: "
-            "`scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC "
-            "with TLS enabled. If `grpc` is used, TLS will be disabled.\n\nYou must also set "
-            "`--remote-store-address`, which will often be the same value."
+        help=softwrap(
+            """
+            The URI of a server used as a remote execution scheduler.
+
+            Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
+            with TLS enabled. If `grpc` is used, TLS will be disabled.
+
+            You must also set `--remote-store-address`, which will often be the same value.
+            """
         ),
     )
     remote_execution_extra_platform_properties = StrListOption(
         "--remote-execution-extra-platform-properties",
         advanced=True,
-        help="Platform properties to set on remote execution requests. "
-        "Format: property=value. Multiple values should be specified as multiple "
-        "occurrences of this flag. Pants itself may add additional platform properties.",
+        help=softwrap(
+            """
+            Platform properties to set on remote execution requests.
+            Format: property=value. Multiple values should be specified as multiple
+            occurrences of this flag. Pants itself may add additional platform properties.
+            """
+        ),
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_extra_platform_properties,
     )
     remote_execution_headers = DictOption(
         "--remote-execution-headers",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_headers,
-        help=(
-            "Headers to set on remote execution requests. Format: header=value. Pants "
-            "may add additional headers.\n\nSee `--remote-store-headers` as well."
+        help=softwrap(
+            """
+            Headers to set on remote execution requests. Format: header=value. Pants
+            may add additional headers.
+
+            See `--remote-store-headers` as well.
+            """
         ),
     )
     remote_execution_overall_deadline_secs = IntOption(
@@ -1200,41 +1354,51 @@ class BootstrapOptions:
         "--watch-filesystem",
         default=True,
         advanced=True,
-        help="Set to False if Pants should not watch the filesystem for changes. `pantsd` or `loop` "
-        "may not be enabled.",
+        help=softwrap(
+            """
+            Set to False if Pants should not watch the filesystem for changes. `pantsd` or `loop`
+            may not be enabled.
+            """
+        ),
     )
 
     use_deprecated_python_macros = BoolOption(
         "--use-deprecated-python-macros",
         advanced=True,
         default=False,
-        help=(
-            "If true, use Pants's deprecated macro system for "
-            "`python_requirements`, `poetry_requirements`, and `pipenv_requirements` "
-            "rather than target generation.\n\n"
-            "The address for macros is different. Rather than "
-            "`3rdparty/python#Django`, the address will look like `3rdparty/python:Django`. "
-            "The macro (`python_requirements` et al) also was not a proper target, meaning "
-            "that you could not give it a `name`. In contrast, if the target generator "
-            "sets its `name`, e.g. to `reqs`, generated targets will have an address like "
-            "`3rdparty/python:reqs#Django`."
+        help=softwrap(
+            """
+            If true, use Pants's deprecated macro system for
+            `python_requirements`, `poetry_requirements`, and `pipenv_requirements`
+            rather than target generation.
+
+            The address for macros is different. Rather than
+            `3rdparty/python#Django`, the address will look like `3rdparty/python:Django`.
+            The macro (`python_requirements` et al) also was not a proper target, meaning
+            that you could not give it a `name`. In contrast, if the target generator
+            sets its `name`, e.g. to `reqs`, generated targets will have an address like
+            `3rdparty/python:reqs#Django`.
+            """
         ),
         removal_version="2.12.0.dev0",
-        removal_hint=(
-            "In Pants 2.12, the deprecated Python macros like `python_requirements` will be "
-            "replaced with improved target generators, which are now enabled by "
-            "default.\n\n"
-            "If you already migrated by setting `use_deprecated_python_macros = false`, simply "
-            "delete the option.\n\n"
-            "Otherwise, when you are ready to upgrade, follow these steps:\n\n"
-            f"  1. Run `{bin_name()} update-build-files --fix-python-macros`\n"
-            "  2. Check the logs for an ERROR log to see if you have to manually add "
-            "`name=` anywhere.\n"
-            "  3. Remove `use_deprecated_python_macros = true` from `[GLOBAL]` in "
-            "pants.toml.\n\n"
-            "(Why upgrade from the old macro mechanism to target generation? Among other "
-            "benefits, it makes sure that the Pants daemon is properly invalidated when you "
-            "change `requirements.txt` and `pyproject.toml`.)"
+        removal_hint=softwrap(
+            f"""
+            In Pants 2.12, the deprecated Python macros like `python_requirements` will be
+            replaced with improved target generators, which are now enabled by default.
+
+            If you already migrated by setting `use_deprecated_python_macros = false`, simply
+            delete the option.
+
+            Otherwise, when you are ready to upgrade, follow these steps:
+
+              1. Run `{bin_name()} update-build-files --fix-python-macros`
+              2. Check the logs for an ERROR log to see if you have to manually add `name=` anywhere.
+              3. Remove `use_deprecated_python_macros = true` from `[GLOBAL]` in pants.toml.
+
+            (Why upgrade from the old macro mechanism to target generation? Among other
+            benefits, it makes sure that the Pants daemon is properly invalidated when you
+            change `requirements.txt` and `pyproject.toml`.)
+            """
         ),
     )
 
@@ -1248,18 +1412,25 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     colors = BoolOption(
         "--colors",
         default=sys.stdout.isatty(),
-        help=(
-            "Whether Pants should use colors in output or not. This may also impact whether "
-            "some tools Pants runs use color.\n\nWhen unset, this value defaults based on "
-            "whether the output destination supports color."
+        help=softwrap(
+            """
+            Whether Pants should use colors in output or not. This may also impact whether
+            some tools Pants runs use color.
+
+            When unset, this value defaults based on whether the output destination supports color.
+            """
         ),
     )
     dynamic_ui = BoolOption(
         "--dynamic-ui",
         default=(("CI" not in os.environ) and sys.stderr.isatty()),
-        help="Display a dynamically-updating console UI as Pants runs. This is true by default "
-        "if Pants detects a TTY and there is no 'CI' environment variable indicating that "
-        "Pants is running in a continuous integration environment.",
+        help=softwrap(
+            """
+            Display a dynamically-updating console UI as Pants runs. This is true by default
+            if Pants detects a TTY and there is no 'CI' environment variable indicating that
+            Pants is running in a continuous integration environment.
+            """
+        ),
     )
     dynamic_ui_renderer = EnumOption(
         "--dynamic-ui-renderer",
@@ -1269,9 +1440,11 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     tag = StrListOption(
         "--tag",
-        help=(
-            "Include only targets with these tags (optional '+' prefix) or without these "
-            f"tags ('-' prefix). See {doc_url('advanced-target-selection')}."
+        help=softwrap(
+            f"""
+            Include only targets with these tags (optional '+' prefix) or without these
+            tags ('-' prefix). See {doc_url('advanced-target-selection')}.
+            """
         ),
         metavar="[+-]tag1,tag2,...",
     )
@@ -1284,18 +1457,24 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     files_not_found_behavior = EnumOption(
         "--files-not-found-behavior",
         default=FilesNotFoundBehavior.warn,
-        help="What to do when files and globs specified in BUILD files, such as in the "
-        "`sources` field, cannot be found. This happens when the files do not exist on "
-        "your machine or when they are ignored by the `--pants-ignore` option.",
+        help=softwrap(
+            """
+            What to do when files and globs specified in BUILD files, such as in the
+            `sources` field, cannot be found. This happens when the files do not exist on
+            your machine or when they are ignored by the `--pants-ignore` option.
+            """
+        ),
         advanced=True,
     )
 
     owners_not_found_behavior = EnumOption(
         "--owners-not-found-behavior",
         default=OwnersNotFoundBehavior.error,
-        help=(
-            "What to do when file arguments do not have any owning target. This happens when "
-            "there are no targets whose `sources` fields include the file argument."
+        help=softwrap(
+            """
+            What to do when file arguments do not have any owning target. This happens when
+            there are no targets whose `sources` fields include the file argument.
+            """
         ),
         advanced=True,
     )
@@ -1303,38 +1482,47 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     build_patterns = StrListOption(
         "--build-patterns",
         default=["BUILD", "BUILD.*"],
-        help=(
-            "The naming scheme for BUILD files, i.e. where you define targets.\n\n"
-            "This only sets the naming scheme, not the directory paths to look for. To add "
-            "ignore patterns, use the option `[GLOBAL].build_ignore`.\n\n"
-            "You may also need to update the option `[tailor].build_file_name` so that it is "
-            "compatible with this option."
+        help=softwrap(
+            """
+            The naming scheme for BUILD files, i.e. where you define targets.
+
+            This only sets the naming scheme, not the directory paths to look for. To add
+            ignore patterns, use the option `[GLOBAL].build_ignore`.
+
+            You may also need to update the option `[tailor].build_file_name` so that it is
+            compatible with this option.
+            """
         ),
         advanced=True,
     )
 
     build_ignore = StrListOption(
         "--build-ignore",
-        help=(
-            "Paths to ignore when identifying BUILD files.\n\n"
-            "This does not affect any other filesystem operations; use `--pants-ignore` for "
-            "that instead.\n\n"
-            "Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
+        help=softwrap(
+            """
+            Paths to ignore when identifying BUILD files.
+
+            This does not affect any other filesystem operations; use `--pants-ignore` for
+            that instead.
+
+            Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).
+            """
         ),
         advanced=True,
     )
     build_file_prelude_globs = StrListOption(
         "--build-file-prelude-globs",
-        help=(
-            "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
-            f"See {doc_url('macros')}."
+        help=softwrap(
+            f"""
+            Python files to evaluate and whose symbols should be exposed to all BUILD files.
+            See {doc_url('macros')}.
+            """
         ),
         advanced=True,
     )
     subproject_roots = StrListOption(
         "--subproject-roots",
-        help="Paths that correspond with build roots for any subproject that this "
-        "project depends on.",
+        help="Paths that correspond with build roots for any subproject that this project depends on.",
         advanced=True,
     )
 
@@ -1358,23 +1546,27 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     streaming_workunits_level = EnumOption(
         "--streaming-workunits-level",
         default=LogLevel.DEBUG,
-        help=(
-            "The level of workunits that will be reported to streaming workunit event "
-            "receivers.\n\n"
-            "Workunits form a tree, and even when workunits are filtered out by this setting, the "
-            "workunit tree structure will be preserved (by adjusting the parent pointers of the "
-            "remaining workunits)."
+        help=softwrap(
+            """
+            The level of workunits that will be reported to streaming workunit event receivers.
+
+            Workunits form a tree, and even when workunits are filtered out by this setting, the
+            workunit tree structure will be preserved (by adjusting the parent pointers of the
+            remaining workunits).
+            """
         ),
         advanced=True,
     )
     streaming_workunits_complete_async = BoolOption(
         "--streaming-workunits-complete-async",
         default=not is_in_container(),
-        help=(
-            "True if stats recording should be allowed to complete asynchronously when `pantsd` "
-            "is enabled. When `pantsd` is disabled, stats recording is always synchronous. "
-            "To reduce data loss, this flag defaults to false inside of containers, such as "
-            "when run with Docker."
+        help=softwrap(
+            """
+            True if stats recording should be allowed to complete asynchronously when `pantsd`
+            is enabled. When `pantsd` is disabled, stats recording is always synchronous.
+            To reduce data loss, this flag defaults to false inside of containers, such as
+            when run with Docker.
+            """
         ),
         advanced=True,
     )
@@ -1400,9 +1592,14 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
             raise OptionsError(
-                "`--remote-execution` cannot be set at the same time as either "
-                "`--remote-cache-read` or `--remote-cache-write`.\n\nIf remote execution is "
-                "enabled, it will already use remote caching."
+                softwrap(
+                    """
+                    `--remote-execution` cannot be set at the same time as either
+                    `--remote-cache-read` or `--remote-cache-write`.
+
+                    If remote execution is enabled, it will already use remote caching.
+                    """
+                )
             )
 
         if opts.remote_execution and not opts.remote_execution_address:
