@@ -228,7 +228,7 @@ def softwrap(text: str) -> str:
             (The algorithm used for dedention simply looks at the first indented line and
             unambiguously tries to strip that much indentation from every indented line thereafter.)
         - Replaces all occurrences of multiple spaces in a sentence with a single space
-        - Replaces all occurances of multiple newlines with exactly 2 newlines
+        - Replaces all occurrences of multiple newlines with exactly 2 newlines
         - Replaces singular newlines with a space (to turn a paragraph into one long line)
         - Double-newlines are preserved
         - Extra indentation is preserved, and also preserves the indented line's ending
