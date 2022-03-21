@@ -504,8 +504,8 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         }
         jobs.update(
             {
-                "build_wheels_linux": {
-                    "name": "Build wheels and fs_util (Linux)",
+                "build_wheels_linux_x86_64": {
+                    "name": "Build wheels and fs_util (Linux x86/64)",
                     "runs-on": LINUX_VERSION,
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
                     "timeout-minutes": 65,
@@ -529,8 +529,8 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         deploy_to_s3_step,
                     ],
                 },
-                "build_wheels_macos": {
-                    "name": "Build wheels and fs_util (macOS)",
+                "build_wheels_macos_x86_64": {
+                    "name": "Build wheels and fs_util (macOS x86/64)",
                     "runs-on": MACOS_VERSION,
                     "timeout-minutes": 80,
                     "env": DISABLE_REMOTE_CACHE_ENV,
