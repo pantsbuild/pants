@@ -67,6 +67,25 @@ IS_PANTS_OWNER = "${{ github.repository_owner == 'pantsbuild' }}"
 # ----------------------------------------------------------------------
 
 
+def ensure_category_label() -> Sequence[Step]:
+    """Check that exactly one category label is present on a pull request."""
+    return [
+        {
+            "if": "github.event_name == 'pull_request'",
+            "name": "Ensure category label",
+            "uses": "mheap/github-action-required-labels@v1",
+            "env": {"GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}"},
+            "with": {
+                "mode": "exactly",
+                "count": 1,
+                "labels": "category:new feature, category:user api change, "
+                "category:plugin api change, category:performance, category:bugfix, "
+                "category:documentation, category:internal",
+            },
+        }
+    ]
+
+
 def checkout() -> Sequence[Step]:
     """Get prior commits and the commit message."""
     return [
@@ -300,6 +319,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "timeout-minutes": 40,
             "if": IS_PANTS_OWNER,
             "steps": [
+                *ensure_category_label(),
                 *checkout(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
@@ -396,6 +416,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "timeout-minutes": 40,
             "if": IS_PANTS_OWNER,
             "steps": [
+                *ensure_category_label(),
                 *checkout(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
