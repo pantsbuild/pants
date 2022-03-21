@@ -11,6 +11,7 @@ from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules import external_tool
 from pants.engine.fs import Digest, MergeDigests
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -65,10 +66,11 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
 
     # Merge all of the outputs into a single output.
     output_digest = await Get(Digest, MergeDigests(r.output_digest for r in results))
+    output_snapshot = await Get(Snapshot, Digest, output_digest)
 
     fmt_result = FmtResult(
-        input=setup.original_digest,
-        output=output_digest,
+        input=setup.original_snapshot,
+        output=output_snapshot,
         stdout=stdout_content,
         stderr=stderr_content,
         formatter_name=request.name,

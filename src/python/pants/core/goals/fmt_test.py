@@ -12,6 +12,7 @@ from pants.core.goals.fmt import Fmt, FmtRequest, FmtResult
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, MultipleSourcesField, Target
 from pants.engine.unions import UnionRule
@@ -46,12 +47,12 @@ class FortranFmtRequest(FmtRequest):
 @rule
 async def fortran_fmt(request: FortranFmtRequest) -> FmtResult:
     output = (
-        await Get(Digest, CreateDigest([FORTRAN_FILE]))
+        await Get(Snapshot, Digest, await Get(Digest, CreateDigest([FORTRAN_FILE])))
         if any(fs.address.target_name == "needs_formatting" for fs in request.field_sets)
-        else EMPTY_DIGEST
+        else EMPTY_SNAPSHOT
     )
     return FmtResult(
-        input=EMPTY_DIGEST, output=output, stdout="", stderr="", formatter_name=request.name
+        input=EMPTY_SNAPSHOT, output=output, stdout="", stderr="", formatter_name=request.name
     )
 
 
@@ -79,9 +80,10 @@ class SmalltalkNoopRequest(FmtRequest):
 @rule
 async def smalltalk_noop(request: SmalltalkNoopRequest) -> FmtResult:
     result_digest = await Get(Digest, CreateDigest([SMALLTALK_FILE]))
+    result_snapshot = await Get(Snapshot, Digest, result_digest)
     return FmtResult(
-        input=result_digest,
-        output=result_digest,
+        input=result_snapshot,
+        output=result_snapshot,
         stdout="",
         stderr="",
         formatter_name=request.name,
@@ -186,9 +188,10 @@ def test_streaming_output_skip() -> None:
 
 def test_streaming_output_changed() -> None:
     changed_digest = Digest(EMPTY_DIGEST.fingerprint, 2)
+    changed_snapshot = Snapshot._unsafe_create(changed_digest, [], [])
     result = FmtResult(
-        input=EMPTY_DIGEST,
-        output=changed_digest,
+        input=EMPTY_SNAPSHOT,
+        output=changed_snapshot,
         stdout="stdout",
         stderr="stderr",
         formatter_name="formatter",
@@ -206,8 +209,8 @@ def test_streaming_output_changed() -> None:
 
 def test_streaming_output_not_changed() -> None:
     result = FmtResult(
-        input=EMPTY_DIGEST,
-        output=EMPTY_DIGEST,
+        input=EMPTY_SNAPSHOT,
+        output=EMPTY_SNAPSHOT,
         stdout="stdout",
         stderr="stderr",
         formatter_name="formatter",
