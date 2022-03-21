@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
@@ -29,20 +30,11 @@ from pants.bsp.spec.targets import (
     WorkspaceBuildTargetsParams,
     WorkspaceBuildTargetsResult,
 )
-from pants.build_graph.address import AddressInput
 from pants.engine.fs import Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule
-from pants.engine.target import (
-    FieldSet,
-    SourcesField,
-    SourcesPaths,
-    SourcesPathsRequest,
-    Targets,
-    WrappedTarget,
-)
-from pants.engine.target import SourcesField, SourcesPaths, SourcesPathsRequest, WrappedTarget
+from pants.engine.target import FieldSet, SourcesField, SourcesPaths, SourcesPathsRequest, Targets
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
@@ -390,12 +382,16 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 
 @union
 @dataclass(frozen=True)
-class BSPDependencyModulesFieldSet(FieldSet):
-    """FieldSet used to hook computing dependency modules."""
+class BSPDependencyModulesRequest(Generic[_FS]):
+    """Hook to allow language backends to provide dependency modules."""
+
+    field_set_type: ClassVar[Type[_FS]]
+
+    field_sets: tuple[_FS, ...]
 
 
 @dataclass(frozen=True)
-class BSPDependencyModules:
+class BSPDependencyModulesResult:
     modules: tuple[DependencyModule, ...]
     digest: Digest = EMPTY_DIGEST
 
@@ -422,26 +418,49 @@ class ResolveOneDependencyModuleResult:
 async def resolve_one_dependency_module(
     request: ResolveOneDependencyModuleRequest,
     union_membership: UnionMembership,
+    bsp_build_targets: BSPBuildTargetsNew,
 ) -> ResolveOneDependencyModuleResult:
-    wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
-    target = wrapped_target.target
+    bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
+    if bsp_target_name not in bsp_build_targets.targets_mapping:
+        raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
+    targets = await Get(
+        Targets,
+        AddressSpecs,
+        bsp_build_targets.targets_mapping[bsp_target_name].specs.address_specs,
+    )
 
-    dep_module_field_sets = union_membership.get(BSPDependencyModulesFieldSet)
-    applicable_field_sets = [
-        fs.create(target) for fs in dep_module_field_sets if fs.is_applicable(target)
-    ]
+    field_sets_by_request_type: dict[
+        Type[BSPDependencyModulesRequest], list[FieldSet]
+    ] = defaultdict(list)
+    dep_module_request_types: FrozenOrderedSet[
+        Type[BSPDependencyModulesRequest]
+    ] = union_membership.get(BSPDependencyModulesRequest)
+    for tgt in targets:
+        for dep_module_request_type in dep_module_request_types:
+            field_set_type = dep_module_request_type.field_set_type
+            if field_set_type.is_applicable(tgt):
+                field_set = field_set_type.create(tgt)
+                field_sets_by_request_type[dep_module_request_type].append(field_set)
 
-    if not applicable_field_sets:
+    if not field_sets_by_request_type:
         return ResolveOneDependencyModuleResult(bsp_target_id=request.bsp_target_id)
 
-    # TODO: Handle multiple applicable field sets?
-    response = await Get(
-        BSPDependencyModules, BSPDependencyModulesFieldSet, applicable_field_sets[0]
+    responses = await MultiGet(
+        Get(
+            BSPDependencyModulesResult,
+            BSPDependencyModulesRequest,
+            dep_module_request_type(field_sets=tuple(field_sets)),
+        )
+        for dep_module_request_type, field_sets in field_sets_by_request_type.items()
     )
+
+    modules = set(itertools.chain.from_iterable([r.modules for r in responses]))
+    digest = await Get(Digest, MergeDigests([r.digest for r in responses]))
+
     return ResolveOneDependencyModuleResult(
         bsp_target_id=request.bsp_target_id,
-        modules=response.modules,
-        digest=response.digest,
+        modules=tuple(modules),
+        digest=digest,
     )
 
 

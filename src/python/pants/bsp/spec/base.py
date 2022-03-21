@@ -12,7 +12,6 @@ from pants.build_graph.address import Address, AddressInput
 # Basic JSON Structures
 # See https://build-server-protocol.github.io/docs/specification.html#basic-json-structures
 # -----------------------------------------------------------------------------------------------
-from pants.util.meta import classproperty
 
 Uri = str
 
