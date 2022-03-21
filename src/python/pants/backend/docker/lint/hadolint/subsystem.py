@@ -6,6 +6,7 @@ from __future__ import annotations
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.util.strutil import softwrap
 
 
 class Hadolint(TemplatedExternalTool):
@@ -36,22 +37,28 @@ class Hadolint(TemplatedExternalTool):
         "--config",
         default=None,
         advanced=True,
-        help=lambda cls: (
-            "Path to an YAML config file understood by Hadolint "
-            "(https://github.com/hadolint/hadolint#configure).\n\n"
-            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-            "this option if the config is located in a non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            Path to an YAML config file understood by Hadolint
+            (https://github.com/hadolint/hadolint#configure).
+
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
         ),
     )
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,
         advanced=True,
-        help=lambda cls: (
-            "If true, Pants will include all relevant config files during runs "
-            "(`.hadolint.yaml` and `.hadolint.yml`).\n\n"
-            f"Use `[{cls.options_scope}].config` instead if your config is in a "
-            "non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include all relevant config files during runs
+            (`.hadolint.yaml` and `.hadolint.yml`).
+
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
         ),
     )
 

@@ -26,7 +26,13 @@ from pants.util.strutil import softwrap
 
 class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"
-    help = f"Options related to the Protobuf Python backend.\n\nSee {doc_url('protobuf')}."
+    help = softwrap(
+        f"""
+        Options related to the Protobuf Python backend.
+
+        See {doc_url('protobuf')}.
+        """
+    )
 
     mypy_plugin = BoolOption(
         "--mypy-plugin",

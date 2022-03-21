@@ -202,6 +202,11 @@ def first_paragraph(s: str) -> str:
 #  (e.g., "CPython>=2.7,<3") and those are sometimes converted to paths.
 _non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
 
+
+def path_safe(s: str) -> str:
+    return _non_path_safe_re.sub("_", s)
+
+
 # TODO: This may be a bit too eager. Some strings might want to preserve multiple spaces in them
 # (e.g. a Python code block which has a comment in it would have 2 spaces before the "#", which
 # would be squashed by this eager regex). The challenge is that there's some overlap between prose
@@ -209,19 +214,21 @@ _non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
 # We can tighten as necessary.
 _super_space_re = re.compile(r"(\S)  +(\S)")
 _more_than_2_newlines = re.compile(r"\n{2}\n+")
+_leading_whitespace_re = re.compile(r"(^[ ]*)(?:[^ \n])", re.MULTILINE)
 
 
-def path_safe(s: str) -> str:
-    return _non_path_safe_re.sub("_", s)
+def softwrap(text: str) -> str:
+    """Turns a multiline-ish string into a softwrapped string.
 
-
-def softwrap(s: str) -> str:
-    """Turns a multiline string into a softwrapped string.
+    This is primarily used to turn strings in source code, which often have a single paragraph
+    span multiple source lines, into consistently formatted blocks for hardwrapping later.
 
     Applies the following rules:
         - Dedents the text (you also don't need to start your string with a backslash)
-        - Replaces all occurances of multiple spaces in a sentence with a single space
-        - Replaces all occurances of multiple newlines with exactly 2 newlines
+            (The algorithm used for dedention simply looks at the first indented line and
+            unambiguously tries to strip that much indentation from every indented line thereafter.)
+        - Replaces all occurrences of multiple spaces in a sentence with a single space
+        - Replaces all occurrences of multiple newlines with exactly 2 newlines
         - Replaces singular newlines with a space (to turn a paragraph into one long line)
         - Double-newlines are preserved
         - Extra indentation is preserved, and also preserves the indented line's ending
@@ -230,11 +237,15 @@ def softwrap(s: str) -> str:
             spaces, this will "just work".)
     """
     # If callers didnt use a leading "\" thats OK.
-    if s[0] == "\n":
-        s = s[1:]
+    if text[0] == "\n":
+        text = text[1:]
 
-    s = _more_than_2_newlines.sub("\n\n", s)
-    lines = textwrap.dedent(s).splitlines(keepends=True)
+    text = _more_than_2_newlines.sub("\n\n", text)
+    margin = _leading_whitespace_re.search(text)
+    if margin:
+        text = re.sub(r"(?m)^" + margin[1], "", text)
+
+    lines = text.splitlines(keepends=True)
     # NB: collecting a list of strs and `"".join` is more performant than calling `+=` repeatedly.
     result_strs = []
     for i, line in enumerate(lines):
