@@ -31,10 +31,18 @@ from pants.bsp.util_rules.targets import (
     BSPDependencyModulesResult,
 )
 from pants.engine.addresses import Addresses
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, DigestEntries, FileEntry
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    DigestEntries,
+    FileEntry,
+    Workspace,
+)
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule
 from pants.engine.target import (
     CoarsenedTargets,
     FieldSet,
@@ -195,11 +203,12 @@ class HandleScalacOptionsResult:
     item: ScalacOptionsItem
 
 
-@rule
+@_uncacheable_rule
 async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
     bsp_build_targets: BSPBuildTargetsNew,
+    workspace: Workspace,
 ) -> HandleScalacOptionsResult:
     bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
     if bsp_target_name not in bsp_build_targets.targets_mapping:
@@ -211,12 +220,31 @@ async def handle_bsp_scalac_options_request(
     )
     coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
     resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
+    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)
+
+    resolve_digest = await Get(
+        Digest,
+        CreateDigest([FileEntry(entry.file_name, entry.file_digest) for entry in lockfile.entries]),
+    )
+
+    resolve_digest = await Get(
+        Digest, AddPrefix(resolve_digest, f"jvm/resolves/{resolve.name}/lib")
+    )
+
+    workspace.write_digest(resolve_digest, path_prefix=".pants.d/bsp")
+
+    classpath = [
+        build_root.pathlib_path.joinpath(
+            f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{entry.file_name}"
+        ).as_uri()
+        for entry in lockfile.entries
+    ]
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
             options=(),
-            classpath=(),
+            classpath=tuple(classpath),
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/jvm/resolves/{resolve.name}/classes"
             ).as_uri(),
