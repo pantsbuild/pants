@@ -17,19 +17,6 @@ use itertools::Itertools;
 use log::log_enabled;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub enum SnapshotOpsError {
-  String(String),
-  DigestMergeFailure(String),
-  GlobMatchError(String),
-}
-
-impl From<String> for SnapshotOpsError {
-  fn from(err: String) -> Self {
-    Self::String(err)
-  }
-}
-
 ///
 /// Parameters used to determine which files and directories to operate on within a parent snapshot.
 ///
@@ -192,21 +179,15 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
   ///
   /// Given N Snapshots, returns a new Snapshot that merges them.
   ///
-  async fn merge(
-    &self,
-    digests: Vec<DirectoryDigest>,
-  ) -> Result<DirectoryDigest, SnapshotOpsError> {
-    merge_directories(self.clone(), digests).await.map_err(|e| {
-      let e: SnapshotOpsError = e.into();
-      e
-    })
+  async fn merge(&self, digests: Vec<DirectoryDigest>) -> Result<DirectoryDigest, String> {
+    merge_directories(self.clone(), digests).await
   }
 
   async fn add_prefix(
     &self,
     digest: DirectoryDigest,
     prefix: &RelativePath,
-  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+  ) -> Result<DirectoryDigest, String> {
     Ok(
       self
         .load_digest_trie(digest)
@@ -220,7 +201,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     &self,
     digest: DirectoryDigest,
     prefix: &RelativePath,
-  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+  ) -> Result<DirectoryDigest, String> {
     Ok(
       self
         .load_digest_trie(digest)
@@ -252,10 +233,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     Ok(DigestTrie::from_path_stats(path_stats, &files)?.into())
   }
 
-  async fn create_empty_dir(
-    &self,
-    path: &RelativePath,
-  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+  async fn create_empty_dir(&self, path: &RelativePath) -> Result<DirectoryDigest, String> {
     self.add_prefix(EMPTY_DIRECTORY_DIGEST.clone(), path).await
   }
 }

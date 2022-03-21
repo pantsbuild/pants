@@ -314,7 +314,7 @@ impl ExecuteProcess {
 
     input_digests_fut?
       .await
-      .map_err(|e| format!("Failed to merge input digests for process: {:?}", e))
+      .map_err(|e| format!("Failed to merge input digests for process: {}", e))
   }
 
   fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, String> {

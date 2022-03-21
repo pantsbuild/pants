@@ -33,7 +33,7 @@ mod snapshot_ops;
 mod snapshot_ops_tests;
 #[cfg(test)]
 mod snapshot_tests;
-pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, SubsetParams};
+pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
@@ -512,7 +512,7 @@ impl Store {
             )
           })?;
           if cfg!(debug_assertions) {
-            protos::verify_directory_canonical(digest, &directory).unwrap();
+            protos::verify_directory_canonical(digest, &directory)?;
           }
           Ok(directory)
         },
