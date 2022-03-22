@@ -221,7 +221,7 @@ impl PySnapshot {
     let into_tuple = |x: &Vec<PathBuf>| -> &'py PyTuple {
       PyTuple::new(
         py,
-        x.into_iter()
+        x.iter()
           .map(|path| PyString::new(py, &path.to_string_lossy()))
           .collect::<Vec<_>>(),
       )
