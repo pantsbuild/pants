@@ -1,9 +1,12 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import sys
 from pathlib import PurePath
 from typing import Set
+
+logger = logging.getLogger(__name__)
 
 #
 # Note: This file is used as an pex entry point in the execution sandbox.
@@ -30,9 +33,14 @@ def resolve_pure_path(base: PurePath, relative_path: PurePath) -> PurePath:
 def extract_module_source_paths(path: PurePath, raw_content: bytes) -> Set[str]:
     # Import here so we can still test this file with pytest (since `hcl2` is not present in normal Pants venv.)
     import hcl2  # type: ignore[import]
+    from lark.exceptions import LarkError  # type: ignore[import]
 
     content = raw_content.decode("utf-8")
-    parsed_content = hcl2.loads(content)
+    try:
+        parsed_content = hcl2.loads(content)
+    except LarkError as e:
+        logger.error("Unable to parse %s: %s", path, e)
+        raise e
 
     # Note: The `module` key is a list where each entry is a dict with a single entry where the key is the
     # module name and the values are a dict for that module's actual values.
