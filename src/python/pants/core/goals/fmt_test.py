@@ -47,7 +47,7 @@ class FortranFmtRequest(FmtRequest):
 @rule
 async def fortran_fmt(request: FortranFmtRequest) -> FmtResult:
     output = (
-        await Get(Snapshot, Digest, await Get(Digest, CreateDigest([FORTRAN_FILE])))
+        await Get(Snapshot, CreateDigest([FORTRAN_FILE]))
         if any(fs.address.target_name == "needs_formatting" for fs in request.field_sets)
         else EMPTY_SNAPSHOT
     )
