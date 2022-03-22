@@ -87,27 +87,28 @@ class BSPBuildTargets:
 
 @dataclass(frozen=True)
 class _ParseOneBSPMappingRequest:
+    name: str
     raw_specs: tuple[str, ...]
 
 
 @rule
-async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> Specs:
+async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuildTargetInternal:
     specs_parser = SpecsParser()
     specs = specs_parser.parse_specs(request.raw_specs)
-    return specs
+    return BSPBuildTargetInternal(request.name, specs)
 
 
 @rule
 async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
-    specs_for_keys = await MultiGet(
-        Get(Specs, _ParseOneBSPMappingRequest(tuple(value)))
-        for value in bsp_goal.target_mapping.values()
+    bsp_internal_targets = await MultiGet(
+        Get(BSPBuildTargetInternal, _ParseOneBSPMappingRequest(name, tuple(value)))
+        for name, value in bsp_goal.target_mapping.items()
     )
-    addr_specs = {
-        key: BSPBuildTargetInternal(key, specs_for_key)
-        for key, specs_for_key in zip(bsp_goal.target_mapping.keys(), specs_for_keys)
+    target_mapping = {
+        key: bsp_internal_target
+        for key, bsp_internal_target in zip(bsp_goal.target_mapping.keys(), bsp_internal_targets)
     }
-    return BSPBuildTargets(FrozenDict(addr_specs))
+    return BSPBuildTargets(FrozenDict(target_mapping))
 
 
 @rule
