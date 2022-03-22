@@ -81,7 +81,7 @@ class BSPBuildTargetInternal:
 
 
 @dataclass(frozen=True)
-class BSPBuildTargetsNew:
+class BSPBuildTargets:
     targets_mapping: FrozenDict[str, BSPBuildTargetInternal]
 
 
@@ -98,7 +98,7 @@ async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> Specs:
 
 
 @rule
-async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargetsNew:
+async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
     specs_for_keys = await MultiGet(
         Get(Specs, _ParseOneBSPMappingRequest(tuple(value)))
         for value in bsp_goal.target_mapping.values()
@@ -107,7 +107,7 @@ async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargetsNew
         key: BSPBuildTargetInternal(key, specs_for_key)
         for key, specs_for_key in zip(bsp_goal.target_mapping.keys(), specs_for_keys)
     }
-    return BSPBuildTargetsNew(FrozenDict(addr_specs))
+    return BSPBuildTargets(FrozenDict(addr_specs))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -253,7 +253,7 @@ async def generate_one_bsp_build_target_request(
 @_uncacheable_rule
 async def bsp_workspace_build_targets(
     _: WorkspaceBuildTargetsParams,
-    bsp_build_targets: BSPBuildTargetsNew,
+    bsp_build_targets: BSPBuildTargets,
     workspace: Workspace,
 ) -> WorkspaceBuildTargetsResult:
     bsp_target_results = await MultiGet(
@@ -295,7 +295,7 @@ class MaterializeBuildTargetSourcesResult:
 async def materialize_bsp_build_target_sources(
     request: MaterializeBuildTargetSourcesRequest,
     build_root: BuildRoot,
-    bsp_build_targets: BSPBuildTargetsNew,
+    bsp_build_targets: BSPBuildTargets,
 ) -> MaterializeBuildTargetSourcesResult:
     bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
     if bsp_target_name not in bsp_build_targets.targets_mapping:
@@ -418,7 +418,7 @@ class ResolveOneDependencyModuleResult:
 async def resolve_one_dependency_module(
     request: ResolveOneDependencyModuleRequest,
     union_membership: UnionMembership,
-    bsp_build_targets: BSPBuildTargetsNew,
+    bsp_build_targets: BSPBuildTargets,
 ) -> ResolveOneDependencyModuleResult:
     bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
     if bsp_target_name not in bsp_build_targets.targets_mapping:

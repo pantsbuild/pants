@@ -24,9 +24,9 @@ from pants.bsp.spec.targets import DependencyModule
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
+    BSPBuildTargets,
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
-    BSPBuildTargetsNew,
     BSPDependencyModulesRequest,
     BSPDependencyModulesResult,
 )
@@ -207,7 +207,7 @@ class HandleScalacOptionsResult:
 async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
-    bsp_build_targets: BSPBuildTargetsNew,
+    bsp_build_targets: BSPBuildTargets,
     workspace: Workspace,
 ) -> HandleScalacOptionsResult:
     bsp_target_name = request.bsp_target_id.uri[len("pants:") :]

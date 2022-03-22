@@ -14,9 +14,9 @@ from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
+    BSPBuildTargets,
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
-    BSPBuildTargetsNew,
 )
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, DigestEntries
@@ -92,7 +92,7 @@ class HandleJavacOptionsResult:
 async def handle_bsp_java_options_request(
     request: HandleJavacOptionsRequest,
     build_root: BuildRoot,
-    bsp_build_targets: BSPBuildTargetsNew,
+    bsp_build_targets: BSPBuildTargets,
 ) -> HandleJavacOptionsResult:
     bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
     if bsp_target_name not in bsp_build_targets.targets_mapping:
