@@ -4,18 +4,68 @@
 from __future__ import annotations
 
 import os
+from textwrap import dedent
+from typing import Any
 
+from pants.backend.helm.resolve.remotes import HelmRemotes
+from pants.backend.helm.target_types import (
+    HelmArtifactRepositoryField,
+    HelmArtifactTarget,
+    HelmChartTarget,
+    HelmRegistriesField,
+)
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import BoolOption
+from pants.engine.rules import SubsystemRule
+from pants.option.option_types import BoolOption, DictOption
+from pants.util.memo import memoized_method
 
-from pants.option.option_types import (
-    BoolOption,
-    DictOption,
-    ShellStrListOption,
-    StrListOption,
-    StrOption,
-    WorkspacePathOption,
+registries_help = (
+    dedent(
+        """\
+        Configure Helm OCI registries. The schema for a registry entry is as follows:
+
+            {
+                "registry-alias": {
+                    "address": "oci://registry-domain:port",
+                    "default": bool,
+                },
+                ...
+            }
+
+        """
+    )
+    + (
+        f"If no registries are provided in either a `{HelmChartTarget.alias}` target, then all default "
+        "addresses will be used, if any.\n"
+        f"The `{HelmChartTarget.alias}.{HelmRegistriesField.alias}` may be provided with a list of registry "
+        "addresses and registry alias prefixed with `@` to be used instead of the defaults.\n"
+        "A configured registry is marked as default either by setting `default = true` "
+        'or with an alias of `"default"`.\n'
+        "Registries also participate in resolving third party Helm charts uplodaded to those registries."
+    )
+)
+classic_repositories_help = (
+    dedent(
+        """\
+        Configure Helm Classic repositories. The schema for a registry entry is as follows:
+
+            {
+                "repository-alias": {
+                    "address": "http://repository-domain:port",
+                },
+                ...
+            }
+
+        """
+    )
+    + (
+        "Classic repositories are used to provide support for Helm third party charts available at Chart Museum "
+        "or similar places.\n"
+        "To be able to reference third party charts in classic repos, you need to assign an alias to each of them "
+        f"as per the previous schema and then declare a `{HelmArtifactTarget.alias}` target and set its "
+        f"`{HelmArtifactRepositoryField.alias}` to the given alias of the classic repository prefixed by a `@`."
+    )
 )
 
 
@@ -38,6 +88,10 @@ class HelmSubsystem(TemplatedExternalTool):
         "macos_x86_64": "darwin-amd64",
     }
 
+    _registries = DictOption[Any]("--registries", help=registries_help, fromfile=True)
+    _classic_repositories = DictOption[Any](
+        "--classic-repositories", help=classic_repositories_help, fromfile=True
+    )
     lint_strict = BoolOption(
         "--lint-strict", default=False, help="Enables strict linting of Helm charts"
     )
@@ -46,3 +100,11 @@ class HelmSubsystem(TemplatedExternalTool):
         mapped_plat = self.default_url_platform_mapping[plat.value]
         bin_path = os.path.join(mapped_plat, "helm")
         return bin_path
+
+    @memoized_method
+    def remotes(self) -> HelmRemotes:
+        return HelmRemotes.from_dicts(self._registries, self._classic_repositories)
+
+
+def rules():
+    return [SubsystemRule(HelmSubsystem)]

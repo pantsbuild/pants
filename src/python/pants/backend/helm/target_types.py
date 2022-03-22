@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from textwrap import dedent
 
+from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
 from pants.core.goals.package import OutputPathField
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -17,6 +19,7 @@ from pants.engine.target import (
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
+    StringSequenceField,
     Target,
     TargetFilesGenerator,
     Targets,
@@ -27,6 +30,40 @@ from pants.util.docutil import bin_name
 # -----------------------------------------------------------------------------------------------
 # Generic commonly used fields
 # -----------------------------------------------------------------------------------------------
+
+
+class HelmRegistriesField(StringSequenceField):
+    alias = "registries"
+    default = (ALL_DEFAULT_HELM_REGISTRIES,)
+    help = (
+        "List of addresses or configured aliases to any OCI registries to use for the "
+        "built chart.\n\n"
+        "The address is an `oci://` prefixed domain name with optional port for your registry, and any registry "
+        "aliases are prefixed with `@` for addresses in the [helm].registries configuration "
+        "section.\n\n"
+        "By default, all configured registries with `default = true` are used.\n\n"
+        + dedent(
+            """\
+            Example:
+                # pants.toml
+                [helm.registries.my-registry-alias]
+                address = "oci://myregistrydomain:port"
+                default = false  # optional
+
+                # example/BUILD
+                helm_chart(
+                    registries = [
+                        "@my-registry-alias",
+                        "oci://myregistrydomain:port",
+                    ],
+                )
+            """
+        )
+        + (
+            "The above example shows two valid `registry` options: using an alias to a configured "
+            "registry and the address to a registry verbatim in the BUILD file."
+        )
+    )
 
 
 class HelmSkipPushField(BoolField):
