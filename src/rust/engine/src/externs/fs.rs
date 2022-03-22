@@ -215,7 +215,6 @@ impl PySnapshot {
     )
   }
 
-  // NB: "Private" method sot he Python-implemented class can wrap in a namedtuple
   fn diff<'py>(&self, other: &PySnapshot, py: Python<'py>) -> &'py PyTuple {
     let result = self.0.tree.diff(&other.0.tree);
 
