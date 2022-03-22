@@ -209,3 +209,71 @@ class ScalaMainClassesResult:
         if self.origin_id is not None:
             result["originId"] = self.origin_id
         return result
+
+
+# -----------------------------------------------------------------------------------------------
+# Scala Test Classes Request
+# See https://build-server-protocol.github.io/docs/extensions/scala.html#scala-test-classes-request
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ScalaTestClassesParams:
+    targets: tuple[BuildTargetIdentifier, ...]
+
+    # An optional number uniquely identifying a client request.
+    origin_id: str | None = None
+
+    @classmethod
+    def from_json_dict(cls, d):
+        return cls(
+            targets=tuple(BuildTargetIdentifier.from_json_dict(x) for x in d["targets"]),
+            origin_id=d.get("originId"),
+        )
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "targets": [tgt.to_json_dict() for tgt in self.targets],
+        }
+        if self.origin_id is not None:
+            result["originId"] = self.origin_id
+        return result
+
+
+@dataclass(frozen=True)
+class ScalaTestClassesItem:
+    # The build target that contains the test classes.
+    target: BuildTargetIdentifier
+
+    # Name of the the framework to which classes belong.
+    # It's optional in order to maintain compatibility, however it is expected
+    # from the newer implementations to not leave that field unspecified.
+    framework: str | None
+
+    # The fully qualified names of the test classes in this target
+    classes: tuple[str, ...]
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "target": self.target.to_json_dict(),
+            "classes": self.classes,
+        }
+        if self.framework is not None:
+            result["framework"] = self.framework
+        return result
+
+
+@dataclass(frozen=True)
+class ScalaTestClassesResult:
+    items: tuple[ScalaTestClassesItem, ...]
+
+    # An optional id of the request that triggered this result.
+    origin_id: str | None = None
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "items": [item.to_json_dict() for item in self.items],
+        }
+        if self.origin_id is not None:
+            result["originId"] = self.origin_id
+        return result
