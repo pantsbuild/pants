@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from textwrap import dedent
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
 from pants.core.goals.package import OutputPathField
