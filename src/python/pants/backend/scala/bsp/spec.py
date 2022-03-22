@@ -86,7 +86,7 @@ class ScalacOptionsParams:
             targets=tuple(BuildTargetIdentifier.from_json_dict(x) for x in d["targets"]),
         )
 
-    def to_json_dict(self):
+    def to_json_dict(self) -> dict[str, Any]:
         return {
             "targets": [tgt.to_json_dict() for tgt in self.targets],
         }
@@ -109,7 +109,7 @@ class ScalacOptionsItem:
     # The output directory for classfiles produced by this target
     class_directory: Uri
 
-    def to_json_dict(self):
+    def to_json_dict(self) -> dict[str, Any]:
         return {
             "target": self.target.to_json_dict(),
             "options": self.options,
@@ -124,3 +124,88 @@ class ScalacOptionsResult:
 
     def to_json_dict(self):
         return {"items": [item.to_json_dict() for item in self.items]}
+
+
+# -----------------------------------------------------------------------------------------------
+# Scala Main Classes Request
+# See https://build-server-protocol.github.io/docs/extensions/scala.html#scala-main-classes-request
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ScalaMainClassesParams:
+    targets: tuple[BuildTargetIdentifier, ...]
+
+    # An optional number uniquely identifying a client request.
+    origin_id: str | None = None
+
+    @classmethod
+    def from_json_dict(cls, d):
+        return cls(
+            targets=tuple(BuildTargetIdentifier.from_json_dict(x) for x in d["targets"]),
+            origin_id=d.get("originId"),
+        )
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "targets": [tgt.to_json_dict() for tgt in self.targets],
+        }
+        if self.origin_id is not None:
+            result["originId"] = self.origin_id
+        return result
+
+
+@dataclass(frozen=True)
+class ScalaMainClass:
+    # The main class to run.
+    class_: str
+
+    # The user arguments to the main entrypoint.
+    arguments: tuple[str, ...]
+
+    # The jvm options for the application.
+    jvm_options: tuple[str, ...]
+
+    # The environment variables for the application.
+    environment_variables: tuple[str, ...] | None = None
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result = {
+            "class": self.class_,
+            "arguments": self.arguments,
+            "jvmOptions": self.jvm_options,
+        }
+        if self.environment_variables is not None:
+            result["environmentVariables"] = self.environment_variables
+        return result
+
+
+@dataclass(frozen=True)
+class ScalaMainClassesItem:
+    # The build target that contains the test classes.
+    target: BuildTargetIdentifier
+
+    # The main class item.
+    classes: tuple[ScalaMainClass, ...]
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "target": self.target.to_json_dict(),
+            "classes": self.classes,
+        }
+
+
+@dataclass(frozen=True)
+class ScalaMainClassesResult:
+    items: tuple[ScalaMainClassesItem, ...]
+
+    # An optional id of the request that triggered this result.
+    origin_id: str | None = None
+
+    def to_json_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "items": [item.to_json_dict() for item in self.items],
+        }
+        if self.origin_id is not None:
+            result["originId"] = self.origin_id
+        return result
