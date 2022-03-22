@@ -110,6 +110,21 @@ async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
     return BSPBuildTargets(FrozenDict(addr_specs))
 
 
+@rule
+async def resolve_bsp_build_target_identifier(
+    bsp_target_id: BuildTargetIdentifier, bsp_build_targets: BSPBuildTargets
+) -> BSPBuildTargetInternal:
+    scheme, _, target_name = bsp_target_id.uri.partition(":")
+    if scheme != "pants":
+        raise ValueError(f"Unknown BSP scheme `{scheme}` for BSP target ID `{bsp_target_id}.")
+
+    target_internal = bsp_build_targets.targets_mapping.get(target_name)
+    if not target_internal:
+        raise ValueError(f"Unknown BSP target name: {target_name}")
+
+    return target_internal
+
+
 # -----------------------------------------------------------------------------------------------
 # Workspace Build Targets Request
 # See https://build-server-protocol.github.io/docs/specification.html#workspace-build-targets-request
@@ -295,15 +310,12 @@ class MaterializeBuildTargetSourcesResult:
 async def materialize_bsp_build_target_sources(
     request: MaterializeBuildTargetSourcesRequest,
     build_root: BuildRoot,
-    bsp_build_targets: BSPBuildTargets,
 ) -> MaterializeBuildTargetSourcesResult:
-    bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
-    if bsp_target_name not in bsp_build_targets.targets_mapping:
-        raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
+    bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
     targets = await Get(
         Targets,
         AddressSpecs,
-        bsp_build_targets.targets_mapping[bsp_target_name].specs.address_specs,
+        bsp_target.specs.address_specs,
     )
     targets_with_sources = [tgt for tgt in targets if tgt.has_field(SourcesField)]
 
@@ -418,15 +430,12 @@ class ResolveOneDependencyModuleResult:
 async def resolve_one_dependency_module(
     request: ResolveOneDependencyModuleRequest,
     union_membership: UnionMembership,
-    bsp_build_targets: BSPBuildTargets,
 ) -> ResolveOneDependencyModuleResult:
-    bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
-    if bsp_target_name not in bsp_build_targets.targets_mapping:
-        raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
+    bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
     targets = await Get(
         Targets,
         AddressSpecs,
-        bsp_build_targets.targets_mapping[bsp_target_name].specs.address_specs,
+        bsp_target.specs.address_specs,
     )
 
     field_sets_by_request_type: dict[
