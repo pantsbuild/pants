@@ -6,6 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
+from pants.backend.helm.resolve.remotes import HelmRemotes
+from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
     AllHelmArtifactTargets,
     HelmArtifactFieldSet,
@@ -16,6 +18,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized_method
 
 
 class MissingHelmArtifactLocation(ValueError):
@@ -77,14 +80,15 @@ class HelmArtifact:
     def name(self) -> str:
         return self.metadata.name
 
-    @property
-    def remote_spec(self) -> str:
+    @memoized_method
+    def remote_spec(self, remotes: HelmRemotes) -> str:
         if isinstance(self.metadata.location, HelmArtifactRegistryLocation):
-            repo_ref = f"{self.metadata.location.registry}/{self.metadata.location.repository or ''}".rstrip(
-                "/"
-            )
+            remote = next(remotes.get(self.metadata.location.registry))
+            repo_ref = f"{remote.address}/{self.metadata.location.repository or ''}".rstrip("/")
         else:
-            repo_ref = self.metadata.location.repository
+            remote = next(remotes.get(self.metadata.location.repository))
+            repo_ref = remote.alias
+
         return f"{repo_ref}/{self.metadata.name}"
 
 
@@ -94,11 +98,11 @@ class ThirdPartyArtifactMapping(FrozenDict[str, Address]):
 
 @rule
 def third_party_artifact_mapping(
-    all_helm_artifact_tgts: AllHelmArtifactTargets,
+    all_helm_artifact_tgts: AllHelmArtifactTargets, subsystem: HelmSubsystem
 ) -> ThirdPartyArtifactMapping:
     artifacts = [HelmArtifact.from_target(tgt) for tgt in all_helm_artifact_tgts]
     return ThirdPartyArtifactMapping(
-        {artifact.remote_spec: artifact.address for artifact in artifacts}
+        {artifact.remote_spec(subsystem.remotes()): artifact.address for artifact in artifacts}
     )
 
 

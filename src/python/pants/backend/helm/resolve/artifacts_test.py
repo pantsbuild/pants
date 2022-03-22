@@ -49,7 +49,7 @@ def test_build_third_party_mapping(rule_runner: RuleRunner) -> None:
                 )
                 helm_artifact(
                   name="bar",
-                  repository="https://www.example.com/charts",
+                  repository="@example",
                   artifact="bar",
                   version="0.1.0",
                 )
@@ -72,10 +72,13 @@ def test_build_third_party_mapping(rule_runner: RuleRunner) -> None:
         metadata=HelmArtifactMetadata(
             name="bar",
             version="0.1.0",
-            location=HelmArtifactClassicRepositoryLocation("https://www.example.com/charts"),
+            location=HelmArtifactClassicRepositoryLocation("@example"),
         ),
         address=Address("3rdparty/helm/example", target_name="bar"),
     )
+
+    repositories_opts = """{"example": {"address": "https://www.example.com/charts"}}"""
+    rule_runner.set_options([f"--helm-classic-repositories={repositories_opts}"])
 
     tgts = rule_runner.request(AllHelmArtifactTargets, [])
     artifacts = [HelmArtifact.from_target(tgt) for tgt in tgts]
@@ -86,4 +89,4 @@ def test_build_third_party_mapping(rule_runner: RuleRunner) -> None:
 
     mapping = rule_runner.request(ThirdPartyArtifactMapping, [])
     assert mapping["oci://www.example.com/charts/foo"] == expected_foo.address
-    assert mapping["https://www.example.com/charts/bar"] == expected_bar.address
+    assert mapping["example/bar"] == expected_bar.address

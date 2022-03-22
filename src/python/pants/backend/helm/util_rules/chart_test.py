@@ -8,8 +8,10 @@ from textwrap import dedent
 import pytest
 import yaml
 
-from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.target_types import HelmChartTarget
+from pants.backend.helm.dependency_inference.chart import rules as chart_infer_rules
+from pants.backend.helm.subsystems import helm
+from pants.backend.helm.target_types import HelmArtifactTarget, HelmChartTarget
+from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.testutil import (
     HELM_CHART_FILE_V1_FULL,
     HELM_CHART_FILE_V2_FULL,
@@ -22,29 +24,32 @@ from pants.backend.helm.util_rules import chart, sources, tool
 from pants.backend.helm.util_rules.chart import (
     ChartType,
     HelmChart,
+    HelmChartDependency,
     HelmChartMetadata,
     HelmChartRequest,
 )
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine import process
-from pants.engine.rules import QueryRule, SubsystemRule
+from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        target_types=[HelmChartTarget],
+        target_types=[HelmChartTarget, HelmArtifactTarget],
         rules=[
             *config_files.rules(),
             *external_tool.rules(),
             *chart.rules(),
+            *chart_infer_rules(),
+            *helm.rules(),
             *sources.rules(),
             *tool.rules(),
             *process.rules(),
             *stripped_source_files.rules(),
-            SubsystemRule(HelmSubsystem),
+            *target_types_rules(),
             QueryRule(HelmChart, (HelmChartRequest,)),
         ],
     )
@@ -128,6 +133,84 @@ def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: R
 
     assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
     assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
+
+
+def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "3rdparty/helm/jetstack/BUILD": dedent(
+                """\
+                helm_artifact(
+                  name="cert-manager",
+                  repository="@jetstack",
+                  artifact="cert-manager",
+                  version="v0.7.0"
+                )
+                """
+            ),
+            "src/chart1/BUILD": "helm_chart()",
+            "src/chart1/Chart.yaml": dedent(
+                """\
+                apiVersion: v2
+                name: chart1
+                version: 0.1.0
+                """
+            ),
+            "src/chart1/values.yaml": HELM_VALUES_FILE,
+            "src/chart1/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/chart1/templates/service.yaml": K8S_SERVICE_FILE,
+            "src/chart2/BUILD": "helm_chart()",
+            "src/chart2/Chart.yaml": dedent(
+                """\
+                apiVersion: v2
+                name: chart2
+                version: 0.1.0
+                dependencies:
+                - name: chart1
+                  alias: dep1
+                - name: cert-manager
+                  repository: "@jetstack"
+                """
+            ),
+        }
+    )
+
+    source_root_patterns = ("/src/*",)
+    registries_opts = """{"default": {"address": "oci://www.example.com/helm-charts"}}"""
+    repositories_opts = """{"jetstack": {"address": "https://charts.jetstack.io"}}"""
+    rule_runner.set_options(
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+            f"--helm-classic-repositories={repositories_opts}",
+            f"--helm-registries={registries_opts}",
+        ]
+    )
+
+    expected_metadata = HelmChartMetadata(
+        name="chart2",
+        api_version="v2",
+        version="0.1.0",
+        dependencies=(
+            HelmChartDependency(
+                name="chart1",
+                repository="oci://www.example.com/helm-charts",
+                alias="dep1",
+                version="0.1.0",
+            ),
+            HelmChartDependency(
+                name="cert-manager", repository="https://charts.jetstack.io", version="v0.7.0"
+            ),
+        ),
+    )
+
+    target = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
+    helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
+
+    assert helm_chart.metadata == expected_metadata
+    assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
+    assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
+    assert "chart2/charts/cert-manager" in helm_chart.snapshot.dirs
+    assert "chart2/charts/cert-manager/Chart.yaml" in helm_chart.snapshot.files
 
 
 _TEST_METADATA_PARSER_PARAMS = [

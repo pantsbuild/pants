@@ -3,13 +3,23 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
+import os
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, cast
 
 import yaml
 
+from pants.backend.helm.resolve import fetch
+from pants.backend.helm.resolve.fetch import (
+    FetchedHelmArtifact,
+    FetchedHelmArtifacts,
+    FetchHelmArfifactsRequest,
+)
+from pants.backend.helm.resolve.remotes import OCI_REGISTRY_PROTOCOL, HelmRemotes
+from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartMetaSourceField
 from pants.backend.helm.util_rules import sources
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
@@ -83,7 +93,7 @@ class HelmChartDependency:
     def to_json_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"name": self.name}
         if self.repository:
-            d["repository"] = self.repository
+            d["repository"] = self.repository.rstrip("/")
         if self.version:
             d["version"] = self.version
         if self.alias:
@@ -95,6 +105,18 @@ class HelmChartDependency:
         if self.import_values:
             d["import-values"] = list(self.import_values)
         return d
+
+    def remote_spec(self, remotes: HelmRemotes) -> str:
+        if not self.repository:
+            registry = remotes.default_registry
+            if registry:
+                return f"{registry.address}/{self.name}"
+            return self.name
+        elif self.repository.startswith(OCI_REGISTRY_PROTOCOL):
+            return f"{self.repository}/{self.name}"
+        else:
+            remote = remotes.all[self.repository]
+            return f"{remote.alias}/{self.name}"
 
 
 @dataclass(frozen=True)
@@ -279,8 +301,22 @@ async def render_chart_metadata(metadata: HelmChartMetadata) -> Digest:
     return digest
 
 
+@rule
+async def create_chart_from_artifact(artifact: FetchedHelmArtifact) -> HelmChart:
+    subset = await Get(Digest, DigestSubset, _chart_metadata_subset(artifact.snapshot.digest))
+    file_contents = await Get(DigestContents, Digest, subset)
+    # TODO this should not be needed as the DigestSubset should have returned a Digest with only one file
+    metadata = [
+        HelmChartMetadata.from_bytes(entry.content)
+        for entry in file_contents
+        if os.path.basename(entry.path) in _HELM_CHART_METADATA_FILENAMES
+    ]
+    # metadata = HelmChartMetadata.from_bytes(file_contents[0].content)
+    return HelmChart(artifact.address, metadata[0], artifact.snapshot)
+
+
 @rule(desc="Collect all source code and subcharts of a Helm Chart", level=LogLevel.DEBUG)
-async def get_helm_chart(request: HelmChartRequest) -> HelmChart:
+async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) -> HelmChart:
     dependencies, source_files, metadata = await MultiGet(
         Get(Targets, DependenciesRequest(request.field_set.dependencies)),
         Get(
@@ -296,17 +332,25 @@ async def get_helm_chart(request: HelmChartRequest) -> HelmChart:
         Get(HelmChartMetadata, HelmChartMetaSourceField, request.field_set.chart),
     )
 
+    third_party_artifacts = await Get(
+        FetchedHelmArtifacts,
+        FetchHelmArfifactsRequest,
+        FetchHelmArfifactsRequest.for_targets(dependencies),
+    )
+
     first_party_subcharts = await MultiGet(
         Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(target))
         for target in dependencies
         if HelmChartFieldSet.is_applicable(target)
     )
+    third_party_charts = await MultiGet(
+        Get(HelmChart, FetchedHelmArtifact, artifact) for artifact in third_party_artifacts
+    )
     logger.debug(
         f"Found {pluralize(len(first_party_subcharts), 'subchart')} as direct dependencies on Helm chart at: {request.field_set.address}"
     )
 
-    # TODO Collect 3rd party chart dependencies (subcharts)
-    subcharts = first_party_subcharts
+    subcharts = [*first_party_subcharts, *third_party_charts]
     subcharts_digest = EMPTY_DIGEST
     if subcharts:
         merged_subcharts = await Get(
@@ -314,7 +358,30 @@ async def get_helm_chart(request: HelmChartRequest) -> HelmChart:
         )
         subcharts_digest = await Get(Digest, AddPrefix(merged_subcharts, "charts"))
 
-        # TODO Update subchart dependencies in the metadata and re-render it (requires support for OCI registries and classic repositories)
+        # Update subchart dependencies in the metadata and re-render it
+        remotes = subsystem.remotes()
+        subchart_map: dict[str, HelmChart] = {chart.metadata.name: chart for chart in subcharts}
+        updated_dependencies = []
+        for dep in metadata.dependencies:
+            updated_dep = dep
+
+            if not dep.repository and remotes.default:
+                # If the dependency hasn't specified a repository, then we choose the registry with the 'default' alias,
+                default_remote = remotes.default_registry
+                updated_dep = dataclasses.replace(updated_dep, repository=default_remote.address)
+            elif dep.repository and dep.repository.startswith("@"):
+                remote = next(remotes.get(dep.repository))
+                updated_dep = dataclasses.replace(updated_dep, repository=remote.address)
+
+            if dep.name in subchart_map:
+                updated_dep = dataclasses.replace(
+                    updated_dep, version=subchart_map[dep.name].metadata.version
+                )
+
+            updated_dependencies.append(updated_dep)
+
+        # Update metadata with the information about charts' dependencies
+        metadata = dataclasses.replace(metadata, dependencies=tuple(updated_dependencies))
 
     # Re-render the Chart.yaml file with the updated dependencies
     metadata_digest, sources_without_metadata = await MultiGet(
@@ -344,4 +411,4 @@ async def get_helm_chart(request: HelmChartRequest) -> HelmChart:
 
 
 def rules():
-    return [*collect_rules(), *sources.rules()]
+    return [*collect_rules(), *sources.rules(), *fetch.rules()]

@@ -56,7 +56,7 @@ class HelmRegistry(HelmRemote):
     def from_dict(cls, alias: str, d: dict[str, Any]) -> HelmRegistry:
         return cls(
             alias=alias,
-            address=cast(str, d["address"]),
+            address=cast(str, d["address"]).rstrip("/"),
             default=Parser.ensure_bool(d.get("default", alias == "default")),
         )
 
@@ -69,7 +69,7 @@ class HelmRegistry(HelmRemote):
 class HelmClassicRepository(HelmRemote):
     @classmethod
     def from_dict(cls, alias: str, d: dict[str, Any]) -> HelmClassicRepository:
-        return cls(alias=alias, address=cast(str, d["address"]))
+        return cls(alias=alias, address=cast(str, d["address"]).rstrip("/"))
 
     def __post_init__(self) -> None:
         if self.address.startswith(OCI_REGISTRY_PROTOCOL):
@@ -119,3 +119,12 @@ class HelmRemotes:
     def classic_repositories(self) -> tuple[HelmClassicRepository, ...]:
         deduped_repos = {r for _, r in self.all.items() if isinstance(r, HelmClassicRepository)}
         return tuple(deduped_repos)
+
+    @property
+    def default_registry(self) -> HelmRegistry | None:
+        remote = self.all.get("default")
+        if remote:
+            return cast(HelmRegistry, remote)
+        if not remote and self.default:
+            return self.default[0]
+        return None
