@@ -9,6 +9,7 @@ from typing import ClassVar
 
 import ijson
 
+from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
@@ -71,7 +72,7 @@ class ImportConfigRequest:
 
 @rule
 async def generate_import_config(
-    request: ImportConfigRequest, stdlib_imports: GoStdLibImports
+    request: ImportConfigRequest, stdlib_imports: GoStdLibImports, golang: GolangSubsystem
 ) -> ImportConfig:
     lines = [
         "# import config",
@@ -86,6 +87,8 @@ async def generate_import_config(
             for import_path, static_file_path in stdlib_imports.items()
         )
     content = "\n".join(lines).encode("utf-8")
+    if golang.dump_importcfg:
+        logger.info(content.decode())
     result = await Get(Digest, CreateDigest([FileContent(ImportConfig.CONFIG_PATH, content)]))
     return ImportConfig(result)
 

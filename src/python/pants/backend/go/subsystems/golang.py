@@ -17,7 +17,7 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.option.option_types import StrListOption, StrOption
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -61,6 +61,9 @@ class GolangSubsystem(Subsystem):
             "or just `ENV_VAR` to copy the value from Pants's own environment."
         ),
         advanced=True,
+    )
+    dump_importcfg = BoolOption(
+        "--dump-importcfg", default=False, help="Dump importcfg to log.", advanced=True
     )
 
     def go_search_paths(self, env: Environment) -> tuple[str, ...]:
