@@ -12,7 +12,11 @@ from pants.backend.scala.bsp.spec import (
     ScalacOptionsItem,
     ScalacOptionsParams,
     ScalacOptionsResult,
+    ScalaMainClassesParams,
+    ScalaMainClassesResult,
     ScalaPlatform,
+    ScalaTestClassesParams,
+    ScalaTestClassesResult,
 )
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
@@ -261,6 +265,48 @@ async def bsp_scalac_options_request(request: ScalacOptionsParams) -> ScalacOpti
 
 
 # -----------------------------------------------------------------------------------------------
+# Scala Main Classes Request
+# See https://build-server-protocol.github.io/docs/extensions/scala.html#scala-main-classes-request
+# -----------------------------------------------------------------------------------------------
+
+
+class ScalaMainClassesHandlerMapping(BSPHandlerMapping):
+    method_name = "buildTarget/scalaMainClasses"
+    request_type = ScalaMainClassesParams
+    response_type = ScalaMainClassesResult
+
+
+@rule
+async def bsp_scala_main_classes_request(request: ScalaMainClassesParams) -> ScalaMainClassesResult:
+    # TODO: This is a stub. VSCode/Metals calls this RPC and expects it to exist.
+    return ScalaMainClassesResult(
+        items=(),
+        origin_id=request.origin_id,
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# Scala Test Classes Request
+# See https://build-server-protocol.github.io/docs/extensions/scala.html#scala-test-classes-request
+# -----------------------------------------------------------------------------------------------
+
+
+class ScalaTestClassesHandlerMapping(BSPHandlerMapping):
+    method_name = "buildTarget/scalaTestClasses"
+    request_type = ScalaTestClassesParams
+    response_type = ScalaTestClassesResult
+
+
+@rule
+async def bsp_scala_test_classes_request(request: ScalaTestClassesParams) -> ScalaTestClassesResult:
+    # TODO: This is a stub. VSCode/Metals calls this RPC and expects it to exist.
+    return ScalaTestClassesResult(
+        items=(),
+        origin_id=request.origin_id,
+    )
+
+
+# -----------------------------------------------------------------------------------------------
 # Dependency Modules
 # -----------------------------------------------------------------------------------------------
 
@@ -406,6 +452,8 @@ def rules():
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
         UnionRule(BSPBuildTargetsMetadataRequest, ScalaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
+        UnionRule(BSPHandlerMapping, ScalaMainClassesHandlerMapping),
+        UnionRule(BSPHandlerMapping, ScalaTestClassesHandlerMapping),
         UnionRule(BSPCompileFieldSet, ScalaBSPCompileFieldSet),
         UnionRule(BSPDependencyModulesRequest, ScalaBSPDependencyModulesRequest),
     )
