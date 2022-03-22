@@ -12,6 +12,7 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -22,7 +23,7 @@ from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize
+from pants.util.strutil import pluralize, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ class SetupRequest:
 @dataclass(frozen=True)
 class Setup:
     process: JvmProcess
-    original_digest: Digest
+    original_snapshot: Snapshot
 
 
 @rule(level=LogLevel.DEBUG)
@@ -118,7 +119,7 @@ async def setup_google_java_format(
         level=LogLevel.DEBUG,
     )
 
-    return Setup(process, original_digest=source_files_snapshot.digest)
+    return Setup(process, original_snapshot=source_files_snapshot)
 
 
 @rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
@@ -129,11 +130,13 @@ async def google_java_format_fmt(
         return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, JvmProcess, setup.process)
-    return FmtResult.from_process_result(
-        result,
-        original_digest=setup.original_digest,
+    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
+    return FmtResult(
+        setup.original_snapshot,
+        output_snapshot,
+        stdout=strip_v2_chroot_path(result.stdout),
+        stderr=strip_v2_chroot_path(result.stderr),
         formatter_name=request.name,
-        strip_chroot_path=True,
     )
 
 

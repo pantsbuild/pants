@@ -17,24 +17,23 @@ from pants.core.goals.style_request import (
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import FallibleProcessResult, ProcessResult
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
-from pants.util.strutil import strip_v2_chroot_path
 
 _F = TypeVar("_F", bound="FmtResult")
 
 
 @dataclass(frozen=True)
 class FmtResult(EngineAwareReturnType):
-    input: Digest
-    output: Digest
+    input: Snapshot
+    output: Snapshot
     stdout: str
     stderr: str
     formatter_name: str
@@ -42,38 +41,18 @@ class FmtResult(EngineAwareReturnType):
     @classmethod
     def skip(cls: type[_F], *, formatter_name: str) -> _F:
         return cls(
-            input=EMPTY_DIGEST,
-            output=EMPTY_DIGEST,
+            input=EMPTY_SNAPSHOT,
+            output=EMPTY_SNAPSHOT,
             stdout="",
             stderr="",
-            formatter_name=formatter_name,
-        )
-
-    @classmethod
-    def from_process_result(
-        cls,
-        process_result: ProcessResult | FallibleProcessResult,
-        *,
-        original_digest: Digest,
-        formatter_name: str,
-        strip_chroot_path: bool = False,
-    ) -> FmtResult:
-        def prep_output(s: bytes) -> str:
-            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-
-        return cls(
-            input=original_digest,
-            output=process_result.output_digest,
-            stdout=prep_output(process_result.stdout),
-            stderr=prep_output(process_result.stderr),
             formatter_name=formatter_name,
         )
 
     @property
     def skipped(self) -> bool:
         return (
-            self.input == EMPTY_DIGEST
-            and self.output == EMPTY_DIGEST
+            self.input == EMPTY_SNAPSHOT
+            and self.output == EMPTY_SNAPSHOT
             and not self.stdout
             and not self.stderr
         )
@@ -258,8 +237,7 @@ async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFm
             continue
         result = await Get(FmtResult, FmtRequest, request)
         results.append(result)
-        if result.did_change:
-            prior_formatter_result = await Get(Snapshot, Digest, result.output)
+        prior_formatter_result = result.output
     return _LanguageFmtResults(
         tuple(results),
         input=original_sources.snapshot.digest,

@@ -15,6 +15,7 @@ from pants.core.util_rules import external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -124,8 +125,9 @@ def get_content(rule_runner: RuleRunner, digest: Digest) -> DigestContents:
     return rule_runner.request(DigestContents, [digest])
 
 
-def get_digest(rule_runner: RuleRunner, source_files: List[FileContent]) -> Digest:
-    return rule_runner.request(Digest, [CreateDigest(source_files)])
+def get_snapshot(rule_runner: RuleRunner, source_files: List[FileContent]) -> Snapshot:
+    digest = rule_runner.request(Digest, [CreateDigest(source_files)])
+    return rule_runner.request(Snapshot, [digest])
 
 
 def test_passing_source(rule_runner: RuleRunner) -> None:
@@ -135,20 +137,20 @@ def test_passing_source(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 0
     assert lint_results[0].stderr == ""
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE])
+    assert fmt_result.output == get_snapshot(rule_runner, [GOOD_SOURCE])
     assert fmt_result.did_change is False
 
 
 def test_failing_source(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
     lint_results, fmt_result = run_tffmt(rule_runner, [target])
-    contents = get_content(rule_runner, fmt_result.output)
+    contents = get_content(rule_runner, fmt_result.output.digest)
     print(f">>>{contents[0].content.decode()}<<<")
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 3
     assert "bad.tf" in lint_results[0].stdout
     assert fmt_result.stderr == ""
-    assert fmt_result.output == get_digest(rule_runner, [FIXED_BAD_SOURCE])
+    assert fmt_result.output == get_snapshot(rule_runner, [FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
 
@@ -159,7 +161,7 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 3
     assert "bad.tf" in lint_results[0].stdout
     assert "good.tf" not in lint_results[0].stdout
-    assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
+    assert fmt_result.output == get_snapshot(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
 
@@ -173,7 +175,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 3
     assert "bad.tf" in lint_results[0].stdout
     assert "good.tf" not in lint_results[0].stdout
-    assert fmt_result.output == get_digest(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
+    assert fmt_result.output == get_snapshot(rule_runner, [GOOD_SOURCE, FIXED_BAD_SOURCE])
     assert fmt_result.did_change is True
 
 

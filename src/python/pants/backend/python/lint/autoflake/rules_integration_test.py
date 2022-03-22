@@ -17,6 +17,7 @@ from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -71,9 +72,10 @@ def run_autoflake(
     return lint_results.results, fmt_result
 
 
-def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
+def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
     files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    return rule_runner.request(Digest, [CreateDigest(files)])
+    digest = rule_runner.request(Digest, [CreateDigest(files)])
+    return rule_runner.request(Snapshot, [digest])
 
 
 @pytest.mark.platform_specific_behavior
@@ -93,7 +95,7 @@ def test_passing_source(rule_runner: RuleRunner, major_minor_interpreter: str) -
     assert lint_results[0].exit_code == 0
     assert lint_results[0].stderr == ""
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": GOOD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -104,7 +106,7 @@ def test_failing_source(rule_runner: RuleRunner) -> None:
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
     assert "f.py: Unused imports/variables detected" in lint_results[0].stdout
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": FIXED_BAD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -121,7 +123,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 1
     assert "bad.py: Unused imports/variables detected" in lint_results[0].stdout
     assert "good.py" not in lint_results[0].stderr
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good.py": GOOD_FILE, "bad.py": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
@@ -154,7 +156,7 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_autoflake(rule_runner, good_tgts)
     assert len(lint_results) == 1 and lint_results[0].exit_code == 0
     assert lint_results[0].stderr == "" and fmt_result.stdout == ""
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good.py": GOOD_FILE, "good.pyi": GOOD_FILE}
     )
     assert not fmt_result.did_change
@@ -169,7 +171,7 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     # autoflake non-deterministically outputs only one the files that needed changes, not
     # all of them.
     assert "Unused imports/variables detected" in lint_results[0].stdout
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"bad.py": FIXED_BAD_FILE, "bad.pyi": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change

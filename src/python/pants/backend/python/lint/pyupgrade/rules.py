@@ -13,6 +13,7 @@ from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -40,7 +41,7 @@ class PyUpgradeRequest(FmtRequest, LintTargetsRequest):
 @dataclass(frozen=True)
 class PyUpgradeResult:
     process_result: FallibleProcessResult
-    original_digest: Digest
+    original_snapshot: Snapshot
 
 
 @rule(level=LogLevel.DEBUG)
@@ -69,7 +70,7 @@ async def run_pyupgrade(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> PyUp
             level=LogLevel.DEBUG,
         ),
     )
-    return PyUpgradeResult(result, original_digest=source_files_snapshot.digest)
+    return PyUpgradeResult(result, original_snapshot=source_files_snapshot)
 
 
 @rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
@@ -77,9 +78,12 @@ async def pyupgrade_fmt(result: PyUpgradeResult, pyupgrade: PyUpgrade) -> FmtRes
     if pyupgrade.skip:
         return FmtResult.skip(formatter_name=PyUpgradeRequest.name)
 
-    return FmtResult.from_process_result(
-        result.process_result,
-        original_digest=result.original_digest,
+    output_snapshot = await Get(Snapshot, Digest, result.process_result.output_digest)
+    return FmtResult(
+        result.original_snapshot,
+        output_snapshot,
+        stdout=result.process_result.stdout.decode(),
+        stderr=result.process_result.stderr.decode(),
         formatter_name=PyUpgradeRequest.name,
     )
 

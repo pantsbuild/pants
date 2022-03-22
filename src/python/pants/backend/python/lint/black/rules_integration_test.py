@@ -19,6 +19,7 @@ from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
@@ -88,9 +89,10 @@ def run_black(
     return lint_results.results, fmt_result
 
 
-def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
+def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
     files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    return rule_runner.request(Digest, [CreateDigest(files)])
+    digest = rule_runner.request(Digest, [CreateDigest(files)])
+    return rule_runner.request(Snapshot, [digest])
 
 
 @pytest.mark.platform_specific_behavior
@@ -113,7 +115,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     assert lint_results[0].exit_code == 0
     assert "1 file would be left unchanged" in lint_results[0].stderr
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": GOOD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -125,7 +127,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 1
     assert "1 file would be reformatted" in lint_results[0].stderr
     assert "1 file reformatted" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": FIXED_BAD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -142,7 +144,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 1
     assert "1 file would be reformatted, 1 file would be left unchanged" in lint_results[0].stderr
     assert "1 file reformatted, 1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good.py": GOOD_FILE, "bad.py": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
@@ -166,7 +168,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     assert lint_results[0].exit_code == 0
     assert "1 file would be left unchanged" in lint_results[0].stderr
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is False
 
 
@@ -180,7 +182,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 0
     assert "1 file would be left unchanged" in lint_results[0].stderr
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is False
 
 
@@ -219,7 +221,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 0
     assert "1 file would be left unchanged" in lint_results[0].stderr
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": content})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": content})
     assert fmt_result.did_change is False
 
 
@@ -243,7 +245,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 0
     assert "1 file would be left unchanged" in lint_results[0].stderr
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": content})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": content})
     assert fmt_result.did_change is False
 
 
@@ -268,7 +270,7 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
         "2 files would be left unchanged" in lint_results[0].stderr
         and "2 files left unchanged" in fmt_result.stderr
     )
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good.pyi": GOOD_FILE, "good.py": GOOD_FILE}
     )
     assert not fmt_result.did_change
@@ -283,7 +285,7 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
         "2 files would be reformatted" in lint_results[0].stderr
         and "2 files reformatted" in fmt_result.stderr
     )
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"bad.pyi": FIXED_BAD_FILE, "bad.py": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change
