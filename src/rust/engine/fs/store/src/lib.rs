@@ -385,7 +385,11 @@ impl Store {
     let mut directories = Vec::new();
     tree.walk(&mut |_, entry| match entry {
       directory::Entry::Directory(d) => {
-        directories.push((Some(d.digest()), d.as_remexec_directory().to_bytes()))
+        let directory = d.as_remexec_directory();
+        if cfg!(debug_assertions) {
+          protos::verify_directory_canonical(d.digest(), &directory).unwrap();
+        }
+        directories.push((Some(d.digest()), directory.to_bytes()))
       }
       directory::Entry::File(_) => (),
     });
@@ -410,14 +414,18 @@ impl Store {
     initial_lease: bool,
   ) -> Result<Digest, String> {
     let local = self.local.clone();
-    local
+    let digest = local
       .store_bytes(
         EntryType::Directory,
         None,
         directory.to_bytes(),
         initial_lease,
       )
-      .await
+      .await?;
+    if cfg!(debug_assertions) {
+      protos::verify_directory_canonical(digest, directory)?;
+    }
+    Ok(digest)
   }
 
   ///
