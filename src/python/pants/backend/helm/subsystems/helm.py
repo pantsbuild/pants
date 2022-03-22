@@ -9,6 +9,15 @@ from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.option_types import BoolOption
 
+from pants.option.option_types import (
+    BoolOption,
+    DictOption,
+    ShellStrListOption,
+    StrListOption,
+    StrOption,
+    WorkspacePathOption,
+)
+
 
 class HelmSubsystem(TemplatedExternalTool):
     options_scope = "helm"
