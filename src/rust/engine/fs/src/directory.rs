@@ -566,6 +566,8 @@ impl DigestTrie {
     result
   }
 
+  // NB: The current implementation assumes that the entries are sorted (by name, irrespective of
+  // whether the entry is a file/dir).
   fn diff_helper(&self, them: &DigestTrie, path_so_far: PathBuf, result: &mut DigestTrieDiff) {
     let mut our_iter = self.0.iter();
     let mut their_iter = them.0.iter();
