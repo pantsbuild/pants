@@ -214,6 +214,31 @@ impl PySnapshot {
         .collect::<Vec<_>>(),
     )
   }
+
+  // NB: "Private" method sot he Python-implemented class can wrap in a namedtuple
+  fn diff<'py>(&self, other: &PySnapshot, py: Python<'py>) -> &'py PyTuple {
+    let result = self.0.tree.diff(&other.0.tree);
+
+    let into_tuple = |x: &Vec<PathBuf>| -> &'py PyTuple {
+      PyTuple::new(
+        py,
+        x.into_iter()
+          .map(|path| PyString::new(py, &path.to_string_lossy()))
+          .collect::<Vec<_>>(),
+      )
+    };
+
+    PyTuple::new(
+      py,
+      vec![
+        into_tuple(result.our_unique_files()),
+        into_tuple(result.our_unique_dirs()),
+        into_tuple(result.their_unique_files()),
+        into_tuple(result.their_unique_dirs()),
+        into_tuple(result.changed_files()),
+      ],
+    )
+  }
 }
 
 #[pyclass(name = "MergeDigests")]

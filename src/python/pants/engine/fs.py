@@ -259,6 +259,19 @@ class SpecsSnapshot:
     snapshot: Snapshot
 
 
+@dataclass(frozen=True)
+class SnapshotDiff:
+    our_unique_files: tuple[str, ...] = ()
+    our_unique_dirs: tuple[str, ...] = ()
+    their_unique_files: tuple[str, ...] = ()
+    their_unique_dirs: tuple[str, ...] = ()
+    changed_files: tuple[str, ...] = ()
+
+    @classmethod
+    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":
+        return cls(*ours.diff(theirs))
+
+
 def rules():
     # Keep in sync with `intrinsics.rs`.
     return (
