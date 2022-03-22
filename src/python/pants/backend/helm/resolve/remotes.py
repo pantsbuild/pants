@@ -9,6 +9,7 @@ from typing import Any, Generator, cast
 
 from pants.option.parser import Parser
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized_method
 
 ALL_DEFAULT_HELM_REGISTRIES = "<ALL DEFAULT HELM REGISTRIES>"
 
@@ -114,5 +115,7 @@ class HelmRemotes:
             else:
                 yield HelmClassicRepository(address=alias_or_address)
 
+    @memoized_method
     def classic_repositories(self) -> tuple[HelmClassicRepository, ...]:
-        [r for _, r in self.all.items() if isinstance(r, HelmClassicRepository)]
+        deduped_repos = {r for _, r in self.all.items() if isinstance(r, HelmClassicRepository)}
+        return tuple(deduped_repos)
