@@ -1,6 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display};
 use std::hash::{self, Hash};
@@ -182,6 +183,13 @@ impl Entry {
     match self {
       Entry::Directory(d) => d.name,
       Entry::File(f) => f.name,
+    }
+  }
+
+  pub fn digest(&self) -> Digest {
+    match self {
+      Entry::Directory(d) => d.digest,
+      Entry::File(f) => f.digest,
     }
   }
 }
@@ -544,6 +552,95 @@ impl DigestTrie {
     }
   }
 
+  pub fn diff(&self, other: &DigestTrie) -> DigestTrieDiff {
+    let mut result = DigestTrieDiff::default();
+    self.diff_helper(other, PathBuf::new(), &mut result);
+    result
+  }
+
+  // NB: The current implementation assumes that the entries are sorted (by name, irrespective of
+  // whether the entry is a file/dir).
+  fn diff_helper(&self, them: &DigestTrie, path_so_far: PathBuf, result: &mut DigestTrieDiff) {
+    let mut our_iter = self.0.iter();
+    let mut their_iter = them.0.iter();
+    let mut ours = our_iter.next();
+    let mut theirs = their_iter.next();
+
+    let add_unique =
+      |entry: &Entry, unique_files: &mut Vec<PathBuf>, unique_dirs: &mut Vec<PathBuf>| {
+        let path = path_so_far.join(entry.name().as_ref());
+        match entry {
+          Entry::File(_) => unique_files.push(path),
+          Entry::Directory(_) => unique_dirs.push(path),
+        }
+      };
+
+    let add_ours = |entry: &Entry, diff: &mut DigestTrieDiff| {
+      add_unique(entry, &mut diff.our_unique_files, &mut diff.our_unique_dirs);
+    };
+    let add_theirs = |entry: &Entry, diff: &mut DigestTrieDiff| {
+      add_unique(
+        entry,
+        &mut diff.their_unique_files,
+        &mut diff.their_unique_dirs,
+      );
+    };
+
+    while let Some(our_entry) = ours {
+      match theirs {
+        Some(their_entry) => match our_entry.name().cmp(&their_entry.name()) {
+          Ordering::Less => {
+            add_ours(our_entry, result);
+            ours = our_iter.next();
+            continue;
+          }
+          Ordering::Greater => {
+            add_theirs(their_entry, result);
+            theirs = their_iter.next();
+            continue;
+          }
+          Ordering::Equal => match (our_entry, their_entry) {
+            (Entry::File(our_file), Entry::File(their_file)) => {
+              if our_file.digest != their_file.digest {
+                result
+                  .changed_files
+                  .push(path_so_far.join(our_file.name().as_ref()));
+              }
+              ours = our_iter.next();
+              theirs = their_iter.next();
+            }
+            (Entry::Directory(our_dir), Entry::Directory(their_dir)) => {
+              if our_dir.digest != their_dir.digest {
+                our_dir.tree.diff_helper(
+                  &their_dir.tree,
+                  path_so_far.join(our_dir.name().as_ref()),
+                  result,
+                )
+              }
+              ours = our_iter.next();
+              theirs = their_iter.next();
+            }
+            _ => {
+              add_ours(our_entry, result);
+              add_theirs(their_entry, result);
+              ours = our_iter.next();
+              theirs = their_iter.next();
+            }
+          },
+        },
+        None => {
+          add_ours(our_entry, result);
+          ours = our_iter.next();
+        }
+      }
+    }
+
+    while let Some(their_entry) = &theirs {
+      add_theirs(their_entry, result);
+      theirs = their_iter.next();
+    }
+  }
+
   /// Add the given path as a prefix for this trie, returning the resulting trie.
   pub fn add_prefix(self, prefix: &RelativePath) -> Result<DigestTrie, String> {
     let mut prefix_iter = prefix.iter();
@@ -809,6 +906,15 @@ impl From<&DigestTrie> for remexec::Tree {
     });
     tree
   }
+}
+
+#[derive(Default)]
+pub struct DigestTrieDiff {
+  pub our_unique_files: Vec<PathBuf>,
+  pub our_unique_dirs: Vec<PathBuf>,
+  pub their_unique_files: Vec<PathBuf>,
+  pub their_unique_dirs: Vec<PathBuf>,
+  pub changed_files: Vec<PathBuf>,
 }
 
 pub enum MergeError {
