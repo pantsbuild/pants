@@ -575,24 +575,27 @@ impl DigestTrie {
         }
       };
 
+    let add_ours = |entry: &Entry, diff: &mut DigestTrieDiff| {
+      add_unique(entry, &mut diff.our_unique_files, &mut diff.our_unique_dirs);
+    };
+    let add_theirs = |entry: &Entry, diff: &mut DigestTrieDiff| {
+      add_unique(
+        entry,
+        &mut diff.their_unique_files,
+        &mut diff.their_unique_dirs,
+      );
+    };
+
     while let Some(our_entry) = ours {
       match theirs {
         Some(their_entry) => match our_entry.name().cmp(&their_entry.name()) {
           Ordering::Less => {
-            add_unique(
-              our_entry,
-              &mut result.our_unique_files,
-              &mut result.our_unique_dirs,
-            );
+            add_ours(our_entry, result);
             ours = our_iter.next();
             continue;
           }
           Ordering::Greater => {
-            add_unique(
-              their_entry,
-              &mut result.their_unique_files,
-              &mut result.their_unique_dirs,
-            );
+            add_theirs(their_entry, result);
             theirs = their_iter.next();
             continue;
           }
@@ -618,38 +621,22 @@ impl DigestTrie {
               theirs = their_iter.next();
             }
             _ => {
-              add_unique(
-                our_entry,
-                &mut result.our_unique_files,
-                &mut result.our_unique_dirs,
-              );
-              add_unique(
-                their_entry,
-                &mut result.their_unique_files,
-                &mut result.their_unique_dirs,
-              );
+              add_ours(our_entry, result);
+              add_theirs(their_entry, result);
               ours = our_iter.next();
               theirs = their_iter.next();
             }
           },
         },
         None => {
-          add_unique(
-            our_entry,
-            &mut result.our_unique_files,
-            &mut result.our_unique_dirs,
-          );
+          add_ours(our_entry, result);
           ours = our_iter.next();
         }
       }
     }
 
     while let Some(their_entry) = &theirs {
-      add_unique(
-        their_entry,
-        &mut result.their_unique_files,
-        &mut result.their_unique_dirs,
-      );
+      add_theirs(their_entry, result);
       theirs = their_iter.next();
     }
   }
