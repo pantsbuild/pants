@@ -20,6 +20,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ async def fetch_helm_artifacts(
             HelmProcess(
                 argv=[
                     "pull",
-                    artifact.remote_spec(remotes),
+                    artifact.remote_address(remotes),
                     "--version",
                     artifact.metadata.version,
                     "--destination",
@@ -77,7 +78,7 @@ async def fetch_helm_artifacts(
                     "--untar",
                 ],
                 input_digest=empty_download_digest,
-                description=f"Pulling Helm Chart {artifact.metadata.name} with version {artifact.metadata.version}",
+                description=f"Pulling Helm Chart '{artifact.metadata.name}' with version {artifact.metadata.version}",
                 output_directories=(download_prefix,),
             ),
         )
@@ -93,6 +94,10 @@ async def fetch_helm_artifacts(
         FetchedHelmArtifact(address=field_set.address, snapshot=snapshot)
         for field_set, snapshot in zip(request.field_sets, stripped_artifact_snapshots)
     ]
+    logger.debug(
+        f"Fetched {pluralize(len(fetched_artifacts), 'Helm artifact')} corresponding with:\n"
+        f"{bullet_list([artifact.address.spec for artifact in fetched_artifacts], max_elements=10)}"
+    )
     return FetchedHelmArtifacts(fetched_artifacts)
 
 

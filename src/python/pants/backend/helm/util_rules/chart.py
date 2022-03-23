@@ -24,6 +24,7 @@ from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartMetaSour
 from pants.backend.helm.util_rules import sources
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
 from pants.backend.helm.util_rules.yaml_utils import snake_case_attr_dict
+from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.addresses import Address
 from pants.engine.fs import (
@@ -39,6 +40,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -248,10 +250,15 @@ class HelmChart:
 @dataclass(frozen=True)
 class HelmChartRequest:
     field_set: HelmChartFieldSet
+    generate_chart_lockfile: bool = False
 
     @classmethod
-    def from_target(cls, target: Target) -> HelmChartRequest:
-        return cls(HelmChartFieldSet.create(target))
+    def from_target(
+        cls, target: Target, *, generate_chart_lockfile: bool = False
+    ) -> HelmChartRequest:
+        return cls(
+            HelmChartFieldSet.create(target), generate_chart_lockfile=generate_chart_lockfile
+        )
 
 
 _HELM_CHART_METADATA_FILENAMES = ["Chart.yaml", "Chart.yml"]
@@ -346,13 +353,14 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
     third_party_charts = await MultiGet(
         Get(HelmChart, FetchedHelmArtifact, artifact) for artifact in third_party_artifacts
     )
-    logger.debug(
-        f"Found {pluralize(len(first_party_subcharts), 'subchart')} as direct dependencies on Helm chart at: {request.field_set.address}"
-    )
 
     subcharts = [*first_party_subcharts, *third_party_charts]
     subcharts_digest = EMPTY_DIGEST
     if subcharts:
+        logger.debug(
+            f"Found {pluralize(len(subcharts), 'subchart')} as direct dependencies on Helm chart at: {request.field_set.address}"
+        )
+
         merged_subcharts = await Get(
             Digest, MergeDigests([chart.snapshot.digest for chart in subcharts])
         )
@@ -365,7 +373,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
         for dep in metadata.dependencies:
             updated_dep = dep
 
-            if not dep.repository and remotes.default:
+            if not dep.repository and remotes.default_registry:
                 # If the dependency hasn't specified a repository, then we choose the registry with the 'default' alias,
                 default_remote = remotes.default_registry
                 updated_dep = dataclasses.replace(updated_dep, repository=default_remote.address)
@@ -397,12 +405,27 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
         ),
     )
 
-    # Merge all sources together
-    all_sources = await Get(
+    # Merge chart content
+    content_digest = await Get(
         Digest, MergeDigests([metadata_digest, sources_without_metadata, subcharts_digest])
     )
 
-    chart_snapshot = await Get(Snapshot, AddPrefix(all_sources, metadata.name))
+    # Re-generate Chart.lock file (charts that have no dependencies, will not produce a Chart.lock file)
+    if request.generate_chart_lockfile:
+        chart_lockfile_result = await Get(
+            ProcessResult,
+            HelmProcess(
+                argv=["dependency", "build", ".", "--skip-refresh"],
+                input_digest=content_digest,
+                description=f"Rebuild Helm chart lockfile for: {metadata.name}",
+                output_files=("Chart.lock",),
+            ),
+        )
+        content_digest = await Get(
+            Digest, MergeDigests([content_digest, chart_lockfile_result.output_digest])
+        )
+
+    chart_snapshot = await Get(Snapshot, AddPrefix(content_digest, metadata.name))
     return HelmChart(
         address=request.field_set.address,
         metadata=metadata,

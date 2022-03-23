@@ -81,7 +81,7 @@ class HelmArtifact:
         return self.metadata.name
 
     @memoized_method
-    def remote_spec(self, remotes: HelmRemotes) -> str:
+    def remote_address(self, remotes: HelmRemotes) -> str:
         if isinstance(self.metadata.location, HelmArtifactRegistryLocation):
             remote = next(remotes.get(self.metadata.location.registry))
             repo_ref = f"{remote.address}/{self.metadata.location.repository or ''}".rstrip("/")
@@ -102,7 +102,7 @@ def third_party_artifact_mapping(
 ) -> ThirdPartyArtifactMapping:
     artifacts = [HelmArtifact.from_target(tgt) for tgt in all_helm_artifact_tgts]
     return ThirdPartyArtifactMapping(
-        {artifact.remote_spec(subsystem.remotes()): artifact.address for artifact in artifacts}
+        {artifact.remote_address(subsystem.remotes()): artifact.address for artifact in artifacts}
     )
 
 

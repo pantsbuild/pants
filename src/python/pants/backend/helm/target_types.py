@@ -124,6 +124,11 @@ class HelmChartLintStrictField(TriBoolField):
     help = "If set to true, enables strict linting of this Helm chart"
 
 
+class HelmChartLockfileField(TriBoolField):
+    alias = "lockfile"
+    help = "Enables/disables the generation of a chart lockfile for this Helm chart"
+
+
 class HelmChartTarget(Target):
     alias = "helm_chart"
     core_fields = (

@@ -176,13 +176,11 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
     )
 
     source_root_patterns = ("/src/*",)
-    registries_opts = """{"default": {"address": "oci://www.example.com/helm-charts"}}"""
     repositories_opts = """{"jetstack": {"address": "https://charts.jetstack.io"}}"""
     rule_runner.set_options(
         [
             f"--source-root-patterns={repr(source_root_patterns)}",
             f"--helm-classic-repositories={repositories_opts}",
-            f"--helm-registries={registries_opts}",
         ]
     )
 
@@ -193,7 +191,6 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
         dependencies=(
             HelmChartDependency(
                 name="chart1",
-                repository="oci://www.example.com/helm-charts",
                 alias="dep1",
                 version="0.1.0",
             ),
@@ -204,9 +201,12 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
     )
 
     target = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
-    helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
+    helm_chart = rule_runner.request(
+        HelmChart, [HelmChartRequest.from_target(target, generate_chart_lockfile=True)]
+    )
 
     assert helm_chart.metadata == expected_metadata
+    assert "chart2/Chart.lock" in helm_chart.snapshot.files
     assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
     assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
     assert "chart2/charts/cert-manager" in helm_chart.snapshot.dirs
