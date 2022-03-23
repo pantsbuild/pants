@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Set, Union, Dict
+from typing import Callable, Dict, Iterable, List, Optional, Set, Union
 
 import pytest
 

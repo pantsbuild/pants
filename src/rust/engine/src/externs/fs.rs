@@ -215,7 +215,9 @@ impl PySnapshot {
     )
   }
 
-  fn diff<'py>(&self, other: &PySnapshot, py: Python<'py>) -> &'py PyTuple {
+  // NB: Prefix with underscore. The Python call will be hidden behind a helper which returns a much
+  // richer type.
+  fn _diff<'py>(&self, other: &PySnapshot, py: Python<'py>) -> &'py PyTuple {
     let result = self.0.tree.diff(&other.0.tree);
 
     let into_tuple = |x: &Vec<PathBuf>| -> &'py PyTuple {

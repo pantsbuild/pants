@@ -269,7 +269,7 @@ class SnapshotDiff:
 
     @classmethod
     def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":
-        return cls(*ours.diff(theirs))
+        return cls(*ours._diff(theirs))
 
 
 def rules():
