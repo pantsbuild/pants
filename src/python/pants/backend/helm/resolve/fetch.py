@@ -27,8 +27,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class FetchedHelmArtifact:
-    address: Address
+    artifact: HelmArtifact
     snapshot: Snapshot
+
+    @property
+    def address(self) -> Address:
+        return self.artifact.address
 
 
 class FetchedHelmArtifacts(Collection[FetchedHelmArtifact]):
@@ -63,7 +67,7 @@ async def fetch_helm_artifacts(
     download_prefix = "__downloads"
     empty_download_digest = await Get(Digest, CreateDigest([Directory(download_prefix)]))
 
-    artifacts_to_pull = [HelmArtifact.from_field_set(fs) for fs in request.field_sets]
+    artifacts = [HelmArtifact.from_field_set(fs) for fs in request.field_sets]
     download_results = await MultiGet(
         Get(
             ProcessResult,
@@ -82,7 +86,7 @@ async def fetch_helm_artifacts(
                 output_directories=(download_prefix,),
             ),
         )
-        for artifact in artifacts_to_pull
+        for artifact in artifacts
     )
 
     stripped_artifact_snapshots = await MultiGet(
@@ -91,8 +95,8 @@ async def fetch_helm_artifacts(
     )
 
     fetched_artifacts = [
-        FetchedHelmArtifact(address=field_set.address, snapshot=snapshot)
-        for field_set, snapshot in zip(request.field_sets, stripped_artifact_snapshots)
+        FetchedHelmArtifact(artifact=artifact, snapshot=snapshot)
+        for artifact, snapshot in zip(artifacts, stripped_artifact_snapshots)
     ]
     logger.debug(
         f"Fetched {pluralize(len(fetched_artifacts), 'Helm artifact')} corresponding with:\n"

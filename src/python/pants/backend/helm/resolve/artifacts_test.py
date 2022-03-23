@@ -10,8 +10,8 @@ import pytest
 from pants.backend.helm.resolve.artifacts import (
     HelmArtifact,
     HelmArtifactClassicRepositoryLocation,
-    HelmArtifactMetadata,
     HelmArtifactRegistryLocation,
+    HelmArtifactRequirement,
     ThirdPartyArtifactMapping,
 )
 from pants.backend.helm.resolve.artifacts import rules as artifacts_rules
@@ -59,7 +59,7 @@ def test_build_third_party_mapping(rule_runner: RuleRunner) -> None:
     )
 
     expected_foo = HelmArtifact(
-        metadata=HelmArtifactMetadata(
+        metadata=HelmArtifactRequirement(
             name="foo",
             version="0.1.0",
             location=HelmArtifactRegistryLocation(
@@ -69,7 +69,7 @@ def test_build_third_party_mapping(rule_runner: RuleRunner) -> None:
         address=Address("3rdparty/helm/example", target_name="foo"),
     )
     expected_bar = HelmArtifact(
-        metadata=HelmArtifactMetadata(
+        metadata=HelmArtifactRequirement(
             name="bar",
             version="0.1.0",
             location=HelmArtifactClassicRepositoryLocation("@example"),

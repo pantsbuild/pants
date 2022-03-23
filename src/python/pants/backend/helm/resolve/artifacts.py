@@ -41,7 +41,7 @@ class HelmArtifactClassicRepositoryLocation:
 
 
 @dataclass(frozen=True)
-class HelmArtifactMetadata:
+class HelmArtifactRequirement:
     name: str
     version: str
     location: HelmArtifactRegistryLocation | HelmArtifactClassicRepositoryLocation
@@ -49,7 +49,7 @@ class HelmArtifactMetadata:
 
 @dataclass(frozen=True)
 class HelmArtifact:
-    metadata: HelmArtifactMetadata
+    metadata: HelmArtifactRequirement
     address: Address
 
     @classmethod
@@ -67,7 +67,7 @@ class HelmArtifact:
         if registry:
             registry_location = HelmArtifactRegistryLocation(registry, repository)
 
-        metadata = HelmArtifactMetadata(
+        metadata = HelmArtifactRequirement(
             name=cast(str, field_set.artifact.value),
             version=cast(str, field_set.version.value),
             location=registry_location

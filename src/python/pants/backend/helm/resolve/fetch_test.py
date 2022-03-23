@@ -8,18 +8,14 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.helm.resolve import fetch
+from pants.backend.helm.resolve.artifacts import HelmArtifact
 from pants.backend.helm.resolve.fetch import FetchedHelmArtifacts, FetchHelmArfifactsRequest
 from pants.backend.helm.subsystems import helm
-from pants.backend.helm.target_types import (
-    AllHelmArtifactTargets,
-    HelmArtifactFieldSet,
-    HelmArtifactTarget,
-)
+from pants.backend.helm.target_types import AllHelmArtifactTargets, HelmArtifactTarget
 from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.util_rules import tool
 from pants.core.util_rules import config_files, external_tool
 from pants.engine import process
-from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -45,7 +41,7 @@ def rule_runner() -> RuleRunner:
 def test_download_artifacts(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "3rdparty/helm/jetstack/BUILD": dedent(
+            "3rdparty/helm/BUILD": dedent(
                 """\
                 helm_artifact(
                   name="cert-manager",
@@ -53,17 +49,32 @@ def test_download_artifacts(rule_runner: RuleRunner) -> None:
                   artifact="cert-manager",
                   version="v0.7.0"
                 )
+
+                helm_artifact(
+                    name="prometheus-stack",
+                    repository="@prometheus",
+                    artifact="kube-prometheus-stack",
+                    version="^27.2.0"
+                )
                 """
             ),
         }
     )
 
-    repositories_opts = """{"jetstack": {"address": "https://charts.jetstack.io"}}"""
-    rule_runner.set_options([f"--helm-classic-repositories={repositories_opts}"])
+    repositories_opts = {
+        "jetstack": {"address": "https://charts.jetstack.io"},
+        "prometheus": {"address": "https://prometheus-community.github.io/helm-charts"},
+    }
+    rule_runner.set_options([f"--helm-classic-repositories={repr(repositories_opts)}"])
 
-    tgt = rule_runner.get_target(Address("3rdparty/helm/jetstack", target_name="cert-manager"))
+    targets = rule_runner.request(AllHelmArtifactTargets, [])
     fetched_artifacts = rule_runner.request(
-        FetchedHelmArtifacts, [FetchHelmArfifactsRequest([HelmArtifactFieldSet.create(tgt)])]
+        FetchedHelmArtifacts, [FetchHelmArfifactsRequest.for_targets(targets)]
     )
-    assert len(fetched_artifacts) == 1
-    assert "cert-manager/Chart.yaml" in fetched_artifacts[0].snapshot.files
+
+    expected_artifacts = [HelmArtifact.from_target(tgt) for tgt in targets]
+
+    assert len(fetched_artifacts) == len(expected_artifacts)
+    for fetched, expected in zip(fetched_artifacts, expected_artifacts):
+        assert fetched.artifact == expected
+        assert f"{expected.name}/Chart.yaml" in fetched.snapshot.files
