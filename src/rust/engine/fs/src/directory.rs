@@ -669,8 +669,11 @@ impl DigestTrie {
 
       let matching_entry = tree
         .entries()
-        .iter()
-        .find(|entry| Path::new(entry.name().as_ref()).as_os_str() == component);
+        .binary_search_by_key(&component, |entry| {
+          Path::new(entry.name().as_ref()).as_os_str()
+        })
+        .ok()
+        .map(|idx| &tree.entries()[idx]);
       if components.peek().is_none() {
         return Ok(matching_entry);
       }
@@ -708,16 +711,15 @@ impl DigestTrie {
       return Ok(trees.pop().unwrap());
     }
 
-    // Merge and sort Entries.
+    // Merge sorted Entries.
     let input_entries = trees
       .iter()
-      .map(|tree| tree.entries())
-      .flatten()
-      .sorted_by(|a, b| a.name().cmp(&b.name()));
+      .map(|tree| tree.entries().iter())
+      .kmerge_by(|a, b| a.name() < b.name());
 
     // Then group by name, and merge into an output list.
     let mut entries: Vec<Entry> = Vec::new();
-    for (name, group) in &input_entries.into_iter().group_by(|e| e.name()) {
+    for (name, group) in &input_entries.group_by(|e| e.name()) {
       let mut group = group.peekable();
       let first = group.next().unwrap();
       if group.peek().is_none() {
