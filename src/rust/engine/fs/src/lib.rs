@@ -36,8 +36,7 @@ pub use crate::directory::{
   DigestTrie, DirectoryDigest, EMPTY_DIGEST_TREE, EMPTY_DIRECTORY_DIGEST,
 };
 pub use crate::glob_matching::{
-  ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
-  SINGLE_STAR_GLOB,
+  GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
 
 use std::cmp::min;
