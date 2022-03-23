@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from typing import ClassVar
@@ -30,7 +31,7 @@ class GoStdLibImports(FrozenDict[str, str]):
 
 
 @rule(desc="Determine Go std lib's imports", level=LogLevel.DEBUG)
-async def determine_go_std_lib_imports() -> GoStdLibImports:
+async def determine_go_std_lib_imports(golang: GolangSubsystem) -> GoStdLibImports:
     list_result = await Get(
         ProcessResult,
         GoSdkProcess(
@@ -41,6 +42,8 @@ async def determine_go_std_lib_imports() -> GoStdLibImports:
     )
     result = {}
     for package_descriptor in ijson.items(list_result.stdout, "", multiple_values=True):
+        if golang.dump_importcfg:
+            logger.info(json.dumps(package_descriptor, indent=2))
         import_path = package_descriptor.get("ImportPath")
         target = package_descriptor.get("Target")
         if not import_path or not target:
