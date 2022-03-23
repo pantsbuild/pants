@@ -28,9 +28,9 @@ from pants.bsp.spec.targets import DependencyModule
 from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
+    BSPBuildTargetInternal,
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
-    BSPBuildTargetsNew,
     BSPDependencyModulesRequest,
     BSPDependencyModulesResult,
 )
@@ -211,16 +211,13 @@ class HandleScalacOptionsResult:
 async def handle_bsp_scalac_options_request(
     request: HandleScalacOptionsRequest,
     build_root: BuildRoot,
-    bsp_build_targets: BSPBuildTargetsNew,
     workspace: Workspace,
 ) -> HandleScalacOptionsResult:
-    bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
-    if bsp_target_name not in bsp_build_targets.targets_mapping:
-        raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
+    bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
     targets = await Get(
         Targets,
         AddressSpecs,
-        bsp_build_targets.targets_mapping[bsp_target_name].specs.address_specs,
+        bsp_target.specs.address_specs,
     )
     coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
     resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
