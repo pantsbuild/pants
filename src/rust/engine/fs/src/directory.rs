@@ -157,6 +157,15 @@ pub struct Name(Intern<String>);
 // static. Switching to `ArcIntern` would get accurate counts at the cost of performance and size.
 known_deep_size!(0; Name);
 
+impl Name {
+  pub fn new(name: &str) -> Self {
+    if cfg!(debug_assertions) {
+      assert!(Path::new(name).components().count() < 2)
+    }
+    Name(Intern::from(name))
+  }
+}
+
 impl Deref for Name {
   type Target = Intern<String>;
 
@@ -194,7 +203,7 @@ pub struct Directory {
 }
 
 impl Directory {
-  fn new(name: Name, entries: Vec<Entry>) -> Self {
+  pub(crate) fn new(name: Name, entries: Vec<Entry>) -> Self {
     Self::from_digest_tree(name, DigestTrie(entries.into()))
   }
 
@@ -650,7 +659,7 @@ impl DigestTrie {
   /// Return the Entry at the given relative path in the trie, or None if no such path was present.
   ///
   /// An error will be returned if the given path attempts to traverse below a file entry.
-  pub fn entry<'a>(&'a self, path: &RelativePath) -> Result<Option<&'a Entry>, String> {
+  pub fn entry<'a>(&'a self, path: &Path) -> Result<Option<&'a Entry>, String> {
     let mut tree = self;
     let mut path_so_far = PathBuf::new();
     let mut components = path.components().peekable();
