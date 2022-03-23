@@ -109,6 +109,12 @@ impl NailgunPool {
           "No idle slots in nailgun pool.".to_owned()
         })?;
 
+        log::debug!(
+          "Terminating nailgun process {idle_fingerprint:?} to make room for \
+           request {requested_fingerprint:?}",
+          idle_fingerprint = processes[idx].fingerprint
+        );
+
         processes.swap_remove(idx);
       }
 
@@ -163,7 +169,8 @@ impl NailgunPool {
     }
     // NB: We'll only prune dead processes if we don't find a live match, but that's fine.
     for dead_process_idx in dead_processes.into_iter().rev() {
-      pool_entries.swap_remove(dead_process_idx);
+      let dead_process = pool_entries.swap_remove(dead_process_idx);
+      log::debug!("Nailgun process had died: {:?}", dead_process.fingerprint);
     }
     Ok(None)
   }
@@ -193,6 +200,10 @@ impl NailgunPool {
     let process = if let Some(process) = process_guard.as_mut() {
       process
     } else {
+      log::warn!(
+        "The nailgun server for {:?} died while starting up, and will be restarted.",
+        pool_entry.fingerprint
+      );
       return Ok(TryUse::Dead);
     };
 
