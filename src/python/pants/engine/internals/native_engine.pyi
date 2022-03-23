@@ -82,8 +82,8 @@ class Snapshot:
     def dirs(self) -> tuple[str, ...]: ...
     @property
     def files(self) -> tuple[str, ...]: ...
-    # Use pants.engine.fs.SnapshotDiff for semantic names
-    def diff(
+    # Don't call this, call pants.engine.fs.SnapshotDiff instead
+    def _diff(
         self, other: Snapshot
     ) -> tuple[
         tuple[str, ...],
