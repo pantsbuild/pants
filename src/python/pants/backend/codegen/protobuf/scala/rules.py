@@ -11,6 +11,8 @@ from pants.backend.codegen.protobuf.scala.subsystem import PluginArtifactSpec, S
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourceField,
+    ProtobufSourcesGeneratorTarget,
+    ProtobufSourceTarget,
 )
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -49,6 +51,7 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.target_types import JvmJdkField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -333,10 +336,16 @@ def generate_scalapbc_lockfile_request(
     return GenerateJvmLockfileFromTool.create(tool)
 
 
+class PrefixedJvmJdkField(JvmJdkField):
+    alias = "jvm_jdk"
+
+
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
         UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),
+        ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
     ]
