@@ -266,7 +266,7 @@ _HELM_CHART_METADATA_FILENAMES = ["Chart.yaml", "Chart.yml"]
 
 def _chart_metadata_subset(digest: Digest) -> DigestSubset:
     globs = PathGlobs(
-        [f"**/{filename}" for filename in _HELM_CHART_METADATA_FILENAMES],
+        [f"*/{filename}" for filename in _HELM_CHART_METADATA_FILENAMES],
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
         conjunction=GlobExpansionConjunction.any_match,
         description_of_origin="parse_chart_metadata",
