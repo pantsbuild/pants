@@ -553,16 +553,8 @@ impl DigestTrie {
   }
 
   pub fn diff(&self, other: &DigestTrie) -> DigestTrieDiff {
-    let mut result = DigestTrieDiff {
-      our_unique_files: Vec::new(),
-      our_unique_dirs: Vec::new(),
-      their_unique_files: Vec::new(),
-      their_unique_dirs: Vec::new(),
-      changed_files: Vec::new(),
-    };
-
+    let mut result = DigestTrieDiff::default();
     self.diff_helper(other, PathBuf::new(), &mut result);
-
     result
   }
 
@@ -929,30 +921,13 @@ impl From<&DigestTrie> for remexec::Tree {
   }
 }
 
+#[derive(Default)]
 pub struct DigestTrieDiff {
-  our_unique_files: Vec<PathBuf>,
-  our_unique_dirs: Vec<PathBuf>,
-  their_unique_files: Vec<PathBuf>,
-  their_unique_dirs: Vec<PathBuf>,
-  changed_files: Vec<PathBuf>,
-}
-
-impl DigestTrieDiff {
-  pub fn our_unique_files(&self) -> &'_ Vec<PathBuf> {
-    &self.our_unique_files
-  }
-  pub fn our_unique_dirs(&self) -> &'_ Vec<PathBuf> {
-    &self.our_unique_dirs
-  }
-  pub fn their_unique_files(&self) -> &'_ Vec<PathBuf> {
-    &self.their_unique_files
-  }
-  pub fn their_unique_dirs(&self) -> &'_ Vec<PathBuf> {
-    &self.their_unique_dirs
-  }
-  pub fn changed_files(&self) -> &'_ Vec<PathBuf> {
-    &self.changed_files
-  }
+  pub our_unique_files: Vec<PathBuf>,
+  pub our_unique_dirs: Vec<PathBuf>,
+  pub their_unique_files: Vec<PathBuf>,
+  pub their_unique_dirs: Vec<PathBuf>,
+  pub changed_files: Vec<PathBuf>,
 }
 
 pub enum MergeError {

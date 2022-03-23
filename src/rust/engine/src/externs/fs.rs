@@ -230,11 +230,11 @@ impl PySnapshot {
     PyTuple::new(
       py,
       vec![
-        into_tuple(result.our_unique_files()),
-        into_tuple(result.our_unique_dirs()),
-        into_tuple(result.their_unique_files()),
-        into_tuple(result.their_unique_dirs()),
-        into_tuple(result.changed_files()),
+        into_tuple(&result.our_unique_files),
+        into_tuple(&result.our_unique_dirs),
+        into_tuple(&result.their_unique_files),
+        into_tuple(&result.their_unique_dirs),
+        into_tuple(&result.changed_files),
       ],
     )
   }
