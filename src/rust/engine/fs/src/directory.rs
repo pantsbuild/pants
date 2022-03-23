@@ -100,19 +100,7 @@ impl DirectoryDigest {
   ///
   /// Use of this method should be rare: code should prefer to pass around a `DirectoryDigest` rather
   /// than to create one from a `Digest` (as the latter requires loading the content from disk).
-  ///
-  /// TODO: If a callsite needs to create a `DirectoryDigest` as a convenience (i.e. in a location
-  /// where its signature could be changed to accept a `DirectoryDigest` instead of constructing
-  /// one) during the porting effort of #13112, it should use `todo_from_digest` rather than
-  /// `from_persisted_digest`.
   pub fn from_persisted_digest(digest: Digest) -> Self {
-    Self { digest, tree: None }
-  }
-
-  /// Marks a callsite that is creating a `DirectoryDigest` as a temporary convenience, rather than
-  /// accepting a `DirectoryDigest` in its signature. All usages of this method should be removed
-  /// before closing #13112.
-  pub fn todo_from_digest(digest: Digest) -> Self {
     Self { digest, tree: None }
   }
 
