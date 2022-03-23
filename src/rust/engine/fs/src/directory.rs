@@ -101,19 +101,7 @@ impl DirectoryDigest {
   ///
   /// Use of this method should be rare: code should prefer to pass around a `DirectoryDigest` rather
   /// than to create one from a `Digest` (as the latter requires loading the content from disk).
-  ///
-  /// TODO: If a callsite needs to create a `DirectoryDigest` as a convenience (i.e. in a location
-  /// where its signature could be changed to accept a `DirectoryDigest` instead of constructing
-  /// one) during the porting effort of #13112, it should use `todo_from_digest` rather than
-  /// `from_persisted_digest`.
   pub fn from_persisted_digest(digest: Digest) -> Self {
-    Self { digest, tree: None }
-  }
-
-  /// Marks a callsite that is creating a `DirectoryDigest` as a temporary convenience, rather than
-  /// accepting a `DirectoryDigest` in its signature. All usages of this method should be removed
-  /// before closing #13112.
-  pub fn todo_from_digest(digest: Digest) -> Self {
     Self { digest, tree: None }
   }
 
@@ -157,6 +145,15 @@ pub struct Name(Intern<String>);
 // keep any record of the number of held references, and instead effectively makes its held value
 // static. Switching to `ArcIntern` would get accurate counts at the cost of performance and size.
 known_deep_size!(0; Name);
+
+impl Name {
+  pub fn new(name: &str) -> Self {
+    if cfg!(debug_assertions) {
+      assert!(Path::new(name).components().count() < 2)
+    }
+    Name(Intern::from(name))
+  }
+}
 
 impl Deref for Name {
   type Target = Intern<String>;
@@ -202,7 +199,7 @@ pub struct Directory {
 }
 
 impl Directory {
-  fn new(name: Name, entries: Vec<Entry>) -> Self {
+  pub(crate) fn new(name: Name, entries: Vec<Entry>) -> Self {
     Self::from_digest_tree(name, DigestTrie(entries.into()))
   }
 
@@ -747,7 +744,7 @@ impl DigestTrie {
   /// Return the Entry at the given relative path in the trie, or None if no such path was present.
   ///
   /// An error will be returned if the given path attempts to traverse below a file entry.
-  pub fn entry<'a>(&'a self, path: &RelativePath) -> Result<Option<&'a Entry>, String> {
+  pub fn entry<'a>(&'a self, path: &Path) -> Result<Option<&'a Entry>, String> {
     let mut tree = self;
     let mut path_so_far = PathBuf::new();
     let mut components = path.components().peekable();
@@ -757,8 +754,11 @@ impl DigestTrie {
 
       let matching_entry = tree
         .entries()
-        .iter()
-        .find(|entry| Path::new(entry.name().as_ref()).as_os_str() == component);
+        .binary_search_by_key(&component, |entry| {
+          Path::new(entry.name().as_ref()).as_os_str()
+        })
+        .ok()
+        .map(|idx| &tree.entries()[idx]);
       if components.peek().is_none() {
         return Ok(matching_entry);
       }
@@ -796,16 +796,15 @@ impl DigestTrie {
       return Ok(trees.pop().unwrap());
     }
 
-    // Merge and sort Entries.
+    // Merge sorted Entries.
     let input_entries = trees
       .iter()
-      .map(|tree| tree.entries())
-      .flatten()
-      .sorted_by(|a, b| a.name().cmp(&b.name()));
+      .map(|tree| tree.entries().iter())
+      .kmerge_by(|a, b| a.name() < b.name());
 
     // Then group by name, and merge into an output list.
     let mut entries: Vec<Entry> = Vec::new();
-    for (name, group) in &input_entries.into_iter().group_by(|e| e.name()) {
+    for (name, group) in &input_entries.group_by(|e| e.name()) {
       let mut group = group.peekable();
       let first = group.next().unwrap();
       if group.peek().is_none() {
