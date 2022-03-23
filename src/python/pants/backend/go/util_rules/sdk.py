@@ -99,6 +99,7 @@ async def setup_go_sdk_process(
     go_sdk_run: GoSdkRunSetup,
     bash: BashBinary,
     golang_subsystem: GolangSubsystem,
+    goroot: GoRoot,
 ) -> Process:
     input_digest, env_vars = await MultiGet(
         Get(Digest, MergeDigests([go_sdk_run.digest, request.input_digest])),
@@ -110,6 +111,7 @@ async def setup_go_sdk_process(
             **env_vars,
             **request.env,
             GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
+            "__PANTS_GO_CACHE_KEY": f"{goroot.version}/{goroot.goos}/{goroot.goarch}",
         },
         input_digest=input_digest,
         description=request.description,
