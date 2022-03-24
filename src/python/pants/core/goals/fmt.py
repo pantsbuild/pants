@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import itertools
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TypeVar
@@ -17,7 +18,7 @@ from pants.core.goals.style_request import (
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import Digest, MergeDigests, Snapshot, SnapshotDiff, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
@@ -29,6 +30,8 @@ from pants.util.logging import LogLevel
 
 _F = TypeVar("_F", bound="FmtResult")
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class FmtResult(EngineAwareReturnType):
@@ -37,6 +40,14 @@ class FmtResult(EngineAwareReturnType):
     stdout: str
     stderr: str
     formatter_name: str
+
+    def __post_init__(self):
+        log = f"Output from {self.formatter_name}"
+        if self.stdout:
+            log += f"\n{self.stdout}"
+        if self.stderr:
+            log += f"\n{self.stderr}"
+        logger.debug(log)
 
     @classmethod
     def skip(cls: type[_F], *, formatter_name: str) -> _F:
@@ -70,13 +81,15 @@ class FmtResult(EngineAwareReturnType):
         if self.skipped:
             return f"{self.formatter_name} skipped."
         message = "made changes." if self.did_change else "made no changes."
-        output = ""
-        if self.stdout:
-            output += f"\n{self.stdout}"
-        if self.stderr:
-            output += f"\n{self.stderr}"
-        if output:
-            output = f"{output.rstrip()}\n\n"
+
+        if self.did_change:
+            output = "".join(
+                f"\n  {file}"
+                for file in SnapshotDiff.from_snapshots(self.input, self.output).changed_files
+            )
+        else:
+            output = ""
+
         return f"{self.formatter_name} {message}{output}"
 
     def cacheable(self) -> bool:
