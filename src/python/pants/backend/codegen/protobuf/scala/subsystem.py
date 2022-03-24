@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.addresses import UnparsedAddressInputs
 from pants.jvm.resolve.jvm_tool import JvmToolBase
-from pants.option.option_types import StrListOption, TargetListOption
+from pants.option.option_types import StrListOption
 from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
@@ -43,19 +42,6 @@ class ScalaPBSubsystem(JvmToolBase):
     )
     default_lockfile_url = git_url(default_lockfile_path)
 
-    _runtime_dependencies = TargetListOption(
-        "--runtime-dependencies",
-        help=lambda cls: softwrap(
-            f"""
-            A list of addresses to `jvm_artifact` targets for the runtime
-            dependencies needed for generated Scala code to work. For example,
-            `['3rdparty/jvm:scalapb-runtime']`. These dependencies will
-            be automatically added to every `protobuf_sources` target. At the very least,
-            this option must be set to a `jvm_artifact` for the
-            `com.thesamet.scalapb:scalapb-runtime_SCALAVER:{cls.default_version}` runtime library.
-            """
-        ),
-    )
     _jvm_plugins = StrListOption(
         "--jvm-plugins",
         help=softwrap(
@@ -72,10 +58,6 @@ class ScalaPBSubsystem(JvmToolBase):
             """
         ),
     )
-
-    @property
-    def runtime_dependencies(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self._runtime_dependencies, owning_address=None)
 
     @property
     def jvm_plugins(self) -> tuple[PluginArtifactSpec, ...]:
