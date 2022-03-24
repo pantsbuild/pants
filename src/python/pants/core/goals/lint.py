@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, cast
+from typing import Any, ClassVar, Iterable, Iterator, cast
 
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.style_request import (
@@ -215,6 +215,30 @@ async def lint(
         )
         for request_type in target_request_types
     )
+
+    def address_str(fs: FieldSet) -> str:
+        return fs.address.spec
+
+    def batch(field_sets: Iterable[FieldSet]) -> Iterator[list[FieldSet]]:
+        return partition_sequentially(
+            field_sets,
+            key=address_str,
+            size_target=lint_subsystem.batch_size,
+            size_max=4 * lint_subsystem.batch_size,
+        )
+
+    lint_target_requests = (
+        request.__class__(field_set_batch)
+        for request in target_requests
+        if isinstance(request, LintTargetsRequest) and request.field_sets
+        for field_set_batch in batch(request.field_sets)
+    )
+    fmt_requests = (
+        request.__class__(field_set_batch)
+        for request in target_requests
+        if isinstance(request, FmtRequest) and request.field_sets
+        for field_set_batch in batch(request.field_sets)
+    )
     file_requests = (
         tuple(
             request_type(specs_snapshot.snapshot.files)
@@ -223,32 +247,6 @@ async def lint(
         )
         if specs_snapshot.snapshot.files
         else ()
-    )
-
-    def address_str(fs: FieldSet) -> str:
-        return fs.address.spec
-
-    lint_target_requests = (
-        request.__class__(field_set_batch)
-        for request in target_requests
-        if request.field_sets and isinstance(request, LintTargetsRequest)
-        for field_set_batch in partition_sequentially(
-            request.field_sets,
-            key=address_str,
-            size_target=lint_subsystem.batch_size,
-            size_max=4 * lint_subsystem.batch_size,
-        )
-    )
-    fmt_requests = (
-        request.__class__(field_set_batch)
-        for request in target_requests
-        if request.field_sets and isinstance(request, FmtRequest)
-        for field_set_batch in partition_sequentially(
-            request.field_sets,
-            key=address_str,
-            size_target=lint_subsystem.batch_size,
-            size_max=4 * lint_subsystem.batch_size,
-        )
     )
 
     all_requests = [

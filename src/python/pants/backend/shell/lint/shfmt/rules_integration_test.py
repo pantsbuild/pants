@@ -12,7 +12,6 @@ from pants.backend.shell.lint.shfmt.rules import rules as shfmt_rules
 from pants.backend.shell.target_types import ShellSourcesGeneratorTarget
 from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -31,7 +30,6 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *target_types_rules(),
-            QueryRule(LintResults, [ShfmtRequest]),
             QueryRule(FmtResult, [ShfmtRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
@@ -74,13 +72,12 @@ def run_shfmt(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
-) -> tuple[tuple[LintResult, ...], FmtResult]:
+) -> FmtResult:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.shell.lint.shfmt", *(extra_args or ())],
         env_inherit={"PATH"},
     )
     field_sets = [ShfmtFieldSet.create(tgt) for tgt in targets]
-    lint_results = rule_runner.request(LintResults, [ShfmtRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
@@ -93,7 +90,7 @@ def run_shfmt(
             ShfmtRequest(field_sets, prior_formatter_result=input_sources.snapshot),
         ],
     )
-    return lint_results.results, fmt_result
+    return fmt_result
 
 
 def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
@@ -105,10 +102,7 @@ def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snaps
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.sh": GOOD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
-    lint_results, fmt_result = run_shfmt(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert lint_results[0].stderr == ""
+    fmt_result = run_shfmt(rule_runner, [tgt])
     assert fmt_result.stdout == ""
     assert fmt_result.output == get_snapshot(rule_runner, {"f.sh": GOOD_FILE})
     assert fmt_result.did_change is False
@@ -117,10 +111,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
-    lint_results, fmt_result = run_shfmt(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "f.sh.orig" in lint_results[0].stdout
+    fmt_result = run_shfmt(rule_runner, [tgt])
     assert fmt_result.stdout == "f.sh\n"
     assert fmt_result.output == get_snapshot(rule_runner, {"f.sh": GOOD_FILE})
     assert fmt_result.did_change is True
@@ -134,11 +125,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.sh")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.sh")),
     ]
-    lint_results, fmt_result = run_shfmt(rule_runner, tgts)
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "bad.sh.orig" in lint_results[0].stdout
-    assert "good.sh" not in lint_results[0].stdout
+    fmt_result = run_shfmt(rule_runner, tgts)
     assert "bad.sh\n" == fmt_result.stdout
     assert fmt_result.output == get_snapshot(
         rule_runner, {"good.sh": GOOD_FILE, "bad.sh": GOOD_FILE}
@@ -160,11 +147,7 @@ def test_config_files(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("a", relative_file_path="f.sh")),
         rule_runner.get_target(Address("b", relative_file_path="f.sh")),
     ]
-    lint_results, fmt_result = run_shfmt(rule_runner, tgts)
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "a/f.sh.orig" in lint_results[0].stdout
-    assert "b/f.sh.orig" not in lint_results[0].stdout
+    fmt_result = run_shfmt(rule_runner, tgts)
     assert fmt_result.stdout == "a/f.sh\n"
     assert fmt_result.output == get_snapshot(
         rule_runner, {"a/f.sh": FIXED_NEEDS_CONFIG_FILE, "b/f.sh": NEEDS_CONFIG_FILE}
@@ -175,10 +158,7 @@ def test_config_files(rule_runner: RuleRunner) -> None:
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.sh": NEEDS_CONFIG_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
-    lint_results, fmt_result = run_shfmt(rule_runner, [tgt], extra_args=["--shfmt-args=-ci"])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "f.sh.orig" in lint_results[0].stdout
+    fmt_result = run_shfmt(rule_runner, [tgt], extra_args=["--shfmt-args=-ci"])
     assert fmt_result.stdout == "f.sh\n"
     assert fmt_result.output == get_snapshot(rule_runner, {"f.sh": FIXED_NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is True
@@ -187,7 +167,6 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
-    lint_results, fmt_result = run_shfmt(rule_runner, [tgt], extra_args=["--shfmt-skip"])
-    assert not lint_results
+    fmt_result = run_shfmt(rule_runner, [tgt], extra_args=["--shfmt-skip"])
     assert fmt_result.skipped is True
     assert fmt_result.did_change is False
