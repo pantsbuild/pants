@@ -17,6 +17,7 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.util_rules import distdir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -44,6 +45,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
+from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
@@ -342,4 +344,7 @@ def rules():
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
+        # Rules to avoid rule grpah errors.
+        *artifact_mapper.rules(),
+        *distdir.rules(),
     ]
