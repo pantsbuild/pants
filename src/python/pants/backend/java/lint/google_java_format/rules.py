@@ -1,6 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import dataclasses
 import logging
 from dataclasses import dataclass
 
@@ -9,12 +8,11 @@ from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaForma
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -39,19 +37,13 @@ class GoogleJavaFormatFieldSet(FieldSet):
         return tgt.get(SkipGoogleJavaFormatField).value
 
 
-class GoogleJavaFormatRequest(FmtRequest, LintTargetsRequest):
+class GoogleJavaFormatRequest(FmtRequest):
     field_set_type = GoogleJavaFormatFieldSet
     name = GoogleJavaFormatSubsystem.options_scope
 
 
 class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = GoogleJavaFormatSubsystem.options_scope
-
-
-@dataclass(frozen=True)
-class SetupRequest:
-    request: GoogleJavaFormatRequest
-    check_only: bool
 
 
 @dataclass(frozen=True)
@@ -62,7 +54,7 @@ class Setup:
 
 @rule(level=LogLevel.DEBUG)
 async def setup_google_java_format(
-    setup_request: SetupRequest,
+    request: GoogleJavaFormatRequest,
     tool: GoogleJavaFormatSubsystem,
     jdk: InternalJdk,
 ) -> Setup:
@@ -73,15 +65,15 @@ async def setup_google_java_format(
     source_files, tool_classpath = await MultiGet(
         Get(
             SourceFiles,
-            SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
+            SourceFilesRequest(field_set.source for field_set in request.field_sets),
         ),
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
     )
 
     source_files_snapshot = (
         source_files.snapshot
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
+        if request.prior_formatter_result is None
+        else request.prior_formatter_result
     )
 
     toolcp_relpath = "__toolcp"
@@ -103,8 +95,8 @@ async def setup_google_java_format(
         *maybe_java11_or_higher_options,
         "com.google.googlejavaformat.java.Main",
         *(["--aosp"] if tool.aosp else []),
-        "--dry-run" if setup_request.check_only else "--replace",
-        *source_files.files,
+        "--replace",
+        *source_files_snapshot.files,
     ]
 
     process = JvmProcess(
@@ -115,7 +107,7 @@ async def setup_google_java_format(
         extra_immutable_input_digests=extra_immutable_input_digests,
         extra_nailgun_keys=extra_immutable_input_digests,
         output_files=source_files_snapshot.files,
-        description=f"Run Google Java Format on {pluralize(len(setup_request.request.field_sets), 'file')}.",
+        description=f"Run Google Java Format on {pluralize(len(request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
     )
 
@@ -128,7 +120,7 @@ async def google_java_format_fmt(
 ) -> FmtResult:
     if tool.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=False))
+    setup = await Get(Setup, GoogleJavaFormatRequest, request)
     result = await Get(ProcessResult, JvmProcess, setup.process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
@@ -138,26 +130,6 @@ async def google_java_format_fmt(
         stderr=strip_v2_chroot_path(result.stderr),
         formatter_name=request.name,
     )
-
-
-@rule(desc="Lint with Google Java Format", level=LogLevel.DEBUG)
-async def google_java_format_lint(
-    request: GoogleJavaFormatRequest, tool: GoogleJavaFormatSubsystem
-) -> LintResults:
-    if tool.skip:
-        return LintResults([], linter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=True))
-    result = await Get(FallibleProcessResult, JvmProcess, setup.process)
-    lint_result = LintResult.from_fallible_process_result(result)
-    if lint_result.exit_code == 0 and lint_result.stdout.strip() != "":
-        # Note: The formetter returns success even if it would have reformatted the files.
-        # When this occurs, convert the LintResult into a failure.
-        lint_result = dataclasses.replace(
-            lint_result,
-            exit_code=1,
-            stdout=f"The following Java files require formatting:\n{lint_result.stdout}\n",
-        )
-    return LintResults([lint_result], linter_name=request.name)
 
 
 @rule
@@ -172,6 +144,5 @@ def rules():
         *collect_rules(),
         *jvm_tool.rules(),
         UnionRule(FmtRequest, GoogleJavaFormatRequest),
-        UnionRule(LintTargetsRequest, GoogleJavaFormatRequest),
         UnionRule(GenerateToolLockfileSentinel, GoogleJavaFormatToolLockfileSentinel),
     ]
