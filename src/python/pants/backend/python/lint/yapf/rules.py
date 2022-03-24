@@ -71,6 +71,7 @@ async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Setup:
             yapf_pex,
             argv=(
                 *yapf.args,
+                "--in-place",
                 *(("--style", yapf.config) if yapf.config else ()),
                 *source_files_snapshot.files,
             ),
