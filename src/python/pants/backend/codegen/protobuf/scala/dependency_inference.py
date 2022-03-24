@@ -43,8 +43,8 @@ async def resolve_scalapb_runtime_for_resolve(
     scalapb: ScalaPBSubsystem,
 ) -> ScalaPBRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    # TODO: Does not handle Scala 3 suffix which is just `_3`.
-    scala_binary_version = ".".join(scala_version.split(".")[0:2])
+    # TODO: Does not handle Scala 3 suffix which is just `_3` nor X.Y.Z versions.
+    scala_binary_version, _, _ = scala_version.rpartition(".")
     version = scalapb.version
 
     for tgt in jvm_artifact_targets:

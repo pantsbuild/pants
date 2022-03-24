@@ -344,7 +344,7 @@ def rules():
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
-        # Rules to avoid rule grpah errors.
+        # Rules to avoid rule graph errors.
         *artifact_mapper.rules(),
         *distdir.rules(),
     ]
