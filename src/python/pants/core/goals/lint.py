@@ -193,9 +193,9 @@ async def lint(
     dist_dir: DistDir,
 ) -> Lint:
     lint_target_request_types = cast(
-        "Iterable[type[LintTargetsRequest]]", union_membership[LintTargetsRequest]
+        "Iterable[type[LintTargetsRequest]]", union_membership.get(LintTargetsRequest)
     )
-    fmt_target_request_types = cast("Iterable[type[FmtRequest]]", union_membership[FmtRequest])
+    fmt_target_request_types = cast("Iterable[type[FmtRequest]]", union_membership.get(FmtRequest))
     target_request_types = [*lint_target_request_types, *fmt_target_request_types]
     file_request_types = union_membership[LintFilesRequest]
     specified_names = determine_specified_tool_names(
