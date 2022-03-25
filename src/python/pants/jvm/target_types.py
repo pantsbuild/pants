@@ -57,6 +57,10 @@ class JvmResolveField(StringField, AsyncFieldMixin):
         return resolve
 
 
+class PrefixedJvmResolveField(JvmResolveField):
+    alias = "jvm_resolve"
+
+
 class JvmJdkField(StringField):
     alias = "jdk"
     required = False
@@ -64,6 +68,10 @@ class JvmJdkField(StringField):
         "The major version of the JDK that this target should be built with. If not defined, "
         "will default to `[jvm].default_source_jdk`."
     )
+
+
+class PrefixedJvmJdkField(JvmJdkField):
+    alias = "jvm_jdk"
 
 
 # -----------------------------------------------------------------------------------------------
