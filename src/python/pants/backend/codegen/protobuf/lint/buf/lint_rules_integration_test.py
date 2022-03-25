@@ -8,8 +8,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.codegen.protobuf.lint.buf.rules import BufFieldSet, BufRequest
-from pants.backend.codegen.protobuf.lint.buf.rules import rules as buf_rules
+from pants.backend.codegen.protobuf.lint.buf.lint_rules import BufFieldSet, BufRequest
+from pants.backend.codegen.protobuf.lint.buf.lint_rules import rules as buf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.goals.lint import LintResult, LintResults

@@ -39,7 +39,7 @@ class BufRequest(LintTargetsRequest):
     name = BufSubsystem.options_scope
 
 
-@rule(desc="Lint with Buf", level=LogLevel.DEBUG)
+@rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
 async def run_buf(request: BufRequest, buf: BufSubsystem) -> LintResults:
     if buf.skip:
         return LintResults([], linter_name=request.name)
@@ -96,7 +96,7 @@ async def run_buf(request: BufRequest, buf: BufSubsystem) -> LintResults:
                 ",".join(target_sources_stripped.snapshot.files),
             ],
             input_digest=input_digest,
-            description=f"Run Buf on {pluralize(len(request.field_sets), 'file')}.",
+            description=f"Run buf lint on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
