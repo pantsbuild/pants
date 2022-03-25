@@ -14,6 +14,7 @@ from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -47,7 +48,7 @@ class SetupRequest:
 @dataclass(frozen=True)
 class Setup:
     process: Process
-    original_digest: Digest
+    original_snapshot: Snapshot
 
 
 def generate_argv(source_files: SourceFiles, yapf: Yapf, check_only: bool) -> Tuple[str, ...]:
@@ -103,7 +104,7 @@ async def setup_yapf(setup_request: SetupRequest, yapf: Yapf) -> Setup:
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_digest=source_files_snapshot.digest)
+    return Setup(process, original_snapshot=source_files_snapshot)
 
 
 @rule(desc="Format with yapf", level=LogLevel.DEBUG)
@@ -112,9 +113,12 @@ async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
         return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
-    return FmtResult.from_process_result(
-        result,
-        original_digest=setup.original_digest,
+    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
+    return FmtResult(
+        setup.original_snapshot,
+        output_snapshot,
+        stdout=result.stdout.decode(),
+        stderr=result.stderr.decode(),
         formatter_name=request.name,
     )
 

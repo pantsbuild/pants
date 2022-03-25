@@ -7,6 +7,7 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
 from pants.engine.target import StringField
+from pants.util.strutil import softwrap
 
 
 class ProtobufPythonInterpreterConstraintsField(InterpreterConstraintsField):
@@ -19,9 +20,12 @@ class ProtobufPythonResolveField(PythonResolveField):
 
 class PythonSourceRootField(StringField):
     alias = "python_source_root"
-    help = (
-        "The source root to generate Python sources under.\n\nIf unspecified, the source root the "
-        "`protobuf_sources` is under will be used."
+    help = softwrap(
+        """
+        The source root to generate Python sources under.
+
+        If unspecified, the source root the `protobuf_sources` is under will be used.
+        """
     )
 
 

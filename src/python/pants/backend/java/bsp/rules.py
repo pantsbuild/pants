@@ -6,21 +6,21 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.java.bsp.spec import JavacOptionsItem, JavacOptionsParams, JavacOptionsResult
-from pants.backend.java.target_types import JavaSourceField
+from pants.backend.java.target_types import JavaFieldSet, JavaSourceField
 from pants.base.build_root import BuildRoot
 from pants.base.specs import AddressSpecs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode
-from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
+from pants.bsp.util_rules.compile import BSPCompileRequest, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
+    BSPBuildTargets,
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
-    BSPBuildTargetsNew,
 )
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, DigestEntries
-from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTargets, FieldSet, Targets
@@ -92,7 +92,7 @@ class HandleJavacOptionsResult:
 async def handle_bsp_java_options_request(
     request: HandleJavacOptionsRequest,
     build_root: BuildRoot,
-    bsp_build_targets: BSPBuildTargetsNew,
+    bsp_build_targets: BSPBuildTargets,
 ) -> HandleJavacOptionsResult:
     bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
     if bsp_target_name not in bsp_build_targets.targets_mapping:
@@ -132,39 +132,52 @@ async def bsp_javac_options_request(request: JavacOptionsParams) -> JavacOptions
 
 
 @dataclass(frozen=True)
-class JavaBSPCompileFieldSet(BSPCompileFieldSet):
-    required_fields = (JavaSourceField,)
-    source: JavaSourceField
+class JavaBSPCompileRequest(BSPCompileRequest):
+    field_set_type = JavaFieldSet
 
 
 @rule
 async def bsp_java_compile_request(
-    request: JavaBSPCompileFieldSet, classpath_entry_request: ClasspathEntryRequestFactory
+    request: JavaBSPCompileRequest, classpath_entry_request: ClasspathEntryRequestFactory
 ) -> BSPCompileResult:
-    coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
-    assert len(coarsened_targets) == 1
-    coarsened_target = coarsened_targets[0]
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
-
-    result = await Get(
-        FallibleClasspathEntry,
-        ClasspathEntryRequest,
-        classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
+    coarsened_targets = await Get(
+        CoarsenedTargets, Addresses([fs.address for fs in request.field_sets])
     )
-    _logger.info(f"java compile result = {result}")
-    output_digest = EMPTY_DIGEST
-    if result.exit_code == 0 and result.output:
-        entries = await Get(DigestEntries, Digest, result.output.digest)
-        new_entires = [
-            dataclasses.replace(entry, path=os.path.basename(entry.path)) for entry in entries
-        ]
-        flat_digest = await Get(Digest, CreateDigest(new_entires))
-        output_digest = await Get(
-            Digest, AddPrefix(flat_digest, f"jvm/resolves/{resolve.name}/lib")
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
+
+    results = await MultiGet(
+        Get(
+            FallibleClasspathEntry,
+            ClasspathEntryRequest,
+            classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
         )
+        for coarsened_target in coarsened_targets
+    )
+
+    status = StatusCode.OK
+    if any(r.exit_code != 0 for r in results):
+        status = StatusCode.ERROR
+
+    output_digest = EMPTY_DIGEST
+    if status == StatusCode.OK:
+        output_entries = []
+        for result in results:
+            if not result.output:
+                continue
+            entries = await Get(DigestEntries, Digest, result.output.digest)
+            output_entries.extend(
+                [
+                    dataclasses.replace(
+                        entry,
+                        path=f"jvm/resolves/{resolve.name}/lib/{os.path.basename(entry.path)}",
+                    )
+                    for entry in entries
+                ]
+            )
+        output_digest = await Get(Digest, CreateDigest(output_entries))
 
     return BSPCompileResult(
-        status=StatusCode.ERROR if result.exit_code != 0 else StatusCode.OK,
+        status=status,
         output_digest=output_digest,
     )
 
@@ -175,5 +188,5 @@ def rules():
         UnionRule(BSPLanguageSupport, JavaBSPLanguageSupport),
         UnionRule(BSPBuildTargetsMetadataRequest, JavaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPHandlerMapping, JavacOptionsHandlerMapping),
-        UnionRule(BSPCompileFieldSet, JavaBSPCompileFieldSet),
+        UnionRule(BSPCompileRequest, JavaBSPCompileRequest),
     )

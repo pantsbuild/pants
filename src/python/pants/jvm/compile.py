@@ -23,6 +23,7 @@ from pants.engine.target import (
     FieldSet,
     GenerateSourcesRequest,
     SourcesField,
+    TargetFilesGenerator,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -153,9 +154,15 @@ class ClasspathEntryRequestFactory:
         generator_sources = self.generator_sources.get(impl) or frozenset()
 
         compatible_direct = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
-        compatible_generated = sum(1 for t in targets for g in generator_sources if t.has_field(g))
+        compatible_codegen = sum(1 for t in targets for g in generator_sources if t.has_field(g))
+        compatible_codegen_target_generator = sum(
+            1
+            for t in targets
+            if isinstance(t, TargetFilesGenerator)
+            and any(field in t.generated_target_cls.core_fields for field in generator_sources)
+        )
 
-        compatible = compatible_direct + compatible_generated
+        compatible = compatible_direct + compatible_codegen + compatible_codegen_target_generator
         if compatible == 0:
             return _ClasspathEntryRequestClassification.INCOMPATIBLE
         if compatible == len(targets):

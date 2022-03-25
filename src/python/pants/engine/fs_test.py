@@ -1,6 +1,5 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 import hashlib
 import os
 import pkgutil
@@ -12,7 +11,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Set, Union
+from typing import Callable, Dict, Iterable, List, Optional, Set, Union
 
 import pytest
 
@@ -37,6 +36,7 @@ from pants.engine.fs import (
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
+    SnapshotDiff,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -1173,3 +1173,80 @@ def test_snapshot_equality() -> None:
     )
     with pytest.raises(TypeError):
         snapshot < snapshot  # type: ignore[operator]
+
+
+@pytest.mark.parametrize(
+    "before, after, expected_diff",
+    [
+        ({"pants.txt": "relaxed fit"}, {"pants.txt": "relaxed fit"}, SnapshotDiff()),
+        (
+            {"pants.txt": "relaxed fit"},
+            {"pants.txt": "slim fit"},
+            SnapshotDiff(
+                changed_files=("pants.txt",),
+            ),
+        ),
+        (
+            {
+                "levis/501.txt": "original",
+                "levis/jeans/511": "slim fit",
+                "wrangler/cowboy_cut.txt": "performance",
+            },
+            {},
+            SnapshotDiff(
+                our_unique_dirs=("levis", "wrangler"),
+            ),
+        ),
+        (
+            {
+                "levis/501.txt": "original",
+                "levis/jeans/511": "slim fit",
+                "levis/chinos/502": "taper fit",
+                "wrangler/cowboy_cut.txt": "performance",
+            },
+            {
+                "levis/501.txt": "slim",
+                "levis/jeans/511": "slim fit",
+                "wrangler/authentics.txt": "relaxed",
+            },
+            SnapshotDiff(
+                our_unique_dirs=("levis/chinos",),
+                our_unique_files=("wrangler/cowboy_cut.txt",),
+                their_unique_files=("wrangler/authentics.txt",),
+                changed_files=("levis/501.txt",),
+            ),
+        ),
+        # Same name, but one is a file and one is a dir
+        (
+            {"duluth/pants.txt": "5-Pocket"},
+            {"duluth": "DuluthFlex"},
+            SnapshotDiff(our_unique_dirs=("duluth",), their_unique_files=("duluth",)),
+        ),
+    ],
+)
+def test_snapshot_diff(
+    rule_runner: RuleRunner,
+    before: Dict[str, str],
+    after: Dict[str, str],
+    expected_diff: SnapshotDiff,
+) -> None:
+    diff = SnapshotDiff.from_snapshots(
+        rule_runner.make_snapshot(before), rule_runner.make_snapshot(after)
+    )
+
+    assert diff.our_unique_files == expected_diff.our_unique_files
+    assert diff.our_unique_dirs == expected_diff.our_unique_dirs
+    assert diff.their_unique_files == expected_diff.their_unique_files
+    assert diff.their_unique_dirs == expected_diff.their_unique_dirs
+    assert diff.changed_files == expected_diff.changed_files
+
+    # test with the arguments reversed
+    diff = SnapshotDiff.from_snapshots(
+        rule_runner.make_snapshot(after), rule_runner.make_snapshot(before)
+    )
+
+    assert diff.our_unique_files == expected_diff.their_unique_files
+    assert diff.our_unique_dirs == expected_diff.their_unique_dirs
+    assert diff.their_unique_files == expected_diff.our_unique_files
+    assert diff.their_unique_dirs == expected_diff.our_unique_dirs
+    assert diff.changed_files == expected_diff.changed_files

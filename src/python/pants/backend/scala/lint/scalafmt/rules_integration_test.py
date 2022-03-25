@@ -123,9 +123,10 @@ def run_scalafmt(
     return lint_results.results, fmt_result
 
 
-def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
+def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
     files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    return rule_runner.request(Digest, [CreateDigest(files)])
+    digest = rule_runner.request(Digest, [CreateDigest(files)])
+    return rule_runner.request(Snapshot, [digest])
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
@@ -140,7 +141,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     lint_results, fmt_result = run_scalafmt(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
-    assert fmt_result.output == get_digest(rule_runner, {"Foo.scala": GOOD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"Foo.scala": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -157,7 +158,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
     assert "Bar.scala\n" == lint_results[0].stdout
-    assert fmt_result.output == get_digest(rule_runner, {"Bar.scala": FIXED_BAD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"Bar.scala": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -178,7 +179,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 1
     assert "Bar.scala\n" == lint_results[0].stdout
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"Foo.scala": GOOD_FILE, "Bar.scala": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
@@ -208,7 +209,7 @@ def test_multiple_config_files(rule_runner: RuleRunner) -> None:
     ]
     lint_results, fmt_result = run_scalafmt(rule_runner, tgts)
     assert len(lint_results) == 2
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"foo/Foo.scala": GOOD_FILE, "foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
     )
     assert fmt_result.did_change is True

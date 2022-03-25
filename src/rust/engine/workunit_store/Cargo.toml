@@ -19,3 +19,6 @@ rand = "0.8"
 strum = "0.20"
 strum_macros = "0.23"
 tokio = { version = "1.16", features = ["rt", "sync"] }
+
+[dev-dependencies]
+internment = "0.6"

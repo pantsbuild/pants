@@ -13,7 +13,7 @@ from pants.backend.terraform.tool import TerraformProcess
 from pants.build_graph.address import Address
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, MergeDigests, Snapshot
+from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
@@ -35,7 +35,7 @@ class StyleSetupRequest:
 @dataclass(frozen=True)
 class StyleSetup:
     directory_to_process: dict[str, tuple[TerraformProcess, tuple[Address, ...]]]
-    original_digest: Digest
+    original_snapshot: Snapshot
 
 
 @rule(level=LogLevel.DEBUG)
@@ -85,7 +85,7 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
         directory_to_process[directory] = (process, addresses)
 
     return StyleSetup(
-        directory_to_process=directory_to_process, original_digest=source_files_snapshot.digest
+        directory_to_process=directory_to_process, original_snapshot=source_files_snapshot
     )
 
 

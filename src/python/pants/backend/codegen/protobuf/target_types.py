@@ -21,6 +21,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -61,9 +62,12 @@ class ProtobufSourceTarget(Target):
         ProtobufSourceField,
         ProtobufGrpcToggleField,
     )
-    help = (
-        "A single Protobuf file used to generate various languages.\n\n"
-        f"See {doc_url('protobuf')}."
+    help = softwrap(
+        f"""
+        A single Protobuf file used to generate various languages.
+
+        See {doc_url('protobuf')}.
+        """
     )
 
 

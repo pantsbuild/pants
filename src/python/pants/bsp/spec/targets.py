@@ -176,6 +176,7 @@ class DependencyModulesParams:
         }
 
 
+@dataclass(frozen=True)
 class DependencyModule:
     # Module name
     name: str

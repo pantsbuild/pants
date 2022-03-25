@@ -12,6 +12,7 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -46,7 +47,7 @@ class SetupRequest:
 @dataclass(frozen=True)
 class Setup:
     process: Process
-    original_digest: Digest
+    original_snapshot: Snapshot
 
 
 @rule(level=LogLevel.DEBUG)
@@ -92,7 +93,7 @@ async def setup_shfmt(setup_request: SetupRequest, shfmt: Shfmt) -> Setup:
         description=f"Run shfmt on {pluralize(len(setup_request.request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
     )
-    return Setup(process, original_digest=source_files_snapshot.digest)
+    return Setup(process, original_snapshot=source_files_snapshot)
 
 
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
@@ -101,8 +102,13 @@ async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
         return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
-    return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name=request.name
+    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
+    return FmtResult(
+        setup.original_snapshot,
+        output_snapshot,
+        stdout=result.stdout.decode(),
+        stderr=result.stderr.decode(),
+        formatter_name=request.name,
     )
 
 

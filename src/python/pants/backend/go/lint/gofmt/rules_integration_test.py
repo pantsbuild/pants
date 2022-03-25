@@ -26,6 +26,7 @@ from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -128,9 +129,10 @@ def run_gofmt(
     return lint_results.results, fmt_result
 
 
-def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
+def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
     files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    return rule_runner.request(Digest, [CreateDigest(files)])
+    digest = rule_runner.request(Digest, [CreateDigest(files)])
+    return rule_runner.request(Snapshot, [digest])
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
@@ -143,7 +145,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 0
     assert lint_results[0].stderr == ""
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_digest(rule_runner, {"f.go": GOOD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.go": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -157,7 +159,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 1
     assert "f.go" in lint_results[0].stdout
     assert fmt_result.stderr == ""
-    assert fmt_result.output == get_digest(rule_runner, {"f.go": FIXED_BAD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.go": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -176,7 +178,7 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 1
     assert "bad.go" in lint_results[0].stdout
     assert "good.go" not in lint_results[0].stdout
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good.go": GOOD_FILE, "bad.go": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
@@ -199,7 +201,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 1
     assert "bad/f.go" in lint_results[0].stdout
     assert "good/f.go" not in lint_results[0].stdout
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good/f.go": GOOD_FILE, "bad/f.go": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
