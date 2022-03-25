@@ -46,6 +46,7 @@ from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequ
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, path_safe
 
 logger = logging.getLogger(__name__)
@@ -503,7 +504,8 @@ async def get_repository_pex(
                     f"the resolve `{chosen_resolve.name}` (from `[python].resolves`)"
                 ),
                 resolve_name=chosen_resolve.name,
-                req_strings=request.requirements.req_strings,
+                # NB: A blank req_strings means install the entire lockfile
+                req_strings=FrozenOrderedSet([]),
             ),
             interpreter_constraints=interpreter_constraints,
             platforms=request.platforms,
@@ -655,6 +657,36 @@ async def get_requirements_pex(request: RequirementsPexRequest, setup: PythonSet
         ),
     )
     return pex_request
+
+
+@dataclass(frozen=True)
+class LockfileSubsetRequest:
+    addresses: Addresses
+
+
+# @TODO: Make this return either a Lockfile (PEX lockfile + no-run-against-entire-lockfile)
+#   or return a `PEX` (to be added to PEX_PATH at the callsite)
+# Assuming the former for the PoC
+
+
+@rule
+async def get_lockfile_subset(request: LockfileSubsetRequest) -> Lockfile:
+    chosen_resolve_get = Get(ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses))
+    requirements_get = Get(PexRequirements, _PexRequirementsRequest(request.addresses))
+    chosen_resolve, requirements = await MultiGet(
+        chosen_resolve_get,
+        requirements_get,
+    )
+
+    lockfile = Lockfile(
+        file_path=chosen_resolve.lockfile_path,
+        file_path_description_of_origin=(
+            f"the resolve `{chosen_resolve.name}` (from `[python].resolves`)"
+        ),
+        resolve_name=chosen_resolve.name,
+        req_strings=requirements.req_strings,
+    )
+    return lockfile
 
 
 def rules():

@@ -16,7 +16,8 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
+from pants.backend.python.util_rules.pex_from_targets import LockfileSubsetRequest
+from pants.backend.python.util_rules.pex_requirements import Lockfile
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -33,7 +34,7 @@ from pants.core.goals.test import (
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
@@ -168,9 +169,7 @@ async def setup_pytest_for_target(
 
     interpreter_constraints = InterpreterConstraints.create_from_targets(all_targets, python_setup)
 
-    requirements_pex_get = Get(
-        Pex, RequirementsPexRequest([request.field_set.address], internal_only=True)
-    )
+    locky_get = Get(Lockfile, LockfileSubsetRequest(Addresses([request.field_set.address])))
     pytest_pex_get = Get(
         Pex,
         PexRequest(
@@ -198,14 +197,14 @@ async def setup_pytest_for_target(
 
     (
         pytest_pex,
-        requirements_pex,
+        locky,
         prepared_sources,
         field_set_source_files,
         field_set_extra_env,
         extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_get,
-        requirements_pex_get,
+        locky_get,
         prepared_sources_get,
         field_set_source_files_get,
         field_set_extra_env_get,
@@ -227,9 +226,10 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
+            requirements=locky,
             main=pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, requirements_pex, local_dists.pex],
+            pex_path=[pytest_pex, local_dists.pex],
         ),
     )
     config_files_get = Get(
