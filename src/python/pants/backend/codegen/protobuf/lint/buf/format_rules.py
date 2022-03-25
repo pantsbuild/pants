@@ -153,7 +153,16 @@ async def run_buf_lint(request: BufRequest, buf: BufSubsystem) -> LintResults:
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
 
-    return LintResults([LintResult.from_fallible_process_result(result)], linter_name=request.name)
+    return LintResults(
+        [
+            LintResult(
+                exit_code=0 if not result.stdout else 1,  # buf format always exits with code 0
+                stdout=result.stdout.decode(),
+                stderr=result.stderr.decode(),
+            )
+        ],
+        linter_name=request.name,
+    )
 
 
 def rules():
