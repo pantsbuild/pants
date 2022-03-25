@@ -14,6 +14,7 @@ use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use workunit_store::WorkunitStore;
 
 use crate::{EntryType, FileContent, Store, UploadSummary, MEGABYTES};
 
@@ -64,11 +65,17 @@ pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Byt
 /// Create a StubCas with a file and a directory inside.
 ///
 pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
+  let _ = WorkunitStore::setup_for_tests();
   StubCAS::builder()
     .chunk_size_bytes(chunk_size_bytes)
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build()
+}
+
+pub fn new_empty_cas() -> StubCAS {
+  let _ = WorkunitStore::setup_for_tests();
+  StubCAS::empty()
 }
 
 ///
@@ -205,6 +212,7 @@ async fn load_recursive_directory() {
   let recursive_testdir_directory = recursive_testdir.directory();
   let recursive_testdir_digest = recursive_testdir.directory_digest();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .file(&roland)
     .file(&catnip)
@@ -247,7 +255,7 @@ async fn load_recursive_directory() {
 async fn load_file_missing_is_none() {
   let dir = TempDir::new().unwrap();
 
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
   assert_eq!(
     load_file_bytes(
       &new_store(dir.path(), &cas.address()),
@@ -263,7 +271,7 @@ async fn load_file_missing_is_none() {
 async fn load_directory_missing_is_none() {
   let dir = TempDir::new().unwrap();
 
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
   assert_eq!(
     new_store(dir.path(), &cas.address())
       .load_directory(TestDirectory::containing_roland().digest(),)
@@ -277,6 +285,7 @@ async fn load_directory_missing_is_none() {
 async fn load_file_remote_error_is_error() {
   let dir = TempDir::new().unwrap();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::always_errors();
   let error = load_file_bytes(
     &new_store(dir.path(), &cas.address()),
@@ -299,6 +308,7 @@ async fn load_file_remote_error_is_error() {
 async fn load_directory_remote_error_is_error() {
   let dir = TempDir::new().unwrap();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::always_errors();
   let error = new_store(dir.path(), &cas.address())
     .load_directory(TestData::roland().digest())
@@ -354,6 +364,7 @@ async fn non_canonical_remote_directory_is_error() {
 
   let dir = TempDir::new().unwrap();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .unverified_content(
       non_canonical_directory_fingerprint.clone(),
@@ -381,6 +392,7 @@ async fn wrong_remote_file_bytes_is_error() {
 
   let testdata = TestData::roland();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .unverified_content(
       testdata.fingerprint(),
@@ -407,6 +419,7 @@ async fn wrong_remote_directory_bytes_is_error() {
 
   let testdir = TestDirectory::containing_dnalor();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .unverified_content(
       testdir.fingerprint(),
@@ -544,7 +557,7 @@ async fn expand_directory_missing_subdir() {
 #[tokio::test]
 async fn uploads_files() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
 
@@ -569,7 +582,7 @@ async fn uploads_files() {
 #[tokio::test]
 async fn uploads_directories_recursively() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
   let testdir = TestDirectory::containing_roland();
@@ -604,7 +617,7 @@ async fn uploads_directories_recursively() {
 #[tokio::test]
 async fn uploads_files_recursively_when_under_three_digests_ignoring_items_already_in_cas() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
   let testdir = TestDirectory::containing_roland();
@@ -645,7 +658,7 @@ async fn uploads_files_recursively_when_under_three_digests_ignoring_items_alrea
 #[tokio::test]
 async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_digests() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let catnip = TestData::catnip();
   let roland = TestData::roland();
@@ -696,7 +709,7 @@ async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_d
 #[tokio::test]
 async fn does_not_reupload_big_file_already_in_cas() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   new_local_store(dir.path())
     .store_file_bytes(extra_big_file_bytes(), false)
@@ -729,7 +742,7 @@ async fn does_not_reupload_big_file_already_in_cas() {
 #[tokio::test]
 async fn upload_missing_files() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
 
@@ -748,7 +761,7 @@ async fn upload_missing_files() {
 #[tokio::test]
 async fn upload_missing_file_in_directory() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdir = TestDirectory::containing_roland();
 
@@ -777,7 +790,7 @@ async fn upload_missing_file_in_directory() {
 #[tokio::test]
 async fn uploading_digest_with_wrong_size_is_error() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
 
@@ -801,6 +814,7 @@ async fn uploading_digest_with_wrong_size_is_error() {
 #[tokio::test]
 async fn instance_name_upload() {
   let dir = TempDir::new().unwrap();
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .instance_name("dark-tower".to_owned())
     .build();
@@ -846,6 +860,7 @@ async fn instance_name_upload() {
 #[tokio::test]
 async fn instance_name_download() {
   let dir = TempDir::new().unwrap();
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .instance_name("dark-tower".to_owned())
     .file(&TestData::roland())
@@ -880,6 +895,7 @@ async fn instance_name_download() {
 #[tokio::test]
 async fn auth_upload() {
   let dir = TempDir::new().unwrap();
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .required_auth_token("Armory.Key".to_owned())
     .build();
@@ -927,6 +943,7 @@ async fn auth_upload() {
 #[tokio::test]
 async fn auth_download() {
   let dir = TempDir::new().unwrap();
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .required_auth_token("Armory.Key".to_owned())
     .file(&TestData::roland())
@@ -1357,7 +1374,7 @@ fn is_readonly(path: &Path) -> bool {
 #[tokio::test]
 async fn returns_upload_summary_on_empty_cas() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testroland = TestData::roland();
   let testcatnip = TestData::catnip();
@@ -1404,7 +1421,7 @@ async fn returns_upload_summary_on_empty_cas() {
 #[tokio::test]
 async fn summary_does_not_count_things_in_cas() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testroland = TestData::roland();
   let testcatnip = TestData::catnip();
@@ -1495,6 +1512,7 @@ async fn explicitly_overwrites_already_existing_file() {
 
   let cas_file = TestData::new("abc123");
   let contents_dir = test_file_with_arbitrary_content("some_filename.ext", &cas_file);
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .directory(&contents_dir)
     .file(&cas_file)

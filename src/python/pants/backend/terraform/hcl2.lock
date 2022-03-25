@@ -9,7 +9,7 @@
 //     "CPython<4,>=3.7"
 //   ],
 //   "generated_with_requirements": [
-//     "python-hcl2==3.0.3"
+//     "python-hcl2==3.0.5"
 //   ]
 // }
 // --- END PANTS LOCKFILE METADATA ---
@@ -43,8 +43,8 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "31b8135f474aa2dbd2325d7924f5ffe0b8a713669ca2d043511d8ed5a91798e5",
-              "url": "https://files.pythonhosted.org/packages/a1/89/aa14f1efd131ebb84d54c5911d1604327a81c947dc24b1041cdb3a9ab169/python-hcl2-3.0.3.tar.gz"
+              "hash": "f8beff86346c6f42ccad75d6d2af4a33981802b6a000de881cc93b649f49ed1c",
+              "url": "https://files.pythonhosted.org/packages/fb/a6/bd6f186bc3c462337a91f4d35daa49423788733f48e8e58793ab516227de/python-hcl2-3.0.5.tar.gz"
             }
           ],
           "project_name": "python-hcl2",
@@ -52,20 +52,20 @@
             "lark-parser<0.11.0,>=0.10.0"
           ],
           "requires_python": ">=3.6.0",
-          "version": "3.0.3"
+          "version": "3.0.5"
         }
       ],
       "platform_tag": [
         "cp39",
         "cp39",
-        "macosx_11_0_arm64"
+        "macosx_12_0_x86_64"
       ]
     }
   ],
   "pex_version": "2.1.72",
   "prefer_older_binary": false,
   "requirements": [
-    "python-hcl2==3.0.3"
+    "python-hcl2==3.0.5"
   ],
   "requires_python": [
     "<4,>=3.7"

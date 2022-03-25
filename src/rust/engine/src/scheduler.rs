@@ -146,10 +146,13 @@ impl Scheduler {
   /// Returns references to all Python objects held alive by the graph, and a summary of sizes of
   /// Rust structs as a count and total size.
   ///
-  pub fn live_items(&self, session: &Session) -> (Vec<Value>, HashMap<String, (usize, usize)>) {
+  pub fn live_items(
+    &self,
+    session: &Session,
+  ) -> (Vec<Value>, HashMap<&'static str, (usize, usize)>) {
     let context = Context::new(self.core.clone(), session.clone());
     let mut items = vec![];
-    let mut sizes: HashMap<String, (usize, usize)> = HashMap::new();
+    let mut sizes: HashMap<&'static str, (usize, usize)> = HashMap::new();
     // TODO: Creation of a Context is exposed in https://github.com/Aeledfyr/deepsize/pull/31.
     let mut deep_context = deepsize::Context::new();
     self.core.graph.visit_live(&context, |k, v| {

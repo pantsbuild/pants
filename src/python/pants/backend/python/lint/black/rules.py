@@ -16,12 +16,13 @@ from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize
+from pants.util.strutil import pluralize, strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
@@ -50,7 +51,7 @@ class SetupRequest:
 @dataclass(frozen=True)
 class Setup:
     process: Process
-    original_digest: Digest
+    original_snapshot: Snapshot
 
 
 def generate_argv(source_files: SourceFiles, black: Black, *, check_only: bool) -> Tuple[str, ...]:
@@ -126,7 +127,7 @@ async def setup_black(
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_digest=source_files_snapshot.digest)
+    return Setup(process, original_snapshot=source_files_snapshot)
 
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
@@ -135,11 +136,13 @@ async def black_fmt(request: BlackRequest, black: Black) -> FmtResult:
         return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
-    return FmtResult.from_process_result(
-        result,
-        original_digest=setup.original_digest,
+    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
+    return FmtResult(
+        setup.original_snapshot,
+        output_snapshot,
+        stdout=strip_v2_chroot_path(result.stdout),
+        stderr=strip_v2_chroot_path(result.stderr),
         formatter_name=request.name,
-        strip_chroot_path=True,
     )
 
 

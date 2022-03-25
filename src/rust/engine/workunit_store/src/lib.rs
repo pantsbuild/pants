@@ -97,7 +97,7 @@ type RunningWorkunitGraph = StableDiGraph<SpanId, (), u32>;
 ///
 #[derive(Clone, Debug)]
 pub struct Workunit {
-  pub name: String,
+  pub name: &'static str,
   pub span_id: SpanId,
   pub parent_id: Option<SpanId>,
   pub state: WorkunitState,
@@ -119,7 +119,7 @@ impl Workunit {
     let identifier = if let Some(ref s) = self.metadata.desc {
       s.as_str()
     } else {
-      self.name.as_str()
+      self.name
     };
 
     /* This length calculation doesn't treat multi-byte unicode charcters identically
@@ -620,10 +620,13 @@ impl WorkunitStore {
     self.heavy_hitters_data.lock().heavy_hitters(k)
   }
 
-  fn start_workunit(
+  ///
+  /// NB: Public for macro use. Use `in_workunit!` instead.
+  ///
+  pub fn _start_workunit(
     &self,
     span_id: SpanId,
-    name: String,
+    name: &'static str,
     parent_id: Option<SpanId>,
     metadata: WorkunitMetadata,
   ) -> Workunit {
@@ -686,7 +689,7 @@ impl WorkunitStore {
 
   pub fn add_completed_workunit(
     &self,
-    name: String,
+    name: &'static str,
     start_time: SystemTime,
     end_time: SystemTime,
     parent_id: Option<SpanId>,
@@ -782,12 +785,7 @@ impl WorkunitStore {
   pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
     let store = WorkunitStore::new(false, Level::Debug);
     store.init_thread_state(None);
-    let workunit = store.start_workunit(
-      SpanId(0),
-      "testing".to_owned(),
-      None,
-      WorkunitMetadata::default(),
-    );
+    let workunit = store._start_workunit(SpanId(0), "testing", None, WorkunitMetadata::default());
     (store.clone(), RunningWorkunit::new(store, Some(workunit)))
   }
 }
@@ -841,35 +839,36 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
   get_workunit_store_handle().expect("A WorkunitStore has not been set for this thread.")
 }
 
+/// Run the given async block. If the level given by the WorkunitMetadata is above a configured
+/// threshold, the block will run inside of a workunit recorded in the workunit store.
 ///
-/// NB: Public for macro usage: use the `in_workunit!` macro.
-///
-pub fn _start_workunit(
-  store_handle: &mut WorkunitStoreHandle,
-  name: String,
-  initial_metadata: WorkunitMetadata,
-) -> RunningWorkunit {
-  let span_id = SpanId::new();
-  let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
-  let workunit = store_handle
-    .store
-    .start_workunit(span_id, name, parent_id, initial_metadata);
-  RunningWorkunit::new(store_handle.store.clone(), Some(workunit))
-}
-
+/// NB: This macro may only be used on a thread with a WorkunitStore configured (via
+/// `WorkunitStore::init_thread_state`). Although it would be an option to silently ignore
+/// workunits recorded from other threads, that would usually represent a bug caused by failing to
+/// propagate state between threads.
 #[macro_export]
 macro_rules! in_workunit {
-  ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| $f: expr $(,)?) => {{
-    // TODO: The workunit store argument is unused: remove in separate patch.
-    std::mem::drop($workunit_store);
-
+  ($workunit_name: expr, $workunit_level: expr $(, $workunit_field_name:ident = $workunit_field_value:expr)*, |$workunit: ident| $f: expr $(,)?) => {{
     use futures::future::FutureExt;
     let mut store_handle = $crate::expect_workunit_store_handle();
-    // TODO: Move Level out of the metadata to allow skipping construction if disabled.
-    let workunit_metadata = $workunit_metadata;
-    if store_handle.store.max_level() >= workunit_metadata.level {
-      let mut $workunit =
-        $crate::_start_workunit(&mut store_handle, $workunit_name, workunit_metadata);
+    let level: log::Level  = $workunit_level;
+    if store_handle.store.max_level() >= level {
+      let mut $workunit = {
+        let workunit_metadata = $crate::WorkunitMetadata {
+          level,
+          $(
+                $workunit_field_name: $workunit_field_value,
+          )*
+          ..Default::default()
+        };
+        let span_id = $crate::SpanId::new();
+        let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
+        let workunit =
+          store_handle
+            .store
+            ._start_workunit(span_id, $workunit_name, parent_id, workunit_metadata);
+        $crate::RunningWorkunit::new(store_handle.store.clone(), Some(workunit))
+      };
       $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
         let result = {
           let $workunit = &mut $workunit;
@@ -902,6 +901,10 @@ pub struct RunningWorkunit {
 impl RunningWorkunit {
   pub fn new(store: WorkunitStore, workunit: Option<Workunit>) -> RunningWorkunit {
     RunningWorkunit { store, workunit }
+  }
+
+  pub fn record_observation(&mut self, metric: ObservationMetric, value: u64) {
+    self.store.record_observation(metric, value);
   }
 
   pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {

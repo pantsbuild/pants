@@ -6,7 +6,6 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
-from textwrap import dedent
 from typing import Callable, ClassVar, Iterator, Optional, cast
 
 from typing_extensions import final
@@ -29,36 +28,44 @@ from pants.engine.target import (
     Target,
 )
 from pants.util.docutil import bin_name, doc_url
+from pants.util.strutil import softwrap
 
 # Common help text to be applied to each field that supports value interpolation.
 _interpolation_help = (
     "{kind} may use placeholders in curly braces to be interpolated. The placeholders are derived "
-    "from various sources, such as the Dockerfile instructions and build args.\n\n"
+    "from various sources, such as the Dockerfile instructions and build args."
 )
 
 
 class DockerImageBuildArgsField(StringSequenceField):
     alias = "extra_build_args"
     default = ()
-    help = (
-        "Build arguments (`--build-arg`) to use when building this image. "
-        "Entries are either strings in the form `ARG_NAME=value` to set an explicit value; "
-        "or just `ARG_NAME` to copy the value from Pants's own environment.\n\n"
-        "Use `[docker].build_args` to set default build args for all images."
+    help = softwrap(
+        """
+        Build arguments (`--build-arg`) to use when building this image.
+        Entries are either strings in the form `ARG_NAME=value` to set an explicit value;
+        or just `ARG_NAME` to copy the value from Pants's own environment.
+
+        Use `[docker].build_args` to set default build args for all images.
+        """
     )
 
 
 class DockerImageContextRootField(StringField):
     alias = "context_root"
-    help = (
-        "Specify which directory to use as the Docker build context root. This affects the file "
-        "paths to use for the `COPY` and `ADD` instructions. For example, whether "
-        "`COPY files/f.txt` should look for the file relative to the build root: "
-        "`<build root>/files/f.txt` vs relative to the BUILD file: "
-        "`<build root>/path_to_build_file/files/f.txt`.\n\n"
-        "Specify the `context_root` path as `files` for relative to build root, or as `./files` "
-        "for relative to the BUILD file.\n\n"
-        "If `context_root` is not specified, it defaults to `[docker].default_context_root`."
+    help = softwrap(
+        """
+        Specify which directory to use as the Docker build context root. This affects the file
+        paths to use for the `COPY` and `ADD` instructions. For example, whether
+        `COPY files/f.txt` should look for the file relative to the build root:
+        `<build root>/files/f.txt` vs relative to the BUILD file:
+        `<build root>/path_to_build_file/files/f.txt`.
+
+        Specify the `context_root` path as `files` for relative to build root, or as `./files`
+        for relative to the BUILD file.
+
+        If `context_root` is not specified, it defaults to `[docker].default_context_root`.
+        """
     )
 
     @classmethod
@@ -67,9 +74,14 @@ class DockerImageContextRootField(StringField):
         if isinstance(value_or_default, str) and value_or_default.startswith("/"):
             val = value_or_default.strip("/")
             raise InvalidFieldException(
-                f"The `{cls.alias}` field in target {address} must be a relative path, but was "
-                f"{value_or_default!r}. Use {val!r} for a path relative to the build root, or "
-                f"{'./' + val!r} for a path relative to the BUILD file (i.e. {os.path.join(address.spec_path, val)!r})."
+                softwrap(
+                    f"""
+                    The `{cls.alias}` field in target {address} must be a relative path, but was
+                    {value_or_default!r}. Use {val!r} for a path relative to the build root, or
+                    {'./' + val!r} for a path relative to the BUILD file
+                    (i.e. {os.path.join(address.spec_path, val)!r}).
+                    """
+                )
             )
         return value_or_default
 
@@ -84,55 +96,65 @@ class DockerImageSourceField(OptionalSingleSourceField):
     # to the user.
     default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
-    help = (
-        "The Dockerfile to use when building the Docker image.\n\n"
-        "Use the `instructions` field instead if you prefer not having the Dockerfile in your "
-        "source tree."
+    help = softwrap(
+        """
+        The Dockerfile to use when building the Docker image.
+
+        Use the `instructions` field instead if you prefer not having the Dockerfile in your
+        source tree.
+        """
     )
 
 
 class DockerImageInstructionsField(StringSequenceField):
     alias = "instructions"
     required = False
-    help = (
-        "The `Dockerfile` content, typically one instruction per list item.\n\n"
-        "Use the `source` field instead if you prefer having the Dockerfile in your source tree."
-        "\n\n"
-        + dedent(
-            """\
-            Example:
+    help = softwrap(
+        """
+        The `Dockerfile` content, typically one instruction per list item.
 
-                # example/BUILD
-                docker_image(
-                  instructions=[
-                    "FROM base/image:1.0",
-                    "RUN echo example",
-                  ],
-                )
-            """
-        )
+        Use the `source` field instead if you prefer having the Dockerfile in your source tree.
+
+        Example:
+
+            # example/BUILD
+            docker_image(
+              instructions=[
+                "FROM base/image:1.0",
+                "RUN echo example",
+              ],
+            )
+        """
     )
 
 
 class DockerImageTagsField(StringSequenceField):
     alias = "image_tags"
     default = ("latest",)
-    help = (
-        "Any tags to apply to the Docker image name (the version is usually applied as a tag).\n\n"
-        + _interpolation_help.format(kind="tag")
-        + f"See {doc_url('tagging-docker-images')}."
+    help = softwrap(
+        f"""
+
+        Any tags to apply to the Docker image name (the version is usually applied as a tag).
+
+        {_interpolation_help.format(kind="tag")}
+
+        See {doc_url('tagging-docker-images')}.
+        """
     )
 
 
 class DockerImageTargetStageField(StringField):
     alias = "target_stage"
-    help = (
-        "Specify target build stage, rather than building the entire `Dockerfile`.\n\n"
-        "When using multi-stage build, you may name your stages, and can target them when building "
-        "to only selectively build a certain stage. See also the `--docker-build-target-stage` "
-        "option.\n\n"
-        "Read more about [multi-stage Docker builds]"
-        "(https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)"
+    help = softwrap(
+        """
+        Specify target build stage, rather than building the entire `Dockerfile`.
+
+        When using multi-stage build, you may name your stages, and can target them when building
+        to only selectively build a certain stage. See also the `--docker-build-target-stage`
+        option.
+
+        Read more about [multi-stage Docker builds](https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)
+        """
     )
 
 
@@ -143,48 +165,53 @@ class DockerImageDependenciesField(Dependencies):
 class DockerImageRegistriesField(StringSequenceField):
     alias = "registries"
     default = (ALL_DEFAULT_REGISTRIES,)
-    help = (
-        "List of addresses or configured aliases to any Docker registries to use for the "
-        "built image.\n\n"
-        "The address is a domain name with optional port for your registry, and any registry "
-        "aliases are prefixed with `@` for addresses in the [docker].registries configuration "
-        "section.\n\n"
-        "By default, all configured registries with `default = true` are used.\n\n"
-        + dedent(
-            """\
-            Example:
+    help = softwrap(
+        """
+        List of addresses or configured aliases to any Docker registries to use for the
+        built image.
 
-                # pants.toml
-                [docker.registries.my-registry-alias]
-                address = "myregistrydomain:port"
-                default = false  # optional
+        The address is a domain name with optional port for your registry, and any registry
+        aliases are prefixed with `@` for addresses in the [docker].registries configuration
+        section.
 
-                # example/BUILD
-                docker_image(
-                    registries = [
-                        "@my-registry-alias",
-                        "myregistrydomain:port",
-                    ],
-                )
+        By default, all configured registries with `default = true` are used.
 
-            """
-        )
-        + (
-            "The above example shows two valid `registry` options: using an alias to a configured "
-            "registry and the address to a registry verbatim in the BUILD file."
-        )
+        Example:
+
+            # pants.toml
+            [docker.registries.my-registry-alias]
+            address = "myregistrydomain:port"
+            default = false # optional
+
+            # example/BUILD
+            docker_image(
+                registries = [
+                    "@my-registry-alias",
+                    "myregistrydomain:port",
+                ],
+            )
+
+        The above example shows two valid `registry` options: using an alias to a configured
+        registry and the address to a registry verbatim in the BUILD file.
+        """
     )
 
 
 class DockerImageRepositoryField(StringField):
     alias = "repository"
-    help = (
-        'The repository name for the Docker image. e.g. "<repository>/<name>".\n\n'
-        "It uses the `[docker].default_repository` by default.\n\n"
-        + _interpolation_help.format(kind="repository")
-        + "Additional placeholders for the repository field are: `name`, `directory` and "
-        "`parent_directory`.\n\nSee the documentation for `[docker].default_repository` for more "
-        "information."
+    help = softwrap(
+        f"""
+        The repository name for the Docker image. e.g. "<repository>/<name>".
+
+        It uses the `[docker].default_repository` by default.
+
+        {_interpolation_help.format(kind="repository")}
+
+        Additional placeholders for the repository field are: `name`, `directory` and
+        `parent_directory`.
+
+        See the documentation for `[docker].default_repository` for more information.
+        """
     )
 
 
@@ -217,11 +244,15 @@ class DockerBuildOptionFieldMixin(ABC):
 
 class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringToStringField):
     alias = "image_labels"
-    help = (
-        "Provide image metadata.\n\n"
-        + _interpolation_help.format(kind="label value")
-        + "See [Docker labels](https://docs.docker.com/config/labels-custom-metadata/"
-        "#manage-labels-on-objects) for more information."
+    help = softwrap(
+        f"""
+        Provide image metadata.
+
+        {_interpolation_help.format(kind="label value")}
+
+        See [Docker labels](https://docs.docker.com/config/labels-custom-metadata/#manage-labels-on-objects)
+        for more information.
+        """
     )
     docker_build_option = "--label"
 
@@ -234,25 +265,25 @@ class DockerImageBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
     alias = "secrets"
-    help = (
-        "Secret files to expose to the build (only if BuildKit enabled).\n\n"
-        "Secrets may use absolute paths, or paths relative to your build root, or the BUILD file "
-        "if prefixed with `./`. The id should be valid as used by the Docker build `--secret` "
-        "option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more "
-        "information.\n\n"
-        + dedent(
-            """\
-            Example:
+    help = softwrap(
+        """
+        Secret files to expose to the build (only if BuildKit enabled).
 
-                docker_image(
-                    secrets={
-                        "mysecret": "/var/secrets/some-secret",
-                        "repo-secret": "src/proj/secrets/some-secret",
-                        "target-secret": "./secrets/some-secret",
-                    }
-                )
-            """
-        )
+        Secrets may use absolute paths, or paths relative to your build root, or the BUILD file
+        if prefixed with `./`. The id should be valid as used by the Docker build `--secret`
+        option. See [Docker secrets](https://docs.docker.com/engine/swarm/secrets/) for more
+        information.
+
+        Example:
+
+            docker_image(
+                secrets={
+                    "mysecret": "/var/secrets/some-secret",
+                    "repo-secret": "src/proj/secrets/some-secret",
+                    "target-secret": "./secrets/some-secret",
+                }
+            )
+        """
     )
 
     docker_build_option = "--secret"
@@ -273,14 +304,19 @@ class DockerImageBuildSecretsOptionField(
 class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
     alias = "ssh"
     default = ()
-    help = (
-        "SSH agent socket or keys to expose to the build (only if BuildKit enabled) "
-        "(format: default|<id>[=<socket>|<key>[,<key>]])\n\n"
-        "The exposed agent and/or keys can then be used in your `Dockerfile` by mounting them in "
-        "your `RUN` instructions:\n\n"
-        "    RUN --mount=type=ssh ...\n\n"
-        "See [Docker documentation](https://docs.docker.com/develop/develop-images"
-        "/build_enhancements/#using-ssh-to-access-private-data-in-builds) for more information."
+    help = softwrap(
+        """
+        SSH agent socket or keys to expose to the build (only if BuildKit enabled)
+        (format: default|<id>[=<socket>|<key>[,<key>]])
+
+        The exposed agent and/or keys can then be used in your `Dockerfile` by mounting them in
+        your `RUN` instructions:
+
+            RUN --mount=type=ssh ...
+
+        See [Docker documentation](https://docs.docker.com/develop/develop-images/build_enhancements/#using-ssh-to-access-private-data-in-builds)
+        for more information.
+        """
     )
 
     docker_build_option = "--ssh"
@@ -308,23 +344,26 @@ class DockerImageTarget(Target):
         DockerImageTargetStageField,
         RestartableField,
     )
-    help = (
-        "The `docker_image` target describes how to build and tag a Docker image.\n\n"
-        "Any dependencies, as inferred or explicitly specified, will be included in the Docker "
-        "build context, after being packaged if applicable.\n\n"
-        "By default, will use a Dockerfile from the same directory as the BUILD file this target "
-        "is defined in. Point at another file with the `source` field, or use the `instructions` "
-        "field to have the Dockerfile contents verbatim directly in the BUILD file.\n\n"
-        "Dependencies on upstream/base images defined by another `docker_image` are inferred if "
-        "referenced by a build argument with a default value of the target address.\n\n"
-        + dedent(
-            """\
-            Example:
+    help = softwrap(
+        """
+        The `docker_image` target describes how to build and tag a Docker image.
 
-                # src/docker/downstream/Dockerfile
-                ARG BASE=src/docker/upstream:image
-                FROM $BASE
-                ...
-            """
-        )
+        Any dependencies, as inferred or explicitly specified, will be included in the Docker
+        build context, after being packaged if applicable.
+
+        By default, will use a Dockerfile from the same directory as the BUILD file this target
+        is defined in. Point at another file with the `source` field, or use the `instructions`
+        field to have the Dockerfile contents verbatim directly in the BUILD file.
+
+        Dependencies on upstream/base images defined by another `docker_image` are inferred if
+        referenced by a build argument with a default value of the target address.
+
+        Example:
+
+            # src/docker/downstream/Dockerfile
+            ARG BASE=src/docker/upstream:image
+            FROM $BASE
+            ...
+
+        """
     )
