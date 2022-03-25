@@ -36,7 +36,7 @@ class BufFieldSet(FieldSet):
 
 class BufRequest(LintTargetsRequest):
     field_set_type = BufFieldSet
-    name = BufSubsystem.options_scope
+    name = "buf-lint"
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)

@@ -9,7 +9,7 @@ from pants.option.option_types import ArgsListOption, SkipOption
 
 
 class BufSubsystem(TemplatedExternalTool):
-    options_scope = "buf-lint"
+    options_scope = "buf"
     name = "Buf"
     help = "A linter and formatter for Protocol Buffers (https://github.com/bufbuild/buf)."
 

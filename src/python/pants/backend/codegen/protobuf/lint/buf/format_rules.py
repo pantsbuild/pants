@@ -13,12 +13,10 @@ from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import (
-    SEARCH_PATHS,
-    BinaryPath,
-    BinaryPathRequest,
-    BinaryPaths,
     BinaryShims,
     BinaryShimsRequest,
+    DiffBinary,
+    DiffBinaryRequest,
 )
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
@@ -45,7 +43,7 @@ class BufFieldSet(FieldSet):
 
 class BufRequest(LintTargetsRequest, FmtRequest):
     field_set_type = BufFieldSet
-    name = BufSubsystem.options_scope
+    name = "buf-format"
 
 
 @dataclass(frozen=True)
@@ -60,33 +58,19 @@ class Setup:
     original_snapshot: Snapshot
 
 
-class DiffBinary(BinaryPath):
-    pass
-
-
-@rule(desc="Finding the `diff` binary", level=LogLevel.DEBUG)
-async def find_diff() -> DiffBinary:
-    request = BinaryPathRequest(binary_name="diff", search_path=SEARCH_PATHS)
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(
-        request, rationale="buf format requires diff in linting mode"
-    )
-    return DiffBinary(first_path.path, first_path.fingerprint)
-
-
 @rule(level=LogLevel.DEBUG)
 async def setup_buf_format(setup_request: SetupRequest, buf: BufSubsystem) -> Setup:
+    diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(
         DownloadedExternalTool, ExternalToolRequest, buf.get_request(Platform.current)
     )
     binary_shims_get = Get(
         BinaryShims,
         BinaryShimsRequest,
-        BinaryShimsRequest.for_binaries(
-            "diff",
+        BinaryShimsRequest.for_paths(
+            diff_binary,
             rationale="buf format requires diff in linting mode",
             output_directory=".bin",
-            search_path=SEARCH_PATHS,
         ),
     )
     source_files_get = Get(

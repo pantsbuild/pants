@@ -316,6 +316,10 @@ class ChmodBinary(BinaryPath):
     pass
 
 
+class DiffBinary(BinaryPath):
+    pass
+
+
 # -------------------------------------------------------------------------------------------
 # Binaries Rules
 # -------------------------------------------------------------------------------------------
@@ -632,6 +636,14 @@ async def find_chmod() -> ChmodBinary:
     return ChmodBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `diff` binary", level=LogLevel.DEBUG)
+async def find_diff() -> DiffBinary:
+    request = BinaryPathRequest(binary_name="diff", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="compare files line by line")
+    return DiffBinary(first_path.path, first_path.fingerprint)
+
+
 # -------------------------------------------------------------------------------------------
 # Rules for lazy requests
 # TODO(#12946): Get rid of this when it becomes possible to use `Get()` with only one arg.
@@ -659,6 +671,10 @@ class MkdirBinaryRequest:
 
 
 class ChmodBinaryRequest:
+    pass
+
+
+class DiffBinaryRequest:
     pass
 
 
@@ -690,6 +706,11 @@ async def find_mkdir_wrapper(_: MkdirBinaryRequest, mkdir_binary: MkdirBinary) -
 @rule
 async def find_chmod_wrapper(_: ChmodBinaryRequest, chmod_binary: ChmodBinary) -> ChmodBinary:
     return chmod_binary
+
+
+@rule
+async def find_diff_wrapper(_: DiffBinaryRequest, diff_binary: DiffBinary) -> DiffBinary:
+    return diff_binary
 
 
 def rules():
