@@ -8,7 +8,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.codegen.protobuf.lint.buf.lint_rules import BufFieldSet, BufRequest
+from pants.backend.codegen.protobuf.lint.buf.lint_rules import BufFieldSet, BufLintRequest
 from pants.backend.codegen.protobuf.lint.buf.lint_rules import rules as buf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
@@ -28,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
-            QueryRule(LintResults, [BufRequest]),
+            QueryRule(LintResults, [BufLintRequest]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
     )
@@ -55,7 +55,7 @@ def run_buf(
     )
     results = rule_runner.request(
         LintResults,
-        [BufRequest(BufFieldSet.create(tgt) for tgt in targets)],
+        [BufLintRequest(BufFieldSet.create(tgt) for tgt in targets)],
     )
     return results.results
 
@@ -133,7 +133,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert_success(
         rule_runner,
         tgt,
-        extra_args=[f"--buf-lint-args='--config={config}'"],
+        extra_args=[f"--buf-args='--config={config}'"],
     )
 
 
@@ -142,7 +142,7 @@ def test_skip(rule_runner: RuleRunner) -> None:
         {"foo/v1/f.proto": BAD_FILE, "foo/v1/BUILD": "protobuf_sources(name='t')"}
     )
     tgt = rule_runner.get_target(Address("foo/v1", target_name="t", relative_file_path="f.proto"))
-    result = run_buf(rule_runner, [tgt], extra_args=["--buf-lint-skip"])
+    result = run_buf(rule_runner, [tgt], extra_args=["--buf-skip"])
     assert not result
 
 

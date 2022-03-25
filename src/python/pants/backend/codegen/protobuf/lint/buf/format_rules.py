@@ -41,14 +41,14 @@ class BufFieldSet(FieldSet):
         return tgt.get(SkipBufField).value
 
 
-class BufRequest(LintTargetsRequest, FmtRequest):
+class BufFormatRequest(LintTargetsRequest, FmtRequest):
     field_set_type = BufFieldSet
     name = "buf-format"
 
 
 @dataclass(frozen=True)
 class SetupRequest:
-    request: BufRequest
+    request: BufFormatRequest
     check_only: bool
 
 
@@ -115,7 +115,7 @@ async def setup_buf_format(setup_request: SetupRequest, buf: BufSubsystem) -> Se
 
 
 @rule(desc="Format with buf format", level=LogLevel.DEBUG)
-async def run_buf_format(request: BufRequest, buf: BufSubsystem) -> FmtResult:
+async def run_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> FmtResult:
     if buf.skip:
         return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
@@ -131,7 +131,7 @@ async def run_buf_format(request: BufRequest, buf: BufSubsystem) -> FmtResult:
 
 
 @rule(desc="Lint with buf format", level=LogLevel.DEBUG)
-async def run_buf_lint(request: BufRequest, buf: BufSubsystem) -> LintResults:
+async def run_buf_lint(request: BufFormatRequest, buf: BufSubsystem) -> LintResults:
     if buf.skip:
         return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
@@ -152,6 +152,6 @@ async def run_buf_lint(request: BufRequest, buf: BufSubsystem) -> LintResults:
 def rules():
     return [
         *collect_rules(),
-        UnionRule(FmtRequest, BufRequest),
-        UnionRule(LintTargetsRequest, BufRequest),
+        UnionRule(FmtRequest, BufFormatRequest),
+        UnionRule(LintTargetsRequest, BufFormatRequest),
     ]

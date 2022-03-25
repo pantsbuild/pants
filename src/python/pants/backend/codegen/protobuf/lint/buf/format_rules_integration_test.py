@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.codegen.protobuf.lint.buf.format_rules import BufFieldSet, BufRequest
+from pants.backend.codegen.protobuf.lint.buf.format_rules import BufFieldSet, BufFormatRequest
 from pants.backend.codegen.protobuf.lint.buf.format_rules import rules as buf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
@@ -29,8 +29,8 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *target_types_rules(),
-            QueryRule(LintResults, [BufRequest]),
-            QueryRule(FmtResult, [BufRequest]),
+            QueryRule(LintResults, [BufFormatRequest]),
+            QueryRule(FmtResult, [BufFormatRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
@@ -55,7 +55,7 @@ def run_buf(
         env_inherit={"PATH"},
     )
     field_sets = [BufFieldSet.create(tgt) for tgt in targets]
-    results = rule_runner.request(LintResults, [BufRequest(field_sets)])
+    results = rule_runner.request(LintResults, [BufFormatRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
@@ -65,7 +65,7 @@ def run_buf(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BufRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            BufFormatRequest(field_sets, prior_formatter_result=input_sources.snapshot),
         ],
     )
 
@@ -124,7 +124,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": GOOD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
-    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-lint-args=--debug"])
+    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-args=--debug"])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
     assert lint_results[0].stdout == ""
@@ -137,7 +137,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": BAD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
-    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-lint-skip"])
+    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-skip"])
     assert not lint_results
     assert fmt_result.skipped is True
     assert fmt_result.did_change is False

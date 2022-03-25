@@ -34,13 +34,13 @@ class BufFieldSet(FieldSet):
         return tgt.get(SkipBufField).value
 
 
-class BufRequest(LintTargetsRequest):
+class BufLintRequest(LintTargetsRequest):
     field_set_type = BufFieldSet
     name = "buf-lint"
 
 
 @rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
-async def run_buf(request: BufRequest, buf: BufSubsystem) -> LintResults:
+async def run_buf(request: BufLintRequest, buf: BufSubsystem) -> LintResults:
     if buf.skip:
         return LintResults([], linter_name=request.name)
 
@@ -106,4 +106,4 @@ async def run_buf(request: BufRequest, buf: BufSubsystem) -> LintResults:
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintTargetsRequest, BufRequest)]
+    return [*collect_rules(), UnionRule(LintTargetsRequest, BufLintRequest)]
