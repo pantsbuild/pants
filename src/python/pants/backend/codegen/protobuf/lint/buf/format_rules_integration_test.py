@@ -96,7 +96,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
     lint_results, fmt_result = run_buf(rule_runner, [tgt])
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
+    assert lint_results[0].exit_code == 100
     assert "f.proto.orig" in lint_results[0].stdout
     assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
     assert fmt_result.did_change is True
@@ -112,7 +112,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     lint_results, fmt_result = run_buf(rule_runner, tgts)
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
+    assert lint_results[0].exit_code == 100
     assert "bad.proto.orig" in lint_results[0].stdout
     assert "good.proto" not in lint_results[0].stdout
     assert fmt_result.output == get_snapshot(
@@ -124,7 +124,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": GOOD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
-    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-args=--debug"])
+    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-format-args=--debug"])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
     assert lint_results[0].stdout == ""
@@ -137,7 +137,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": BAD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
-    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-skip"])
+    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-format-skip"])
     assert not lint_results
     assert fmt_result.skipped is True
     assert fmt_result.did_change is False

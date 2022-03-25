@@ -133,7 +133,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert_success(
         rule_runner,
         tgt,
-        extra_args=[f"--buf-args='--config={config}'"],
+        extra_args=[f"--buf-lint-args='--config={config}'"],
     )
 
 
@@ -142,7 +142,7 @@ def test_skip(rule_runner: RuleRunner) -> None:
         {"foo/v1/f.proto": BAD_FILE, "foo/v1/BUILD": "protobuf_sources(name='t')"}
     )
     tgt = rule_runner.get_target(Address("foo/v1", target_name="t", relative_file_path="f.proto"))
-    result = run_buf(rule_runner, [tgt], extra_args=["--buf-skip"])
+    result = run_buf(rule_runner, [tgt], extra_args=["--buf-lint-skip"])
     assert not result
 
 

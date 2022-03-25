@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 
-from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufField
+from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufFormatField
 from pants.backend.codegen.protobuf.lint.buf.subsystem import BufSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
@@ -38,7 +38,7 @@ class BufFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipBufField).value
+        return tgt.get(SkipBufFormatField).value
 
 
 class BufFormatRequest(LintTargetsRequest, FmtRequest):
@@ -95,9 +95,10 @@ async def setup_buf_format(setup_request: SetupRequest, buf: BufSubsystem) -> Se
     argv = [
         downloaded_buf.exe,
         "format",
-        # If linting, use `-d` to error with a diff. Else, write the change with `-w`.
-        *(["-d"] if setup_request.check_only else ["-w"]),
-        *buf.args,
+        # If linting, use `-d` to error with a diff and `--exit-code` to exit with a non-zero exit code if
+        # the file is not already formatted. Else, write the change with `-w`.
+        *(["-d", "--exit-code"] if setup_request.check_only else ["-w"]),
+        *buf.format_args,
         "--path",
         ",".join(source_files_snapshot.files),
     ]
@@ -116,7 +117,7 @@ async def setup_buf_format(setup_request: SetupRequest, buf: BufSubsystem) -> Se
 
 @rule(desc="Format with buf format", level=LogLevel.DEBUG)
 async def run_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> FmtResult:
-    if buf.skip:
+    if buf.skip_format:
         return FmtResult.skip(formatter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
@@ -132,21 +133,11 @@ async def run_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> FmtRes
 
 @rule(desc="Lint with buf format", level=LogLevel.DEBUG)
 async def run_buf_lint(request: BufFormatRequest, buf: BufSubsystem) -> LintResults:
-    if buf.skip:
+    if buf.skip_format:
         return LintResults([], linter_name=request.name)
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
-
-    return LintResults(
-        [
-            LintResult(
-                exit_code=0 if not result.stdout else 1,  # buf format always exits with code 0
-                stdout=result.stdout.decode(),
-                stderr=result.stderr.decode(),
-            )
-        ],
-        linter_name=request.name,
-    )
+    return LintResults([LintResult.from_fallible_process_result(result)], linter_name=request.name)
 
 
 def rules():

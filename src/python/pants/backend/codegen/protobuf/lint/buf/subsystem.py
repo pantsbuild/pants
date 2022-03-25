@@ -13,12 +13,12 @@ class BufSubsystem(TemplatedExternalTool):
     name = "Buf"
     help = "A linter and formatter for Protocol Buffers (https://github.com/bufbuild/buf)."
 
-    default_version = "v1.2.1"
+    default_version = "v1.3.0"
     default_known_versions = [
-        "v1.2.1|linux_arm64 |8c9df682691436bd9f58efa44928e6fcd68ec6dd346e35eddac271786f4c0ae3|13940426",
-        "v1.2.1|linux_x86_64|eb227afeaf5f5c5a5f1d2aca92926d8c89be5b7a410e5afd6dd68f2ed0c00f22|15267079",
-        "v1.2.1|macos_arm64 |6877c9b8f895ec4962faff551c541d9d14e12f49b899ed7e553f0dc74a69b1b8|15388080",
-        "v1.2.1|macos_x86_64|652b407fd08e5e664244971f4a725763ef582f26778674490658ad2ce361fe95|15954329",
+        "v1.3.0|linux_arm64 |fbfd53c501451b36900247734bfa4cbe86ae05d0f51bc298de8711d5ee374ee5|13940828",
+        "v1.3.0|linux_x86_64|e29c4283b1cd68ada41fa493171c41d7605750d258fcd6ecdf692a63fae95213|15267162",
+        "v1.3.0|macos_arm64 |147985d7f2816a545792e38b26178ff4027bf16cd3712f6e387a4e3692a16deb|15391890",
+        "v1.3.0|macos_x86_64|3b6bd2e5a5dd758178aee01fb067261baf5d31bfebe93336915bfdf7b21928c4|15955291",
     ]
     default_url_template = (
         "https://github.com/bufbuild/buf/releases/download/{version}/buf-{platform}.tar.gz"
@@ -30,8 +30,10 @@ class BufSubsystem(TemplatedExternalTool):
         "linux_x86_64": "Linux-x86_64",
     }
 
-    skip = SkipOption("fmt", "lint")
-    args = ArgsListOption(example="--error-format json")
+    skip_format = SkipOption("fmt", "lint", flag_name="--format-skip")
+    skip_lint = SkipOption("lint", flag_name="--lint-skip")
+    format_args = ArgsListOption(example="--error-format json", flag_name="--format-args")
+    lint_args = ArgsListOption(example="--error-format json", flag_name="--lint-args")
 
     def generate_exe(self, plat: Platform) -> str:
         return "./buf/bin/buf"
