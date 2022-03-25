@@ -152,10 +152,11 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
     fix_python_macros = BoolOption(
         "--fix-python-macros",
         default=False,
-        help=(
-            "Update references to targets generated from `python_requirements` and "
-            "`poetry_requirements` from the old deprecated macro mechanism to the new target "
-            f"generation mechanism described at {doc_url('targets#target-generation')}.\n\n"
+        help="Deprecated.",
+        removal_version="2.13.0.dev0",
+        removal_hint=(
+            "No longer does anything as the old macros have been removed in favor of target "
+            "generators."
         ),
     )
 
