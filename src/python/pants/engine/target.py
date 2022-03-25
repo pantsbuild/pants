@@ -358,7 +358,9 @@ class Target:
             if alias not in aliases_to_field_types:
                 if isinstance(self, TargetGenerator):
                     # Even though moved_fields don't live on the target generator, they are valid
-                    # for users to specify.
+                    # for users to specify. It's intentional that these are only used for
+                    # `InvalidFieldException` and are not stored as normal fields with
+                    # `aliases_to_field_types`.
                     for field_type in self.moved_fields:
                         valid_aliases.add(field_type.alias)
                         if field_type.deprecated_alias is not None:

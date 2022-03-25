@@ -482,6 +482,10 @@ def determine_renamed_field_types(
             if field_type.deprecated_alias is not None:
                 target_field_renames[tgt.alias][field_type.deprecated_alias] = field_type.alias
 
+        # Make sure we also update deprecated fields in deprecated targets.
+        if tgt.deprecated_alias is not None:
+            target_field_renames[tgt.deprecated_alias] = target_field_renames[tgt.alias]
+
     return RenamedFieldTypes.from_dict(target_field_renames)
 
 

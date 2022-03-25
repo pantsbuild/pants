@@ -22,6 +22,7 @@ from pants.core.goals.update_build_files import (
     RewrittenBuildFileRequest,
     UpdateBuildFilesGoal,
     UpdateBuildFilesSubsystem,
+    determine_renamed_field_types,
     format_build_file_with_black,
     format_build_file_with_yapf,
     maybe_rename_deprecated_fields,
@@ -30,12 +31,14 @@ from pants.core.goals.update_build_files import (
 )
 from pants.core.util_rules import config_files
 from pants.engine.rules import SubsystemRule, rule
-from pants.engine.unions import UnionRule
+from pants.engine.target import RegisteredTargetTypes, StringField, Target, TargetGenerator
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 
 # ------------------------------------------------------------------------------------------
 # Generic goal
 # ------------------------------------------------------------------------------------------
+from pants.util.frozendict import FrozenDict
 
 
 class MockRewriteAddLine(RewrittenBuildFileRequest):
@@ -286,6 +289,34 @@ def test_rename_deprecated_target_types_rewrite(lines: list[str], expected: list
 # ------------------------------------------------------------------------------------------
 
 
+def test_determine_renamed_fields() -> None:
+    class DeprecatedField(StringField):
+        alias = "new_name"
+        deprecated_alias = "old_name"
+        deprecated_alias_removal_version = "99.9.0.dev0"
+
+    class OkayField(StringField):
+        alias = "okay"
+
+    class Tgt(Target):
+        alias = "tgt"
+        core_fields = (DeprecatedField, OkayField)
+        deprecated_alias = "deprecated_tgt"
+        deprecated_alias_removal_version = "99.9.0.dev0"
+
+    class TgtGenerator(TargetGenerator):
+        alias = "generator"
+        core_fields = ()
+        moved_fields = (DeprecatedField, OkayField)
+
+    registered_targets = RegisteredTargetTypes.create([Tgt, TgtGenerator])
+    result = determine_renamed_field_types(registered_targets, UnionMembership({}))
+    deprecated_fields = FrozenDict({DeprecatedField.deprecated_alias: DeprecatedField.alias})
+    assert result.target_field_renames == FrozenDict(
+        {k: deprecated_fields for k in (TgtGenerator.alias, Tgt.alias, Tgt.deprecated_alias)}
+    )
+
+
 @pytest.mark.parametrize(
     "lines",
     (
@@ -320,7 +351,7 @@ def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
 )
 def test_rename_deprecated_field_types_rewrite(lines: list[str], expected: list[str]) -> None:
     result = maybe_rename_deprecated_fields(
-        RenameDeprecatedTargetsRequest("BUILD", tuple(lines), colors_enabled=False),
+        RenameDeprecatedFieldsRequest("BUILD", tuple(lines), colors_enabled=False),
         RenamedFieldTypes.from_dict({"tgt1": {"deprecated_name": "new_name"}}),
     )
     assert result.change_descriptions
