@@ -15,7 +15,7 @@ from pants.core.util_rules import config_files, external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest, Snapshot
+from pants.engine.internals.native_engine import Digest
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -72,10 +72,9 @@ def run_buf(
     return results.results, fmt_result
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
+def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
     files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
+    return rule_runner.request(Digest, [CreateDigest(files)])
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
@@ -87,7 +86,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert lint_results[0].stdout == ""
     assert lint_results[0].stderr == ""
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
+    assert fmt_result.output == get_digest(rule_runner, {"f.proto": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -98,7 +97,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 100
     assert "f.proto.orig" in lint_results[0].stdout
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
+    assert fmt_result.output == get_digest(rule_runner, {"f.proto": GOOD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -115,7 +114,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert lint_results[0].exit_code == 100
     assert "bad.proto.orig" in lint_results[0].stdout
     assert "good.proto" not in lint_results[0].stdout
-    assert fmt_result.output == get_snapshot(
+    assert fmt_result.output == get_digest(
         rule_runner, {"good.proto": GOOD_FILE, "bad.proto": GOOD_FILE}
     )
     assert fmt_result.did_change is True
@@ -130,7 +129,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     assert lint_results[0].stdout == ""
     assert "DEBUG" in lint_results[0].stderr
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
+    assert fmt_result.output == get_digest(rule_runner, {"f.proto": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
