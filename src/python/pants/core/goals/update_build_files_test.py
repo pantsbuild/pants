@@ -34,11 +34,11 @@ from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 # ------------------------------------------------------------------------------------------
 # Generic goal
 # ------------------------------------------------------------------------------------------
-from pants.util.frozendict import FrozenDict
 
 
 class MockRewriteAddLine(RewrittenBuildFileRequest):
