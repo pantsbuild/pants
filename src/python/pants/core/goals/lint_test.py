@@ -11,6 +11,7 @@ from typing import Iterable, Optional, Sequence, Tuple, Type
 import pytest
 
 from pants.core.goals.lint import (
+    AmbiguousRequestNamesError,
     Lint,
     LintFilesRequest,
     LintResult,
@@ -53,6 +54,14 @@ class MockLintRequest(LintTargetsRequest, metaclass=ABCMeta):
 
 
 class SuccessfulRequest(MockLintRequest):
+    name = "SuccessfulLinter"
+
+    @staticmethod
+    def exit_code(_: Iterable[Address]) -> int:
+        return 0
+
+
+class DuplicatedSuccessfulRequest(MockLintRequest):
     name = "SuccessfulLinter"
 
     @staticmethod
@@ -310,3 +319,15 @@ def test_streaming_output_partitions() -> None:
 
         """
     )
+
+
+def test_duplicated_names(rule_runner: RuleRunner) -> None:
+    with pytest.raises(AmbiguousRequestNamesError):
+        run_lint_rule(
+            rule_runner,
+            lint_request_types=[
+                SuccessfulRequest,
+                DuplicatedSuccessfulRequest,
+            ],
+            targets=[],
+        )

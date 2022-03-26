@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, cast
+from typing import Any, ClassVar, Iterable, Type, cast
 
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -32,6 +32,21 @@ from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
+
+
+class AmbiguousRequestNamesError(Exception):
+    def __init__(self, ambiguous_name: str, request_targets: set[Type[LintTargetsRequest]]):
+        request_target_names = {
+            f"{request_target.__module__}.{request_target.__qualname__}"
+            for request_target in request_targets
+        }
+
+        super().__init__(
+            f"The same name `{ambiguous_name}` is used by multiple `LintTargetsRequest`, "
+            f"which causes ambiguity: {request_target_names}\n\n"
+            f"To fix, please update these `LintTargetsRequest` so that `{ambiguous_name}` "
+            f"is not used more than once."
+        )
 
 
 @dataclass(frozen=True)
@@ -212,6 +227,11 @@ async def lint(
         )
         for request_type in target_request_types
     )
+
+    for name, grouped_targets in itertools.groupby(target_requests, key=lambda target: target.name):
+        if len(list(grouped_targets)) > 1:
+            raise AmbiguousRequestNamesError(name, {target.__class__ for target in grouped_targets})
+
     file_requests = (
         tuple(
             request_type(specs_snapshot.snapshot.files)
