@@ -202,10 +202,10 @@ def _check_ambiguous_request_names(
     *requests: Type[LintFilesRequest] | Type[LintTargetsRequest],
 ) -> None:
     for name, request_group in itertools.groupby(requests, key=lambda target: target.name):
-        request_group_list = list(request_group)
+        request_group_set = set(request_group)
 
-        if len(request_group_list) > 1:
-            raise AmbiguousRequestNamesError(name, set(request_group_list))
+        if len(request_group_set) > 1:
+            raise AmbiguousRequestNamesError(name, request_group_set)
 
 
 @goal_rule
