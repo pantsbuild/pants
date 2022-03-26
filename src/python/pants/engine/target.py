@@ -819,7 +819,7 @@ def maybe_warn_dependencies_as_copied_field(tgt_type: type[TargetGenerator]) -> 
     ]
     if copied_dependencies_field_types:
         warn_or_error(
-            removal_version="2.12.0.dev0",
+            removal_version="2.12.0.dev1",
             entity=(
                 f"using a `Dependencies` field subclass ({copied_dependencies_field_types}) "
                 "as a `TargetGenerator.copied_field`"
@@ -883,7 +883,7 @@ class TargetFilesGenerator(TargetGenerator):
         if self.has_field(MultipleSourcesField) and not self[MultipleSourcesField].value:
             sources_field = self[MultipleSourcesField]
             warn_or_error(
-                removal_version="2.12.0.dev0",
+                removal_version="2.12.0.dev1",
                 entity=(
                     f"specifying an empty `{sources_field.alias}` field for target generator type "
                     f"`{self.alias}`"

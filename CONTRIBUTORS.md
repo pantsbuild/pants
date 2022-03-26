@@ -15,6 +15,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Antoine Tollenaere
 + Asher Foa
 + Bardur Arantsson
++ Bastian Wegge
 + Benjy Weinberger
 + Bill Farner
 + Billy "Hyun Joon" Seol
@@ -193,6 +194,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Paul Phillips
 + Paul Yau
 + Peiyu Wang
++ Peter A. I. Forsyth
 + Peter Seibel
 + Peter Vlugter
 + Pierre Chevalier
