@@ -35,16 +35,18 @@ logger = logging.getLogger(__name__)
 
 
 class AmbiguousRequestNamesError(Exception):
-    def __init__(self, ambiguous_name: str, request_targets: set[Type[LintTargetsRequest]]):
-        request_target_names = {
+    def __init__(
+        self, ambiguous_name: str, requests: set[Type[LintTargetsRequest] | Type[LintFilesRequest]]
+    ):
+        request_names = {
             f"{request_target.__module__}.{request_target.__qualname__}"
-            for request_target in request_targets
+            for request_target in requests
         }
 
         super().__init__(
-            f"The same name `{ambiguous_name}` is used by multiple `LintTargetsRequest`, "
-            f"which causes ambiguity: {request_target_names}\n\n"
-            f"To fix, please update these `LintTargetsRequest` so that `{ambiguous_name}` "
+            f"The same name `{ambiguous_name}` is used by multiple requests, "
+            f"which causes ambiguity: {request_names}\n\n"
+            f"To fix, please update these requests so that `{ambiguous_name}` "
             f"is not used more than once."
         )
 
@@ -196,6 +198,16 @@ class Lint(Goal):
     subsystem_cls = LintSubsystem
 
 
+def _check_ambiguous_request_names(
+    *requests: Type[LintFilesRequest] | Type[LintTargetsRequest],
+) -> None:
+    for name, request_group in itertools.groupby(requests, key=lambda target: target.name):
+        request_group_list = list(request_group)
+
+        if len(request_group_list) > 1:
+            raise AmbiguousRequestNamesError(name, set(request_group_list))
+
+
 @goal_rule
 async def lint(
     console: Console,
@@ -210,6 +222,9 @@ async def lint(
         "Iterable[type[LintTargetsRequest]]", union_membership[LintTargetsRequest]
     )
     file_request_types = union_membership[LintFilesRequest]
+
+    _check_ambiguous_request_names(*target_request_types, *file_request_types)
+
     specified_names = determine_specified_tool_names(
         "lint",
         lint_subsystem.only,
@@ -227,10 +242,6 @@ async def lint(
         )
         for request_type in target_request_types
     )
-
-    for name, grouped_targets in itertools.groupby(target_requests, key=lambda target: target.name):
-        if len(list(grouped_targets)) > 1:
-            raise AmbiguousRequestNamesError(name, {target.__class__ for target in grouped_targets})
 
     file_requests = (
         tuple(

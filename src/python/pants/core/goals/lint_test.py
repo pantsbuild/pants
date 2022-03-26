@@ -61,12 +61,8 @@ class SuccessfulRequest(MockLintRequest):
         return 0
 
 
-class DuplicatedSuccessfulRequest(MockLintRequest):
-    name = "SuccessfulLinter"
-
-    @staticmethod
-    def exit_code(_: Iterable[Address]) -> int:
-        return 0
+class AmbiguousLintTargetsRequest(LintTargetsRequest):
+    name = "FilesLinter"
 
 
 class FailingRequest(MockLintRequest):
@@ -326,8 +322,8 @@ def test_duplicated_names(rule_runner: RuleRunner) -> None:
         run_lint_rule(
             rule_runner,
             lint_request_types=[
-                SuccessfulRequest,
-                DuplicatedSuccessfulRequest,
+                AmbiguousLintTargetsRequest,
             ],
+            run_files_linter=True,
             targets=[],
         )
