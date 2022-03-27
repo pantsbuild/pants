@@ -351,13 +351,13 @@ jobs:
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
+        ./build-support/bin/release.sh build-local-pex
+
         ./build-support/bin/release.sh build-wheels
 
         USE_PY38=true ./build-support/bin/release.sh build-wheels
 
         USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-local-pex
 
         ./build-support/bin/release.sh build-fs-util
 
@@ -450,13 +450,13 @@ jobs:
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
+        ./build-support/bin/release.sh build-local-pex
+
         ./build-support/bin/release.sh build-wheels
 
         USE_PY38=true ./build-support/bin/release.sh build-wheels
 
         USE_PY39=true ./build-support/bin/release.sh build-wheels
-
-        ./build-support/bin/release.sh build-local-pex
 
         ./build-support/bin/release.sh build-fs-util
 
