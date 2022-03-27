@@ -41,6 +41,8 @@ def deploy() -> None:
             # distinct shards—which may finish building their wheels at different times—to not
             # overwrite otherwise-identical wheels.
             "--size-only",
+            # Turn off the dynamic progress display, which clutters the CI output.
+            "--no-progress",
             "--acl",
             "public-read",
             "dist/deploy",
