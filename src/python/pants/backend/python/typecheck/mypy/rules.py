@@ -17,8 +17,8 @@ from pants.backend.python.typecheck.mypy.subsystem import (
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_from_targets import LockfileSubsetRequest
-from pants.backend.python.util_rules.pex_requirements import Lockfile, PexRequirements
+from pants.backend.python.util_rules.pex_from_targets import PexReqs, PexReqsRequest
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -129,9 +129,11 @@ async def mypy_typecheck_partition(
         SourceFilesRequest(tgt.get(PythonSourceField) for tgt in partition.root_targets),
     )
 
-    # See `requirements_venv_pex` for how this will get wrapped in a `VenvPex`.
-    locky_get = Get(
-        Lockfile, LockfileSubsetRequest(Addresses(t.address for t in partition.root_targets))
+    pex_reqs_get = Get(
+        PexReqs, PexReqsRequest(
+            Addresses(t.address for t in partition.root_targets),
+            interpreter_constraints=partition.interpreter_constraints,
+        )
     )
 
     extra_type_stubs_pex_get = Get(
@@ -153,12 +155,12 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    (closure_sources, roots_sources, mypy_pex, extra_type_stubs_pex, locky,) = await MultiGet(
+    (closure_sources, roots_sources, mypy_pex, extra_type_stubs_pex, pex_reqs,) = await MultiGet(
         closure_sources_get,
         roots_sources_get,
         mypy_pex_get,
         extra_type_stubs_pex_get,
-        locky_get,
+        pex_reqs_get,
     )
 
     python_files = determine_python_files(roots_sources.snapshot.files)
@@ -179,9 +181,9 @@ async def mypy_typecheck_partition(
         VenvPex,
         PexRequest(
             output_filename="requirements_venv.pex",
-            requirements=locky,
+            requirements=pex_reqs.requirements,
             internal_only=True,
-            pex_path=[extra_type_stubs_pex],
+            pex_path=[extra_type_stubs_pex, *pex_reqs.pexes],
             interpreter_constraints=partition.interpreter_constraints,
         ),
     )

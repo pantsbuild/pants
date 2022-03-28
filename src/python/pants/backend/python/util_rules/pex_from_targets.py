@@ -27,8 +27,10 @@ from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     OptionalPex,
     OptionalPexRequest,
+    Pex,
     PexPlatforms,
     PexRequest,
+    _is_probably_pex_json_lockfile,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import Lockfile, PexRequirements
@@ -193,6 +195,10 @@ async def interpreter_constraints_for_targets(
 class ChosenPythonResolve:
     name: str
     lockfile_path: str
+
+    @property
+    def description_of_origin(self) -> str:
+        return f"the resolve `{self.name}` (from `[python].resolves`)"
 
 
 @dataclass(frozen=True)
@@ -500,9 +506,7 @@ async def get_repository_pex(
             internal_only=request.internal_only,
             requirements=Lockfile(
                 file_path=chosen_resolve.lockfile_path,
-                file_path_description_of_origin=(
-                    f"the resolve `{chosen_resolve.name}` (from `[python].resolves`)"
-                ),
+                file_path_description_of_origin=chosen_resolve.description_of_origin,
                 resolve_name=chosen_resolve.name,
                 # NB: A blank req_strings means install the entire lockfile
                 req_strings=FrozenOrderedSet([]),
@@ -660,33 +664,67 @@ async def get_requirements_pex(request: RequirementsPexRequest, setup: PythonSet
 
 
 @dataclass(frozen=True)
-class LockfileSubsetRequest:
+class PexReqsRequest:
     addresses: Addresses
+    interpreter_constraints: InterpreterConstraints | None = None
 
 
-# @TODO: Make this return either a Lockfile (PEX lockfile + no-run-against-entire-lockfile)
-#   or return a `PEX` (to be added to PEX_PATH at the callsite)
-# Assuming the former for the PoC
+
+@dataclass(frozen=True)
+class PexReqs:
+    requirements: Lockfile | PexRequirements
+    pexes: Iterable[Pex]
 
 
 @rule
-async def get_lockfile_subset(request: LockfileSubsetRequest) -> Lockfile:
-    chosen_resolve_get = Get(ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses))
-    requirements_get = Get(PexRequirements, _PexRequirementsRequest(request.addresses))
-    chosen_resolve, requirements = await MultiGet(
-        chosen_resolve_get,
-        requirements_get,
-    )
+async def get_lockfile_subset(
+    request: PexReqsRequest,
+    python_setup: PythonSetup,
+) -> PexReqs:
+    if python_setup.enable_resolves:
+        chosen_resolve = await Get(
+            ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
+        )
+        lock_path = chosen_resolve.lockfile_path
+        requirements_file_digest = await Get(
+            Digest,
+            PathGlobs(
+                [lock_path],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=chosen_resolve.description_of_origin,
+            ),
+        )
+        _digest_contents = await Get(DigestContents, Digest, requirements_file_digest)
+        lock_bytes = _digest_contents[0].content
 
-    lockfile = Lockfile(
-        file_path=chosen_resolve.lockfile_path,
-        file_path_description_of_origin=(
-            f"the resolve `{chosen_resolve.name}` (from `[python].resolves`)"
+        if _is_probably_pex_json_lockfile(lock_bytes):
+            if python_setup.run_against_entire_lockfile:
+                # NB: PEX treats no requirements as "install entire lockfile"
+                req_strings: FrozenOrderedSet[str] = FrozenOrderedSet()
+                # @TODO: complain deprecated
+            else:
+                requirements = await Get(
+                    PexRequirements, _PexRequirementsRequest(request.addresses)
+                )
+                req_strings = requirements.req_strings
+
+            lockfile = Lockfile(
+                file_path=chosen_resolve.lockfile_path,
+                file_path_description_of_origin=chosen_resolve.description_of_origin,
+                resolve_name=chosen_resolve.name,
+                req_strings=req_strings,
+            )
+        return PexReqs(lockfile, ())
+
+    pex = await Get(
+        Pex,
+        RequirementsPexRequest(
+            (request.addresses),
+            hardcoded_interpreter_constraints=request.interpreter_constraints,
+            internal_only=True,
         ),
-        resolve_name=chosen_resolve.name,
-        req_strings=requirements.req_strings,
     )
-    return lockfile
+    return PexReqs(PexRequirements(), (pex,))
 
 
 def rules():

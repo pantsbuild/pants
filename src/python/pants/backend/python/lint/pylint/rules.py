@@ -25,8 +25,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
     VenvPexRequest,
 )
-from pants.backend.python.util_rules.pex_from_targets import LockfileSubsetRequest
-from pants.backend.python.util_rules.pex_requirements import Lockfile
+from pants.backend.python.util_rules.pex_from_targets import PexReqs, PexReqsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -91,8 +90,14 @@ async def pylint_lint_partition(
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
-    locky_get = Get(
-        Lockfile, LockfileSubsetRequest(Addresses(t.address for t in partition.root_targets))
+    pex_reqs_get = Get(
+        PexReqs, PexReqsRequest(
+            Addresses(t.address for t in partition.root_targets),
+            # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
+            # a different version for the requirements than the other two PEXes, which can result
+            # in a PEX runtime error about missing dependencies.
+            interpreter_constraints=partition.interpreter_constraints,
+        )
     )
 
     (
@@ -100,13 +105,13 @@ async def pylint_lint_partition(
         prepared_python_sources,
         field_set_sources,
         report_directory,
-        locky,
+        pex_reqs,
     ) = await MultiGet(
         pylint_pex_get,
         prepare_python_sources_get,
         field_set_sources_get,
         report_directory_digest_get,
-        locky_get,
+        pex_reqs_get,
     )
 
     pylint_runner_pex, config_files = await MultiGet(
@@ -115,11 +120,11 @@ async def pylint_lint_partition(
             VenvPexRequest(
                 PexRequest(
                     output_filename="pylint_runner.pex",
-                    requirements=locky,
+                    requirements=pex_reqs.requirements,
                     interpreter_constraints=partition.interpreter_constraints,
                     main=pylint.main,
                     internal_only=True,
-                    pex_path=[pylint_pex],
+                    pex_path=[pylint_pex, *pex_reqs.pexes],
                 ),
                 # TODO(John Sirois): Remove this (change to the default of symlinks) when we can
                 #  upgrade to a version of Pylint with https://github.com/PyCQA/pylint/issues/1470

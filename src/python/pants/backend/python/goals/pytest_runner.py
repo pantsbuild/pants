@@ -16,8 +16,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_from_targets import LockfileSubsetRequest
-from pants.backend.python.util_rules.pex_requirements import Lockfile
+from pants.backend.python.util_rules.pex_from_targets import PexReqs, PexReqsRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -169,7 +168,7 @@ async def setup_pytest_for_target(
 
     interpreter_constraints = InterpreterConstraints.create_from_targets(all_targets, python_setup)
 
-    locky_get = Get(Lockfile, LockfileSubsetRequest(Addresses([request.field_set.address])))
+    pex_reqs_get = Get(PexReqs, PexReqsRequest(Addresses([request.field_set.address])))
     pytest_pex_get = Get(
         Pex,
         PexRequest(
@@ -197,14 +196,14 @@ async def setup_pytest_for_target(
 
     (
         pytest_pex,
-        locky,
+        pex_reqs,
         prepared_sources,
         field_set_source_files,
         field_set_extra_env,
         extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_get,
-        locky_get,
+        pex_reqs_get,
         prepared_sources_get,
         field_set_source_files_get,
         field_set_extra_env_get,
@@ -226,10 +225,10 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
-            requirements=locky,
+            requirements=pex_reqs.requirements,
             main=pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, local_dists.pex],
+            pex_path=[pytest_pex, local_dists.pex, *pex_reqs.pexes],
         ),
     )
     config_files_get = Get(
