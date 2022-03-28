@@ -99,7 +99,7 @@ class Subsystem(metaclass=ABCMeta):
 
     @classmethod
     @deprecated(
-        removal_version="2.12.0.dev0",
+        removal_version="2.12.0.dev1",
         hint=(
             "Options are now registered by declaring class attributes using the types in "
             f"pants/option/option_types.py. See {doc_url('plugin-upgrade-guide')}"

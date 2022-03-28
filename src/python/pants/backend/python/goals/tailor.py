@@ -35,7 +35,6 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions
 from pants.source.filespec import Filespec, matches_filespec
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
@@ -90,7 +89,6 @@ async def find_putative_targets(
     req: PutativePythonTargetsRequest,
     all_owned_sources: AllOwnedSources,
     python_setup: PythonSetup,
-    global_options: GlobalOptions,
 ) -> PutativeTargets:
     # Find library/test/test_util targets.
 
@@ -135,7 +133,6 @@ async def find_putative_targets(
                     type_alias="python_requirements",
                     triggering_sources=[req_file],
                     owned_sources=[req_file],
-                    addressable=not global_options.use_deprecated_python_macros,
                     kwargs={} if name == "requirements.txt" else {"source": name},
                 )
             )

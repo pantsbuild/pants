@@ -79,6 +79,10 @@ class BSPBuildTargetInternal:
     name: str
     specs: Specs
 
+    @property
+    def bsp_target_id(self) -> BuildTargetIdentifier:
+        return BuildTargetIdentifier(f"pants:{self.name}")
+
 
 @dataclass(frozen=True)
 class BSPBuildTargetSourcesInfo:

@@ -6,20 +6,21 @@ import os
 import pkgutil
 from dataclasses import dataclass
 
+from pants.backend.codegen import export_codegen_goal
 from pants.backend.codegen.protobuf.protoc import Protoc
+from pants.backend.codegen.protobuf.scala import dependency_inference
 from pants.backend.codegen.protobuf.scala.subsystem import PluginArtifactSpec, ScalaPBSubsystem
 from pants.backend.codegen.protobuf.target_types import (
-    ProtobufDependenciesField,
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
 )
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.util_rules import distdir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
     AddPrefix,
@@ -39,19 +40,18 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
+from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
-from pants.jvm.target_types import JvmJdkField
+from pants.jvm.target_types import JvmJdkField, JvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -206,18 +206,6 @@ async def generate_scala_from_protobuf(
     return GeneratedSources(source_root_restored)
 
 
-class InjectScalaProtobufDependencies(InjectDependenciesRequest):
-    inject_for = ProtobufDependenciesField
-
-
-@rule
-async def inject_scalapb_dependencies(
-    _: InjectScalaProtobufDependencies, scalapb: ScalaPBSubsystem
-) -> InjectedDependencies:
-    addresses = await Get(Addresses, UnparsedAddressInputs, scalapb.runtime_dependencies)
-    return InjectedDependencies(addresses)
-
-
 @rule
 async def materialize_jvm_plugin(request: MaterializeJvmPluginRequest) -> MaterializedJvmPlugin:
     requirements = await Get(
@@ -340,12 +328,23 @@ class PrefixedJvmJdkField(JvmJdkField):
     alias = "jvm_jdk"
 
 
+class PrefixedJvmResolveField(JvmResolveField):
+    alias = "jvm_resolve"
+
+
 def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
+        *export_codegen_goal.rules(),
+        *dependency_inference.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
         UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
+        ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
+        # Rules to avoid rule graph errors.
+        *artifact_mapper.rules(),
+        *distdir.rules(),
     ]

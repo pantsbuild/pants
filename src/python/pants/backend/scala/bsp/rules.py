@@ -19,13 +19,13 @@ from pants.backend.scala.bsp.spec import (
     ScalaTestClassesResult,
 )
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
-from pants.backend.scala.target_types import ScalaSourceField
+from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
 from pants.base.build_root import BuildRoot
 from pants.base.specs import AddressSpecs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier, StatusCode
 from pants.bsp.spec.targets import DependencyModule
-from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
+from pants.bsp.util_rules.compile import BSPCompileRequest, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
     BSPBuildTargetInternal,
@@ -405,40 +405,53 @@ async def scala_bsp_dependency_modules(
 
 
 @dataclass(frozen=True)
-class ScalaBSPCompileFieldSet(BSPCompileFieldSet):
-    required_fields = (ScalaSourceField,)
-    source: ScalaSourceField
+class ScalaBSPCompileRequest(BSPCompileRequest):
+    field_set_type = ScalaFieldSet
 
 
 @rule
 async def bsp_scala_compile_request(
-    request: ScalaBSPCompileFieldSet,
+    request: ScalaBSPCompileRequest,
     classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> BSPCompileResult:
-    coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
-    assert len(coarsened_targets) == 1
-    coarsened_target = coarsened_targets[0]
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
-
-    result = await Get(
-        FallibleClasspathEntry,
-        ClasspathEntryRequest,
-        classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
+    coarsened_targets = await Get(
+        CoarsenedTargets, Addresses([fs.address for fs in request.field_sets])
     )
-    _logger.info(f"scala compile result = {result}")
-    output_digest = EMPTY_DIGEST
-    if result.exit_code == 0 and result.output:
-        entries = await Get(DigestEntries, Digest, result.output.digest)
-        new_entires = [
-            dataclasses.replace(entry, path=os.path.basename(entry.path)) for entry in entries
-        ]
-        flat_digest = await Get(Digest, CreateDigest(new_entires))
-        output_digest = await Get(
-            Digest, AddPrefix(flat_digest, f"jvm/resolves/{resolve.name}/lib")
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
+
+    results = await MultiGet(
+        Get(
+            FallibleClasspathEntry,
+            ClasspathEntryRequest,
+            classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
         )
+        for coarsened_target in coarsened_targets
+    )
+
+    status = StatusCode.OK
+    if any(r.exit_code != 0 for r in results):
+        status = StatusCode.ERROR
+
+    output_digest = EMPTY_DIGEST
+    if status == StatusCode.OK:
+        output_entries = []
+        for result in results:
+            if not result.output:
+                continue
+            entries = await Get(DigestEntries, Digest, result.output.digest)
+            output_entries.extend(
+                [
+                    dataclasses.replace(
+                        entry,
+                        path=f"jvm/resolves/{resolve.name}/lib/{os.path.basename(entry.path)}",
+                    )
+                    for entry in entries
+                ]
+            )
+        output_digest = await Get(Digest, CreateDigest(output_entries))
 
     return BSPCompileResult(
-        status=StatusCode.ERROR if result.exit_code != 0 else StatusCode.OK,
+        status=status,
         output_digest=output_digest,
     )
 
@@ -451,6 +464,6 @@ def rules():
         UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),
         UnionRule(BSPHandlerMapping, ScalaMainClassesHandlerMapping),
         UnionRule(BSPHandlerMapping, ScalaTestClassesHandlerMapping),
-        UnionRule(BSPCompileFieldSet, ScalaBSPCompileFieldSet),
+        UnionRule(BSPCompileRequest, ScalaBSPCompileRequest),
         UnionRule(BSPDependencyModulesRequest, ScalaBSPDependencyModulesRequest),
     )

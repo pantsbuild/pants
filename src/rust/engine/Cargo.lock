@@ -204,7 +204,7 @@ dependencies = [
  "task_executor",
  "tempfile",
  "testutil",
- "time 0.3.7",
+ "time 0.3.9",
  "tokio",
  "tokio-stream",
  "workunit_store",
@@ -721,7 +721,7 @@ dependencies = [
  "task_executor",
  "tempfile",
  "testutil",
- "time 0.3.7",
+ "time 0.3.9",
  "tokio",
  "tokio-util",
  "tryfuture",
@@ -1272,9 +1272,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
-version = "0.14.17"
+version = "0.14.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "043f0e083e9901b6cc658a77d1eb86f4fc650bbb977a4337dd63192826aa85dd"
+checksum = "b26ae0a80afebe130861d90abf98e3814a4f28a4c6ffeb5ab8ebb2be311e0ef2"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1304,7 +1304,7 @@ dependencies = [
  "hyper",
  "rustls 0.20.2",
  "tokio",
- "tokio-rustls 0.23.2",
+ "tokio-rustls 0.23.3",
 ]
 
 [[package]]
@@ -1984,9 +1984,9 @@ dependencies = [
 
 [[package]]
 name = "os_pipe"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e3492ebca331b895fe23ed427dce2013d9b2e00c45964f12040b0db38b8ab27"
+checksum = "2c92f2b54f081d635c77e7120862d48db8e91f7f21cef23ab1b4fe9971c59f55"
 dependencies = [
  "libc",
  "winapi 0.3.9",
@@ -2280,7 +2280,7 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-rustls 0.23.2",
+ "tokio-rustls 0.23.3",
  "tokio-util",
  "tonic",
  "tryfuture",
@@ -2665,7 +2665,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "tokio",
- "tokio-rustls 0.23.2",
+ "tokio-rustls 0.23.3",
  "tokio-util",
  "url",
  "wasm-bindgen",
@@ -3071,7 +3071,7 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-rustls 0.23.2",
+ "tokio-rustls 0.23.3",
  "tonic",
  "tower-service",
  "tryfuture",
@@ -3300,9 +3300,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.7"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "004cbc98f30fa233c61a38bc77e96a9106e65c88f2d3bef182ae952027e5753d"
+checksum = "c2702e08a7a860f005826c6815dcac101b19b5eb330c27fe4a5928fec1d20ddd"
 dependencies = [
  "libc",
  "num_threads",
@@ -3386,9 +3386,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-rustls"
-version = "0.23.2"
+version = "0.23.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a27d5f2b839802bd8267fa19b0530f5a08b9c08cd417976be2a65d130fe1c11b"
+checksum = "4151fda0cf2798550ad0b34bcfc9b9dcc2a9d2471c895c68f3a8818e54f2389e"
 dependencies = [
  "rustls 0.20.2",
  "tokio",
