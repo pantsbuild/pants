@@ -855,7 +855,7 @@ fn maybe_add_workunit(
   workunit_store: &WorkunitStore,
   metadata: WorkunitMetadata,
 ) {
-  if !result_cached {
+  if !result_cached && workunit_store.max_level() >= metadata.level {
     let start_time: SystemTime = SystemTime::UNIX_EPOCH + time_span.start.into();
     let end_time: SystemTime = start_time + time_span.duration.into();
     workunit_store.add_completed_workunit(name, start_time, end_time, parent_id, metadata);
