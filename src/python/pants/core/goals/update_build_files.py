@@ -36,7 +36,7 @@ from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.parser import ParseError
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import RegisteredTargetTypes
+from pants.engine.target import RegisteredTargetTypes, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
 from pants.util.dirutil import recursive_dirname
@@ -474,13 +474,17 @@ def determine_renamed_field_types(
 ) -> RenamedFieldTypes:
     target_field_renames: DefaultDict[str, dict[str, str]] = defaultdict(dict)
     for tgt in target_types.types:
-        field_renames = target_field_renames[tgt.alias]
-        if tgt.deprecated_alias is not None:
-            target_field_renames[tgt.deprecated_alias] = field_renames
+        field_types = list(tgt.class_field_types(union_membership))
+        if issubclass(tgt, TargetGenerator):
+            field_types.extend(tgt.moved_fields)
 
-        for field_type in tgt.class_field_types(union_membership):
+        for field_type in field_types:
             if field_type.deprecated_alias is not None:
-                field_renames[field_type.deprecated_alias] = field_type.alias
+                target_field_renames[tgt.alias][field_type.deprecated_alias] = field_type.alias
+
+        # Make sure we also update deprecated fields in deprecated targets.
+        if tgt.deprecated_alias is not None:
+            target_field_renames[tgt.deprecated_alias] = target_field_renames[tgt.alias]
 
     return RenamedFieldTypes.from_dict(target_field_renames)
 
