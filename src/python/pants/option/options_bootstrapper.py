@@ -168,9 +168,10 @@ class OptionsBootstrapper:
             # were any from aliases.
             # stuhood: This could potentially break the rust client when aliases are used:
             # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
+            alias_vals = post_bootstrap_config.get("cli", "alias")
             alias_dict = parse_expression(
                 name="cli.alias",
-                val=post_bootstrap_config.get("cli", "alias") or "{}",
+                val=alias_vals[-1] if alias_vals else "{}",
                 acceptable_types=dict,
             )
             alias = CliAlias.from_dict(alias_dict)

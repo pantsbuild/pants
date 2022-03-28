@@ -51,6 +51,13 @@ FILE_1 = ConfigFile(
         add = 0
         remove = 0
         nested = { nested_key = 'foo' }
+
+        [list_merging]
+        list1 = []
+        list2 = [1, 2]
+        list3.add = [3, 4]
+        list4.remove = [5]
+        list5 = [6, 7]
         """
     ),
     default_values={
@@ -70,6 +77,13 @@ FILE_1 = ConfigFile(
             "recursively_interpolated_from_section": "overridden_from_default is interpolated (again)",
         },
         "d": {"dict_val": "{'add': 0, 'remove': 0, 'nested': {'nested_key': 'foo'}"},
+        "list_merging": {
+            "list1": "[]",
+            "list2": "[1, 2]",
+            "list3": "+[3, 4]",
+            "list4": "-[5]",
+            "list5": "[6, 7]",
+        },
     },
 )
 
@@ -88,6 +102,14 @@ FILE_2 = ConfigFile(
         list.remove = [8, 9]
 
         [empty_section]
+
+        [list_merging]
+        list1 = [11, 22]
+        list2.add = [33]
+        list3.add = [8, 9]
+        list3.remove = [4, 55]
+        list4 = [66]
+        list6.add = [77, 88]
         """
     ),
     default_values={},
@@ -96,6 +118,13 @@ FILE_2 = ConfigFile(
         "b": {"preempt": "False"},
         "d": {"list": "+[0, 1],-[8, 9]"},
         "empty_section": {},
+        "list_merging": {
+            "list1": "[11, 22]",
+            "list2": "+[33]",
+            "list3": "+[8, 9],-[4, 55]",
+            "list4": "[66]",
+            "list6": "+[77, 88]",
+        },
     },
 )
 
@@ -118,16 +147,40 @@ class ConfigTest(unittest.TestCase):
         self.default_seed_values = Config._determine_seed_values(
             seed_values={"buildroot": "fake_buildroot"},
         )
-        self.expected_combined_values = {
-            **FILE_1.expected_options,
-            **FILE_2.expected_options,
-            "a": {**FILE_2.expected_options["a"], **FILE_1.expected_options["a"]},
+        self.expected_combined_values: dict[str, dict[str, list[str]]] = {
+            "a": {
+                "list": ['["1", "2", "3", "42"]'],
+                "list2": ["+[7, 8, 9]"],
+                "list3": ['-["x", "y", "z"]'],
+                "fast": ["True"],
+            },
+            "b": {"preempt": ["True", "False"]},
+            "c": {
+                "name": ["overridden_from_default"],
+                "interpolated_from_section": ["overridden_from_default is interpolated"],
+                "recursively_interpolated_from_section": [
+                    "overridden_from_default is interpolated (again)"
+                ],
+            },
+            "d": {
+                "dict_val": ["{'add': 0, 'remove': 0, 'nested': {'nested_key': 'foo'}}"],
+                "list": ["+[0, 1],-[8, 9]"],
+            },
+            "empty_section": {},
+            "list_merging": {
+                "list1": ["[]", "[11, 22]"],
+                "list2": ["[1, 2]", "+[33]"],
+                "list3": ["+[3, 4]", "+[8, 9],-[4, 55]"],
+                "list4": ["-[5]", "[66]"],
+                "list5": ["[6, 7]"],
+                "list6": ["+[77, 88]"],
+            },
         }
 
     def test_default_values(self) -> None:
         # This is used in `options_bootstrapper.py` to ignore default values when validating options.
-        file1_config_values = self.config.values[0]
-        file2_config_values = self.config.values[1]
+        file1_values = self.config.values[0]
+        file2_values = self.config.values[1]
         # NB: string interpolation should only happen when calling _ConfigValues.get_value(). The
         # values for _ConfigValues.defaults are not yet interpolated.
         default_file1_values_unexpanded = {
@@ -135,20 +188,25 @@ class ConfigTest(unittest.TestCase):
             "path": "/a/b/%(answer)s",
             "embed": "%(path)s::foo",
         }
-        assert file1_config_values.defaults == {
+        assert file1_values.defaults == {
             **self.default_seed_values,
             **default_file1_values_unexpanded,
         }
-        assert file2_config_values.defaults == self.default_seed_values
+        assert file2_values.defaults == self.default_seed_values
 
     def test_get(self) -> None:
         # Check the DEFAULT section
-        for option, value in {**self.default_seed_values, **FILE_1.default_values}.items():
-            assert self.config.get(section="DEFAULT", option=option) == value
+        for option, value in self.default_seed_values.items():
+            # Both config files have the seed values.
+            assert self.config.get(section="DEFAULT", option=option) == [value, value]
+        for option, value in FILE_1.default_values.items():
+            # Only FILE_1 has explicit DEFAULT values.
+            assert self.config.get(section="DEFAULT", option=option) == [value]
+
         # Check the combined values.
         for section, section_values in self.expected_combined_values.items():
-            for option, value in section_values.items():
-                assert self.config.get(section=section, option=option) == value
+            for option, value_list in section_values.items():
+                assert self.config.get(section=section, option=option) == value_list
 
     def test_empty(self) -> None:
         config = Config.load([])
