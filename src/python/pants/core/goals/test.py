@@ -333,9 +333,10 @@ class TestSubsystem(GoalSubsystem):
     report = BoolOption(
         "--report", default=False, advanced=True, help="Write test reports to --report-dir."
     )
+    default_report_path = str(PurePath("{distdir}", "test", "reports"))
     _report_dir = StrOption(
         "--report-dir",
-        default=str(PurePath("{distdir}", "test", "reports")),
+        default=default_report_path,
         advanced=True,
         help="Path to write test reports to. Must be relative to the build root.",
     )
@@ -447,7 +448,7 @@ async def run_tests(
             MergeDigests(result.xml_results.digest for result in results if result.xml_results),
         )
         workspace.write_digest(merged_reports, path_prefix=str(report_dir))
-        console.print_stderr(f"\nWrote test reports to `{report_dir}`")
+        console.print_stderr(f"\nWrote test reports to {report_dir}")
 
     if test_subsystem.use_coverage:
         # NB: We must pre-sort the data for itertools.groupby() to work properly, using the same
