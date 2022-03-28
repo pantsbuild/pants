@@ -48,8 +48,7 @@ use petgraph::visit::{VisitMap, Visitable};
 use rand::thread_rng;
 use rand::Rng;
 use smallvec::SmallVec;
-use tokio::sync::broadcast::error::TryRecvError;
-use tokio::sync::broadcast::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task_local;
 
 mod metrics;
@@ -380,19 +379,19 @@ enum StoreMsg {
 pub struct WorkunitStore {
   log_starting_workunits: bool,
   max_level: Level,
-  sender: Sender<StoreMsg>,
+  senders: [UnboundedSender<StoreMsg>; 2],
   streaming_workunit_data: Arc<Mutex<StreamingWorkunitData>>,
   heavy_hitters_data: Arc<Mutex<HeavyHittersData>>,
   metrics_data: Arc<MetricsData>,
 }
 
 struct StreamingWorkunitData {
-  receiver: Receiver<StoreMsg>,
+  receiver: UnboundedReceiver<StoreMsg>,
   running_graph: RunningWorkunitGraph,
 }
 
 impl StreamingWorkunitData {
-  fn new(receiver: Receiver<StoreMsg>) -> StreamingWorkunitData {
+  fn new(receiver: UnboundedReceiver<StoreMsg>) -> StreamingWorkunitData {
     StreamingWorkunitData {
       receiver,
       running_graph: RunningWorkunitGraph::default(),
@@ -404,20 +403,7 @@ impl StreamingWorkunitData {
 
     let mut started_workunits = Vec::new();
     let mut completed_workunits = Vec::new();
-    loop {
-      let msg = match self.receiver.try_recv() {
-        Ok(msg) => msg,
-        Err(TryRecvError::Closed | TryRecvError::Empty) => break,
-        Err(TryRecvError::Lagged(skipped)) => {
-          log::warn!(
-            "The StreamingWorkunitHandler fell behind on workunit processing: \
-            {skipped} messages were dropped.\n\
-            Try lowering the `--streaming-workunits-report-interval` to ensure that workunits \
-            are processed in a timely manner."
-          );
-          continue;
-        }
-      };
+    while let Ok(msg) = self.receiver.try_recv() {
       match msg {
         StoreMsg::Started(mut started) => {
           self.running_graph.add(started.clone());
@@ -452,12 +438,12 @@ impl StreamingWorkunitData {
 }
 
 struct HeavyHittersData {
-  receiver: Receiver<StoreMsg>,
+  receiver: UnboundedReceiver<StoreMsg>,
   running_graph: RunningWorkunitGraph,
 }
 
 impl HeavyHittersData {
-  fn new(receiver: Receiver<StoreMsg>) -> HeavyHittersData {
+  fn new(receiver: UnboundedReceiver<StoreMsg>) -> HeavyHittersData {
     HeavyHittersData {
       receiver,
       running_graph: RunningWorkunitGraph::default(),
@@ -465,20 +451,7 @@ impl HeavyHittersData {
   }
 
   fn refresh_store(&mut self) {
-    loop {
-      let msg = match self.receiver.try_recv() {
-        Ok(msg) => msg,
-        Err(TryRecvError::Closed | TryRecvError::Empty) => break,
-        Err(TryRecvError::Lagged(skipped)) => {
-          log::warn!(
-            "The `--dynamic-ui` fell behind on workunit processing: \
-            {skipped} messages were dropped.\n\
-            This is unexpected: please file an issue at \
-            `https://github.com/pantsbuild/pants/issues/new/choose`."
-          );
-          continue;
-        }
-      };
+    while let Ok(msg) = self.receiver.try_recv() {
       match msg {
         StoreMsg::Started(started) => self.running_graph.add(started),
         StoreMsg::Completed(span_id, new_metadata, time) => {
@@ -594,17 +567,18 @@ impl HeavyHittersData {
 
 impl WorkunitStore {
   pub fn new(log_starting_workunits: bool, max_level: Level) -> WorkunitStore {
-    // NB: This is a relatively large allocation. The UI will poll multiple times a second and
-    // shouldn't fall behind. But the streaming workunit subscriber has a configurable poll
-    // frequency, and the error message below suggests adjusting that if messages are dropped.
-    let (sender, receiver1) = broadcast::channel(16384);
-    let receiver2 = sender.subscribe();
+    // NB: Although it would be nice not to have seperate allocations per consumer, it is
+    // difficult to use a channel like `tokio::sync::broadcast` due to that channel being bounded.
+    // Subscribers receive messages at very different rates, and adjusting the workunit level
+    // affects the total number of messages that might be queued at any given time.
+    let (sender1, receiver1) = mpsc::unbounded_channel();
+    let (sender2, receiver2) = mpsc::unbounded_channel();
     WorkunitStore {
       log_starting_workunits,
       max_level,
       // TODO: Create one `StreamingWorkunitData` per subscriber, and zero if no subscribers are
       // installed.
-      sender,
+      senders: [sender1, sender2],
       streaming_workunit_data: Arc::new(Mutex::new(StreamingWorkunitData::new(receiver1))),
       heavy_hitters_data: Arc::new(Mutex::new(HeavyHittersData::new(receiver2))),
       metrics_data: Arc::default(),
@@ -641,6 +615,19 @@ impl WorkunitStore {
     self.heavy_hitters_data.lock().heavy_hitters(k)
   }
 
+  fn send(&self, msg: StoreMsg) {
+    let send_inner = |sender: &UnboundedSender<StoreMsg>, msg: StoreMsg| {
+      sender
+        .send(msg)
+        .unwrap_or_else(|_| panic!("Receivers are static, and should always be present."));
+    };
+    // Send clones to the first N-1 senders, and the owned value to the final sender.
+    for sender in &self.senders[0..self.senders.len() - 1] {
+      send_inner(sender, msg.clone());
+    }
+    send_inner(&self.senders[self.senders.len() - 1], msg);
+  }
+
   ///
   /// NB: Public for macro use. Use `in_workunit!` instead.
   ///
@@ -662,10 +649,7 @@ impl WorkunitStore {
       metadata,
     };
 
-    self
-      .sender
-      .send(StoreMsg::Started(started.clone()))
-      .unwrap_or_else(|_| panic!("Receivers are static, and should always be present."));
+    self.send(StoreMsg::Started(started.clone()));
 
     if self.log_starting_workunits {
       started.log_workunit_state(false)
@@ -679,23 +663,17 @@ impl WorkunitStore {
 
   fn cancel_workunit(&self, workunit: Workunit) {
     workunit.log_workunit_state(true);
-    self
-      .sender
-      .send(StoreMsg::Canceled(
-        workunit.span_id,
-        std::time::SystemTime::now(),
-      ))
-      .unwrap_or_else(|_| panic!("Receivers are static, and should always be present."));
+    self.send(StoreMsg::Canceled(
+      workunit.span_id,
+      std::time::SystemTime::now(),
+    ));
   }
 
   fn complete_workunit_impl(&self, mut workunit: Workunit, end_time: SystemTime) {
     let span_id = workunit.span_id;
     let new_metadata = workunit.metadata.clone();
 
-    self
-      .sender
-      .send(StoreMsg::Completed(span_id, new_metadata, end_time))
-      .unwrap_or_else(|_| panic!("Receivers are static, and should always be present."));
+    self.send(StoreMsg::Completed(span_id, new_metadata, end_time));
 
     let start_time = match workunit.state {
       WorkunitState::Started { start_time, .. } => start_time,
@@ -731,11 +709,7 @@ impl WorkunitStore {
       metadata: Some(metadata),
     };
 
-    self
-      .sender
-      .send(StoreMsg::Started(workunit.clone()))
-      .unwrap_or_else(|_| panic!("Receivers are static, and should always be present."));
-
+    self.send(StoreMsg::Started(workunit.clone()));
     self.complete_workunit_impl(workunit, end_time);
   }
 
