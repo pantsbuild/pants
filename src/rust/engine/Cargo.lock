@@ -3987,6 +3987,7 @@ dependencies = [
  "parking_lot 0.12.0",
  "petgraph",
  "rand 0.8.5",
+ "smallvec",
  "strum",
  "strum_macros",
  "tokio",
