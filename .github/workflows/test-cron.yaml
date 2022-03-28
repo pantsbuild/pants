@@ -13,18 +13,9 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Bootstrap Pants, test+lint Rust (Linux)
+    needs: check_labels
     runs-on: ubuntu-20.04
     steps:
-    - env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: github.event_name == 'pull_request'
-      name: Ensure category label
-      uses: mheap/github-action-required-labels@v1
-      with:
-        count: 1
-        labels: category:new feature, category:user api change, category:plugin api
-          change, category:performance, category:bugfix, category:documentation, category:internal
-        mode: exactly
     - name: Check out code
       uses: actions/checkout@v2
       with:
@@ -174,6 +165,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Bootstrap Pants, test Rust (macOS)
+    needs: check_labels
     runs-on: macos-10.15
     steps:
     - env:
@@ -301,6 +293,21 @@ jobs:
         - '3.8'
         - '3.9'
     timeout-minutes: 40
+  check_labels:
+    if: ${{ github.repository_owner == 'pantsbuild' }}
+    name: Ensure PR has a category label
+    runs-on: ubuntu-20.04
+    steps:
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: github.event_name == 'pull_request'
+      name: Ensure category label
+      uses: mheap/github-action-required-labels@v1
+      with:
+        count: 1
+        labels: category:new feature, category:user api change, category:plugin api
+          change, category:performance, category:bugfix, category:documentation, category:internal
+        mode: exactly
   lint_python:
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Lint Python and Shell
