@@ -311,15 +311,21 @@ def download_apache_thrift() -> Step:
 
 def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     jobs = {
+        "check_labels": {
+            "name": "Ensure PR has a category label",
+            "runs-on": LINUX_VERSION,
+            "if": IS_PANTS_OWNER,
+            "steps": ensure_category_label(),
+        },
         "bootstrap_pants_linux": {
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": LINUX_VERSION,
+            "needs": "check_labels",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
             "if": IS_PANTS_OWNER,
             "steps": [
-                *ensure_category_label(),
                 *checkout(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
@@ -411,6 +417,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         "bootstrap_pants_macos": {
             "name": "Bootstrap Pants, test Rust (macOS)",
             "runs-on": MACOS_VERSION,
+            "needs": "check_labels",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
@@ -497,6 +504,11 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 },
             ]
 
+        build_wheels_common = {
+            "needs": "check_labels",
+            "env": DISABLE_REMOTE_CACHE_ENV,
+            "if": IS_PANTS_OWNER,
+        }
         deploy_to_s3_step = {
             "name": "Deploy to S3",
             "run": "./build-support/bin/deploy_to_s3.py",
@@ -513,8 +525,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "runs-on": LINUX_VERSION,
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
                     "timeout-minutes": 65,
-                    "env": DISABLE_REMOTE_CACHE_ENV,
-                    "if": IS_PANTS_OWNER,
+                    **build_wheels_common,
                     "steps": [
                         *checkout(),
                         install_rustup(),
@@ -537,8 +548,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "name": "Build wheels and fs_util (macOS x86/64)",
                     "runs-on": MACOS_VERSION,
                     "timeout-minutes": 80,
-                    "env": DISABLE_REMOTE_CACHE_ENV,
-                    "if": IS_PANTS_OWNER,
+                    **build_wheels_common,
                     "steps": [
                         *checkout(),
                         setup_toolchain_auth(),
