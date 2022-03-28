@@ -631,19 +631,13 @@ class Parser:
         flag_details = None if flag_val is None else "from command-line flag"
 
         # Rank all available values.
-        # Note that some of these values may already be of the value type, but type conversion
-        # is idempotent, so this is OK.
-
         values_to_rank = [
-            (to_value_type(x), detail)
-            for (x, detail) in [
-                (flag_val, flag_details),
-                (env_val, env_details),
-                (config_val, config_details),
-                (config_default_val, config_details),
-                (kwargs.get("default"), None),
-                (None, None),
-            ]
+            (flag_val, flag_details),
+            (env_val, env_details),
+            (config_val, config_details),
+            (config_default_val, config_details),
+            (to_value_type(kwargs.get("default")), None),
+            (None, None),
         ]
         # Note that ranked_vals will always have at least one element, and all elements will be
         # instances of RankedValue (so none will be None, although they may wrap a None value).
