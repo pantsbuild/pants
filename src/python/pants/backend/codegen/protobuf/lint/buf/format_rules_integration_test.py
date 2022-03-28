@@ -10,7 +10,6 @@ from pants.backend.codegen.protobuf.lint.buf.format_rules import rules as buf_ru
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -29,7 +28,6 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *source_files.rules(),
             *target_types_rules(),
-            QueryRule(LintResults, [BufFormatRequest]),
             QueryRule(FmtResult, [BufFormatRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
@@ -46,7 +44,7 @@ def run_buf(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
-) -> tuple[tuple[LintResult, ...], FmtResult]:
+) -> FmtResult:
     rule_runner.set_options(
         [
             "--backend-packages=pants.backend.codegen.protobuf.lint.buf",
@@ -55,7 +53,6 @@ def run_buf(
         env_inherit={"PATH"},
     )
     field_sets = [BufFieldSet.create(tgt) for tgt in targets]
-    results = rule_runner.request(LintResults, [BufFormatRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
@@ -69,7 +66,7 @@ def run_buf(
         ],
     )
 
-    return results.results, fmt_result
+    return fmt_result
 
 
 def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
@@ -81,11 +78,7 @@ def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snaps
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": GOOD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
-    lint_results, fmt_result = run_buf(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert lint_results[0].stdout == ""
-    assert lint_results[0].stderr == ""
+    fmt_result = run_buf(rule_runner, [tgt])
     assert fmt_result.stdout == ""
     assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
     assert fmt_result.did_change is False
@@ -94,10 +87,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": BAD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
-    lint_results, fmt_result = run_buf(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 100
-    assert "f.proto.orig" in lint_results[0].stdout
+    fmt_result = run_buf(rule_runner, [tgt])
     assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
     assert fmt_result.did_change is True
 
@@ -110,11 +100,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.proto")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.proto")),
     ]
-    lint_results, fmt_result = run_buf(rule_runner, tgts)
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 100
-    assert "bad.proto.orig" in lint_results[0].stdout
-    assert "good.proto" not in lint_results[0].stdout
+    fmt_result = run_buf(rule_runner, tgts)
     assert fmt_result.output == get_snapshot(
         rule_runner, {"good.proto": GOOD_FILE, "bad.proto": GOOD_FILE}
     )
@@ -124,11 +110,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": GOOD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
-    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-format-args=--debug"])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert lint_results[0].stdout == ""
-    assert "DEBUG" in lint_results[0].stderr
+    fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-format-args=--debug"])
     assert fmt_result.stdout == ""
     assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
     assert fmt_result.did_change is False
@@ -137,7 +119,6 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": BAD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
-    lint_results, fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-format-skip"])
-    assert not lint_results
+    fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-format-skip"])
     assert fmt_result.skipped is True
     assert fmt_result.did_change is False
