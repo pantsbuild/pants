@@ -32,6 +32,7 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -141,9 +142,9 @@ class CoverageSubsystem(PythonToolBase):
     )
     _output_dir = StrOption(
         "--output-dir",
-        default=str(PurePath("dist", "coverage", "python")),
+        default=str(PurePath("{distdir}", "coverage", "python")),
         advanced=True,
-        help="Path to write the Pytest Coverage report to. Must be relative to build root.",
+        help="Path to write the Pytest Coverage report to. Must be relative to the build root.",
     )
     config = FileOption(
         "--config",
@@ -191,9 +192,8 @@ class CoverageSubsystem(PythonToolBase):
         ),
     )
 
-    @property
-    def output_dir(self) -> PurePath:
-        return PurePath(self._output_dir)
+    def output_dir(self, distdir: DistDir) -> PurePath:
+        return PurePath(self._output_dir.format(distdir=distdir.relpath))
 
     @property
     def config_request(self) -> ConfigFilesRequest:
@@ -462,6 +462,7 @@ async def generate_coverage_reports(
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
     process_cleanup: ProcessCleanupOption,
+    distdir: DistDir,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     transitive_targets = await Get(
@@ -491,6 +492,7 @@ async def generate_coverage_reports(
     report_types = []
     result_snapshot = await Get(Snapshot, Digest, merged_coverage_data.coverage_data)
     coverage_reports: list[CoverageReport] = []
+    output_dir: PurePath = coverage_subsystem.output_dir(distdir)
     for report_type in coverage_subsystem.reports:
         if report_type == CoverageReportType.RAW:
             coverage_reports.append(
@@ -500,8 +502,8 @@ async def generate_coverage_reports(
                     coverage_insufficient=False,
                     report_type=CoverageReportType.RAW.value,
                     result_snapshot=result_snapshot,
-                    directory_to_materialize_to=coverage_subsystem.output_dir,
-                    report_file=coverage_subsystem.output_dir / ".coverage",
+                    directory_to_materialize_to=output_dir,
+                    report_file=output_dir / ".coverage",
                 )
             )
             continue
@@ -547,9 +549,7 @@ async def generate_coverage_reports(
     result_snapshots = await MultiGet(Get(Snapshot, Digest, res.output_digest) for res in results)
 
     coverage_reports.extend(
-        _get_coverage_report(
-            coverage_subsystem.output_dir, report_type, exit_code != 0, stdout, snapshot
-        )
+        _get_coverage_report(output_dir, report_type, exit_code != 0, stdout, snapshot)
         for (report_type, exit_code, stdout, snapshot) in zip(
             report_types, result_exit_codes, result_stdouts, result_snapshots
         )
