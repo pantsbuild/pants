@@ -690,7 +690,6 @@ async fn prepare_workdir_exclusive_relative() {
     work_dir.path().to_owned(),
     &process,
     TestDirectory::recursive().directory_digest(),
-    Context::default(),
     store,
     executor,
     &named_caches,

@@ -84,6 +84,10 @@ impl<'x> Params {
   pub fn type_ids(&self) -> impl Iterator<Item = TypeId> + '_ {
     self.0.iter().map(|k| *k.type_id())
   }
+
+  pub fn is_empty(&self) -> bool {
+    self.0.is_empty()
+  }
 }
 
 ///

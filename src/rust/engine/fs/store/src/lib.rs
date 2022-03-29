@@ -64,7 +64,7 @@ use remexec::{ServerCapabilities, Tree};
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tryfuture::try_future;
-use workunit_store::{get_workunit_store_handle, in_workunit, Level, Metric, WorkunitMetadata};
+use workunit_store::{in_workunit, Level, Metric};
 
 use crate::remote::ByteStoreError;
 
@@ -800,20 +800,14 @@ impl Store {
       Some(_) => Ok(()),
       None => {
         log::debug!("Missing file digest from remote store: {:?}", file_digest);
-        if let Some(workunit_store_handle) = get_workunit_store_handle() {
-          in_workunit!(
-            workunit_store_handle.store,
-            "missing_file_counter".to_owned(),
-            WorkunitMetadata {
-              level: Level::Trace,
-              ..WorkunitMetadata::default()
-            },
-            |workunit| async move {
-              workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
-            },
-          )
-          .await;
-        }
+        in_workunit!(
+          "missing_file_counter",
+          Level::Trace,
+          |workunit| async move {
+            workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
+          },
+        )
+        .await;
         Err("File did not exist in the remote store.".to_owned())
       }
     }
