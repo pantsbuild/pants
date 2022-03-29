@@ -667,6 +667,15 @@ async fn workunit_to_py_value(
   workunit: Workunit,
   core: &Arc<Core>,
 ) -> PyO3Result<Value> {
+  let metadata = workunit.metadata.ok_or_else(|| {
+    PyException::new_err(format!(
+      // TODO: It would be better for this to be typesafe, but it isn't currently worth it to
+      // split the Workunit struct.
+      "Workunit for {} was disabled. Please file an issue at \
+            [https://github.com/pantsbuild/pants/issues/new].",
+      workunit.span_id
+    ))
+  })?;
   let has_parent_ids = !workunit.parent_ids.is_empty();
   let mut dict_entries = {
     let gil = Python::acquire_gil();
@@ -682,7 +691,7 @@ async fn workunit_to_py_value(
       ),
       (
         externs::store_utf8(py, "level"),
-        externs::store_utf8(py, &workunit.metadata.level.to_string()),
+        externs::store_utf8(py, &metadata.level.to_string()),
       ),
     ];
 
@@ -739,7 +748,7 @@ async fn workunit_to_py_value(
       }
     };
 
-    if let Some(desc) = &workunit.metadata.desc.as_ref() {
+    if let Some(desc) = &metadata.desc.as_ref() {
       dict_entries.push((
         externs::store_utf8(py, "description"),
         externs::store_utf8(py, desc),
@@ -750,7 +759,7 @@ async fn workunit_to_py_value(
 
   let mut artifact_entries = Vec::new();
 
-  for (artifact_name, digest) in workunit.metadata.artifacts.iter() {
+  for (artifact_name, digest) in metadata.artifacts.iter() {
     let store = core.store();
     let py_val = match digest {
       ArtifactOutput::FileDigest(digest) => {
@@ -786,8 +795,8 @@ async fn workunit_to_py_value(
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  let mut user_metadata_entries = Vec::with_capacity(workunit.metadata.user_metadata.len());
-  for (user_metadata_key, user_metadata_item) in workunit.metadata.user_metadata.iter() {
+  let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
+  for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
     let value = match user_metadata_item {
       UserMetadataItem::ImmediateString(v) => v.into_py(py),
       UserMetadataItem::ImmediateInt(n) => n.into_py(py),
@@ -810,14 +819,14 @@ async fn workunit_to_py_value(
     externs::store_dict(py, user_metadata_entries)?,
   ));
 
-  if let Some(stdout_digest) = workunit.metadata.stdout {
+  if let Some(stdout_digest) = metadata.stdout {
     artifact_entries.push((
       externs::store_utf8(py, "stdout_digest"),
       crate::nodes::Snapshot::store_file_digest(py, stdout_digest).map_err(PyException::new_err)?,
     ));
   }
 
-  if let Some(stderr_digest) = workunit.metadata.stderr {
+  if let Some(stderr_digest) = metadata.stderr {
     artifact_entries.push((
       externs::store_utf8(py, "stderr_digest"),
       crate::nodes::Snapshot::store_file_digest(py, stderr_digest).map_err(PyException::new_err)?,

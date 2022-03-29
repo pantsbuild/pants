@@ -298,14 +298,17 @@ impl CommandRunner {
               }
               // When we successfully use the cache, we change the description and increase the level
               // (but not so much that it will be logged by default).
-              workunit.update_metadata(|initial| WorkunitMetadata {
-                desc: initial
-                  .desc
-                  .as_ref()
-                  .map(|desc| format!("Hit: {}", desc)),
-                level: Level::Debug,
-                ..initial
+              workunit.update_metadata(|initial| {
+                initial.map(|initial|
+                WorkunitMetadata {
+                  desc: initial
+                    .desc
+                    .as_ref()
+                    .map(|desc| format!("Hit: {}", desc)),
+                  level: Level::Debug,
+                  ..initial
 
+                })
               });
               Ok((cached_response, true))
             } else {

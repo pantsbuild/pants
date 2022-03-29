@@ -433,24 +433,26 @@ impl WrappedNode for ExecuteProcess {
 
     let definition = serde_json::to_string(&request)
       .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
-    workunit.update_metadata(|initial| WorkunitMetadata {
-      stdout: Some(res.stdout_digest),
-      stderr: Some(res.stderr_digest),
-      user_metadata: vec![
-        (
-          "definition".to_string(),
-          UserMetadataItem::ImmediateString(definition),
-        ),
-        (
-          "source".to_string(),
-          UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
-        ),
-        (
-          "exit_code".to_string(),
-          UserMetadataItem::ImmediateInt(res.exit_code as i64),
-        ),
-      ],
-      ..initial
+    workunit.update_metadata(|initial| {
+      initial.map(|initial| WorkunitMetadata {
+        stdout: Some(res.stdout_digest),
+        stderr: Some(res.stderr_digest),
+        user_metadata: vec![
+          (
+            "definition".to_string(),
+            UserMetadataItem::ImmediateString(definition),
+          ),
+          (
+            "source".to_string(),
+            UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+          ),
+          (
+            "exit_code".to_string(),
+            UserMetadataItem::ImmediateInt(res.exit_code as i64),
+          ),
+        ],
+        ..initial
+      })
     });
     if let Some(total_elapsed) = res.metadata.total_elapsed {
       let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
@@ -1183,14 +1185,11 @@ impl WrappedNode for Task {
       )));
     }
 
-    let engine_aware_return_type = if self.task.engine_aware_return_type {
+    if self.task.engine_aware_return_type {
       let gil = Python::acquire_gil();
       let py = gil.python();
-      EngineAwareReturnType::from_task_result((*result_val).as_ref(py))
-    } else {
-      EngineAwareReturnType::default()
+      EngineAwareReturnType::update_workunit(workunit, (*result_val).as_ref(py))
     };
-    engine_aware_return_type.update_workunit(workunit);
 
     Ok(result_val)
   }

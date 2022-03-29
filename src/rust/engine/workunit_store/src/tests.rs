@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use internment::Intern;
 
-use crate::{SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
+use crate::{Level, SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[test]
 fn heavy_hitters_basic() {
@@ -56,6 +56,46 @@ fn straggling_workunits_blocked_path() {
   // Test that a chain of blocked workunits do not cause their parents to be rendered.
   let ws = create_store(vec![wu_root(0)], vec![wu(1, 0), wu(2, 1)], vec![]);
   assert!(ws.straggling_workunits(Duration::from_secs(0)).is_empty());
+}
+
+#[tokio::test]
+async fn workunit_escalation_is_recorded() {
+  // Create a store which will disable Debug level workunits.
+  let ws = WorkunitStore::new(true, Level::Info);
+  ws.init_thread_state(None);
+
+  // Start a workunit at Debug (below the level of the store).
+  let new_desc = "One more thing!";
+  in_workunit!(
+    "super_fine",
+    Level::Debug,
+    desc = Some("Should be ignored".to_owned()),
+    |workunit| async move {
+      workunit.update_metadata(|metadata| {
+        // Ensure that it has no metadata (i.e.: is disabled).
+        assert!(metadata.is_none());
+
+        // Then return new metadata to raise the workunit's level.
+        Some(WorkunitMetadata {
+          level: Level::Info,
+          desc: Some(new_desc.to_owned()),
+          ..WorkunitMetadata::default()
+        })
+      });
+    }
+  )
+  .await;
+
+  // Finally, confirm that the workunit did end up recorded using the new level.
+  let (started, completed) = ws.latest_workunits(Level::Info);
+  assert!(started.is_empty());
+  assert_eq!(
+    completed
+      .into_iter()
+      .map(|wu| wu.metadata.and_then(|m| m.desc))
+      .collect::<Vec<_>>(),
+    vec![Some(new_desc.to_owned())]
+  );
 }
 
 #[test]
@@ -115,7 +155,7 @@ fn create_store(
         span_id,
         Intern::new(format!("{}", span_id.0)).as_ref(),
         parent_id,
-        metadata,
+        Some(metadata),
       )
     })
     .collect::<Vec<_>>();
