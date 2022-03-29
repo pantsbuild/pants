@@ -141,7 +141,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             return image_names
 
         return tuple(
-            "/".join([registry.address, image_name])
+            registry.get_image_ref(image_name)
             for image_name in image_names
             for registry in registries_options
         )
