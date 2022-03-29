@@ -139,7 +139,7 @@ async def run_helm_unittest(
 
 @rule
 async def generate_helm_unittest_debug_request(field_set: HelmUnitTestFieldSet) -> TestDebugRequest:
-    raise NotImplementedError("This is a stub")
+    raise NotImplementedError("Can not debug Helm unit tests")
 
 
 def rules():

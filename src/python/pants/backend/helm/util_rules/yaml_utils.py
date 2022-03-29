@@ -6,7 +6,8 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 
-def _as_python_attribute_name(str: str) -> str:
+def _to_snake_case(str: str) -> str:
+    """Translates an camel-case or kebab-case identifier by a snake-case one."""
     base_string = str.replace("-", "_")
 
     result = ""
@@ -23,5 +24,6 @@ def _as_python_attribute_name(str: str) -> str:
     return result
 
 
-def yaml_attr_dict(d: Mapping[str, Any]) -> dict[str, Any]:
-    return {_as_python_attribute_name(name): value for name, value in d.items()}
+def snake_case_attr_dict(d: Mapping[str, Any]) -> dict[str, Any]:
+    """Transforms all keys in the given mapping to be snake-case."""
+    return {_to_snake_case(name): value for name, value in d.items()}

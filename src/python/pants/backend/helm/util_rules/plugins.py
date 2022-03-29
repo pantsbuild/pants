@@ -11,7 +11,7 @@ from typing import Any, ClassVar, Generic, Type, TypeVar
 import yaml
 from typing_extensions import final
 
-from pants.backend.helm.util_rules.yaml_utils import yaml_attr_dict
+from pants.backend.helm.util_rules.yaml_utils import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -60,7 +60,7 @@ class HelmPluginPlatformCommand:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> HelmPluginPlatformCommand:
-        return cls(**yaml_attr_dict(d))
+        return cls(**snake_case_attr_dict(d))
 
 
 @dataclass(frozen=True)
@@ -81,7 +81,7 @@ class HelmPluginMetadata:
         ]
         hooks = d.pop("hooks", {})
 
-        attrs = yaml_attr_dict(d)
+        attrs = snake_case_attr_dict(d)
         return cls(platform_command=tuple(platform_command), hooks=FrozenDict(hooks), **attrs)
 
     @classmethod

@@ -13,7 +13,7 @@ import yaml
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartMetaSourceField
 from pants.backend.helm.util_rules import sources
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
-from pants.backend.helm.util_rules.yaml_utils import yaml_attr_dict
+from pants.backend.helm.util_rules.yaml_utils import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.addresses import Address
 from pants.engine.fs import (
@@ -78,7 +78,7 @@ class HelmChartDependency:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> HelmChartDependency:
-        return cls(**yaml_attr_dict(d))
+        return cls(**snake_case_attr_dict(d))
 
     def to_json_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"name": self.name}
@@ -155,7 +155,7 @@ class HelmChartMetadata:
         sources = d.pop("sources", [])
         annotations = d.pop("annotations", {})
 
-        attrs = yaml_attr_dict(d)
+        attrs = snake_case_attr_dict(d)
 
         return cls(
             api_version=api_version,
