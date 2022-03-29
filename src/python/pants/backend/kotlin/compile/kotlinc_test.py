@@ -233,7 +233,7 @@ def test_compile_no_deps_jdk_12(rule_runner: RuleRunner) -> None:
             ),
             "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
             "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
-            "ExampleLib.scala": KOTLIN_LIB_JDK12_SOURCE,
+            "ExampleLib.kt": KOTLIN_LIB_JDK12_SOURCE,
         }
     )
     coarsened_target = expect_single_expanded_coarsened_target(
