@@ -75,21 +75,22 @@ async def run_helm_unittest(
     if len(chart_targets) == 0:
         raise MissingUnitTestChartDependency(field_set.address)
 
-    chart = await Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_targets[0]))
-
-    source_files = await Get(
-        StrippedSourceFiles,
-        SourceFilesRequest(
-            sources_fields=[
-                field_set.source,
-                *(
-                    tgt.get(SourcesField)
-                    for tgt in transitive_targets.dependencies
-                    if not HelmChartFieldSet.is_applicable(tgt)
-                ),
-            ],
-            for_sources_types=(HelmUnitTestSourceField, ResourceSourceField),
-            enable_codegen=True,
+    chart, source_files = await MultiGet(
+        Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(chart_targets[0])),
+        Get(
+            StrippedSourceFiles,
+            SourceFilesRequest(
+                sources_fields=[
+                    field_set.source,
+                    *(
+                        tgt.get(SourcesField)
+                        for tgt in transitive_targets.dependencies
+                        if not HelmChartFieldSet.is_applicable(tgt)
+                    ),
+                ],
+                for_sources_types=(HelmUnitTestSourceField, ResourceSourceField),
+                enable_codegen=True,
+            ),
         ),
     )
     prefixed_test_files_digest = await Get(
