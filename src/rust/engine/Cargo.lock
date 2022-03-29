@@ -3980,6 +3980,7 @@ dependencies = [
  "bytes",
  "concrete_time",
  "deepsize",
+ "futures",
  "hashing",
  "hdrhistogram",
  "internment",

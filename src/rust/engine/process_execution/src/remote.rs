@@ -808,13 +808,15 @@ impl crate::CommandRunner for CommandRunner {
         let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
         let result = tokio::time::timeout(deadline_duration, result_fut).await;
         if result.is_err() {
-          workunit.update_metadata(|inititial| WorkunitMetadata {
-            level: Level::Error,
-            desc: Some(format!(
-              "remote execution timed out after {:?}",
-              deadline_duration
-            )),
-            ..inititial
+          workunit.update_metadata(|initial| {
+            Some(WorkunitMetadata {
+              level: Level::Error,
+              desc: Some(format!(
+                "remote execution timed out after {:?}",
+                deadline_duration
+              )),
+              ..initial.unwrap_or_default()
+            })
           })
         }
 
