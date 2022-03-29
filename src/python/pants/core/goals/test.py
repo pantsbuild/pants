@@ -60,6 +60,8 @@ class TestResult(EngineAwareReturnType):
     result_metadata: ProcessResultMetadata | None
 
     coverage_data: CoverageData | None = None
+    # TODO: Rename this to `reports`. There is no guarantee that every language will produce
+    #  XML reports, or only XML reports.
     xml_results: Snapshot | None = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
     extra_output: Snapshot | None = None
@@ -328,9 +330,24 @@ class TestSubsystem(GoalSubsystem):
             "system supports this."
         ),
     )
+    report = BoolOption(
+        "--report", default=False, advanced=True, help="Write test reports to --report-dir."
+    )
+    default_report_path = str(PurePath("{distdir}", "test", "reports"))
+    _report_dir = StrOption(
+        "--report-dir",
+        default=default_report_path,
+        advanced=True,
+        help="Path to write test reports to. Must be relative to the build root.",
+    )
     xml_dir = StrOption(
         "--xml-dir",
         metavar="<DIR>",
+        removal_version="2.13.0.dev0",
+        removal_hint=(
+            "Set the `report` option in [test] scope to emit reports to a standard location under "
+            "dist/. Set the `report-dir` option to customize that location."
+        ),
         default=None,
         advanced=True,
         help=(
@@ -347,6 +364,9 @@ class TestSubsystem(GoalSubsystem):
         ),
     )
 
+    def report_dir(self, distdir: DistDir) -> PurePath:
+        return PurePath(self._report_dir.format(distdir=distdir.relpath))
+
 
 class Test(Goal):
     subsystem_cls = TestSubsystem
@@ -360,7 +380,7 @@ async def run_tests(
     test_subsystem: TestSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
-    dist_dir: DistDir,
+    distdir: DistDir,
     run_id: RunId,
 ) -> Test:
     if test_subsystem.debug:
@@ -416,17 +436,19 @@ async def run_tests(
         if result.extra_output and result.extra_output.files:
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=str(dist_dir.relpath / "test" / result.address.path_safe_spec),
+                path_prefix=str(distdir.relpath / "test" / result.address.path_safe_spec),
             )
 
-    if test_subsystem.xml_dir:
-        xml_dir = test_subsystem.xml_dir
-        merged_xml_results = await Get(
+    if test_subsystem.report or test_subsystem.xml_dir:
+        report_dir = (
+            test_subsystem.report_dir(distdir) if test_subsystem.report else test_subsystem.xml_dir
+        )
+        merged_reports = await Get(
             Digest,
             MergeDigests(result.xml_results.digest for result in results if result.xml_results),
         )
-        workspace.write_digest(merged_xml_results, path_prefix=xml_dir)
-        console.print_stderr(f"\nWrote test XML to `{xml_dir}`")
+        workspace.write_digest(merged_reports, path_prefix=str(report_dir))
+        console.print_stderr(f"\nWrote test reports to {report_dir}")
 
     if test_subsystem.use_coverage:
         # NB: We must pre-sort the data for itertools.groupby() to work properly, using the same

@@ -30,7 +30,6 @@ from pants.backend.python.target_types import (
     PythonRequirementTypeStubModulesField,
 )
 from pants.base.build_root import BuildRoot
-from pants.base.parse_context import ParseContext
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
@@ -178,18 +177,6 @@ class PyProjectToml:
     build_root: PurePath
     toml_relpath: PurePath
     toml_contents: str
-
-    @classmethod
-    def deprecated_macro_create(
-        cls, parse_context: ParseContext, pyproject_toml_relpath: str
-    ) -> PyProjectToml:
-        build_root = Path(parse_context.build_root)
-        toml_relpath = PurePath(parse_context.rel_path, pyproject_toml_relpath)
-        return cls(
-            build_root=build_root,
-            toml_relpath=toml_relpath,
-            toml_contents=(build_root / toml_relpath).read_text(),
-        )
 
     def parse(self) -> Mapping[str, Any]:
         return toml.loads(self.toml_contents)

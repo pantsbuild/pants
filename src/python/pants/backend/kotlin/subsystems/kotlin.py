@@ -1,0 +1,33 @@
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
+import logging
+
+from pants.option.option_types import DictOption
+from pants.option.subsystem import Subsystem
+
+DEFAULT_KOTLIN_VERSION = "1.6.0"
+
+_logger = logging.getLogger(__name__)
+
+
+class KotlinSubsystem(Subsystem):
+    options_scope = "kotlin"
+    name = "kotlin"
+    help = "The Kotlin programming language (https://kotlinlang.org/)."
+
+    _version_for_resolve = DictOption[str](
+        "--version-for-resolve",
+        help=(
+            "A dictionary mapping the name of a resolve to the Kotlin version to use for all Kotlin "
+            "targets consuming that resolve.\n\n"
+        ),
+    )
+
+    def version_for_resolve(self, resolve: str) -> str:
+        version = self._version_for_resolve.get(resolve)
+        if version:
+            return version
+        return DEFAULT_KOTLIN_VERSION

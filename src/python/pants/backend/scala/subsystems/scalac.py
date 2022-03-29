@@ -30,7 +30,7 @@ class Scalac(Subsystem):
             "set `[scalac].plugins_global_lockfile`."
         ),
         advanced=True,
-        removal_version="2.12.0.dev0",
+        removal_version="2.12.0.dev1",
         removal_hint="Use `--scalac-plugins-for-resolve` instead to use user resolves",
     )
 
@@ -54,7 +54,7 @@ class Scalac(Subsystem):
             "`[scalac].plugins_global`."
         ),
         advanced=True,
-        removal_version="2.12.0.dev0",
+        removal_version="2.12.0.dev1",
         removal_hint="Use `--scalac-plugins-for-resolve` instead, which will add plugin dependencies to JVM user resolves.",
     )
 

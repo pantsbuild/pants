@@ -808,13 +808,15 @@ impl crate::CommandRunner for CommandRunner {
         let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
         let result = tokio::time::timeout(deadline_duration, result_fut).await;
         if result.is_err() {
-          workunit.update_metadata(|inititial| WorkunitMetadata {
-            level: Level::Error,
-            desc: Some(format!(
-              "remote execution timed out after {:?}",
-              deadline_duration
-            )),
-            ..inititial
+          workunit.update_metadata(|initial| {
+            Some(WorkunitMetadata {
+              level: Level::Error,
+              desc: Some(format!(
+                "remote execution timed out after {:?}",
+                deadline_duration
+              )),
+              ..initial.unwrap_or_default()
+            })
           })
         }
 
@@ -855,7 +857,7 @@ fn maybe_add_workunit(
   workunit_store: &WorkunitStore,
   metadata: WorkunitMetadata,
 ) {
-  if !result_cached {
+  if !result_cached && workunit_store.max_level() >= metadata.level {
     let start_time: SystemTime = SystemTime::UNIX_EPOCH + time_span.start.into();
     let end_time: SystemTime = start_time + time_span.duration.into();
     workunit_store.add_completed_workunit(name, start_time, end_time, parent_id, metadata);

@@ -761,12 +761,12 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 class SkipOption(BoolOption[bool]):
     """A --skip option (for an invocable tool)."""
 
-    def __new__(cls, goal: str, *other_goals: str):
+    def __new__(cls, goal: str, *other_goals: str, flag_name: str = "--skip"):
         goals = (goal,) + other_goals
         invocation_str = " and ".join([f"`{bin_name()} {goal}`" for goal in goals])
         return super().__new__(
             cls,  # type: ignore[arg-type]
-            "--skip",
+            flag_name,
             default=False,  # type: ignore[arg-type]
             help=(
                 lambda subsystem_cls: (
@@ -788,12 +788,13 @@ class ArgsListOption(ShellStrListOption):
         # This should be set when callers can alternatively use "--" followed by the arguments,
         # instead of having to provide "--[scope]-args='--arg1 --arg2'".
         passthrough: bool | None = None,
+        flag_name: str = "--args",
     ):
         if extra_help:
             extra_help = "\n\n" + extra_help
         instance = super().__new__(
             cls,  # type: ignore[arg-type]
-            "--args",
+            flag_name,
             help=(
                 lambda subsystem_cls: (
                     f"Arguments to pass directly to {tool_name or subsystem_cls.name}, "

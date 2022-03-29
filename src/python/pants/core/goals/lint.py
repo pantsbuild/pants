@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, cast
+from typing import Any, ClassVar, Iterable, Type, cast
 
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -32,6 +32,23 @@ from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
+
+
+class AmbiguousRequestNamesError(Exception):
+    def __init__(
+        self, ambiguous_name: str, requests: set[Type[LintTargetsRequest] | Type[LintFilesRequest]]
+    ):
+        request_names = {
+            f"{request_target.__module__}.{request_target.__qualname__}"
+            for request_target in requests
+        }
+
+        super().__init__(
+            f"The same name `{ambiguous_name}` is used by multiple requests, "
+            f"which causes ambiguity: {request_names}\n\n"
+            f"To fix, please update these requests so that `{ambiguous_name}` "
+            f"is not used more than once."
+        )
 
 
 @dataclass(frozen=True)
@@ -181,6 +198,16 @@ class Lint(Goal):
     subsystem_cls = LintSubsystem
 
 
+def _check_ambiguous_request_names(
+    *requests: Type[LintFilesRequest] | Type[LintTargetsRequest],
+) -> None:
+    for name, request_group in itertools.groupby(requests, key=lambda target: target.name):
+        request_group_set = set(request_group)
+
+        if len(request_group_set) > 1:
+            raise AmbiguousRequestNamesError(name, request_group_set)
+
+
 @goal_rule
 async def lint(
     console: Console,
@@ -195,6 +222,9 @@ async def lint(
         "Iterable[type[LintTargetsRequest]]", union_membership[LintTargetsRequest]
     )
     file_request_types = union_membership[LintFilesRequest]
+
+    _check_ambiguous_request_names(*target_request_types, *file_request_types)
+
     specified_names = determine_specified_tool_names(
         "lint",
         lint_subsystem.only,
@@ -212,6 +242,7 @@ async def lint(
         )
         for request_type in target_request_types
     )
+
     file_requests = (
         tuple(
             request_type(specs_snapshot.snapshot.files)

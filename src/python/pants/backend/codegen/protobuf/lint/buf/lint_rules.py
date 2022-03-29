@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 
-from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufField
+from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufLintField
 from pants.backend.codegen.protobuf.lint.buf.subsystem import BufSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
@@ -31,17 +31,17 @@ class BufFieldSet(FieldSet):
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
-        return tgt.get(SkipBufField).value
+        return tgt.get(SkipBufLintField).value
 
 
-class BufRequest(LintTargetsRequest):
+class BufLintRequest(LintTargetsRequest):
     field_set_type = BufFieldSet
-    name = BufSubsystem.options_scope
+    name = "buf-lint"
 
 
-@rule(desc="Lint with Buf", level=LogLevel.DEBUG)
-async def run_buf(request: BufRequest, buf: BufSubsystem) -> LintResults:
-    if buf.skip:
+@rule(desc="Lint with buf lint", level=LogLevel.DEBUG)
+async def run_buf(request: BufLintRequest, buf: BufSubsystem) -> LintResults:
+    if buf.skip_lint:
         return LintResults([], linter_name=request.name)
 
     transitive_targets = await Get(
@@ -91,12 +91,12 @@ async def run_buf(request: BufRequest, buf: BufSubsystem) -> LintResults:
             argv=[
                 downloaded_buf.exe,
                 "lint",
-                *buf.args,
+                *buf.lint_args,
                 "--path",
                 ",".join(target_sources_stripped.snapshot.files),
             ],
             input_digest=input_digest,
-            description=f"Run Buf on {pluralize(len(request.field_sets), 'file')}.",
+            description=f"Run buf lint on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
@@ -106,4 +106,4 @@ async def run_buf(request: BufRequest, buf: BufSubsystem) -> LintResults:
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintTargetsRequest, BufRequest)]
+    return [*collect_rules(), UnionRule(LintTargetsRequest, BufLintRequest)]

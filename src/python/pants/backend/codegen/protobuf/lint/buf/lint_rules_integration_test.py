@@ -8,8 +8,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.codegen.protobuf.lint.buf.rules import BufFieldSet, BufRequest
-from pants.backend.codegen.protobuf.lint.buf.rules import rules as buf_rules
+from pants.backend.codegen.protobuf.lint.buf.lint_rules import BufFieldSet, BufLintRequest
+from pants.backend.codegen.protobuf.lint.buf.lint_rules import rules as buf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.goals.lint import LintResult, LintResults
@@ -28,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
-            QueryRule(LintResults, [BufRequest]),
+            QueryRule(LintResults, [BufLintRequest]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
     )
@@ -55,7 +55,7 @@ def run_buf(
     )
     results = rule_runner.request(
         LintResults,
-        [BufRequest(BufFieldSet.create(tgt) for tgt in targets)],
+        [BufLintRequest(BufFieldSet.create(tgt) for tgt in targets)],
     )
     return results.results
 
