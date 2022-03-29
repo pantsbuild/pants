@@ -15,7 +15,6 @@ from pants.core.goals.check import CheckResults
 from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
@@ -148,16 +147,6 @@ KOTLIN_LIB_SOURCE = dedent(
     """
 )
 
-KOTLIN_LIB_JDK12_SOURCE = dedent(
-    """
-    package org.pantsbuild.example.lib
-
-    class C {
-        val hello = "hello!".indent(4)
-    }
-    """
-)
-
 
 KOTLIN_LIB_MAIN_SOURCE = dedent(
     """
@@ -217,65 +206,6 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     assert len(check_results.results) == 1
     check_result = check_results.results[0]
     assert check_result.exit_code == 0
-
-
-@maybe_skip_jdk_test
-def test_compile_no_deps_jdk_12(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": dedent(
-                """\
-                kotlin_sources(
-                    name = 'lib',
-                    jdk = 'adopt:1.12',
-                )
-                """
-            ),
-            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
-            "ExampleLib.kt": KOTLIN_LIB_JDK12_SOURCE,
-        }
-    )
-    coarsened_target = expect_single_expanded_coarsened_target(
-        rule_runner, Address(spec_path="", target_name="lib")
-    )
-
-    rule_runner.request(
-        RenderedClasspath,
-        [CompileKotlinSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
-    )
-
-
-@maybe_skip_jdk_test
-def test_compile_jdk_12_file_fails_on_jdk_11(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "BUILD": dedent(
-                """\
-                kotlin_sources(
-                    name = 'lib',
-                    jdk = 'adopt:1.11',
-                )
-                """
-            ),
-            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
-            "ExampleLib.kt": KOTLIN_LIB_JDK12_SOURCE,
-        }
-    )
-    coarsened_target = expect_single_expanded_coarsened_target(
-        rule_runner, Address(spec_path="", target_name="lib")
-    )
-
-    with pytest.raises(ExecutionError):
-        rule_runner.request(
-            RenderedClasspath,
-            [
-                CompileKotlinSourceRequest(
-                    component=coarsened_target, resolve=make_resolve(rule_runner)
-                )
-            ],
-        )
 
 
 @maybe_skip_jdk_test
