@@ -11,7 +11,7 @@ from pants.backend.helm.dependency_inference.unittest import (
 from pants.backend.helm.dependency_inference.unittest import rules as inject_deps_rules
 from pants.backend.helm.target_types import (
     HelmChartTarget,
-    HelmUnitTestChartField,
+    HelmUnitTestDependenciesField,
     HelmUnitTestTestsGeneratorTarget,
     HelmUnitTestTestTarget,
 )
@@ -64,7 +64,7 @@ def test_injects_single_chart(rule_runner: RuleRunner) -> None:
     unittest_tgt = rule_runner.get_target(Address("tests", target_name="foo_tests"))
     injected_deps = rule_runner.request(
         InjectedDependencies,
-        [InjectHelmUnitTestChartDependencyRequest(unittest_tgt[HelmUnitTestChartField])],
+        [InjectHelmUnitTestChartDependencyRequest(unittest_tgt[HelmUnitTestDependenciesField])],
     )
 
     assert len(injected_deps) == 1
@@ -100,11 +100,19 @@ def test_injects_parent_chart(rule_runner: RuleRunner) -> None:
 
     chart1_injected_deps = rule_runner.request(
         InjectedDependencies,
-        [InjectHelmUnitTestChartDependencyRequest(chart1_unittest_tgt[HelmUnitTestChartField])],
+        [
+            InjectHelmUnitTestChartDependencyRequest(
+                chart1_unittest_tgt[HelmUnitTestDependenciesField]
+            )
+        ],
     )
     chart2_injected_deps = rule_runner.request(
         InjectedDependencies,
-        [InjectHelmUnitTestChartDependencyRequest(chart2_unittest_tgt[HelmUnitTestChartField])],
+        [
+            InjectHelmUnitTestChartDependencyRequest(
+                chart2_unittest_tgt[HelmUnitTestDependenciesField]
+            )
+        ],
     )
 
     assert len(chart1_injected_deps) == 1

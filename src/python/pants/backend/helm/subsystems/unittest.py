@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from enum import Enum
-from typing import cast
 
 from pants.backend.helm.util_rules.plugins import (
     ExternalHelmPlugin,
@@ -10,8 +9,9 @@ from pants.backend.helm.util_rules.plugins import (
     ExternalHelmPluginRequest,
 )
 from pants.engine.platform import Platform
-from pants.engine.rules import SubsystemRule, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.option_types import EnumOption
 
 
 class HelmUnitTestReportFormat(Enum):
@@ -42,22 +42,14 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         "macos_x86_64": "macos-amd64",
     }
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--output-type",
-            type=HelmUnitTestReportFormat,
-            default=HelmUnitTestReportFormat.XUNIT,
-            help="Output type used for the test report",
-        )
+    output_type = EnumOption(
+        "--output-type",
+        default=HelmUnitTestReportFormat.XUNIT,
+        help="Output type used for the test report",
+    )
 
     def generate_exe(self, _: Platform) -> str:
         return "./untt"
-
-    @property
-    def output_type(self) -> HelmUnitTestReportFormat:
-        return cast(HelmUnitTestReportFormat, self.options.output_type)
 
 
 class HelmUnitTestPluginBinding(ExternalHelmPluginBinding[HelmUnitTestSubsystem]):
@@ -74,6 +66,5 @@ def download_plugin_request(
 def rules():
     return [
         *collect_rules(),
-        SubsystemRule(HelmUnitTestSubsystem),
         UnionRule(ExternalHelmPluginBinding, HelmUnitTestPluginBinding),
     ]

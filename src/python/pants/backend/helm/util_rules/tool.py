@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Iterable, Mapping
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.subsystems.helm import rules as helm_rules
 from pants.backend.helm.util_rules.plugins import HelmPlugins
 from pants.backend.helm.util_rules.plugins import rules as plugins_rules
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -179,4 +178,4 @@ def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
 
 
 def rules():
-    return [*collect_rules(), *helm_rules(), *plugins_rules()]
+    return [*collect_rules(), *plugins_rules()]

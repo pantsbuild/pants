@@ -12,6 +12,7 @@ import yaml
 from typing_extensions import final
 
 from pants.backend.helm.util_rules.yaml_utils import yaml_attr_dict
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -154,7 +155,15 @@ async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> H
     downloaded_tool = await Get(DownloadedExternalTool, ExternalToolRequest, request.tool_request)
 
     metadata_file = await Get(
-        Digest, DigestSubset(downloaded_tool.digest, PathGlobs(["plugin.yaml"]))
+        Digest,
+        DigestSubset(
+            downloaded_tool.digest,
+            PathGlobs(
+                ["plugin.yaml"],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=request.plugin_name,
+            ),
+        ),
     )
     metadata_content = await Get(DigestContents, Digest, metadata_file)
     if len(metadata_content) == 0:

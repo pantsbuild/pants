@@ -15,7 +15,6 @@ from pants.engine.target import (
     FieldSet,
     MultipleSourcesField,
     SingleSourceField,
-    SpecialCasedDependencies,
     Target,
     TargetFilesGenerator,
     Targets,
@@ -126,11 +125,6 @@ def all_helm_chart_targets(all_targets: AllTargets) -> AllHelmChartTargets:
 # -----------------------------------------------------------------------------------------------
 
 
-class HelmUnitTestChartField(SpecialCasedDependencies):
-    alias = "chart"
-    help = f"Dependency on a `{HelmChartTarget.alias}` target that provides with templates for the Helm unit tests."
-
-
 class HelmUnitTestDependenciesField(Dependencies):
     pass
 
@@ -147,7 +141,6 @@ class HelmUnitTestTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         HelmUnitTestSourceField,
-        HelmUnitTestChartField,
         HelmUnitTestDependenciesField,
     )
     help = "A single helm-unittest suite file"
@@ -183,11 +176,10 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         HelmUnitTestGeneratingSourcesField,
         HelmUnitTestDependenciesField,
-        HelmUnitTestChartField,
     )
     generated_target_cls = HelmUnitTestTestTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (HelmUnitTestDependenciesField, HelmUnitTestChartField)
+    moved_fields = (HelmUnitTestDependenciesField,)
     help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field"
 
 

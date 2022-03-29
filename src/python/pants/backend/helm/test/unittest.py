@@ -11,7 +11,6 @@ from pants.backend.helm.subsystems.unittest import rules as subsystem_rules
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
     HelmChartTarget,
-    HelmUnitTestChartField,
     HelmUnitTestDependenciesField,
     HelmUnitTestSourceField,
     HelmUnitTestTestsGeneratorTarget,
@@ -53,10 +52,9 @@ class MissingUnitTestChartDependency(Exception):
 
 @dataclass(frozen=True)
 class HelmUnitTestFieldSet(TestFieldSet):
-    required_fields = (HelmUnitTestSourceField, HelmUnitTestChartField)
+    required_fields = (HelmUnitTestSourceField,)
 
     source: HelmUnitTestSourceField
-    chart: HelmUnitTestChartField
     dependencies: HelmUnitTestDependenciesField
 
 
@@ -66,13 +64,14 @@ async def run_helm_unittest(
     test_subsystem: TestSubsystem,
     unittest_subsystem: HelmUnitTestSubsystem,
 ) -> TestResult:
-    chart_targets, transitive_targets = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.chart, include_special_cased_deps=True)),
+    direct_dep_targets, transitive_targets = await MultiGet(
+        Get(Targets, DependenciesRequest(field_set.dependencies)),
         Get(
             TransitiveTargets,
-            TransitiveTargetsRequest([field_set.address], include_special_cased_deps=False),
+            TransitiveTargetsRequest([field_set.address]),
         ),
     )
+    chart_targets = [tgt for tgt in direct_dep_targets if HelmChartFieldSet.is_applicable(tgt)]
     if len(chart_targets) == 0:
         raise MissingUnitTestChartDependency(field_set.address)
 

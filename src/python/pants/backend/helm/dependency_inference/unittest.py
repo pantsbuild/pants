@@ -3,12 +3,20 @@
 
 import logging
 import os
+from typing import Sequence
 
-from pants.backend.helm.target_types import AllHelmChartTargets, HelmUnitTestChartField
+from pants.backend.helm.target_types import AllHelmChartTargets, HelmUnitTestDependenciesField
 from pants.engine.addresses import Address
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, Target
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import (
+    DependenciesRequest,
+    ExplicitlyProvidedDependencies,
+    InjectDependenciesRequest,
+    InjectedDependencies,
+    Target,
+)
 from pants.engine.unions import UnionRule
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
@@ -23,7 +31,7 @@ class InvalidUnitTestTestFolder(Exception):
 
 
 class AmbiguousHelmUnitTestChart(Exception):
-    def __init__(self, *, target_addr: str, putative_addresses: list[str]) -> None:
+    def __init__(self, *, target_addr: str, putative_addresses: Sequence[str]) -> None:
         super().__init__(
             f"The actual Helm chart for the target at '{target_addr}' is ambiguous and can not be inferred. "
             f"Found {pluralize(len(putative_addresses), 'candidate')}:\n{bullet_list(putative_addresses)}"
@@ -31,7 +39,7 @@ class AmbiguousHelmUnitTestChart(Exception):
 
 
 class InjectHelmUnitTestChartDependencyRequest(InjectDependenciesRequest):
-    inject_for = HelmUnitTestChartField
+    inject_for = HelmUnitTestDependenciesField
 
 
 @rule
@@ -48,19 +56,39 @@ async def inject_chart_dependency_into_unittests(
         chart_folder = target.address.spec_path
         return chart_folder == putative_chart_path
 
-    parent_chart_addrs = [tgt.address for tgt in all_helm_charts if is_parent_chart(tgt)]
-    if len(parent_chart_addrs) > 1:
+    candidate_charts: OrderedSet[Address] = OrderedSet(
+        [tgt.address for tgt in all_helm_charts if is_parent_chart(tgt)]
+    )
+    chart_dependencies: OrderedSet[Address] = OrderedSet()
+
+    explicitly_provided_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.dependencies_field)
+    )
+
+    for candidate_chart in candidate_charts:
+        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+            (candidate_chart,),
+            unittest_target_addr,
+            import_reference="chart",
+            context=f"The target {unittest_target_addr} is nested under the chart {candidate_chart}",
+        )
+        maybe_disambiguated = explicitly_provided_deps.disambiguated((candidate_chart,))
+        if maybe_disambiguated:
+            chart_dependencies.add(maybe_disambiguated)
+
+    if len(chart_dependencies) > 1:
         raise AmbiguousHelmUnitTestChart(
             target_addr=unittest_target_addr.spec,
-            putative_addresses=[addr.spec for addr in parent_chart_addrs],
+            putative_addresses=[addr.spec for addr in chart_dependencies],
         )
 
-    if len(parent_chart_addrs) == 1:
+    if len(chart_dependencies) == 1:
+        found_dep = list(chart_dependencies)[0]
         logger.debug(
-            f"Found Helm chart at '{parent_chart_addrs[0].spec}' for unittest at: {unittest_target_addr.spec}"
+            f"Found Helm chart at '{found_dep.spec}' for unittest at: {unittest_target_addr.spec}"
         )
 
-    return InjectedDependencies(parent_chart_addrs)
+    return InjectedDependencies(chart_dependencies)
 
 
 def rules():
