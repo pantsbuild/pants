@@ -635,6 +635,12 @@ async def _setup_constraints_repository_pex(
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class RequirementsPexRequest:
+    """Requests a PEX containing only thirdparty requirements for internal/non-portable use.
+
+    Used as part of an optimization to reduce the "overhead" (in terms of both time and space) of
+    thirdparty requirements by taking advantage of certain PEX features.
+    """
+
     addresses: tuple[Address, ...]
     hardcoded_interpreter_constraints: InterpreterConstraints | None
 
