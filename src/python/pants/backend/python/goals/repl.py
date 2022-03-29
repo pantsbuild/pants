@@ -16,7 +16,6 @@ from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
     NoCompatibleResolveException,
-    PexFromTargetsRequest,
     RequirementsPexRequest,
 )
 from pants.backend.python.util_rules.python_sources import (
@@ -75,14 +74,7 @@ async def create_python_repl_request(
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
     )
 
-    requirements_request = Get(
-        Pex,
-        PexFromTargetsRequest(
-            request.addresses,
-            internal_only=True,
-            output_filename="requirements.pex",
-        ),
-    )
+    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses))
     local_dists_request = Get(
         LocalDistsPex,
         LocalDistsPexRequest(
