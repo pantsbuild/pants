@@ -532,6 +532,7 @@ async def get_repository_pex(
                 ),
                 resolve_name=chosen_resolve.name,
                 # NB: PEX interprets `--lock` with no `req_strings` as "install the entire lockfile"
+                # And we don't use `req_strings` if the resolve isn't a PEX lockfile.
                 req_strings=FrozenOrderedSet(),
             ),
             interpreter_constraints=interpreter_constraints,
