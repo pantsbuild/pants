@@ -161,7 +161,7 @@ async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> H
             PathGlobs(
                 ["plugin.yaml"],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=request.plugin_name,
+                description_of_origin=f"The Helm plugin `{request.plugin_name}`",
             ),
         ),
     )
