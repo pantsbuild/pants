@@ -21,7 +21,6 @@ from pants.backend.scala.bsp.spec import (
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
 from pants.base.build_root import BuildRoot
-from pants.base.specs import AddressSpecs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier, StatusCode
 from pants.bsp.spec.targets import DependencyModule
@@ -214,11 +213,7 @@ async def handle_bsp_scalac_options_request(
     workspace: Workspace,
 ) -> HandleScalacOptionsResult:
     bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
-    targets = await Get(
-        Targets,
-        AddressSpecs,
-        bsp_target.specs.address_specs,
-    )
+    targets = await Get(Targets, BSPBuildTargetInternal, bsp_target)
     coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
     resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)

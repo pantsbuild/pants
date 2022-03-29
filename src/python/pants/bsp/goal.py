@@ -8,7 +8,7 @@ import os
 import shlex
 import sys
 import textwrap
-from typing import Any, Mapping
+from typing import Mapping
 
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -22,7 +22,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
-from pants.option.option_types import BoolOption, DictOption, StrListOption
+from pants.option.option_types import BoolOption, FileListOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.util.docutil import bin_name
@@ -66,12 +66,32 @@ class BSPGoal(BuiltinGoal):
         advanced=True,
     )
 
-    target_mapping = DictOption[Any](
-        "--target-mapping",
+    targets_config_files = FileListOption(
+        "--targets-config-files",
         help=(
-            'Defines how Pants maps targets to "build targets" that are exposed to IDEs via the '
-            'Build Server Protocol ("BSP"). The key for each entry is the ID to be used in the BSP protocol. '
-            'The value of each entry is a list of Pants addresses specs; for example, `["src/python::"]`.'
+            'A list of config files that define the "build targets" exposed to IDEs via Build Server Protocol.\n\n'
+            "Pants generally uses fine-grained targets to define the components of a build (in many cases on a file-by-file "
+            "basis). Many IDEs, however, favor coarse-grained targets that contain large numbers of source files. "
+            "To accomodate this distinction, the Pants BSP server will use the target definitions present in the "
+            "config files specified for this option to aggregate Pants targets into the BSP build targets exposed "
+            "to IDEs.\n\n"
+            "Each config file is a TOML file with a `targets` dictionary with the following format for an entry:\n\n"
+            '    # The dictionary key is the "build target identifier" used in BSP requests. This must be unique.\n'
+            "    [targets.bspTargetId123]:\n"
+            '    name = "Display Name"  # Name shown to the user in the IDE.\n'
+            '    base_directory = "path/from/build/root"  # Hint to the IDE for where the build target should live.\n'
+            "    # One or more Pants address specs defining what targets to include in the BSP build target.\n"
+            "    addresses = [\n"
+            '      "src/jvm::",\n'
+            '      "tests/jvm::",\n'
+            "    ]\n"
+            "    # Filter targets to a specific resolve. Targets in a BSP build target must be from a single resolve.\n"
+            "    # Format of filter is `TYPE:RESOLVE_NAME`. The only supported TYPE is `jvm`. RESOLVE_NAME must be\n"
+            "    # a valid resolve name.\n"
+            '    resolve = "jvm:jvm-default"\n'
+            "\n"
+            "Pants will merge the contents of the files together. If the same ID is used for a target definition, "
+            "in multiple config files, the definition in the latter config file will take effect."
         ),
     )
 
