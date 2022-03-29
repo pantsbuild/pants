@@ -332,7 +332,6 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-@pytest.mark.xfail(reason="compilation succeeded for some reason")
 def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -347,7 +346,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "Example.scala": KOTLIN_LIB_MAIN_SOURCE,
+            "Example.kt": KOTLIN_LIB_MAIN_SOURCE,
             "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
             "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
         }
@@ -360,10 +359,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
     )
     fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
-    assert (
-        "error: object lib is not a member of package org.pantsbuild.example"
-        in fallible_result.stderr
-    )
+    assert "Example.kt:4:31: error: unresolved reference: lib" in fallible_result.stderr
 
 
 @maybe_skip_jdk_test
