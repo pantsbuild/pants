@@ -12,6 +12,7 @@ from typing import ClassVar, Iterable
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
+from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
 
@@ -42,6 +43,7 @@ class AddressLiteralSpec(AddressSpec):
     path_component: str
     target_component: str | None = None
     generated_component: str | None = None
+    parameters: FrozenDict[str, str] = FrozenDict()
 
     def __str__(self) -> str:
         tgt = f":{self.target_component}" if self.target_component else ""
@@ -51,7 +53,11 @@ class AddressLiteralSpec(AddressSpec):
     @property
     def is_directory_shorthand(self) -> bool:
         """Is in the format `path/to/dir`, which is shorthand for `path/to/dir:dir`."""
-        return self.target_component is None and self.generated_component is None
+        return (
+            self.target_component is None
+            and self.generated_component is None
+            and not self.parameters
+        )
 
 
 @dataclass(frozen=True)  # type: ignore[misc]
@@ -261,9 +267,7 @@ class DirLiteralSpec(FilesystemSpec):
 
     def to_address_literal(self) -> AddressLiteralSpec:
         """For now, `dir` can also be shorthand for `dir:dir`."""
-        return AddressLiteralSpec(
-            path_component=self.v, target_component=None, generated_component=None
-        )
+        return AddressLiteralSpec(path_component=self.v)
 
 
 @frozen_after_init

@@ -21,12 +21,18 @@ from pants.base.specs import (
     Spec,
 )
 from pants.base.specs_parser import SpecsParser
+from pants.util.frozendict import FrozenDict
 
 
 def address_literal(
-    directory: str, name: str | None, generated: str | None = None
+    directory: str,
+    name: str | None = None,
+    generated: str | None = None,
+    parameters: dict[str, str] | None = None,
 ) -> AddressLiteralSpec:
-    return AddressLiteralSpec(directory, name, generated)
+    return AddressLiteralSpec(
+        directory, name, generated, FrozenDict(sorted(parameters.items()) if parameters else ())
+    )
 
 
 def desc(directory: str) -> DescendantAddresses:
@@ -66,6 +72,7 @@ def assert_spec_parsed(build_root: Path, spec_str: str, expected_spec: Spec) -> 
         (":root", address_literal("", "root")),
         ("//:root", address_literal("", "root")),
         ("a", dir_literal("a")),
+        ("a@k=v", address_literal("a", parameters={"k": "v"})),
         ("a:a", address_literal("a", "a")),
         ("a/b", dir_literal("a/b")),
         ("a/b:b", address_literal("a/b", "b")),

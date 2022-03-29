@@ -24,7 +24,9 @@ from pants.engine.process import InteractiveProcessResult
 class AddressParseException(Exception):
     pass
 
-def address_parse(spec: str) -> tuple[str, str | None, str | None, tuple[tuple[str, str], ...]]: ...
+def address_spec_parse(
+    spec: str,
+) -> tuple[bool, tuple[str, str | None, str | None, tuple[tuple[str, str], ...]], str | None]: ...
 
 # ------------------------------------------------------------------------------
 # Scheduler
