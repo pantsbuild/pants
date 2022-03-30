@@ -37,7 +37,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InvalidFieldException,
     SingleSourceField,
-    Target,
+    TargetGenerator,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -48,7 +48,7 @@ class PythonRequirementsSourceField(SingleSourceField):
     required = False
 
 
-class PythonRequirementsTargetGenerator(Target):
+class PythonRequirementsTargetGenerator(TargetGenerator):
     alias = "python_requirements"
     help = (
         "Generate a `python_requirement` for each entry in a requirements.txt-style file.\n\n"
@@ -58,6 +58,7 @@ class PythonRequirementsTargetGenerator(Target):
         "Instead of pip-style VCS requirements, use direct references from PEP 440: "
         "https://www.python.org/dev/peps/pep-0440/#direct-references."
     )
+    generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -67,6 +68,8 @@ class PythonRequirementsTargetGenerator(Target):
         RequirementsOverrideField,
         PythonRequirementResolveField,
     )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = ()
 
 
 class GenerateFromPythonRequirementsRequest(GenerateTargetsRequest):

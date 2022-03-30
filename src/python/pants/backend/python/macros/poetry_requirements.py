@@ -44,7 +44,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InvalidFieldException,
     SingleSourceField,
-    Target,
+    TargetGenerator,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -385,9 +385,10 @@ class PoetryRequirementsSourceField(SingleSourceField):
     required = False
 
 
-class PoetryRequirementsTargetGenerator(Target):
+class PoetryRequirementsTargetGenerator(TargetGenerator):
     alias = "poetry_requirements"
     help = "Generate a `python_requirement` for each entry in a Poetry pyproject.toml."
+    generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -397,6 +398,8 @@ class PoetryRequirementsTargetGenerator(Target):
         RequirementsOverrideField,
         PythonRequirementResolveField,
     )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = ()
 
 
 class GenerateFromPoetryRequirementsRequest(GenerateTargetsRequest):

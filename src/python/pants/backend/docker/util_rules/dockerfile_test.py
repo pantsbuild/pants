@@ -16,7 +16,12 @@ from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import rule
-from pants.engine.target import GeneratedTargets, GenerateTargetsRequest, SourcesField, Target
+from pants.engine.target import (
+    GeneratedTargets,
+    GenerateTargetsRequest,
+    SourcesField,
+    TargetGenerator,
+)
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -102,9 +107,12 @@ def test_generate_dockerfile(rule_runner: RuleRunner) -> None:
 
 
 def setup_target_generator(rule_runner_args: dict) -> None:
-    class GenerateOriginTarget(Target):
+    class GenerateOriginTarget(TargetGenerator):
         alias = "docker_image_generator"
+        generated_target_cls = DockerImageTarget
         core_fields = ()
+        copied_fields = ()
+        moved_fields = ()
 
     class GenerateDockerImageTargetFromOrigin(GenerateTargetsRequest):
         generate_from = GenerateOriginTarget

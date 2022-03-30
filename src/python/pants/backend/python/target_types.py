@@ -56,6 +56,7 @@ from pants.engine.target import (
     Target,
     TargetFilesGenerator,
     TargetFilesGeneratorSettingsRequest,
+    TargetGenerator,
     TriBoolField,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
@@ -483,7 +484,6 @@ class PexIncludeToolsField(BoolField):
 
 
 _PEX_BINARY_COMMON_FIELDS = (
-    *COMMON_TARGET_FIELDS,
     InterpreterConstraintsField,
     PythonResolveField,
     PexBinaryDependenciesField,
@@ -506,6 +506,7 @@ _PEX_BINARY_COMMON_FIELDS = (
 class PexBinary(Target):
     alias = "pex_binary"
     core_fields = (
+        *COMMON_TARGET_FIELDS,
         *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointField,
         PexScriptField,
@@ -563,13 +564,8 @@ class PexBinariesOverrideField(OverridesField):
     )
 
 
-class PexBinariesGeneratorTarget(Target):
+class PexBinariesGeneratorTarget(TargetGenerator):
     alias = "pex_binaries"
-    core_fields = (
-        *_PEX_BINARY_COMMON_FIELDS,
-        PexEntryPointsField,
-        PexBinariesOverrideField,
-    )
     help = (
         "Generate a `pex_binary` target for each entry_point in the `entry_points` field."
         "\n\n"
@@ -583,6 +579,14 @@ class PexBinariesGeneratorTarget(Target):
         "`pex_binary` target in that case. This target generator works best when the entry point "
         "is a first-party file, like `app.py` or `app.py:main`."
     )
+    generated_target_cls = PexBinary
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PexEntryPointsField,
+        PexBinariesOverrideField,
+    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = _PEX_BINARY_COMMON_FIELDS
 
 
 class PexBinaryDefaults(Subsystem):

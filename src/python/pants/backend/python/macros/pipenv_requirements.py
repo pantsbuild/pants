@@ -35,7 +35,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InvalidFieldException,
     SingleSourceField,
-    Target,
+    TargetGenerator,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -46,9 +46,10 @@ class PipenvSourceField(SingleSourceField):
     required = False
 
 
-class PipenvRequirementsTargetGenerator(Target):
+class PipenvRequirementsTargetGenerator(TargetGenerator):
     alias = "pipenv_requirements"
     help = "Generate a `python_requirement` for each entry in `Pipenv.lock`."
+    generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -58,6 +59,8 @@ class PipenvRequirementsTargetGenerator(Target):
         RequirementsOverrideField,
         PythonRequirementResolveField,
     )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = ()
 
 
 class GenerateFromPipenvRequirementsRequest(GenerateTargetsRequest):
