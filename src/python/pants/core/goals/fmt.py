@@ -42,6 +42,7 @@ class FmtResult(EngineAwareReturnType):
     formatter_name: str
 
     def __post_init__(self):
+        # NB: BWe debug log stdout/stderr because `message` doesn't log it.
         log = f"Output from {self.formatter_name}"
         if self.stdout:
             log += f"\n{self.stdout}"
@@ -82,6 +83,11 @@ class FmtResult(EngineAwareReturnType):
             return f"{self.formatter_name} skipped."
         message = "made changes." if self.did_change else "made no changes."
 
+        # NB: Instead of printing out `stdout` and `stderr`, we just print a list of files which
+        # changed. We do this for two reasons:
+        #   1. This is run as part of both `fmt` and `lint`, and we want consistent output between both
+        #   2. Different formatters have different stdout/stderr. This way is consistent across all
+        #       formatters.
         if self.did_change:
             output = "".join(
                 f"\n  {file}"
