@@ -12,6 +12,7 @@ from pants.engine.target import (
     FieldSet,
     MultipleSourcesField,
     Target,
+    TargetGenerator,
 )
 
 
@@ -45,13 +46,16 @@ class TerraformModulesGeneratingSourcesField(MultipleSourcesField):
     expected_file_extensions = (".tf",)
 
 
-class TerraformModulesGeneratorTarget(Target):
+class TerraformModulesGeneratorTarget(TargetGenerator):
     alias = "terraform_modules"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, TerraformModulesGeneratingSourcesField)
     help = (
         "Generate a `terraform_module` target for each directory from the `sources` field "
         "where Terraform files are present."
     )
+    generated_target_cls = TerraformModuleTarget
+    core_fields = (*COMMON_TARGET_FIELDS, TerraformModulesGeneratingSourcesField)
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (Dependencies,)
 
 
 def rules():

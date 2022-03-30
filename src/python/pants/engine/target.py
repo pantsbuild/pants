@@ -34,7 +34,7 @@ from typing import (
 
 from typing_extensions import final
 
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import deprecated_conditional, warn_or_error
 from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -1005,6 +1005,22 @@ class GeneratedTargets(FrozenDict[Address, Target]):
 
 
 class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for tgt_cls, request in self.items():
+            # TODO: After this deprecation, the key type for this class should become
+            # `TargetGenerator`, and the `request_for` method should require a `TargetGenerator`
+            # argument, so that callers are forced to cast / check subtyping before calling.
+            deprecated_conditional(
+                lambda: not issubclass(tgt_cls, TargetGenerator),
+                removal_version="2.12.0.dev0",
+                entity="`GenerateTargetsRequest.generate_from` types which do not subclass `TargetGenerator`",
+                hint=(
+                    f"The generate_from type of `{request.__name__}` was `{tgt_cls.__name__}`, "
+                    "which does not subclass `TargetGenerator`."
+                ),
+            )
+
     def is_generator(self, tgt: Target) -> bool:
         """Does this target type generate other targets?"""
         return bool(self.request_for(type(tgt)))
