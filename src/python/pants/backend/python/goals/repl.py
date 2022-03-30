@@ -74,7 +74,7 @@ async def create_python_repl_request(
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
     )
 
-    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses, internal_only=True))
+    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses))
     local_dists_request = Get(
         LocalDistsPex,
         LocalDistsPexRequest(
@@ -128,7 +128,7 @@ async def create_ipython_repl_request(
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
     )
 
-    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses, internal_only=True))
+    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses))
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
     )

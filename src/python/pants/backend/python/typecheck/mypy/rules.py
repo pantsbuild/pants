@@ -134,7 +134,6 @@ async def mypy_typecheck_partition(
         RequirementsPexRequest(
             (tgt.address for tgt in partition.root_targets),
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
-            internal_only=True,
         ),
     )
     extra_type_stubs_pex_get = Get(
