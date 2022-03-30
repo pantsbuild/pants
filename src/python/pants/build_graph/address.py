@@ -39,6 +39,14 @@ class InvalidParameters(InvalidAddress):
     """Indicate invalid parameter values for `Address`."""
 
 
+class UnsupportedIgnore(InvalidAddress):
+    """Indicate that a `!` ignore was used."""
+
+
+class UnsupportedWildcard(InvalidAddress):
+    """Indicate that an address wildcard was used."""
+
+
 @dataclass(frozen=True)
 class AddressInput:
     """A string that has been parsed and normalized using the Address syntax.
@@ -149,11 +157,27 @@ class AddressInput:
             return os.path.normpath(subproject)
 
         (
-            path_component,
-            target_component,
-            generated_component,
-            parameters,
-        ) = native_engine.address_parse(spec)
+            is_ignored,
+            (
+                path_component,
+                target_component,
+                generated_component,
+                parameters,
+            ),
+            wildcard,
+        ) = native_engine.address_spec_parse(spec)
+
+        if is_ignored:
+            # NB: BUILD dependency ignore parsing occurs at a different level, because AddressInput
+            # does not support encoding negation.
+            raise UnsupportedIgnore(
+                f"The address `{spec}` was prefixed with a `!` ignore, which is not supported."
+            )
+
+        if wildcard:
+            raise UnsupportedWildcard(
+                f"The address `{spec}` included a wildcard (`{wildcard}`), which is not supported."
+            )
 
         normalized_relative_to = None
         if relative_to:

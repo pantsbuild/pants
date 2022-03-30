@@ -12,6 +12,8 @@ from pants.build_graph.address import (
     InvalidParameters,
     InvalidSpecPath,
     InvalidTargetName,
+    UnsupportedIgnore,
+    UnsupportedWildcard,
 )
 from pants.util.frozendict import FrozenDict
 
@@ -110,7 +112,6 @@ def test_address_input_parse_bad_path_component(spec: str) -> None:
 @pytest.mark.parametrize(
     "spec,expected",
     [
-        ("a:", "non-empty target name"),
         ("a@t", "one or more key=value pairs"),
         ("a@=", "one or more key=value pairs"),
         ("a@t,y", "one or more key=value pairs"),
@@ -128,7 +129,6 @@ def test_address_input_parse(spec: str, expected: str) -> None:
     "spec",
     [
         "",
-        "a::",
         "//",
         "//:!t",
         "//:?",
@@ -140,6 +140,35 @@ def test_address_input_parse(spec: str, expected: str) -> None:
 )
 def test_address_bad_target_component(spec: str) -> None:
     with pytest.raises(InvalidTargetName):
+        AddressInput.parse(spec).dir_to_address()
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "!",
+        "!a",
+        "!a:x",
+        "!a#x",
+    ],
+)
+def test_address_bad_ignore(spec: str) -> None:
+    with pytest.raises(UnsupportedIgnore):
+        AddressInput.parse(spec).dir_to_address()
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "a::",
+        "a:",
+        "a:b:",
+        "a:b::",
+        "a#b:",
+    ],
+)
+def test_address_bad_wildcard(spec: str) -> None:
+    with pytest.raises(UnsupportedWildcard):
         AddressInput.parse(spec).dir_to_address()
 
 
