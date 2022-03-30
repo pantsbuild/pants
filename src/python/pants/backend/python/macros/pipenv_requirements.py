@@ -138,10 +138,6 @@ async def generate_from_pipenv_requirement(
         for req, info in {**lock_info.get("default", {}), **lock_info.get("develop", {})}.items()
     ) + (file_tgt,)
 
-    if len(result) > 1:
-        # Validate that the resolve is legal.
-        result[0][PythonRequirementResolveField].normalized_value(python_setup)
-
     if overrides:
         raise InvalidFieldException(
             f"Unused key in the `overrides` field for {request.template_address}: "

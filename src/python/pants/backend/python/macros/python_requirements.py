@@ -145,10 +145,6 @@ async def generate_from_python_requirement(
         for project_name, parsed_reqs_ in grouped_requirements
     ) + (file_tgt,)
 
-    if len(result) > 1:
-        # Validate that the resolve is legal.
-        result[0][PythonRequirementResolveField].normalized_value(python_setup)
-
     if overrides:
         raise InvalidFieldException(
             f"Unused key in the `overrides` field for {request.template_address}: "
