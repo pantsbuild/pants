@@ -166,8 +166,8 @@ class Pylint(PythonToolBase):
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
             discovery=cast(bool, self.options.config_discovery),
-            check_existence=[".pylinrc", *(os.path.join(d, "pylintrc") for d in ("", *dirs))],
-            check_content={"pyproject.toml": b"[tool.pylint]", "setup.cfg": b"[pylint."},
+            check_existence=[".pylintrc", *(os.path.join(d, "pylintrc") for d in ("", *dirs))],
+            check_content={"pyproject.toml": b"[tool.pylint.", "setup.cfg": b"[pylint."},
         )
 
     @property
