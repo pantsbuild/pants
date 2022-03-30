@@ -344,6 +344,7 @@ def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
+        UnionRule(InjectDependenciesRequest, InjectScalaProtobufDependencies),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
         UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
