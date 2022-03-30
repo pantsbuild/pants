@@ -215,7 +215,7 @@ async def generate_targets_from_go_mod(
 
     def create_tgt(pkg_info: ThirdPartyPkgAnalysis) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
-            {GoImportPathField.alias: pkg_info.import_path},
+            {**request.template, GoImportPathField.alias: pkg_info.import_path},
             # E.g. `src/go:mod#github.com/google/uuid`.
             generator_addr.create_generated(pkg_info.import_path),
             union_membership,

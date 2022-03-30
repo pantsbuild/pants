@@ -184,7 +184,6 @@ async def resolve_target_parametrizations(
         # Split out the `propagated_fields` before construction.
         generator_fields = dict(target_adaptor.kwargs)
         template_fields = {}
-        # TODO: Require for all instances before landing.
         if issubclass(target_type, TargetGenerator):
             copied_fields = (
                 *target_type.copied_fields,

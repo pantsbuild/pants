@@ -22,8 +22,50 @@ from pants.engine.target import (
     MultipleSourcesField,
     StringField,
     Target,
+    TargetGenerator,
     ValidNumbers,
 )
+
+# -----------------------------------------------------------------------------------------------
+# `go_third_party_package` target
+# -----------------------------------------------------------------------------------------------
+
+
+class GoImportPathField(StringField):
+    alias = "import_path"
+    help = (
+        "Import path in Go code to import this package.\n\n"
+        "This field should not be overridden; use the value from target generation."
+    )
+    required = True
+    value: str
+
+
+class GoThirdPartyPackageDependenciesField(Dependencies):
+    pass
+
+
+class GoThirdPartyPackageTarget(Target):
+    alias = "go_third_party_package"
+    core_fields = (*COMMON_TARGET_FIELDS, GoThirdPartyPackageDependenciesField, GoImportPathField)
+    help = (
+        "A package from a third-party Go module.\n\n"
+        "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
+        "target where you have your `go.mod` file, which will generate "
+        "`go_third_party_package` targets for you.\n\n"
+        "Make sure that your `go.mod` and `go.sum` files include this package's module."
+    )
+
+    def validate(self) -> None:
+        if not self.address.is_generated_target:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target type should not be manually created in BUILD "
+                f"files, but it was created for {self.address}.\n\n"
+                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
+                f"generate `{self.alias}` targets for you based on the `require` directives in "
+                f"your `go.mod`."
+            )
+
 
 # -----------------------------------------------------------------------------------------------
 # `go_mod` target generator
@@ -69,13 +111,8 @@ class GoModDependenciesField(Dependencies):
     alias = "_dependencies"
 
 
-class GoModTarget(Target):
+class GoModTarget(TargetGenerator):
     alias = "go_mod"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        GoModDependenciesField,
-        GoModSourcesField,
-    )
     help = (
         "A first-party Go module (corresponding to a `go.mod` file).\n\n"
         "Generates `go_third_party_package` targets based on the `require` directives in your "
@@ -83,6 +120,14 @@ class GoModTarget(Target):
         "If you have third-party packages, make sure you have an up-to-date `go.sum`. Run "
         "`go mod tidy` directly to update your `go.mod` and `go.sum`."
     )
+    generated_target_cls = GoThirdPartyPackageTarget
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        GoModDependenciesField,
+        GoModSourcesField,
+    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = ()
 
 
 # -----------------------------------------------------------------------------------------------
@@ -152,47 +197,6 @@ class GoPackageTarget(Target):
         "Expects that there is a `go_mod` target in its directory or in an ancestor "
         "directory."
     )
-
-
-# -----------------------------------------------------------------------------------------------
-# `go_third_party_package` target
-# -----------------------------------------------------------------------------------------------
-
-
-class GoImportPathField(StringField):
-    alias = "import_path"
-    help = (
-        "Import path in Go code to import this package.\n\n"
-        "This field should not be overridden; use the value from target generation."
-    )
-    required = True
-    value: str
-
-
-class GoThirdPartyPackageDependenciesField(Dependencies):
-    pass
-
-
-class GoThirdPartyPackageTarget(Target):
-    alias = "go_third_party_package"
-    core_fields = (*COMMON_TARGET_FIELDS, GoThirdPartyPackageDependenciesField, GoImportPathField)
-    help = (
-        "A package from a third-party Go module.\n\n"
-        "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
-        "target where you have your `go.mod` file, which will generate "
-        "`go_third_party_package` targets for you.\n\n"
-        "Make sure that your `go.mod` and `go.sum` files include this package's module."
-    )
-
-    def validate(self) -> None:
-        if not self.address.is_generated_target:
-            raise InvalidTargetException(
-                f"The `{self.alias}` target type should not be manually created in BUILD "
-                f"files, but it was created for {self.address}.\n\n"
-                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
-                f"generate `{self.alias}` targets for you based on the `require` directives in "
-                f"your `go.mod`."
-            )
 
 
 # -----------------------------------------------------------------------------------------------
