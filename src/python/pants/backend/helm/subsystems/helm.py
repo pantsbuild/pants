@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import os
-from typing import cast
 
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
+from pants.option.option_types import BoolOption
 
 
 class HelmSubsystem(TemplatedExternalTool):
@@ -29,18 +29,11 @@ class HelmSubsystem(TemplatedExternalTool):
         "macos_x86_64": "darwin-amd64",
     }
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--lint-strict", type=bool, default=False, help="Enables strict linting of Helm charts"
-        )
+    lint_strict = BoolOption(
+        "--lint-strict", default=False, help="Enables strict linting of Helm charts"
+    )
 
     def generate_exe(self, plat: Platform) -> str:
         mapped_plat = self.default_url_platform_mapping[plat.value]
         bin_path = os.path.join(mapped_plat, "helm")
         return bin_path
-
-    @property
-    def lint_strict(self) -> bool:
-        return cast("bool", self.options.lint_strict)

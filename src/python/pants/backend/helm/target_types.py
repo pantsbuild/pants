@@ -6,14 +6,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.core.goals.package import OutputPathField
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AllTargets,
     BoolField,
     Dependencies,
     FieldSet,
     MultipleSourcesField,
     SingleSourceField,
     Target,
+    TargetFilesGenerator,
+    Targets,
     TriBoolField,
 )
 from pants.util.docutil import bin_name
@@ -105,3 +109,79 @@ class HelmChartFieldSet(FieldSet):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
+
+
+class AllHelmChartTargets(Targets):
+    pass
+
+
+@rule
+def all_helm_chart_targets(all_targets: AllTargets) -> AllHelmChartTargets:
+    return AllHelmChartTargets([tgt for tgt in all_targets if HelmChartFieldSet.is_applicable(tgt)])
+
+
+# -----------------------------------------------------------------------------------------------
+# `helm_unittest_test` target
+# -----------------------------------------------------------------------------------------------
+
+
+class HelmUnitTestDependenciesField(Dependencies):
+    pass
+
+
+class HelmUnitTestSourceField(SingleSourceField):
+    expected_file_extensions = (
+        ".yaml",
+        ".yml",
+    )
+
+
+class HelmUnitTestTestTarget(Target):
+    alias = "helm_unittest_test"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        HelmUnitTestSourceField,
+        HelmUnitTestDependenciesField,
+    )
+    help = "A single helm-unittest suite file"
+
+
+class AllHelmUnitTestTestTargets(Targets):
+    pass
+
+
+@rule
+def all_helm_unittest_test_targets(all_targets: AllTargets) -> AllHelmUnitTestTestTargets:
+    return AllHelmUnitTestTestTargets(
+        [tgt for tgt in all_targets if tgt.has_field(HelmUnitTestSourceField)]
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `helm_unittest_tests` target generator
+# -----------------------------------------------------------------------------------------------
+
+
+class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
+    default = ("*_test.yaml",)
+    expected_file_extensions = (
+        ".yaml",
+        ".yml",
+    )
+
+
+class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
+    alias = "helm_unittest_tests"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        HelmUnitTestGeneratingSourcesField,
+        HelmUnitTestDependenciesField,
+    )
+    generated_target_cls = HelmUnitTestTestTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (HelmUnitTestDependenciesField,)
+    help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field"
+
+
+def rules():
+    return collect_rules()
