@@ -32,7 +32,7 @@ tempfile = "3"
 concrete_time = { path = "../concrete_time" }
 tokio = { version = "1.16", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = "0.23"
-tokio-util = { version = "0.6", features = ["codec"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 uname = "0.1.1"
 uuid = { version = "0.8", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }
