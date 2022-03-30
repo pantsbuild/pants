@@ -658,16 +658,17 @@ pub fn mount<P: AsRef<Path>>(
   runtime: task_executor::Executor,
 ) -> std::io::Result<(fuser::BackgroundSession, Receiver<BRFSEvent>)> {
   // TODO: Work out how to disable caching in the filesystem
-  let options = ["-o", "ro", "-o", "fsname=brfs", "-o", "noapplexattr"]
-    .iter()
-    .map(<&str>::as_ref)
-    .collect::<Vec<&OsStr>>();
+  let options = vec![
+    fuser::MountOption::RO,
+    fuser::MountOption::FSName("brfs".to_owned()),
+    fuser::MountOption::CUSTOM("noapplexattr".to_owned()),
+  ];
 
   let (sender, receiver) = channel();
   let brfs = BuildResultFS::new(sender, runtime, store);
 
   debug!("About to spawn_mount with options {:?}", options);
-  let result = fuser::spawn_mount(brfs, &mount_path, &options);
+  let result = fuser::spawn_mount2(brfs, &mount_path, &options);
   // N.B.: The session won't be used by the caller, but we return it since a reference must be
   // maintained to prevent early dropping which unmounts the filesystem.
   result.map(|session| (session, receiver))
