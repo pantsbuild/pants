@@ -22,6 +22,8 @@ from pants.base.specs import (
     SiblingAddresses,
     Specs,
 )
+from pants.engine.internals import native_engine
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
 
@@ -71,37 +73,40 @@ class SpecsParser:
 
         :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
         """
-        if spec.endswith("::"):
-            spec_path = spec[: -len("::")]
-            return DescendantAddresses(directory=self._normalize_spec_path(spec_path))
-        if spec.endswith(":"):
-            spec_path = spec[: -len(":")]
-            return SiblingAddresses(directory=self._normalize_spec_path(spec_path))
-        if ":" in spec or "#" in spec:
-            tgt_parts = spec.split(":", maxsplit=1)
-            path_component = tgt_parts[0]
-            if len(tgt_parts) == 1:
-                target_component = None
-                generated_parts = path_component.split("#", maxsplit=1)
-                if len(generated_parts) == 1:
-                    generated_component = None
-                else:
-                    path_component, generated_component = generated_parts
-            else:
-                generated_parts = tgt_parts[1].split("#", maxsplit=1)
-                if len(generated_parts) == 1:
-                    target_component = generated_parts[0]
-                    generated_component = None
-                else:
-                    target_component, generated_component = generated_parts
+        (
+            is_ignored,
+            (
+                path_component,
+                target_component,
+                generated_component,
+                parameters,
+            ),
+            wildcard,
+        ) = native_engine.address_spec_parse(spec)
+
+        def assert_not_ignored(spec_descriptor: str) -> None:
+            if is_ignored:
+                raise self.BadSpecError(
+                    f"The {spec_descriptor} spec `{spec}` does not support ignore (`!`) syntax."
+                )
+
+        if wildcard == "::":
+            assert_not_ignored("address wildcard")
+            return DescendantAddresses(directory=self._normalize_spec_path(path_component))
+        if wildcard == ":":
+            assert_not_ignored("address wildcard")
+            return SiblingAddresses(directory=self._normalize_spec_path(path_component))
+        if target_component or generated_component or parameters:
+            assert_not_ignored("address")
             return AddressLiteralSpec(
                 path_component=self._normalize_spec_path(path_component),
                 target_component=target_component,
                 generated_component=generated_component,
+                parameters=FrozenDict(sorted(parameters)),
             )
-        if spec.startswith("!"):
-            return FileIgnoreSpec(spec[1:])
-        if "*" in spec:
+        if is_ignored:
+            return FileIgnoreSpec(path_component)
+        if "*" in path_component:
             return FileGlobSpec(spec)
         if PurePath(spec).suffix:
             return FileLiteralSpec(self._normalize_spec_path(spec))
