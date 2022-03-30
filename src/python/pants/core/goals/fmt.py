@@ -42,7 +42,7 @@ class FmtResult(EngineAwareReturnType):
     formatter_name: str
 
     def __post_init__(self):
-        # NB: BWe debug log stdout/stderr because `message` doesn't log it.
+        # NB: We debug log stdout/stderr because `message` doesn't log it.
         log = f"Output from {self.formatter_name}"
         if self.stdout:
             log += f"\n{self.stdout}"
