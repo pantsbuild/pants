@@ -444,6 +444,7 @@ async def build_pex(
             )
             requirement_count = _pex_lockfile_requirement_count(lock_bytes)
             argv.extend(["--lock", lock_path])
+            argv.extend(request.requirements.req_strings)
         else:
             header_delimiter = "#"
             # Note: this is a very naive heuristic. It will overcount because entries often
