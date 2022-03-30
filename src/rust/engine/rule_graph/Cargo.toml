@@ -14,4 +14,4 @@ log = "0.4"
 petgraph = "0.6"
 
 [dev-dependencies]
-env_logger = "0.5.4"
+env_logger = "0.9.0"
