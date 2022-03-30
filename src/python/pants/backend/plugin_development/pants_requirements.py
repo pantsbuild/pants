@@ -90,9 +90,9 @@ def generate_from_pants_requirements(
             {
                 PythonRequirementsField.alias: (f"{dist}{version}",),
                 PythonRequirementModulesField.alias: (module,),
-                PythonRequirementResolveField.alias: generator[PythonRequirementResolveField].value,
+                **request.template,
             },
-            generator.address.create_generated(dist),
+            request.template_address.create_generated(dist),
         )
 
     result = [create_tgt("pantsbuild.pants", "pants")]

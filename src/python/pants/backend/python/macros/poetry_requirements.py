@@ -396,10 +396,9 @@ class PoetryRequirementsTargetGenerator(TargetGenerator):
         TypeStubsModuleMappingField,
         PoetryRequirementsSourceField,
         RequirementsOverrideField,
-        PythonRequirementResolveField,
     )
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = ()
+    moved_fields = (PythonRequirementResolveField,)
 
 
 class GenerateFromPoetryRequirementsRequest(GenerateTargetsRequest):
@@ -421,8 +420,8 @@ async def generate_from_python_requirement(
     file_tgt = TargetGeneratorSourcesHelperTarget(
         {TargetGeneratorSourcesHelperSourcesField.alias: [pyproject_rel_path]},
         Address(
-            generator.address.spec_path,
-            target_name=generator.address.target_name,
+            request.template_address.spec_path,
+            target_name=request.template_address.target_name,
             relative_file_path=pyproject_rel_path,
         ),
     )
@@ -444,16 +443,8 @@ async def generate_from_python_requirement(
         )
     )
 
-    # Validate the resolve is legal.
-    generator[PythonRequirementResolveField].normalized_value(python_setup)
-
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
-    inherited_fields = {
-        field.alias: field.value
-        for field in request.generator.field_values.values()
-        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementResolveField))
-    }
 
     def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:
         normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
@@ -465,7 +456,7 @@ async def generate_from_python_requirement(
 
         return PythonRequirementTarget(
             {
-                **inherited_fields,
+                **request.template,
                 PythonRequirementsField.alias: [parsed_req],
                 PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
                 PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
@@ -476,14 +467,18 @@ async def generate_from_python_requirement(
                 Dependencies.alias: [file_tgt.address.spec],
                 **tgt_overrides,
             },
-            generator.address.create_generated(parsed_req.project_name),
+            request.template_address.create_generated(parsed_req.project_name),
         )
 
     result = tuple(generate_tgt(requirement) for requirement in requirements) + (file_tgt,)
 
+    if len(result) > 1:
+        # Validate that the resolve is legal.
+        result[0][PythonRequirementResolveField].normalized_value(python_setup)
+
     if overrides:
         raise InvalidFieldException(
-            f"Unused key in the `overrides` field for {request.generator.address}: "
+            f"Unused key in the `overrides` field for {request.template_address}: "
             f"{sorted(overrides)}"
         )
 
