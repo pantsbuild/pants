@@ -82,7 +82,6 @@ async def pylint_lint_partition(
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
-            internal_only=True,
         ),
     )
 

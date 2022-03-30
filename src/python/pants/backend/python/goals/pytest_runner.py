@@ -168,9 +168,7 @@ async def setup_pytest_for_target(
 
     interpreter_constraints = InterpreterConstraints.create_from_targets(all_targets, python_setup)
 
-    requirements_pex_get = Get(
-        Pex, RequirementsPexRequest([request.field_set.address], internal_only=True)
-    )
+    requirements_pex_get = Get(Pex, RequirementsPexRequest([request.field_set.address]))
     pytest_pex_get = Get(
         Pex,
         PexRequest(

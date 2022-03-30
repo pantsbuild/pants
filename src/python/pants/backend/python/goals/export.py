@@ -87,7 +87,6 @@ async def export_virtualenv(
         Pex,
         RequirementsPexRequest(
             (tgt.address for tgt in request.root_python_targets),
-            internal_only=True,
             hardcoded_interpreter_constraints=min_interpreter,
         ),
     )
