@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.backend.python.lint.autoflake.skip_field import SkipAutoflakeField
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
@@ -10,12 +9,12 @@ from pants.backend.python.target_types import InterpreterConstraintsField, Pytho
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.selectors import MultiGet
+from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -34,15 +33,9 @@ class AutoflakeFieldSet(FieldSet):
         return tgt.get(SkipAutoflakeField).value
 
 
-class AutoflakeRequest(FmtRequest, LintTargetsRequest):
+class AutoflakeRequest(FmtRequest):
     field_set_type = AutoflakeFieldSet
     name = Autoflake.options_scope
-
-
-@dataclass(frozen=True)
-class SetupRequest:
-    request: AutoflakeRequest
-    check_only: bool
 
 
 @dataclass(frozen=True)
@@ -51,44 +44,35 @@ class Setup:
     original_snapshot: Snapshot
 
 
-def generate_argv(
-    source_files: SourceFiles, autoflake: Autoflake, *, check_only: bool
-) -> Tuple[str, ...]:
-    args = []
-    if check_only:
-        args.append("--check")
-    else:
-        args.append("--in-place")
-    args.append("--remove-all-unused-imports")
-    args.extend(autoflake.args)
-    args.extend(source_files.files)
-    return tuple(args)
-
-
 @rule(level=LogLevel.DEBUG)
-async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> Setup:
+async def setup_autoflake(request: AutoflakeRequest, autoflake: Autoflake) -> Setup:
     autoflake_pex_get = Get(VenvPex, PexRequest, autoflake.to_pex_request())
 
     source_files_get = Get(
         SourceFiles,
-        SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
+        SourceFilesRequest(field_set.source for field_set in request.field_sets),
     )
 
     source_files, autoflake_pex = await MultiGet(source_files_get, autoflake_pex_get)
     source_files_snapshot = (
         source_files.snapshot
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
+        if request.prior_formatter_result is None
+        else request.prior_formatter_result
     )
 
     process = await Get(
         Process,
         VenvPexProcess(
             autoflake_pex,
-            argv=generate_argv(source_files, autoflake, check_only=setup_request.check_only),
+            argv=(
+                "--in-place",
+                "--remove-all-unused-imports",
+                *autoflake.args,
+                *source_files_snapshot.files,
+            ),
             input_digest=source_files_snapshot.digest,
             output_files=source_files_snapshot.files,
-            description=f"Run Autoflake on {pluralize(len(setup_request.request.field_sets), 'file')}.",
+            description=f"Run Autoflake on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
@@ -99,7 +83,7 @@ async def setup_autoflake(setup_request: SetupRequest, autoflake: Autoflake) -> 
 async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtResult:
     if autoflake.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=False))
+    setup = await Get(Setup, AutoflakeRequest, request)
     result = await Get(ProcessResult, Process, setup.process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
@@ -111,32 +95,9 @@ async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtR
     )
 
 
-@rule(desc="Lint with autoflake", level=LogLevel.DEBUG)
-async def autoflake_lint(request: AutoflakeRequest, autoflake: Autoflake) -> LintResults:
-    if autoflake.skip:
-        return LintResults([], linter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=True))
-    result = await Get(FallibleProcessResult, Process, setup.process)
-
-    def strip_check_result(output: str) -> str:
-        return "\n".join(line for line in output.splitlines() if line != "No issues detected!")
-
-    return LintResults(
-        [
-            LintResult(
-                result.exit_code,
-                strip_check_result(result.stdout.decode()),
-                result.stderr.decode(),
-            )
-        ],
-        linter_name=request.name,
-    )
-
-
 def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, AutoflakeRequest),
-        UnionRule(LintTargetsRequest, AutoflakeRequest),
         *pex.rules(),
     ]

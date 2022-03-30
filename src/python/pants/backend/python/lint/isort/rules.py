@@ -1,5 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Tuple
@@ -10,12 +11,11 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -34,15 +34,9 @@ class IsortFieldSet(FieldSet):
         return tgt.get(SkipIsortField).value
 
 
-class IsortRequest(FmtRequest, LintTargetsRequest):
+class IsortRequest(FmtRequest):
     field_set_type = IsortFieldSet
     name = Isort.options_scope
-
-
-@dataclass(frozen=True)
-class SetupRequest:
-    request: IsortRequest
-    check_only: bool
 
 
 @dataclass(frozen=True)
@@ -52,11 +46,9 @@ class Setup:
 
 
 def generate_argv(
-    source_files: SourceFiles, isort: Isort, *, is_isort5: bool, check_only: bool
+    source_files: tuple[str, ...], isort: Isort, *, is_isort5: bool
 ) -> Tuple[str, ...]:
     args = [*isort.args]
-    if check_only:
-        args.append("--check-only")
     if is_isort5 and len(isort.config) == 1:
         explicitly_configured_config_args = [
             arg
@@ -72,23 +64,23 @@ def generate_argv(
         #  `[isort].config` to be a string rather than list[str] option.
         if not explicitly_configured_config_args:
             args.append(f"--settings={isort.config[0]}")
-    args.extend(source_files.files)
+    args.extend(source_files)
     return tuple(args)
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
+async def setup_isort(request: IsortRequest, isort: Isort) -> Setup:
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
     source_files_get = Get(
         SourceFiles,
-        SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
+        SourceFilesRequest(field_set.source for field_set in request.field_sets),
     )
     source_files, isort_pex = await MultiGet(source_files_get, isort_pex_get)
 
     source_files_snapshot = (
         source_files.snapshot
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
+        if request.prior_formatter_result is None
+        else request.prior_formatter_result
     )
 
     config_files = await Get(
@@ -112,12 +104,10 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
         Process,
         VenvPexProcess(
             isort_pex,
-            argv=generate_argv(
-                source_files, isort, is_isort5=is_isort5, check_only=setup_request.check_only
-            ),
+            argv=generate_argv(source_files_snapshot.files, isort, is_isort5=is_isort5),
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
-            description=f"Run isort on {pluralize(len(setup_request.request.field_sets), 'file')}.",
+            description=f"Run isort on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
@@ -128,7 +118,7 @@ async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=False))
+    setup = await Get(Setup, IsortRequest, request)
     result = await Get(ProcessResult, Process, setup.process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
@@ -140,22 +130,9 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     )
 
 
-@rule(desc="Lint with isort", level=LogLevel.DEBUG)
-async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
-    if isort.skip:
-        return LintResults([], linter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=True))
-    result = await Get(FallibleProcessResult, Process, setup.process)
-    return LintResults(
-        [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
-        linter_name=request.name,
-    )
-
-
 def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, IsortRequest),
-        UnionRule(LintTargetsRequest, IsortRequest),
         *pex.rules(),
     ]

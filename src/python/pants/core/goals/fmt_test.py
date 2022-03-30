@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
@@ -186,7 +187,8 @@ def test_streaming_output_skip() -> None:
     assert result.message() == "formatter skipped."
 
 
-def test_streaming_output_changed() -> None:
+def test_streaming_output_changed(caplog) -> None:
+    caplog.set_level(logging.DEBUG)
     changed_digest = Digest(EMPTY_DIGEST.fingerprint, 2)
     changed_snapshot = Snapshot._unsafe_create(changed_digest, [], [])
     result = FmtResult(
@@ -197,17 +199,14 @@ def test_streaming_output_changed() -> None:
         formatter_name="formatter",
     )
     assert result.level() == LogLevel.WARN
-    assert result.message() == dedent(
-        """\
-        formatter made changes.
-        stdout
-        stderr
-
-        """
-    )
+    assert result.message() == "formatter made changes."
+    assert ["Output from formatter\nstdout\nstderr"] == [
+        rec.message for rec in caplog.records if rec.levelno == logging.DEBUG
+    ]
 
 
-def test_streaming_output_not_changed() -> None:
+def test_streaming_output_not_changed(caplog) -> None:
+    caplog.set_level(logging.DEBUG)
     result = FmtResult(
         input=EMPTY_SNAPSHOT,
         output=EMPTY_SNAPSHOT,
@@ -216,11 +215,7 @@ def test_streaming_output_not_changed() -> None:
         formatter_name="formatter",
     )
     assert result.level() == LogLevel.INFO
-    assert result.message() == dedent(
-        """\
-        formatter made no changes.
-        stdout
-        stderr
-
-        """
-    )
+    assert result.message() == "formatter made no changes."
+    assert ["Output from formatter\nstdout\nstderr"] == [
+        rec.message for rec in caplog.records if rec.levelno == logging.DEBUG
+    ]

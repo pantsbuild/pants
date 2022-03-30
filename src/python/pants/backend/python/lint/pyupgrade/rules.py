@@ -10,12 +10,12 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
+from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -33,7 +33,7 @@ class PyUpgradeFieldSet(FieldSet):
         return tgt.get(SkipPyUpgradeField).value
 
 
-class PyUpgradeRequest(FmtRequest, LintTargetsRequest):
+class PyUpgradeRequest(FmtRequest):
     field_set_type = PyUpgradeFieldSet
     name = PyUpgrade.options_scope
 
@@ -88,20 +88,9 @@ async def pyupgrade_fmt(result: PyUpgradeResult, pyupgrade: PyUpgrade) -> FmtRes
     )
 
 
-@rule(desc="Lint with pyupgrade", level=LogLevel.DEBUG)
-async def pyupgrade_lint(result: PyUpgradeResult, pyupgrade: PyUpgrade) -> LintResults:
-    if pyupgrade.skip:
-        return LintResults([], linter_name=PyUpgradeRequest.name)
-    return LintResults(
-        [LintResult.from_fallible_process_result(result.process_result)],
-        linter_name=PyUpgradeRequest.name,
-    )
-
-
 def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, PyUpgradeRequest),
-        UnionRule(LintTargetsRequest, PyUpgradeRequest),
         *pex.rules(),
     ]
