@@ -16,7 +16,7 @@ hyper = { version = "0.14", features = ["stream", "tcp"] }
 log = "0.4"
 parking_lot = "0.12"
 prost = "0.9"
-prost-types = "0.9"
+prost-types = "0.10"
 testutil = { path = ".." }
 tokio = { version = "1.16", features = ["time"] }
 tonic = { version = "0.6" }
