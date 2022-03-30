@@ -73,6 +73,8 @@ def assert_spec_parsed(build_root: Path, spec_str: str, expected_spec: Spec) -> 
         ("//:root", address_literal("", "root")),
         ("a", dir_literal("a")),
         ("a@k=v", address_literal("a", parameters={"k": "v"})),
+        ("a@k=v,x=y", address_literal("a", parameters={"k": "v", "x": "y"})),
+        ("a:b@k=v", address_literal("a", "b", parameters={"k": "v"})),
         ("a:a", address_literal("a", "a")),
         ("a/b", dir_literal("a/b")),
         ("a/b:b", address_literal("a/b", "b")),

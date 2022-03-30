@@ -18,8 +18,8 @@ pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
 
 /// 1. a path component
 /// 2. a target component
-/// 3. a sequence of key/value parameters
-/// 4. a generated component
+/// 3. a generated component
+/// 4. a sequence of key/value parameters
 type ParsedAddress<'a> = (
   &'a str,
   Option<&'a str>,
