@@ -72,6 +72,7 @@ def calculate_specs(
                 path_component=address_input.path_component,
                 target_component=address_input.target_component,
                 generated_component=address_input.generated_component,
+                parameters=address_input.parameters,
             )
         )
     return Specs(AddressSpecs(address_specs, filter_by_global_options=True), FilesystemSpecs([]))

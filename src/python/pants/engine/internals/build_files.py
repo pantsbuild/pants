@@ -191,7 +191,12 @@ async def addresses_from_address_specs(
     literal_wrapped_targets = await MultiGet(
         Get(
             WrappedTarget,
-            AddressInput(spec.path_component, spec.target_component, spec.generated_component),
+            AddressInput(
+                spec.path_component,
+                spec.target_component,
+                spec.generated_component,
+                spec.parameters,
+            ),
         )
         for spec in address_specs.literals
     )
