@@ -46,7 +46,7 @@ async-oncecell = "0.2"
 rand = "0.8"
 prost = "0.9"
 prost-types = "0.9"
-strum = "0.20"
+strum = "0.24"
 strum_macros = "0.23"
 tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tryfuture = { path = "../tryfuture" }
