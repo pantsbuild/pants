@@ -13,7 +13,7 @@ from pants.engine.target import (
     BoolField,
     GeneratedTargets,
     GenerateTargetsRequest,
-    Target,
+    TargetGenerator,
 )
 from pants.engine.unions import UnionRule
 from pants.version import MAJOR_MINOR, PANTS_SEMVER
@@ -25,7 +25,7 @@ class PantsRequirementsTestutilField(BoolField):
     help = "If true, include `pantsbuild.pants.testutil` to write tests for your plugin."
 
 
-class PantsRequirementsTargetGenerator(Target):
+class PantsRequirementsTargetGenerator(TargetGenerator):
     alias = "pants_requirements"
     help = (
         "Generate `python_requirement` targets for Pants itself to use with Pants plugins.\n\n"
@@ -42,11 +42,13 @@ class PantsRequirementsTargetGenerator(Target):
         "also invite you to share your ideas at "
         "https://github.com/pantsbuild/pants/issues/new/choose)"
     )
+    generated_target_cls = PythonRequirementTarget
     core_fields = (
         *COMMON_TARGET_FIELDS,
         PantsRequirementsTestutilField,
-        PythonRequirementResolveField,
     )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (PythonRequirementResolveField,)
 
 
 class GenerateFromPantsRequirementsRequest(GenerateTargetsRequest):
@@ -88,9 +90,9 @@ def generate_from_pants_requirements(
             {
                 PythonRequirementsField.alias: (f"{dist}{version}",),
                 PythonRequirementModulesField.alias: (module,),
-                PythonRequirementResolveField.alias: generator[PythonRequirementResolveField].value,
+                **request.template,
             },
-            generator.address.create_generated(dist),
+            request.template_address.create_generated(dist),
         )
 
     result = [create_tgt("pantsbuild.pants", "pants")]
