@@ -130,9 +130,12 @@ def test_execution_options_remote_addresses() -> None:
 
 
 def test_invalidation_globs() -> None:
-    # Confirm that an un-normalized relative path in the pythonpath is filtered out.
+    # Confirm that an un-normalized relative path in the pythonpath is filtered out, and that an
+    # empty entry (i.e.: a relative path for the current directory) doesn't cause an error.
     suffix = "something-ridiculous"
-    ob = OptionsBootstrapper.create(env={}, args=[f"--pythonpath=../{suffix}"], allow_pantsrc=False)
+    ob = OptionsBootstrapper.create(
+        env={}, args=[f"--pythonpath=../{suffix}", "--pythonpath="], allow_pantsrc=False
+    )
     globs = GlobalOptions.compute_pantsd_invalidation_globs(
         get_buildroot(), ob.bootstrap_options.for_global_scope()
     )

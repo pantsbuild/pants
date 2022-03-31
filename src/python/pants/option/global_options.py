@@ -1601,13 +1601,16 @@ class GlobalOptions(Subsystem):
         for glob in potentially_absolute_globs:
             # NB: We use `relpath` here because these paths are untrusted, and might need to be
             # normalized in addition to being relativized.
-            glob_relpath = os.path.relpath(glob, buildroot)
+            glob_relpath = (
+                os.path.relpath(glob, buildroot) if os.path.isabs(glob) else os.path.normpath(glob)
+            )
             if glob_relpath == "." or glob_relpath.startswith(".."):
                 logger.debug(
                     f"Changes to {glob}, outside of the buildroot, will not be invalidated."
                 )
-            else:
-                invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
+                continue
+
+            invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
 
         # Explicitly specified globs are already relative, and are added verbatim.
         invalidation_globs.update(
