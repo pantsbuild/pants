@@ -73,7 +73,7 @@ peg::parser! {
                     path,
                     target,
                     generated,
-                    parameters: parameters.unwrap_or_else(Vec::new),
+                    parameters: parameters.unwrap_or_default(),
                 }
             }
 

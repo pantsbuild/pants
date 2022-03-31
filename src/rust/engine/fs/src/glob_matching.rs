@@ -650,7 +650,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
         // Escape any globs in the parsed dest, which should guarantee one output PathGlob.
         PathGlob::create(vec![Pattern::escape(dest_str)]).ok()
       })
-      .unwrap_or_else(Vec::new);
+      .unwrap_or_default();
 
     let path_globs =
       PreparedPathGlobs::from_globs(link_globs).map_err(|e| Self::mk_error(e.as_str()))?;
