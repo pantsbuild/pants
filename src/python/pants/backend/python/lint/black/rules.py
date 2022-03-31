@@ -12,7 +12,6 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
@@ -41,14 +40,8 @@ class BlackRequest(FmtRequest):
     name = Black.options_scope
 
 
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_snapshot: Snapshot
-
-
 @rule(level=LogLevel.DEBUG)
-async def setup_black(request: BlackRequest, black: Black, python_setup: PythonSetup) -> Setup:
+async def setup_black_process(request: BlackRequest, black: Black, python_setup: PythonSetup) -> Process:
     # Black requires 3.6+ but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6, and 3.7.
     # However, typed-ast does not understand 3.8+, so instead we must run Black with Python 3.8+
     # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
@@ -75,23 +68,16 @@ async def setup_black(request: BlackRequest, black: Black, python_setup: PythonS
         black.to_pex_request(interpreter_constraints=tool_interpreter_constraints),
     )
 
-    source_files_get = Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.source for field_set in request.field_sets),
+    config_files_get = Get(
+        ConfigFiles,
+        ConfigFilesRequest,
+        black.config_request(request.snapshot.dirs),
     )
 
-    source_files, black_pex = await MultiGet(source_files_get, black_pex_get)
-    source_files_snapshot = (
-        source_files.snapshot
-        if request.prior_formatter_result is None
-        else request.prior_formatter_result
-    )
+    config_files, black_pex = await MultiGet(config_files_get, black_pex_get)
 
-    config_files = await Get(
-        ConfigFiles, ConfigFilesRequest, black.config_request(source_files_snapshot.dirs)
-    )
     input_digest = await Get(
-        Digest, MergeDigests((source_files_snapshot.digest, config_files.snapshot.digest))
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
     process = await Get(
@@ -103,32 +89,26 @@ async def setup_black(request: BlackRequest, black: Black, python_setup: PythonS
                 "-W",
                 "{pants_concurrency}",
                 *black.args,
-                *source_files_snapshot.files,
+                *request.snapshot.files,
             ),
             input_digest=input_digest,
-            output_files=source_files_snapshot.files,
+            output_files=request.snapshot.files,
             concurrency_available=len(request.field_sets),
             description=f"Run Black on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_snapshot=source_files_snapshot)
+    return process
 
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
 async def black_fmt(request: BlackRequest, black: Black) -> FmtResult:
     if black.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, BlackRequest, request)
-    result = await Get(ProcessResult, Process, setup.process)
+    process = await Get(Process, BlackRequest, request)
+    result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult(
-        setup.original_snapshot,
-        output_snapshot,
-        stdout=strip_v2_chroot_path(result.stdout),
-        stderr=strip_v2_chroot_path(result.stderr),
-        formatter_name=request.name,
-    )
+    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 
 
 def rules():

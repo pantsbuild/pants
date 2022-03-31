@@ -13,7 +13,7 @@ from pants.backend.terraform.tool import TerraformProcess
 from pants.build_graph.address import Address
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import MergeDigests, Snapshot
+from pants.engine.fs import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
@@ -35,7 +35,6 @@ class StyleSetupRequest:
 @dataclass(frozen=True)
 class StyleSetup:
     directory_to_process: dict[str, tuple[TerraformProcess, tuple[Address, ...]]]
-    original_snapshot: Snapshot
 
 
 @rule(level=LogLevel.DEBUG)
@@ -48,14 +47,8 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
         for field_set in setup_request.request.field_sets
     )
 
-    source_files_snapshot = (
-        await Get(Snapshot, MergeDigests(sfs.snapshot.digest for sfs in source_files_by_field_set))
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
-    )
-
     # `terraform` operates on a directory-by-directory basis. First determine the directories in
-    # the snapshot. This does not use `source_files_snapshot.dirs` because that will be empty if the files
+    # the snapshot. This does not use `request.snapshot.dirs` because that will be empty if the files
     # are in a single directory.
     directories = defaultdict(list)
     for source_files, field_set in zip(source_files_by_field_set, setup_request.request.field_sets):
@@ -77,7 +70,7 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
         joined_args = " ".join(setup_request.args)
         process = TerraformProcess(
             args=tuple(args),
-            input_digest=source_files_snapshot.digest,
+            input_digest=setup_request.snapshot.digest,
             output_files=files_in_directory,
             description=f"Run `terraform {joined_args}` on {pluralize(len(files_in_directory), 'file')}.",
         )
@@ -85,7 +78,7 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
         directory_to_process[directory] = (process, addresses)
 
     return StyleSetup(
-        directory_to_process=directory_to_process, original_snapshot=source_files_snapshot
+        directory_to_process=directory_to_process
     )
 
 

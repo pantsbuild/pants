@@ -17,6 +17,7 @@ from pants.core.goals.style_request import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsSnapshot, Workspace
@@ -225,61 +226,79 @@ async def lint(
         "Iterable[type[LintTargetsRequest]]", union_membership.get(LintTargetsRequest)
     )
     fmt_target_request_types = cast("Iterable[type[FmtRequest]]", union_membership.get(FmtRequest))
-    target_request_types = [
-        *lint_target_request_types,
-        *fmt_target_request_types,
-    ]
     file_request_types = union_membership[LintFilesRequest]
 
-    _check_ambiguous_request_names(*target_request_types, *file_request_types)
+    _check_ambiguous_request_names(
+        *lint_target_request_types, *fmt_target_request_types, *file_request_types
+    )
 
     specified_names = determine_specified_tool_names(
         "lint",
         lint_subsystem.only,
-        target_request_types,
+        [
+            *lint_target_request_types,
+            *fmt_target_request_types,
+        ],
         extra_valid_names={request.name for request in file_request_types},
     )
-    target_requests = tuple(
-        request_type(
-            request_type.field_set_type.create(target)
-            for target in targets
-            if (
-                request_type.name in specified_names
-                and request_type.field_set_type.is_applicable(target)
-            )
-        )
-        for request_type in target_request_types
-    )
 
-    def address_str(fs: FieldSet) -> str:
-        return fs.address.spec
+    def is_specified(request_type: type[StyleRequest]):
+        return request_type.name in specified_names
+
+    lint_target_request_types = filter(is_specified, lint_target_request_types)
+    fmt_target_request_types = filter(is_specified, fmt_target_request_types)
+    file_request_types = filter(is_specified, file_request_types)
 
     def batch(field_sets: Iterable[FieldSet]) -> Iterator[list[FieldSet]]:
-        return partition_sequentially(
+        partitions = partition_sequentially(
             field_sets,
-            key=address_str,
+            key=lambda fs: fs.address.spec,
             size_target=lint_subsystem.batch_size,
             size_max=4 * lint_subsystem.batch_size,
         )
+        for partition in partitions:
+            if partition:
+                yield partition
+
+    def batch_by_type(
+        request_types: Iterable[StyleRequest],
+    ) -> tuple[tuple[type[StyleRequest], list[FieldSet]], ...]:
+        return tuple(
+            (request_type, field_set_batch)
+            for request_type in request_types
+            for field_set_batch in batch(
+                request_type.field_set_type.create(target)
+                for target in targets
+                if request_type.field_set_type.is_applicable(target)
+            )
+        )
 
     lint_target_requests = (
-        request.__class__(field_set_batch)
-        for request in target_requests
-        if isinstance(request, LintTargetsRequest) and request.field_sets
-        for field_set_batch in batch(request.field_sets)
+        request_type(batch) for request_type, batch in batch_by_type(lint_target_request_types)
     )
+
+    batched_fmt_request_pairs = batch_by_type(fmt_target_request_types)
+    all_fmt_source_batches = await MultiGet(
+        Get(
+            SourceFiles,
+            SourceFilesRequest(
+                getattr(field_set, "sources", getattr(field_set, "source")) for field_set in batch
+            ),
+        )
+        for _, batch in batched_fmt_request_pairs
+    )
+
     fmt_requests = (
-        request.__class__(field_set_batch)
-        for request in target_requests
-        if isinstance(request, FmtRequest) and request.field_sets
-        for field_set_batch in batch(request.field_sets)
+        request_type(
+            batch,
+            snapshot=source_files_snapshot.snapshot,
+        )
+        for (request_type, batch), source_files_snapshot in zip(
+            batched_fmt_request_pairs, all_fmt_source_batches
+        )
     )
     file_requests = (
-        tuple(
-            request_type(specs_snapshot.snapshot.files)
-            for request_type in file_request_types
-            if request_type.name in specified_names
-        )
+        tuple(request_type(specs_snapshot.snapshot.files) for request_type in file_request_types)
         if specs_snapshot.snapshot.files
         else ()
     )

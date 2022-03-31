@@ -59,7 +59,7 @@ def run_docformatter(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            DocformatterRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            DocformatterRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
     return fmt_result

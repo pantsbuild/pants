@@ -7,7 +7,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Iterable, TypeVar
 
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -16,19 +16,24 @@ from pants.core.goals.style_request import (
     style_batch_size_help,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest, MergeDigests, Snapshot, SnapshotDiff, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
+from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import SourcesField, Targets
+from pants.engine.target import FieldSet, SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
+from pants.util.strutil import strip_v2_chroot_path
 
 _F = TypeVar("_F", bound="FmtResult")
+_FS = TypeVar("_FS", bound=FieldSet)
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +45,26 @@ class FmtResult(EngineAwareReturnType):
     stdout: str
     stderr: str
     formatter_name: str
+
+    @classmethod
+    def create(
+        cls,
+        request: FmtRequest,
+        process_result: ProcessResult | FallibleProcessResult,
+        output: Snapshot,
+        *,
+        strip_chroot_path: bool = False,
+    ) -> FmtResult:
+        def prep_output(s: bytes) -> str:
+            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
+
+        return cls(
+            input=request.snapshot,
+            output=output,
+            stdout=prep_output(process_result.stdout),
+            stderr=prep_output(process_result.stderr),
+            formatter_name=request.name,
+        )
 
     def __post_init__(self):
         # NB: We debug log stdout/stderr because `message` doesn't log it.
@@ -104,8 +129,14 @@ class FmtResult(EngineAwareReturnType):
 
 
 @union
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class FmtRequest(StyleRequest):
-    pass
+    snapshot: Snapshot
+
+    def __init__(self, field_sets: Iterable[_FS], snapshot: Snapshot) -> None:
+        self.field_sets = Collection[_FS](field_sets)
+        self.snapshot = snapshot
 
 
 @dataclass(frozen=True)
@@ -240,7 +271,7 @@ async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFm
         SourceFiles,
         SourceFilesRequest(target[SourcesField] for target in language_fmt_request.targets),
     )
-    prior_formatter_result = original_sources.snapshot
+    input_snapshot = original_sources.snapshot
 
     results = []
     for fmt_request_type in language_fmt_request.request_types:
@@ -250,17 +281,17 @@ async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFm
                 for target in language_fmt_request.targets
                 if fmt_request_type.field_set_type.is_applicable(target)
             ),
-            prior_formatter_result=prior_formatter_result,
+            snapshot=input_snapshot,
         )
         if not request.field_sets:
             continue
         result = await Get(FmtResult, FmtRequest, request)
         results.append(result)
-        prior_formatter_result = result.output
+        input_snapshot = result.output
     return _LanguageFmtResults(
         tuple(results),
         input=original_sources.snapshot.digest,
-        output=prior_formatter_result.digest,
+        output=input_snapshot.digest,
     )
 
 
