@@ -124,6 +124,10 @@ class HelmChartLintStrictField(TriBoolField):
     help = "If set to true, enables strict linting of this Helm chart."
 
 
+class HelmChartRepositoryField(StringField):
+    alias = "repository"
+    help = "Repository to use in the Helm registry where this chart is going to be published"
+
 class HelmChartTarget(Target):
     alias = "helm_chart"
     core_fields = (
@@ -133,6 +137,8 @@ class HelmChartTarget(Target):
         HelmChartDependenciesField,
         HelmChartOutputPathField,
         HelmChartLintStrictField,
+        HelmChartRepositoryField,
+        HelmRegistriesField,
         HelmSkipPushField,
     )
     help = "A Helm chart."
