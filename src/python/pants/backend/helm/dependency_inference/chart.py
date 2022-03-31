@@ -9,7 +9,7 @@ from pants.backend.helm.subsystems import helm
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import AllHelmChartTargets, HelmChartMetaSourceField
 from pants.backend.helm.util_rules.chart import HelmChartMetadata
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import InferDependenciesRequest, InferredDependencies
@@ -33,7 +33,7 @@ async def infer_chart_dependencies_via_metadata(
     subsystem: HelmSubsystem,
 ) -> InferredDependencies:
     # Build a mapping between the available Helm chart targets and their names
-    first_party_chart_mapping: dict[str, Addresses] = {}
+    first_party_chart_mapping: dict[str, Address] = {}
     for tgt in all_chart_tgts:
         first_party_chart_mapping[tgt.address.target_name] = tgt.address
 

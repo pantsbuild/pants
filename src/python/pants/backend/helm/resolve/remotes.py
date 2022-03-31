@@ -91,11 +91,7 @@ class HelmRemotes:
         return cls(
             default=tuple(
                 sorted(
-                    {
-                        cast(HelmRegistry, r)
-                        for r in remotes.values()
-                        if isinstance(r, HelmRegistry) and cast(HelmRegistry, r).default
-                    },
+                    {r for r in remotes.values() if isinstance(r, HelmRegistry) and r.default},
                     key=lambda r: r.address,
                 )
             ),

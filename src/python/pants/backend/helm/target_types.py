@@ -17,7 +17,6 @@ from pants.engine.target import (
     FieldSet,
     MultipleSourcesField,
     SingleSourceField,
-    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,

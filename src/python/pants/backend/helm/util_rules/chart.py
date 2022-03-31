@@ -23,8 +23,8 @@ from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartMetaSourceField
 from pants.backend.helm.util_rules import sources
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
-from pants.backend.helm.util_rules.yaml_utils import snake_case_attr_dict
 from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.backend.helm.util_rules.yaml_utils import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.addresses import Address
 from pants.engine.fs import (
@@ -264,12 +264,20 @@ class HelmChartRequest:
 _HELM_CHART_METADATA_FILENAMES = ["Chart.yaml", "Chart.yml"]
 
 
-def _chart_metadata_subset(digest: Digest) -> DigestSubset:
+def _chart_metadata_subset(
+    digest: Digest, *, description_of_origin: str, prefix: str | None = None
+) -> DigestSubset:
+    def prefixed_filename(filename: str) -> str:
+        if not prefix:
+            return filename
+        return os.path.join(prefix, filename)
+
+    glob_exprs = [prefixed_filename(filename) for filename in _HELM_CHART_METADATA_FILENAMES]
     globs = PathGlobs(
-        [f"*/{filename}" for filename in _HELM_CHART_METADATA_FILENAMES],
+        glob_exprs,
         glob_match_error_behavior=GlobMatchErrorBehavior.error,
         conjunction=GlobExpansionConjunction.any_match,
-        description_of_origin="parse_chart_metadata",
+        description_of_origin=description_of_origin,
     )
     return DigestSubset(digest, globs)
 
@@ -282,7 +290,15 @@ async def parse_chart_metadata_from_field(field: HelmChartMetaSourceField) -> He
             field, for_sources_types=(HelmChartMetaSourceField,), enable_codegen=True
         ),
     )
-    subset = await Get(Digest, DigestSubset, _chart_metadata_subset(source_files.snapshot.digest))
+    subset = await Get(
+        Digest,
+        DigestSubset,
+        _chart_metadata_subset(
+            source_files.snapshot.digest,
+            description_of_origin="rule parse_chart_metadata_from_field",
+            prefix="**",
+        ),
+    )
     file_contents = await Get(DigestContents, Digest, subset)
 
     if len(file_contents) == 0:
@@ -309,17 +325,21 @@ async def render_chart_metadata(metadata: HelmChartMetadata) -> Digest:
 
 
 @rule
-async def create_chart_from_artifact(artifact: FetchedHelmArtifact) -> HelmChart:
-    subset = await Get(Digest, DigestSubset, _chart_metadata_subset(artifact.snapshot.digest))
+async def create_chart_from_artifact(fetched_artifact: FetchedHelmArtifact) -> HelmChart:
+    subset = await Get(
+        Digest,
+        DigestSubset,
+        _chart_metadata_subset(
+            fetched_artifact.snapshot.digest,
+            description_of_origin="rule create_chart_from_artifact",
+            prefix=fetched_artifact.artifact.name,
+        ),
+    )
     file_contents = await Get(DigestContents, Digest, subset)
-    # TODO this should not be needed as the DigestSubset should have returned a Digest with only one file
-    metadata = [
-        HelmChartMetadata.from_bytes(entry.content)
-        for entry in file_contents
-        if os.path.basename(entry.path) in _HELM_CHART_METADATA_FILENAMES
-    ]
-    # metadata = HelmChartMetadata.from_bytes(file_contents[0].content)
-    return HelmChart(artifact.address, metadata[0], artifact.snapshot)
+    assert len(file_contents) == 1
+
+    metadata = HelmChartMetadata.from_bytes(file_contents[0].content)
+    return HelmChart(fetched_artifact.address, metadata, fetched_artifact.snapshot)
 
 
 @rule(desc="Collect all source code and subcharts of a Helm Chart", level=LogLevel.DEBUG)
