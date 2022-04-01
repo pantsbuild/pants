@@ -106,8 +106,12 @@ class CoursierSubsystem(TemplatedExternalTool):
     name = "coursier"
     help = "A dependency resolver for the Maven ecosystem."
 
-    default_version = "v2.0.16-169-g194ebc55c"
+    default_version = "v2.1.0-M5-18-gfebf9838c"
     default_known_versions = [
+        "v2.1.0-M5-18-gfebf9838c|linux_arm64 |d4ad15ba711228041ad8a46d848c83c8fbc421d7b01c415d8022074dd609760f|19264005",
+        "v2.1.0-M5-18-gfebf9838c|linux_x86_64|3e1a1ad1010d5582e9e43c5a26b273b0147baee5ebd27d3ac1ab61964041c90b|19551533",
+        "v2.1.0-M5-18-gfebf9838c|macos_arm64 |d13812c5a5ef4c9b3e25cc046d18addd09bacd149f95b20a14e4d2a73e358ecf|18826510",
+        "v2.1.0-M5-18-gfebf9838c|macos_x86_64|d13812c5a5ef4c9b3e25cc046d18addd09bacd149f95b20a14e4d2a73e358ecf|18826510",
         "v2.0.16-169-g194ebc55c|linux_arm64 |da38c97d55967505b8454c20a90370c518044829398b9bce8b637d194d79abb3|18114472",
         "v2.0.16-169-g194ebc55c|linux_x86_64|4c61a634c4bd2773b4543fe0fc32210afd343692891121cddb447204b48672e8|18486946",
         "v2.0.16-169-g194ebc55c|macos_arm64 |15bce235d223ef1d022da30b67b4c64e9228d236b876c834b64e029bbe824c6f|17957182",

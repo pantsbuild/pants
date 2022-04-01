@@ -78,18 +78,12 @@ serialized_bytes_length = 118671
 [[entries]]
 file_name = "com.thesamet.scalapb_lenses_2.13_0.11.4.jar"
 [[entries.directDependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
+group = "org.scala-lang.modules"
+artifact = "scala-collection-compat_2.13"
+version = "2.4.4"
 packaging = "jar"
 
 [[entries.directDependencies]]
-group = "org.scala-lang.modules"
-artifact = "scala-collection-compat_2.13"
-version = "2.4.4"
-packaging = "jar"
-
-[[entries.dependencies]]
 group = "org.scala-lang"
 artifact = "scala-library"
 version = "2.13.7"
@@ -99,6 +93,12 @@ packaging = "jar"
 group = "org.scala-lang.modules"
 artifact = "scala-collection-compat_2.13"
 version = "2.4.4"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.7"
 packaging = "jar"
 
 
@@ -125,15 +125,15 @@ version = "0.11.4"
 packaging = "jar"
 
 [[entries.directDependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
-packaging = "jar"
-
-[[entries.directDependencies]]
 group = "org.scala-lang.modules"
 artifact = "scala-collection-compat_2.13"
 version = "2.4.4"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -149,15 +149,15 @@ version = "0.11.4"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
-packaging = "jar"
-
-[[entries.dependencies]]
 group = "org.scala-lang.modules"
 artifact = "scala-collection-compat_2.13"
 version = "2.4.4"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.7"
 packaging = "jar"
 
 
@@ -190,15 +190,15 @@ version = "2.6.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
+group = "io.circe"
+artifact = "circe-numbers_2.13"
+version = "0.14.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.typelevel"
-artifact = "simulacrum-scalafix-annotations_2.13"
-version = "0.5.4"
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -208,15 +208,15 @@ version = "2.6.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "io.circe"
-artifact = "circe-numbers_2.13"
-version = "0.14.1"
+group = "org.typelevel"
+artifact = "cats-kernel_2.13"
+version = "2.6.1"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.typelevel"
-artifact = "cats-kernel_2.13"
-version = "2.6.1"
+artifact = "simulacrum-scalafix-annotations_2.13"
+version = "0.5.4"
 packaging = "jar"
 
 
@@ -249,30 +249,6 @@ version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.typelevel"
-artifact = "simulacrum-scalafix-annotations_2.13"
-version = "0.5.4"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.typelevel"
-artifact = "cats-core_2.13"
-version = "2.6.1"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "io.circe"
-artifact = "circe-numbers_2.13"
-version = "0.14.1"
-packaging = "jar"
-
-[[entries.dependencies]]
 group = "com.chuusai"
 artifact = "shapeless_2.13"
 version = "2.3.7"
@@ -285,9 +261,33 @@ version = "0.14.1"
 packaging = "jar"
 
 [[entries.dependencies]]
+group = "io.circe"
+artifact = "circe-numbers_2.13"
+version = "0.14.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.7"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.typelevel"
+artifact = "cats-core_2.13"
+version = "2.6.1"
+packaging = "jar"
+
+[[entries.dependencies]]
 group = "org.typelevel"
 artifact = "cats-kernel_2.13"
 version = "2.6.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.typelevel"
+artifact = "simulacrum-scalafix-annotations_2.13"
+version = "0.5.4"
 packaging = "jar"
 
 
@@ -475,18 +475,6 @@ version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-compiler"
-version = "2.13.7"
-packaging = "jar"
-
-[[entries.dependencies]]
 group = "net.java.dev.jna"
 artifact = "jna"
 version = "5.8.0"
@@ -496,6 +484,18 @@ packaging = "jar"
 group = "org.jline"
 artifact = "jline"
 version = "3.20.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scala-lang"
+artifact = "scala-compiler"
+version = "2.13.7"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -534,15 +534,9 @@ version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.thesamet.scalapb"
-artifact = "scalapb-runtime_2.13"
-version = "0.11.4"
+group = "com.google.protobuf"
+artifact = "protobuf-java"
+version = "3.15.8"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -552,21 +546,27 @@ version = "0.2.7"
 packaging = "jar"
 
 [[entries.dependencies]]
+group = "com.thesamet.scalapb"
+artifact = "lenses_2.13"
+version = "0.11.4"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.thesamet.scalapb"
+artifact = "scalapb-runtime_2.13"
+version = "0.11.4"
+packaging = "jar"
+
+[[entries.dependencies]]
 group = "org.scala-lang.modules"
 artifact = "scala-collection-compat_2.13"
 version = "2.4.4"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.google.protobuf"
-artifact = "protobuf-java"
-version = "3.15.8"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.thesamet.scalapb"
-artifact = "lenses_2.13"
-version = "0.11.4"
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.7"
 packaging = "jar"
 
 
@@ -628,27 +628,15 @@ version = "4.4.30"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
+group = "com.google.protobuf"
+artifact = "protobuf-java"
+version = "3.15.8"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.thesamet.scalapb"
-artifact = "scalapb-runtime_2.13"
-version = "0.11.4"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.scalameta"
-artifact = "trees_2.13"
-version = "4.4.30"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.scalameta"
-artifact = "common_2.13"
-version = "4.4.30"
+group = "com.lihaoyi"
+artifact = "geny_2.13"
+version = "0.6.5"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -658,9 +646,15 @@ version = "0.2.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scalameta"
-artifact = "fastparse-v2_2.13"
-version = "2.3.1"
+group = "com.thesamet.scalapb"
+artifact = "lenses_2.13"
+version = "0.11.4"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.thesamet.scalapb"
+artifact = "scalapb-runtime_2.13"
+version = "0.11.4"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -670,21 +664,27 @@ version = "2.4.4"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.google.protobuf"
-artifact = "protobuf-java"
-version = "3.15.8"
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.thesamet.scalapb"
-artifact = "lenses_2.13"
-version = "0.11.4"
+group = "org.scalameta"
+artifact = "common_2.13"
+version = "4.4.30"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.lihaoyi"
-artifact = "geny_2.13"
-version = "0.6.5"
+group = "org.scalameta"
+artifact = "fastparse-v2_2.13"
+version = "2.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scalameta"
+artifact = "trees_2.13"
+version = "4.4.30"
 packaging = "jar"
 
 
@@ -717,45 +717,15 @@ version = "4.4.30"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
+group = "com.google.protobuf"
+artifact = "protobuf-java"
+version = "3.15.8"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.thesamet.scalapb"
-artifact = "scalapb-runtime_2.13"
-version = "0.11.4"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.scalameta"
-artifact = "parsers_2.13"
-version = "4.4.30"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-compiler"
-version = "2.13.7"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "net.java.dev.jna"
-artifact = "jna"
-version = "5.8.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.scalameta"
-artifact = "trees_2.13"
-version = "4.4.30"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.scalameta"
-artifact = "common_2.13"
-version = "4.4.30"
+group = "com.lihaoyi"
+artifact = "geny_2.13"
+version = "0.6.5"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -765,15 +735,27 @@ version = "0.2.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.jline"
-artifact = "jline"
-version = "3.20.0"
+group = "com.thesamet.scalapb"
+artifact = "lenses_2.13"
+version = "0.11.4"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scalameta"
-artifact = "fastparse-v2_2.13"
-version = "2.3.1"
+group = "com.thesamet.scalapb"
+artifact = "scalapb-runtime_2.13"
+version = "0.11.4"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "net.java.dev.jna"
+artifact = "jna"
+version = "5.8.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.jline"
+artifact = "jline"
+version = "3.20.0"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -784,7 +766,13 @@ packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.scala-lang"
-artifact = "scalap"
+artifact = "scala-compiler"
+version = "2.13.7"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scala-lang"
+artifact = "scala-library"
 version = "2.13.7"
 packaging = "jar"
 
@@ -795,21 +783,33 @@ version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.google.protobuf"
-artifact = "protobuf-java"
-version = "3.15.8"
+group = "org.scala-lang"
+artifact = "scalap"
+version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.thesamet.scalapb"
-artifact = "lenses_2.13"
-version = "0.11.4"
+group = "org.scalameta"
+artifact = "common_2.13"
+version = "4.4.30"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.lihaoyi"
-artifact = "geny_2.13"
-version = "0.6.5"
+group = "org.scalameta"
+artifact = "fastparse-v2_2.13"
+version = "2.3.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scalameta"
+artifact = "parsers_2.13"
+version = "4.4.30"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "org.scalameta"
+artifact = "trees_2.13"
+version = "4.4.30"
 packaging = "jar"
 
 
@@ -842,21 +842,15 @@ version = "2.3.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scala-lang"
-artifact = "scala-library"
-version = "2.13.7"
+group = "com.google.protobuf"
+artifact = "protobuf-java"
+version = "3.15.8"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.thesamet.scalapb"
-artifact = "scalapb-runtime_2.13"
-version = "0.11.4"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.scalameta"
-artifact = "common_2.13"
-version = "4.4.30"
+group = "com.lihaoyi"
+artifact = "geny_2.13"
+version = "0.6.5"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -866,9 +860,15 @@ version = "0.2.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "org.scalameta"
-artifact = "fastparse-v2_2.13"
-version = "2.3.1"
+group = "com.thesamet.scalapb"
+artifact = "lenses_2.13"
+version = "0.11.4"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.thesamet.scalapb"
+artifact = "scalapb-runtime_2.13"
+version = "0.11.4"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -878,21 +878,21 @@ version = "2.4.4"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.google.protobuf"
-artifact = "protobuf-java"
-version = "3.15.8"
+group = "org.scala-lang"
+artifact = "scala-library"
+version = "2.13.7"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.thesamet.scalapb"
-artifact = "lenses_2.13"
-version = "0.11.4"
+group = "org.scalameta"
+artifact = "common_2.13"
+version = "4.4.30"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.lihaoyi"
-artifact = "geny_2.13"
-version = "0.6.5"
+group = "org.scalameta"
+artifact = "fastparse-v2_2.13"
+version = "2.3.1"
 packaging = "jar"
 
 
