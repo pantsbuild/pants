@@ -19,7 +19,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize, strip_v2_chroot_path
+from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,7 @@ class IsortFieldSet(FieldSet):
 class IsortRequest(FmtRequest):
     field_set_type = IsortFieldSet
     name = Isort.options_scope
+
 
 def generate_argv(
     source_files: tuple[str, ...], isort: Isort, *, is_isort5: bool
@@ -103,6 +104,7 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
+
 
 def rules():
     return [

@@ -20,7 +20,7 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize, strip_v2_chroot_path
+from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)

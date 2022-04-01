@@ -20,7 +20,7 @@ from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize, strip_v2_chroot_path
+from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
 

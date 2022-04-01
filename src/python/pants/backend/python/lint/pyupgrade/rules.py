@@ -36,7 +36,6 @@ class PyUpgradeRequest(FmtRequest):
     name = PyUpgrade.options_scope
 
 
-
 @rule(level=LogLevel.DEBUG)
 async def setup_pyupgrade_process(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> Process:
     pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
@@ -50,7 +49,7 @@ async def setup_pyupgrade_process(request: PyUpgradeRequest, pyupgrade: PyUpgrad
             output_files=request.snapshot.files,
             description=f"Run pyupgrade on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
-        )
+        ),
     )
 
     return process

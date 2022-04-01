@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.backend.python.lint.docformatter.skip_field import SkipDocformatterField
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
@@ -10,7 +9,6 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import Process, ProcessResult
