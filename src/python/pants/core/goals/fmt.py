@@ -16,7 +16,6 @@ from pants.core.goals.style_request import (
     style_batch_size_help,
 )
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest, MergeDigests, Snapshot, SnapshotDiff, Workspace
@@ -135,8 +134,8 @@ class FmtRequest(StyleRequest):
     snapshot: Snapshot
 
     def __init__(self, field_sets: Iterable[_FS], snapshot: Snapshot) -> None:
-        super().__init__(field_sets)
         self.snapshot = snapshot
+        super().__init__(field_sets)
 
 
 @dataclass(frozen=True)
