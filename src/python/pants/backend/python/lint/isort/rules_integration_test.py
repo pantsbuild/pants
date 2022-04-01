@@ -67,7 +67,7 @@ def run_isort(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            IsortRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            IsortRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
     return fmt_result

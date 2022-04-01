@@ -62,7 +62,7 @@ def run_buf(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BufFormatRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            BufFormatRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
 

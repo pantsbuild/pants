@@ -92,7 +92,7 @@ def run_google_java_format(rule_runner: RuleRunner, targets: list[Target]) -> Fm
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            GoogleJavaFormatRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            GoogleJavaFormatRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
     return fmt_result
