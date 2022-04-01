@@ -126,7 +126,12 @@ class HelmChartLintStrictField(TriBoolField):
 
 class HelmChartRepositoryField(StringField):
     alias = "repository"
-    help = "Repository to use in the Helm registry where this chart is going to be published"
+    help = (
+        "Repository to use in the Helm registry where this chart is going to be published.\n"
+        "If no value is given and `default-registry-repository` is undefined too, then the chart "
+        "will be pushed to the root of the OCI registry."
+    )
+
 
 class HelmChartTarget(Target):
     alias = "helm_chart"

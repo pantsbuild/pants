@@ -8,7 +8,7 @@ import os
 import pytest
 
 from pants.backend.helm.goals import package
-from pants.backend.helm.goals.package import HelmPackageFieldSet
+from pants.backend.helm.goals.package import BuiltHelmArtifact, HelmPackageFieldSet
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartTarget
 from pants.backend.helm.testutil import (
@@ -55,9 +55,11 @@ def _assert_build_package(rule_runner: RuleRunner, *, chart_name: str, chart_ver
     result = rule_runner.request(BuiltPackage, [field_set])
 
     assert len(result.artifacts) == 1
+    assert isinstance(result.artifacts[0], BuiltHelmArtifact)
     assert result.artifacts[0].relpath == os.path.join(
         dest_dir, f"{chart_name}-{chart_version}.tgz"
     )
+    assert result.artifacts[0].metadata
 
 
 def test_helm_package(rule_runner: RuleRunner) -> None:

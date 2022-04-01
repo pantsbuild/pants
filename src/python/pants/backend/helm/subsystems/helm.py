@@ -10,7 +10,7 @@ from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.target_types import HelmChartTarget, HelmRegistriesField
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import BoolOption, DictOption
+from pants.option.option_types import BoolOption, DictOption, StrOption
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
 
@@ -62,6 +62,16 @@ class HelmSubsystem(TemplatedExternalTool):
     _registries = DictOption[Any]("--registries", help=registries_help, fromfile=True)
     lint_strict = BoolOption(
         "--lint-strict", default=False, help="Enables strict linting of Helm charts"
+    )
+    default_registry_repository = StrOption(
+        "--default-registry-repository",
+        default=None,
+        help=(
+            "Default location where to push Helm charts in the available registries "
+            "when no specific one has been given.\n"
+            "If no registry repository is given, charts will be pushed to the root of "
+            "the OCI registry"
+        ),
     )
 
     def generate_exe(self, plat: Platform) -> str:
