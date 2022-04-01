@@ -14,7 +14,6 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.tailor import group_by_dir
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
     Digest,
     DigestSubset,
@@ -188,26 +187,13 @@ async def setup_scalafmt(
     toolcp_relpath = "__toolcp"
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, ScalafmtToolLockfileSentinel())
-    source_files, tool_classpath = await MultiGet(
-        Get(
-            SourceFiles,
-            SourceFilesRequest(field_set.source for field_set in request.field_sets),
-        ),
+    tool_classpath, config_files = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-    )
-
-    source_files_snapshot = (
-        source_files.snapshot
-        if request.prior_formatter_result is None
-        else request.prior_formatter_result
-    )
-
-    config_files = await Get(
-        ScalafmtConfigFiles, GatherScalafmtConfigFilesRequest(source_files_snapshot)
+        Get(ScalafmtConfigFiles, GatherScalafmtConfigFilesRequest(request.snapshot)),
     )
 
     merged_sources_digest = await Get(
-        Digest, MergeDigests([source_files_snapshot.digest, config_files.snapshot.digest])
+        Digest, MergeDigests([request.snapshot.digest, config_files.snapshot.digest])
     )
 
     extra_immutable_input_digests = {
@@ -216,7 +202,7 @@ async def setup_scalafmt(
 
     # Partition the work by which source files share the same config file (regardless of directory).
     source_files_by_config_file: dict[str, set[str]] = defaultdict(set)
-    for source_dir, files_in_source_dir in group_by_dir(source_files_snapshot.files).items():
+    for source_dir, files_in_source_dir in group_by_dir(request.snapshot.files).items():
         config_file = config_files.source_dir_to_config_file[source_dir]
         source_files_by_config_file[config_file].update(
             os.path.join(source_dir, name) for name in files_in_source_dir
@@ -236,7 +222,7 @@ async def setup_scalafmt(
         for config_file, files in source_files_by_config_file.items()
     )
 
-    return Setup(tuple(partitions), original_snapshot=source_files_snapshot)
+    return Setup(tuple(partitions), original_snapshot=request.snapshot)
 
 
 @rule(desc="Format with scalafmt", level=LogLevel.DEBUG)

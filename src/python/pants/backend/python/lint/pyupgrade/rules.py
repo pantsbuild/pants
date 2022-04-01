@@ -10,10 +10,8 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -46,31 +44,20 @@ class PyUpgradeResult:
 
 @rule(level=LogLevel.DEBUG)
 async def run_pyupgrade(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> PyUpgradeResult:
-    pyupgrade_pex_get = Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
-    source_files_get = Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.source for field_set in request.field_sets),
-    )
-    source_files, pyupgrade_pex = await MultiGet(source_files_get, pyupgrade_pex_get)
-
-    source_files_snapshot = (
-        source_files.snapshot
-        if request.prior_formatter_result is None
-        else request.prior_formatter_result
-    )
+    pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
 
     result = await Get(
         FallibleProcessResult,
         VenvPexProcess(
             pyupgrade_pex,
-            argv=(*pyupgrade.args, *source_files.files),
-            input_digest=source_files_snapshot.digest,
-            output_files=source_files_snapshot.files,
+            argv=(*pyupgrade.args, *request.snapshot.files),
+            input_digest=request.snapshot.digest,
+            output_files=request.snapshot.files,
             description=f"Run pyupgrade on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    return PyUpgradeResult(result, original_snapshot=source_files_snapshot)
+    return PyUpgradeResult(result, original_snapshot=request.snapshot)
 
 
 @rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)

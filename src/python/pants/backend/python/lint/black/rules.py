@@ -12,7 +12,6 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
@@ -74,24 +73,14 @@ async def setup_black(request: BlackRequest, black: Black, python_setup: PythonS
         PexRequest,
         black.to_pex_request(interpreter_constraints=tool_interpreter_constraints),
     )
-
-    source_files_get = Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.source for field_set in request.field_sets),
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, black.config_request(request.snapshot.dirs)
     )
 
-    source_files, black_pex = await MultiGet(source_files_get, black_pex_get)
-    source_files_snapshot = (
-        source_files.snapshot
-        if request.prior_formatter_result is None
-        else request.prior_formatter_result
-    )
+    black_pex, config_files = await MultiGet(black_pex_get, config_files_get)
 
-    config_files = await Get(
-        ConfigFiles, ConfigFilesRequest, black.config_request(source_files_snapshot.dirs)
-    )
     input_digest = await Get(
-        Digest, MergeDigests((source_files_snapshot.digest, config_files.snapshot.digest))
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
     process = await Get(
@@ -103,16 +92,16 @@ async def setup_black(request: BlackRequest, black: Black, python_setup: PythonS
                 "-W",
                 "{pants_concurrency}",
                 *black.args,
-                *source_files_snapshot.files,
+                *request.snapshot.files,
             ),
             input_digest=input_digest,
-            output_files=source_files_snapshot.files,
+            output_files=request.snapshot.files,
             concurrency_available=len(request.field_sets),
             description=f"Run Black on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_snapshot=source_files_snapshot)
+    return Setup(process, original_snapshot=request.snapshot)
 
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)

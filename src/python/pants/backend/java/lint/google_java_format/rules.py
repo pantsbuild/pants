@@ -8,10 +8,9 @@ from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaForma
 from pants.backend.java.target_types import JavaSourceField
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -62,19 +61,7 @@ async def setup_google_java_format(
     lockfile_request = await Get(
         GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()
     )
-    source_files, tool_classpath = await MultiGet(
-        Get(
-            SourceFiles,
-            SourceFilesRequest(field_set.source for field_set in request.field_sets),
-        ),
-        Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request)),
-    )
-
-    source_files_snapshot = (
-        source_files.snapshot
-        if request.prior_formatter_result is None
-        else request.prior_formatter_result
-    )
+    tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 
     toolcp_relpath = "__toolcp"
     extra_immutable_input_digests = {
@@ -96,22 +83,22 @@ async def setup_google_java_format(
         "com.google.googlejavaformat.java.Main",
         *(["--aosp"] if tool.aosp else []),
         "--replace",
-        *source_files_snapshot.files,
+        *request.snapshot.files,
     ]
 
     process = JvmProcess(
         jdk=jdk,
         argv=args,
         classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-        input_digest=source_files_snapshot.digest,
+        input_digest=request.snapshot.digest,
         extra_immutable_input_digests=extra_immutable_input_digests,
         extra_nailgun_keys=extra_immutable_input_digests,
-        output_files=source_files_snapshot.files,
+        output_files=request.snapshot.files,
         description=f"Run Google Java Format on {pluralize(len(request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
     )
 
-    return Setup(process, original_snapshot=source_files_snapshot)
+    return Setup(process, original_snapshot=request.snapshot)
 
 
 @rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)

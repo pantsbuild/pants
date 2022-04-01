@@ -12,7 +12,6 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import Process, ProcessResult
@@ -71,21 +70,10 @@ def generate_argv(
 @rule(level=LogLevel.DEBUG)
 async def setup_isort(request: IsortRequest, isort: Isort) -> Setup:
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
-    source_files_get = Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.source for field_set in request.field_sets),
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
     )
-    source_files, isort_pex = await MultiGet(source_files_get, isort_pex_get)
-
-    source_files_snapshot = (
-        source_files.snapshot
-        if request.prior_formatter_result is None
-        else request.prior_formatter_result
-    )
-
-    config_files = await Get(
-        ConfigFiles, ConfigFilesRequest, isort.config_request(source_files_snapshot.dirs)
-    )
+    isort_pex, config_files = await MultiGet(isort_pex_get, config_files_get)
 
     # Isort 5+ changes how config files are handled. Determine which semantics we should use.
     is_isort5 = False
@@ -97,21 +85,21 @@ async def setup_isort(request: IsortRequest, isort: Isort) -> Setup:
         )
 
     input_digest = await Get(
-        Digest, MergeDigests((source_files_snapshot.digest, config_files.snapshot.digest))
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
     process = await Get(
         Process,
         VenvPexProcess(
             isort_pex,
-            argv=generate_argv(source_files_snapshot.files, isort, is_isort5=is_isort5),
+            argv=generate_argv(request.snapshot.files, isort, is_isort5=is_isort5),
             input_digest=input_digest,
-            output_files=source_files_snapshot.files,
+            output_files=request.snapshot.files,
             description=f"Run isort on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_snapshot=source_files_snapshot)
+    return Setup(process, original_snapshot=request.snapshot)
 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)

@@ -10,7 +10,6 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import Process, ProcessResult
@@ -46,23 +45,14 @@ class Setup:
 @rule(level=LogLevel.DEBUG)
 async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Setup:
     yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
-    source_files_get = Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.source for field_set in request.field_sets),
-    )
-    source_files, yapf_pex = await MultiGet(source_files_get, yapf_pex_get)
-
-    source_files_snapshot = (
-        source_files.snapshot
-        if request.prior_formatter_result is None
-        else request.prior_formatter_result
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, yapf.config_request(request.snapshot.dirs)
     )
 
-    config_files = await Get(
-        ConfigFiles, ConfigFilesRequest, yapf.config_request(source_files_snapshot.dirs)
-    )
+    yapf_pex, config_files = await MultiGet(yapf_pex_get, config_files_get)
+
     input_digest = await Get(
-        Digest, MergeDigests((source_files_snapshot.digest, config_files.snapshot.digest))
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
     process = await Get(
@@ -73,15 +63,15 @@ async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Setup:
                 *yapf.args,
                 "--in-place",
                 *(("--style", yapf.config) if yapf.config else ()),
-                *source_files_snapshot.files,
+                *request.snapshot.files,
             ),
             input_digest=input_digest,
-            output_files=source_files_snapshot.files,
+            output_files=request.snapshot.files,
             description=f"Run yapf on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_snapshot=source_files_snapshot)
+    return Setup(process, original_snapshot=request.snapshot)
 
 
 @rule(desc="Format with yapf", level=LogLevel.DEBUG)

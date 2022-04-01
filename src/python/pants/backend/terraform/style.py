@@ -13,7 +13,8 @@ from pants.backend.terraform.tool import TerraformProcess
 from pants.build_graph.address import Address
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import MergeDigests, Snapshot
+from pants.engine.fs import Snapshot
+from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
@@ -50,8 +51,8 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
 
     source_files_snapshot = (
         await Get(Snapshot, MergeDigests(sfs.snapshot.digest for sfs in source_files_by_field_set))
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
+        if getattr(setup_request.request, "snapshot", None) is None
+        else getattr(setup_request.request, "snapshot")
     )
 
     # `terraform` operates on a directory-by-directory basis. First determine the directories in
