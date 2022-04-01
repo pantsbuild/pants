@@ -104,7 +104,7 @@ POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(
 class CoursierSubsystem(TemplatedExternalTool):
     options_scope = "coursier"
     name = "coursier"
-    help = "A dependency resolver for the Maven ecosystem."
+    help = "A dependency resolver for the Maven ecosystem. (https://get-coursier.io/)"
 
     default_version = "v2.1.0-M5-18-gfebf9838c"
     default_known_versions = [
