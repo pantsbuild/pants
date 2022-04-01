@@ -14,7 +14,7 @@ from typing_extensions import Protocol
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import EMPTY_DIGEST, Digest, Snapshot, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.target import FieldSet
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import path_safe
@@ -95,17 +95,12 @@ class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
     name: ClassVar[str]
 
     field_sets: Collection[_FS]
-    # TODO: Move this onto `FmtRequest`.
-    prior_formatter_result: Snapshot | None = None
 
     def __init__(
         self,
         field_sets: Iterable[_FS],
-        *,
-        prior_formatter_result: Snapshot | None = None,
     ) -> None:
         self.field_sets = Collection[_FS](field_sets)
-        self.prior_formatter_result = prior_formatter_result
 
     def debug_hint(self) -> str:
         return self.name
