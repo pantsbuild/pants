@@ -66,13 +66,7 @@ async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformat
     process = await Get(Process, DocformatterRequest, request)
     result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult(
-        request.snapshot,
-        output_snapshot,
-        stdout=result.stdout.decode(),
-        stderr=result.stderr.decode(),
-        formatter_name=request.name,
-    )
+    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 
 
 def rules():

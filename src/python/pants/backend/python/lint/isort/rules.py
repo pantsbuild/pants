@@ -102,14 +102,7 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     process = await Get(Process, IsortRequest, request)
     result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult(
-        request.snapshot,
-        output_snapshot,
-        stdout=strip_v2_chroot_path(result.stdout),
-        stderr=strip_v2_chroot_path(result.stderr),
-        formatter_name=request.name,
-    )
-
+    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 
 def rules():
     return [

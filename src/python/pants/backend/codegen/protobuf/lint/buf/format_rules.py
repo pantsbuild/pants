@@ -94,13 +94,7 @@ async def run_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> FmtRes
     process = await Get(Process, BufFormatRequest, request)
     result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult(
-        request.snapshot,
-        output_snapshot,
-        stdout=result.stdout.decode(),
-        stderr=result.stderr.decode(),
-        formatter_name=request.name,
-    )
+    return FmtResult.create(request, result, output_snapshot)
 
 
 def rules():

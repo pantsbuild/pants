@@ -63,13 +63,7 @@ async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtR
     process = await Get(Process, PyUpgradeRequest, request)
     result = await Get(FallibleProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult(
-        request.snapshot,
-        output_snapshot,
-        stdout=result.process_result.stdout.decode(),
-        stderr=result.process_result.stderr.decode(),
-        formatter_name=PyUpgradeRequest.name,
-    )
+    return FmtResult.create(request, result, output_snapshot)
 
 
 def rules():

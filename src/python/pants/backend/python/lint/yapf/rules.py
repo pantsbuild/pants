@@ -75,13 +75,7 @@ async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
     process = await Get(Process, YapfRequest, request)
     result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult(
-        request.snapshot,
-        output_snapshot,
-        stdout=result.stdout.decode(),
-        stderr=result.stderr.decode(),
-        formatter_name=request.name,
-    )
+    return FmtResult.create(request, result, output_snapshot)
 
 
 def rules():

@@ -109,13 +109,7 @@ async def google_java_format_fmt(
     setup = await Get(Setup, GoogleJavaFormatRequest, request)
     result = await Get(ProcessResult, JvmProcess, setup.process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult(
-        request.snapshot,
-        output_snapshot,
-        stdout=strip_v2_chroot_path(result.stdout),
-        stderr=strip_v2_chroot_path(result.stderr),
-        formatter_name=request.name,
-    )
+    return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 
 
 @rule
