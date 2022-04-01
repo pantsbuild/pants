@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 _SR = TypeVar("_SR", bound=StyleRequest)
 
+
 class AmbiguousRequestNamesError(Exception):
     def __init__(
         self,
@@ -227,7 +228,9 @@ async def lint(
         "Iterable[type[LintTargetsRequest]]", union_membership.get(LintTargetsRequest)
     )
     fmt_target_request_types = cast("Iterable[type[FmtRequest]]", union_membership.get(FmtRequest))
-    file_request_types = cast("Iterable[type[LintFilesRequest]]", union_membership[LintFilesRequest])
+    file_request_types = cast(
+        "Iterable[type[LintFilesRequest]]", union_membership[LintFilesRequest]
+    )
 
     _check_ambiguous_request_names(
         *lint_target_request_types, *fmt_target_request_types, *file_request_types
