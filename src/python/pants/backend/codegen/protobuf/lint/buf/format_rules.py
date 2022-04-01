@@ -44,14 +44,8 @@ class BufFormatRequest(FmtRequest):
     name = "buf-format"
 
 
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_snapshot: Snapshot
-
-
 @rule(level=LogLevel.DEBUG)
-async def setup_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> Setup:
+async def setup_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> Process:
     diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(
         DownloadedExternalTool, ExternalToolRequest, buf.get_request(Platform.current)
@@ -90,18 +84,18 @@ async def setup_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> Setu
             "PATH": binary_shims.bin_directory,
         },
     )
-    return Setup(process, original_snapshot=request.snapshot)
+    return process
 
 
 @rule(desc="Format with buf format", level=LogLevel.DEBUG)
 async def run_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> FmtResult:
     if buf.skip_format:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, BufFormatRequest, request)
-    result = await Get(ProcessResult, Process, setup.process)
+    process = await Get(Process, BufFormatRequest, request)
+    result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
-        setup.original_snapshot,
+        request.snapshot,
         output_snapshot,
         stdout=result.stdout.decode(),
         stderr=result.stderr.decode(),

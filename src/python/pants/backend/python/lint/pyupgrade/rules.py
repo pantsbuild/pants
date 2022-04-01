@@ -12,7 +12,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import FallibleProcessResult
+from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -36,18 +36,13 @@ class PyUpgradeRequest(FmtRequest):
     name = PyUpgrade.options_scope
 
 
-@dataclass(frozen=True)
-class PyUpgradeResult:
-    process_result: FallibleProcessResult
-    original_snapshot: Snapshot
-
 
 @rule(level=LogLevel.DEBUG)
-async def run_pyupgrade(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> PyUpgradeResult:
+async def setup_pyupgrade_process(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> Process:
     pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
 
-    result = await Get(
-        FallibleProcessResult,
+    process = await Get(
+        Process,
         VenvPexProcess(
             pyupgrade_pex,
             argv=(*pyupgrade.args, *request.snapshot.files),
@@ -55,19 +50,21 @@ async def run_pyupgrade(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> PyUp
             output_files=request.snapshot.files,
             description=f"Run pyupgrade on {pluralize(len(request.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
-        ),
+        )
     )
-    return PyUpgradeResult(result, original_snapshot=request.snapshot)
+
+    return process
 
 
 @rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
-async def pyupgrade_fmt(result: PyUpgradeResult, pyupgrade: PyUpgrade) -> FmtResult:
+async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtResult:
     if pyupgrade.skip:
-        return FmtResult.skip(formatter_name=PyUpgradeRequest.name)
-
-    output_snapshot = await Get(Snapshot, Digest, result.process_result.output_digest)
+        return FmtResult.skip(formatter_name=request.name)
+    process = await Get(Process, PyUpgradeRequest, request)
+    result = await Get(FallibleProcessResult, Process, process)
+    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
-        result.original_snapshot,
+        request.snapshot,
         output_snapshot,
         stdout=result.process_result.stdout.decode(),
         stderr=result.process_result.stderr.decode(),

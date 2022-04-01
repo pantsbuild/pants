@@ -67,7 +67,7 @@ async def tffmt_fmt(request: TffmtRequest, tffmt: TfFmtSubsystem) -> FmtResult:
     output_snapshot = await Get(Snapshot, Digest, output_digest)
 
     fmt_result = FmtResult(
-        input=setup.original_snapshot,
+        input=request.snapshot,
         output=output_snapshot,
         stdout=stdout_content,
         stderr=stderr_content,

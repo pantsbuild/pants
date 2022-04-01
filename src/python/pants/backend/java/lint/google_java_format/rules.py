@@ -48,7 +48,6 @@ class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):
 @dataclass(frozen=True)
 class Setup:
     process: JvmProcess
-    original_snapshot: Snapshot
 
 
 @rule(level=LogLevel.DEBUG)
@@ -98,7 +97,7 @@ async def setup_google_java_format(
         level=LogLevel.DEBUG,
     )
 
-    return Setup(process, original_snapshot=request.snapshot)
+    return Setup(process)
 
 
 @rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
@@ -111,7 +110,7 @@ async def google_java_format_fmt(
     result = await Get(ProcessResult, JvmProcess, setup.process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
-        setup.original_snapshot,
+        request.snapshot,
         output_snapshot,
         stdout=strip_v2_chroot_path(result.stdout),
         stderr=strip_v2_chroot_path(result.stderr),

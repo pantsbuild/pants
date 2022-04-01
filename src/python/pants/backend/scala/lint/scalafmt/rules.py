@@ -67,7 +67,6 @@ class Partition:
 @dataclass(frozen=True)
 class Setup:
     partitions: tuple[Partition, ...]
-    original_snapshot: Snapshot
 
 
 @dataclass(frozen=True)
@@ -222,7 +221,7 @@ async def setup_scalafmt(
         for config_file, files in source_files_by_config_file.items()
     )
 
-    return Setup(tuple(partitions), original_snapshot=request.snapshot)
+    return Setup(tuple(partitions))
 
 
 @rule(desc="Format with scalafmt", level=LogLevel.DEBUG)
@@ -257,7 +256,7 @@ async def scalafmt_fmt(request: ScalafmtRequest, tool: ScalafmtSubsystem) -> Fmt
     output_snapshot = await Get(Snapshot, Digest, output_digest)
 
     fmt_result = FmtResult(
-        input=setup.original_snapshot,
+        input=request.snapshot,
         output=output_snapshot,
         stdout=stdout_content,
         stderr=stderr_content,

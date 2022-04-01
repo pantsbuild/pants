@@ -37,20 +37,8 @@ class DocformatterRequest(FmtRequest):
     name = Docformatter.options_scope
 
 
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_snapshot: Snapshot
-
-
-def generate_args(
-    *, source_files: SourceFiles, docformatter: Docformatter, check_only: bool
-) -> Tuple[str, ...]:
-    return ("--check" if check_only else "--in-place", *docformatter.args, *source_files.files)
-
-
 @rule(level=LogLevel.DEBUG)
-async def setup_docformatter(request: DocformatterRequest, docformatter: Docformatter) -> Setup:
+async def setup_docformatter(request: DocformatterRequest, docformatter: Docformatter) -> Process:
     docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
 
     process = await Get(
@@ -68,18 +56,18 @@ async def setup_docformatter(request: DocformatterRequest, docformatter: Docform
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_snapshot=request.snapshot)
+    return process
 
 
 @rule(desc="Format with docformatter", level=LogLevel.DEBUG)
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
     if docformatter.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, DocformatterRequest, request)
-    result = await Get(ProcessResult, Process, setup.process)
+    process = await Get(Process, DocformatterRequest, request)
+    result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
-        setup.original_snapshot,
+        request.snapshot,
         output_snapshot,
         stdout=result.stdout.decode(),
         stderr=result.stderr.decode(),

@@ -37,13 +37,6 @@ class IsortRequest(FmtRequest):
     field_set_type = IsortFieldSet
     name = Isort.options_scope
 
-
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_snapshot: Snapshot
-
-
 def generate_argv(
     source_files: tuple[str, ...], isort: Isort, *, is_isort5: bool
 ) -> Tuple[str, ...]:
@@ -68,7 +61,7 @@ def generate_argv(
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_isort(request: IsortRequest, isort: Isort) -> Setup:
+async def setup_isort(request: IsortRequest, isort: Isort) -> Process:
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
@@ -99,18 +92,18 @@ async def setup_isort(request: IsortRequest, isort: Isort) -> Setup:
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_snapshot=request.snapshot)
+    return process
 
 
 @rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, IsortRequest, request)
-    result = await Get(ProcessResult, Process, setup.process)
+    process = await Get(Process, IsortRequest, request)
+    result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
-        setup.original_snapshot,
+        request.snapshot,
         output_snapshot,
         stdout=strip_v2_chroot_path(result.stdout),
         stderr=strip_v2_chroot_path(result.stderr),

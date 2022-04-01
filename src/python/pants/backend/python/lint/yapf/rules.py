@@ -36,14 +36,8 @@ class YapfRequest(FmtRequest):
     name = Yapf.options_scope
 
 
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_snapshot: Snapshot
-
-
 @rule(level=LogLevel.DEBUG)
-async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Setup:
+async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Process:
     yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, yapf.config_request(request.snapshot.dirs)
@@ -71,18 +65,18 @@ async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Setup:
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_snapshot=request.snapshot)
+    return process
 
 
 @rule(desc="Format with yapf", level=LogLevel.DEBUG)
 async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
     if yapf.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, YapfRequest, request)
-    result = await Get(ProcessResult, Process, setup.process)
+    process = await Get(Process, YapfRequest, request)
+    result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
-        setup.original_snapshot,
+        request.snapshot,
         output_snapshot,
         stdout=result.stdout.decode(),
         stderr=result.stderr.decode(),

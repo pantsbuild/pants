@@ -36,14 +36,8 @@ class AutoflakeRequest(FmtRequest):
     name = Autoflake.options_scope
 
 
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_snapshot: Snapshot
-
-
 @rule(level=LogLevel.DEBUG)
-async def setup_autoflake(request: AutoflakeRequest, autoflake: Autoflake) -> Setup:
+async def setup_autoflake(request: AutoflakeRequest, autoflake: Autoflake) -> Process:
     autoflake_pex = await Get(VenvPex, PexRequest, autoflake.to_pex_request())
 
     process = await Get(
@@ -62,18 +56,18 @@ async def setup_autoflake(request: AutoflakeRequest, autoflake: Autoflake) -> Se
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_snapshot=request.snapshot)
+    return process
 
 
 @rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
 async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtResult:
     if autoflake.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, AutoflakeRequest, request)
-    result = await Get(ProcessResult, Process, setup.process)
+    process = await Get(Process, AutoflakeRequest, request)
+    result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
-        setup.original_snapshot,
+        request.snapshot,
         output_snapshot,
         stdout=strip_v2_chroot_path(result.stdout),
         stderr=strip_v2_chroot_path(result.stderr),

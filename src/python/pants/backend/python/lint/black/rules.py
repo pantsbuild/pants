@@ -40,14 +40,8 @@ class BlackRequest(FmtRequest):
     name = Black.options_scope
 
 
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_snapshot: Snapshot
-
-
 @rule(level=LogLevel.DEBUG)
-async def setup_black(request: BlackRequest, black: Black, python_setup: PythonSetup) -> Setup:
+async def setup_black(request: BlackRequest, black: Black, python_setup: PythonSetup) -> Process:
     # Black requires 3.6+ but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6, and 3.7.
     # However, typed-ast does not understand 3.8+, so instead we must run Black with Python 3.8+
     # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
@@ -101,18 +95,18 @@ async def setup_black(request: BlackRequest, black: Black, python_setup: PythonS
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_snapshot=request.snapshot)
+    return process
 
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)
 async def black_fmt(request: BlackRequest, black: Black) -> FmtResult:
     if black.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, BlackRequest, request)
-    result = await Get(ProcessResult, Process, setup.process)
+    process = await Get(Process, BlackRequest, request)
+    result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult(
-        setup.original_snapshot,
+        request.snapshot,
         output_snapshot,
         stdout=strip_v2_chroot_path(result.stdout),
         stderr=strip_v2_chroot_path(result.stderr),
