@@ -14,8 +14,19 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufGrpcToggleField,
     ProtobufSourceField,
 )
+from pants.backend.go import target_type_rules
 from pants.backend.go.target_type_rules import ImportPathToPackages
 from pants.backend.go.target_types import GoPackageSourcesField
+from pants.backend.go.util_rules import (
+    assembly,
+    build_pkg,
+    build_pkg_target,
+    first_party_pkg,
+    go_mod,
+    link,
+    sdk,
+    third_party_pkg,
+)
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -30,6 +41,7 @@ from pants.backend.go.util_rules.first_party_pkg import (
 )
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.python.util_rules import pex
 from pants.build_graph.address import Address
 from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -604,4 +616,15 @@ def rules():
         UnionRule(GenerateSourcesRequest, GenerateGoFromProtobufRequest),
         UnionRule(GoCodegenBuildRequest, GoCodegenBuildProtobufRequest),
         UnionRule(InferDependenciesRequest, InferGoProtobufDependenciesRequest),
+        # Rules needed for this to pass src/python/pants/init/load_backends_integration_test.py:
+        *assembly.rules(),
+        *build_pkg.rules(),
+        *build_pkg_target.rules(),
+        *first_party_pkg.rules(),
+        *go_mod.rules(),
+        *link.rules(),
+        *sdk.rules(),
+        *target_type_rules.rules(),
+        *third_party_pkg.rules(),
+        *pex.rules(),
     )
