@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, Iterator, Type, cast
+from typing import Any, ClassVar, Iterable, Iterator, Type, TypeVar, cast
 
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.style_request import (
@@ -35,6 +35,7 @@ from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
+_SR = TypeVar("_SR", bound=StyleRequest)
 
 class AmbiguousRequestNamesError(Exception):
     def __init__(
@@ -226,7 +227,7 @@ async def lint(
         "Iterable[type[LintTargetsRequest]]", union_membership.get(LintTargetsRequest)
     )
     fmt_target_request_types = cast("Iterable[type[FmtRequest]]", union_membership.get(FmtRequest))
-    file_request_types = union_membership[LintFilesRequest]
+    file_request_types = cast("Iterable[type[LintFilesRequest]]", union_membership[LintFilesRequest])
 
     _check_ambiguous_request_names(
         *lint_target_request_types, *fmt_target_request_types, *file_request_types
@@ -242,7 +243,7 @@ async def lint(
         extra_valid_names={request.name for request in file_request_types},
     )
 
-    def is_specified(request_type: type[StyleRequest]):
+    def is_specified(request_type: type[StyleRequest] | type[LintFilesRequest]):
         return request_type.name in specified_names
 
     lint_target_request_types = filter(is_specified, lint_target_request_types)
@@ -261,8 +262,8 @@ async def lint(
                 yield partition
 
     def batch_by_type(
-        request_types: Iterable[StyleRequest],
-    ) -> tuple[tuple[type[StyleRequest], list[FieldSet]], ...]:
+        request_types: Iterable[type[_SR]],
+    ) -> tuple[tuple[type[_SR], list[FieldSet]], ...]:
         return tuple(
             (request_type, field_set_batch)
             for request_type in request_types
@@ -290,7 +291,7 @@ async def lint(
 
     fmt_requests = (
         request_type(
-            batch,
+            batch,  # type: ignore # TODO: Why does mypy complain?
             snapshot=source_files_snapshot.snapshot,
         )
         for (request_type, batch), source_files_snapshot in zip(

@@ -135,7 +135,7 @@ class FmtRequest(StyleRequest):
     snapshot: Snapshot
 
     def __init__(self, field_sets: Iterable[_FS], snapshot: Snapshot) -> None:
-        self.field_sets = Collection[_FS](field_sets)
+        super().__init__(field_sets)
         self.snapshot = snapshot
 
 
