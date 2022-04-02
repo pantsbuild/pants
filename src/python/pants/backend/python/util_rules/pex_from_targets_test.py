@@ -351,9 +351,9 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
     assert list(pex_req2_reqs.req_strings) == ["bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req]
-    assert pex_req2_reqs.repository_pex is not None
-    assert not info(rule_runner, pex_req2_reqs.repository_pex)["strip_pex_env"]
-    repository_pex = pex_req2_reqs.repository_pex
+    assert isinstance(pex_req2_reqs.from_superset, Pex)
+    repository_pex = pex_req2_reqs.from_superset
+    assert not info(rule_runner, repository_pex)["strip_pex_env"]
     assert ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "foorl", "qux==3.4.5"] == requirements(
         rule_runner, repository_pex
     )

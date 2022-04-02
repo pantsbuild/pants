@@ -28,12 +28,10 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
-    _is_probably_pex_json_lockfile,
-    _pex_lockfile_requirement_count,
-    _strip_comments_from_pex_json_lockfile,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import (
+    EntireLockfile,
     Lockfile,
     LockfileContent,
     PexRequirements,
@@ -49,7 +47,6 @@ from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.option.global_options import GlobalOptions
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.dirutil import safe_rmtree
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 @pytest.fixture
@@ -367,11 +364,10 @@ def test_lockfiles(rule_runner: RuleRunner) -> None:
             path,
             file_path_description_of_origin="foo",
             resolve_name="a",
-            req_strings=FrozenOrderedSet(["ansicolors"]),
         )
         create_pex_and_get_pex_info(
             rule_runner,
-            requirements=lock,
+            requirements=EntireLockfile(lock, ("ansicolors",)),
             additional_pants_args=("--python-invalid-lockfile-behavior=ignore",),
         )
 
@@ -488,7 +484,7 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 def test_build_pex_description() -> None:
     def assert_description(
-        requirements: PexRequirements | Lockfile | LockfileContent,
+        requirements: PexRequirements | EntireLockfile,
         *,
         description: str | None = None,
         expected: str,
@@ -505,17 +501,17 @@ def test_build_pex_description() -> None:
 
     assert_description(PexRequirements(), description="Custom!", expected="Custom!")
     assert_description(
-        PexRequirements(repository_pex=repo_pex), description="Custom!", expected="Custom!"
+        PexRequirements(from_superset=repo_pex), description="Custom!", expected="Custom!"
     )
 
     assert_description(PexRequirements(), expected="Building new.pex")
-    assert_description(PexRequirements(repository_pex=repo_pex), expected="Building new.pex")
+    assert_description(PexRequirements(from_superset=repo_pex), expected="Building new.pex")
 
     assert_description(
         PexRequirements(["req"]), expected="Building new.pex with 1 requirement: req"
     )
     assert_description(
-        PexRequirements(["req"], repository_pex=repo_pex),
+        PexRequirements(["req"], from_superset=repo_pex),
         expected="Extracting 1 requirement to build new.pex from repo.pex: req",
     )
 
@@ -524,25 +520,27 @@ def test_build_pex_description() -> None:
         expected="Building new.pex with 2 requirements: req1, req2",
     )
     assert_description(
-        PexRequirements(["req1", "req2"], repository_pex=repo_pex),
+        PexRequirements(["req1", "req2"], from_superset=repo_pex),
         expected="Extracting 2 requirements to build new.pex from repo.pex: req1, req2",
     )
 
     assert_description(
-        LockfileContent(
-            file_content=FileContent("lock.txt", b""),
-            resolve_name="a",
-            req_strings=FrozenOrderedSet(),
+        EntireLockfile(
+            LockfileContent(
+                file_content=FileContent("lock.txt", b""),
+                resolve_name="a",
+            )
         ),
         expected="Building new.pex from lock.txt",
     )
 
     assert_description(
-        Lockfile(
-            file_path="lock.txt",
-            file_path_description_of_origin="foo",
-            resolve_name="a",
-            req_strings=FrozenOrderedSet(),
+        EntireLockfile(
+            Lockfile(
+                file_path="lock.txt",
+                file_path_description_of_origin="foo",
+                resolve_name="a",
+            )
         ),
         expected="Building new.pex from lock.txt",
     )
@@ -566,153 +564,17 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         "lock.txt",
         file_path_description_of_origin="a test",
         resolve_name="a",
-        req_strings=FrozenOrderedSet("ansicolors"),
     )
     with engine_error(InvalidLockfileError):
-        create_pex_and_get_all_data(rule_runner, requirements=lockfile)
+        create_pex_and_get_all_data(
+            rule_runner, requirements=EntireLockfile(lockfile, ("ansicolors",))
+        )
 
     lockfile_content = LockfileContent(
         FileContent("lock.txt", lock_content),
         resolve_name="a",
-        req_strings=FrozenOrderedSet("ansicolors"),
     )
     with engine_error(InvalidLockfileError):
-        create_pex_and_get_all_data(rule_runner, requirements=lockfile_content)
-
-
-def test_is_probably_pex_json_lockfile():
-    def is_pex(lock: str) -> bool:
-        return _is_probably_pex_json_lockfile(lock.encode())
-
-    for s in (
-        "{}",
-        textwrap.dedent(
-            """\
-            // Special comment
-            {}
-            """
-        ),
-        textwrap.dedent(
-            """\
-            // Next line has extra space
-             {"key": "val"}
-            """
-        ),
-        textwrap.dedent(
-            """\
-            {
-                "key": "val",
-            }
-            """
-        ),
-    ):
-        assert is_pex(s)
-
-    for s in (
-        "",
-        "# foo",
-        "# {",
-        "cheesey",
-        "cheesey==10.0",
-        textwrap.dedent(
-            """\
-            # Special comment
-            cheesey==10.0
-            """
-        ),
-    ):
-        assert not is_pex(s)
-
-
-def test_strip_comments_from_pex_json_lockfile() -> None:
-    def assert_stripped(lock: str, expected: str) -> None:
-        assert _strip_comments_from_pex_json_lockfile(lock.encode()).decode() == expected
-
-    assert_stripped("{}", "{}")
-    assert_stripped(
-        textwrap.dedent(
-            """\
-            { // comment
-                "key": "foo",
-            }
-            """
-        ),
-        textwrap.dedent(
-            """\
-            { // comment
-                "key": "foo",
-            }"""
-        ),
-    )
-    assert_stripped(
-        textwrap.dedent(
-            """\
-            // header
-               // more header
-              {
-                "key": "foo",
-            }
-            // footer
-            """
-        ),
-        textwrap.dedent(
-            """\
-              {
-                "key": "foo",
-            }"""
-        ),
-    )
-
-
-def test_pex_lockfile_requirement_count() -> None:
-    assert _pex_lockfile_requirement_count(b"empty") == 2
-    assert (
-        _pex_lockfile_requirement_count(
-            textwrap.dedent(
-                """\
-            {
-              "allow_builds": true,
-              "allow_prereleases": false,
-              "allow_wheels": true,
-              "build_isolation": true,
-              "constraints": [],
-              "locked_resolves": [
-                {
-                  "locked_requirements": [
-                    {
-                      "artifacts": [
-                        {
-                          "algorithm": "sha256",
-                          "hash": "00d2dde5a675579325902536738dd27e4fac1fd68f773fe36c21044eb559e187",
-                          "url": "https://files.pythonhosted.org/packages/53/18/a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/ansicolors-1.1.8-py2.py3-none-any.whl"
-                        }
-                      ],
-                      "project_name": "ansicolors",
-                      "requires_dists": [],
-                      "requires_python": null,
-                      "version": "1.1.8"
-                    }
-                  ],
-                  "platform_tag": [
-                    "cp39",
-                    "cp39",
-                    "macosx_11_0_arm64"
-                  ]
-                }
-              ],
-              "pex_version": "2.1.70",
-              "prefer_older_binary": false,
-              "requirements": [
-                "ansicolors"
-              ],
-              "requires_python": [],
-              "resolver_version": "pip-legacy-resolver",
-              "style": "strict",
-              "transitive": true,
-              "use_pep517": null
-            }
-            """
-            ).encode()
+        create_pex_and_get_all_data(
+            rule_runner, requirements=EntireLockfile(lockfile_content, ("ansicolors",))
         )
-        == 3
-    )

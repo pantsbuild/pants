@@ -22,11 +22,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex_cli import PexPEX
-from pants.backend.python.util_rules.pex_requirements import (
-    Lockfile,
-    LockfileContent,
-    PexRequirements,
-)
+from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -129,7 +125,7 @@ def create_pex_and_get_all_data(
     rule_runner: RuleRunner,
     *,
     pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
+    requirements: PexRequirements | EntireLockfile = PexRequirements(),
     main: MainSpecification | None = None,
     interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
@@ -171,7 +167,7 @@ def create_pex_and_get_pex_info(
     rule_runner: RuleRunner,
     *,
     pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
+    requirements: PexRequirements | EntireLockfile = PexRequirements(),
     main: MainSpecification | None = None,
     interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
     platforms: PexPlatforms = PexPlatforms(),
