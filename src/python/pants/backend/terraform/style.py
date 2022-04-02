@@ -48,11 +48,11 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
         for field_set in setup_request.request.field_sets
     )
 
-    source_files_snapshot = (
-        await Get(Snapshot, MergeDigests(sfs.snapshot.digest for sfs in source_files_by_field_set))
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
-    )
+    source_files_snapshot = getattr(setup_request.request, "prior_formatter_result", None)
+    if source_files_snapshot is None:
+        source_files_snapshot = await Get(
+            Snapshot, MergeDigests(sfs.snapshot.digest for sfs in source_files_by_field_set)
+        )
 
     # `terraform` operates on a directory-by-directory basis. First determine the directories in
     # the snapshot. This does not use `source_files_snapshot.dirs` because that will be empty if the files
