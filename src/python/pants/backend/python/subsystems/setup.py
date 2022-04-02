@@ -219,7 +219,7 @@ class PythonSetup(Subsystem):
         "--only-binary",
         help=(
             "Do not use source packages (i.e., sdists) for these 3rdparty distributions. Also "
-            "accepts :all: to disable all binary packages. Packages without binary distributions "
+            "accepts :all: to disable all source packages. Packages without binary distributions "
             "will fail to install when this option is used on them."
             "See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for details."
             'Note: Only takes effect if you use lockfiles, and set lockfile_generator = "pex" '
