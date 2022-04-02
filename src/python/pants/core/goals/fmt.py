@@ -111,7 +111,7 @@ class FmtResult(EngineAwareReturnType):
 class FmtRequest(StyleRequest):
     prior_formatter_result: Snapshot | None
 
-    def __init__(self, field_sets: Iterable[_FS], prior_formatter_result: Snapshot | None) -> None:
+    def __init__(self, field_sets: Iterable[_FS], prior_formatter_result: Snapshot) -> None:
         self.prior_formatter_result = prior_formatter_result
         super().__init__(field_sets)
 
