@@ -108,7 +108,7 @@ class FmtResult(EngineAwareReturnType):
 @union
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class FmtRequest(StyleRequest):
+class FmtRequest(StyleRequest[_FS]):
     prior_formatter_result: Snapshot | None
 
     def __init__(self, field_sets: Iterable[_FS], prior_formatter_result: Snapshot) -> None:

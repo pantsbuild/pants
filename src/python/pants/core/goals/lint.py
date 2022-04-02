@@ -295,7 +295,7 @@ async def lint(
 
     fmt_requests = (
         request_type(
-            batch,  # type: ignore # TODO: Why does mypy complain?
+            batch,
             prior_formatter_result=source_files_snapshot.snapshot,
         )
         for (request_type, batch), source_files_snapshot in zip(
