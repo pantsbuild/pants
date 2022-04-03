@@ -261,8 +261,7 @@ async def lint(
             size_max=4 * lint_subsystem.batch_size,
         )
         for partition in partitions:
-            if partition:
-                yield partition
+            yield partition
 
     def batch_by_type(
         request_types: Iterable[type[_SR]],
