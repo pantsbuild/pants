@@ -7,7 +7,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Iterable, TypeVar
 
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -22,13 +22,15 @@ from pants.engine.fs import Digest, MergeDigests, Snapshot, SnapshotDiff, Worksp
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import SourcesField, Targets
+from pants.engine.target import FieldSet, SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 
 _F = TypeVar("_F", bound="FmtResult")
+_FS = TypeVar("_FS", bound=FieldSet)
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +106,15 @@ class FmtResult(EngineAwareReturnType):
 
 
 @union
-class FmtRequest(StyleRequest):
-    pass
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class FmtRequest(StyleRequest[_FS]):
+    # TODO NB: The name and type are historical and should likely be changed
+    prior_formatter_result: Snapshot | None
+
+    def __init__(self, field_sets: Iterable[_FS], prior_formatter_result: Snapshot) -> None:
+        self.prior_formatter_result = prior_formatter_result
+        super().__init__(field_sets)
 
 
 @dataclass(frozen=True)

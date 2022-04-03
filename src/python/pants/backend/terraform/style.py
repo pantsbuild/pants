@@ -8,10 +8,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.backend.terraform.tool import TerraformProcess
 from pants.build_graph.address import Address
-from pants.core.goals.style_request import StyleRequest
+from pants.core.goals.check import CheckRequest
+from pants.core.goals.fmt import FmtRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -24,10 +24,10 @@ from pants.util.strutil import pluralize
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class StyleSetupRequest:
-    request: StyleRequest[TerraformFieldSet]
+    request: FmtRequest | CheckRequest
     args: tuple[str, ...]
 
-    def __init__(self, request: StyleRequest[TerraformFieldSet], args: Iterable[str]):
+    def __init__(self, request: FmtRequest | CheckRequest, args: Iterable[str]):
         self.request = request
         self.args = tuple(args)
 
@@ -49,10 +49,13 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
     )
 
     source_files_snapshot = (
-        await Get(Snapshot, MergeDigests(sfs.snapshot.digest for sfs in source_files_by_field_set))
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
+        setup_request.request.prior_formatter_result
+        if isinstance(setup_request.request, FmtRequest)
+        else await Get(
+            Snapshot, MergeDigests(sfs.snapshot.digest for sfs in source_files_by_field_set)
+        )
     )
+    assert source_files_snapshot is not None
 
     # `terraform` operates on a directory-by-directory basis. First determine the directories in
     # the snapshot. This does not use `source_files_snapshot.dirs` because that will be empty if the files
