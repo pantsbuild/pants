@@ -50,7 +50,7 @@ def test_config_file_parsing(rule_runner: RuleRunner) -> None:
         }
     )
     rule_runner.set_options(
-        ["--experimental-bsp-targets-config-files=['first.toml', 'second.toml']"]
+        ["--experimental-bsp-groups-config-files=['first.toml', 'second.toml']"]
     )
 
     bsp_build_targets = rule_runner.request(BSPBuildTargets, ())
