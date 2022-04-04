@@ -64,7 +64,8 @@ class PyTest(PythonToolBase):
     # This should be compatible with requirements.txt, although it can be more precise.
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement` to override the version.
-    default_version = "pytest>=7,<8"
+    # Pytest 7.1.0 has a significant bug, see https://github.com/pantsbuild/pants/issues/14990.
+    default_version = "pytest>=7,<8,!=7.1.0"
     default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
 
     default_main = ConsoleScript("pytest")

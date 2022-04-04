@@ -1,4 +1,5 @@
-# Note: Adding a third-party dependency is usually frowned upon because it increases the time to install Pants.
+# Note: Adding a third-party dependency is usually frowned upon because it increases the time
+# to install Pants.
 # This is particularly painful for CI, where the installation of Pants is often slow.
 # Additionally, it increases the surface area of Pants's supply chain for security.
 # Consider pinging us on Slack if you're thinking a new dependency might be needed.
@@ -16,7 +17,10 @@ ijson==3.1.4
 packaging==21.3
 pex==2.1.75
 psutil==5.9.0
-pytest>=6.2.4,<8  # This should be compatible with pytest.py, although it can be looser so that we don't over-constrain pantsbuild.pants.testutil
+# This should be compatible with pytest.py, although it can be looser so that we don't
+# over-constrain pantsbuild.pants.testutil
+# Note: Pytest 7.1.0 has a significant bug, see https://github.com/pantsbuild/pants/issues/14990
+pytest>=6.2.4,<8,!=7.1.0
 python-lsp-jsonrpc==1.0.0
 PyYAML>=6.0,<7.0
 requests[security]>=2.25.1
