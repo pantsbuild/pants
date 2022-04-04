@@ -1,7 +1,7 @@
 import { Box, Grid, Typography } from '@mui/material';
 
-import Page from '../components/Page';
-import { TargetsStats } from '../components/Targets';
+import Page from 'components/Page';
+import TargetsStatsCard from 'components/Targets/StatsCard';
 
 // ----------------------------------------------------------------------
 
@@ -18,7 +18,7 @@ export default function ExplorerHome() {
       </Box>
       <Grid container spacing={3}>
         <Grid item xs={12} md={6} xl={3}>
-          <TargetsStats />
+          <TargetsStatsCard />
         </Grid>
       </Grid>
     </Page>

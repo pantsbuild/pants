@@ -1,4 +1,4 @@
-import { act, default as renderer } from 'react-test-renderer';
+import { act, default as renderer, ReactTestRenderer } from 'react-test-renderer';
 import { TargetDoc } from './TargetDoc';
 
 
@@ -28,13 +28,13 @@ test('TargetDoc renders help card.', async () => {
     ],
   };
 
-  let component;
+  let component
   await act(async () => {
     component = renderer.create(
       <TargetDoc info={info} />
     );
   });
 
-  let tree = component.toJSON();
+  let tree = (component as unknown as ReactTestRenderer).toJSON();
   expect(tree).toMatchSnapshot();
 });

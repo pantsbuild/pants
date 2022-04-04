@@ -15,10 +15,10 @@ import AnnouncementIcon from '@mui/icons-material/Announcement';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import IconButton, { IconButtonProps } from '@mui/material/IconButton';
 
-import ContextHelp from "../ContextHelp";
-import { TargetTypeDocs } from "../docs/Targets";
-import { TargetData, getTargetFieldValue } from "../../lib/target-data";
-import Address from "./Address";
+import ContextHelp from "components/ContextHelp";
+import { TargetTypeDocs } from "components/docs/Targets";
+import { TargetData, getTargetFieldValue } from "lib/target-data";
+import TargetAddress from "components/TargetAddress";
 
 
 type ExpandMoreProps = IconButtonProps & {
@@ -41,7 +41,7 @@ type TargetProps = CardProps & {
   target?: TargetData;
 }
 
-export const Target = ({target, ...props}: TargetProps) => {
+export default ({target, ...props}: TargetProps) => {
   const [expanded, setExpanded] = useState(false);
   const toggleExpanded = () => setExpanded(!expanded);
 
@@ -89,7 +89,7 @@ export const Target = ({target, ...props}: TargetProps) => {
     <Card {...props}>
       <CardContent>
         <Stack direction="row" justifyContent="space-between">
-          <Address tooltip>{target.address}</Address>
+          <TargetAddress tooltip>{target.address}</TargetAddress>
           <ContextHelp
             maxWidth="lg"
             title={(
@@ -121,5 +121,3 @@ export const Target = ({target, ...props}: TargetProps) => {
     </Card>
   );
 };
-
-export default Target;

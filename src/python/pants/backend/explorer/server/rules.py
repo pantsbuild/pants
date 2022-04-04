@@ -51,6 +51,10 @@ class UvicornServer:
 
         app = FastAPI()
         app.include_router(graphql_app, prefix="/graphql")
+
+        plug_a_files = StaticFiles(directory="src/javascript/explorer/plugins/plug-a/build/static/js")
+        app.mount("/plugins/plug-a", plug_a_files, name="plug-a")
+
         app.mount("/", static_files, name="root")
 
         @app.middleware("http")
