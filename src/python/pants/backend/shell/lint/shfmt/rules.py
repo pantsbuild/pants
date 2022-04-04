@@ -74,8 +74,7 @@ async def setup_shfmt(request: ShfmtRequest, shfmt: Shfmt) -> Process:
 async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
     if shfmt.skip:
         return FmtResult.skip(formatter_name=request.name)
-    process = await Get(Process, ShfmtRequest, request)
-    result = await Get(ProcessResult, Process, process)
+    result = await Get(ProcessResult, ShfmtRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

@@ -91,8 +91,7 @@ async def setup_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> Proc
 async def run_buf_format(request: BufFormatRequest, buf: BufSubsystem) -> FmtResult:
     if buf.skip_format:
         return FmtResult.skip(formatter_name=request.name)
-    process = await Get(Process, BufFormatRequest, request)
-    result = await Get(ProcessResult, Process, process)
+    result = await Get(ProcessResult, BufFormatRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

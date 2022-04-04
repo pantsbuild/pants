@@ -60,8 +60,7 @@ async def setup_gofmt(request: GofmtRequest, goroot: GoRoot) -> Process:
 async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem) -> FmtResult:
     if gofmt.skip:
         return FmtResult.skip(formatter_name=request.name)
-    process = await Get(Process, GofmtRequest, request)
-    result = await Get(ProcessResult, Process, process)
+    result = await Get(ProcessResult, GofmtRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

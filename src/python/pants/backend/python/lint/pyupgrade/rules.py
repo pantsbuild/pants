@@ -59,8 +59,7 @@ async def setup_pyupgrade_process(request: PyUpgradeRequest, pyupgrade: PyUpgrad
 async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtResult:
     if pyupgrade.skip:
         return FmtResult.skip(formatter_name=request.name)
-    process = await Get(Process, PyUpgradeRequest, request)
-    result = await Get(FallibleProcessResult, Process, process)
+    result = await Get(FallibleProcessResult, PyUpgradeRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

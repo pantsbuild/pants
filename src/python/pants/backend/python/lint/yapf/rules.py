@@ -71,8 +71,7 @@ async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Process:
 async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
     if yapf.skip:
         return FmtResult.skip(formatter_name=request.name)
-    process = await Get(Process, YapfRequest, request)
-    result = await Get(ProcessResult, Process, process)
+    result = await Get(ProcessResult, YapfRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

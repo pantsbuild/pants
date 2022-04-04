@@ -100,8 +100,7 @@ async def setup_isort(request: IsortRequest, isort: Isort) -> Process:
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
         return FmtResult.skip(formatter_name=request.name)
-    process = await Get(Process, IsortRequest, request)
-    result = await Get(ProcessResult, Process, process)
+    result = await Get(ProcessResult, IsortRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 

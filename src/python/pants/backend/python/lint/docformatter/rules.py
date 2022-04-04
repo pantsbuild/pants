@@ -61,8 +61,7 @@ async def setup_docformatter(request: DocformatterRequest, docformatter: Docform
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
     if docformatter.skip:
         return FmtResult.skip(formatter_name=request.name)
-    process = await Get(Process, DocformatterRequest, request)
-    result = await Get(ProcessResult, Process, process)
+    result = await Get(ProcessResult, DocformatterRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

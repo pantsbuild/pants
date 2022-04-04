@@ -63,8 +63,7 @@ async def setup_autoflake(request: AutoflakeRequest, autoflake: Autoflake) -> Pr
 async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtResult:
     if autoflake.skip:
         return FmtResult.skip(formatter_name=request.name)
-    process = await Get(Process, AutoflakeRequest, request)
-    result = await Get(ProcessResult, Process, process)
+    result = await Get(ProcessResult, AutoflakeRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 

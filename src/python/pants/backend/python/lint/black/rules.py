@@ -102,8 +102,7 @@ async def setup_black(request: BlackRequest, black: Black, python_setup: PythonS
 async def black_fmt(request: BlackRequest, black: Black) -> FmtResult:
     if black.skip:
         return FmtResult.skip(formatter_name=request.name)
-    process = await Get(Process, BlackRequest, request)
-    result = await Get(ProcessResult, Process, process)
+    result = await Get(ProcessResult, BlackRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 
