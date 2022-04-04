@@ -466,7 +466,7 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants test ::
+      run: './pants test :: -- --error-for-skips
 
         '
     - if: always()
