@@ -25,6 +25,7 @@ from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """\
@@ -133,12 +134,14 @@ class CoursierSubsystem(TemplatedExternalTool):
             "https://maven-central.storage-download.googleapis.com/maven2",
             "https://repo1.maven.org/maven2",
         ],
-        help=(
-            "Maven style repositories to resolve artifacts from."
-            "\n\n"
-            "Coursier will resolve these repositories in the order in which they are "
-            "specifed, and re-ordering repositories will cause artifacts to be "
-            "re-downloaded. This can result in artifacts in lockfiles becoming invalid."
+        help=softwrap(
+            """
+            Maven style repositories to resolve artifacts from.
+
+            Coursier will resolve these repositories in the order in which they are
+            specifed, and re-ordering repositories will cause artifacts to be
+            re-downloaded. This can result in artifacts in lockfiles becoming invalid.
+            """
         ),
     )
 
