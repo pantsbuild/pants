@@ -295,7 +295,7 @@ async def lint(
     fmt_requests = (
         request_type(
             batch,
-            prior_formatter_result=source_files_snapshot.snapshot,
+            snapshot=source_files_snapshot.snapshot,
         )
         for (request_type, batch), source_files_snapshot in zip(
             batched_fmt_request_pairs, all_fmt_source_batches
