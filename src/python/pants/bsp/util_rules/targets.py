@@ -79,8 +79,8 @@ class BSPBuildTargetsMetadataResult:
 
 @dataclass(frozen=True)
 class BSPTargetDefinition:
-    display_name: str
-    base_directory: str
+    display_name: str | None
+    base_directory: str | None
     addresses: tuple[str, ...]
     resolve_filter: str | None
 
@@ -141,37 +141,40 @@ async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
             raise ValueError(f"BSP targets config file `{config_file}` does not exist.")
         elif len(config_contents) > 1:
             raise ValueError(
-                f"BSP targets config file specified as `{config_file}` matches multiple files. Please do not use wildcards."
+                f"BSP targets config file specified as `{config_file}` matches multiple files. "
+                "Please do not use wildcards in config file paths."
             )
 
         config = toml.loads(config_contents[0].content.decode())
 
-        if "targets" not in config:
+        groups = config.get("groups")
+        if groups is None:
             raise ValueError(
-                f"BSP targets config file `{config_file}` is missing the `targets` dictionary."
+                f"BSP targets config file `{config_file}` is missing the `groups` table."
             )
-        targets = config["targets"]
-        if not isinstance(targets, dict):
+        if not isinstance(groups, dict):
             raise ValueError(
-                f"BSP targets config file `{config_file}` contains a `targets` config that is not a dictionary."
+                f"BSP targets config file `{config_file}` contains a `groups` key that is not a TOML table."
             )
 
-        for id, d in targets.items():
-            display_name = d.get("display_name")
-            if display_name is None:
-                display_name = id
+        for id, group in groups.items():
+            if not isinstance(group, dict):
+                raise ValueError(
+                    f"BSP targets config file `{config_file}` contains an entry for "
+                    "`groups` array that is not a dictionary (index={i})."
+                )
 
-            base_directory = d.get("base_directory")
-
-            addresses = d.get("addresses", [])
+            base_directory = group.get("base_directory")
+            display_name = group.get("display_name")
+            addresses = group.get("addresses", [])
             if not addresses:
                 raise ValueError(
-                    f"BSP targets config file `{config_file}` contains target ID `{id}` which "
-                    "no address specs defined via the `addresses` property. Please specify at least "
+                    f"BSP targets config file `{config_file}` contains group ID `{id}` which has "
+                    "no address specs defined via the `addresses` key. Please specify at least "
                     "one address spec."
                 )
 
-            resolve_filter = d.get("resolve")
+            resolve_filter = group.get("resolve")
 
             definitions[id] = BSPTargetDefinition(
                 display_name=display_name,

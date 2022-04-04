@@ -25,7 +25,7 @@ def test_config_file_parsing(rule_runner: RuleRunner) -> None:
         {
             "first.toml": textwrap.dedent(
                 """\
-            [targets.foo]
+            [groups.foo]
             display_name = "Foo"
             base_directory = "src/jvm"
             addresses = ["src/jvm::"]
@@ -34,13 +34,13 @@ def test_config_file_parsing(rule_runner: RuleRunner) -> None:
             ),
             "second.toml": textwrap.dedent(
                 """\
-            [targets.foo]
+            [groups.foo]
             display_name = "Foo for My Team"
             base_directory = "src/jvm"
             addresses = ["src/jvm::", "my-team/src/jvm::"]
             resolve = "jvm:jvm-default"
 
-            [targets.bar]
+            [groups.bar]
             display_name = "Bar"
             base_directory = "bar/src/jvm"
             addresses = ["bar/src/jvm::"]
