@@ -27,7 +27,6 @@ from pants.bsp.spec.targets import DependencyModule
 from pants.bsp.util_rules.compile import BSPCompileRequest, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
-    BSPBuildTargetInternal,
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
     BSPDependencyModulesRequest,
@@ -212,8 +211,7 @@ async def handle_bsp_scalac_options_request(
     build_root: BuildRoot,
     workspace: Workspace,
 ) -> HandleScalacOptionsResult:
-    bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
-    targets = await Get(Targets, BSPBuildTargetInternal, bsp_target)
+    targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
     coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
     resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)

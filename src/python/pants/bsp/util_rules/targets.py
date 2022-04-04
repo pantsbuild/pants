@@ -510,8 +510,7 @@ async def resolve_one_dependency_module(
     request: ResolveOneDependencyModuleRequest,
     union_membership: UnionMembership,
 ) -> ResolveOneDependencyModuleResult:
-    bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
-    targets = await Get(Targets, BSPBuildTargetInternal, bsp_target)
+    targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
 
     field_sets_by_request_type: dict[
         Type[BSPDependencyModulesRequest], list[FieldSet]

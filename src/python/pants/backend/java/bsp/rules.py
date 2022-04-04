@@ -13,7 +13,6 @@ from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode
 from pants.bsp.util_rules.compile import BSPCompileRequest, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
-    BSPBuildTargetInternal,
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
 )
@@ -92,8 +91,7 @@ async def handle_bsp_java_options_request(
     request: HandleJavacOptionsRequest,
     build_root: BuildRoot,
 ) -> HandleJavacOptionsResult:
-    bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
-    targets = await Get(Targets, BSPBuildTargetInternal, bsp_target)
+    targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
 
     coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
     resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
