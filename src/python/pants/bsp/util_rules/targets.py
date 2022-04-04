@@ -128,7 +128,7 @@ async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuild
 @rule
 async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
     definitions: dict[str, BSPTargetDefinition] = {}
-    for config_file in bsp_goal.targets_config_files:
+    for config_file in bsp_goal.groups_config_files:
         config_contents = await Get(
             DigestContents,
             PathGlobs(
