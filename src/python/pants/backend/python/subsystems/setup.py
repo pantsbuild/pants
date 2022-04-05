@@ -321,7 +321,7 @@ class PythonSetup(Subsystem):
         """Else, generate with Poetry."""
         if self.options.is_default("lockfile_generator"):
             warn_or_error(
-                "2.12.0.dev1",
+                "2.12.0.dev2",
                 "`[python].lockfile_generator` defaulting to 'poetry'",
                 softwrap(
                     f"""

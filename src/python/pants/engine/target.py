@@ -830,7 +830,7 @@ def maybe_warn_dependencies_as_copied_field(tgt_type: type[TargetGenerator]) -> 
     ]
     if copied_dependencies_field_types:
         warn_or_error(
-            removal_version="2.12.0.dev1",
+            removal_version="2.12.0.dev2",
             entity=(
                 f"using a `Dependencies` field subclass ({copied_dependencies_field_types}) "
                 "as a `TargetGenerator.copied_field`"
@@ -894,7 +894,7 @@ class TargetFilesGenerator(TargetGenerator):
         if self.has_field(MultipleSourcesField) and not self[MultipleSourcesField].value:
             sources_field = self[MultipleSourcesField]
             warn_or_error(
-                removal_version="2.12.0.dev1",
+                removal_version="2.12.0.dev2",
                 entity=(
                     f"specifying an empty `{sources_field.alias}` field for target generator type "
                     f"`{self.alias}`"
@@ -1013,7 +1013,7 @@ class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[Generat
             # argument, so that callers are forced to cast / check subtyping before calling.
             deprecated_conditional(
                 lambda: not issubclass(tgt_cls, TargetGenerator),
-                removal_version="2.12.0.dev0",
+                removal_version="2.12.0.dev2",
                 entity="`GenerateTargetsRequest.generate_from` types which do not subclass `TargetGenerator`",
                 hint=(
                     f"The generate_from type of `{request.__name__}` was `{tgt_cls.__name__}`, "
