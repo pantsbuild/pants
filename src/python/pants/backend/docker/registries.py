@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import Any, Iterator
 
 from pants.option.parser import Parser
 from pants.util.frozendict import FrozenDict
@@ -29,6 +29,7 @@ class DockerRegistryOptions:
     address: str
     alias: str = ""
     default: bool = False
+    skip_push: bool = False
 
     @classmethod
     def from_dict(cls, alias: str, d: dict[str, Any]) -> DockerRegistryOptions:
@@ -36,6 +37,7 @@ class DockerRegistryOptions:
             alias=alias,
             address=d["address"],
             default=Parser.ensure_bool(d.get("default", alias == "default")),
+            skip_push=Parser.ensure_bool(d.get("skip_push", DockerRegistryOptions.skip_push)),
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:
@@ -61,7 +63,7 @@ class DockerRegistries:
             registries=FrozenDict(registries),
         )
 
-    def get(self, *aliases_or_addresses: str) -> Generator[DockerRegistryOptions, None, None]:
+    def get(self, *aliases_or_addresses: str) -> Iterator[DockerRegistryOptions]:
         for alias_or_address in aliases_or_addresses:
             if alias_or_address in self.registries:
                 # Get configured registry by "@alias" or "address".
