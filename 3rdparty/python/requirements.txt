@@ -19,8 +19,11 @@ pex==2.1.75
 psutil==5.9.0
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
-# Note: Pytest 7.1.0 has a significant bug, see https://github.com/pantsbuild/pants/issues/14990
-pytest>=6.2.4,<8,!=7.1.0
+# Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
+# recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.
+# TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
+#  E.g., as default_version = "pytest>=6.2.4,<8,!=7.1.0,!=7.1.1"
+pytest>=6.2.4,<7.1.0
 python-lsp-jsonrpc==1.0.0
 PyYAML>=6.0,<7.0
 requests[security]>=2.25.1
