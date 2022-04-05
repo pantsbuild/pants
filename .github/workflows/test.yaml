@@ -646,7 +646,7 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants test :: -- --noskip
+      run: './pants test ::
 
         '
     - if: always()
