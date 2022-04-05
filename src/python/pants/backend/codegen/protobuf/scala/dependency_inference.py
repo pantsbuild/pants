@@ -106,7 +106,7 @@ class MissingScalaPBRuntimeInResolveError(ValueError):
     def __init__(self, resolve_name: str, version: str, scala_binary_version: str) -> None:
         super().__init__(
             f"The JVM resolve `{resolve_name}` does not contain a requirement for the ScalaPB runtime. "
-            "Since at least one Scala target type in this repository consumes a `protobuf_sources` target "
+            "Since at least one JVM target type in this repository consumes a `protobuf_sources` target "
             "in this resolve, the resolve must contain a `jvm_artifact` target for the ScalaPB runtime.\n\n"
             "Please add the following `jvm_artifact` target somewhere in the repository and re-run "
             f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
