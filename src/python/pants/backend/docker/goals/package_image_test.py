@@ -274,6 +274,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 docker_image(name="unreg", image_tags=["1.2.3"], registries=[])
                 docker_image(name="def", image_tags=["1.2.3"])
                 docker_image(name="multi", image_tags=["1.2.3"], registries=["@reg2", "@reg1"])
+                docker_image(name="extra_tags", image_tags=["1.2.3"], registries=["@reg1", "@extra"])
                 """
             ),
             "docker/test/Dockerfile": "FROM python:3.8",
@@ -285,6 +286,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         "registries": {
             "reg1": {"address": "myregistry1domain:port"},
             "reg2": {"address": "myregistry2domain:port", "default": "true"},
+            "extra": {"address": "extra", "extra_image_tags": ["latest"]},
         },
     }
 
@@ -343,6 +345,17 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
             "Built docker images: \n"
             "  * myregistry2domain:port/multi:1.2.3\n"
             "  * myregistry1domain:port/multi:1.2.3"
+        ),
+        options=options,
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="extra_tags"),
+        (
+            "Built docker images: \n"
+            "  * myregistry1domain:port/extra_tags:1.2.3\n"
+            "  * extra/extra_tags:1.2.3\n"
+            "  * extra/extra_tags:latest"
         ),
         options=options,
     )

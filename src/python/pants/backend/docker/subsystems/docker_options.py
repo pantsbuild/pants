@@ -44,6 +44,8 @@ class DockerOptions(Subsystem):
                     "registry-alias": {
                         "address": "registry-domain:port",
                         "default": bool,
+                        "extra_image_tags": [],
+                        "skip_push": bool,
                     },
                     ...
                 }
@@ -56,6 +58,15 @@ class DockerOptions(Subsystem):
 
             A configured registry is marked as default either by setting `default = true`
             or with an alias of `"default"`.
+
+            A `docker_image` may be pushed to subset of registries using the per registry
+            `skip_push` option rather then the all or nothing toggle of the field option `skip_push`
+            on the `docker_image` target.
+
+            Any image tags that should only be added for specific registries may be provided as the
+            `extra_image_tags` option. The tags may use value formatting the same as for the
+            `image_tags` field of the `docker_image` target.
+
             """
         ),
         fromfile=True,
