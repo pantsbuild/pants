@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
+
 import pytest
 
 from pants.backend.python import target_types_rules
@@ -188,3 +190,47 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
         rule_runner, {"bad.py": FIXED_BAD_FILE, "bad.pyi": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change
+
+
+def test_fmt_one_of_multiple_sources(rule_runner: RuleRunner) -> None:
+    """Test case show casing how isort classifies imports differently depending on if a source file
+    is found on disk or not.
+
+    This behavior is confusing and frustrating, as these two invocations will never agree (produce
+    the same output):
+
+        ./pants fmt src/proj/models/users.py
+        ./pants fmt src/proj::
+    """
+    rule_runner.write_files(
+        {
+            "src/proj/store.py": "class Store: pass",
+            "src/proj/models/user_schema.py": "class User: pass",
+            "src/proj/models/users.py": dedent(
+                """\
+                from proj.models.user_schema import User
+                from proj.store import Store
+                """
+            ),
+            "src/proj/BUILD": "python_sources()",
+            "src/proj/models/BUILD": "python_sources()",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(
+            Address("src/proj", target_name="proj", relative_file_path="store.py")
+        ),
+        rule_runner.get_target(
+            Address("src/proj/models", target_name="models", relative_file_path="user_schema.py")
+        ),
+        rule_runner.get_target(
+            Address("src/proj/models", target_name="models", relative_file_path="users.py")
+        ),
+    ]
+    fmt_result = run_isort(rule_runner, tgts)
+    assert fmt_result.did_change is False
+
+    # Now show that if we leave store.py out, our imports in users.py are not stable..
+    fmt_result = run_isort(rule_runner, tgts[1:])
+    print(fmt_result.stdout)
+    assert fmt_result.did_change is False
