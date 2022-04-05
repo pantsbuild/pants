@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-from textwrap import dedent
 from typing import Any
 
 from pants.backend.helm.resolve.remotes import HelmRemotes
@@ -19,53 +18,51 @@ from pants.engine.platform import Platform
 from pants.engine.rules import SubsystemRule
 from pants.option.option_types import BoolOption, DictOption
 from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
 
-registries_help = (
-    dedent(
-        """\
-        Configure Helm OCI registries. The schema for a registry entry is as follows:
+registries_help = softwrap(
+    f"""
+    Configure Helm OCI registries. The schema for a registry entry is as follows:
 
-            {
-                "registry-alias": {
-                    "address": "oci://registry-domain:port",
-                    "default": bool,
-                },
-                ...
-            }
+        {{
+            "registry-alias": {{
+                "address": "oci://registry-domain:port",
+                "default": bool,
+            }},
+            ...
+        }}
 
-        """
-    )
-    + (
-        f"If no registries are provided in either a `{HelmChartTarget.alias}` target, then all default "
-        "addresses will be used, if any.\n"
-        f"The `{HelmChartTarget.alias}.{HelmRegistriesField.alias}` may be provided with a list of registry "
-        "addresses and registry alias prefixed with `@` to be used instead of the defaults.\n"
-        "A configured registry is marked as default either by setting `default = true` "
-        'or with an alias of `"default"`.\n'
-        "Registries also participate in resolving third party Helm charts uplodaded to those registries."
-    )
+    If no registries are provided in either a `{HelmChartTarget.alias}` target, then all default
+    addresses will be used, if any.
+
+    The `{HelmChartTarget.alias}.{HelmRegistriesField.alias}` may be provided with a list of registry
+    addresses and registry alias prefixed with `@` to be used instead of the defaults.
+
+    A configured registry is marked as default either by setting `default = true`
+    or with an alias of `"default"`.
+
+    Registries also participate in resolving third party Helm charts uplodaded to those registries.
+    """
 )
-classic_repositories_help = (
-    dedent(
-        """\
-        Configure Helm Classic repositories. The schema for a registry entry is as follows:
 
-            {
-                "repository-alias": {
-                    "address": "http://repository-domain:port",
-                },
-                ...
-            }
+classic_repositories_help = softwrap(
+    f"""
+    Configure Helm Classic repositories. The schema for a registry entry is as follows:
 
-        """
-    )
-    + (
-        "Classic repositories are used to provide support for Helm third party charts available at Chart Museum "
-        "or similar places.\n"
-        "To be able to reference third party charts in classic repos, you need to assign an alias to each of them "
-        f"as per the previous schema and then declare a `{HelmArtifactTarget.alias}` target and set its "
-        f"`{HelmArtifactRepositoryField.alias}` to the given alias of the classic repository prefixed by a `@`."
-    )
+        {{
+            "repository-alias": {{
+                "address": "http://repository-domain:port",
+            }},
+            ...
+        }}
+
+    Classic repositories are used to provide support for Helm third party charts available at Chart Museum
+    or similar places.
+
+    To be able to reference third party charts in classic repos, you need to assign an alias to each of them
+    as per the previous schema and then declare a `{HelmArtifactTarget.alias}` target and set its
+    `{HelmArtifactRepositoryField.alias}` to the given alias of the classic repository prefixed by a `@`.
+    """
 )
 
 

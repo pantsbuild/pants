@@ -4,10 +4,13 @@
 import logging
 
 from pants.backend.helm.resolve import artifacts
-from pants.backend.helm.resolve.artifacts import FirstPartyArtifactMapping, ThirdPartyArtifactMapping
+from pants.backend.helm.resolve.artifacts import (
+    FirstPartyArtifactMapping,
+    ThirdPartyArtifactMapping,
+)
 from pants.backend.helm.subsystems import helm
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.target_types import AllHelmChartTargets, HelmChartMetaSourceField
+from pants.backend.helm.target_types import HelmChartMetaSourceField
 from pants.backend.helm.util_rules.chart import HelmChartDependency, HelmChartMetadata
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get
@@ -20,12 +23,14 @@ from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
 
+
 class UnknownHelmChartDependency(Exception):
     def __init__(self, address: Address, dependency: HelmChartDependency) -> None:
         super().__init__(
             f"Can not find any declared artifact for dependency '{dependency.name}' "
             f"declared at `Chart.yaml` in Helm chart at address: {address}"
         )
+
 
 class InferHelmChartDependenciesRequest(InferDependenciesRequest):
     infer_from = HelmChartMetaSourceField
@@ -54,7 +59,7 @@ async def infer_chart_dependencies_via_metadata(
         first_party_addr = first_party_mapping.get(chart_dep.name)
         if not first_party_addr:
             raise UnknownHelmChartDependency(request.sources_field.address, chart_dep)
-        
+
         dependencies.add(first_party_addr)
 
     logger.debug(

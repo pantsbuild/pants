@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, Generator, cast
+from typing import Any, Iterator, cast
 
 from pants.option.parser import Parser
 from pants.util.frozendict import FrozenDict

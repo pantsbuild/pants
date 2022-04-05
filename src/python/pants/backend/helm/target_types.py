@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from textwrap import dedent
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
 from pants.core.goals.package import OutputPathField
@@ -25,6 +24,7 @@ from pants.engine.target import (
     TriBoolField,
 )
 from pants.util.docutil import bin_name
+from pants.util.strutil import softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Generic commonly used fields
@@ -34,34 +34,34 @@ from pants.util.docutil import bin_name
 class HelmRegistriesField(StringSequenceField):
     alias = "registries"
     default = (ALL_DEFAULT_HELM_REGISTRIES,)
-    help = (
-        "List of addresses or configured aliases to any OCI registries to use for the "
-        "built chart.\n\n"
-        "The address is an `oci://` prefixed domain name with optional port for your registry, and any registry "
-        "aliases are prefixed with `@` for addresses in the [helm].registries configuration "
-        "section.\n\n"
-        "By default, all configured registries with `default = true` are used.\n\n"
-        + dedent(
-            """\
-            Example:
-                # pants.toml
-                [helm.registries.my-registry-alias]
-                address = "oci://myregistrydomain:port"
-                default = false  # optional
+    help = softwrap(
+        """
+        List of addresses or configured aliases to any OCI registries to use for the
+        built chart.
 
-                # example/BUILD
-                helm_chart(
-                    registries = [
-                        "@my-registry-alias",
-                        "oci://myregistrydomain:port",
-                    ],
-                )
-            """
-        )
-        + (
-            "The above example shows two valid `registry` options: using an alias to a configured "
-            "registry and the address to a registry verbatim in the BUILD file."
-        )
+        The address is an `oci://` prefixed domain name with optional port for your registry, and any registry
+        aliases are prefixed with `@` for addresses in the [helm].registries configuration
+        section.
+
+        By default, all configured registries with `default = true` are used.
+
+        Example:
+            # pants.toml
+            [helm.registries.my-registry-alias]
+            address = "oci://myregistrydomain:port"
+            default = false  # optional
+
+            # example/BUILD
+            helm_chart(
+                registries = [
+                    "@my-registry-alias",
+                    "oci://myregistrydomain:port",
+                ],
+            )
+
+        The above example shows two valid `registry` options: using an alias to a configured
+        registry and the address to a registry verbatim in the BUILD file.
+        """
     )
 
 
