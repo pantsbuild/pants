@@ -78,7 +78,7 @@ class MissingProtobufJavaRuntimeInResolveError(ValueError):
             f"The JVM resolve `{resolve_name}` does not contain a requirement for the protobuf-java "
             "runtime. Since at least one JVM target type in this repository consumes a "
             "`protobuf_sources` target in this resolve, the resolve must contain a `jvm_artifact` "
-            "target for the protobuf-java` runtime.\n\n Please add the following `jvm_artifact` "
+            "target for the `protobuf-java` runtime.\n\n Please add the following `jvm_artifact` "
             f"target somewhere in the repository and re-run `{bin_name()} generate-lockfiles "
             f"--resolve={resolve_name}`:\n"
             "jvm_artifact(\n"
