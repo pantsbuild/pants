@@ -72,3 +72,19 @@ def test_skip_push() -> None:
     assert reg1.skip_push is False
     assert reg2.skip_push is True
     assert reg3.skip_push is False
+
+
+def test_extra_image_tags() -> None:
+    registries = DockerRegistries.from_dict(
+        {
+            "reg1": {"address": "registry1"},
+            "reg2": {
+                "address": "registry2",
+                "extra_image_tags": ["latest", "v{build_args.VERSION}"],
+            },
+        }
+    )
+
+    reg1, reg2 = registries.get("@reg1", "@reg2")
+    assert reg1.extra_image_tags == ()
+    assert reg2.extra_image_tags == ("latest", "v{build_args.VERSION}")

@@ -30,6 +30,7 @@ class DockerRegistryOptions:
     alias: str = ""
     default: bool = False
     skip_push: bool = False
+    extra_image_tags: tuple[str, ...] = ()
 
     @classmethod
     def from_dict(cls, alias: str, d: dict[str, Any]) -> DockerRegistryOptions:
@@ -38,6 +39,9 @@ class DockerRegistryOptions:
             address=d["address"],
             default=Parser.ensure_bool(d.get("default", alias == "default")),
             skip_push=Parser.ensure_bool(d.get("skip_push", DockerRegistryOptions.skip_push)),
+            extra_image_tags=tuple(
+                d.get("extra_image_tags", DockerRegistryOptions.extra_image_tags)
+            ),
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:
