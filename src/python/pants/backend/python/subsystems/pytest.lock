@@ -10,7 +10,7 @@
 //   ],
 //   "generated_with_requirements": [
 //     "pytest-cov!=2.12.1,<3.1,>=2.12",
-//     "pytest<8,>=7"
+//     "pytest==7.0.1"
 //   ]
 // }
 // --- END PANTS LOCKFILE METADATA ---
@@ -470,13 +470,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b555252a95bbb2a37a97b5ac2eb050c436f7989993565f5e0c9128fcaacadd0e",
-              "url": "https://files.pythonhosted.org/packages/36/e6/dea2b8cd72cf0600f3c2572fb5a48b01aa8e8fd8703c830dab972036c34c/pytest-7.1.0-py3-none-any.whl"
+              "hash": "9ce3ff477af913ecf6321fe337b93a2c0dcf2a0a1439c43f5452112c1e4280db",
+              "url": "https://files.pythonhosted.org/packages/38/93/c7c0bd1e932b287fb948eb9ce5a3d6307c9fc619db1e199f8c8bc5dad95f/pytest-7.0.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f1089d218cfcc63a212c42896f1b7fbf096874d045e1988186861a1a87d27b47",
-              "url": "https://files.pythonhosted.org/packages/6e/1c/5a8a4ae3548eaa9a082a25cd6118f166d6bbe440300b3c57c4904cc47935/pytest-7.1.0.tar.gz"
+              "hash": "e30905a0c131d3d94b89624a1cc5afec3e0ba2fbdb151867d8e0ebd49850f171",
+              "url": "https://files.pythonhosted.org/packages/3e/2c/a67ad48759051c7abf82ce182a4e6d766de371b183182d2dde03089e8dfb/pytest-7.0.1.tar.gz"
             }
           ],
           "project_name": "pytest",
@@ -498,8 +498,8 @@
             "tomli>=1.0.0",
             "xmlschema; extra == \"testing\""
           ],
-          "requires_python": ">=3.7",
-          "version": "7.1"
+          "requires_python": ">=3.6",
+          "version": "7.0.1"
         },
         {
           "artifacts": [
@@ -568,46 +568,46 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b47250dd24f92b7dd6a0a8fc5244da14608f3ca90a5efcd37a3b1642fac9a375",
-              "url": "https://files.pythonhosted.org/packages/52/c5/df7953fe6065185af5956265e3b16f13c2826c2b1ba23d43154f3af453bc/zipp-3.7.0-py3-none-any.whl"
+              "hash": "c4f6e5bbf48e74f7a38e7cc5b0480ff42b0ae5178957d564d18932525d5cf099",
+              "url": "https://files.pythonhosted.org/packages/80/0e/16a7ee38617aab6a624e95948d314097cc2669edae9b02ded53309941cfc/zipp-3.8.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9f50f446828eb9d45b267433fd3e9da8d801f614129124863f9c51ebceafb87d",
-              "url": "https://files.pythonhosted.org/packages/94/64/3115548d41cb001378099cb4fc6a6889c64ef43ac1b0e68c9e80b55884fa/zipp-3.7.0.tar.gz"
+              "hash": "56bf8aadb83c24db6c4b577e13de374ccfb67da2078beba1d037c17980bf43ad",
+              "url": "https://files.pythonhosted.org/packages/cc/3c/3e8c69cd493297003da83f26ccf1faea5dd7da7892a0a7c965ac3bcba7bf/zipp-3.8.0.tar.gz"
             }
           ],
           "project_name": "zipp",
           "requires_dists": [
             "func-timeout; extra == \"testing\"",
             "jaraco.itertools; extra == \"testing\"",
-            "jaraco.packaging>=8.2; extra == \"docs\"",
+            "jaraco.packaging>=9; extra == \"docs\"",
             "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-checkdocs>=2.4; extra == \"testing\"",
             "pytest-cov; extra == \"testing\"",
             "pytest-enabler>=1.0.1; extra == \"testing\"",
             "pytest-flake8; extra == \"testing\"",
-            "pytest-mypy; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
+            "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest>=6; extra == \"testing\"",
             "rst.linker>=1.9; extra == \"docs\"",
             "sphinx; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.7"
+          "version": "3.8"
         }
       ],
       "platform_tag": [
-        "cp39",
-        "cp39",
-        "macosx_11_0_arm64"
+        "cp36",
+        "cp36m",
+        "macosx_10_16_x86_64"
       ]
     }
   ],
-  "pex_version": "2.1.72",
+  "pex_version": "2.1.76",
   "prefer_older_binary": false,
   "requirements": [
     "pytest-cov!=2.12.1,<3.1,>=2.12",
-    "pytest<8,>=7"
+    "pytest==7.0.1"
   ],
   "requires_python": [
     "<4,>=3.7"
