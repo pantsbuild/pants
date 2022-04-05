@@ -154,7 +154,6 @@ extra_requirements.add = [
   "pytest-html",
   "pytest-icdiff",
   "pygments",
-  "pytest-error-for-skips",
 ]
 lockfile = "3rdparty/python/pytest.lock"
 timeout_default = 60

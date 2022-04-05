@@ -3,6 +3,8 @@
 
 from pathlib import Path
 
+import pytest
+
 # The top-level `pants` module must be a namespace package, because we build two dists from it
 # (pantsbuild.pants, and pantsbuild.pants.testutil) and consumers of these dists need to be
 # able to import from both.
@@ -42,3 +44,26 @@ def pytest_sessionfinish(session) -> None:
     # Technically unecessary, but nice if people are running tests directly from repo
     # (not using pants).
     namespace_init_path.unlink()
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]):
+    outcome = yield
+    rep = outcome.get_result()
+
+    if (
+        item.config.getoption("--noskip")
+        and rep.skipped
+        and (call.excinfo and call.excinfo.errisinstance(pytest.skip.Exception))
+        and "no_error_if_skipped" not in item.keywords
+    ):
+        rep.outcome = "failed"
+        assert call.excinfo is not None
+        r = call.excinfo._getreprcrash()
+        rep.longrepr = f"Forbidden skipped test - {r.message}"
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--noskip", action="store_true", default=False, help="Treat skipped tests as errors"
+    )

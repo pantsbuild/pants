@@ -386,7 +386,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
-                {"name": "Run Python tests", "run": "./pants test :: -- --error-for-skips\n"},
+                {"name": "Run Python tests", "run": "./pants test :: -- --noskip\n"},
                 upload_log_artifacts(name="python-test-linux"),
             ],
         },
