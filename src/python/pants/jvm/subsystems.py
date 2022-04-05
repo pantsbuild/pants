@@ -25,7 +25,7 @@ class JvmSubsystem(Subsystem):
 
     tool_jdk = StrOption(
         "--tool-jdk",
-        default="adopt:1.11",
+        default="temurin:1.11",
         help=softwrap(
             """
             The JDK to use when building and running Pants' internal JVM support code and other
@@ -36,7 +36,7 @@ class JvmSubsystem(Subsystem):
     )
     jdk = StrOption(
         "--jdk",
-        default="adopt:1.11",
+        default="temurin:1.11",
         help=softwrap(
             """
             The JDK to use.
