@@ -114,6 +114,9 @@ def run_pants_with_workdir_without_waiting(
 
     if hermetic:
         args.append("--pants-config-files=[]")
+        # Certain tests may be invoking `./pants test` for a pytest test with conftest discovery
+        # enabled. We should ignore the root conftest.py for these cases.
+        args.append('--pants-ignore=["/conftest.py"]')
 
     if config:
         toml_file_name = os.path.join(workdir, "pants.toml")

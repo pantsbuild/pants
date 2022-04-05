@@ -21,6 +21,12 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]):
         rep.longrepr = f"Forbidden skipped test - {r.message}"
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "no_error_if_skipped: Don't error if this test is skipped when using --noskip"
+    )
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--noskip", action="store_true", default=False, help="Treat skipped tests as errors"
