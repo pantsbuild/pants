@@ -333,6 +333,7 @@ class FilesystemSpecs:
 class Specs:
     address_specs: AddressSpecs
     filesystem_specs: FilesystemSpecs
+    from_change_detection: bool = False
 
     @property
     def provided(self) -> bool:

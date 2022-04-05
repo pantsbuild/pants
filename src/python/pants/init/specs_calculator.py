@@ -75,7 +75,11 @@ def calculate_specs(
                 parameters=address_input.parameters,
             )
         )
-    return Specs(AddressSpecs(address_specs, filter_by_global_options=True), FilesystemSpecs([]))
+    return Specs(
+        AddressSpecs(address_specs, filter_by_global_options=True),
+        FilesystemSpecs([]),
+        from_change_detection=True,
+    )
 
 
 def rules():
