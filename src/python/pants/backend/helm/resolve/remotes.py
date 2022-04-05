@@ -98,7 +98,7 @@ class HelmRemotes:
             all=FrozenDict(remotes),
         )
 
-    def get(self, *aliases_or_addresses: str) -> Generator[HelmRemote, None, None]:
+    def get(self, *aliases_or_addresses: str) -> Iterator[HelmRemote]:
         for alias_or_address in aliases_or_addresses:
             if alias_or_address in self.all:
                 yield self.all[alias_or_address]
