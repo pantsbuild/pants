@@ -394,7 +394,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
             updated_dep = dep
 
             if not dep.repository and remotes.default_registry:
-                # If the dependency hasn't specified a repository, then we choose the registry with the 'default' alias,
+                # If the dependency hasn't specified a repository, then we choose the registry with the 'default' alias.
                 default_remote = remotes.default_registry
                 updated_dep = dataclasses.replace(updated_dep, repository=default_remote.address)
             elif dep.repository and dep.repository.startswith("@"):
