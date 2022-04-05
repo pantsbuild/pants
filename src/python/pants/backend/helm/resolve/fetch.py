@@ -14,6 +14,7 @@ from pants.backend.helm.target_types import HelmArtifactFieldSet
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, Directory, RemovePrefix, Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -41,7 +42,7 @@ class FetchedHelmArtifacts(Collection[FetchedHelmArtifact]):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class FetchHelmArfifactsRequest:
+class FetchHelmArfifactsRequest(EngineAwareParameter):
     field_sets: tuple[HelmArtifactFieldSet, ...]
 
     def __init__(self, field_sets: Iterable[HelmArtifactFieldSet]) -> None:
@@ -56,6 +57,10 @@ class FetchHelmArfifactsRequest:
                 if HelmArtifactFieldSet.is_applicable(tgt)
             ]
         )
+
+    def debug_hint(self) -> str | None:
+        addrs = [field_set.address.spec for field_set in self.field_sets]
+        return f"[{', '.join(addrs)}]"
 
 
 @rule(desc="Fetch third party Helm Chart artifacts", level=LogLevel.DEBUG)

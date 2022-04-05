@@ -42,7 +42,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_infer_3rparty_dependency(rule_runner: RuleRunner) -> None:
+def test_infer_3rdparty_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "3rdparty/helm/jetstack/BUILD": dedent(

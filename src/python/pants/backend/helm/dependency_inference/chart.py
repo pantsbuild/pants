@@ -4,11 +4,11 @@
 import logging
 
 from pants.backend.helm.resolve import artifacts
-from pants.backend.helm.resolve.artifacts import ThirdPartyArtifactMapping
+from pants.backend.helm.resolve.artifacts import FirstPartyArtifactMapping, ThirdPartyArtifactMapping
 from pants.backend.helm.subsystems import helm
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import AllHelmChartTargets, HelmChartMetaSourceField
-from pants.backend.helm.util_rules.chart import HelmChartMetadata
+from pants.backend.helm.util_rules.chart import HelmChartDependency, HelmChartMetadata
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
@@ -20,6 +20,12 @@ from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
 
+class UnknownHelmChartDependency(Exception):
+    def __init__(self, address: Address, dependency: HelmChartDependency) -> None:
+        super().__init__(
+            f"Can not find any declared artifact for dependency '{dependency.name}' "
+            f"declared at `Chart.yaml` in Helm chart at address: {address}"
+        )
 
 class InferHelmChartDependenciesRequest(InferDependenciesRequest):
     infer_from = HelmChartMetaSourceField
@@ -28,29 +34,28 @@ class InferHelmChartDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Inferring Helm chart dependencies", level=LogLevel.DEBUG)
 async def infer_chart_dependencies_via_metadata(
     request: InferHelmChartDependenciesRequest,
-    all_chart_tgts: AllHelmChartTargets,
+    first_party_mapping: FirstPartyArtifactMapping,
     third_party_mapping: ThirdPartyArtifactMapping,
     subsystem: HelmSubsystem,
 ) -> InferredDependencies:
-    # Build a mapping between the available Helm chart targets and their names
-    first_party_chart_mapping: dict[str, Address] = {}
-    for tgt in all_chart_tgts:
-        first_party_chart_mapping[tgt.address.target_name] = tgt.address
-
-    # Parse Chart.yaml for explicitly set dependencies
+    # Parse Chart.yaml for explicitly set dependencies.
     metadata = await Get(HelmChartMetadata, HelmChartMetaSourceField, request.sources_field)
 
-    # Associate dependencies in Chart.yaml with addresses
+    # Associate dependencies in Chart.yaml with addresses.
     dependencies: OrderedSet[Address] = OrderedSet()
     for chart_dep in metadata.dependencies:
-        # Check if this is a third party dependency declared as `helm_artifact`
+        # Check if this is a third party dependency declared as `helm_artifact`.
         artifact_addr = third_party_mapping.get(chart_dep.remote_spec(subsystem.remotes()))
         if artifact_addr:
             dependencies.add(artifact_addr)
             continue
 
-        # Treat the dependency as a first party one
-        dependencies.add(first_party_chart_mapping[chart_dep.name])
+        # Treat the dependency as a first party one.
+        first_party_addr = first_party_mapping.get(chart_dep.name)
+        if not first_party_addr:
+            raise UnknownHelmChartDependency(request.sources_field.address, chart_dep)
+        
+        dependencies.add(first_party_addr)
 
     logger.debug(
         f"Inferred {pluralize(len(dependencies), 'dependency')} for target at address: {request.sources_field.address}"

@@ -171,7 +171,7 @@ class HelmChartMetadata:
             except KeyError:
                 raise InvalidChartTypeValueError(type_str)
 
-        # If the `apiVersion` is missing in the original `dict`, then we assume we are dealing with `v1` charts
+        # If the `apiVersion` is missing in the original `dict`, then we assume we are dealing with `v1` charts.
         api_version = d.pop("apiVersion", "v1")
         dependencies = [HelmChartDependency.from_dict(d) for d in d.pop("dependencies", [])]
         maintainers = [HelmChartMaintainer.from_dict(d) for d in d.pop("maintainers", [])]
@@ -386,7 +386,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
         )
         subcharts_digest = await Get(Digest, AddPrefix(merged_subcharts, "charts"))
 
-        # Update subchart dependencies in the metadata and re-render it
+        # Update subchart dependencies in the metadata and re-render it.
         remotes = subsystem.remotes()
         subchart_map: dict[str, HelmChart] = {chart.metadata.name: chart for chart in subcharts}
         updated_dependencies = []
@@ -408,10 +408,10 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
 
             updated_dependencies.append(updated_dep)
 
-        # Update metadata with the information about charts' dependencies
+        # Update metadata with the information about charts' dependencies.
         metadata = dataclasses.replace(metadata, dependencies=tuple(updated_dependencies))
 
-    # Re-render the Chart.yaml file with the updated dependencies
+    # Re-render the Chart.yaml file with the updated dependencies.
     metadata_digest, sources_without_metadata = await MultiGet(
         Get(Digest, HelmChartMetadata, metadata),
         Get(
@@ -425,12 +425,12 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
         ),
     )
 
-    # Merge chart content
+    # Merge all digests that conform chart's content.
     content_digest = await Get(
         Digest, MergeDigests([metadata_digest, sources_without_metadata, subcharts_digest])
     )
 
-    # Re-generate Chart.lock file (charts that have no dependencies, will not produce a Chart.lock file)
+    # Re-generate Chart.lock file (charts that have no dependencies, will not produce a Chart.lock file).
     if request.generate_chart_lockfile:
         chart_lockfile_result = await Get(
             ProcessResult,

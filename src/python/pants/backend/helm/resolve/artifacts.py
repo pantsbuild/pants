@@ -10,6 +10,7 @@ from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
     AllHelmArtifactTargets,
+    AllHelmChartTargets,
     HelmArtifactFieldSet,
     HelmArtifactRegistryField,
     HelmArtifactRepositoryField,
@@ -91,6 +92,15 @@ class HelmArtifact:
 
         return f"{repo_ref}/{self.metadata.name}"
 
+class FirstPartyArtifactMapping(FrozenDict[str, Address]):
+    pass
+
+@rule
+def first_party_artifact_mapping(all_helm_chart_tgts: AllHelmChartTargets) -> FirstPartyArtifactMapping:
+    first_party_chart_mapping: dict[str, Address] = {}
+    for tgt in all_helm_chart_tgts:
+        first_party_chart_mapping[tgt.address.target_name] = tgt.address
+    return FirstPartyArtifactMapping(first_party_artifact_mapping)
 
 class ThirdPartyArtifactMapping(FrozenDict[str, Address]):
     pass

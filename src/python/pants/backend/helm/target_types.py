@@ -87,7 +87,7 @@ class HelmChartMetaSourceField(SingleSourceField):
         ".yml",
     )
     required = False
-    help = "The chart definition file"
+    help = "The chart definition file."
 
 
 class HelmChartSourcesField(MultipleSourcesField):
@@ -120,7 +120,7 @@ class HelmChartOutputPathField(OutputPathField):
 
 class HelmChartLintStrictField(TriBoolField):
     alias = "lint_strict"
-    help = "If set to true, enables strict linting of this Helm chart"
+    help = "If set to true, enables strict linting of this Helm chart."
 
 
 class HelmChartTarget(Target):
@@ -134,7 +134,7 @@ class HelmChartTarget(Target):
         HelmChartLintStrictField,
         HelmSkipPushField,
     )
-    help = "A Helm chart"
+    help = "A Helm chart."
 
 
 @dataclass(frozen=True)
@@ -181,7 +181,7 @@ class HelmUnitTestTestTarget(Target):
         HelmUnitTestSourceField,
         HelmUnitTestDependenciesField,
     )
-    help = "A single helm-unittest suite file"
+    help = "A single helm-unittest suite file."
 
 
 class AllHelmUnitTestTestTargets(Targets):
@@ -218,7 +218,7 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = HelmUnitTestTestTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (HelmUnitTestDependenciesField,)
-    help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field"
+    help = f"Generates a `{HelmUnitTestTestTarget.alias}` target per each file in the `{HelmUnitTestGeneratingSourcesField.alias}` field."
 
 
 # -----------------------------------------------------------------------------------------------
@@ -229,25 +229,25 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
 class HelmArtifactRegistryField(StringField):
     alias = "registry"
     help = (
-        "Registry alias (prefixed by `@`) configured in `[helm.registries]` for the Helm artifact"
+        "Registry alias (prefixed by `@`) configured in `[helm.registries]` for the Helm artifact."
     )
 
 
 class HelmArtifactRepositoryField(StringField):
     alias = "repository"
-    help = "Either an alias (prefixed by `@`) to a classic Helm repository configured in `[helm.registries]` or a path inside an OCI registry"
+    help = "Either an alias (prefixed by `@`) to a classic Helm repository configured in `[helm.registries]` or a path inside an OCI registry."
 
 
 class HelmArtifactArtifactField(StringField):
     alias = "artifact"
     required = True
-    help = "Artifact name of the chart, without version number"
+    help = "Artifact name of the chart, without version number."
 
 
 class HelmArtifactVersionField(StringField):
     alias = "version"
     required = True
-    help = "The `version` part of a third party Helm chart"
+    help = "The `version` part of a third party Helm chart."
 
 
 class HelmArtifactTarget(Target):
@@ -259,7 +259,7 @@ class HelmArtifactTarget(Target):
         HelmArtifactArtifactField,
         HelmArtifactVersionField,
     )
-    help = "A third party Helm artifact"
+    help = "A third party Helm artifact."
 
 
 @dataclass(frozen=True)
