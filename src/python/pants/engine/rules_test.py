@@ -993,14 +993,14 @@ def test_invalid_rule_helper_name() -> None:
 
 
 def test_cant_be_both_rule_and_rule_helper() -> None:
-    with pytest.raises(ValueError, match="A @rule cannot be a @rule_helper"):
+    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
 
         @rule_helper
         @rule
         async def _func1() -> A:
             pass
 
-    with pytest.raises(ValueError, match="A @rule cannot be a @rule_helper"):
+    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
 
         @rule
         @rule_helper

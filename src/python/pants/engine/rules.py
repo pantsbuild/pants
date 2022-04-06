@@ -157,7 +157,7 @@ def rule_decorator(func, **kwargs) -> Callable:
         raise ValueError("The @rule decorator expects to be placed on a function.")
 
     if hasattr(func, "rule_helper"):
-        raise ValueError("A @rule cannot be a @rule_helper")
+        raise ValueError("Cannot use both @rule and @rule_helper")
 
     if (
         len(
@@ -287,15 +287,37 @@ def rule_helper(func: Callable) -> Callable:
     awaitables.
 
     There are a few restrictions:
-        - Rule helpers must be "private". I.e. start with an underscore
-        - Rule helpers must be called by accessing module-scoped attributes
-        - Rule helpers can't be rules
+        1. Rule helpers must be "private". I.e. start with an underscore
+        2. Rule helpers can't be rules
+        3. Rule helpers must be accessed by attributes chained from a module variable (see below)
+
+    To explain restriction 3, consider the following:
+    ```
+        from some_mod import helper_function, attribute
+
+        ...
+
+        some_instance = AClass()
+
+        @rule
+        async def my_rule(arg: RequestType) -> ReturnType
+            helper_function()  # OK
+            attribute.helper()  # OK (assuming `helper` is a @rule_helper)
+            attribute.otherattr.helper()  # OK (assuming `helper` is a @rule_helper)
+            some_instance.helper()  # OK (assuming `helper` is a @rule_helper)
+
+            AClass().helper()  # Not OK, won't collect awaitables from `helper`
+
+            func_var = AClass()
+            func_var.helper()  # Not OK, won't collect awaitables from `helper`
+            arg.helper()  # Not OK, won't collect awaitables from `helper`
+    ```
     """
     if not func.__name__.startswith("_"):
         raise ValueError("@rule_helpers must be private. I.e. start with an underscore.")
 
     if hasattr(func, "rule"):
-        raise ValueError("A @rule cannot be a @rule_helper")
+        raise ValueError("Cannot use both @rule and @rule_helper")
 
     setattr(func, "rule_helper", func)
     return func
