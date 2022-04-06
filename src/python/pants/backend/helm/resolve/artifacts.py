@@ -64,7 +64,7 @@ class HelmArtifactRequirement:
 
 @dataclass(frozen=True)
 class HelmArtifact:
-    metadata: HelmArtifactRequirement
+    requirement: HelmArtifactRequirement
     address: Address
 
     @classmethod
@@ -83,28 +83,28 @@ class HelmArtifact:
             registry_location = HelmArtifactRegistryLocation(registry, repository)
 
         location = registry_location or HelmArtifactClassicRepositoryLocation(cast(str, repository))
-        metadata = HelmArtifactRequirement(
+        req = HelmArtifactRequirement(
             name=cast(str, field_set.artifact.value),
             version=cast(str, field_set.version.value),
             location=location,
         )
 
-        return cls(metadata=metadata, address=field_set.address)
+        return cls(requirement=req, address=field_set.address)
 
     @property
     def name(self) -> str:
-        return self.metadata.name
+        return self.requirement.name
 
     @memoized_method
     def remote_address(self, remotes: HelmRemotes) -> str:
-        if isinstance(self.metadata.location, HelmArtifactRegistryLocation):
-            remote = next(remotes.get(self.metadata.location.registry))
-            repo_ref = f"{remote.address}/{self.metadata.location.repository or ''}".rstrip("/")
+        if isinstance(self.requirement.location, HelmArtifactRegistryLocation):
+            remote = next(remotes.get(self.requirement.location.registry))
+            repo_ref = f"{remote.address}/{self.requirement.location.repository or ''}".rstrip("/")
         else:
-            remote = next(remotes.get(self.metadata.location.repository))
+            remote = next(remotes.get(self.requirement.location.repository))
             repo_ref = remote.alias
 
-        return f"{repo_ref}/{self.metadata.name}"
+        return f"{repo_ref}/{self.name}"
 
 
 class FirstPartyArtifactMapping(FrozenDict[str, Address]):

@@ -93,7 +93,9 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
     third_party_artifacts = await Get(
         FetchedHelmArtifacts,
         FetchHelmArfifactsRequest,
-        FetchHelmArfifactsRequest.for_targets(dependencies),
+        FetchHelmArfifactsRequest.for_targets(
+            dependencies, description_of_origin=request.field_set.address.spec
+        ),
     )
 
     first_party_subcharts = await MultiGet(

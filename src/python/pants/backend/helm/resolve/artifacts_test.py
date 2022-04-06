@@ -133,7 +133,7 @@ def test_build_third_party_mapping(rule_runner: RuleRunner) -> None:
     )
 
     expected_foo = HelmArtifact(
-        metadata=HelmArtifactRequirement(
+        requirement=HelmArtifactRequirement(
             name="foo",
             version="0.1.0",
             location=HelmArtifactRegistryLocation(
@@ -143,7 +143,7 @@ def test_build_third_party_mapping(rule_runner: RuleRunner) -> None:
         address=Address("3rdparty/helm/example", target_name="foo"),
     )
     expected_bar = HelmArtifact(
-        metadata=HelmArtifactRequirement(
+        requirement=HelmArtifactRequirement(
             name="bar",
             version="0.1.0",
             location=HelmArtifactClassicRepositoryLocation("@example"),

@@ -67,7 +67,12 @@ def test_download_artifacts(rule_runner: RuleRunner) -> None:
 
     targets = rule_runner.request(AllHelmArtifactTargets, [])
     fetched_artifacts = rule_runner.request(
-        FetchedHelmArtifacts, [FetchHelmArfifactsRequest.for_targets(targets)]
+        FetchedHelmArtifacts,
+        [
+            FetchHelmArfifactsRequest.for_targets(
+                targets, description_of_origin="test_download_artifacts"
+            )
+        ],
     )
 
     expected_artifacts = [HelmArtifact.from_target(tgt) for tgt in targets]

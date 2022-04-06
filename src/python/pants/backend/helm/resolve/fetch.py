@@ -44,23 +44,29 @@ class FetchedHelmArtifacts(Collection[FetchedHelmArtifact]):
 @dataclass(unsafe_hash=True)
 class FetchHelmArfifactsRequest(EngineAwareParameter):
     field_sets: tuple[HelmArtifactFieldSet, ...]
+    description_of_origin: str
 
-    def __init__(self, field_sets: Iterable[HelmArtifactFieldSet]) -> None:
+    def __init__(
+        self, field_sets: Iterable[HelmArtifactFieldSet], *, description_of_origin: str
+    ) -> None:
         self.field_sets = tuple(field_sets)
+        self.description_of_origin = description_of_origin
 
     @classmethod
-    def for_targets(cls, targets: Iterable[Target]) -> FetchHelmArfifactsRequest:
+    def for_targets(
+        cls, targets: Iterable[Target], *, description_of_origin: str
+    ) -> FetchHelmArfifactsRequest:
         return cls(
             [
                 HelmArtifactFieldSet.create(tgt)
                 for tgt in targets
                 if HelmArtifactFieldSet.is_applicable(tgt)
-            ]
+            ],
+            description_of_origin=description_of_origin,
         )
 
     def debug_hint(self) -> str | None:
-        addrs = [field_set.address.spec for field_set in self.field_sets]
-        return f"[{', '.join(addrs)}]"
+        return f"{self.description_of_origin}: fetch {pluralize(len(self.field_sets), 'artifact')}"
 
 
 @rule(desc="Fetch third party Helm Chart artifacts", level=LogLevel.DEBUG)
@@ -81,13 +87,13 @@ async def fetch_helm_artifacts(
                     "pull",
                     artifact.remote_address(remotes),
                     "--version",
-                    artifact.metadata.version,
+                    artifact.requirement.version,
                     "--destination",
                     download_prefix,
                     "--untar",
                 ],
                 input_digest=empty_download_digest,
-                description=f"Pulling Helm Chart '{artifact.metadata.name}' with version {artifact.metadata.version}",
+                description=f"Pulling Helm Chart '{artifact.requirement.name}' with version {artifact.requirement.version}",
                 output_directories=(download_prefix,),
             ),
         )
