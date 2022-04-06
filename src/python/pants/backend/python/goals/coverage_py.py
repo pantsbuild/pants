@@ -15,6 +15,7 @@ import toml
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
@@ -31,6 +32,7 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -113,11 +115,11 @@ class CoverageSubsystem(PythonToolBase):
     default_main = ConsoleScript("coverage")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6,<4"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/coverage_py_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/coverage_py.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     filter = StrListOption(
@@ -140,9 +142,9 @@ class CoverageSubsystem(PythonToolBase):
     )
     _output_dir = StrOption(
         "--output-dir",
-        default=str(PurePath("dist", "coverage", "python")),
+        default=str(PurePath("{distdir}", "coverage", "python")),
         advanced=True,
-        help="Path to write the Pytest Coverage report to. Must be relative to build root.",
+        help="Path to write the Pytest Coverage report to. Must be relative to the build root.",
     )
     config = FileOption(
         "--config",
@@ -190,9 +192,8 @@ class CoverageSubsystem(PythonToolBase):
         ),
     )
 
-    @property
-    def output_dir(self) -> PurePath:
-        return PurePath(self._output_dir)
+    def output_dir(self, distdir: DistDir) -> PurePath:
+        return PurePath(self._output_dir.format(distdir=distdir.relpath))
 
     @property
     def config_request(self) -> ConfigFilesRequest:
@@ -216,9 +217,11 @@ class CoveragePyLockfileSentinel(GenerateToolLockfileSentinel):
 
 @rule
 def setup_coverage_lockfile(
-    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem
+    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(coverage)
+    return GeneratePythonLockfile.from_tool(
+        coverage, use_pex=python_setup.generate_lockfiles_with_pex
+    )
 
 
 @dataclass(frozen=True)
@@ -235,25 +238,6 @@ class PytestCoverageDataCollection(CoverageDataCollection):
 class CoverageConfig:
     digest: Digest
     path: str
-
-
-def _validate_and_update_config(
-    coverage_config: configparser.ConfigParser, config_path: str | None
-) -> None:
-    if not coverage_config.has_section("run"):
-        coverage_config.add_section("run")
-    run_section = coverage_config["run"]
-    relative_files_str = run_section.get("relative_files", "True")
-    if relative_files_str.lower() != "true":
-        raise ValueError(
-            "relative_files under the 'run' section must be set to True in the config "
-            f"file {config_path}"
-        )
-    coverage_config.set("run", "relative_files", "True")
-    omit_elements = list(run_section.get("omit", "").split("\n")) or ["\n"]
-    if "pytest.pex/*" not in omit_elements:
-        omit_elements.append("pytest.pex/*")
-    run_section["omit"] = "\n".join(omit_elements)
 
 
 class InvalidCoverageConfigError(Exception):
@@ -337,6 +321,7 @@ async def create_or_update_coverage_config(coverage: CoverageSubsystem) -> Cover
         cp.set("run", "omit", "\npytest.pex/*")
         stream = StringIO()
         cp.write(stream)
+        # We know that .coveragerc doesn't exist, so it's fine to create one.
         file_content = FileContent(".coveragerc", stream.getvalue().encode())
     digest = await Get(Digest, CreateDigest([file_content]))
     return CoverageConfig(digest, file_content.path)
@@ -477,6 +462,7 @@ async def generate_coverage_reports(
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
     process_cleanup: ProcessCleanupOption,
+    distdir: DistDir,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     transitive_targets = await Get(
@@ -506,6 +492,7 @@ async def generate_coverage_reports(
     report_types = []
     result_snapshot = await Get(Snapshot, Digest, merged_coverage_data.coverage_data)
     coverage_reports: list[CoverageReport] = []
+    output_dir: PurePath = coverage_subsystem.output_dir(distdir)
     for report_type in coverage_subsystem.reports:
         if report_type == CoverageReportType.RAW:
             coverage_reports.append(
@@ -515,8 +502,8 @@ async def generate_coverage_reports(
                     coverage_insufficient=False,
                     report_type=CoverageReportType.RAW.value,
                     result_snapshot=result_snapshot,
-                    directory_to_materialize_to=coverage_subsystem.output_dir,
-                    report_file=coverage_subsystem.output_dir / ".coverage",
+                    directory_to_materialize_to=output_dir,
+                    report_file=output_dir / ".coverage",
                 )
             )
             continue
@@ -562,9 +549,7 @@ async def generate_coverage_reports(
     result_snapshots = await MultiGet(Get(Snapshot, Digest, res.output_digest) for res in results)
 
     coverage_reports.extend(
-        _get_coverage_report(
-            coverage_subsystem.output_dir, report_type, exit_code != 0, stdout, snapshot
-        )
+        _get_coverage_report(output_dir, report_type, exit_code != 0, stdout, snapshot)
         for (report_type, exit_code, stdout, snapshot) in zip(
             report_types, result_exit_codes, result_stdouts, result_snapshots
         )

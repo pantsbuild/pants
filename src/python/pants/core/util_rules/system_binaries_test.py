@@ -4,14 +4,24 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 
 from pants.core.util_rules import system_binaries
-from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths, PythonBinary
+from pants.core.util_rules.system_binaries import (
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryShims,
+    BinaryShimsRequest,
+    PythonBinary,
+)
+from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule, rule
@@ -43,6 +53,8 @@ def rule_runner() -> RuleRunner:
             python_binary_version,
             QueryRule(PythonBinaryVersion, []),
             QueryRule(BinaryPaths, [BinaryPathRequest]),
+            QueryRule(BinaryShims, [BinaryShimsRequest]),
+            QueryRule(DigestContents, [Digest]),
         ]
     )
 
@@ -152,3 +164,67 @@ def test_python_interpreter_search_path_file_entries() -> None:
     )
     python_binary = rule_runner.request(PythonBinary, inputs=())
     assert current_python == python_binary.path
+
+
+def test_binary_shims_request(rule_runner: RuleRunner) -> None:
+    result = rule_runner.request(
+        BinaryShims,
+        [
+            BinaryShimsRequest.for_binaries(
+                "ls",
+                rationale="test the binary shims feature",
+                output_directory=".bin",
+                search_path=("/usr/bin", "/bin"),
+            )
+        ],
+    )
+
+    assert result.bin_directory == ".bin"
+
+    contents = rule_runner.request(DigestContents, [result.digest])
+    assert len(contents) == 1
+
+    binary_shim = contents[0]
+    assert binary_shim.path == ".bin/ls"
+    assert binary_shim.is_executable
+    assert re.match(
+        dedent(
+            """\
+            #!(/usr)?/bin/bash
+            exec "(/usr)?/bin/ls" "\\$@"
+            """
+        ),
+        binary_shim.content.decode(),
+    )
+
+
+def test_binary_shims_paths(rule_runner: RuleRunner, tmp_path: Path) -> None:
+    binary_path_abs = str(tmp_path / "bin" / "mybin")
+    result = rule_runner.request(
+        BinaryShims,
+        [
+            BinaryShimsRequest.for_paths(
+                BinaryPath(binary_path_abs),
+                rationale="test the binary shims feature",
+                output_directory=".bin",
+            )
+        ],
+    )
+
+    assert result.bin_directory == ".bin"
+
+    contents = rule_runner.request(DigestContents, [result.digest])
+    assert len(contents) == 1
+
+    binary_shim = contents[0]
+    assert binary_shim.path == ".bin/mybin"
+    assert binary_shim.is_executable
+    assert re.match(
+        dedent(
+            f"""\
+            #!(/usr)?/bin/bash
+            exec "{binary_path_abs}" "\\$@"
+            """
+        ),
+        binary_shim.content.decode(),
+    )

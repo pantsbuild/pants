@@ -62,7 +62,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context(log_level="debug") as ctx:
-            with setup_tmpdir({"foo/BUILD": "files(sources=[])"}) as tmpdir:
+            with setup_tmpdir({"foo/BUILD": "target()"}) as tmpdir:
                 ctx.runner(["list", f"{tmpdir}/foo::"])
                 ctx.checker.assert_started()
 

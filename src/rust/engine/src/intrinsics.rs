@@ -304,7 +304,7 @@ fn remove_prefix_request_to_digest(
         .extract::<PyRef<PyRemovePrefix>>()
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_remove_prefix.prefix)
-        .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
+        .map_err(|e| throw(format!("The `prefix` must be relative: {}", e)))?;
       let res: NodeResult<_> = Ok((py_remove_prefix.digest.clone(), prefix));
       res
     })?;
@@ -313,7 +313,7 @@ fn remove_prefix_request_to_digest(
       .store()
       .strip_prefix(digest, &prefix)
       .await
-      .map_err(|e| throw(format!("{:?}", e)))?;
+      .map_err(throw)?;
     let gil = Python::acquire_gil();
     Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
@@ -331,7 +331,7 @@ fn add_prefix_request_to_digest(
         .extract::<PyRef<PyAddPrefix>>()
         .map_err(|e| throw(format!("{}", e)))?;
       let prefix = RelativePath::new(&py_add_prefix.prefix)
-        .map_err(|e| throw(format!("The `prefix` must be relative: {:?}", e)))?;
+        .map_err(|e| throw(format!("The `prefix` must be relative: {}", e)))?;
       let res: NodeResult<(DirectoryDigest, RelativePath)> =
         Ok((py_add_prefix.digest.clone(), prefix));
       res
@@ -341,7 +341,7 @@ fn add_prefix_request_to_digest(
       .store()
       .add_prefix(digest, &prefix)
       .await
-      .map_err(|e| throw(format!("{:?}", e)))?;
+      .map_err(throw)?;
     let gil = Python::acquire_gil();
     Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
@@ -377,10 +377,7 @@ fn merge_digests_request_to_digest(
         .map(|py_merge_digests| py_merge_digests.0.clone())
         .map_err(|e| throw(format!("{}", e)))
     })?;
-    let digest = store
-      .merge(digests)
-      .await
-      .map_err(|e| throw(format!("{:?}", e)))?;
+    let digest = store.merge(digests).await.map_err(throw)?;
     let gil = Python::acquire_gil();
     Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
@@ -506,10 +503,7 @@ fn create_digest_to_digest(
   let store = context.core.store();
   async move {
     let digests = future::try_join_all(digest_futures).await.map_err(throw)?;
-    let digest = store
-      .merge(digests)
-      .await
-      .map_err(|e| throw(format!("{:?}", e)))?;
+    let digest = store.merge(digests).await.map_err(throw)?;
     let gil = Python::acquire_gil();
     Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }
@@ -536,7 +530,7 @@ fn digest_subset_to_digest(
     let digest = store
       .subset(original_digest, subset_params)
       .await
-      .map_err(|e| throw(format!("{:?}", e)))?;
+      .map_err(throw)?;
     let gil = Python::acquire_gil();
     Snapshot::store_directory_digest(gil.python(), digest).map_err(throw)
   }

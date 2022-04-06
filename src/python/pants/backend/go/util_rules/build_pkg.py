@@ -78,7 +78,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"digest={self.digest}, "
             f"dir_path={self.dir_path}, "
             f"go_file_names={self.go_file_names}, "
-            f"go_file_names={self.s_file_names}, "
+            f"s_file_names={self.s_file_names}, "
             f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "

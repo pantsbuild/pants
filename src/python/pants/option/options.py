@@ -223,33 +223,11 @@ class Options:
     def verify_configs(self, global_config: Config) -> None:
         """Verify all loaded configs have correct scopes and options."""
 
-        error_log = []
-        for config in global_config.configs():
-            for section in config.sections():
-                scope = GLOBAL_SCOPE if section == GLOBAL_SCOPE_CONFIG_SECTION else section
-                try:
-                    valid_options_under_scope = set(self.for_scope(scope, check_deprecations=False))
-                # Only catch ConfigValidationError. Other exceptions will be raised directly.
-                except ConfigValidationError:
-                    error_log.append(f"Invalid scope [{section}] in {config.config_path}")
-                else:
-                    # All the options specified under [`section`] in `config` excluding bootstrap defaults.
-                    all_options_under_scope = set(config.values.options(section)) - set(
-                        config.values.defaults
-                    )
-                    for option in sorted(all_options_under_scope):
-                        if option not in valid_options_under_scope:
-                            error_log.append(
-                                f"Invalid option '{option}' under [{section}] in {config.config_path}"
-                            )
-
-        if error_log:
-            for error in error_log:
-                logger.error(error)
-            raise ConfigValidationError(
-                "Invalid config entries detected. See log for details on which entries to update "
-                "or remove.\n(Specify --no-verify-config to disable this check.)"
-            )
+        section_to_valid_options = {}
+        for scope in self.known_scope_to_info:
+            section = GLOBAL_SCOPE_CONFIG_SECTION if scope == GLOBAL_SCOPE else scope
+            section_to_valid_options[section] = set(self.for_scope(scope, check_deprecations=False))
+        global_config.verify(section_to_valid_options)
 
     def is_known_scope(self, scope: str) -> bool:
         """Whether the given scope is known by this instance.

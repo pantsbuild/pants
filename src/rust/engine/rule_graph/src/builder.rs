@@ -1121,7 +1121,7 @@ impl<R: Rule> Builder<R> {
       .flat_map(|(_, errors)| {
         let mut errors = errors.clone();
         errors.sort();
-        errors.into_iter().map(|e| e.trim().replace("\n", "\n    "))
+        errors.into_iter().map(|e| e.trim().replace('\n', "\n    "))
       })
       .collect::<Vec<_>>();
 

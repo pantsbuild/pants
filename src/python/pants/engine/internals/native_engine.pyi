@@ -24,7 +24,9 @@ from pants.engine.process import InteractiveProcessResult
 class AddressParseException(Exception):
     pass
 
-def address_parse(spec: str) -> tuple[str, str | None, tuple[tuple[str, str], ...], str | None]: ...
+def address_spec_parse(
+    spec: str,
+) -> tuple[bool, tuple[str, str | None, str | None, tuple[tuple[str, str], ...]], str | None]: ...
 
 # ------------------------------------------------------------------------------
 # Scheduler
@@ -82,6 +84,16 @@ class Snapshot:
     def dirs(self) -> tuple[str, ...]: ...
     @property
     def files(self) -> tuple[str, ...]: ...
+    # Don't call this, call pants.engine.fs.SnapshotDiff instead
+    def _diff(
+        self, other: Snapshot
+    ) -> tuple[
+        tuple[str, ...],
+        tuple[str, ...],
+        tuple[str, ...],
+        tuple[str, ...],
+        tuple[str, ...],
+    ]: ...
     def __eq__(self, other: Snapshot | Any) -> bool: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...

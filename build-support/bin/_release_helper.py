@@ -742,6 +742,7 @@ def build_fs_util() -> None:
 #  capabilities, we should improve Pants. When porting, using `runtime_package_dependencies` to do
 #  the validation.
 def build_pex(fetch: bool) -> None:
+    stable = os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE"
     if fetch:
         extra_pex_args = [
             "--python-shebang",
@@ -774,6 +775,8 @@ def build_pex(fetch: bool) -> None:
     if fetch:
         fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
         check_pants_wheels_present(CONSTANTS.deploy_dir)
+        if stable:
+            reversion_prebuilt_wheels()
     else:
         build_pants_wheels()
         build_3rdparty_wheels()
@@ -809,14 +812,21 @@ def build_pex(fetch: bool) -> None:
             check=True,
         )
 
-    if os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE":
+    if stable:
         stable_dest = CONSTANTS.deploy_dir / "pex" / f"pants.{CONSTANTS.pants_stable_version}.pex"
         stable_dest.parent.mkdir(parents=True, exist_ok=True)
         dest.rename(stable_dest)
         dest = stable_dest
     green(f"Built {dest}")
 
-    subprocess.run([sys.executable, str(dest), "--no-pantsd", "--version"], env=env, check=True)
+    with TemporaryDirectory() as tmpdir:
+        validated_pex_path = Path(tmpdir, "pants.pex")
+        shutil.copyfile(dest, validated_pex_path)
+        validated_pex_path.chmod(0o777)
+        Path(tmpdir, "BUILD_ROOT").touch()
+        # We also need to filter out Pants options like `PANTS_CONFIG_FILES`.
+        env = {k: v for k, v in env.items() if not k.startswith("PANTS_")}
+        subprocess.run([validated_pex_path, "--version"], env=env, check=True, cwd=dest.parent)
     green(f"Validated {dest}")
 
 

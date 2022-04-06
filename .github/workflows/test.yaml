@@ -13,6 +13,7 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Bootstrap Pants, test+lint Rust (Linux)
+    needs: check_labels
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
@@ -52,7 +53,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.58.1-*
+        path: '~/.rustup/toolchains/1.59.0-*
 
           ~/.rustup/update-hashes
 
@@ -163,8 +164,19 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Bootstrap Pants, test Rust (macOS)
+    needs: check_labels
     runs-on: macos-10.15
     steps:
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: github.event_name == 'pull_request'
+      name: Ensure category label
+      uses: mheap/github-action-required-labels@v1
+      with:
+        count: 1
+        labels: category:new feature, category:user api change, category:plugin api
+          change, category:performance, category:bugfix, category:documentation, category:internal
+        mode: exactly
     - name: Check out code
       uses: actions/checkout@v2
       with:
@@ -202,7 +214,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.58.1-*
+        path: '~/.rustup/toolchains/1.59.0-*
 
           ~/.rustup/update-hashes
 
@@ -279,13 +291,14 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 40
-  build_wheels_linux:
+  build_wheels_linux_x86_64:
     container: quay.io/pypa/manylinux2014_x86_64:latest
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Build wheels and fs_util (Linux)
+    name: Build wheels and fs_util (Linux x86/64)
+    needs: check_labels
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
@@ -331,6 +344,8 @@ jobs:
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
+        ./build-support/bin/release.sh build-local-pex
+
         ./build-support/bin/release.sh build-wheels
 
         USE_PY38=true ./build-support/bin/release.sh build-wheels
@@ -358,12 +373,13 @@ jobs:
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 65
-  build_wheels_macos:
+  build_wheels_macos_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Build wheels and fs_util (macOS)
+    name: Build wheels and fs_util (macOS x86/64)
+    needs: check_labels
     runs-on: macos-10.15
     steps:
     - name: Check out code
@@ -399,7 +415,7 @@ jobs:
       uses: actions/cache@v2
       with:
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.58.1-*
+        path: '~/.rustup/toolchains/1.59.0-*
 
           ~/.rustup/update-hashes
 
@@ -428,6 +444,8 @@ jobs:
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
+        ./build-support/bin/release.sh build-local-pex
+
         ./build-support/bin/release.sh build-wheels
 
         USE_PY38=true ./build-support/bin/release.sh build-wheels
@@ -455,7 +473,22 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 65
+    timeout-minutes: 80
+  check_labels:
+    if: ${{ github.repository_owner == 'pantsbuild' }}
+    name: Ensure PR has a category label
+    runs-on: ubuntu-20.04
+    steps:
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: github.event_name == 'pull_request'
+      name: Ensure category label
+      uses: mheap/github-action-required-labels@v1
+      with:
+        count: 1
+        labels: category:new feature, category:user api change, category:plugin api
+          change, category:performance, category:bugfix, category:documentation, category:internal
+        mode: exactly
   lint_python:
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Lint Python and Shell

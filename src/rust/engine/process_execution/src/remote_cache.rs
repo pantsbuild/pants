@@ -282,14 +282,9 @@ impl CommandRunner {
     .boxed();
 
     // We speculate between reading from the remote cache vs. running locally.
-    let context2 = context.clone();
     in_workunit!(
-      context.workunit_store.clone(),
-      "remote_cache_read_speculation".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        ..WorkunitMetadata::default()
-      },
+      "remote_cache_read_speculation",
+      Level::Trace,
       |workunit| async move {
         tokio::select! {
           cache_result = cache_read_future => {
@@ -299,20 +294,21 @@ impl CommandRunner {
               if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
                 let time_saved = time_saved.as_millis() as u64;
                 workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
-                context2
-                  .workunit_store
-                  .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
+                workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
               }
               // When we successfully use the cache, we change the description and increase the level
               // (but not so much that it will be logged by default).
-              workunit.update_metadata(|initial| WorkunitMetadata {
-                desc: initial
-                  .desc
-                  .as_ref()
-                  .map(|desc| format!("Hit: {}", desc)),
-                level: Level::Debug,
-                ..initial
+              workunit.update_metadata(|initial| {
+                initial.map(|initial|
+                WorkunitMetadata {
+                  desc: initial
+                    .desc
+                    .as_ref()
+                    .map(|desc| format!("Hit: {}", desc)),
+                  level: Level::Debug,
+                  ..initial
 
+                })
               });
               Ok((cached_response, true))
             } else {
@@ -334,7 +330,6 @@ impl CommandRunner {
   /// Stores an execution result into the remote Action Cache.
   async fn update_action_cache(
     &self,
-    context: &Context,
     result: &FallibleProcessResultWithPlatform,
     metadata: &ProcessMetadata,
     command: &Command,
@@ -343,14 +338,7 @@ impl CommandRunner {
   ) -> Result<(), String> {
     // Upload the Action and Command, but not the input files. See #12432.
     // Assumption: The Action and Command have already been stored locally.
-    crate::remote::ensure_action_uploaded(
-      context,
-      &self.store,
-      command_digest,
-      action_digest,
-      None,
-    )
-    .await?;
+    crate::remote::ensure_action_uploaded(&self.store, command_digest, action_digest, None).await?;
 
     // Create an ActionResult from the process result.
     let (action_result, digests_for_action_result) = self
@@ -468,38 +456,15 @@ impl crate::CommandRunner for CommandRunner {
     };
 
     if !hit_cache && (result.exit_code == 0 || write_failures_to_cache) && self.cache_write {
-      // NB: We use a distinct workunit for the start of the cache write so that we guarantee the
-      // counter is recorded, given that the cache write is async and may still be executing after
-      // the Pants session has finished and workunits are no longer processed.
-      //
-      // TODO(#11688): remove this workunit once we have tailing tasks.
-      in_workunit!(
-        context.workunit_store.clone(),
-        "remote_cache_write_setup".to_owned(),
-        WorkunitMetadata {
-          level: Level::Trace,
-          ..WorkunitMetadata::default()
-        },
-        |workunit| async move {
-          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
-        }
-      )
-      .await;
       let command_runner = self.clone();
       let result = result.clone();
-      let context2 = context.clone();
-      // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
       let _write_join = self.executor.spawn(in_workunit!(
-        context.workunit_store,
-        "remote_cache_write".to_owned(),
-        WorkunitMetadata {
-          level: Level::Trace,
-          ..WorkunitMetadata::default()
-        },
+        "remote_cache_write",
+        Level::Trace,
         |workunit| async move {
+          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
           let write_result = command_runner
             .update_action_cache(
-              &context2,
               &result,
               &command_runner.metadata,
               &command,

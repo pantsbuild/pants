@@ -79,11 +79,11 @@ class MyPy(PythonToolBase):
 
     # See `mypy/rules.py`. We only use these default constraints in some situations.
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.typecheck.mypy", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/typecheck/mypy/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.typecheck.mypy", "mypy.lock")
+    default_lockfile_path = "src/python/pants/backend/python/typecheck/mypy/mypy.lock"
     default_lockfile_url = git_url(default_lockfile_path)
     uses_requirements_from_source_plugins = True
 
@@ -274,7 +274,9 @@ async def setup_mypy_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not mypy.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(mypy)
+        return GeneratePythonLockfile.from_tool(
+            mypy, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
@@ -293,7 +295,10 @@ async def setup_mypy_lockfile(
             constraints = code_constraints
 
     return GeneratePythonLockfile.from_tool(
-        mypy, constraints, extra_requirements=first_party_plugins.requirement_strings
+        mypy,
+        constraints,
+        extra_requirements=first_party_plugins.requirement_strings,
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

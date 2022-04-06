@@ -314,7 +314,7 @@ impl ExecuteProcess {
 
     input_digests_fut?
       .await
-      .map_err(|e| format!("Failed to merge input digests for process: {:?}", e))
+      .map_err(|e| format!("Failed to merge input digests for process: {}", e))
   }
 
   fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, String> {
@@ -433,24 +433,26 @@ impl WrappedNode for ExecuteProcess {
 
     let definition = serde_json::to_string(&request)
       .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
-    workunit.update_metadata(|initial| WorkunitMetadata {
-      stdout: Some(res.stdout_digest),
-      stderr: Some(res.stderr_digest),
-      user_metadata: vec![
-        (
-          "definition".to_string(),
-          UserMetadataItem::ImmediateString(definition),
-        ),
-        (
-          "source".to_string(),
-          UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
-        ),
-        (
-          "exit_code".to_string(),
-          UserMetadataItem::ImmediateInt(res.exit_code as i64),
-        ),
-      ],
-      ..initial
+    workunit.update_metadata(|initial| {
+      initial.map(|initial| WorkunitMetadata {
+        stdout: Some(res.stdout_digest),
+        stderr: Some(res.stderr_digest),
+        user_metadata: vec![
+          (
+            "definition".to_string(),
+            UserMetadataItem::ImmediateString(definition),
+          ),
+          (
+            "source".to_string(),
+            UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+          ),
+          (
+            "exit_code".to_string(),
+            UserMetadataItem::ImmediateInt(res.exit_code as i64),
+          ),
+        ],
+        ..initial
+      })
     });
     if let Some(total_elapsed) = res.metadata.total_elapsed {
       let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
@@ -1183,14 +1185,11 @@ impl WrappedNode for Task {
       )));
     }
 
-    let engine_aware_return_type = if self.task.engine_aware_return_type {
+    if self.task.engine_aware_return_type {
       let gil = Python::acquire_gil();
       let py = gil.python();
-      EngineAwareReturnType::from_task_result((*result_val).as_ref(py))
-    } else {
-      EngineAwareReturnType::default()
+      EngineAwareReturnType::update_workunit(workunit, (*result_val).as_ref(py))
     };
-    engine_aware_return_type.update_workunit(workunit);
 
     Ok(result_val)
   }
@@ -1303,19 +1302,19 @@ impl NodeKey {
   /// Provides the `name` field in workunits associated with this node. These names
   /// should be friendly to machine-parsing (i.e. "my_node" rather than "My awesome node!").
   ///
-  pub fn workunit_name(&self) -> String {
+  pub fn workunit_name(&self) -> &'static str {
     match self {
-      NodeKey::Task(ref task) => task.task.display_info.name.clone(),
-      NodeKey::ExecuteProcess(..) => "process".to_string(),
-      NodeKey::Snapshot(..) => "snapshot".to_string(),
-      NodeKey::Paths(..) => "paths".to_string(),
-      NodeKey::DigestFile(..) => "digest_file".to_string(),
-      NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
-      NodeKey::ReadLink(..) => "read_link".to_string(),
-      NodeKey::Scandir(..) => "scandir".to_string(),
-      NodeKey::Select(..) => "select".to_string(),
-      NodeKey::SessionValues(..) => "session_values".to_string(),
-      NodeKey::RunId(..) => "run_id".to_string(),
+      NodeKey::Task(ref task) => &task.task.as_ref().display_info.name,
+      NodeKey::ExecuteProcess(..) => "process",
+      NodeKey::Snapshot(..) => "snapshot",
+      NodeKey::Paths(..) => "paths",
+      NodeKey::DigestFile(..) => "digest_file",
+      NodeKey::DownloadedFile(..) => "downloaded_file",
+      NodeKey::ReadLink(..) => "read_link",
+      NodeKey::Scandir(..) => "scandir",
+      NodeKey::Select(..) => "select",
+      NodeKey::SessionValues(..) => "session_values",
+      NodeKey::RunId(..) => "run_id",
     }
   }
 
@@ -1348,6 +1347,29 @@ impl NodeKey {
       NodeKey::RunId(..) => None,
     }
   }
+
+  ///
+  /// Filters the given Params to those which are subtypes of EngineAwareParameter.
+  ///
+  fn engine_aware_params<'a>(
+    context: Context,
+    py: Python<'a>,
+    params: &'a Params,
+  ) -> impl Iterator<Item = Value> + 'a {
+    let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
+    params.keys().filter_map(move |key| {
+      if key
+        .type_id()
+        .as_py_type(py)
+        .is_subclass(engine_aware_param_ty)
+        .unwrap_or(false)
+      {
+        Some(key.to_value())
+      } else {
+        None
+      }
+    })
+  }
 }
 
 #[async_trait]
@@ -1358,61 +1380,31 @@ impl Node for NodeKey {
   type Error = Failure;
 
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
-    let workunit_store_handle = workunit_store::expect_workunit_store_handle();
-
     let workunit_name = self.workunit_name();
-    let user_facing_name = self.user_facing_name();
-    let engine_aware_params: Vec<_> = match &self {
-      NodeKey::Task(ref task) => {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
-        task
-          .params
-          .keys()
-          .filter_map(|key| {
-            if key
-              .type_id()
-              .as_py_type(py)
-              .is_subclass(engine_aware_param_ty)
-              .unwrap_or(false)
-            {
-              Some(key.to_value())
-            } else {
-              None
-            }
-          })
-          .collect()
-      }
-      _ => vec![],
+    let params = match &self {
+      NodeKey::Task(ref task) => task.params.clone(),
+      _ => Params::default(),
     };
-    let user_metadata = {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      engine_aware_params
-        .iter()
-        .flat_map(|val| EngineAwareParameter::metadata((**val).as_ref(py)))
-        .collect()
-    };
-
-    let metadata = WorkunitMetadata {
-      desc: user_facing_name,
-      level: self.workunit_level(),
-      user_metadata,
-      ..WorkunitMetadata::default()
-    };
+    let context2 = context.clone();
 
     in_workunit!(
-      workunit_store_handle.store,
-      self.workunit_name(),
-      metadata,
+      workunit_name,
+      self.workunit_level(),
+      desc = self.user_facing_name(),
+      user_metadata = {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        Self::engine_aware_params(context.clone(), py, &params)
+          .flat_map(|val| EngineAwareParameter::metadata((*val).as_ref(py)))
+          .collect()
+      },
       |workunit| async move {
         // To avoid races, we must ensure that we have installed a watch for the subject before
         // executing the node logic. But in case of failure, we wait to see if the Node itself
         // fails, and prefer that error message if so (because we have little control over the
         // error messages of the watch API).
-        let maybe_watch = if let Some(path) = self.fs_subject() {
-          if let Some(watcher) = &context.core.watcher {
+        let maybe_watch =
+          if let Some((path, watcher)) = self.fs_subject().zip(context.core.watcher.as_ref()) {
             let abs_path = context.core.build_root.join(path);
             watcher
               .watch(abs_path)
@@ -1420,10 +1412,7 @@ impl Node for NodeKey {
               .await
           } else {
             Ok(())
-          }
-        } else {
-          Ok(())
-        };
+          };
 
         let mut result = match self {
           NodeKey::DigestFile(n) => {
@@ -1498,13 +1487,12 @@ impl Node for NodeKey {
           let displayable_param_names: Vec<_> = {
             let gil = Python::acquire_gil();
             let py = gil.python();
-            engine_aware_params
-              .into_iter()
+            Self::engine_aware_params(context2, py, &params)
               .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
               .collect()
           };
           let failure_name = if displayable_param_names.is_empty() {
-            name
+            name.to_owned()
           } else if displayable_param_names.len() == 1 {
             format!(
               "{} ({})",

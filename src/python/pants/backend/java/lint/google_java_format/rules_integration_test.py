@@ -15,10 +15,10 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSour
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath, jdk_rules
@@ -44,7 +44,6 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             *gjf_fmt_rules.rules(),
             *skip_field.rules(),
-            QueryRule(LintResults, (GoogleJavaFormatRequest,)),
             QueryRule(FmtResult, (GoogleJavaFormatRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
@@ -82,11 +81,8 @@ public class Bar {
 """
 
 
-def run_google_java_format(
-    rule_runner: RuleRunner, targets: list[Target]
-) -> tuple[tuple[LintResult, ...], FmtResult]:
+def run_google_java_format(rule_runner: RuleRunner, targets: list[Target]) -> FmtResult:
     field_sets = [GoogleJavaFormatFieldSet.create(tgt) for tgt in targets]
-    lint_results = rule_runner.request(LintResults, [GoogleJavaFormatRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
@@ -96,35 +92,31 @@ def run_google_java_format(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            GoogleJavaFormatRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            GoogleJavaFormatRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
-    return lint_results.results, fmt_result
+    return fmt_result
 
 
-def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
+def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
     files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    return rule_runner.request(Digest, [CreateDigest(files)])
+    digest = rule_runner.request(Digest, [CreateDigest(files)])
+    return rule_runner.request(Snapshot, [digest])
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"Foo.java": GOOD_FILE, "BUILD": "java_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Foo.java"))
-    lint_results, fmt_result = run_google_java_format(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert fmt_result.output == get_digest(rule_runner, {"Foo.java": GOOD_FILE})
+    fmt_result = run_google_java_format(rule_runner, [tgt])
+    assert fmt_result.output == get_snapshot(rule_runner, {"Foo.java": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"Bar.java": BAD_FILE, "BUILD": "java_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.java"))
-    lint_results, fmt_result = run_google_java_format(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "The following Java files require formatting:\nBar.java\n\n" == lint_results[0].stdout
-    assert fmt_result.output == get_digest(rule_runner, {"Bar.java": FIXED_BAD_FILE})
+    fmt_result = run_google_java_format(rule_runner, [tgt])
+    assert fmt_result.output == get_snapshot(rule_runner, {"Bar.java": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -136,11 +128,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="Foo.java")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.java")),
     ]
-    lint_results, fmt_result = run_google_java_format(rule_runner, tgts)
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "The following Java files require formatting:\nBar.java\n\n" == lint_results[0].stdout
-    assert fmt_result.output == get_digest(
+    fmt_result = run_google_java_format(rule_runner, tgts)
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"Foo.java": GOOD_FILE, "Bar.java": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True

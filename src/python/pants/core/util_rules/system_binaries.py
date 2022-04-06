@@ -165,6 +165,61 @@ class BinaryNotFoundError(EnvironmentError):
 
 
 # -------------------------------------------------------------------------------------------
+# Binary shims
+# Creates a Digest with a shim for each requested binary in a directory suitable for PATH.
+# -------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class BinaryShimsRequest:
+    """Request to create shims for one or more system binaries."""
+
+    output_directory: str
+    rationale: str = dataclasses.field(compare=False)
+
+    # Create shims for provided binary paths
+    paths: tuple[BinaryPath, ...] = tuple()
+
+    # Create shims for the provided binary names after looking up the paths.
+    requests: tuple[BinaryPathRequest, ...] = tuple()
+
+    @classmethod
+    def for_binaries(
+        cls, *names: str, rationale: str, output_directory: str, search_path: Sequence[str]
+    ) -> BinaryShimsRequest:
+        return cls(
+            requests=tuple(
+                BinaryPathRequest(binary_name=binary_name, search_path=search_path)
+                for binary_name in names
+            ),
+            rationale=rationale,
+            output_directory=output_directory,
+        )
+
+    @classmethod
+    def for_paths(
+        cls, *paths: BinaryPath, rationale: str, output_directory: str
+    ) -> BinaryShimsRequest:
+        return cls(paths=paths, rationale=rationale, output_directory=output_directory)
+
+
+@dataclass(frozen=True)
+class BinaryShims:
+    """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
+
+    The purpose of these shims is so that a Process may be executed with `bin_directory` added to
+    PATH so that the binaries are available for execution.
+
+    The alternative is to add the directories hosting the binaries directly, but that opens up for
+    many more unrelated binaries to also be executable from PATH, leaking into the sandbox
+    unnecessarily.
+    """
+
+    bin_directory: str
+    digest: Digest
+
+
+# -------------------------------------------------------------------------------------------
 # Binaries
 # -------------------------------------------------------------------------------------------
 
@@ -253,9 +308,85 @@ class TarBinary(BinaryPath):
         return (self.path, "xf", archive_path, "-C", extract_path)
 
 
+class MkdirBinary(BinaryPath):
+    pass
+
+
+class ChmodBinary(BinaryPath):
+    pass
+
+
+class DiffBinary(BinaryPath):
+    pass
+
+
 # -------------------------------------------------------------------------------------------
-# Rules to find binaries
+# Binaries Rules
 # -------------------------------------------------------------------------------------------
+
+
+@rule
+async def create_binary_shims(
+    binary_shims_request: BinaryShimsRequest,
+    bash: BashBinary,
+    mkdir: MkdirBinary,
+    chmod: ChmodBinary,
+) -> BinaryShims:
+    """Creates a bin directory with shims for all requested binaries.
+
+    Useful as input digest for a Process to setup a `bin` directory for PATH.
+    """
+    paths = binary_shims_request.paths
+    requests = binary_shims_request.requests
+    if requests:
+        all_binary_paths = await MultiGet(
+            Get(BinaryPaths, BinaryPathRequest, request) for request in requests
+        )
+        first_paths = tuple(
+            binary_paths.first_path_or_raise(request, rationale=binary_shims_request.rationale)
+            for binary_paths, request in zip(all_binary_paths, requests)
+        )
+        paths += first_paths
+
+    all_paths = (binary.path for binary in paths)
+    bin_relpath = binary_shims_request.output_directory
+    script = ";".join(
+        (
+            f"{mkdir.path} -p {bin_relpath}",
+            *(
+                " && ".join(
+                    [
+                        (
+                            # The `printf` cmd is a bash builtin, so always available.
+                            f"printf '{_create_shim(bash.path, binary_path)}'"
+                            f" > '{bin_relpath}/{os.path.basename(binary_path)}'"
+                        ),
+                        f"{chmod.path} +x '{bin_relpath}/{os.path.basename(binary_path)}'",
+                    ]
+                )
+                for binary_path in all_paths
+            ),
+        )
+    )
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=(bash.path, "-c", script),
+            description=f"Setup binary shims so that Pants can {binary_shims_request.rationale}.",
+            output_directories=(bin_relpath,),
+        ),
+    )
+    return BinaryShims(bin_relpath, result.output_digest)
+
+
+def _create_shim(bash: str, binary: str) -> str:
+    """The binary shim script to be placed in the output directory for the digest."""
+    return dedent(
+        f"""\
+        #!{bash}
+        exec "{binary}" "$@"
+        """
+    )
 
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
@@ -487,6 +618,32 @@ async def find_tar() -> TarBinary:
     return TarBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `mkdir` binary", level=LogLevel.DEBUG)
+async def find_mkdir() -> MkdirBinary:
+    request = BinaryPathRequest(binary_name="mkdir", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="create directories")
+    return MkdirBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `chmod` binary", level=LogLevel.DEBUG)
+async def find_chmod() -> ChmodBinary:
+    request = BinaryPathRequest(binary_name="chmod", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(
+        request, rationale="change file modes or Access Control Lists"
+    )
+    return ChmodBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `diff` binary", level=LogLevel.DEBUG)
+async def find_diff() -> DiffBinary:
+    request = BinaryPathRequest(binary_name="diff", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="compare files line by line")
+    return DiffBinary(first_path.path, first_path.fingerprint)
+
+
 # -------------------------------------------------------------------------------------------
 # Rules for lazy requests
 # TODO(#12946): Get rid of this when it becomes possible to use `Get()` with only one arg.
@@ -509,6 +666,18 @@ class TarBinaryRequest:
     pass
 
 
+class MkdirBinaryRequest:
+    pass
+
+
+class ChmodBinaryRequest:
+    pass
+
+
+class DiffBinaryRequest:
+    pass
+
+
 @rule
 async def find_zip_wrapper(_: ZipBinaryRequest, zip_binary: ZipBinary) -> ZipBinary:
     return zip_binary
@@ -527,6 +696,21 @@ async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> G
 @rule
 async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
     return tar_binary
+
+
+@rule
+async def find_mkdir_wrapper(_: MkdirBinaryRequest, mkdir_binary: MkdirBinary) -> MkdirBinary:
+    return mkdir_binary
+
+
+@rule
+async def find_chmod_wrapper(_: ChmodBinaryRequest, chmod_binary: ChmodBinary) -> ChmodBinary:
+    return chmod_binary
+
+
+@rule
+async def find_diff_wrapper(_: DiffBinaryRequest, diff_binary: DiffBinary) -> DiffBinary:
+    return diff_binary
 
 
 def rules():

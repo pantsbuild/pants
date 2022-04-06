@@ -80,8 +80,8 @@ class Pylint(PythonToolBase):
     default_main = ConsoleScript("pylint")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.pylint", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/pylint/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.pylint", "pylint.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/pylint/pylint.lock"
     default_lockfile_url = git_url(default_lockfile_path)
     uses_requirements_from_source_plugins = True
 
@@ -141,8 +141,8 @@ class Pylint(PythonToolBase):
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
-            check_existence=[".pylinrc", *(os.path.join(d, "pylintrc") for d in ("", *dirs))],
-            check_content={"pyproject.toml": b"[tool.pylint]", "setup.cfg": b"[pylint."},
+            check_existence=[".pylintrc", *(os.path.join(d, "pylintrc") for d in ("", *dirs))],
+            check_content={"pyproject.toml": b"[tool.pylint.", "setup.cfg": b"[pylint."},
         )
 
     @property
@@ -233,7 +233,9 @@ async def setup_pylint_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not pylint.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(pylint)
+        return GeneratePythonLockfile.from_tool(
+            pylint, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # While Pylint will run in partitions, we need a single lockfile that works with every
     # partition. We must also consider any 3rd-party requirements used by 1st-party plugins.
@@ -274,6 +276,7 @@ async def setup_pylint_lockfile(
         pylint,
         constraints or InterpreterConstraints(python_setup.interpreter_constraints),
         extra_requirements=first_party_plugins.requirement_strings,
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

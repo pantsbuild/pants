@@ -6,38 +6,30 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.java.bsp.spec import JavacOptionsItem, JavacOptionsParams, JavacOptionsResult
-from pants.backend.java.compile.javac import compute_output_jar_filename
-from pants.backend.java.dependency_inference.symbol_mapper import AllJavaTargets
-from pants.backend.java.target_types import JavaSourceField
+from pants.backend.java.target_types import JavaFieldSet, JavaSourceField
 from pants.base.build_root import BuildRoot
-from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import (
-    BuildTarget,
-    BuildTargetCapabilities,
-    BuildTargetIdentifier,
-    StatusCode,
-)
-from pants.bsp.util_rules.compile import BSPCompileFieldSet, BSPCompileResult
+from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode
+from pants.bsp.util_rules.compile import BSPCompileRequest, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
-from pants.bsp.util_rules.targets import BSPBuildTargets, BSPBuildTargetsRequest
-from pants.build_graph.address import Address, AddressInput
+from pants.bsp.util_rules.targets import (
+    BSPBuildTargetsMetadataRequest,
+    BSPBuildTargetsMetadataResult,
+)
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, DigestEntries
-from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    CoarsenedTargets,
-    Dependencies,
-    DependenciesRequest,
-    Target,
-    WrappedTarget,
+from pants.engine.target import CoarsenedTargets, FieldSet, Targets
+from pants.engine.unions import UnionRule
+from pants.jvm.compile import (
+    ClasspathEntryRequest,
+    ClasspathEntryRequestFactory,
+    FallibleClasspathEntry,
 )
-from pants.engine.unions import UnionMembership, UnionRule
-from pants.jvm.bsp.spec import JvmBuildTarget
-from pants.jvm.compile import ClasspathEntryRequest, FallibleClasspathEntry
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.target_types import JvmResolveField
 
 LANGUAGE_ID = "java"
 
@@ -49,62 +41,27 @@ class JavaBSPLanguageSupport(BSPLanguageSupport):
     can_compile = True
 
 
-class JavaBSPBuildTargetsRequest(BSPBuildTargetsRequest):
-    pass
-
-
 @dataclass(frozen=True)
-class ResolveJavaBSPBuildTargetRequest:
-    target: Target
+class JavaMetadataFieldSet(FieldSet):
+    required_fields = (JavaSourceField, JvmResolveField)
+
+    source: JavaSourceField
+    resolve: JvmResolveField
+
+
+class JavaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
+    language_id = LANGUAGE_ID
+    can_merge_metadata_from = ()
+    field_set_type = JavaMetadataFieldSet
 
 
 @rule
-async def bsp_resolve_one_java_build_target(
-    request: ResolveJavaBSPBuildTargetRequest,
-    union_membership: UnionMembership,
-) -> BuildTarget:
-    dep_addrs = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
-    impls = union_membership.get(BSPCompileFieldSet)
-
-    reported_deps = []
-    for dep_addr in dep_addrs:
-        if dep_addr == request.target.address:
-            continue
-
-        wrapped_dep_tgt = await Get(WrappedTarget, Address, dep_addr)
-        dep_tgt = wrapped_dep_tgt.target
-        for impl in impls:
-            if impl.is_applicable(dep_tgt):
-                reported_deps.append(BuildTargetIdentifier.from_address(dep_tgt.address))
-                break
-
-    return BuildTarget(
-        id=BuildTargetIdentifier.from_address(request.target.address),
-        display_name=str(request.target.address),
-        base_directory=None,
-        tags=(),
-        capabilities=BuildTargetCapabilities(
-            can_compile=True,
-        ),
-        language_ids=(LANGUAGE_ID,),
-        dependencies=tuple(reported_deps),
-        data_kind="jvm",
-        data=JvmBuildTarget(),
+async def bsp_resolve_java_metadata(
+    _: JavaBSPBuildTargetsMetadataRequest,
+) -> BSPBuildTargetsMetadataResult:
+    return BSPBuildTargetsMetadataResult(
+        can_compile=True,
     )
-
-
-@rule
-async def bsp_resolve_all_java_build_targets(
-    _: JavaBSPBuildTargetsRequest,
-    all_java_targets: AllJavaTargets,
-    bsp_context: BSPContext,
-) -> BSPBuildTargets:
-    if LANGUAGE_ID not in bsp_context.client_params.capabilities.language_ids:
-        return BSPBuildTargets()
-    build_targets = await MultiGet(
-        Get(BuildTarget, ResolveJavaBSPBuildTargetRequest(tgt)) for tgt in all_java_targets
-    )
-    return BSPBuildTargets(targets=tuple(build_targets))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -134,22 +91,16 @@ async def handle_bsp_java_options_request(
     request: HandleJavacOptionsRequest,
     build_root: BuildRoot,
 ) -> HandleJavacOptionsResult:
-    wrapped_target = await Get(WrappedTarget, AddressInput, request.bsp_target_id.address_input)
-    coarsened_targets = await Get(CoarsenedTargets, Addresses([wrapped_target.target.address]))
-    assert len(coarsened_targets) == 1
-    coarsened_target = coarsened_targets[0]
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
-    output_file = compute_output_jar_filename(coarsened_target)
+    targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
+
+    coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
 
     return HandleJavacOptionsResult(
         JavacOptionsItem(
             target=request.bsp_target_id,
             options=(),
-            classpath=(
-                build_root.pathlib_path.joinpath(
-                    f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{output_file}"
-                ).as_uri(),
-            ),
+            classpath=(),
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/jvm/resolves/{resolve.name}/classes"
             ).as_uri(),
@@ -171,42 +122,52 @@ async def bsp_javac_options_request(request: JavacOptionsParams) -> JavacOptions
 
 
 @dataclass(frozen=True)
-class JavaBSPCompileFieldSet(BSPCompileFieldSet):
-    required_fields = (JavaSourceField,)
-    source: JavaSourceField
+class JavaBSPCompileRequest(BSPCompileRequest):
+    field_set_type = JavaFieldSet
 
 
 @rule
 async def bsp_java_compile_request(
-    request: JavaBSPCompileFieldSet,
-    union_membership: UnionMembership,
+    request: JavaBSPCompileRequest, classpath_entry_request: ClasspathEntryRequestFactory
 ) -> BSPCompileResult:
-    coarsened_targets = await Get(CoarsenedTargets, Addresses([request.source.address]))
-    assert len(coarsened_targets) == 1
-    coarsened_target = coarsened_targets[0]
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets([coarsened_target]))
-
-    result = await Get(
-        FallibleClasspathEntry,
-        ClasspathEntryRequest,
-        ClasspathEntryRequest.for_targets(
-            union_membership, component=coarsened_target, resolve=resolve
-        ),
+    coarsened_targets = await Get(
+        CoarsenedTargets, Addresses([fs.address for fs in request.field_sets])
     )
-    _logger.info(f"java compile result = {result}")
-    output_digest = EMPTY_DIGEST
-    if result.exit_code == 0 and result.output:
-        entries = await Get(DigestEntries, Digest, result.output.digest)
-        new_entires = [
-            dataclasses.replace(entry, path=os.path.basename(entry.path)) for entry in entries
-        ]
-        flat_digest = await Get(Digest, CreateDigest(new_entires))
-        output_digest = await Get(
-            Digest, AddPrefix(flat_digest, f"jvm/resolves/{resolve.name}/lib")
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
+
+    results = await MultiGet(
+        Get(
+            FallibleClasspathEntry,
+            ClasspathEntryRequest,
+            classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
         )
+        for coarsened_target in coarsened_targets
+    )
+
+    status = StatusCode.OK
+    if any(r.exit_code != 0 for r in results):
+        status = StatusCode.ERROR
+
+    output_digest = EMPTY_DIGEST
+    if status == StatusCode.OK:
+        output_entries = []
+        for result in results:
+            if not result.output:
+                continue
+            entries = await Get(DigestEntries, Digest, result.output.digest)
+            output_entries.extend(
+                [
+                    dataclasses.replace(
+                        entry,
+                        path=f"jvm/resolves/{resolve.name}/lib/{os.path.basename(entry.path)}",
+                    )
+                    for entry in entries
+                ]
+            )
+        output_digest = await Get(Digest, CreateDigest(output_entries))
 
     return BSPCompileResult(
-        status=StatusCode.ERROR if result.exit_code != 0 else StatusCode.OK,
+        status=status,
         output_digest=output_digest,
     )
 
@@ -215,7 +176,7 @@ def rules():
     return (
         *collect_rules(),
         UnionRule(BSPLanguageSupport, JavaBSPLanguageSupport),
-        UnionRule(BSPBuildTargetsRequest, JavaBSPBuildTargetsRequest),
+        UnionRule(BSPBuildTargetsMetadataRequest, JavaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPHandlerMapping, JavacOptionsHandlerMapping),
-        UnionRule(BSPCompileFieldSet, JavaBSPCompileFieldSet),
+        UnionRule(BSPCompileRequest, JavaBSPCompileRequest),
     )

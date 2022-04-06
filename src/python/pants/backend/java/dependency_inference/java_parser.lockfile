@@ -90,6 +90,12 @@ packaging = "jar"
 
 [[entries.dependencies]]
 group = "com.fasterxml.jackson.core"
+artifact = "jackson-annotations"
+version = "2.12.4"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.fasterxml.jackson.core"
 artifact = "jackson-core"
 version = "2.12.4"
 packaging = "jar"
@@ -97,12 +103,6 @@ packaging = "jar"
 [[entries.dependencies]]
 group = "com.fasterxml.jackson.core"
 artifact = "jackson-databind"
-version = "2.12.4"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.fasterxml.jackson.core"
-artifact = "jackson-annotations"
 version = "2.12.4"
 packaging = "jar"
 
@@ -149,6 +149,36 @@ version = "3.28.0-GA"
 packaging = "jar"
 
 [[entries.dependencies]]
+group = "com.github.javaparser"
+artifact = "javaparser-core"
+version = "3.23.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.google.code.findbugs"
+artifact = "jsr305"
+version = "3.0.2"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.google.errorprone"
+artifact = "error_prone_annotations"
+version = "2.5.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.google.guava"
+artifact = "failureaccess"
+version = "1.0.1"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.google.guava"
+artifact = "guava"
+version = "30.1.1-jre"
+packaging = "jar"
+
+[[entries.dependencies]]
 group = "com.google.guava"
 artifact = "listenablefuture"
 version = "9999.0-empty-to-avoid-conflict-with-guava"
@@ -161,45 +191,15 @@ version = "1.3"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.google.code.findbugs"
-artifact = "jsr305"
-version = "3.0.2"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.github.javaparser"
-artifact = "javaparser-core"
-version = "3.23.0"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.google.guava"
-artifact = "guava"
-version = "30.1.1-jre"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.google.guava"
-artifact = "failureaccess"
-version = "1.0.1"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.google.errorprone"
-artifact = "error_prone_annotations"
-version = "2.5.1"
+group = "org.checkerframework"
+artifact = "checker-qual"
+version = "3.8.0"
 packaging = "jar"
 
 [[entries.dependencies]]
 group = "org.javassist"
 artifact = "javassist"
 version = "3.28.0-GA"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "org.checkerframework"
-artifact = "checker-qual"
-version = "3.8.0"
 packaging = "jar"
 
 
@@ -253,21 +253,15 @@ serialized_bytes_length = 4617
 [[entries]]
 file_name = "com.google.guava_guava_30.1.1-jre.jar"
 [[entries.directDependencies]]
-group = "com.google.guava"
-artifact = "listenablefuture"
-version = "9999.0-empty-to-avoid-conflict-with-guava"
-packaging = "jar"
-
-[[entries.directDependencies]]
-group = "com.google.j2objc"
-artifact = "j2objc-annotations"
-version = "1.3"
-packaging = "jar"
-
-[[entries.directDependencies]]
 group = "com.google.code.findbugs"
 artifact = "jsr305"
 version = "3.0.2"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.google.errorprone"
+artifact = "error_prone_annotations"
+version = "2.5.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
@@ -277,9 +271,15 @@ version = "1.0.1"
 packaging = "jar"
 
 [[entries.directDependencies]]
-group = "com.google.errorprone"
-artifact = "error_prone_annotations"
-version = "2.5.1"
+group = "com.google.guava"
+artifact = "listenablefuture"
+version = "9999.0-empty-to-avoid-conflict-with-guava"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.google.j2objc"
+artifact = "j2objc-annotations"
+version = "1.3"
 packaging = "jar"
 
 [[entries.directDependencies]]
@@ -289,21 +289,15 @@ version = "3.8.0"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.google.guava"
-artifact = "listenablefuture"
-version = "9999.0-empty-to-avoid-conflict-with-guava"
-packaging = "jar"
-
-[[entries.dependencies]]
-group = "com.google.j2objc"
-artifact = "j2objc-annotations"
-version = "1.3"
-packaging = "jar"
-
-[[entries.dependencies]]
 group = "com.google.code.findbugs"
 artifact = "jsr305"
 version = "3.0.2"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.google.errorprone"
+artifact = "error_prone_annotations"
+version = "2.5.1"
 packaging = "jar"
 
 [[entries.dependencies]]
@@ -313,9 +307,15 @@ version = "1.0.1"
 packaging = "jar"
 
 [[entries.dependencies]]
-group = "com.google.errorprone"
-artifact = "error_prone_annotations"
-version = "2.5.1"
+group = "com.google.guava"
+artifact = "listenablefuture"
+version = "9999.0-empty-to-avoid-conflict-with-guava"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.google.j2objc"
+artifact = "j2objc-annotations"
+version = "1.3"
 packaging = "jar"
 
 [[entries.dependencies]]

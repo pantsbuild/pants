@@ -788,7 +788,6 @@ impl crate::CommandRunner for CommandRunner {
 
     // Upload the action (and related data, i.e. the embedded command and input files).
     ensure_action_uploaded(
-      &context,
       &self.store,
       command_digest,
       action_digest,
@@ -799,27 +798,25 @@ impl crate::CommandRunner for CommandRunner {
     // Submit the execution request to the RE server for execution.
     let context2 = context.clone();
     in_workunit!(
-      context.workunit_store.clone(),
-      "run_execute_request".to_owned(),
-      WorkunitMetadata {
-        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-        // renders at the Process's level.
-        level: request.level,
-        desc: Some(request.description.clone()),
-        ..WorkunitMetadata::default()
-      },
+      "run_execute_request",
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      request.level,
+      desc = Some(request.description.clone()),
       |workunit| async move {
         workunit.increment_counter(Metric::RemoteExecutionRequests, 1);
         let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
         let result = tokio::time::timeout(deadline_duration, result_fut).await;
         if result.is_err() {
-          workunit.update_metadata(|inititial| WorkunitMetadata {
-            level: Level::Error,
-            desc: Some(format!(
-              "remote execution timed out after {:?}",
-              deadline_duration
-            )),
-            ..inititial
+          workunit.update_metadata(|initial| {
+            Some(WorkunitMetadata {
+              level: Level::Error,
+              desc: Some(format!(
+                "remote execution timed out after {:?}",
+                deadline_duration
+              )),
+              ..initial.unwrap_or_default()
+            })
           })
         }
 
@@ -854,22 +851,16 @@ impl crate::CommandRunner for CommandRunner {
 
 fn maybe_add_workunit(
   result_cached: bool,
-  name: &str,
+  name: &'static str,
   time_span: concrete_time::TimeSpan,
   parent_id: Option<SpanId>,
   workunit_store: &WorkunitStore,
   metadata: WorkunitMetadata,
 ) {
-  if !result_cached {
+  if !result_cached && workunit_store.max_level() >= metadata.level {
     let start_time: SystemTime = SystemTime::UNIX_EPOCH + time_span.start.into();
     let end_time: SystemTime = start_time + time_span.duration.into();
-    workunit_store.add_completed_workunit(
-      name.to_string(),
-      start_time,
-      end_time,
-      parent_id,
-      metadata,
-    );
+    workunit_store.add_completed_workunit(name, start_time, end_time, parent_id, metadata);
   }
 }
 
@@ -1338,13 +1329,9 @@ pub async fn check_action_cache(
   timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
   in_workunit!(
-    context.workunit_store.clone(),
-    "check_action_cache".to_owned(),
-    WorkunitMetadata {
-      level: Level::Debug,
-      desc: Some(format!("Remote cache lookup for: {}", command_description)),
-      ..WorkunitMetadata::default()
-    },
+    "check_action_cache",
+    Level::Debug,
+    desc = Some(format!("Remote cache lookup for: {}", command_description)),
     |workunit| async move {
       workunit.increment_counter(Metric::RemoteCacheRequests, 1);
 
@@ -1354,11 +1341,7 @@ pub async fn check_action_cache(
         move |mut client| {
           let request = remexec::GetActionResultRequest {
             action_digest: Some(action_digest.into()),
-            instance_name: metadata
-              .instance_name
-              .as_ref()
-              .cloned()
-              .unwrap_or_else(String::new),
+            instance_name: metadata.instance_name.as_ref().cloned().unwrap_or_default(),
             ..remexec::GetActionResultRequest::default()
           };
           let request = apply_headers(Request::new(request), &context.build_id);
@@ -1391,13 +1374,9 @@ pub async fn check_action_cache(
           if eager_fetch {
             let response = response.clone();
             in_workunit!(
-              context.workunit_store.clone(),
-              "eager_fetch_action_cache".to_owned(),
-              WorkunitMetadata {
-                level: Level::Trace,
-                desc: Some("eagerly fetching after action cache hit".to_owned()),
-                ..WorkunitMetadata::default()
-              },
+              "eager_fetch_action_cache",
+              Level::Trace,
+              desc = Some("eagerly fetching after action cache hit".to_owned()),
               |_workunit| async move {
                 future::try_join_all(vec![
                   store.ensure_local_has_file(response.stdout_digest).boxed(),
@@ -1459,20 +1438,15 @@ pub async fn ensure_action_stored_locally(
 /// whether we are in a remote execution context, or a pure cache-usage context) are uploaded.
 ///
 pub async fn ensure_action_uploaded(
-  context: &Context,
   store: &Store,
   command_digest: Digest,
   action_digest: Digest,
   input_files: Option<DirectoryDigest>,
 ) -> Result<(), String> {
   in_workunit!(
-    context.workunit_store.clone(),
-    "ensure_action_uploaded".to_owned(),
-    WorkunitMetadata {
-      level: Level::Trace,
-      desc: Some(format!("ensure action uploaded for {:?}", action_digest)),
-      ..WorkunitMetadata::default()
-    },
+    "ensure_action_uploaded",
+    Level::Trace,
+    desc = Some(format!("ensure action uploaded for {:?}", action_digest)),
     |_workunit| async move {
       let mut digests = vec![command_digest, action_digest];
       if let Some(input_files) = input_files {

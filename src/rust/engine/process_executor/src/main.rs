@@ -43,7 +43,7 @@ use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use store::{SnapshotOps, Store};
 use structopt::StructOpt;
-use workunit_store::{in_workunit, WorkunitMetadata, WorkunitStore};
+use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(StructOpt)]
 struct CommandSpec {
@@ -326,12 +326,9 @@ async fn main() {
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
-  let result = in_workunit!(
-    workunit_store.clone(),
-    "process_executor".to_owned(),
-    WorkunitMetadata::default(),
-    |workunit| async move { runner.run(Context::default(), workunit, request).await }
-  )
+  let result = in_workunit!("process_executor", Level::Info, |workunit| async move {
+    runner.run(Context::default(), workunit, request).await
+  })
   .await
   .expect("Error executing");
 

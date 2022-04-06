@@ -9,6 +9,7 @@ from typing import Iterable
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -28,11 +29,11 @@ class Yapf(PythonToolBase):
     default_main = ConsoleScript("yapf")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.yapf", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/yapf/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.yapf", "yapf.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/yapf/yapf.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")
@@ -82,7 +83,7 @@ class Yapf(PythonToolBase):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
-            discovery=self.options.config_discovery,
+            discovery=self.config_discovery,
             check_existence=check_existence,
             check_content=check_content,
         )
@@ -93,8 +94,10 @@ class YapfLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule
-def setup_yapf_lockfile(_: YapfLockfileSentinel, yapf: Yapf) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(yapf)
+def setup_yapf_lockfile(
+    _: YapfLockfileSentinel, yapf: Yapf, python_setup: PythonSetup
+) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(yapf, use_pex=python_setup.generate_lockfiles_with_pex)
 
 
 def rules():

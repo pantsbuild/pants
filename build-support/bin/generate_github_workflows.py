@@ -67,6 +67,25 @@ IS_PANTS_OWNER = "${{ github.repository_owner == 'pantsbuild' }}"
 # ----------------------------------------------------------------------
 
 
+def ensure_category_label() -> Sequence[Step]:
+    """Check that exactly one category label is present on a pull request."""
+    return [
+        {
+            "if": "github.event_name == 'pull_request'",
+            "name": "Ensure category label",
+            "uses": "mheap/github-action-required-labels@v1",
+            "env": {"GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}"},
+            "with": {
+                "mode": "exactly",
+                "count": 1,
+                "labels": "category:new feature, category:user api change, "
+                "category:plugin api change, category:performance, category:bugfix, "
+                "category:documentation, category:internal",
+            },
+        }
+    ]
+
+
 def checkout() -> Sequence[Step]:
     """Get prior commits and the commit message."""
     return [
@@ -292,9 +311,16 @@ def download_apache_thrift() -> Step:
 
 def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     jobs = {
+        "check_labels": {
+            "name": "Ensure PR has a category label",
+            "runs-on": LINUX_VERSION,
+            "if": IS_PANTS_OWNER,
+            "steps": ensure_category_label(),
+        },
         "bootstrap_pants_linux": {
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": LINUX_VERSION,
+            "needs": "check_labels",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
@@ -391,11 +417,13 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         "bootstrap_pants_macos": {
             "name": "Bootstrap Pants, test Rust (macOS)",
             "runs-on": MACOS_VERSION,
+            "needs": "check_labels",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
             "if": IS_PANTS_OWNER,
             "steps": [
+                *ensure_category_label(),
                 *checkout(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
@@ -450,8 +478,13 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "run": dedent(
                         # We use MODE=debug on PR builds to speed things up, given that those are
                         # only smoke tests of our release process.
+                        # Note that the build-local-pex run is just for smoke-testing that pex
+                        # builds work, and it must come *before* the build-wheels runs, since
+                        # it cleans out `dist/deploy`, which the build-wheels runs populate for
+                        # later attention by deploy_to_s3.py.
                         """\
                         [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+                        ./build-support/bin/release.sh build-local-pex
                         ./build-support/bin/release.sh build-wheels
                         USE_PY38=true ./build-support/bin/release.sh build-wheels
                         USE_PY39=true ./build-support/bin/release.sh build-wheels
@@ -471,6 +504,11 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 },
             ]
 
+        build_wheels_common = {
+            "needs": "check_labels",
+            "env": DISABLE_REMOTE_CACHE_ENV,
+            "if": IS_PANTS_OWNER,
+        }
         deploy_to_s3_step = {
             "name": "Deploy to S3",
             "run": "./build-support/bin/deploy_to_s3.py",
@@ -482,13 +520,12 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         }
         jobs.update(
             {
-                "build_wheels_linux": {
-                    "name": "Build wheels and fs_util (Linux)",
+                "build_wheels_linux_x86_64": {
+                    "name": "Build wheels and fs_util (Linux x86/64)",
                     "runs-on": LINUX_VERSION,
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
                     "timeout-minutes": 65,
-                    "env": DISABLE_REMOTE_CACHE_ENV,
-                    "if": IS_PANTS_OWNER,
+                    **build_wheels_common,
                     "steps": [
                         *checkout(),
                         install_rustup(),
@@ -507,12 +544,11 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         deploy_to_s3_step,
                     ],
                 },
-                "build_wheels_macos": {
-                    "name": "Build wheels and fs_util (macOS)",
+                "build_wheels_macos_x86_64": {
+                    "name": "Build wheels and fs_util (macOS x86/64)",
                     "runs-on": MACOS_VERSION,
-                    "timeout-minutes": 65,
-                    "env": DISABLE_REMOTE_CACHE_ENV,
-                    "if": IS_PANTS_OWNER,
+                    "timeout-minutes": 80,
+                    **build_wheels_common,
                     "steps": [
                         *checkout(),
                         setup_toolchain_auth(),

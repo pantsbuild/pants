@@ -3,8 +3,10 @@
 
 import pytest
 
+from pants.option.config import Config
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.options import Options
 from pants.option.subsystem import Subsystem
 
 
@@ -55,3 +57,37 @@ def test_is_valid_scope_name() -> None:
     check_false("foo.bar.")
     check_false("foo--bar")
     check_false("foo-bar-")
+
+
+def test_deprecated_register_options(caplog) -> None:
+    class GoodToGo(Subsystem):
+        options_scope = "good-to-go"
+
+    options = Options.create(
+        env={},
+        config=Config.load([]),
+        known_scope_infos=[GoodToGo.get_scope_info()],
+        args=["./pants"],
+        bootstrap_option_values=None,
+    )
+    GoodToGo.register_options_on_scope(options)
+
+    assert not caplog.records
+
+    class OldAndDusty(Subsystem):
+        options_scope = "good-to-go"
+
+        @classmethod
+        def register_options(cls, register):
+            return super().register_options(register)
+
+    options = Options.create(
+        env={},
+        config=Config.load([]),
+        known_scope_infos=[OldAndDusty.get_scope_info()],
+        args=["./pants"],
+        bootstrap_option_values=None,
+    )
+    OldAndDusty.register_options_on_scope(options)
+
+    assert "DEPRECATED: pants.option.subsystem.register_options() will be removed" in caplog.text

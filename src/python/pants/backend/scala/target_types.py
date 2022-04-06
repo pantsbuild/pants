@@ -109,14 +109,11 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
-        ScalaDependenciesField,
     )
     generated_target_cls = ScalatestTestTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        ScalaDependenciesField,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
         JvmJdkField,
         JvmProvidesTypesField,
@@ -161,14 +158,11 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
-        ScalaDependenciesField,
     )
     generated_target_cls = ScalaJunitTestTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        ScalaDependenciesField,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
         JvmJdkField,
         JvmProvidesTypesField,
@@ -214,15 +208,12 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "scala_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ScalaDependenciesField,
         ScalaSourcesGeneratorSourcesField,
     )
     generated_target_cls = ScalaSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        ScalaDependenciesField,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmJdkField,

@@ -218,7 +218,7 @@ async def setup_shunit2_for_target(
 
     env_dict = {
         "PATH": create_path_env_var(shell_setup.executable_search_path(env)),
-        "SHUNIT_COLOR": "always" if global_options.options.colors else "none",
+        "SHUNIT_COLOR": "always" if global_options.colors else "none",
         **test_extra_env.env,
     }
     argv = (

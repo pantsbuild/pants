@@ -41,7 +41,7 @@ use hashing::Digest;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
-use store::{SnapshotOps, SnapshotOpsError, Store};
+use store::{SnapshotOps, Store};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 pub mod bounded;
@@ -241,7 +241,7 @@ impl InputDigests {
     input_files: DirectoryDigest,
     immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
     use_nailgun: Vec<RelativePath>,
-  ) -> Result<Self, SnapshotOpsError> {
+  ) -> Result<Self, String> {
     // Collect all digests into `complete`.
     let mut complete_digests = try_join_all(
       immutable_inputs
@@ -459,6 +459,14 @@ impl Process {
   ///
   pub fn env(mut self, env: BTreeMap<String, String>) -> Process {
     self.env = env;
+    self
+  }
+
+  ///
+  /// Replaces the working_directory for this process.
+  ///
+  pub fn working_directory(mut self, working_directory: Option<RelativePath>) -> Process {
+    self.working_directory = working_directory;
     self
   }
 

@@ -64,9 +64,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_find_putative_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(
-        ["--no-python-tailor-ignore-solitary-init-files", "--no-use-deprecated-python-macros"]
-    )
+    rule_runner.set_options(["--no-python-tailor-ignore-solitary-init-files"])
     rule_runner.write_files(
         {
             "3rdparty/requirements.txt": "",

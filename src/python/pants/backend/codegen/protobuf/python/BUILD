@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(dependencies=[":lockfile"])
-resource(name="lockfile", source="mypy_protobuf_lockfile.txt")
+resource(name="lockfile", source="mypy_protobuf.lock")
 
 python_tests(
     name="python_protobuf_module_mapper_test", sources=["python_protobuf_module_mapper_test.py"]

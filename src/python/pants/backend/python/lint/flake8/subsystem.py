@@ -72,8 +72,8 @@ class Flake8(PythonToolBase):
     default_main = ConsoleScript("flake8")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.flake8", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/flake8/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.flake8", "flake8.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/flake8/flake8.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("lint")
@@ -230,7 +230,9 @@ async def setup_flake8_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not flake8.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(flake8)
+        return GeneratePythonLockfile.from_tool(
+            flake8, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # While Flake8 will run in partitions, we need a single lockfile that works with every
     # partition.
@@ -261,6 +263,7 @@ async def setup_flake8_lockfile(
         flake8,
         constraints or InterpreterConstraints(python_setup.interpreter_constraints),
         extra_requirements=first_party_plugins.requirement_strings,
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

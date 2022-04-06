@@ -20,6 +20,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -67,7 +68,13 @@ class ThriftSourceTarget(Target):
         ThriftDependenciesField,
         ThriftSourceField,
     )
-    help = f"A single Thrift file used to generate various languages.\n\nSee {doc_url('thrift')}."
+    help = softwrap(
+        f"""
+        A single Thrift file used to generate various languages.
+
+        See {doc_url('thrift')}.
+        """
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -96,16 +103,12 @@ class ThriftSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "thrift_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ThriftDependenciesField,
         ThriftSourcesGeneratingSourcesField,
         ThriftSourcesOverridesField,
     )
     generated_target_cls = ThriftSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        ThriftDependenciesField,
-    )
-    moved_fields = ()
+    copied_fields = (*COMMON_TARGET_FIELDS,)
+    moved_fields = (ThriftDependenciesField,)
     settings_request_cls = GeneratorSettingsRequest
     help = "Generate a `thrift_source` target for each file in the `sources` field."
 

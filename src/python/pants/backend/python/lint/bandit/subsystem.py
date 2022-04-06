@@ -57,8 +57,8 @@ class Bandit(PythonToolBase):
     default_main = ConsoleScript("bandit")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.bandit", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/bandit/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.bandit", "bandit.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/bandit/bandit.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("lint")
@@ -97,7 +97,9 @@ async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not bandit.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(bandit)
+        return GeneratePythonLockfile.from_tool(
+            bandit, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # While Bandit will run in partitions, we need a single lockfile that works with every
     # partition.
@@ -112,7 +114,9 @@ async def setup_bandit_lockfile(
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return GeneratePythonLockfile.from_tool(
-        bandit, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        bandit,
+        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

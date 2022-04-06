@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence, cast
+from typing import Iterable, NamedTuple, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
@@ -99,6 +99,7 @@ from pants.source.filespec import matches_filespec
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize
 
@@ -127,6 +128,7 @@ def target_types_to_generate_targets_requests(
     )
 
 
+@memoized
 def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     assert tgt_type.deprecated_alias_removal_version is not None
     warn_or_error(
@@ -139,6 +141,7 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     )
 
 
+@memoized
 def warn_deprecated_field_type(field_type: type[Field]) -> None:
     assert field_type.deprecated_alias_removal_version is not None
     warn_or_error(
@@ -181,7 +184,6 @@ async def resolve_target_parametrizations(
         # Split out the `propagated_fields` before construction.
         generator_fields = dict(target_adaptor.kwargs)
         template_fields = {}
-        # TODO: Require for all instances before landing.
         if issubclass(target_type, TargetGenerator):
             copied_fields = (
                 *target_type.copied_fields,
@@ -254,7 +256,7 @@ async def resolve_target_parametrizations(
     else:
         first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
         if rest:
-            # The target was parametrized, and so the original target is not addressable.
+            # The target was parametrized, and so the original Target does not exist.
             generated = FrozenDict(
                 (
                     parameterized_address,
@@ -688,7 +690,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 @rule
 def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
-    return cast(OwnersNotFoundBehavior, global_options.options.owners_not_found_behavior)
+    return global_options.owners_not_found_behavior
 
 
 def _log_or_raise_unmatched_owners(
@@ -819,7 +821,7 @@ async def resolve_specs_snapshot(
 
 @rule
 def extract_files_not_found_behavior(global_options: GlobalOptions) -> FilesNotFoundBehavior:
-    return cast(FilesNotFoundBehavior, global_options.options.files_not_found_behavior)
+    return global_options.files_not_found_behavior
 
 
 class AmbiguousCodegenImplementationsException(Exception):
@@ -953,7 +955,7 @@ class SubprojectRoots(Collection[str]):
 
 @rule
 def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
-    return SubprojectRoots(global_options.options.subproject_roots)
+    return SubprojectRoots(global_options.subproject_roots)
 
 
 class ParsedDependencies(NamedTuple):
@@ -1080,7 +1082,23 @@ async def resolve_dependencies(
         parametrizations = await Get(
             _TargetParametrizations, Address, tgt.address.maybe_convert_to_target_generator()
         )
-        generated_addresses = tuple(parametrizations.parametrization_for(tgt.address).keys())
+        generated_addresses = tuple(parametrizations.generated_for(tgt.address).keys())
+
+    # If the target is parametrized, see whether any explicitly provided dependencies are also
+    # parametrized, but with partial/no parameters. If so, fill them in.
+    explicitly_provided_includes: Iterable[Address] = explicitly_provided.includes
+    if request.field.address.is_parametrized and explicitly_provided_includes:
+        explicit_dependency_parametrizations = await MultiGet(
+            Get(_TargetParametrizations, Address, address.maybe_convert_to_target_generator())
+            for address in explicitly_provided_includes
+        )
+
+        explicitly_provided_includes = [
+            parametrizations.get_subset(address, tgt).address
+            for address, parametrizations in zip(
+                explicitly_provided_includes, explicit_dependency_parametrizations
+            )
+        ]
 
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
@@ -1114,7 +1132,7 @@ async def resolve_dependencies(
         addr
         for addr in (
             *generated_addresses,
-            *explicitly_provided.includes,
+            *explicitly_provided_includes,
             *itertools.chain.from_iterable(injected),
             *itertools.chain.from_iterable(inferred),
             *special_cased,
@@ -1302,7 +1320,18 @@ async def find_valid_field_sets_for_target_roots(
         )
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
             raise no_applicable_exception
-        if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn:
+        # We squelch the warning if the specs came from change detection or only from address globs,
+        # since in that case we interpret the user's intent as "if there are relevant matching
+        # targets, act on them". But we still want to warn if the specs were literal, or empty.
+        empty_ok = specs.from_change_detection or (
+            specs.address_specs.globs
+            and not specs.address_specs.literals
+            and not specs.filesystem_specs
+        )
+        if (
+            request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn
+            and not empty_ok
+        ):
             logger.warning(str(no_applicable_exception))
 
     result = TargetRootsToFieldSets(targets_to_applicable_field_sets)

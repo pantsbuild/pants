@@ -43,6 +43,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -133,12 +134,18 @@ async def package_python_awslambda(
     if file_tgts:
         files_addresses = sorted(tgt.address.spec for tgt in file_tgts)
         logger.warning(
-            f"The `python_awslambda` target {field_set.address} transitively depends on the below "
-            "`files` targets, but Pants will not include them in the built Lambda. Filesystem APIs "
-            "like `open()` are not able to load files within the binary itself; instead, they "
-            "read from the current working directory."
-            f"\n\nInstead, use `resources` targets. See {doc_url('resources')}."
-            f"\n\nFiles targets dependencies: {files_addresses}"
+            softwrap(
+                f"""
+                The `python_awslambda` target {field_set.address} transitively depends on the below
+                `files` targets, but Pants will not include them in the built Lambda. Filesystem APIs
+                like `open()` are not able to load files within the binary itself; instead, they
+                read from the current working directory.
+
+                Instead, use `resources` targets. See {doc_url('resources')}.
+
+                Files targets dependencies: {files_addresses}
+                """
+            )
         )
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.

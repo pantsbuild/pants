@@ -36,8 +36,7 @@ pub use crate::directory::{
   DigestTrie, DirectoryDigest, EMPTY_DIGEST_TREE, EMPTY_DIRECTORY_DIGEST,
 };
 pub use crate::glob_matching::{
-  ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
-  SINGLE_STAR_GLOB,
+  GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
 
 use std::cmp::min;
@@ -663,6 +662,59 @@ impl Vfs<io::Error> for Arc<PosixFS> {
 
   fn mk_error(msg: &str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, msg)
+  }
+}
+
+#[async_trait]
+impl Vfs<String> for DigestTrie {
+  async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
+    // DigestTrie does not currently support Links.
+    Err(format!("{:?} does not exist within this Snapshot.", link))
+  }
+
+  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {
+    // TODO(#14890): Change interface to take a reference to an Entry, and to avoid absolute paths.
+    // That would avoid both the need to handle this root case, and the need to recurse in `entry`
+    // down into children.
+    let directory = if dir.0.components().next().is_none() {
+      directory::Directory::new(directory::Name::new(""), self.entries().into())
+    } else {
+      let entry = self
+        .entry(&dir.0)?
+        .ok_or_else(|| format!("{:?} does not exist within this Snapshot.", dir))?;
+      match entry {
+        directory::Entry::File(_) => {
+          return Err(format!(
+            "Path `{}` was a file rather than a directory.",
+            dir.0.display()
+          ))
+        }
+        directory::Entry::Directory(d) => d.clone(),
+      }
+    };
+
+    Ok(Arc::new(DirectoryListing(
+      directory
+        .tree()
+        .entries()
+        .iter()
+        .map(|child| match child {
+          directory::Entry::File(f) => Stat::File(File {
+            path: dir.0.join(f.name().as_ref()),
+            is_executable: f.is_executable(),
+          }),
+          directory::Entry::Directory(d) => Stat::Dir(Dir(dir.0.join(d.name().as_ref()))),
+        })
+        .collect(),
+    )))
+  }
+
+  fn is_ignored(&self, _stat: &Stat) -> bool {
+    false
+  }
+
+  fn mk_error(msg: &str) -> String {
+    msg.to_owned()
   }
 }
 

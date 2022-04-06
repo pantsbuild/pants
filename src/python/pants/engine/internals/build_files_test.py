@@ -233,29 +233,30 @@ def target_adaptor_rule_runner() -> RuleRunner:
 def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {
-            "helloworld/BUILD": dedent(
+            "helloworld/dir/BUILD": dedent(
                 """\
                 mock_tgt(
                     fake_field=42,
                     dependencies=[
                         # Because we don't follow dependencies or even parse dependencies, this
                         # self-cycle should be fine.
-                        "helloworld",
+                        ":dir",
                         ":sibling",
                         "helloworld/util",
                         "helloworld/util:tests",
                     ],
+                    build_file_dir=f"build file's dir is: {build_file_dir()}"
                 )
                 """
             )
         }
     )
-    addr = Address("helloworld")
+    addr = Address("helloworld/dir")
     target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [addr])
-    assert target_adaptor.name == "helloworld"
+    assert target_adaptor.name == "dir"
     assert target_adaptor.type_alias == "mock_tgt"
     assert target_adaptor.kwargs["dependencies"] == [
-        "helloworld",
+        ":dir",
         ":sibling",
         "helloworld/util",
         "helloworld/util:tests",
@@ -263,6 +264,7 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
     # when encountering this, but it's fine at this stage.
     assert target_adaptor.kwargs["fake_field"] == 42
+    assert target_adaptor.kwargs["build_file_dir"] == "build file's dir is: helloworld/dir"
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:

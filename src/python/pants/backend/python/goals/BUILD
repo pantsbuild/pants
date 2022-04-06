@@ -15,7 +15,7 @@ python_tests(name="coverage_py_test", sources=["coverage_py_test.py"], timeout=2
 
 python_tests(name="export_integration_test", sources=["export_integration_test.py"])
 
-python_tests(name="lockfile_test", sources=["lockfile_test.py"])
+python_tests(name="lockfile_test", sources=["lockfile_test.py"], timeout=120)
 
 resources(name="platforms", sources=["platform*.json"])
 

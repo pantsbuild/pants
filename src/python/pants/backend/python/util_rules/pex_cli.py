@@ -39,9 +39,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.70"
+    default_version = "v2.1.76"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.70,<3.0"
+    version_constraints = ">=2.1.76,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -50,8 +50,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "b0cbd713fc8d0bc590980748d5e2a57cecc02f11e9c881df4861a980597b8c33",
-                    "3785513",
+                    "71c9a67b7bf8ede5f1bdacbbc2bd3e3df4395499623d9d0d5dfee40ae38ab941",
+                    "3731258",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64"]
@@ -136,9 +136,9 @@ async def setup_pex_cli_process(
     # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
     # Instead we manually create a FileContent for it.
     cert_args = []
-    if global_options.options.ca_certs_path:
-        ca_certs_content = Path(global_options.options.ca_certs_path).read_bytes()
-        chrooted_ca_certs_path = os.path.basename(global_options.options.ca_certs_path)
+    if global_options.ca_certs_path:
+        ca_certs_content = Path(global_options.ca_certs_path).read_bytes()
+        chrooted_ca_certs_path = os.path.basename(global_options.ca_certs_path)
 
         gets.append(
             Get(

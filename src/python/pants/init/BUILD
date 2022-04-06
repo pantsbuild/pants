@@ -8,13 +8,22 @@ target(
     name="plugins",
     dependencies=[
         "src/python/pants/backend/awslambda/python",
+        "src/python/pants/backend/codegen/protobuf/lint/buf",
         "src/python/pants/backend/codegen/protobuf/python",
         "src/python/pants/backend/codegen/thrift/apache/python",
         "src/python/pants/backend/docker",
         "src/python/pants/backend/docker/lint/hadolint",
+        "src/python/pants/backend/experimental/codegen/avro/java",
+        "src/python/pants/backend/experimental/codegen/protobuf/go",
+        "src/python/pants/backend/experimental/codegen/protobuf/java",
+        "src/python/pants/backend/experimental/codegen/protobuf/scala",
+        "src/python/pants/backend/experimental/codegen/thrift/apache/java",
+        "src/python/pants/backend/experimental/codegen/thrift/scrooge/java",
+        "src/python/pants/backend/experimental/codegen/thrift/scrooge/scala",
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/go",
         "src/python/pants/backend/experimental/go/lint/vet",
+        "src/python/pants/backend/experimental/helm",
         "src/python/pants/backend/experimental/java",
         "src/python/pants/backend/experimental/java/debug_goals",
         "src/python/pants/backend/experimental/java/lint/google_java_format",
@@ -46,4 +55,9 @@ target(
     ],
 )
 
-python_tests(name="tests", timeout=240)
+python_tests(
+    name="tests",
+    overrides={
+        "load_backends_integration_test.py": {"timeout": 300},
+    },
+)

@@ -34,7 +34,7 @@ from typing import (
 
 from typing_extensions import final
 
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import deprecated_conditional, warn_or_error
 from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -52,7 +52,7 @@ from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
+from pants.util.memo import memoized, memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, pluralize
@@ -351,9 +351,20 @@ class Target:
             valid_aliases.add(field_type.alias)
             aliases_to_field_types[field_type.alias] = field_type
             if field_type.deprecated_alias is not None:
+                valid_aliases.add(field_type.deprecated_alias)
                 aliases_to_field_types[field_type.deprecated_alias] = field_type
+
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
+                if isinstance(self, TargetGenerator):
+                    # Even though moved_fields don't live on the target generator, they are valid
+                    # for users to specify. It's intentional that these are only used for
+                    # `InvalidFieldException` and are not stored as normal fields with
+                    # `aliases_to_field_types`.
+                    for field_type in self.moved_fields:
+                        valid_aliases.add(field_type.alias)
+                        if field_type.deprecated_alias is not None:
+                            valid_aliases.add(field_type.deprecated_alias)
                 raise InvalidFieldException(
                     f"Unrecognized field `{alias}={value}` in target {address}. Valid fields for "
                     f"the target type `{self.alias}`: {sorted(valid_aliases)}.",
@@ -810,6 +821,27 @@ class AllTargetsRequest:
 # -----------------------------------------------------------------------------------------------
 
 
+@memoized
+def maybe_warn_dependencies_as_copied_field(tgt_type: type[TargetGenerator]) -> None:
+    copied_dependencies_field_types = [
+        field_type.__name__
+        for field_type in tgt_type.copied_fields
+        if issubclass(field_type, Dependencies)
+    ]
+    if copied_dependencies_field_types:
+        warn_or_error(
+            removal_version="2.12.0.dev2",
+            entity=(
+                f"using a `Dependencies` field subclass ({copied_dependencies_field_types}) "
+                "as a `TargetGenerator.copied_field`"
+            ),
+            hint=(
+                "`Dependencies` fields should be `TargetGenerator.moved_field`s, to avoid "
+                "redundant graph edges."
+            ),
+        )
+
+
 class TargetGenerator(Target):
     """A Target type which generates other Targets via installed `@rule` logic.
 
@@ -841,6 +873,10 @@ class TargetGenerator(Target):
     # acting as a convenient place for them to be specified.
     moved_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    def validate(self) -> None:
+        super().validate()
+        maybe_warn_dependencies_as_copied_field(type(self))
+
 
 class TargetFilesGenerator(TargetGenerator):
     """A TargetGenerator which generates a Target per file matched by the generator.
@@ -851,6 +887,25 @@ class TargetFilesGenerator(TargetGenerator):
     """
 
     settings_request_cls: ClassVar[type[TargetFilesGeneratorSettingsRequest] | None] = None
+
+    def validate(self) -> None:
+        super().validate()
+
+        if self.has_field(MultipleSourcesField) and not self[MultipleSourcesField].value:
+            sources_field = self[MultipleSourcesField]
+            warn_or_error(
+                removal_version="2.12.0.dev2",
+                entity=(
+                    f"specifying an empty `{sources_field.alias}` field for target generator type "
+                    f"`{self.alias}`"
+                ),
+                hint=(
+                    f"The target generator at {self.address} will not generate any targets. If its "
+                    "purpose is to act as an alias for its dependencies, then it should be "
+                    "declared as a `target(..)` generic target instead. If it is unused, then it "
+                    "should be removed."
+                ),
+            )
 
 
 @union
@@ -950,6 +1005,22 @@ class GeneratedTargets(FrozenDict[Address, Target]):
 
 
 class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for tgt_cls, request in self.items():
+            # TODO: After this deprecation, the key type for this class should become
+            # `TargetGenerator`, and the `request_for` method should require a `TargetGenerator`
+            # argument, so that callers are forced to cast / check subtyping before calling.
+            deprecated_conditional(
+                lambda: not issubclass(tgt_cls, TargetGenerator),
+                removal_version="2.12.0.dev2",
+                entity="`GenerateTargetsRequest.generate_from` types which do not subclass `TargetGenerator`",
+                hint=(
+                    f"The generate_from type of `{request.__name__}` was `{tgt_cls.__name__}`, "
+                    "which does not subclass `TargetGenerator`."
+                ),
+            )
+
     def is_generator(self, tgt: Target) -> bool:
         """Does this target type generate other targets?"""
         return bool(self.request_for(type(tgt)))
@@ -1033,10 +1104,13 @@ def _generate_file_level_targets(
 
     def gen_tgt(address: Address, full_fp: str, generated_target_fields: dict[str, Any]) -> Target:
         if add_dependencies_on_all_siblings:
-            if not generator.has_field(Dependencies):
+            if union_membership and not generated_target_cls.class_has_field(
+                Dependencies, union_membership
+            ):
                 raise AssertionError(
-                    f"The `{generator.alias}` target {template_address.spec} does "
-                    "not have a `dependencies` field, and thus cannot "
+                    f"The {type(generator).__name__} target class generates "
+                    f"{generated_target_cls.__name__} targets, which do not "
+                    f"have a `{Dependencies.alias}` field, and thus cannot "
                     "`add_dependencies_on_all_siblings`."
                 )
             original_deps = generated_target_fields.get(Dependencies.alias, ())

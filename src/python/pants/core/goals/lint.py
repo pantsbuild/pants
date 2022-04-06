@@ -6,8 +6,9 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, cast
+from typing import Any, ClassVar, Iterable, Iterator, Type, TypeVar, cast
 
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.style_request import (
     StyleRequest,
     determine_specified_tool_names,
@@ -16,6 +17,7 @@ from pants.core.goals.style_request import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsSnapshot, Workspace
@@ -32,6 +34,27 @@ from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
+
+_SR = TypeVar("_SR", bound=StyleRequest)
+
+
+class AmbiguousRequestNamesError(Exception):
+    def __init__(
+        self,
+        ambiguous_name: str,
+        requests: set[Type[StyleRequest] | Type[LintFilesRequest]],
+    ):
+        request_names = {
+            f"{request_target.__module__}.{request_target.__qualname__}"
+            for request_target in requests
+        }
+
+        super().__init__(
+            f"The same name `{ambiguous_name}` is used by multiple requests, "
+            f"which causes ambiguity: {request_names}\n\n"
+            f"To fix, please update these requests so that `{ambiguous_name}` "
+            f"is not used more than once."
+        )
 
 
 @dataclass(frozen=True)
@@ -135,7 +158,7 @@ class LintResults(EngineAwareReturnType):
 
 @union
 class LintTargetsRequest(StyleRequest):
-    """AThe entry point for linters that need targets."""
+    """The entry point for linters that need targets."""
 
 
 @union
@@ -181,6 +204,16 @@ class Lint(Goal):
     subsystem_cls = LintSubsystem
 
 
+def _check_ambiguous_request_names(
+    *requests: Type[LintFilesRequest] | Type[StyleRequest],
+) -> None:
+    for name, request_group in itertools.groupby(requests, key=lambda target: target.name):
+        request_group_set = set(request_group)
+
+        if len(request_group_set) > 1:
+            raise AmbiguousRequestNamesError(name, request_group_set)
+
+
 @goal_rule
 async def lint(
     console: Console,
@@ -191,77 +224,129 @@ async def lint(
     union_membership: UnionMembership,
     dist_dir: DistDir,
 ) -> Lint:
-    target_request_types = cast(
-        "Iterable[type[LintTargetsRequest]]", union_membership[LintTargetsRequest]
+    lint_target_request_types = cast(
+        "Iterable[type[LintTargetsRequest]]", union_membership.get(LintTargetsRequest)
     )
-    file_request_types = union_membership[LintFilesRequest]
+    fmt_target_request_types = cast("Iterable[type[FmtRequest]]", union_membership.get(FmtRequest))
+    file_request_types = cast(
+        "Iterable[type[LintFilesRequest]]", union_membership[LintFilesRequest]
+    )
+
+    _check_ambiguous_request_names(
+        *lint_target_request_types, *fmt_target_request_types, *file_request_types
+    )
+
     specified_names = determine_specified_tool_names(
         "lint",
         lint_subsystem.only,
-        target_request_types,
+        [
+            *lint_target_request_types,
+            *fmt_target_request_types,
+        ],
         extra_valid_names={request.name for request in file_request_types},
     )
-    target_requests = tuple(
-        request_type(
-            request_type.field_set_type.create(target)
-            for target in targets
-            if (
-                request_type.name in specified_names
-                and request_type.field_set_type.is_applicable(target)
+
+    def is_specified(request_type: type[StyleRequest] | type[LintFilesRequest]):
+        return request_type.name in specified_names
+
+    lint_target_request_types = filter(is_specified, lint_target_request_types)
+    fmt_target_request_types = filter(is_specified, fmt_target_request_types)
+    file_request_types = filter(is_specified, file_request_types)
+
+    def batch(field_sets: Iterable[FieldSet]) -> Iterator[list[FieldSet]]:
+        partitions = partition_sequentially(
+            field_sets,
+            key=lambda fs: fs.address.spec,
+            size_target=lint_subsystem.batch_size,
+            size_max=4 * lint_subsystem.batch_size,
+        )
+        for partition in partitions:
+            yield partition
+
+    def batch_by_type(
+        request_types: Iterable[type[_SR]],
+    ) -> tuple[tuple[type[_SR], list[FieldSet]], ...]:
+        return tuple(
+            (request_type, field_set_batch)
+            for request_type in request_types
+            for field_set_batch in batch(
+                request_type.field_set_type.create(target)
+                for target in targets
+                if request_type.field_set_type.is_applicable(target)
             )
         )
-        for request_type in target_request_types
+
+    lint_target_requests = (
+        request_type(batch) for request_type, batch in batch_by_type(lint_target_request_types)
+    )
+
+    batched_fmt_request_pairs = batch_by_type(fmt_target_request_types)
+    all_fmt_source_batches = await MultiGet(
+        Get(
+            SourceFiles,
+            SourceFilesRequest(
+                getattr(field_set, "sources", getattr(field_set, "source", None))
+                for field_set in batch
+            ),
+        )
+        for _, batch in batched_fmt_request_pairs
+    )
+
+    fmt_requests = (
+        request_type(
+            batch,
+            snapshot=source_files_snapshot.snapshot,
+        )
+        for (request_type, batch), source_files_snapshot in zip(
+            batched_fmt_request_pairs, all_fmt_source_batches
+        )
     )
     file_requests = (
-        tuple(
-            request_type(specs_snapshot.snapshot.files)
-            for request_type in file_request_types
-            if request_type.name in specified_names
-        )
+        tuple(request_type(specs_snapshot.snapshot.files) for request_type in file_request_types)
         if specs_snapshot.snapshot.files
         else ()
     )
 
-    def address_str(fs: FieldSet) -> str:
-        return fs.address.spec
-
     all_requests = [
-        *(
-            Get(LintResults, LintTargetsRequest, request.__class__(field_set_batch))
-            for request in target_requests
-            if request.field_sets
-            for field_set_batch in partition_sequentially(
-                request.field_sets,
-                key=address_str,
-                size_target=lint_subsystem.batch_size,
-                size_max=4 * lint_subsystem.batch_size,
-            )
-        ),
+        *(Get(LintResults, LintTargetsRequest, request) for request in lint_target_requests),
+        *(Get(FmtResult, FmtRequest, request) for request in fmt_requests),
         *(Get(LintResults, LintFilesRequest, request) for request in file_requests),
     ]
     all_batch_results = cast(
-        "tuple[LintResults, ...]",
+        "tuple[LintResults | FmtResult, ...]",
         await MultiGet(all_requests),  # type: ignore[arg-type]
     )
 
-    def key_fn(results: LintResults):
+    def key_fn(results: LintResults | FmtResult):
+        if isinstance(results, FmtResult):
+            return results.formatter_name
         return results.linter_name
 
     # NB: We must pre-sort the data for itertools.groupby() to work properly.
     sorted_all_batch_results = sorted(all_batch_results, key=key_fn)
+
+    def coerce_to_lintresult(batch_results: LintResults | FmtResult) -> tuple[LintResult, ...]:
+        if isinstance(batch_results, FmtResult):
+            return (
+                LintResult(
+                    1 if batch_results.did_change else 0,
+                    batch_results.stdout,
+                    batch_results.stderr,
+                ),
+            )
+        return batch_results.results
+
     # We consolidate all results for each linter into a single `LintResults`.
     all_results = tuple(
         sorted(
             (
                 LintResults(
                     itertools.chain.from_iterable(
-                        batch_results.results for batch_results in all_linter_results
+                        coerce_to_lintresult(batch_results) for batch_results in results
                     ),
                     linter_name=linter_name,
                 )
-                for linter_name, all_linter_results in itertools.groupby(
-                    sorted_all_batch_results, key=key_fn
-                )
+                for linter_name, results in itertools.groupby(sorted_all_batch_results, key=key_fn)
             ),
             key=key_fn,
         )

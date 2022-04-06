@@ -203,11 +203,13 @@ def run_pants_help_all() -> dict[str, Any]:
     # List all (stable enough) backends here.
     backends = [
         "pants.backend.awslambda.python",
+        "pants.backend.codegen.protobuf.lint.buf",
         "pants.backend.codegen.protobuf.python",
         "pants.backend.codegen.thrift.apache.python",
         "pants.backend.docker",
         "pants.backend.docker.lint.hadolint",
         "pants.backend.experimental.go",
+        "pants.backend.experimental.helm",
         "pants.backend.experimental.java",
         "pants.backend.experimental.java.lint.google_java_format",
         "pants.backend.experimental.python",

@@ -28,8 +28,8 @@ class IPython(PythonToolBase):
     default_main = ConsoleScript("ipython")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.subsystems", "ipython_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/ipython_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "ipython.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/ipython.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     ignore_cwd = BoolOption(
@@ -60,7 +60,9 @@ async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not ipython.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(ipython)
+        return GeneratePythonLockfile.from_tool(
+            ipython, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # IPython is often run against the whole repo (`./pants repl ::`), but it is possible to run
     # on subsets of the codebase with disjoint interpreter constraints, such as
@@ -79,7 +81,9 @@ async def setup_ipython_lockfile(
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return GeneratePythonLockfile.from_tool(
-        ipython, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        ipython,
+        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

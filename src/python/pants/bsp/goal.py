@@ -22,6 +22,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
+from pants.option.option_types import BoolOption, FileListOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.util.docutil import bin_name
@@ -38,38 +39,61 @@ class BSPGoal(BuiltinGoal):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return False
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--server",
-            type=bool,
-            default=False,
-            advanced=True,
-            help=(
-                "Run the Build Server Protocol server. Pants will receive BSP RPC requests via the console. "
-                "This should only ever be invoked via the IDE."
-            ),
-        )
-        register(
-            "--runner-env-vars",
-            type=list,
-            member_type=str,
-            default=["PATH"],
-            help=(
-                "Environment variables to set in the BSP runner script when setting up BSP in a repository. "
-                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-                f"or just `ENV_VAR` to copy the value from Pants' own environment when the {cls.name} goal was run.\n\n"
-                "This option only takes effect when the BSP runner script is written. If the option changes, you "
-                f"must run `{bin_name()} {cls.name}` again to write a new copy of the BSP runner script.\n\n"
-                "Note: The environment variables passed to the Pants BSP server will be those set for your IDE "
-                "and not your shell. For example, on macOS, the IDE is generally launched by `launchd` after "
-                "clicking on a Dock icon, and not from the shell. Thus, any environment variables set for your "
-                "shell will likely not be seen by the Pants BSP server. At the very least, on macOS consider "
-                "writing an explicit PATH into the BSP runner script via this option."
-            ),
-            advanced=True,
-        )
+    server = BoolOption(
+        "--server",
+        default=False,
+        advanced=True,
+        help=(
+            "Run the Build Server Protocol server. Pants will receive BSP RPC requests via the console. "
+            "This should only ever be invoked via the IDE."
+        ),
+    )
+    runner_env_vars = StrListOption(
+        "--runner-env-vars",
+        default=["PATH"],
+        help=(
+            "Environment variables to set in the BSP runner script when setting up BSP in a repository. "
+            "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
+            f"or just `ENV_VAR` to copy the value from Pants' own environment when the {name} goal was run.\n\n"
+            "This option only takes effect when the BSP runner script is written. If the option changes, you "
+            f"must run `{bin_name()} {name}` again to write a new copy of the BSP runner script.\n\n"
+            "Note: The environment variables passed to the Pants BSP server will be those set for your IDE "
+            "and not your shell. For example, on macOS, the IDE is generally launched by `launchd` after "
+            "clicking on a Dock icon, and not from the shell. Thus, any environment variables set for your "
+            "shell will likely not be seen by the Pants BSP server. At the very least, on macOS consider "
+            "writing an explicit PATH into the BSP runner script via this option."
+        ),
+        advanced=True,
+    )
+
+    groups_config_files = FileListOption(
+        "--groups-config-files",
+        help=(
+            "A list of config files that define groups of Pants targets to expose to IDEs via Build Server Protocol.\n\n"
+            "Pants generally uses fine-grained targets to define the components of a build (in many cases on a file-by-file "
+            "basis). Many IDEs, however, favor coarse-grained targets that contain large numbers of source files. "
+            "To accommodate this distinction, the Pants BSP server will compute a set of BSP build targets to use "
+            "from the groups specified in the config files set for this option. Each group will become one or more "
+            "BSP build targets.\n\n"
+            "Each config file is a TOML file with a `groups` dictionary with the following format for an entry:\n\n"
+            "    # The dictionary key is used to identify the group. It must be unique.\n"
+            "    [groups.ID1]:\n"
+            "    # One or more Pants address specs defining what targets to include in the group.\n"
+            "    addresses = [\n"
+            '      "src/jvm::",\n'
+            '      "tests/jvm::",\n'
+            "    ]\n"
+            "    # Filter targets to a specific resolve. Targets in a group must be from a single resolve.\n"
+            "    # Format of filter is `TYPE:RESOLVE_NAME`. The only supported TYPE is `jvm`. RESOLVE_NAME must be\n"
+            "    # a valid resolve name.\n"
+            '    resolve = "jvm:jvm-default"\n'
+            '    display_name = "Display Name"  # (Optional) Name shown to the user in the IDE.\n'
+            '    base_directory = "path/from/build/root"  # (Optional) Hint to the IDE for where the build target should "live."\n'
+            "\n"
+            "Pants will merge the contents of the config files together. If the same ID is used for a group definition, "
+            "in multiple config files, the definition in the latter config file will take effect."
+        ),
+    )
 
     def run(
         self,

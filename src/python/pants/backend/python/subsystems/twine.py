@@ -9,6 +9,7 @@ from pathlib import Path
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -34,11 +35,11 @@ class TwineSubsystem(PythonToolBase):
     default_extra_requirements = ["colorama>=0.4.3"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.subsystems", "twine_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/twine_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "twine.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/twine.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("publish")
@@ -106,8 +107,10 @@ class TwineLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule
-def setup_twine_lockfile(_: TwineLockfileSentinel, twine: TwineSubsystem) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(twine)
+def setup_twine_lockfile(
+    _: TwineLockfileSentinel, twine: TwineSubsystem, python_setup: PythonSetup
+) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(twine, use_pex=python_setup.generate_lockfiles_with_pex)
 
 
 def rules():

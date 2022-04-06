@@ -68,8 +68,9 @@ def construct_workunits_logger_callback(
     _: WorkunitsLoggerRequest,
     opts: WorkunitsLoggerOptions,
 ) -> WorkunitsCallbackFactory:
-    output_file = opts.options.dest
-    return WorkunitsCallbackFactory(lambda: WorkunitsLogger(output_file))
+    assert opts.dest is not None
+    dest = opts.dest
+    return WorkunitsCallbackFactory(lambda: WorkunitsLogger(dest))
 
 
 def rules():

@@ -64,14 +64,18 @@ class PyTest(PythonToolBase):
     # This should be compatible with requirements.txt, although it can be more precise.
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement` to override the version.
-    default_version = "pytest>=7,<8"
+    # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
+    # recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.
+    # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
+    #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
+    default_version = "pytest==7.0.1"
     default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
 
     default_main = ConsoleScript("pytest")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.subsystems", "pytest_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/pytest_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "pytest.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/pytest.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="-k test_foo --quiet", passthrough=True)
@@ -98,7 +102,7 @@ class PyTest(PythonToolBase):
         advanced=True,
         help="The maximum timeout (in seconds) that may be used on a `python_tests` target.",
     )
-    juint_family = StrOption(
+    junit_family = StrOption(
         "--junit-family",
         default="xunit2",
         advanced=True,
@@ -189,7 +193,9 @@ async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not pytest.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(pytest)
+        return GeneratePythonLockfile.from_tool(
+            pytest, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     # Even though we run each python_tests target in isolation, we need a single lockfile that
     # works with them all (and their transitive deps).
@@ -210,7 +216,9 @@ async def setup_pytest_lockfile(
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return GeneratePythonLockfile.from_tool(
-        pytest, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        pytest,
+        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

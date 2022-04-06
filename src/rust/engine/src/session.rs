@@ -399,6 +399,7 @@ impl Sessions {
         .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
       let (abort_handle, abort_registration) = AbortHandle::new_pair();
       let sessions = sessions.clone();
+      #[allow(clippy::let_underscore_lock)]
       let _ = executor.spawn(Abortable::new(
         async move {
           loop {

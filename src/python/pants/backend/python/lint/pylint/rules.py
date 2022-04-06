@@ -82,7 +82,6 @@ async def pylint_lint_partition(
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
-            internal_only=True,
         ),
     )
 
@@ -179,7 +178,7 @@ async def pylint_lint_partition(
 #  targets per field set. Doing that would require changing how we calculate interpreter
 #  constraints to be more like how we determine resolves, i.e. only inspecting the root target
 #  (and later validating the closure is compatible).
-@rule(desc="Determine if necessary to partition MyPy input", level=LogLevel.DEBUG)
+@rule(desc="Determine if necessary to partition Pylint input", level=LogLevel.DEBUG)
 async def pylint_determine_partitions(
     request: PylintRequest, python_setup: PythonSetup, first_party_plugins: PylintFirstPartyPlugins
 ) -> PylintPartitions:

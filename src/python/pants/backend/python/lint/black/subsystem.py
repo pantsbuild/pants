@@ -32,11 +32,11 @@ class Black(PythonToolBase):
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6.2"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.black", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/black/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/black/black.lock"
     default_lockfile_url = git_url(default_lockfile_path)
     default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
@@ -88,7 +88,9 @@ async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not black.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(black)
+        return GeneratePythonLockfile.from_tool(
+            black, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
@@ -100,7 +102,9 @@ async def setup_black_lockfile(
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints
 
-    return GeneratePythonLockfile.from_tool(black, constraints)
+    return GeneratePythonLockfile.from_tool(
+        black, constraints, use_pex=python_setup.generate_lockfiles_with_pex
+    )
 
 
 def rules():

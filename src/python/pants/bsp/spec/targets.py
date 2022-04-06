@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any
 
-from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier, Uri
+from pants.bsp.spec.base import BSPData, BuildTarget, BuildTargetIdentifier, Uri
 
 # -----------------------------------------------------------------------------------------------
 # Workspace Build Targets Request
@@ -176,6 +176,7 @@ class DependencyModulesParams:
         }
 
 
+@dataclass(frozen=True)
 class DependencyModule:
     # Module name
     name: str
@@ -183,21 +184,17 @@ class DependencyModule:
     # Module version
     version: str
 
-    # Kind of data to expect in the `data` field. If this field is not set, the kind of data is not specified.
-    data_kind: str | None
-
     # Language-specific metadata about this module.
     # See MavenDependencyModule as an example.
-    data: Any | None
+    data: BSPData | None
 
     def to_json_dict(self) -> dict[str, Any]:
-        result = {
+        result: dict[str, Any] = {
             "name": self.name,
             "version": self.version,
         }
-        if self.data_kind is not None:
-            result["dataKind"] = self.data_kind
         if self.data is not None:
+            result["dataKind"] = self.data.DATA_KIND
             result["data"] = self.data.to_json_dict()
         return result
 

@@ -9,6 +9,7 @@ from pathlib import PurePath
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
@@ -34,14 +35,14 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     options_scope = "terraform-hcl2-parser"
     help = "Used to parse Terraform modules to infer their dependencies."
 
-    default_version = "python-hcl2==3.0.3"
+    default_version = "python-hcl2==3.0.5"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.terraform", "hcl2_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/terraform/hcl2_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.terraform", "hcl2.lock")
+    default_lockfile_path = "src/python/pants/backend/terraform/hcl2.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
 
@@ -51,9 +52,13 @@ class TerraformHcl2ParserLockfileSentinel(GenerateToolLockfileSentinel):
 
 @rule
 def setup_lockfile_request(
-    _: TerraformHcl2ParserLockfileSentinel, hcl2_parser: TerraformHcl2Parser
+    _: TerraformHcl2ParserLockfileSentinel,
+    hcl2_parser: TerraformHcl2Parser,
+    python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(hcl2_parser)
+    return GeneratePythonLockfile.from_tool(
+        hcl2_parser, use_pex=python_setup.generate_lockfiles_with_pex
+    )
 
 
 @dataclass(frozen=True)

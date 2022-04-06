@@ -22,7 +22,7 @@ use remexec::{
   ServerCapabilities,
 };
 use tonic::{Code, Request, Status};
-use workunit_store::{in_workunit, Metric, ObservationMetric, WorkunitMetadata};
+use workunit_store::{in_workunit, Metric, ObservationMetric};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -273,16 +273,11 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes,
     );
-    let workunit_name = format!("store_bytes({})", resource_name.clone());
-    let workunit_metadata = WorkunitMetadata {
-      level: Level::Debug,
-      ..WorkunitMetadata::default()
-    };
+    let workunit_desc = format!("Storing bytes at: {resource_name}");
     let store = self.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
 
-    let resource_name = resource_name.clone();
     let chunk_size_bytes = store.chunk_size_bytes;
 
     let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
@@ -320,24 +315,19 @@ impl ByteStore {
       }
     });
 
-    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-      let workunit_store = workunit_store_handle.store;
-      in_workunit!(
-        workunit_store,
-        workunit_name,
-        workunit_metadata,
-        |workunit| async move {
-          let result = result_future.await;
-          if result.is_ok() {
-            workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
-          }
-          result
-        },
-      )
-      .await
-    } else {
-      result_future.await
-    }
+    in_workunit!(
+      "store_bytes",
+      Level::Trace,
+      desc = Some(workunit_desc),
+      |workunit| async move {
+        let result = result_future.await;
+        if result.is_ok() {
+          workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
+        }
+        result
+      },
+    )
+    .await
   }
 
   pub async fn load_bytes_with<
@@ -358,12 +348,7 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes
     );
-    let workunit_name = format!("load_bytes_with({})", resource_name.clone());
-    let workunit_metadata = WorkunitMetadata {
-      level: Level::Debug,
-      ..WorkunitMetadata::default()
-    };
-    let resource_name = resource_name.clone();
+    let workunit_desc = format!("Loading bytes at: {resource_name}");
     let f = f.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
@@ -374,7 +359,7 @@ impl ByteStore {
       let stream_result = client
         .read({
           protos::gen::google::bytestream::ReadRequest {
-            resource_name: resource_name.clone(),
+            resource_name,
             read_offset: 0,
             // 0 means no limit.
             read_limit: 0,
@@ -437,30 +422,26 @@ impl ByteStore {
       }
     };
 
-    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-      workunit_store_handle.store.record_observation(
-        ObservationMetric::RemoteStoreReadBlobTimeMicros,
-        start.elapsed().as_micros() as u64,
-      );
-      in_workunit!(
-        workunit_store_handle.store,
-        workunit_name,
-        workunit_metadata,
-        |workunit| async move {
-          let result = result_future.await;
-          if result.is_ok() {
-            workunit.increment_counter(
-              Metric::RemoteStoreBlobBytesDownloaded,
-              digest.size_bytes as u64,
-            );
-          }
-          result
-        },
-      )
-      .await
-    } else {
-      result_future.await
-    }
+    in_workunit!(
+      "load_bytes_with",
+      Level::Trace,
+      desc = Some(workunit_desc),
+      |workunit| async move {
+        workunit.record_observation(
+          ObservationMetric::RemoteStoreReadBlobTimeMicros,
+          start.elapsed().as_micros() as u64,
+        );
+        let result = result_future.await;
+        if result.is_ok() {
+          workunit.increment_counter(
+            Metric::RemoteStoreBlobBytesDownloaded,
+            digest.size_bytes as u64,
+          );
+        }
+        result
+      },
+    )
+    .await
   }
 
   ///
@@ -472,47 +453,33 @@ impl ByteStore {
     request: remexec::FindMissingBlobsRequest,
   ) -> impl Future<Output = Result<HashSet<Digest>, String>> {
     let store = self.clone();
-    let workunit_name = format!(
-      "list_missing_digests({})",
-      store.instance_name.clone().unwrap_or_default()
-    );
-    let workunit_metadata = WorkunitMetadata {
-      level: Level::Debug,
-      ..WorkunitMetadata::default()
-    };
-    let result_future = async move {
-      let store2 = store.clone();
-      let client = store2.cas_client.as_ref().clone();
-      let response = retry_call(
-        client,
-        move |mut client| {
-          let request = request.clone();
-          async move { client.find_missing_blobs(request).await }
-        },
-        status_is_retryable,
+    async {
+      in_workunit!(
+        "list_missing_digests",
+        Level::Debug,
+        |_workunit| async move {
+          let store2 = store.clone();
+          let client = store2.cas_client.as_ref().clone();
+          let response = retry_call(
+            client,
+            move |mut client| {
+              let request = request.clone();
+              async move { client.find_missing_blobs(request).await }
+            },
+            status_is_retryable,
+          )
+          .await
+          .map_err(status_to_str)?;
+
+          response
+            .into_inner()
+            .missing_blob_digests
+            .iter()
+            .map(|digest| digest.try_into())
+            .collect::<Result<HashSet<_>, _>>()
+        }
       )
       .await
-      .map_err(status_to_str)?;
-
-      response
-        .into_inner()
-        .missing_blob_digests
-        .iter()
-        .map(|digest| digest.try_into())
-        .collect::<Result<HashSet<_>, _>>()
-    };
-    async {
-      if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-        in_workunit!(
-          workunit_store_handle.store,
-          workunit_name,
-          workunit_metadata,
-          |_workunit| result_future,
-        )
-        .await
-      } else {
-        result_future.await
-      }
     }
   }
 
