@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
@@ -12,8 +14,8 @@ from pants.core.util_rules import config_files, external_tool
 from pants.engine import process
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import QueryRule, SubsystemRule
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -27,10 +29,10 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *tool.rules(),
             *process.rules(),
-            SubsystemRule(HelmSubsystem),
             QueryRule(HelmBinary, ()),
             QueryRule(HelmSubsystem, ()),
             QueryRule(Process, (HelmProcess,)),
+            QueryRule(ProcessResult, (HelmProcess,)),
         ],
     )
 
@@ -40,6 +42,32 @@ def test_initialises_basic_helm_binary(rule_runner: RuleRunner) -> None:
     helm_binary = rule_runner.request(HelmBinary, [])
     assert helm_binary
     assert helm_binary.path == f"__helm/{helm_subsystem.generate_exe(Platform.current)}"
+
+
+def test_initialise_classic_repos(rule_runner: RuleRunner) -> None:
+    repositories_opts = """{"jetstack": {"address": "https://charts.jetstack.io"}}"""
+    rule_runner.set_options([f"--helm-classic-repositories={repositories_opts}"])
+
+    process = HelmProcess(
+        argv=["repo", "list"],
+        input_digest=EMPTY_DIGEST,
+        description="List installed classic repositories",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+
+    # The result of the `helm repo list` command is a table with a header like
+    #    NAME     URL
+    #    alias    http://example.com/charts
+    #
+    # So to build the test expectation we parse that output keeping
+    # the repository's alias and url to be used in the comparison
+    table_rows = result.stdout.decode().splitlines()[1:]
+    configured_repos = [
+        (columns[0].strip(), columns[1].strip())
+        for columns in (re.split(r"\t+", line.rstrip()) for line in table_rows)
+    ]
+
+    assert configured_repos == [("jetstack", "https://charts.jetstack.io")]
 
 
 def test_create_helm_process(rule_runner: RuleRunner) -> None:
