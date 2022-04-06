@@ -23,7 +23,7 @@ class GitException(Exception):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class Git:
+class GitBinary:
     worktree: PurePath
     _gitdir: PurePath
     _gitcmd: str
@@ -46,12 +46,14 @@ class Git:
         self._gitcmd = binary
 
     @classmethod
-    def mount(cls, subdir: str | PurePath | None = None, *, binary: str | PurePath = "git") -> Git:
+    def mount(
+        cls, subdir: str | PurePath | None = None, *, binary: str | PurePath = "git"
+    ) -> GitBinary:
         """Detect the git working tree above cwd and return it.
 
         :param string subdir: The path to start searching for a git repo.
         :param string binary: The path to the git binary to use, 'git' by default.
-        :returns: a Git object that is configured to operate on the found git repo.
+        :returns: a GitBinary object that is configured to operate on the found git repo.
         :raises: :class:`GitException` if no git repo could be found.
         """
         cmd = [str(binary), "rev-parse", "--show-toplevel"]

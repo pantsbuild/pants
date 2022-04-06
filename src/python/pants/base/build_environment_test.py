@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from pants.base.build_environment import GitResult, get_pants_cachedir, rules
+from pants.base.build_environment import MaybeGitBinary, get_pants_cachedir, rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_file
@@ -16,7 +16,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *rules(),
-            QueryRule(GitResult, []),
+            QueryRule(MaybeGitBinary, []),
         ],
     )
 
@@ -29,9 +29,9 @@ def test_get_pants_cachedir() -> None:
 
 
 def test_git_rule(rule_runner: RuleRunner) -> None:
-    results = rule_runner.request(
-        GitResult,
+    maybe_git_binary = rule_runner.request(
+        MaybeGitBinary,
         [],
     )
 
-    assert results.git is None
+    assert maybe_git_binary.git is None

@@ -17,11 +17,11 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, run_pa
 from pants.testutil.test_base import AbstractTestGenerator
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
-from pants.vcs.git import Git
+from pants.vcs.git import GitBinary
 
 
 @contextmanager
-def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[Git]:
+def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[GitBinary]:
     """Initialize a git repository for the given `worktree`.
 
     NB: The given `worktree` must contain at least one file which will be committed to form an initial
@@ -29,7 +29,7 @@ def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[
 
     :param worktree: The path to the git work tree.
     :param gitdir: An optional path to the `.git` dir to use.
-    :returns: A `Git` repository object that can be used to interact with the repo.
+    :returns: A `GitBinary` repository object that can be used to interact with the repo.
     """
 
     @contextmanager
@@ -50,7 +50,7 @@ def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[
         subprocess.run(["git", "config", "user.name", "Your Name"], check=True)
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-am", "Add project files."], check=True)
-        yield Git.mount(subdir=worktree)
+        yield GitBinary.mount(subdir=worktree)
 
 
 def lines_to_set(str_or_list):

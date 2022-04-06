@@ -13,7 +13,7 @@ from typing import Iterator
 import pytest
 
 from pants.util.contextutil import environment_as, pushd
-from pants.vcs.git import Git, GitException
+from pants.vcs.git import GitBinary, GitException
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
@@ -53,7 +53,7 @@ def readme_file(worktree: Path) -> Path:
 
 
 @pytest.fixture
-def git(origin: Path, gitdir: Path, worktree: Path, readme_file: Path) -> Git:
+def git(origin: Path, gitdir: Path, worktree: Path, readme_file: Path) -> GitBinary:
     with environment_as(GIT_DIR=str(gitdir), GIT_WORK_TREE=str(worktree)):
         init_repo("depot", origin)
 
@@ -85,10 +85,10 @@ def git(origin: Path, gitdir: Path, worktree: Path, readme_file: Path) -> Git:
         readme_file.write_bytes("Hello World.\u2764".encode())
         subprocess.check_call(["git", "commit", "-am", "Update README."])
 
-    return Git(gitdir=gitdir, worktree=worktree)
+    return GitBinary(gitdir=gitdir, worktree=worktree)
 
 
-def test_integration(worktree: Path, readme_file: Path, git: Git) -> None:
+def test_integration(worktree: Path, readme_file: Path, git: GitBinary) -> None:
     assert set() == git.changed_files()
     assert {"README"} == git.changed_files(from_commit="HEAD^")
 
@@ -106,7 +106,7 @@ def test_integration(worktree: Path, readme_file: Path, git: Git) -> None:
     assert set() == git.changed_files(relative_to="non-existent")
 
 
-def test_detect_worktree(tmp_path: Path, origin: PurePath, git: Git) -> None:
+def test_detect_worktree(tmp_path: Path, origin: PurePath, git: GitBinary) -> None:
     clone = tmp_path / "clone"
     clone.mkdir()
     with pushd(clone.as_posix()):
@@ -119,7 +119,7 @@ def test_detect_worktree(tmp_path: Path, origin: PurePath, git: Git) -> None:
             abs_cwd = clone / cwd
             abs_cwd.mkdir(parents=True, exist_ok=True)
             with pushd(str(abs_cwd)):
-                actual = Git.mount().worktree
+                actual = GitBinary.mount().worktree
                 assert expected == actual
 
         with pytest.raises(GitException):
@@ -130,7 +130,7 @@ def test_detect_worktree(tmp_path: Path, origin: PurePath, git: Git) -> None:
         worktree_relative_to("is/a/dir", clone)
 
 
-def test_detect_worktree_no_cwd(tmp_path: Path, origin: PurePath, git: Git) -> None:
+def test_detect_worktree_no_cwd(tmp_path: Path, origin: PurePath, git: GitBinary) -> None:
     clone = tmp_path / "clone"
     clone.mkdir()
     with pushd(clone.as_posix()):
@@ -142,7 +142,7 @@ def test_detect_worktree_no_cwd(tmp_path: Path, origin: PurePath, git: Git) -> N
             # 'expected'.
             subdir = clone / some_dir
             subdir.mkdir(parents=True, exist_ok=True)
-            actual = Git.mount(subdir=subdir).worktree
+            actual = GitBinary.mount(subdir=subdir).worktree
             assert expected == actual
 
         with pytest.raises(GitException):
@@ -153,7 +153,7 @@ def test_detect_worktree_no_cwd(tmp_path: Path, origin: PurePath, git: Git) -> N
         worktree_relative_to("is/a/dir", clone)
 
 
-def test_changes_in(gitdir: PurePath, worktree: Path, git: Git) -> None:
+def test_changes_in(gitdir: PurePath, worktree: Path, git: GitBinary) -> None:
     """Test finding changes in a diffspecs.
 
     To some extent this is just testing functionality of git not pants, since all pants says is that
@@ -208,7 +208,7 @@ def test_changes_in(gitdir: PurePath, worktree: Path, git: Git) -> None:
         assert {"foo", "bar", "baz"} == git.changes_in(f"{c1}..{c4}")
 
 
-def test_commit_with_new_untracked_file_adds_file(worktree: Path, git: Git) -> None:
+def test_commit_with_new_untracked_file_adds_file(worktree: Path, git: GitBinary) -> None:
     new_file = worktree / "untracked_file"
     new_file.touch()
 
@@ -223,7 +223,7 @@ def test_commit_with_new_untracked_file_adds_file(worktree: Path, git: Git) -> N
     assert set() == git.changed_files(include_untracked=True)
 
 
-def test_bad_ref_stderr_issues_13396(git: Git) -> None:
+def test_bad_ref_stderr_issues_13396(git: GitBinary) -> None:
     with pytest.raises(GitException, match=re.escape("fatal: bad revision 'remote/dne...HEAD'\n")):
         git.changed_files(from_commit="remote/dne")
 
@@ -260,21 +260,21 @@ def executable_git(unexecutable_git: Path) -> Path:
 
 def test_detect_worktree_no_git(empty_path: PurePath) -> None:
     with pytest.raises(GitException):
-        Git.mount()
+        GitBinary.mount()
 
 
 def test_detect_worktree_unexectuable_git(unexecutable_git: PurePath) -> None:
     with pytest.raises(GitException):
-        Git.mount()
+        GitBinary.mount()
     with pytest.raises(GitException):
-        Git.mount(binary=unexecutable_git)
+        GitBinary.mount(binary=unexecutable_git)
 
 
 def test_detect_worktree_invalid_executable_git(executable_git: PurePath) -> None:
     with pytest.raises(GitException):
-        assert Git.mount() is None
+        assert GitBinary.mount() is None
     with pytest.raises(GitException):
-        Git.mount(binary=executable_git)
+        GitBinary.mount(binary=executable_git)
 
 
 def test_detect_worktree_failing_git(executable_git: Path) -> None:
@@ -287,9 +287,9 @@ def test_detect_worktree_failing_git(executable_git: Path) -> None:
         )
     )
     with pytest.raises(GitException):
-        Git.mount()
+        GitBinary.mount()
     with pytest.raises(GitException):
-        Git.mount(binary=executable_git)
+        GitBinary.mount(binary=executable_git)
 
 
 def test_detect_worktree_working_git(executable_git: Path) -> None:
@@ -302,5 +302,5 @@ def test_detect_worktree_working_git(executable_git: Path) -> None:
             """
         )
     )
-    assert expected_worktree_dir == Git.mount().worktree
-    assert expected_worktree_dir == Git.mount(binary=executable_git).worktree
+    assert expected_worktree_dir == GitBinary.mount().worktree
+    assert expected_worktree_dir == GitBinary.mount(binary=executable_git).worktree

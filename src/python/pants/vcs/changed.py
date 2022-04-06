@@ -18,7 +18,7 @@ from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
-from pants.vcs.git import Git
+from pants.vcs.git import GitBinary
 
 
 class DependeesOption(Enum):
@@ -73,15 +73,17 @@ class ChangedOptions:
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
 
-    def changed_files(self, git: Git) -> list[str]:
+    def changed_files(self, git_binary: GitBinary) -> list[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:
-            return cast(List[str], git.changes_in(self.diffspec, relative_to=get_buildroot()))
+            return cast(
+                List[str], git_binary.changes_in(self.diffspec, relative_to=get_buildroot())
+            )
 
-        changes_since = self.since or git.current_rev_identifier
+        changes_since = self.since or git_binary.current_rev_identifier
         return cast(
             List[str],
-            git.changed_files(
+            git_binary.changed_files(
                 from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
             ),
         )

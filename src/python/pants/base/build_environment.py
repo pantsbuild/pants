@@ -14,7 +14,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.internals import native_engine
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
-from pants.vcs.git import Git, GitException
+from pants.vcs.git import GitBinary, GitException
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
@@ -58,41 +58,41 @@ class _GitInitialized(Enum):
     NO = 0
 
 
-_Git: _GitInitialized | GitResult = _GitInitialized.NO
+_Git: _GitInitialized | MaybeGitBinary = _GitInitialized.NO
 
 
 @dataclasses.dataclass(frozen=True)
-class GitResult(EngineAwareReturnType):
-    git: Git | None
+class MaybeGitBinary(EngineAwareReturnType):
+    git: GitBinary | None
 
     def cacheable(self) -> bool:
         return False
 
 
 @rule(desc="Resolving `git` context", level=LogLevel.DEBUG)
-def get_git() -> GitResult:
+def get_git() -> MaybeGitBinary:
     """Returns Git, if available."""
     global _Git
     if _Git is _GitInitialized.NO:
         # We know about Git, so attempt an auto-configure
         try:
-            git = Git.mount()
+            git = GitBinary.mount()
             logger.debug(f"Detected git repository at {git.worktree} on branch {git.branch_name}")
-            _Git = GitResult(git=git)
+            _Git = MaybeGitBinary(git=git)
         except GitException as e:
             logger.info(f"No git repository at {os.getcwd()}: {e!r}")
-            _Git = GitResult(git=None)
+            _Git = MaybeGitBinary(git=None)
     return _Git
 
 
 # TODO(#12946): Get rid of this when it becomes possible to use `Get()` with only one arg.
-class GitRequest:
+class GitBinaryRequest:
     pass
 
 
 @rule
-async def get_git_wrapper(_: GitRequest, git_result: GitResult) -> GitResult:
-    return git_result
+async def get_git_wrapper(_: GitBinaryRequest, maybe_git_binary: MaybeGitBinary) -> MaybeGitBinary:
+    return maybe_git_binary
 
 
 def rules():
