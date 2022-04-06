@@ -322,7 +322,7 @@ class HelpInfoExtracter:
                     )
                 provider = ""
                 if subsystem_cls is not None and build_configuration is not None:
-                    provider = cls.get_first_provider(
+                    provider = cls.get_provider(
                         build_configuration.subsystem_to_providers.get(subsystem_cls)
                     )
                 return HelpInfoExtracter(scope_info.scope).get_option_scope_help_info(
@@ -340,7 +340,7 @@ class HelpInfoExtracter:
                 subsystem_cls = scope_info.subsystem_cls
                 assert subsystem_cls is not None
                 if build_configuration is not None:
-                    provider = cls.get_first_provider(
+                    provider = cls.get_provider(
                         build_configuration.subsystem_to_providers.get(subsystem_cls)
                     )
                 goal_subsystem_cls = cast(Type[GoalSubsystem], subsystem_cls)
@@ -359,12 +359,12 @@ class HelpInfoExtracter:
                 return TargetTypeHelpInfo.create(
                     target_type,
                     union_membership=union_membership,
-                    provider=cls.get_first_provider(
+                    provider=cls.get_provider(
                         build_configuration
                         and build_configuration.target_type_to_providers.get(target_type)
                         or None
                     ),
-                    get_field_type_provider=lambda field_type: cls.get_first_provider(
+                    get_field_type_provider=lambda field_type: cls.get_provider(
                         build_configuration.union_rule_to_providers.get(
                             UnionRule(target_type._plugin_field_cls, field_type)
                         )
@@ -478,10 +478,11 @@ class HelpInfoExtracter:
             return None
 
     @staticmethod
-    def get_first_provider(providers: tuple[str, ...] | None) -> str:
+    def get_provider(providers: tuple[str, ...] | None) -> str:
         if not providers:
             return ""
-        return providers[0]
+        # Pick the shortest backend name.
+        return sorted(providers, key=len)[0]
 
     @staticmethod
     def maybe_cleandoc(doc: str | None) -> str | None:
@@ -503,7 +504,7 @@ class HelpInfoExtracter:
                 name=rule.canonical_name,
                 description=rule.desc,
                 help=cls.maybe_cleandoc(rule.func.__doc__),
-                provider=cls.get_first_provider(providers),
+                provider=cls.get_provider(providers),
                 input_types=tuple(selector.__name__ for selector in rule.input_selectors),
                 input_gets=tuple(str(constraints) for constraints in rule.input_gets),
                 output_type=rule.output_type.__name__,
