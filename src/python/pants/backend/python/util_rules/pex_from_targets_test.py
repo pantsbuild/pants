@@ -430,11 +430,16 @@ def test_exclude_requirements(
     assert len(pex_request.requirements.req_strings) == (1 if include_requirements else 0)
 
 
-def test_issue_12222(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("enable_resolves", [False, True])
+def test_cross_platform_pex_disables_subsetting(
+    rule_runner: RuleRunner, enable_resolves: bool
+) -> None:
+    # See https://github.com/pantsbuild/pants/issues/12222.
+    lockfile = "3rdparty/python/default.lock"
     constraints = ["foo==1.0", "bar==1.0"]
     rule_runner.write_files(
         {
-            "constraints.txt": "\n".join(constraints),
+            lockfile: "\n".join(constraints),
             "a.py": "",
             "BUILD": dedent(
                 """
@@ -445,22 +450,34 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+
+    if enable_resolves:
+        options = [
+            "--python-enable-resolves",
+            # NB: Because this is a synthetic lockfile without a header.
+            "--python-invalid-lockfile-behavior=ignore",
+        ]
+    else:
+        options = [
+            f"--python-requirement-constraints={lockfile}",
+            "--python-resolve-all-constraints",
+        ]
+    rule_runner.set_options(options, env_inherit={"PATH"})
+
     request = PexFromTargetsRequest(
         [Address("", target_name="lib")],
         output_filename="demo.pex",
         internal_only=False,
         platforms=PexPlatforms(["some-platform-x86_64"]),
     )
-    rule_runner.set_options(
-        [
-            "--python-requirement-constraints=constraints.txt",
-            "--python-resolve-all-constraints",
-        ],
-        env_inherit={"PATH"},
-    )
     result = rule_runner.request(PexRequest, [request])
 
-    assert result.requirements == PexRequirements(["foo"], constraints_strings=constraints)
+    # TODO: Only a `resolve_constraints` file will be used as constraints for a cross-platform
+    # build currently, because we don't parse a manually generated (or poetry) lockfile to find
+    # constraints.
+    assert result.requirements == PexRequirements(
+        ["foo"], constraints_strings=(() if enable_resolves else constraints)
+    )
 
 
 class ResolveMode(Enum):
