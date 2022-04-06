@@ -464,20 +464,23 @@ def test_issue_12222(rule_runner: RuleRunner) -> None:
 
 
 class ResolveMode(Enum):
-    run_against_entire_lockfile = "run_against_entire_lockfile"
     resolve_all_constraints = "resolve_all_constraints"
     poetry_or_manual = "poetry_or_manual"
     pex = "pex"
 
 
 @pytest.mark.parametrize(
-    "mode,internal_only", [(m, io) for m in ResolveMode for io in [True, False]]
+    "mode,internal_only,run_against_entire_lockfile",
+    [(m, io, rael) for m in ResolveMode for io in [True, False] for rael in [True, False]],
 )
 def test_lockfile_requirements_selection(
-    rule_runner: RuleRunner, mode: ResolveMode, internal_only: bool
+    rule_runner: RuleRunner,
+    mode: ResolveMode,
+    internal_only: bool,
+    run_against_entire_lockfile: bool,
 ) -> None:
     mode_files: Mapping[str | PurePath, str | bytes]
-    if mode in (ResolveMode.resolve_all_constraints, ResolveMode.run_against_entire_lockfile):
+    if mode == ResolveMode.resolve_all_constraints:
         mode_files = {"constraints.txt": "setuptools==54.1.2"}
     elif mode == ResolveMode.poetry_or_manual:
         mode_files = {"3rdparty/python/default.lock": setuptools_poetry_lockfile}
@@ -506,16 +509,14 @@ def test_lockfile_requirements_selection(
         options = [
             "--python-requirement-constraints=constraints.txt",
         ]
-    elif mode == ResolveMode.run_against_entire_lockfile:
-        options = [
-            "--python-requirement-constraints=constraints.txt",
-            "--python-run-against-entire-lockfile",
-        ]
     else:
         # NB: It doesn't matter what the lockfile generator is set to: only what is actually on disk.
         options = [
             "--python-enable-resolves",
         ]
+
+    if run_against_entire_lockfile:
+        options.append("--python-run-against-entire-lockfile")
 
     request = PexFromTargetsRequest(
         [Address("", target_name="lib")],
@@ -526,25 +527,24 @@ def test_lockfile_requirements_selection(
     result = rule_runner.request(PexRequest, [request])
     assert result.layout == (PexLayout.PACKED if internal_only else PexLayout.ZIPAPP)
 
-    if mode in (ResolveMode.resolve_all_constraints, ResolveMode.poetry_or_manual):
-        assert isinstance(result.requirements, PexRequirements)
-        assert isinstance(result.requirements.from_superset, Pex)
-        assert not get_all_data(rule_runner, result.requirements.from_superset).is_zipapp
-    elif mode == ResolveMode.run_against_entire_lockfile:
-        # NB: The use of the legacy constraints file with `run_against_entire_lockfile` requires
-        # parsing and manipulation of the constraints, and needs to include transitive deps (unlike
-        # other lockfile requests). So it is emitted as `PexRequirements` rather than
-        # EntireLockfile.
-        assert isinstance(result.requirements, PexRequirements)
-        if internal_only:
-            # All internal requests result in the full set of requirements.
+    if run_against_entire_lockfile and internal_only:
+        # With `run_against_entire_lockfile`, all internal requests result in the full set
+        # of requirements, but that is encoded slightly differently per mode.
+        if mode == ResolveMode.resolve_all_constraints:
+            # NB: The use of the legacy constraints file with `resolve_all_constraints` requires parsing
+            # and manipulation of the constraints, and needs to include transitive deps (unlike other
+            # lockfile requests). So it is emitted as `PexRequirements` rather than EntireLockfile.
+            assert isinstance(result.requirements, PexRequirements)
             assert not result.requirements.from_superset
         else:
-            # But non-internal requests still subset from a packed PEX.
+            assert mode in (ResolveMode.poetry_or_manual, ResolveMode.pex)
+            assert isinstance(result.requirements, EntireLockfile)
+    else:
+        assert isinstance(result.requirements, PexRequirements)
+        if mode in (ResolveMode.resolve_all_constraints, ResolveMode.poetry_or_manual):
             assert isinstance(result.requirements.from_superset, Pex)
             assert not get_all_data(rule_runner, result.requirements.from_superset).is_zipapp
-    else:
-        assert mode == ResolveMode.pex
-        assert isinstance(result.requirements, PexRequirements)
-        assert isinstance(result.requirements.from_superset, LoadedLockfile)
-        assert result.requirements.from_superset.is_pex_native
+        else:
+            assert mode == ResolveMode.pex
+            assert isinstance(result.requirements.from_superset, LoadedLockfile)
+            assert result.requirements.from_superset.is_pex_native
