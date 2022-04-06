@@ -3,14 +3,10 @@
 
 from __future__ import annotations
 
-import json
 import os.path
 import re
 import textwrap
 import zipfile
-from dataclasses import dataclass
-from pathlib import PurePath
-from typing import Any, Iterable, Iterator, Mapping
 
 import pytest
 from packaging.specifiers import SpecifierSet
@@ -18,7 +14,8 @@ from packaging.version import Version
 from pkg_resources import Requirement
 
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.target_types import EntryPoint, MainSpecification
+from pants.backend.python.target_types import EntryPoint
+from pants.backend.python.util_rules import pex_test_utils
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import (
@@ -36,11 +33,15 @@ from pants.backend.python.util_rules.pex import (
     _strip_comments_from_pex_json_lockfile,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     LockfileContent,
     PexRequirements,
+)
+from pants.backend.python.util_rules.pex_test_utils import (
+    create_pex_and_get_all_data,
+    create_pex_and_get_pex_info,
+    parse_requirements,
 )
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, FileContent
@@ -51,176 +52,18 @@ from pants.util.dirutil import safe_rmtree
 from pants.util.ordered_set import FrozenOrderedSet
 
 
-@dataclass(frozen=True)
-class ExactRequirement:
-    project_name: str
-    version: str
-
-    @classmethod
-    def parse(cls, requirement: str) -> ExactRequirement:
-        req = PipRequirement.parse(requirement)
-        assert len(req.specs) == 1, (
-            f"Expected an exact requirement with only 1 specifier, given {requirement} with "
-            f"{len(req.specs)} specifiers"
-        )
-        operator, version = req.specs[0]
-        assert operator == "==", (
-            f"Expected an exact requirement using only the '==' specifier, given {requirement} "
-            f"using the {operator!r} operator"
-        )
-        return cls(project_name=req.project_name, version=version)
-
-
-def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement]:
-    for requirement in requirements:
-        yield ExactRequirement.parse(requirement)
-
-
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            *pex_test_utils.rules(),
             *pex_rules(),
             QueryRule(GlobalOptions, []),
-            QueryRule(Pex, (PexRequest,)),
-            QueryRule(VenvPex, (PexRequest,)),
-            QueryRule(Process, (PexProcess,)),
-            QueryRule(Process, (VenvPexProcess,)),
             QueryRule(ProcessResult, (Process,)),
             QueryRule(PexResolveInfo, (Pex,)),
             QueryRule(PexResolveInfo, (VenvPex,)),
-            QueryRule(PexPEX, ()),
         ],
     )
-
-
-@dataclass(frozen=True)
-class PexData:
-    pex: Pex | VenvPex
-    is_zipapp: bool
-    sandbox_path: PurePath
-    local_path: PurePath
-    info: Mapping[str, Any]
-    files: tuple[str, ...]
-
-
-def create_pex_and_get_all_data(
-    rule_runner: RuleRunner,
-    *,
-    pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
-    main: MainSpecification | None = None,
-    interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
-    platforms: PexPlatforms = PexPlatforms(),
-    sources: Digest | None = None,
-    additional_inputs: Digest | None = None,
-    additional_pants_args: tuple[str, ...] = (),
-    additional_pex_args: tuple[str, ...] = (),
-    env: Mapping[str, str] | None = None,
-    internal_only: bool = True,
-) -> PexData:
-    request = PexRequest(
-        output_filename="test.pex",
-        internal_only=internal_only,
-        requirements=requirements,
-        interpreter_constraints=interpreter_constraints,
-        platforms=platforms,
-        main=main,
-        sources=sources,
-        additional_inputs=additional_inputs,
-        additional_args=additional_pex_args,
-    )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python", *additional_pants_args],
-        env=env,
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
-
-    pex: Pex | VenvPex
-    if pex_type == Pex:
-        pex = rule_runner.request(Pex, [request])
-        digest = pex.digest
-        sandbox_path = pex.name
-        pex_pex = rule_runner.request(PexPEX, [])
-        process = rule_runner.request(
-            Process,
-            [
-                PexProcess(
-                    Pex(digest=pex_pex.digest, name=pex_pex.exe, python=pex.python),
-                    argv=["-m", "pex.tools", pex.name, "info"],
-                    input_digest=pex.digest,
-                    extra_env=dict(PEX_INTERPRETER="1"),
-                    description="Extract PEX-INFO.",
-                )
-            ],
-        )
-    else:
-        pex = rule_runner.request(VenvPex, [request])
-        digest = pex.digest
-        sandbox_path = pex.pex_filename
-        process = rule_runner.request(
-            Process,
-            [
-                VenvPexProcess(
-                    pex,
-                    argv=["info"],
-                    extra_env=dict(PEX_TOOLS="1"),
-                    description="Extract PEX-INFO.",
-                ),
-            ],
-        )
-
-    rule_runner.scheduler.write_digest(digest)
-    local_path = PurePath(rule_runner.build_root) / "test.pex"
-    result = rule_runner.request(ProcessResult, [process])
-    pex_info_content = result.stdout.decode()
-
-    is_zipapp = zipfile.is_zipfile(local_path)
-    if is_zipapp:
-        with zipfile.ZipFile(local_path, "r") as zipfp:
-            files = tuple(zipfp.namelist())
-    else:
-        files = tuple(
-            os.path.normpath(os.path.relpath(os.path.join(root, path), local_path))
-            for root, dirs, files in os.walk(local_path)
-            for path in dirs + files
-        )
-
-    return PexData(
-        pex=pex,
-        is_zipapp=is_zipapp,
-        sandbox_path=PurePath(sandbox_path),
-        local_path=local_path,
-        info=json.loads(pex_info_content),
-        files=files,
-    )
-
-
-def create_pex_and_get_pex_info(
-    rule_runner: RuleRunner,
-    *,
-    pex_type: type[Pex | VenvPex] = Pex,
-    requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
-    main: MainSpecification | None = None,
-    interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
-    platforms: PexPlatforms = PexPlatforms(),
-    sources: Digest | None = None,
-    additional_pants_args: tuple[str, ...] = (),
-    additional_pex_args: tuple[str, ...] = (),
-    internal_only: bool = True,
-) -> Mapping[str, Any]:
-    return create_pex_and_get_all_data(
-        rule_runner,
-        pex_type=pex_type,
-        requirements=requirements,
-        main=main,
-        interpreter_constraints=interpreter_constraints,
-        platforms=platforms,
-        sources=sources,
-        additional_pants_args=additional_pants_args,
-        additional_pex_args=additional_pex_args,
-        internal_only=internal_only,
-    ).info
 
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
@@ -412,22 +255,6 @@ def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
     assert set(parse_requirements(requirements.req_strings)).issubset(
         set(parse_requirements(pex_info["requirements"]))
     )
-
-
-@pytest.mark.parametrize("is_all_constraints_resolve", [True, False])
-@pytest.mark.parametrize("internal_only", [True, False])
-def test_use_packed_pex_requirements(
-    rule_runner: RuleRunner, is_all_constraints_resolve: bool, internal_only: bool
-) -> None:
-    requirements = PexRequirements(
-        ["six==1.12.0"], is_all_constraints_resolve=is_all_constraints_resolve
-    )
-    pex_data = create_pex_and_get_all_data(
-        rule_runner, requirements=requirements, internal_only=internal_only
-    )
-    # If this is either internal_only, or an all_constraints resolve, we should use packed.
-    should_use_packed = is_all_constraints_resolve or internal_only
-    assert (not pex_data.is_zipapp) == should_use_packed
 
 
 def test_requirement_constraints(rule_runner: RuleRunner) -> None:
