@@ -988,7 +988,7 @@ def test_invalid_rule_helper_name() -> None:
     with pytest.raises(ValueError, match="must be private"):
 
         @rule_helper
-        async def foo():
+        async def foo() -> A:
             pass
 
 
@@ -997,12 +997,12 @@ def test_cant_be_both_rule_and_rule_helper() -> None:
 
         @rule_helper
         @rule
-        async def func1():
+        async def _func1() -> A:
             pass
 
     with pytest.raises(ValueError, match="A @rule cannot be a @rule_helper"):
 
         @rule
         @rule_helper
-        async def func2():
+        async def _func2() -> A:
             pass
