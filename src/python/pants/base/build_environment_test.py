@@ -3,8 +3,22 @@
 
 import os
 
-from pants.base.build_environment import get_pants_cachedir
+import pytest
+
+from pants.base.build_environment import GitResult, get_pants_cachedir, rules
+from pants.engine.rules import QueryRule
+from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import environment_as, temporary_file
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *rules(),
+            QueryRule(GitResult, []),
+        ],
+    )
 
 
 def test_get_pants_cachedir() -> None:
@@ -12,3 +26,12 @@ def test_get_pants_cachedir() -> None:
         assert os.path.expanduser("~/.cache/pants") == get_pants_cachedir()
     with temporary_file() as temp, environment_as(XDG_CACHE_HOME=temp.name):
         assert os.path.join(temp.name, "pants") == get_pants_cachedir()
+
+
+def test_git_rule(rule_runner: RuleRunner) -> None:
+    results = rule_runner.request(
+        GitResult,
+        [],
+    )
+
+    assert results.git is None

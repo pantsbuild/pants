@@ -50,13 +50,13 @@ def calculate_specs(
     if not changed_options.provided:
         return specs
 
-    git = get_git()
-    if not git:
+    git_result = get_git()
+    if not git_result.git:
         raise InvalidSpecConstraint(
             "The `--changed-*` options are only available if Git is used for the repository."
         )
     changed_request = ChangedRequest(
-        sources=tuple(changed_options.changed_files(git)),
+        sources=tuple(changed_options.changed_files(git_result.git)),
         dependees=changed_options.dependees,
     )
     (changed_addresses,) = session.product_request(

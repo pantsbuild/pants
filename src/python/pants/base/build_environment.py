@@ -3,13 +3,17 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 from enum import Enum
 from pathlib import Path
 
 from pants.base.build_root import BuildRoot
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.internals import native_engine
+from pants.engine.rules import collect_rules, rule
+from pants.util.logging import LogLevel
 from pants.vcs.git import Git, GitException
 from pants.version import VERSION
 
@@ -50,23 +54,46 @@ def is_in_container() -> bool:
     )
 
 
-class _GitIinitialized(Enum):
+class _GitInitialized(Enum):
     NO = 0
 
 
-_Git: _GitIinitialized | Git | None = _GitIinitialized.NO
+_Git: _GitInitialized | GitResult = _GitInitialized.NO
 
 
-def get_git() -> Git | None:
+@dataclasses.dataclass(frozen=True)
+class GitResult(EngineAwareReturnType):
+    git: Git | None
+
+    def cacheable(self) -> bool:
+        return False
+
+
+@rule(desc="Resolving `git` context", level=LogLevel.DEBUG)
+def get_git() -> GitResult:
     """Returns Git, if available."""
     global _Git
-    if _Git is _GitIinitialized.NO:
+    if _Git is _GitInitialized.NO:
         # We know about Git, so attempt an auto-configure
         try:
             git = Git.mount()
             logger.debug(f"Detected git repository at {git.worktree} on branch {git.branch_name}")
-            _Git = git
+            _Git = GitResult(git=git)
         except GitException as e:
             logger.info(f"No git repository at {os.getcwd()}: {e!r}")
-            _Git = None
+            _Git = GitResult(git=None)
     return _Git
+
+
+# TODO(#12946): Get rid of this when it becomes possible to use `Get()` with only one arg.
+class GitRequest:
+    pass
+
+
+@rule
+async def get_git_wrapper(_: GitRequest, git_result: GitResult) -> GitResult:
+    return git_result
+
+
+def rules():
+    return [*collect_rules()]
