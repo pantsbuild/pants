@@ -314,6 +314,7 @@ class PythonSetup(Subsystem):
         "when building wheels. Otherwise, the default of macosx_11_0 will be used. "
         "This may be required for pip to be able to install the resulting distribution "
         "on Big Sur.",
+        advanced=True,
     )
 
     @property
