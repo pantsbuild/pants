@@ -7,8 +7,9 @@ import inspect
 import itertools
 import logging
 import sys
+import types
 from functools import partial
-from typing import List
+from typing import Callable, List, cast
 
 from pants.engine.internals.selectors import AwaitableConstraints, GetParseError
 from pants.util.memo import memoized
@@ -16,11 +17,11 @@ from pants.util.memo import memoized
 logger = logging.getLogger(__name__)
 
 
-def _is_awaitable_constraint(call_node) -> bool:
+def _is_awaitable_constraint(call_node: ast.Call) -> bool:
     return isinstance(call_node.func, ast.Name) and call_node.func.id in ("Get", "Effect")
 
 
-def _get_starting_indent(source):
+def _get_starting_indent(source: str) -> int:
     """Used to remove leading indentation from `source` so ast.parse() doesn't raise an
     exception."""
     if source.startswith(" "):
@@ -28,7 +29,7 @@ def _get_starting_indent(source):
     return 0
 
 
-def _get_lookup_names(attr: ast.Attribute | ast.Name):
+def _get_lookup_names(attr: ast.expr):
     names = []
     while isinstance(attr, ast.Attribute):
         names.append(attr.attr)
@@ -39,22 +40,24 @@ def _get_lookup_names(attr: ast.Attribute | ast.Name):
 
 
 class _AwaitableCollector(ast.NodeVisitor):
-    def __init__(self, func):
+    def __init__(self, func: Callable):
         self.func = func
-        self.source = inspect.getsource(func) or "<string>"
-        beginning_indent = _get_starting_indent(self.source)
+        source = inspect.getsource(func) or "<string>"
+        beginning_indent = _get_starting_indent(source)
         if beginning_indent:
-            self.source = "\n".join(line[beginning_indent:] for line in self.source.split("\n"))
-        self.source_file = inspect.getsourcefile(func)
-        self.owning_module = sys.modules[func.__module__]
-        self.awaitables = []
-        self.visit(ast.parse(self.source))
+            source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
 
-    def _resolve_constrain_arg_type(self, name, lineno):
+        self.source_file = inspect.getsourcefile(func)
+
+        self.owning_module = sys.modules[func.__module__]
+        self.awaitables: List[AwaitableConstraints] = []
+        self.visit(ast.parse(source))
+
+    def _resolve_constrain_arg_type(self, name: str, lineno: int) -> type:
         lineno += self.func.__code__.co_firstlineno - 1
         resolved = (
             getattr(self.owning_module, name, None)
-            or self.owning_module.__builtins__.get(name, None)
+            or self.owning_module.__builtins__.get(name, None)  # type: ignore[attr-defined]
         )  # fmt: skip
         if resolved is None:
             raise ValueError(
@@ -69,6 +72,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         return resolved
 
     def _get_awaitable(self, call_node: ast.Call) -> AwaitableConstraints:
+        assert isinstance(call_node.func, ast.Name)
         is_effect = call_node.func.id == "Effect"
         get_args = call_node.args
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=self.source_file)
@@ -86,6 +90,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         output_type = output_expr
 
         input_args = get_args[1:]
+        input_type: ast.Name
         if len(input_args) == 1:
             input_constructor = input_args[0]
             if not isinstance(input_constructor, ast.Call):
@@ -94,22 +99,22 @@ class _AwaitableCollector(ast.NodeVisitor):
                     "InputType(constructor args), the second argument should be a constructor "
                     "call, like `MergeDigest(...)` or `Process(...)`."
                 )
-            if not hasattr(input_constructor.func, "id"):
+            if not isinstance(input_constructor.func, ast.Name):
                 raise parse_error(
                     f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
                     "InputType(constructor args), the second argument should be a top-level "
                     "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
                     "than a method call."
                 )
-            input_type = input_constructor.func  # type: ignore[attr-defined]
+            input_type = input_constructor.func
         else:
-            input_type, _ = input_args
-            if not isinstance(input_type, ast.Name):
+            if not isinstance(input_args[0], ast.Name):
                 raise parse_error(
                     f"Because you are using the longhand form {call_node.func.id}(OutputType, "
                     "InputType, input), the second argument should be a type, like `MergeDigests` or "
                     "`Process`."
                 )
+            input_type = input_args[0]
 
         return AwaitableConstraints(
             self._resolve_constrain_arg_type(output_type.id, output_type.lineno),
@@ -123,7 +128,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         else:
             func_node = call_node.func
             lookup_names = _get_lookup_names(func_node)
-            attr = self.func.__globals__.get(lookup_names.pop(), None)
+            attr = cast(types.FunctionType, self.func).__globals__.get(lookup_names.pop(), None)
             while attr is not None and lookup_names:
                 attr = getattr(attr, lookup_names.pop(), None)
 
@@ -134,5 +139,5 @@ class _AwaitableCollector(ast.NodeVisitor):
 
 
 @memoized
-def collect_awaitables(func) -> List[AwaitableConstraints]:
+def collect_awaitables(func: Callable) -> List[AwaitableConstraints]:
     return _AwaitableCollector(func).awaitables
