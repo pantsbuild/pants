@@ -15,7 +15,6 @@ from pants.backend.helm.target_types import (
 )
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.engine.rules import SubsystemRule
 from pants.option.option_types import BoolOption, DictOption
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
@@ -101,7 +100,3 @@ class HelmSubsystem(TemplatedExternalTool):
     @memoized_method
     def remotes(self) -> HelmRemotes:
         return HelmRemotes.from_dicts(self._registries, self._classic_repositories)
-
-
-def rules():
-    return [SubsystemRule(HelmSubsystem)]

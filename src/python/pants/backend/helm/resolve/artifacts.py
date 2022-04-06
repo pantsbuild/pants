@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import cast
+from typing import Iterable, cast
 
 from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.subsystems.helm import HelmSubsystem
@@ -14,12 +14,18 @@ from pants.backend.helm.target_types import (
     HelmArtifactFieldSet,
     HelmArtifactRegistryField,
     HelmArtifactRepositoryField,
+    HelmChartMetaSourceField,
+    HelmChartTarget,
 )
+from pants.backend.helm.util_rules.chart_metadata import HelmChartMetadata
+from pants.backend.helm.util_rules.chart_metadata import rules as metadata_rules
 from pants.engine.addresses import Address
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
+from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import bullet_list
 
 
 class MissingHelmArtifactLocation(ValueError):
@@ -27,6 +33,14 @@ class MissingHelmArtifactLocation(ValueError):
         super().__init__(
             f"Target at address '{address}' needs to specify either `{HelmArtifactRegistryField.alias}`, "
             f"`{HelmArtifactRepositoryField.alias}` or both."
+        )
+
+
+class DuplicateHelmChartNamesFound(Exception):
+    def __init__(self, duplicates: Iterable[tuple[str, Address]]) -> None:
+        super().__init__(
+            f"Found more than one `{HelmChartTarget.alias}` target using the same chart name:\n\n"
+            f"{bullet_list([f'{addr} -> {name}' for name, addr in duplicates])}"
         )
 
 
@@ -68,11 +82,11 @@ class HelmArtifact:
         if registry:
             registry_location = HelmArtifactRegistryLocation(registry, repository)
 
+        location = registry_location or HelmArtifactClassicRepositoryLocation(cast(str, repository))
         metadata = HelmArtifactRequirement(
             name=cast(str, field_set.artifact.value),
             version=cast(str, field_set.version.value),
-            location=registry_location
-            or HelmArtifactClassicRepositoryLocation(cast(str, repository)),
+            location=location,
         )
 
         return cls(metadata=metadata, address=field_set.address)
@@ -98,13 +112,29 @@ class FirstPartyArtifactMapping(FrozenDict[str, Address]):
 
 
 @rule
-def first_party_artifact_mapping(
+async def first_party_artifact_mapping(
     all_helm_chart_tgts: AllHelmChartTargets,
 ) -> FirstPartyArtifactMapping:
-    first_party_chart_mapping: dict[str, Address] = {}
-    for tgt in all_helm_chart_tgts:
-        first_party_chart_mapping[tgt.address.target_name] = tgt.address
-    return FirstPartyArtifactMapping(first_party_artifact_mapping)
+    charts_metadata = await MultiGet(
+        Get(HelmChartMetadata, HelmChartMetaSourceField, tgt[HelmChartMetaSourceField])
+        for tgt in all_helm_chart_tgts
+    )
+
+    name_addr_mapping: dict[str, Address] = {}
+    duplicate_chart_names: OrderedSet[tuple[str, Address]] = OrderedSet()
+
+    for meta, tgt in zip(charts_metadata, all_helm_chart_tgts):
+        if meta.name in name_addr_mapping:
+            duplicate_chart_names.add((meta.name, name_addr_mapping[meta.name]))
+            duplicate_chart_names.add((meta.name, tgt.address))
+            continue
+
+        name_addr_mapping[meta.name] = tgt.address
+
+    if duplicate_chart_names:
+        raise DuplicateHelmChartNamesFound(duplicate_chart_names)
+
+    return FirstPartyArtifactMapping(name_addr_mapping)
 
 
 class ThirdPartyArtifactMapping(FrozenDict[str, Address]):
@@ -122,4 +152,4 @@ def third_party_artifact_mapping(
 
 
 def rules():
-    return collect_rules()
+    return [*collect_rules(), *metadata_rules()]

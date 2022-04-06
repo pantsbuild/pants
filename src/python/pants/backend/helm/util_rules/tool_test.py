@@ -8,7 +8,6 @@ import re
 import pytest
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.subsystems.helm import rules as helm_subsytem_rules
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.tool import HelmBinary, HelmProcess
 from pants.core.util_rules import config_files, external_tool
@@ -30,7 +29,6 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *tool.rules(),
             *process.rules(),
-            *helm_subsytem_rules(),
             QueryRule(HelmBinary, ()),
             QueryRule(HelmSubsystem, ()),
             QueryRule(Process, (HelmProcess,)),

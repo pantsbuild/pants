@@ -10,7 +10,6 @@ import pytest
 from pants.backend.helm.resolve import fetch
 from pants.backend.helm.resolve.artifacts import HelmArtifact
 from pants.backend.helm.resolve.fetch import FetchedHelmArtifacts, FetchHelmArfifactsRequest
-from pants.backend.helm.subsystems import helm
 from pants.backend.helm.target_types import AllHelmArtifactTargets, HelmArtifactTarget
 from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.util_rules import tool
@@ -28,7 +27,6 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *external_tool.rules(),
             *fetch.rules(),
-            *helm.rules(),
             *tool.rules(),
             *process.rules(),
             *target_types_rules(),

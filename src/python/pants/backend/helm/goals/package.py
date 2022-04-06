@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass
 
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartOutputPathField
-from pants.backend.helm.util_rules.chart import HelmChart, HelmChartMetadata, HelmChartRequest
+from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.engine.fs import (
@@ -28,10 +28,6 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-def _helm_artifact_filename(chart_metadata: HelmChartMetadata) -> str:
-    return f"{chart_metadata.name}-{chart_metadata.version}.tgz"
-
-
 @dataclass(frozen=True)
 class HelmPackageFieldSet(HelmChartFieldSet, PackageFieldSet):
     output_path: HelmChartOutputPathField
@@ -42,12 +38,12 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
     result_dir = "__out"
 
     chart, result_digest = await MultiGet(
-        Get(HelmChart, HelmChartRequest(field_set, generate_chart_lockfile=True)),
+        Get(HelmChart, HelmChartRequest(field_set)),
         Get(Digest, CreateDigest([Directory(result_dir)])),
     )
 
     input_digest = await Get(Digest, MergeDigests([chart.snapshot.digest, result_digest]))
-    process_output_file = os.path.join(result_dir, _helm_artifact_filename(chart.metadata))
+    process_output_file = os.path.join(result_dir, f"{chart.metadata.artifact_name}.tgz")
 
     process_result = await Get(
         ProcessResult,

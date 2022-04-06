@@ -8,20 +8,15 @@ import pytest
 from pants.backend.helm.dependency_inference.chart import InferHelmChartDependenciesRequest
 from pants.backend.helm.dependency_inference.chart import rules as chart_infer_rules
 from pants.backend.helm.resolve import artifacts
-from pants.backend.helm.subsystems import helm
 from pants.backend.helm.target_types import (
     HelmArtifactTarget,
     HelmChartMetaSourceField,
     HelmChartTarget,
 )
 from pants.backend.helm.target_types import rules as target_types_rules
-from pants.backend.helm.testutil import (
-    HELM_TEMPLATE_HELPERS_FILE,
-    HELM_VALUES_FILE,
-    K8S_SERVICE_FILE,
-)
 from pants.backend.helm.util_rules import chart
 from pants.engine.addresses import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies
 from pants.testutil.rule_runner import RuleRunner
@@ -35,14 +30,13 @@ def rule_runner() -> RuleRunner:
             *artifacts.rules(),
             *chart.rules(),
             *chart_infer_rules(),
-            *helm.rules(),
             *target_types_rules(),
             QueryRule(InferredDependencies, (InferHelmChartDependenciesRequest,)),
         ],
     )
 
 
-def test_infer_3rdparty_dependency(rule_runner: RuleRunner) -> None:
+def test_infer_chart_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "3rdparty/helm/jetstack/BUILD": dedent(
@@ -55,20 +49,26 @@ def test_infer_3rdparty_dependency(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "src/chart/BUILD": """helm_chart()""",
-            "src/chart/Chart.yaml": dedent(
+            "src/bar/BUILD": """helm_chart()""",
+            "src/bar/Chart.yaml": dedent(
                 """\
                 apiVersion: v2
-                name: chart2
+                name: bar
+                version: 0.1.0
+                """
+            ),
+            "src/foo/BUILD": """helm_chart()""",
+            "src/foo/Chart.yaml": dedent(
+                """\
+                apiVersion: v2
+                name: foo
                 version: 0.1.0
                 dependencies:
                 - name: cert-manager
                   repository: "@jetstack"
+                - name: bar
                 """
             ),
-            "src/chart/values.yaml": HELM_VALUES_FILE,
-            "src/chart/templates/service.yaml": K8S_SERVICE_FILE,
-            "src/chart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
         }
     )
 
@@ -81,11 +81,40 @@ def test_infer_3rdparty_dependency(rule_runner: RuleRunner) -> None:
         ]
     )
 
-    tgt = rule_runner.get_target(Address("src/chart", target_name="chart"))
-
+    tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
     inferred_deps = rule_runner.request(
         InferredDependencies, [InferHelmChartDependenciesRequest(tgt[HelmChartMetaSourceField])]
     )
     assert set(inferred_deps.dependencies) == {
-        Address("3rdparty/helm/jetstack", target_name="cert-manager")
+        Address("3rdparty/helm/jetstack", target_name="cert-manager"),
+        Address("src/bar", target_name="bar"),
     }
+
+
+def test_raise_error_when_unknown_dependency_is_found(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/foo/BUILD": """helm_chart()""",
+            "src/foo/Chart.yaml": dedent(
+                """\
+                apiVersion: v2
+                name: foo
+                version: 0.1.0
+                dependencies:
+                - name: bar
+                """
+            ),
+        }
+    )
+
+    source_root_patterns = ("/src/*",)
+    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
+
+    tgt = rule_runner.get_target(Address("src/foo", target_name="foo"))
+
+    with pytest.raises(
+        ExecutionError, match="Can not find any declared artifact for dependency 'bar'"
+    ):
+        rule_runner.request(
+            InferredDependencies, [InferHelmChartDependenciesRequest(tgt[HelmChartMetaSourceField])]
+        )

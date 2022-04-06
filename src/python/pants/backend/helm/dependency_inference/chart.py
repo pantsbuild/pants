@@ -8,10 +8,9 @@ from pants.backend.helm.resolve.artifacts import (
     FirstPartyArtifactMapping,
     ThirdPartyArtifactMapping,
 )
-from pants.backend.helm.subsystems import helm
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartMetaSourceField
-from pants.backend.helm.util_rules.chart import HelmChartDependency, HelmChartMetadata
+from pants.backend.helm.util_rules.chart_metadata import HelmChartDependency, HelmChartMetadata
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
@@ -72,6 +71,5 @@ def rules():
     return [
         *collect_rules(),
         *artifacts.rules(),
-        *helm.rules(),
         UnionRule(InferDependenciesRequest, InferHelmChartDependenciesRequest),
     ]
