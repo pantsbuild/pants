@@ -1,3 +1,5 @@
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
 import ast
@@ -5,13 +7,14 @@ import inspect
 import itertools
 import logging
 import sys
-import types
 from functools import partial
 from typing import List
 
 from pants.engine.internals.selectors import AwaitableConstraints, GetParseError
+from pants.util.memo import memoized
 
 logger = logging.getLogger(__name__)
+
 
 def _is_awaitable_constraint(call_node) -> bool:
     return isinstance(call_node.func, ast.Name) and call_node.func.id in ("Get", "Effect")
@@ -124,19 +127,12 @@ class _AwaitableCollector(ast.NodeVisitor):
             while attr is not None and lookup_names:
                 attr = getattr(attr, lookup_names.pop(), None)
 
-            if (
-                attr is not None
-                and attr is not self.func
-                # NB: This only is True for free functions and staticmethods
-                and isinstance(attr, types.FunctionType)
-                # @TODO: This wouldn't be true for plugins
-                and attr.__module__.startswith("pants")
-            ):
+            if hasattr(attr, "rule_helper"):
                 self.awaitables.extend(collect_awaitables(attr))
 
         self.generic_visit(call_node)
 
 
-# @TODO: memoization?
+@memoized
 def collect_awaitables(func) -> List[AwaitableConstraints]:
     return _AwaitableCollector(func).awaitables
