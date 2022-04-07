@@ -393,6 +393,9 @@ async def create_pex_from_targets(
 
         pex_native_subsetting_supported = False
         if python_setup.enable_resolves:
+            # TODO: Once `requirement_constraints` is removed in favor of `enable_resolves`,
+            # `ChosenPythonResolveRequest` and `_PexRequirementsRequest` should merge and
+            # do a single transitive walk to replace this method.
             chosen_resolve = await Get(
                 ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
             )
@@ -400,6 +403,10 @@ async def create_pex_from_targets(
                 LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile)
             )
             pex_native_subsetting_supported = loaded_lockfile.is_pex_native
+            if loaded_lockfile.constraints_strings:
+                requirements = dataclasses.replace(
+                    requirements, constraints_strings=loaded_lockfile.constraints_strings
+                )
 
         should_return_entire_lockfile = (
             python_setup.run_against_entire_lockfile and request.internal_only

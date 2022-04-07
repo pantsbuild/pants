@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Iterable, Iterator
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
-from pants.backend.python.target_types import PythonRequirementsField
+from pants.backend.python.target_types import PythonRequirementsField, parse_requirements_file
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
     InvalidPythonLockfileReason,
@@ -87,8 +87,11 @@ class LoadedLockfile:
     requirement_estimate: int
     # True if the loaded lockfile is in PEX's native format.
     is_pex_native: bool
+    # If !is_pex_native, the lockfile parsed as constraints strings, for use when the lockfile
+    # needs to be subsetted (see #15031, ##12222).
+    constraints_strings: FrozenOrderedSet[str] | None
     # The original file or file content (which may not have identical content to the output
-    # `lockfile_digest).
+    # `lockfile_digest`).
     original_lockfile: Lockfile | LockfileContent
 
 
@@ -167,11 +170,16 @@ async def load_lockfile(
             ),
         )
         requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
+        constraints_strings = None
     else:
         header_delimiter = "#"
+        lock_string = lock_bytes.decode()
         # Note: this is a very naive heuristic. It will overcount because entries often
         # have >1 line due to `--hash`.
-        requirement_estimate = len(lock_bytes.decode().splitlines())
+        requirement_estimate = len(lock_string.splitlines())
+        constraints_strings = FrozenOrderedSet(
+            str(req) for req in parse_requirements_file(lock_string, rel_path=lockfile_path)
+        )
 
     metadata: PythonLockfileMetadata | None = None
     if should_validate_metadata(lockfile, python_setup):
@@ -188,6 +196,7 @@ async def load_lockfile(
         metadata,
         requirement_estimate,
         is_pex_native,
+        constraints_strings,
         original_lockfile=lockfile,
     )
 

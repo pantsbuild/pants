@@ -472,12 +472,7 @@ def test_cross_platform_pex_disables_subsetting(
     )
     result = rule_runner.request(PexRequest, [request])
 
-    # TODO: Only a `resolve_constraints` file will be used as constraints for a cross-platform
-    # build currently, because we don't parse a manually generated (or poetry) lockfile to find
-    # constraints.
-    assert result.requirements == PexRequirements(
-        ["foo"], constraints_strings=(() if enable_resolves else constraints)
-    )
+    assert result.requirements == PexRequirements(["foo"], constraints_strings=constraints)
 
 
 class ResolveMode(Enum):
