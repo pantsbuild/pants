@@ -263,6 +263,8 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✓ FilesLinter succeeded.
         ✓ SuccessfulFormatter succeeded.
         ✓ SuccessfulLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
         """
     )
 
@@ -280,6 +282,8 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✕ FailingFormatter failed.
         ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
         """
     )
 
