@@ -21,7 +21,7 @@ class ApacheThriftSubsystem(Subsystem):
             "A list of paths to search for Thrift.\n\n"
             "Specify absolute paths to directories with the `thrift` binary, e.g. `/usr/bin`. "
             "Earlier entries will be searched first.\n\n"
-            "The special string '<PATH>' will expand to the contents of the PATH env var."
+            'The special string `"<PATH>"` will expand to the contents of the PATH env var.'
         ),
     )
     expected_version = StrOption(
