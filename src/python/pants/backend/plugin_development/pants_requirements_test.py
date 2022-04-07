@@ -24,8 +24,9 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
     "pants_version,expected",
     (
         ("2.4.0.dev1", "==2.4.0.dev1"),
-        ("2.4.0rc1", ">=2.4.0rc0,<2.5"),
-        ("2.4.0", ">=2.4.0rc0,<2.5"),
+        ("2.4.0rc1", ">=2.4.0rc1,<2.5"),
+        ("2.4.0", ">=2.4.0,<2.5"),
+        ("2.4.5", ">=2.4.5,<2.5"),
     ),
 )
 def test_determine_version(monkeypatch, pants_version: str, expected: str) -> None:
