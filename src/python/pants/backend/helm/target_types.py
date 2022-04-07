@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from textwrap import dedent
 
 from pants.backend.helm.resolve.remotes import ALL_DEFAULT_HELM_REGISTRIES
 from pants.core.goals.package import OutputPathField
@@ -351,68 +350,6 @@ class HelmArtifactTarget(Target):
         HelmArtifactVersionField,
     )
     help = "A third party Helm artifact."
-
-
-@dataclass(frozen=True)
-class HelmArtifactFieldSet(FieldSet):
-    required_fields = (HelmArtifactArtifactField, HelmArtifactVersionField)
-
-    registry: HelmArtifactRegistryField
-    repository: HelmArtifactRepositoryField
-    artifact: HelmArtifactArtifactField
-    version: HelmArtifactVersionField
-
-
-class AllHelmArtifactTargets(Targets):
-    pass
-
-
-@rule
-def all_helm_artifact_targets(all_targets: AllTargets) -> AllHelmArtifactTargets:
-    return AllHelmArtifactTargets(
-        [tgt for tgt in all_targets if HelmArtifactFieldSet.is_applicable(tgt)]
-    )
-
-
-# -----------------------------------------------------------------------------------------------
-# `helm_artifact` target
-# -----------------------------------------------------------------------------------------------
-
-
-class HelmArtifactRegistryField(StringField):
-    alias = "registry"
-    help = (
-        "Registry alias (prefixed by `@`) configured in `[helm.registries]` for the Helm artifact"
-    )
-
-
-class HelmArtifactRepositoryField(StringField):
-    alias = "repository"
-    help = "Either an alias (prefixed by `@`) to a classic Helm repository configured in `[helm.registries]` or a path inside an OCI registry"
-
-
-class HelmArtifactArtifactField(StringField):
-    alias = "artifact"
-    required = True
-    help = "Artifact name of the chart, without version number"
-
-
-class HelmArtifactVersionField(StringField):
-    alias = "version"
-    required = True
-    help = "The `version` part of a third party Helm chart"
-
-
-class HelmArtifactTarget(Target):
-    alias = "helm_artifact"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        HelmArtifactRegistryField,
-        HelmArtifactRepositoryField,
-        HelmArtifactArtifactField,
-        HelmArtifactVersionField,
-    )
-    help = "A third party Helm artifact"
 
 
 @dataclass(frozen=True)

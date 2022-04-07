@@ -195,12 +195,9 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
     )
 
     target = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
-    helm_chart = rule_runner.request(
-        HelmChart, [HelmChartRequest.from_target(target, generate_chart_lockfile=True)]
-    )
+    helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
 
     assert helm_chart.metadata == expected_metadata
-    assert "chart2/Chart.lock" in helm_chart.snapshot.files
     assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
     assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
     assert "chart2/charts/cert-manager" in helm_chart.snapshot.dirs
