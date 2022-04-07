@@ -25,9 +25,8 @@ from pants.backend.python.target_types import (
     PexLayout,
 )
 from pants.backend.python.target_types import PexPlatformsField as PythonPlatformsField
-from pants.backend.python.util_rules import pex_cli
+from pants.backend.python.util_rules import pex_cli, pex_requirements
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
@@ -35,30 +34,22 @@ from pants.backend.python.util_rules.pex_environment import (
     PexRuntimeEnvironment,
     PythonExecutable,
 )
-from pants.backend.python.util_rules.pex_requirements import Lockfile, LockfileContent
+from pants.backend.python.util_rules.pex_requirements import (
+    EntireLockfile,
+    LoadedLockfile,
+    LoadedLockfileRequest,
+    Lockfile,
+)
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
 )
-from pants.backend.python.util_rules.pex_requirements import (
-    should_validate_metadata,
-    validate_metadata,
-)
+from pants.backend.python.util_rules.pex_requirements import validate_metadata
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
@@ -135,14 +126,14 @@ async def digest_complete_platforms(
 class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
-    layout: PexLayout | None
+    layout: PexLayout
     python: PythonExecutable | None
-    requirements: PexRequirements | Lockfile | LockfileContent
+    requirements: PexRequirements | EntireLockfile
     interpreter_constraints: InterpreterConstraints
     platforms: PexPlatforms
     complete_platforms: CompletePlatforms
     sources: Digest | None
-    additional_inputs: Digest | None
+    additional_inputs: Digest
     main: MainSpecification | None
     additional_args: tuple[str, ...]
     pex_path: tuple[Pex, ...]
@@ -155,7 +146,7 @@ class PexRequest(EngineAwareParameter):
         internal_only: bool,
         layout: PexLayout | None = None,
         python: PythonExecutable | None = None,
-        requirements: PexRequirements | Lockfile | LockfileContent = PexRequirements(),
+        requirements: PexRequirements | EntireLockfile = PexRequirements(),
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         complete_platforms=CompletePlatforms(),
@@ -202,18 +193,21 @@ class PexRequest(EngineAwareParameter):
         """
         self.output_filename = output_filename
         self.internal_only = internal_only
-        self.layout = layout
+        # Use any explicitly requested layout, or Packed for internal PEXes (which is a much
+        # friendlier layout for the CAS than Zipapp.)
+        self.layout = layout or (PexLayout.PACKED if internal_only else PexLayout.ZIPAPP)
         self.python = python
         self.requirements = requirements
         self.interpreter_constraints = interpreter_constraints
         self.platforms = platforms
         self.complete_platforms = complete_platforms
         self.sources = sources
-        self.additional_inputs = additional_inputs
+        self.additional_inputs = additional_inputs or EMPTY_DIGEST
         self.main = main
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
         self.description = description
+
         self.__post_init__()
 
     def __post_init__(self):
@@ -222,11 +216,6 @@ class PexRequest(EngineAwareParameter):
                 "Internal only PEXes can only constrain interpreters with interpreter_constraints."
                 f"Given platform constraints {self.platforms} for internal only pex request: "
                 f"{self}."
-            )
-        if self.internal_only and self.layout:
-            raise ValueError(
-                "Internal only PEXes have their layout controlled centrally. Given layout "
-                f"{self.layout} for internal only pex request: {self}."
             )
         if self.python and self.platforms:
             raise ValueError(
@@ -351,16 +340,6 @@ async def build_pex(
         *python_setup.manylinux_pex_args,
         *request.additional_args,
     ]
-    should_resolve = True
-
-    repository_pex = (
-        request.requirements.repository_pex
-        if isinstance(request.requirements, PexRequirements)
-        else None
-    )
-    if repository_pex:
-        should_resolve = False
-        argv.extend(["--pex-repository", repository_pex.name])
 
     python: PythonExecutable | None = None
 
@@ -404,81 +383,71 @@ async def build_pex(
         Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
 
-    additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
-    repository_pex_digest = repository_pex.digest if repository_pex else EMPTY_DIGEST
-    constraints_file_digest = EMPTY_DIGEST
-    requirements_file_digest = EMPTY_DIGEST
-    requirement_count: int
-
-    if isinstance(request.requirements, (Lockfile, LockfileContent)):
-        is_monolithic_resolve = True
-        resolve_name = request.requirements.resolve_name
-
-        if isinstance(request.requirements, Lockfile):
-            synthetic_lock = False
-            lock_path = request.requirements.file_path
-            requirements_file_digest = await Get(
-                Digest,
-                PathGlobs(
-                    [lock_path],
-                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                    description_of_origin=request.requirements.file_path_description_of_origin,
-                ),
-            )
-            _digest_contents = await Get(DigestContents, Digest, requirements_file_digest)
-            lock_bytes = _digest_contents[0].content
+    # Include any additional arguments and input digests required by the requirements.
+    requirements_digests = []
+    if isinstance(request.requirements, EntireLockfile):
+        lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile))
+        concurrency_available = lockfile.requirement_estimate
+        requirements_digests.append(lockfile.lockfile_digest)
+        if lockfile.is_pex_native:
+            argv.extend(["--lock", lockfile.lockfile_path])
+            is_network_resolve = False
         else:
-            synthetic_lock = True
-            _fc = request.requirements.file_content
-            lock_path, lock_bytes = (_fc.path, _fc.content)
-            requirements_file_digest = await Get(Digest, CreateDigest([_fc]))
-
-        if _is_probably_pex_json_lockfile(lock_bytes):
-            should_resolve = False
-            header_delimiter = "//"
-            requirements_file_digest = await Get(
-                Digest,
-                CreateDigest(
-                    [FileContent(lock_path, _strip_comments_from_pex_json_lockfile(lock_bytes))]
-                ),
-            )
-            requirement_count = _pex_lockfile_requirement_count(lock_bytes)
-            argv.extend(["--lock", lock_path])
-            argv.extend(request.requirements.req_strings)
-        else:
-            header_delimiter = "#"
-            # Note: this is a very naive heuristic. It will overcount because entries often
-            # have >1 line due to `--hash`.
-            requirement_count = len(lock_bytes.decode().splitlines())
-            argv.extend(["--requirement", lock_path, "--no-transitive"])
-
-        if should_validate_metadata(request.requirements, python_setup):  # type: ignore[arg-type]
-            metadata = PythonLockfileMetadata.from_lockfile(
-                lock_bytes,
-                **(dict() if synthetic_lock else dict(lockfile_path=lock_path)),
-                resolve_name=resolve_name,
-                delimeter=header_delimiter,
-            )
-
+            argv.extend(["--requirement", lockfile.lockfile_path, "--no-transitive"])
+            is_network_resolve = True
+        if lockfile.metadata and request.requirements.complete_req_strings:
             validate_metadata(
-                metadata, request.interpreter_constraints, request.requirements, python_setup  # type: ignore[arg-type]
+                lockfile.metadata,
+                request.interpreter_constraints,
+                lockfile.original_lockfile,
+                request.requirements.complete_req_strings,
+                python_setup,
             )
-
     else:
-        assert isinstance(request.requirements, PexRequirements)
-        is_monolithic_resolve = request.requirements.is_all_constraints_resolve
-        requirement_count = len(request.requirements.req_strings)
-
-        if request.requirements.constraints_strings:
-            constraints_file = "__constraints.txt"
-            constaints_content = "\n".join(request.requirements.constraints_strings)
-            constraints_file_digest = await Get(
-                Digest,
-                CreateDigest([FileContent(constraints_file, constaints_content.encode())]),
-            )
-            argv.extend(["--constraints", constraints_file])
-
+        # TODO: This is not the best heuristic for available concurrency, since the
+        # requirements almost certainly have transitive deps which also need building, but it
+        # is better than using something hardcoded.
+        concurrency_available = len(request.requirements.req_strings)
         argv.extend(request.requirements.req_strings)
+
+        if isinstance(request.requirements.from_superset, Pex):
+            repository_pex = request.requirements.from_superset
+            argv.extend(["--pex-repository", repository_pex.name])
+            requirements_digests.append(repository_pex.digest)
+            is_network_resolve = False
+        elif isinstance(request.requirements.from_superset, LoadedLockfile):
+            loaded_lockfile = request.requirements.from_superset
+            # NB: This is also validated in the constructor.
+            assert loaded_lockfile.is_pex_native
+            requirements_digests.append(loaded_lockfile.lockfile_digest)
+            argv.extend(["--lock", loaded_lockfile.lockfile_path])
+            is_network_resolve = False
+
+            if loaded_lockfile.metadata:
+                validate_metadata(
+                    loaded_lockfile.metadata,
+                    request.interpreter_constraints,
+                    loaded_lockfile.original_lockfile,
+                    request.requirements.req_strings,
+                    python_setup,
+                )
+        else:
+            assert request.requirements.from_superset is None
+
+            is_network_resolve = True
+            if request.requirements.constraints_strings:
+                constraints_file = "__constraints.txt"
+                constraints_content = "\n".join(request.requirements.constraints_strings)
+                requirements_digests.append(
+                    await Get(
+                        Digest,
+                        CreateDigest([FileContent(constraints_file, constraints_content.encode())]),
+                    )
+                )
+                argv.extend(["--constraints", constraints_file])
+
+    if is_network_resolve:
+        argv.extend([*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"])
 
     merged_digest = await Get(
         Digest,
@@ -486,31 +455,20 @@ async def build_pex(
             (
                 request.complete_platforms.digest,
                 sources_digest_as_subdir,
-                additional_inputs_digest,
-                constraints_file_digest,
-                requirements_file_digest,
-                repository_pex_digest,
+                request.additional_inputs,
+                *requirements_digests,
                 *(pex.digest for pex in request.pex_path),
             )
         ),
     )
 
-    if request.internal_only or is_monolithic_resolve:
-        # This is a much friendlier layout for the CAS than the default zipapp.
-        layout = PexLayout.PACKED
-    else:
-        layout = request.layout or PexLayout.ZIPAPP
-    argv.extend(["--layout", layout.value])
-
+    argv.extend(["--layout", request.layout.value])
     output_files: Iterable[str] | None = None
     output_directories: Iterable[str] | None = None
-    if PexLayout.ZIPAPP == layout:
+    if PexLayout.ZIPAPP == request.layout:
         output_files = [request.output_filename]
     else:
         output_directories = [request.output_filename]
-
-    if should_resolve:
-        argv.extend([*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"])
 
     process = await Get(
         Process,
@@ -522,10 +480,7 @@ async def build_pex(
             description=_build_pex_description(request),
             output_files=output_files,
             output_directories=output_directories,
-            # TODO: This is not the best heuristic for available concurrency, since the
-            # requirements almost certainly have transitive deps which also need building, but it
-            # is better than using something hardcoded.
-            concurrency_available=requirement_count,
+            concurrency_available=concurrency_available,
         ),
     )
 
@@ -558,18 +513,27 @@ def _build_pex_description(request: PexRequest) -> str:
     if request.description:
         return request.description
 
-    if isinstance(request.requirements, Lockfile):
-        desc_suffix = f"from {request.requirements.file_path}"
-    elif isinstance(request.requirements, LockfileContent):
-        desc_suffix = f"from {request.requirements.file_content.path}"
+    if isinstance(request.requirements, EntireLockfile):
+        lockfile = request.requirements.lockfile
+        if isinstance(lockfile, Lockfile):
+            desc_suffix = f"from {lockfile.file_path}"
+        else:
+            desc_suffix = f"from {lockfile.file_content.path}"
     else:
         if not request.requirements.req_strings:
             return f"Building {request.output_filename}"
-        elif request.requirements.repository_pex:
-            repo_pex = request.requirements.repository_pex.name
+        elif isinstance(request.requirements.from_superset, Pex):
+            repo_pex = request.requirements.from_superset.name
             return (
                 f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
                 f"to build {request.output_filename} from {repo_pex}: "
+                f"{', '.join(request.requirements.req_strings)}"
+            )
+        elif isinstance(request.requirements.from_superset, LoadedLockfile):
+            lockfile_path = request.requirements.from_superset.lockfile_path
+            return (
+                f"Building {pluralize(len(request.requirements.req_strings), 'requirement')} "
+                f"for {request.output_filename} from the {lockfile_path} resolve: "
                 f"{', '.join(request.requirements.req_strings)}"
             )
         else:
@@ -578,39 +542,6 @@ def _build_pex_description(request: PexRequest) -> str:
                 f"{', '.join(request.requirements.req_strings)}"
             )
     return f"Building {request.output_filename} {desc_suffix}"
-
-
-def _strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
-    """Pex does not like the header Pants adds to lockfiles, as it violates JSON.
-
-    Note that we only strip lines starting with `//`, which is all that Pants will ever add. If
-    users add their own comments, things will fail.
-    """
-    return b"\n".join(
-        line for line in lockfile_bytes.splitlines() if not line.lstrip().startswith(b"//")
-    )
-
-
-def _is_probably_pex_json_lockfile(lockfile_bytes: bytes) -> bool:
-    for line in lockfile_bytes.splitlines():
-        if line and not line.startswith(b"//"):
-            # Note that pip/Pex complain if a requirements.txt style starts with `{`.
-            return line.lstrip().startswith(b"{")
-    return False
-
-
-def _pex_lockfile_requirement_count(lockfile_bytes: bytes) -> int:
-    # TODO: this is a very naive heuristic that will overcount, and also relies on Pants
-    #  setting `--indent` when generating lockfiles. More robust would be parsing the JSON
-    #  and getting the len(locked_resolves.locked_requirements.project_name), but we risk
-    #  if Pex ever changes its lockfile format.
-
-    num_lines = len(lockfile_bytes.splitlines())
-    # These are very naive estimates, and they bias towards overcounting. For example, requirements
-    # often are 20+ lines.
-    num_lines_for_options = 10
-    lines_per_req = 10
-    return max((num_lines - num_lines_for_options) // lines_per_req, 2)
 
 
 @rule
@@ -1124,4 +1055,4 @@ async def determine_pex_resolve_info(pex_pex: PexPEX, pex: Pex) -> PexResolveInf
 
 
 def rules():
-    return [*collect_rules(), *pex_cli.rules()]
+    return [*collect_rules(), *pex_cli.rules(), *pex_requirements.rules()]

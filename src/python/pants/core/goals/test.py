@@ -44,6 +44,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption, EnumOption, StrListOption, StrOption
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -302,9 +303,11 @@ class TestSubsystem(GoalSubsystem):
     debug = BoolOption(
         "--debug",
         default=False,
-        help=(
-            "Run tests sequentially in an interactive process. This is necessary, for "
-            "example, when you add breakpoints to your code."
+        help=softwrap(
+            """
+            Run tests sequentially in an interactive process. This is necessary, for
+            example, when you add breakpoints to your code.
+            """
         ),
     )
     force = BoolOption(
@@ -325,9 +328,11 @@ class TestSubsystem(GoalSubsystem):
     open_coverage = BoolOption(
         "--open-coverage",
         default=False,
-        help=(
-            "If a coverage report file is generated, open it on the local system if the "
-            "system supports this."
+        help=softwrap(
+            """
+            If a coverage report file is generated, open it on the local system if the
+            system supports this.
+            """
         ),
     )
     report = BoolOption(
@@ -350,17 +355,21 @@ class TestSubsystem(GoalSubsystem):
         ),
         default=None,
         advanced=True,
-        help=(
-            "Specifying a directory causes Junit XML result files to be emitted under "
-            "that dir for each test run that supports producing them."
+        help=softwrap(
+            """
+            Specifying a directory causes Junit XML result files to be emitted under
+            that dir for each test run that supports producing them.
+            """
         ),
     )
     extra_env_vars = StrListOption(
         "--extra-env-vars",
-        help=(
-            "Additional environment variables to include in test processes. "
-            "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
-            "`ENV_VAR` to copy the value of a variable in Pants's own environment."
+        help=softwrap(
+            """
+            Additional environment variables to include in test processes.
+            Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+            `ENV_VAR` to copy the value of a variable in Pants's own environment.
+            """
         ),
     )
 
@@ -547,13 +556,18 @@ async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEn
 
 class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
-    help = (
-        f"Addresses to targets that can be built with the `{bin_name()} package` goal and whose "
-        "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
-        f"as if you had run `{bin_name()} package`. It will include the results in your test's chroot, "
-        "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
-        f"`dist/`).\n\nYou can include anything that can be built by `{bin_name()} package`, e.g. a "
-        "`pex_binary`, `python_awslambda`, or an `archive`."
+    help = softwrap(
+        f"""
+        Addresses to targets that can be built with the `{bin_name()} package` goal and whose
+        resulting artifacts should be included in the test run.
+
+        Pants will build the artifacts as if you had run `{bin_name()} package`.
+        It will include the results in your test's chroot, using the same name they would normally
+        have, but without the `--distdir` prefix (e.g. `dist/`).
+
+        You can include anything that can be built by `{bin_name()} package`, e.g. a `pex_binary`,
+        `python_awslambda`, or an `archive`.
+        """
     )
 
 

@@ -16,11 +16,7 @@ from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.python.util_rules.pex_requirements import (
-    Lockfile,
-    LockfileContent,
-    PexRequirements,
-)
+from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import (
     CreateDigest,
@@ -62,7 +58,7 @@ class BuildSystemRequest:
 class BuildSystem:
     """A PEP 517/518 build system configuration."""
 
-    requires: PexRequirements | Lockfile | LockfileContent
+    requires: PexRequirements | EntireLockfile
     build_backend: str
 
     @classmethod

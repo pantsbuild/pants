@@ -696,6 +696,7 @@ def test_vintage_files_dependencies(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.skip  # TODO(14537) `relocated_files` doesn't presently work, un-skip when fixing that.
+@pytest.mark.no_error_if_skipped
 @maybe_skip_jdk_test
 def test_vintage_relocated_files_dependency(rule_runner: RuleRunner) -> None:
     _write_file_dependencies(rule_runner, [":relocated_ducks"], "ducks/ducks.txt")

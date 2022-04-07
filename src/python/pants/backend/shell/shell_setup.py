@@ -22,7 +22,7 @@ class ShellSetup(Subsystem):
         help=(
             "The PATH value that will be used to find shells and to run certain processes "
             "like the shunit2 test runner.\n\n"
-            'The special string "<PATH>" will expand to the contents of the PATH env var.'
+            'The special string `"<PATH>"` will expand to the contents of the PATH env var.'
         ),
         advanced=True,
         metavar="<binary-paths>",

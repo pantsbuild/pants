@@ -38,7 +38,7 @@ class GolangSubsystem(Subsystem):
             "A list of paths to search for Go.\n\n"
             "Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`. "
             "Earlier entries will be searched first.\n\n"
-            "The special string '<PATH>' will expand to the contents of the PATH env var."
+            'The special string `"<PATH>"` will expand to the contents of the PATH env var.'
         ),
     )
     # TODO(#13005): Support multiple Go versions in a project?
