@@ -52,7 +52,7 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
     result_dir = "__out"
 
     chart, result_digest = await MultiGet(
-        Get(HelmChart, HelmChartRequest(field_set, generate_chart_lockfile=True)),
+        Get(HelmChart, HelmChartRequest(field_set)),
         Get(Digest, CreateDigest([Directory(result_dir)])),
     )
 
