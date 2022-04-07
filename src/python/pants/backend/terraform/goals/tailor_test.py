@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pathlib import PurePath
 
-from pants.backend.terraform.tailor import (
+from pants.backend.terraform.goals.tailor import (
     PutativeTerraformTargetsRequest,
     find_disjoint_longest_common_prefixes,
 )
-from pants.backend.terraform.tailor import rules as terraform_tailor_rules
+from pants.backend.terraform.goals.tailor import rules as terraform_tailor_rules
 from pants.backend.terraform.target_types import (
     TerraformModulesGeneratorTarget,
     TerraformModuleTarget,
