@@ -27,6 +27,7 @@ from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +40,11 @@ class RunFieldSet(FieldSet, metaclass=ABCMeta):
 class RestartableField(BoolField):
     alias = "restartable"
     default = False
-    help = (
-        "If true, runs of this target with the `run` goal may be interrupted and "
-        "restarted when its input files change."
+    help = softwrap(
+        """
+        If true, runs of this target with the `run` goal may be interrupted and
+        restarted when its input files change.
+        """
     )
 
 
@@ -68,13 +71,17 @@ class RunRequest:
 
 class RunSubsystem(GoalSubsystem):
     name = "run"
-    help = (
-        "Runs a binary target.\n\n"
-        "This goal propagates the return code of the underlying executable.\n\n"
-        "If your application can safely be restarted while it is running, you can pass "
-        "`restartable=True` on your binary target (for supported types), and the `run` goal "
-        "will automatically restart them as all relevant files change. This can be particularly "
-        "useful for server applications."
+    help = softwrap(
+        """
+        Runs a binary target.
+
+        This goal propagates the return code of the underlying executable.
+
+        If your application can safely be restarted while it is running, you can pass
+        `restartable=True` on your binary target (for supported types), and the `run` goal
+        will automatically restart them as all relevant files change. This can be particularly
+        useful for server applications.
+        """
     )
 
     @classmethod

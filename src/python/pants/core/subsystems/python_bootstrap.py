@@ -19,41 +19,48 @@ from pants.option.option_types import StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
 
 class PythonBootstrapSubsystem(Subsystem):
     options_scope = "python-bootstrap"
-    help = (
-        "Options used to locate Python interpreters used by all Pants backends."
-        "\n\n"
-        "This subsystem controls where and how Pants will locate Python, but beyond that it does "
-        "not control which Python interpreter versions are actually used for your code: see the "
-        "`python` subsystem for that."
+    help = softwrap(
+        """
+        Options used to locate Python interpreters used by all Pants backends.
+
+        This subsystem controls where and how Pants will locate Python, but beyond that it does
+        not control which Python interpreter versions are actually used for your code: see the
+        `python` subsystem for that.
+        """
     )
 
     search_path = StrListOption(
         "--search-path",
         default=["<PYENV>", "<PATH>"],
-        help=(
-            "A list of paths to search for Python interpreters.\n\n"
-            "Which interpeters are actually used from these paths is context-specific: "
-            "the Python backend selects interpreters using options on the `python` subsystem, "
-            "in particular, the `[python].interpreter_constraints` option.\n\n"
-            "You can specify absolute paths to interpreter binaries "
-            "and/or to directories containing interpreter binaries. The order of entries does "
-            "not matter.\n\n"
-            "The following special strings are supported:\n\n"
-            "* `<PATH>`, the contents of the PATH env var\n"
-            "* `<ASDF>`, all Python versions currently configured by ASDF "
-            "`(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions\n"
-            "* `<ASDF_LOCAL>`, the ASDF interpreter with the version in "
-            "BUILD_ROOT/.tool-versions\n"
-            "* `<PYENV>`, all Python versions under $(pyenv root)/versions\n"
-            "* `<PYENV_LOCAL>`, the Pyenv interpreter with the version in "
-            "BUILD_ROOT/.python-version\n"
-            "* `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc"
+        help=softwrap(
+            """
+            A list of paths to search for Python interpreters.
+
+            Which interpeters are actually used from these paths is context-specific:
+            the Python backend selects interpreters using options on the `python` subsystem,
+            in particular, the `[python].interpreter_constraints` option.
+
+            You can specify absolute paths to interpreter binaries
+            and/or to directories containing interpreter binaries. The order of entries does
+            not matter.
+
+            The following special strings are supported:
+
+              * `<PATH>`, the contents of the PATH env var
+              * `<ASDF>`, all Python versions currently configured by ASDF \
+                  `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
+              * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
+              * `<PYENV>`, all Python versions under $(pyenv root)/versions
+              * `<PYENV_LOCAL>`, the Pyenv interpreter with the version in BUILD_ROOT/.python-version
+              * `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc
+            """
         ),
         advanced=True,
         metavar="<binary-paths>",
@@ -61,11 +68,14 @@ class PythonBootstrapSubsystem(Subsystem):
     names = StrListOption(
         "--names",
         default=["python", "python3"],
-        help=(
-            "The names of Python binaries to search for. See the `--search-path` option to "
-            "influence where interpreters are searched for.\n\n"
-            "This does not impact which Python interpreter is used to run your code, only what "
-            "is used to run internal tools."
+        help=softwrap(
+            """
+            The names of Python binaries to search for. See the `--search-path` option to
+            influence where interpreters are searched for.
+
+            This does not impact which Python interpreter is used to run your code, only what
+            is used to run internal tools.
+            """
         ),
         advanced=True,
         metavar="<python-binary-names>",
