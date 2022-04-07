@@ -25,7 +25,7 @@ class ApacheThriftSubsystem(Subsystem):
             Specify absolute paths to directories with the `thrift` binary, e.g. `/usr/bin`.
             Earlier entries will be searched first.
 
-            The special string '<PATH>' will expand to the contents of the PATH env var.
+            The special string `"<PATH>"` will expand to the contents of the PATH env var.
             """
         ),
     )

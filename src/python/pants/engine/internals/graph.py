@@ -1320,7 +1320,18 @@ async def find_valid_field_sets_for_target_roots(
         )
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
             raise no_applicable_exception
-        if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn:
+        # We squelch the warning if the specs came from change detection or only from address globs,
+        # since in that case we interpret the user's intent as "if there are relevant matching
+        # targets, act on them". But we still want to warn if the specs were literal, or empty.
+        empty_ok = specs.from_change_detection or (
+            specs.address_specs.globs
+            and not specs.address_specs.literals
+            and not specs.filesystem_specs
+        )
+        if (
+            request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn
+            and not empty_ok
+        ):
             logger.warning(str(no_applicable_exception))
 
     result = TargetRootsToFieldSets(targets_to_applicable_field_sets)

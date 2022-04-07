@@ -147,6 +147,14 @@ async def generate_lockfile(
     python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
     if req.use_pex:
+        pip_args_file = "__pip_args.txt"
+        pip_args_file_content = "\n".join(
+            [f"--no-binary {pkg}" for pkg in python_setup.no_binary]
+            + [f"--only-binary {pkg}" for pkg in python_setup.only_binary]
+        )
+        pip_args_file_digest = await Get(
+            Digest, CreateDigest([FileContent(pip_args_file, pip_args_file_content.encode())])
+        )
         header_delimiter = "//"
         result = await Get(
             ProcessResult,
@@ -163,11 +171,14 @@ async def generate_lockfile(
                     "pip-2020-resolver",
                     # This makes diffs more readable when lockfiles change.
                     "--indent=2",
+                    "-r",
+                    pip_args_file,
                     *python_repos.pex_args,
                     *python_setup.manylinux_pex_args,
                     *req.interpreter_constraints.generate_pex_arg_list(),
                     *req.requirements,
                 ),
+                additional_input_digest=pip_args_file_digest,
                 output_files=("lock.json",),
                 description=f"Generate lockfile for {req.resolve_name}",
                 # Instead of caching lockfile generation with LMDB, we instead use the invalidation

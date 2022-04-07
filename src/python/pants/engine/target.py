@@ -55,7 +55,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized, memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import bullet_list, pluralize
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -830,7 +830,7 @@ def maybe_warn_dependencies_as_copied_field(tgt_type: type[TargetGenerator]) -> 
     ]
     if copied_dependencies_field_types:
         warn_or_error(
-            removal_version="2.12.0.dev1",
+            removal_version="2.12.0.dev2",
             entity=(
                 f"using a `Dependencies` field subclass ({copied_dependencies_field_types}) "
                 "as a `TargetGenerator.copied_field`"
@@ -894,7 +894,7 @@ class TargetFilesGenerator(TargetGenerator):
         if self.has_field(MultipleSourcesField) and not self[MultipleSourcesField].value:
             sources_field = self[MultipleSourcesField]
             warn_or_error(
-                removal_version="2.12.0.dev1",
+                removal_version="2.12.0.dev2",
                 entity=(
                     f"specifying an empty `{sources_field.alias}` field for target generator type "
                     f"`{self.alias}`"
@@ -1013,7 +1013,7 @@ class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[Generat
             # argument, so that callers are forced to cast / check subtyping before calling.
             deprecated_conditional(
                 lambda: not issubclass(tgt_cls, TargetGenerator),
-                removal_version="2.12.0.dev0",
+                removal_version="2.12.0.dev2",
                 entity="`GenerateTargetsRequest.generate_from` types which do not subclass `TargetGenerator`",
                 hint=(
                     f"The generate_from type of `{request.__name__}` was `{tgt_cls.__name__}`, "
@@ -1898,11 +1898,15 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
     """
 
     alias = "sources"
-    help = (
-        "A list of files and globs that belong to this target.\n\n"
-        "Paths are relative to the BUILD file's directory. You can ignore files/globs by "
-        "prefixing them with `!`.\n\n"
-        "Example: `sources=['example.ext', 'test_*.ext', '!test_ignore.ext']`."
+    help = softwrap(
+        """
+        A list of files and globs that belong to this target.
+
+        Paths are relative to the BUILD file's directory. You can ignore files/globs by
+        prefixing them with `!`.
+
+        Example: `sources=['example.ext', 'test_*.ext', '!test_ignore.ext']`.
+        """
     )
 
     @property
@@ -1923,9 +1927,12 @@ class OptionalSingleSourceField(SourcesField, StringField):
     """
 
     alias = "source"
-    help = (
-        "A single file that belongs to this target.\n\n"
-        "Path is relative to the BUILD file's directory, e.g. `source='example.ext'`."
+    help = softwrap(
+        """
+        A single file that belongs to this target.
+
+        Path is relative to the BUILD file's directory, e.g. `source='example.ext'`.
+        """
     )
     required = False
     default: ClassVar[str | None] = None
@@ -2190,23 +2197,29 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     alias = "dependencies"
-    help = (
-        "Addresses to other targets that this target depends on, e.g. "
-        "['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].\n\n"
-        "This augments any dependencies inferred by Pants, such as by analyzing your imports. Use "
-        f"`{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final "
-        "result.\n\n"
-        f"See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for "
-        "more about how addresses are formed, including for generated targets. You can also run "
-        f"`{bin_name()} list ::` to find all addresses in your project, or "
-        f"`{bin_name()} list dir:` to find all addresses defined in that directory.\n\n"
-        "If the target is in the same BUILD file, you can leave off the BUILD file path, e.g. "
-        "`:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use "
-        "`./` for the file path, e.g. `./main.py:tgt`; for all other generated targets, "
-        "use `:tgt#generated_name`.\n\n"
-        "You may exclude dependencies by prefixing with `!`, e.g. "
-        "`['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are intended for false positives "
-        "with dependency inference; otherwise, simply leave off the dependency from the BUILD file."
+    help = softwrap(
+        f"""
+        Addresses to other targets that this target depends on, e.g.
+        ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
+
+        This augments any dependencies inferred by Pants, such as by analyzing your imports. Use
+        `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
+        result.
+
+        See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for
+        more about how addresses are formed, including for generated targets. You can also run
+        `{bin_name()} list ::` to find all addresses in your project, or
+        `{bin_name()} list dir:` to find all addresses defined in that directory.
+
+        If the target is in the same BUILD file, you can leave off the BUILD file path, e.g.
+        `:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use
+        `./` for the file path, e.g. `./main.py:tgt`; for all other generated targets,
+        use `:tgt#generated_name`.
+
+        You may exclude dependencies by prefixing with `!`, e.g.
+        `['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are intended for false positives
+        with dependency inference; otherwise, simply leave off the dependency from the BUILD file.
+        """
     )
     supports_transitive_excludes = False
 
@@ -2475,18 +2488,24 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 class Tags(StringSequenceField):
     alias = "tags"
-    help = (
-        "Arbitrary strings to describe a target.\n\nFor example, you may tag some test targets "
-        f"with 'integration_test' so that you could run `{bin_name()} --tag='integration_test' test ::` "
-        "to only run on targets with that tag."
+    help = softwrap(
+        f"""
+        Arbitrary strings to describe a target.
+
+        For example, you may tag some test targets with 'integration_test' so that you could run
+        `{bin_name()} --tag='integration_test' test ::`  to only run on targets with that tag.
+        """
     )
 
 
 class DescriptionField(StringField):
     alias = "description"
-    help = (
-        f"A human-readable description of the target.\n\nUse `{bin_name()} list --documented ::` to see "
-        "all targets with descriptions."
+    help = softwrap(
+        f"""
+        A human-readable description of the target.
+
+        Use `{bin_name()} list --documented ::` to see all targets with descriptions.
+        """
     )
 
 

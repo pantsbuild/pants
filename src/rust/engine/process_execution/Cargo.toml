@@ -25,7 +25,7 @@ log = "0.4"
 nails = "0.12"
 nix = "0.23"
 sha2 = "0.10"
-shell-quote = "0.1.0"
+shell-quote = "0.3.0"
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
@@ -47,7 +47,7 @@ rand = "0.8"
 prost = "0.9"
 prost-types = "0.9"
 strum = "0.24"
-strum_macros = "0.23"
+strum_macros = "0.24"
 tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tryfuture = { path = "../tryfuture" }
 

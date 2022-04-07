@@ -37,10 +37,10 @@ impl EngineAwareReturnType {
       metadata.message = Self::message(task_result);
       metadata
         .artifacts
-        .extend(Self::artifacts(task_result).unwrap_or_else(Vec::new));
+        .extend(Self::artifacts(task_result).unwrap_or_default());
       metadata
         .user_metadata
-        .extend(metadata_for(task_result).unwrap_or_else(Vec::new));
+        .extend(metadata_for(task_result).unwrap_or_default());
       Some(metadata)
     });
   }
@@ -101,7 +101,7 @@ impl EngineAwareParameter {
   }
 
   pub fn metadata(obj: &PyAny) -> Vec<(String, UserMetadataItem)> {
-    metadata_for(obj).unwrap_or_else(Vec::new)
+    metadata_for(obj).unwrap_or_default()
   }
 }
 

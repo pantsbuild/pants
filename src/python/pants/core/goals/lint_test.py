@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Iterable, Optional, Sequence, Tuple, Type
@@ -22,6 +23,7 @@ from pants.core.goals.lint import (
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import SpecsSnapshot, Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, EMPTY_SNAPSHOT, Digest, Snapshot
@@ -37,8 +39,10 @@ class MockTarget(Target):
     core_fields = (MultipleSourcesField,)
 
 
+@dataclass(frozen=True)
 class MockLinterFieldSet(FieldSet):
     required_fields = (MultipleSourcesField,)
+    sources: MultipleSourcesField
 
 
 class MockLintRequest(LintTargetsRequest, metaclass=ABCMeta):
@@ -186,6 +190,11 @@ def run_lint_rule(
             ],
             mock_gets=[
                 MockGet(
+                    output_type=SourceFiles,
+                    input_type=SourceFilesRequest,
+                    mock=lambda _: SourceFiles(EMPTY_SNAPSHOT, ()),
+                ),
+                MockGet(
                     output_type=LintResults,
                     input_type=LintTargetsRequest,
                     mock=lambda mock_request: mock_request.lint_results,
@@ -254,6 +263,8 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✓ FilesLinter succeeded.
         ✓ SuccessfulFormatter succeeded.
         ✓ SuccessfulLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
         """
     )
 
@@ -271,6 +282,8 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✕ FailingFormatter failed.
         ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
         """
     )
 

@@ -8,7 +8,7 @@ import os
 import shlex
 import sys
 import textwrap
-from typing import Any, Mapping
+from typing import Mapping
 
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -22,7 +22,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.unions import UnionMembership
 from pants.goal.builtin_goal import BuiltinGoal
 from pants.init.engine_initializer import GraphSession
-from pants.option.option_types import BoolOption, DictOption, StrListOption
+from pants.option.option_types import BoolOption, FileListOption, StrListOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.util.docutil import bin_name
@@ -66,12 +66,32 @@ class BSPGoal(BuiltinGoal):
         advanced=True,
     )
 
-    target_mapping = DictOption[Any](
-        "--target-mapping",
+    groups_config_files = FileListOption(
+        "--groups-config-files",
         help=(
-            'Defines how Pants maps targets to "build targets" that are exposed to IDEs via the '
-            'Build Server Protocol ("BSP"). The key for each entry is the ID to be used in the BSP protocol. '
-            'The value of each entry is a list of Pants addresses specs; for example, `["src/python::"]`.'
+            "A list of config files that define groups of Pants targets to expose to IDEs via Build Server Protocol.\n\n"
+            "Pants generally uses fine-grained targets to define the components of a build (in many cases on a file-by-file "
+            "basis). Many IDEs, however, favor coarse-grained targets that contain large numbers of source files. "
+            "To accommodate this distinction, the Pants BSP server will compute a set of BSP build targets to use "
+            "from the groups specified in the config files set for this option. Each group will become one or more "
+            "BSP build targets.\n\n"
+            "Each config file is a TOML file with a `groups` dictionary with the following format for an entry:\n\n"
+            "    # The dictionary key is used to identify the group. It must be unique.\n"
+            "    [groups.ID1]:\n"
+            "    # One or more Pants address specs defining what targets to include in the group.\n"
+            "    addresses = [\n"
+            '      "src/jvm::",\n'
+            '      "tests/jvm::",\n'
+            "    ]\n"
+            "    # Filter targets to a specific resolve. Targets in a group must be from a single resolve.\n"
+            "    # Format of filter is `TYPE:RESOLVE_NAME`. The only supported TYPE is `jvm`. RESOLVE_NAME must be\n"
+            "    # a valid resolve name.\n"
+            '    resolve = "jvm:jvm-default"\n'
+            '    display_name = "Display Name"  # (Optional) Name shown to the user in the IDE.\n'
+            '    base_directory = "path/from/build/root"  # (Optional) Hint to the IDE for where the build target should "live."\n'
+            "\n"
+            "Pants will merge the contents of the config files together. If the same ID is used for a group definition, "
+            "in multiple config files, the definition in the latter config file will take effect."
         ),
     )
 

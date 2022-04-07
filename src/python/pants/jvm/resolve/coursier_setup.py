@@ -25,6 +25,7 @@ from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """\
@@ -104,10 +105,14 @@ POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(
 class CoursierSubsystem(TemplatedExternalTool):
     options_scope = "coursier"
     name = "coursier"
-    help = "A dependency resolver for the Maven ecosystem."
+    help = "A dependency resolver for the Maven ecosystem. (https://get-coursier.io/)"
 
-    default_version = "v2.0.16-169-g194ebc55c"
+    default_version = "v2.1.0-M5-18-gfebf9838c"
     default_known_versions = [
+        "v2.1.0-M5-18-gfebf9838c|linux_arm64 |d4ad15ba711228041ad8a46d848c83c8fbc421d7b01c415d8022074dd609760f|19264005",
+        "v2.1.0-M5-18-gfebf9838c|linux_x86_64|3e1a1ad1010d5582e9e43c5a26b273b0147baee5ebd27d3ac1ab61964041c90b|19551533",
+        "v2.1.0-M5-18-gfebf9838c|macos_arm64 |d13812c5a5ef4c9b3e25cc046d18addd09bacd149f95b20a14e4d2a73e358ecf|18826510",
+        "v2.1.0-M5-18-gfebf9838c|macos_x86_64|d13812c5a5ef4c9b3e25cc046d18addd09bacd149f95b20a14e4d2a73e358ecf|18826510",
         "v2.0.16-169-g194ebc55c|linux_arm64 |da38c97d55967505b8454c20a90370c518044829398b9bce8b637d194d79abb3|18114472",
         "v2.0.16-169-g194ebc55c|linux_x86_64|4c61a634c4bd2773b4543fe0fc32210afd343692891121cddb447204b48672e8|18486946",
         "v2.0.16-169-g194ebc55c|macos_arm64 |15bce235d223ef1d022da30b67b4c64e9228d236b876c834b64e029bbe824c6f|17957182",
@@ -129,12 +134,14 @@ class CoursierSubsystem(TemplatedExternalTool):
             "https://maven-central.storage-download.googleapis.com/maven2",
             "https://repo1.maven.org/maven2",
         ],
-        help=(
-            "Maven style repositories to resolve artifacts from."
-            "\n\n"
-            "Coursier will resolve these repositories in the order in which they are "
-            "specifed, and re-ordering repositories will cause artifacts to be "
-            "re-downloaded. This can result in artifacts in lockfiles becoming invalid."
+        help=softwrap(
+            """
+            Maven style repositories to resolve artifacts from.
+
+            Coursier will resolve these repositories in the order in which they are
+            specifed, and re-ordering repositories will cause artifacts to be
+            re-downloaded. This can result in artifacts in lockfiles becoming invalid.
+            """
         ),
     )
 

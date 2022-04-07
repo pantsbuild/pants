@@ -16,6 +16,7 @@ from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -38,16 +39,23 @@ class CliOptions(Subsystem):
 
     alias = DictOption[str](
         "--alias",
-        help=(
-            "Register command line aliases.\nExample:\n\n"
-            "    [cli.alias]\n"
-            '    green = "fmt lint check"\n'
-            '    all-changed = "--changed-since=HEAD --changed-dependees=transitive"\n'
-            "\n"
-            f"This would allow you to run `{bin_name()} green all-changed`, which is shorthand for "
-            f"`{bin_name()} fmt lint check --changed-since=HEAD --changed-dependees=transitive`.\n\n"
-            "Notice: this option must be placed in a config file (e.g. `pants.toml` or "
-            "`pantsrc`) to have any effect."
+        help=softwrap(
+            f"""
+            Register command line aliases.
+
+            Example:
+
+                [cli.alias]
+                green = "fmt lint check"
+                all-changed = "--changed-since=HEAD --changed-dependees=transitive"
+
+
+            This would allow you to run `{bin_name()} green all-changed`, which is shorthand for
+            `{bin_name()} fmt lint check --changed-since=HEAD --changed-dependees=transitive`.
+
+            Notice: this option must be placed in a config file (e.g. `pants.toml` or `pantsrc`)
+            to have any effect.
+            """
         ),
     )
 

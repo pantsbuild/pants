@@ -204,6 +204,30 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    no_binary = StrListOption(
+        "--no-binary",
+        help=(
+            "Do not use binary packages (i.e., wheels) for these 3rdparty projects. Also "
+            "accepts :all: to disable all binary packages. Note that some packages are tricky to "
+            "compile and may fail to install when this option is used on them."
+            "See https://pip.pypa.io/en/stable/cli/pip_install/#install-no-binary for details."
+            'Note: Only takes effect if you use lockfiles, and set lockfile_generator = "pex" '
+            "in the [python] section of your config file. You must regenerate the lockfile after "
+            "changing this option."
+        ),
+    )
+    only_binary = StrListOption(
+        "--only-binary",
+        help=(
+            "Do not use source packages (i.e., sdists) for these 3rdparty projects. Also "
+            "accepts :all: to disable all source packages. Packages without binary distributions "
+            "will fail to install when this option is used on them."
+            "See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for details."
+            'Note: Only takes effect if you use lockfiles, and set lockfile_generator = "pex" '
+            "in the [python] section of your config file. You must regenerate the lockfile after "
+            "changing this option."
+        ),
+    )
     invalid_lockfile_behavior = EnumOption(
         "--invalid-lockfile-behavior",
         default=InvalidLockfileBehavior.error,
@@ -314,6 +338,7 @@ class PythonSetup(Subsystem):
         "when building wheels. Otherwise, the default of macosx_11_0 will be used. "
         "This may be required for pip to be able to install the resulting distribution "
         "on Big Sur.",
+        advanced=True,
     )
 
     @property
@@ -321,7 +346,7 @@ class PythonSetup(Subsystem):
         """Else, generate with Poetry."""
         if self.options.is_default("lockfile_generator"):
             warn_or_error(
-                "2.12.0.dev1",
+                "2.12.0.dev2",
                 "`[python].lockfile_generator` defaulting to 'poetry'",
                 softwrap(
                     f"""

@@ -25,7 +25,7 @@ impl Env {
     let name = id.name("_", NameTransform::ToUpper);
     let mut names = vec![format!(
       "PANTS_{}_{}",
-      id.0.name().replace("-", "_").to_ascii_uppercase(),
+      id.0.name().replace('-', "_").to_ascii_uppercase(),
       name
     )];
     if id.0 == Scope::Global {

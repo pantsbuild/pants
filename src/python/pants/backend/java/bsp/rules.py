@@ -8,13 +8,11 @@ from dataclasses import dataclass
 from pants.backend.java.bsp.spec import JavacOptionsItem, JavacOptionsParams, JavacOptionsResult
 from pants.backend.java.target_types import JavaFieldSet, JavaSourceField
 from pants.base.build_root import BuildRoot
-from pants.base.specs import AddressSpecs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode
 from pants.bsp.util_rules.compile import BSPCompileRequest, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
-    BSPBuildTargets,
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
 )
@@ -92,16 +90,8 @@ class HandleJavacOptionsResult:
 async def handle_bsp_java_options_request(
     request: HandleJavacOptionsRequest,
     build_root: BuildRoot,
-    bsp_build_targets: BSPBuildTargets,
 ) -> HandleJavacOptionsResult:
-    bsp_target_name = request.bsp_target_id.uri[len("pants:") :]
-    if bsp_target_name not in bsp_build_targets.targets_mapping:
-        raise ValueError(f"Invalid BSP target name: {request.bsp_target_id}")
-    targets = await Get(
-        Targets,
-        AddressSpecs,
-        bsp_build_targets.targets_mapping[bsp_target_name].specs.address_specs,
-    )
+    targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
 
     coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
     resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)

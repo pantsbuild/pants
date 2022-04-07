@@ -8,7 +8,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import ClassVar, Generic, Sequence, Type, TypeVar
 
+import toml
+
 from pants.base.build_root import BuildRoot
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.bsp.goal import BSPGoal
@@ -30,7 +33,7 @@ from pants.bsp.spec.targets import (
     WorkspaceBuildTargetsParams,
     WorkspaceBuildTargetsResult,
 )
-from pants.engine.fs import Workspace
+from pants.engine.fs import DigestContents, PathGlobs, Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule
@@ -75,9 +78,18 @@ class BSPBuildTargetsMetadataResult:
 
 
 @dataclass(frozen=True)
+class BSPTargetDefinition:
+    display_name: str | None
+    base_directory: str | None
+    addresses: tuple[str, ...]
+    resolve_filter: str | None
+
+
+@dataclass(frozen=True)
 class BSPBuildTargetInternal:
     name: str
     specs: Specs
+    definition: BSPTargetDefinition
 
     @property
     def bsp_target_id(self) -> BuildTargetIdentifier:
@@ -103,25 +115,81 @@ class BSPBuildTargets:
 @dataclass(frozen=True)
 class _ParseOneBSPMappingRequest:
     name: str
-    raw_specs: tuple[str, ...]
+    definition: BSPTargetDefinition
 
 
 @rule
 async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuildTargetInternal:
     specs_parser = SpecsParser()
-    specs = specs_parser.parse_specs(request.raw_specs)
-    return BSPBuildTargetInternal(request.name, specs)
+    specs = specs_parser.parse_specs(request.definition.addresses)
+    return BSPBuildTargetInternal(request.name, specs, request.definition)
 
 
 @rule
 async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
+    definitions: dict[str, BSPTargetDefinition] = {}
+    for config_file in bsp_goal.groups_config_files:
+        config_contents = await Get(
+            DigestContents,
+            PathGlobs(
+                [config_file],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"BSP config file `{config_file}`",
+            ),
+        )
+        if len(config_contents) == 0:
+            raise ValueError(f"BSP targets config file `{config_file}` does not exist.")
+        elif len(config_contents) > 1:
+            raise ValueError(
+                f"BSP targets config file specified as `{config_file}` matches multiple files. "
+                "Please do not use wildcards in config file paths."
+            )
+
+        config = toml.loads(config_contents[0].content.decode())
+
+        groups = config.get("groups")
+        if groups is None:
+            raise ValueError(
+                f"BSP targets config file `{config_file}` is missing the `groups` table."
+            )
+        if not isinstance(groups, dict):
+            raise ValueError(
+                f"BSP targets config file `{config_file}` contains a `groups` key that is not a TOML table."
+            )
+
+        for id, group in groups.items():
+            if not isinstance(group, dict):
+                raise ValueError(
+                    f"BSP targets config file `{config_file}` contains an entry for "
+                    "`groups` array that is not a dictionary (index={i})."
+                )
+
+            base_directory = group.get("base_directory")
+            display_name = group.get("display_name")
+            addresses = group.get("addresses", [])
+            if not addresses:
+                raise ValueError(
+                    f"BSP targets config file `{config_file}` contains group ID `{id}` which has "
+                    "no address specs defined via the `addresses` key. Please specify at least "
+                    "one address spec."
+                )
+
+            resolve_filter = group.get("resolve")
+
+            definitions[id] = BSPTargetDefinition(
+                display_name=display_name,
+                base_directory=base_directory,
+                addresses=tuple(addresses),
+                resolve_filter=resolve_filter,
+            )
+
     bsp_internal_targets = await MultiGet(
-        Get(BSPBuildTargetInternal, _ParseOneBSPMappingRequest(name, tuple(value)))
-        for name, value in bsp_goal.target_mapping.items()
+        Get(BSPBuildTargetInternal, _ParseOneBSPMappingRequest(name, definition))
+        for name, definition in definitions.items()
     )
     target_mapping = {
         key: bsp_internal_target
-        for key, bsp_internal_target in zip(bsp_goal.target_mapping.keys(), bsp_internal_targets)
+        for key, bsp_internal_target in zip(definitions.keys(), bsp_internal_targets)
     }
     return BSPBuildTargets(FrozenDict(target_mapping))
 
@@ -142,10 +210,16 @@ async def resolve_bsp_build_target_identifier(
 
 
 @rule
+async def resolve_bsp_build_target_addresses(bsp_target: BSPBuildTargetInternal) -> Targets:
+    targets = await Get(Targets, AddressSpecs, bsp_target.specs.address_specs)
+    return targets
+
+
+@rule
 async def resolve_bsp_build_target_source_roots(
     bsp_target: BSPBuildTargetInternal,
 ) -> BSPBuildTargetSourcesInfo:
-    targets = await Get(Targets, AddressSpecs, bsp_target.specs.address_specs)
+    targets = await Get(Targets, BSPBuildTargetInternal, bsp_target)
     targets_with_sources = [tgt for tgt in targets if tgt.has_field(SourcesField)]
     sources_paths = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField])) for tgt in targets_with_sources
@@ -215,7 +289,7 @@ async def generate_one_bsp_build_target_request(
     build_root: BuildRoot,
 ) -> GenerateOneBSPBuildTargetResult:
     # Find all Pants targets that are part of this BSP build target.
-    targets = await Get(Targets, AddressSpecs, request.bsp_target.specs.address_specs)
+    targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
 
     # Classify the targets by the language backends that claim them to provide metadata for them.
     field_sets_by_lang_id: dict[str, OrderedSet[FieldSet]] = defaultdict(OrderedSet)
@@ -436,12 +510,7 @@ async def resolve_one_dependency_module(
     request: ResolveOneDependencyModuleRequest,
     union_membership: UnionMembership,
 ) -> ResolveOneDependencyModuleResult:
-    bsp_target = await Get(BSPBuildTargetInternal, BuildTargetIdentifier, request.bsp_target_id)
-    targets = await Get(
-        Targets,
-        AddressSpecs,
-        bsp_target.specs.address_specs,
-    )
+    targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
 
     field_sets_by_request_type: dict[
         Type[BSPDependencyModulesRequest], list[FieldSet]
