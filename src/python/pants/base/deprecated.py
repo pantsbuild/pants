@@ -57,7 +57,7 @@ def is_deprecation_active(start_version: str | None) -> bool:
 
 def get_deprecated_tense(removal_version: str) -> str:
     """Provides the grammatical tense for a given deprecated version vs the current version."""
-    return "may be" if (Version(removal_version) >= PANTS_SEMVER) else "was"
+    return "is scheduled to be" if (Version(removal_version) >= PANTS_SEMVER) else "was"
 
 
 @memoized_method

@@ -90,4 +90,7 @@ def test_deprecated_register_options(caplog) -> None:
     )
     OldAndDusty.register_options_on_scope(options)
 
-    assert "DEPRECATED: pants.option.subsystem.register_options() will be removed" in caplog.text
+    assert (
+        "DEPRECATED: pants.option.subsystem.register_options() is scheduled to be removed"
+        in caplog.text
+    )
