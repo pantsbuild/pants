@@ -22,6 +22,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
     MissingJvmArtifacts,
@@ -151,4 +152,6 @@ def rules():
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
         UnionRule(InjectDependenciesRequest, InjectApacheThriftJavaDependencies),
+        # Rules needed to avoid rule graph errors.
+        *artifact_mapper.rules(),
     )
