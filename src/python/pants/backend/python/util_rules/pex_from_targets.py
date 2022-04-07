@@ -393,6 +393,9 @@ async def create_pex_from_targets(
 
         pex_native_subsetting_supported = False
         if python_setup.enable_resolves:
+            # TODO: Once `requirement_constraints` is removed in favor of `enable_resolves`,
+            # `ChosenPythonResolveRequest` and `_PexRequirementsRequest` should merge and
+            # do a single transitive walk to replace this method.
             chosen_resolve = await Get(
                 ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
             )
@@ -400,6 +403,10 @@ async def create_pex_from_targets(
                 LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile)
             )
             pex_native_subsetting_supported = loaded_lockfile.is_pex_native
+            if loaded_lockfile.constraints_strings:
+                requirements = dataclasses.replace(
+                    requirements, constraints_strings=loaded_lockfile.constraints_strings
+                )
 
         should_return_entire_lockfile = (
             python_setup.run_against_entire_lockfile and request.internal_only
@@ -520,6 +527,10 @@ async def create_pex_from_targets(
 async def get_repository_pex(
     request: _RepositoryPexRequest, python_setup: PythonSetup
 ) -> OptionalPexRequest:
+    # NB: It isn't safe to resolve against an entire lockfile or constraints file if
+    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
+    if request.platforms or request.complete_platforms:
+        return OptionalPexRequest(None)
 
     interpreter_constraints = await Get(
         InterpreterConstraints,
@@ -570,9 +581,7 @@ async def _setup_constraints_repository_pex(
     global_requirement_constraints: GlobalRequirementConstraints,
 ) -> OptionalPexRequest:
     request = constraints_request.repository_pex_request
-    # NB: it isn't safe to resolve against the whole constraints file if
-    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
-    if not python_setup.resolve_all_constraints or request.platforms or request.complete_platforms:
+    if not python_setup.resolve_all_constraints:
         return OptionalPexRequest(None)
 
     constraints_path = python_setup.requirement_constraints
