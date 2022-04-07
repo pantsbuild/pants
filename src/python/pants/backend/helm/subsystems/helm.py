@@ -67,11 +67,14 @@ class HelmSubsystem(TemplatedExternalTool):
     default_registry_repository = StrOption(
         "--default-registry-repository",
         default=None,
-        help=(
-            "Default location where to push Helm charts in the available registries "
-            "when no specific one has been given.\n"
-            "If no registry repository is given, charts will be pushed to the root of "
-            "the OCI registry"
+        help=softwrap(
+            """
+            Default location where to push Helm charts in the available registries
+            when no specific one has been given.
+
+            If no registry repository is given, charts will be pushed to the root of
+            the OCI registry.
+            """
         ),
     )
 

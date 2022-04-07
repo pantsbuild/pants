@@ -46,6 +46,7 @@ class HelmRegistriesField(StringSequenceField):
         By default, all configured registries with `default = true` are used.
 
         Example:
+
             # pants.toml
             [helm.registries.my-registry-alias]
             address = "oci://myregistrydomain:port"
@@ -100,21 +101,27 @@ class HelmChartDependenciesField(Dependencies):
 
 
 class HelmChartOutputPathField(OutputPathField):
-    help = (
-        "Where the built directory tree should be located.\n\n"
-        "If undefined, this will use the path to the BUILD file, "
-        "For example, `src/charts/mychart:tgt_name` would be "
-        "`src.charts.mychart/tgt_name/`.\n\n"
-        "Regardless of whether you use the default or set this field, the path will end with "
-        "Helms's file format of `<chart_name>-<chart_version>.tgz`, where "
-        "`chart_name` and `chart_version` are the values extracted from the Chart.yaml file. "
-        "So, using the default for this field, the target "
-        "`src/charts/mychart:tgt_name` might have a final path like "
-        "`src.charts.mychart/tgt_name/mychart-0.1.0.tgz`.\n\n"
-        f"When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. "
-        "`dist/`).\n\n"
-        "Warning: setting this value risks naming collisions with other package targets you may "
-        "have."
+    help = softwrap(
+        f"""
+        Where the built directory tree should be located.
+
+        If undefined, this will use the path to the BUILD file,
+        For example, `src/charts/mychart:tgt_name` would be
+        `src.charts.mychart/tgt_name/`.
+
+        Regardless of whether you use the default or set this field, the path will end with
+        Helms's file format of `<chart_name>-<chart_version>.tgz`, where
+        `chart_name` and `chart_version` are the values extracted from the Chart.yaml file.
+        So, using the default for this field, the target
+        `src/charts/mychart:tgt_name` might have a final path like
+        `src.charts.mychart/tgt_name/mychart-0.1.0.tgz`.
+
+        When running `{bin_name()} package`, this path will be prefixed by `--distdir`
+        (e.g. `dist/`).
+
+        Warning: setting this value risks naming collisions with other package targets
+        you may have.
+        """
     )
 
 
@@ -125,10 +132,13 @@ class HelmChartLintStrictField(TriBoolField):
 
 class HelmChartRepositoryField(StringField):
     alias = "repository"
-    help = (
-        "Repository to use in the Helm registry where this chart is going to be published.\n"
-        "If no value is given and `default-registry-repository` is undefined too, then the chart "
-        "will be pushed to the root of the OCI registry."
+    help = softwrap(
+        """
+        Repository to use in the Helm registry where this chart is going to be published.
+
+        If no value is given and `default-registry-repository` is undefined too, then the chart
+        will be pushed to the root of the OCI registry.
+        """
     )
 
 
