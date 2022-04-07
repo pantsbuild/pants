@@ -3,6 +3,7 @@
 
 from pants.backend.helm.goals import lint, package
 from pants.backend.helm.target_types import (
+    HelmArtifactTarget,
     HelmChartTarget,
     HelmUnitTestTestsGeneratorTarget,
     HelmUnitTestTestTarget,
@@ -13,7 +14,12 @@ from pants.backend.helm.util_rules import chart, sources, tool
 
 
 def target_types():
-    return [HelmChartTarget, HelmUnitTestTestTarget, HelmUnitTestTestsGeneratorTarget]
+    return [
+        HelmArtifactTarget,
+        HelmChartTarget,
+        HelmUnitTestTestTarget,
+        HelmUnitTestTestsGeneratorTarget,
+    ]
 
 
 def rules():

@@ -16,7 +16,7 @@ from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import CreateDigest, Digest, DigestSubset, Directory, PathGlobs, RemovePrefix
 from pants.engine.internals.native_engine import AddPrefix, MergeDigests
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -116,6 +116,47 @@ async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) 
     # Create a digest that will get mutated during the setup process
     mutable_input_digest = empty_dirs_digest
 
+    output_dirs = (cache_dir, config_dir, data_dir)
+
+    def create_process(args: list[str], *, description: str, input_digest: Digest) -> Process:
+        return Process(
+            [helm_path, *args],
+            env=helm_env,
+            input_digest=input_digest,
+            immutable_input_digests=immutable_input_digests,
+            output_directories=output_dirs,
+            description=description,
+            level=LogLevel.DEBUG,
+        )
+
+    # Configures Helm classic repositories
+    helm_remotes = helm_subsytem.remotes()
+    classic_repos = helm_remotes.classic_repositories()
+    if classic_repos:
+        for repo in classic_repos:
+            args = ["repo", "add", repo.alias, repo.address]
+            result = await Get(
+                ProcessResult,
+                Process,
+                create_process(
+                    args,
+                    description=f"Adding Helm classic repository '{repo.alias}' at: {repo.address}",
+                    input_digest=mutable_input_digest,
+                ),
+            )
+            mutable_input_digest = result.output_digest
+
+        update_index_result = await Get(
+            ProcessResult,
+            Process,
+            create_process(
+                ["repo", "update"],
+                description="Update Helm classic repository indexes",
+                input_digest=mutable_input_digest,
+            ),
+        )
+        mutable_input_digest = update_index_result.output_digest
+
     # Install all global Helm plugins
     if global_plugins:
         prefixed_plugins_digests = await MultiGet(
@@ -125,8 +166,6 @@ async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) 
         mutable_input_digest = await Get(
             Digest, MergeDigests([mutable_input_digest, *prefixed_plugins_digests])
         )
-
-    # TODO Configure Helm classic repositories
 
     updated_cache_digest, updated_config_digest, updated_data_digest = await MultiGet(
         Get(Digest, DigestSubset(mutable_input_digest, PathGlobs([f"{cache_dir}/**"]))),

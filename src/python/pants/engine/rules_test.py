@@ -587,6 +587,7 @@ class TestRuleGraph:
         ) in str(cm.value)
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_not_fulfillable_duplicated_dependency(self) -> None:
         # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
         # Only the unfulfillable one should be in the errors.
@@ -631,6 +632,7 @@ class TestRuleGraph:
     @pytest.mark.skip(
         reason="TODO(#10649): Fix and re-enable once reachability checks are restored."
     )
+    @pytest.mark.no_error_if_skipped
     def test_unreachable_rule(self) -> None:
         """Test that when one rule "shadows" another, we get an error."""
 
@@ -827,6 +829,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_noop_removal_in_subgraph(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
@@ -859,6 +862,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_noop_removal_full_single_subject_type(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
@@ -887,6 +891,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_root_tuple_removed_when_no_matches(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
@@ -922,6 +927,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_noop_removal_transitive(self) -> None:
         # If a noop-able rule has rules that depend on it,
         # they should be removed from the graph.
@@ -990,6 +996,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_depends_on_multiple_one_noop(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
@@ -1065,6 +1072,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_get_simple(self) -> None:
         @rule
         async def a() -> A:  # type: ignore[return]

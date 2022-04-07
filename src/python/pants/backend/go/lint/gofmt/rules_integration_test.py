@@ -120,7 +120,7 @@ def run_gofmt(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            GofmtRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            GofmtRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
     return fmt_result

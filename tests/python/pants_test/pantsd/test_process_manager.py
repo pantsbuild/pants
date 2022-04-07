@@ -64,6 +64,7 @@ class TestProcessManager(unittest.TestCase):
             )
 
     @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6836")
+    @pytest.mark.no_error_if_skipped
     def test_deadline_until(self):
         with self.assertRaises(ProcessManager.Timeout):
             with self.captured_logging(logging.INFO) as captured:

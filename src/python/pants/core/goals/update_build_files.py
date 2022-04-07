@@ -44,6 +44,7 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -102,13 +103,17 @@ class DeprecationFixerRequest(RewrittenBuildFileRequest):
 
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
-    help = (
-        "Format and fix safe deprecations in BUILD files.\n\n"
-        "This does not handle the full Pants upgrade. You must still manually change "
-        "`pants_version` in `pants.toml` and you may need to manually address some deprecations. "
-        f"See {doc_url('upgrade-tips')} for upgrade tips.\n\n"
-        "This goal is run without arguments. It will run over all BUILD files in your "
-        "project."
+    help = softwrap(
+        f"""
+        Format and fix safe deprecations in BUILD files.
+
+        This does not handle the full Pants upgrade. You must still manually change
+        `pants_version` in `pants.toml` and you may need to manually address some deprecations.
+        See {doc_url('upgrade-tips')} for upgrade tips.
+
+        This goal is run without arguments. It will run over all BUILD files in your
+        project.
+        """
     )
 
     @classmethod
@@ -118,22 +123,27 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
     check = BoolOption(
         "--check",
         default=False,
-        help=(
-            "Do not write changes to disk, only write back what would change. Return code "
-            "0 means there would be no changes, and 1 means that there would be. "
+        help=softwrap(
+            """
+            Do not write changes to disk, only write back what would change. Return code
+            0 means there would be no changes, and 1 means that there would be.
+            """
         ),
     )
     fmt = BoolOption(
         "--fmt",
         default=True,
-        help=(
-            "Format BUILD files using Black or Yapf.\n\n"
-            "Set `[black].args` / `[yapf].args`, `[black].config` / `[yapf].config` , "
-            "and `[black].config_discovery` / `[yapf].config_discovery` to change "
-            "Black's or Yapf's behavior. Set "
-            "`[black].interpreter_constraints` / `[yapf].interpreter_constraints` "
-            "and `[python].interpreter_search_path` to change which interpreter is "
-            "used to run the formatter."
+        help=softwrap(
+            """
+            Format BUILD files using Black or Yapf.
+
+            Set `[black].args` / `[yapf].args`, `[black].config` / `[yapf].config` ,
+            and `[black].config_discovery` / `[yapf].config_discovery` to change
+            Black's or Yapf's behavior. Set
+            `[black].interpreter_constraints` / `[yapf].interpreter_constraints`
+            and `[python].interpreter_search_path` to change which interpreter is
+            used to run the formatter.
+            """
         ),
     )
     formatter = EnumOption(
@@ -144,9 +154,11 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
     fix_safe_deprecations = BoolOption(
         "--fix-safe-deprecations",
         default=True,
-        help=(
-            "Automatically fix deprecations, such as target type renames, that are safe "
-            "because they do not change semantics."
+        help=softwrap(
+            """
+            Automatically fix deprecations, such as target type renames, that are safe
+            because they do not change semantics.
+            """
         ),
     )
     fix_python_macros = BoolOption(
@@ -154,9 +166,11 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
         default=False,
         help="Deprecated.",
         removal_version="2.13.0.dev0",
-        removal_hint=(
-            "No longer does anything as the old macros have been removed in favor of target "
-            "generators."
+        removal_hint=softwrap(
+            """
+            No longer does anything as the old macros have been removed in favor of target
+            generators.
+            """
         ),
     )
 

@@ -49,7 +49,7 @@ async def setup_terraform_style(setup_request: StyleSetupRequest) -> StyleSetup:
     )
 
     source_files_snapshot = (
-        setup_request.request.prior_formatter_result
+        setup_request.request.snapshot
         if isinstance(setup_request.request, FmtRequest)
         else await Get(
             Snapshot, MergeDigests(sfs.snapshot.digest for sfs in source_files_by_field_set)
