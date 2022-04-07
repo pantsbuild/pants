@@ -40,7 +40,6 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import DependenciesRequest, ExplicitlyProvidedDependencies, Target, Targets
 from pants.util.logging import LogLevel
@@ -70,7 +69,6 @@ class HelmChart:
 @dataclass(frozen=True)
 class HelmChartRequest:
     field_set: HelmChartFieldSet
-    generate_chart_lockfile: bool = False
 
     @classmethod
     def from_target(cls, target: Target) -> HelmChartRequest:
