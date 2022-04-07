@@ -465,6 +465,10 @@ async def create_pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
 async def get_repository_pex(
     request: _RepositoryPexRequest, python_setup: PythonSetup
 ) -> OptionalPexRequest:
+    # NB: It isn't safe to resolve against an entire lockfile or constraints file if
+    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
+    if request.platforms or request.complete_platforms:
+        return OptionalPexRequest(None)
 
     interpreter_constraints = await Get(
         InterpreterConstraints,
@@ -520,9 +524,7 @@ async def _setup_constraints_repository_pex(
     global_requirement_constraints: GlobalRequirementConstraints,
 ) -> OptionalPexRequest:
     request = constraints_request.repository_pex_request
-    # NB: it isn't safe to resolve against the whole constraints file if
-    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
-    if not python_setup.resolve_all_constraints or request.platforms or request.complete_platforms:
+    if not python_setup.resolve_all_constraints:
         return OptionalPexRequest(None)
 
     constraints_path = python_setup.requirement_constraints

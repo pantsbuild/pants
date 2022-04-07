@@ -1011,8 +1011,9 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
     VCS requirements will fail, with a helpful error message describing how to use PEP 440.
     """
     for i, line in enumerate(content.splitlines()):
-        line = line.strip()
-        if not line or line.startswith("#") or line.startswith("-"):
+        line, _, _ = line.partition("--")
+        line = line.strip().rstrip("\\")
+        if not line or line.startswith("#"):
             continue
         try:
             yield PipRequirement.parse(line)
