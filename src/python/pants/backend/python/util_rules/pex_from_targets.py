@@ -46,6 +46,7 @@ from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequ
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, path_safe
 
 logger = logging.getLogger(__name__)
@@ -376,7 +377,10 @@ class _ConstraintsRepositoryPexRequest:
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
+async def create_pex_from_targets(
+    request: PexFromTargetsRequest,
+    python_setup: PythonSetup,
+) -> PexRequest:
     interpreter_constraints = await Get(
         InterpreterConstraints,
         InterpreterConstraintsRequest,
@@ -444,6 +448,29 @@ async def create_pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
             ),
         )
         requirements = dataclasses.replace(requirements, repository_pex=repository_pex.maybe_pex)
+        if python_setup.enable_resolves and not repository_pex.maybe_pex:
+            # If we cannot use a PEX-repository for whatever reason, we still need to parse and
+            # apply the lockfile as constraints.
+            chosen_resolve = await Get(
+                ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
+            )
+            lockfile_contents = await Get(
+                DigestContents,
+                PathGlobs(
+                    [chosen_resolve.lockfile_path],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin=f"the resolve `{chosen_resolve.name}` (from `[python].resolves`)",
+                ),
+            )
+            constraints_strings = FrozenOrderedSet(
+                str(req)
+                for req in parse_requirements_file(
+                    lockfile_contents[0].content.decode(), rel_path=chosen_resolve.lockfile_path
+                )
+            )
+            requirements = dataclasses.replace(
+                requirements, constraints_strings=constraints_strings
+            )
 
     return PexRequest(
         output_filename=request.output_filename,
