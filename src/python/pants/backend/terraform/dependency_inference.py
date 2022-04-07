@@ -28,6 +28,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 
 
@@ -104,6 +105,7 @@ async def setup_process_for_parse_terraform_module_sources(
             argv=request.paths,
             input_digest=request.sources_digest,
             description="Parse Terraform module sources.",
+            level=LogLevel.DEBUG,
         ),
     )
     return process
