@@ -33,7 +33,7 @@ def test_run_then_edit(use_pantsd: bool) -> None:
             """
         ),
     }
-    Path(dirname).mkdir()
+    Path(dirname).mkdir(exist_ok=True)
     for name, content in files.items():
         Path(name).write_text(content)
 
