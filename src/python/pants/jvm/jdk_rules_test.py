@@ -81,6 +81,7 @@ def test_java_binary_bogus_version_fails(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 @pytest.mark.skip(reason="#12293 Coursier JDK bootstrapping is currently flaky in CI")
+@pytest.mark.no_error_if_skipped
 def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     # default version is 1.11
     assert "javac 11.0" in run_javac_version(rule_runner)

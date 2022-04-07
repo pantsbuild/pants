@@ -191,6 +191,7 @@ def test_subdirectories(rule_runner: RuleRunner) -> None:
     "The Process is not being cached, but the rule invocation is being memoized so the "
     "`--force` does not work properly."
 )
+@pytest.mark.no_error_if_skipped
 def test_force(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"tests.sh": GOOD_TEST, "BUILD": "shunit2_tests(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
