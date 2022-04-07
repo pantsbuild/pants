@@ -49,15 +49,7 @@ def test_infer_chart_dependencies(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "src/bar/BUILD": """helm_chart()""",
-            "src/bar/Chart.yaml": dedent(
-                """\
-                apiVersion: v2
-                name: bar
-                version: 0.1.0
-                """
-            ),
-            "src/foo/BUILD": """helm_chart()""",
+            "src/foo/BUILD": """helm_chart(dependencies=["//src/quxx"])""",
             "src/foo/Chart.yaml": dedent(
                 """\
                 apiVersion: v2
@@ -67,6 +59,23 @@ def test_infer_chart_dependencies(rule_runner: RuleRunner) -> None:
                 - name: cert-manager
                   repository: "@jetstack"
                 - name: bar
+                - name: quxx
+                """
+            ),
+            "src/bar/BUILD": """helm_chart()""",
+            "src/bar/Chart.yaml": dedent(
+                """\
+                apiVersion: v2
+                name: bar
+                version: 0.1.0
+                """
+            ),
+            "src/quxx/BUILD": """helm_chart()""",
+            "src/quxx/Chart.yaml": dedent(
+                """\
+                apiVersion: v2
+                name: quxx
+                version: 0.1.0
                 """
             ),
         }
