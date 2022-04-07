@@ -22,8 +22,12 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.dependency_inference.artifact_mapper import AllJvmArtifactTargets
-from pants.jvm.resolve.common import ArtifactRequirement
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmArtifactTargets,
+    MissingJvmArtifacts,
+    UnversionedCoordinate,
+    find_jvm_artifacts_or_raise,
+)
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -87,22 +91,23 @@ async def resolve_apache_thrift_java_runtime_for_resolve(
     jvm_artifact_targets: AllJvmArtifactTargets,
     jvm: JvmSubsystem,
 ) -> ApacheThriftJavaRuntimeForResolve:
-    for tgt in jvm_artifact_targets:
-        if tgt[JvmResolveField].normalized_value(jvm) != request.resolve_name:
-            continue
-
-        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
-        if (
-            artifact.coordinate.group != _LIBTHRIFT_GROUP
-            or artifact.coordinate.artifact != _LIBTHRIFT_ARTIFACT
-        ):
-            continue
-
-        return ApacheThriftJavaRuntimeForResolve(tgt.address)
-
-    raise MissingApacheThriftJavaRuntimeInResolveError(
-        request.resolve_name,
-    )
+    try:
+        addresses = find_jvm_artifacts_or_raise(
+            required_coordinates=[
+                UnversionedCoordinate(
+                    group=_LIBTHRIFT_GROUP,
+                    artifact=_LIBTHRIFT_ARTIFACT,
+                )
+            ],
+            resolve=request.resolve_name,
+            jvm_artifact_targets=jvm_artifact_targets,
+            jvm=jvm,
+        )
+        return ApacheThriftJavaRuntimeForResolve(list(addresses)[0])
+    except MissingJvmArtifacts:
+        raise MissingApacheThriftJavaRuntimeInResolveError(
+            request.resolve_name,
+        )
 
 
 @rule
