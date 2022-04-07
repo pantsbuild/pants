@@ -11,6 +11,7 @@ from pants.build_graph.address import Address
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
 from pants.jvm.dependency_inference.jvm_artifact_mappings import JVM_ARTIFACT_MAPPINGS
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
@@ -277,6 +278,69 @@ async def compute_java_third_party_artifact_mapping(
             (resolve_name, FrozenTrieNode(mapping)) for resolve_name, mapping in mappings.items()
         )
     )
+
+
+class ConflictingJvmArtifactVersion(ValueError):
+    def __init__(
+        self, group: str, artifact: str, required_version: str, found_coordinate: Coordinate
+    ) -> None:
+        self.group: str = group
+        self.artifact: str = artifact
+        self.required_version: str = required_version
+        self.found_coordinate: Coordinate = found_coordinate
+
+
+class MissingJvmArtifacts(ValueError):
+    def __init__(self, coordinates: Iterable[Coordinate | UnversionedCoordinate]) -> None:
+        self.coordinates: tuple[Coordinate | UnversionedCoordinate, ...] = tuple(coordinates)
+
+
+def find_jvm_artifacts_or_raise(
+    required_coordinates: Iterable[Coordinate | UnversionedCoordinate],
+    resolve: str,
+    jvm_artifact_targets: AllJvmArtifactTargets,
+    jvm: JvmSubsystem,
+) -> frozenset[Address]:
+    remaining_coordinates: set[Coordinate | UnversionedCoordinate] = set(required_coordinates)
+
+    addresses: set[Address] = set()
+    for tgt in jvm_artifact_targets:
+        if tgt[JvmResolveField].normalized_value(jvm) != resolve:
+            continue
+
+        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
+        found_coordinates: set[Coordinate | UnversionedCoordinate] = set()
+        for coordinate in remaining_coordinates:
+            if isinstance(coordinate, Coordinate):
+                if (
+                    artifact.coordinate.group != coordinate.group
+                    or artifact.coordinate.artifact != coordinate.artifact
+                ):
+                    continue
+                if artifact.coordinate.version != coordinate.version:
+                    raise ConflictingJvmArtifactVersion(
+                        group=coordinate.group,
+                        artifact=coordinate.artifact,
+                        required_version=coordinate.version,
+                        found_coordinate=artifact.coordinate,
+                    )
+            elif isinstance(coordinate, UnversionedCoordinate):
+                if (
+                    artifact.coordinate.group != coordinate.group
+                    or artifact.coordinate.artifact != coordinate.artifact
+                ):
+                    continue
+
+            found_coordinates.add(coordinate)
+
+        if found_coordinates:
+            remaining_coordinates.difference_update(found_coordinates)
+            addresses.add(tgt.address)
+
+    if remaining_coordinates:
+        raise MissingJvmArtifacts(remaining_coordinates)
+
+    return frozenset(addresses)
 
 
 def rules():
