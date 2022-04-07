@@ -36,7 +36,7 @@ class PexRuntimeEnvironment(Subsystem):
         default=["<PATH>"],
         help=(
             "The PATH value that will be used by the PEX subprocess and any subprocesses it "
-            'spawns.\n\nThe special string "<PATH>" will expand to the contents of the PATH '
+            'spawns.\n\nThe special string `"<PATH>"` will expand to the contents of the PATH '
             "env var."
         ),
         advanced=True,
