@@ -18,6 +18,7 @@ from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartMetaSour
 from pants.backend.helm.util_rules import chart_metadata, sources
 from pants.backend.helm.util_rules.chart_metadata import (
     HELM_CHART_METADATA_FILENAMES,
+    HelmChartDependency,
     HelmChartMetadata,
     ParseHelmChartMetadataDigest,
 )
@@ -35,6 +36,7 @@ from pants.engine.fs import (
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import DependenciesRequest, Target, Targets
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
@@ -122,7 +124,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
         # Update subchart dependencies in the metadata and re-render it.
         remotes = subsystem.remotes()
         subchart_map: dict[str, HelmChart] = {chart.metadata.name: chart for chart in subcharts}
-        updated_dependencies = []
+        updated_dependencies: OrderedSet[HelmChartDependency] = OrderedSet()
         for dep in metadata.dependencies:
             updated_dep = dep
 
@@ -139,7 +141,20 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
                     updated_dep, version=subchart_map[dep.name].metadata.version
                 )
 
-            updated_dependencies.append(updated_dep)
+            updated_dependencies.add(updated_dep)
+
+        # Include the explicitly provided subchats in the set of dependencies if not already present.
+        updated_dependencies_names = {dep.name for dep in updated_dependencies}
+        remaining_first_party_subcharts = [
+            chart
+            for chart in first_party_subcharts
+            if chart.metadata.name not in updated_dependencies_names
+        ]
+        for chart in remaining_first_party_subcharts:
+            dependency = HelmChartDependency(
+                name=chart.metadata.name, version=chart.metadata.version
+            )
+            updated_dependencies.add(dependency)
 
         # Update metadata with the information about charts' dependencies.
         metadata = dataclasses.replace(metadata, dependencies=tuple(updated_dependencies))

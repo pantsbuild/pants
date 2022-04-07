@@ -112,6 +112,11 @@ class HelmRemotes:
                 yield HelmClassicRepository(address=alias_or_address)
 
     @memoized_method
+    def registries(self) -> tuple[HelmRegistry, ...]:
+        deduped_regs = {r for _, r in self.all.items() if isinstance(r, HelmRegistry)}
+        return tuple(deduped_regs)
+
+    @memoized_method
     def classic_repositories(self) -> tuple[HelmClassicRepository, ...]:
         deduped_repos = {r for _, r in self.all.items() if isinstance(r, HelmClassicRepository)}
         return tuple(deduped_repos)
