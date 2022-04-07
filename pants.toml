@@ -91,6 +91,7 @@ root_patterns = [
   "/build-support/flake8",
   "/build-support/migration-support",
   "/pants-plugins",
+  # For `conftest.py`
   "/",
 ]
 
