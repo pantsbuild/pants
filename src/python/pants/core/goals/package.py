@@ -22,6 +22,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, union
 from pants.util.docutil import bin_name
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -50,14 +51,17 @@ class BuiltPackage:
 
 class OutputPathField(StringField, AsyncFieldMixin):
     alias = "output_path"
-    help = (
-        "Where the built asset should be located.\n\n"
-        "If undefined, this will use the path to the BUILD file, followed by the target name. "
-        "For example, `src/python/project:app` would be `src.python.project/app.ext`.\n\n"
-        f"When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. "
-        "`dist/`).\n\n"
-        "Warning: setting this value risks naming collisions with other package targets you may "
-        "have."
+    help = softwrap(
+        f"""
+        Where the built asset should be located.
+
+        If undefined, this will use the path to the BUILD file, followed by the target name.
+        For example, `src/python/project:app` would be `src.python.project/app.ext`.
+
+        When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. `dist/`).
+
+        Warning: setting this value risks naming collisions with other package targets you may have.
+        """
     )
 
     def value_or_default(self, *, file_ending: str | None) -> str:
