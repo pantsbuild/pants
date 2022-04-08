@@ -8,7 +8,7 @@ import pytest
 
 from pants.backend.kotlin import target_types
 from pants.backend.kotlin.dependency_inference import kotlin_parser
-from pants.backend.kotlin.dependency_inference.kotlin_parser import KotlinSourceDependencyAnalysis
+from pants.backend.kotlin.dependency_inference.kotlin_parser import KotlinSourceDependencyAnalysis, KotlinImport
 from pants.backend.kotlin.target_types import KotlinSourceField, KotlinSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
@@ -18,7 +18,7 @@ from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.resolve import jvm_tool
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[KotlinSourceTarget],
     )
-    rule_runner.set_options(args=["-ldebug"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(args=["-ldebug", "--no-process-cleanup"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -64,6 +64,7 @@ def _analyze(rule_runner: RuleRunner, source: str) -> KotlinSourceDependencyAnal
     return rule_runner.request(KotlinSourceDependencyAnalysis, [source_files])
 
 
+@logging
 def test_parser_simple(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
         rule_runner,
@@ -71,10 +72,14 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             """\
             package org.pantsbuild.backend.kotlin
 
+            import java.io.File
+
             fun main(args: Array<String>) {
             }
             """
         ),
     )
 
-    assert analysis.imports == set()
+    assert analysis.imports == {
+        KotlinImport(name="java.io.File", alias=None, is_wildcard=False)
+    }

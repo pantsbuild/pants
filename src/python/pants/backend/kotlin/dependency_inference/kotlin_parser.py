@@ -10,12 +10,12 @@ from dataclasses import dataclass
 from pants.backend.kotlin.subsystems.kotlin import DEFAULT_KOTLIN_VERSION
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, DigestContents, Directory, FileContent
-from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix
+from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.jdk_rules import InternalJdk, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess, JdkRequest, JdkEnvironment
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.option.global_options import ProcessCleanupOption
@@ -25,21 +25,46 @@ _KOTLIN_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements.from_coordinates(
     [
         Coordinate(
             group="org.jetbrains.kotlin",
-            artifact="kotlin-compiler-embeddable",
+            artifact="kotlin-compiler",
             version=DEFAULT_KOTLIN_VERSION,  # TODO: Make this follow the resolve?
+        ),
+        Coordinate(
+            group="org.jetbrains.kotlin",
+            artifact="kotlin-stdlib",
+            version=DEFAULT_KOTLIN_VERSION,  # TODO: Make this follow the resolve?
+        ),
+        Coordinate(
+            group="org.jetbrains.kotlinx",
+            artifact="kotlinx-serialization-json",
+            version="1.3.2",
         )
     ]
 )
 
 
 @dataclass(frozen=True)
+class KotlinImport:
+    name: str
+    alias: str | None
+    is_wildcard: bool
+
+    @classmethod
+    def from_json_dict(cls, d: dict) -> KotlinImport:
+        return cls(
+            name=d["name"],
+            alias=d.get("alias"),
+            is_wildcard=d["isWildcard"],
+        )
+
+
+@dataclass(frozen=True)
 class KotlinSourceDependencyAnalysis:
-    imports: frozenset[str]
+    imports: frozenset[KotlinImport]
 
     @classmethod
     def from_json_dict(cls, d: dict) -> KotlinSourceDependencyAnalysis:
         return cls(
-            imports=frozenset(d["imports"]),
+            imports=frozenset(KotlinImport.from_json_dict(i) for i in d["imports"]),
         )
 
 
@@ -54,10 +79,14 @@ class KotlinParserCompiledClassfiles(ClasspathEntry):
 
 @rule(level=LogLevel.DEBUG)
 async def analyze_kotlin_source_dependencies(
-    jdk: InternalJdk,
     processor_classfiles: KotlinParserCompiledClassfiles,
     source_files: SourceFiles,
 ) -> FallibleKotlinSourceDependencyAnalysisResult:
+    # Use JDK 8 due to https://youtrack.jetbrains.com/issue/KTIJ-17192 and https://youtrack.jetbrains.com/issue/KT-37446.
+    request = JdkRequest("adopt:8")
+    env = await Get(JdkEnvironment, JdkRequest, request)
+    jdk = InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
+
     if len(source_files.files) > 1:
         raise ValueError(
             f"analyze_scala_source_dependencies expects sources with exactly 1 source file, but found {len(source_files.snapshot.files)}."
@@ -145,7 +174,7 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
 
     parser_source = FileContent("KotlinParser.kt", parser_source_content)
 
-    tool_classpath, parser_classpath, source_digest = await MultiGet(
+    tool_classpath, parser_classpath, plugin_classpath, source_digest = await MultiGet(
         Get(
             ToolClasspath,
             ToolClasspathRequest(
@@ -157,6 +186,11 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
                             artifact="kotlin-compiler",
                             version=DEFAULT_KOTLIN_VERSION,  # TODO: Pull from resolve or hard-code Kotlin version?
                         ),
+                        Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-serialization-compiler-plugin",
+                            version=DEFAULT_KOTLIN_VERSION,
+                        ),
                     ]
                 ),
             ),
@@ -165,6 +199,21 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
             ToolClasspath,
             ToolClasspathRequest(
                 prefix="__parsercp", artifact_requirements=_KOTLIN_PARSER_ARTIFACT_REQUIREMENTS
+            ),
+        ),
+        Get(
+            ToolClasspath,
+            ToolClasspathRequest(
+                prefix="__plugincp",
+                artifact_requirements=ArtifactRequirements.from_coordinates(
+                    [
+                        Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-serialization",
+                            version=DEFAULT_KOTLIN_VERSION,
+                        ),
+                    ]
+                ),
             ),
         ),
         Get(Digest, CreateDigest([parser_source, Directory(dest_dir)])),
@@ -188,8 +237,11 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
             classpath_entries=tool_classpath.classpath_entries(),
             argv=[
                 "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+                # TODO: This should use the jar provided in KOTLIN_HOME instead if we ever use kotlin
+                # distribution instead of Coursier to fetch Kotlin jars.
+                f"-Xplugin={':'.join(plugin_classpath.classpath_entries())}",
                 "-classpath",
-                ":".join(parser_classpath.classpath_entries()),
+                ":".join(list(parser_classpath.classpath_entries()) + list(plugin_classpath.classpath_entries())),
                 "-d",
                 dest_dir,
                 parser_source.path,
@@ -205,6 +257,9 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
     stripped_classfiles_digest = await Get(
         Digest, RemovePrefix(process_result.output_digest, dest_dir)
     )
+    ss = await Get(Snapshot, Digest, stripped_classfiles_digest)
+    files = "\n".join(sorted(ss.files))
+    print(f"classfiles = {files}")
     return KotlinParserCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
