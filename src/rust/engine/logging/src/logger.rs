@@ -218,17 +218,25 @@ impl Log for PantsLogger {
     };
     let uncolored_log_string = fmt_log!(log_time, self.get_level_marker(false, record), log_line);
     let uncolored_log_bytes = uncolored_log_string.as_bytes();
-    let colored_log_string = fmt_log!(log_time, self.get_level_marker(true, record), log_line);
-    let colored_log_bytes = colored_log_string.as_bytes();
 
-    let stderr_log = if destination.stderr_use_color() {
-      colored_log_bytes
+    {
+      let mut maybe_per_run_file = inner.per_run_log.lock();
+      if let Some(ref mut file) = *maybe_per_run_file {
+        // deliberately ignore errors writing to per-run log file
+        let _ = file.write_all(uncolored_log_bytes);
+      }
+    }
+
+    let stderr_log_string = if destination.stderr_use_color() {
+      fmt_log!(log_time, self.get_level_marker(true, record), log_line)
     } else {
-      uncolored_log_bytes
+      uncolored_log_string.clone()
     };
+
+    let stderr_log_bytes = stderr_log_string.as_bytes();
     // Attempt to write to stdio, and write to the pantsd log if we fail (either because we don't
     // have a valid stdio instance, or because of an error).
-    if destination.write_stderr_raw(stderr_log).is_err() {
+    if destination.write_stderr_raw(stderr_log_bytes).is_err() {
       let mut maybe_file = inner.log_file.lock();
       if let Some(ref mut file) = *maybe_file {
         match file.write_all(uncolored_log_bytes) {
@@ -239,14 +247,6 @@ impl Log for PantsLogger {
             debug_log!("fatal.log", "Failed to write to log file {:?}: {}", file, e);
           }
         }
-      }
-    }
-
-    {
-      let mut maybe_per_run_file = inner.per_run_log.lock();
-      if let Some(ref mut file) = *maybe_per_run_file {
-        // deliberately ignore errors writing to per-run log file
-        let _ = file.write_all(uncolored_log_bytes);
       }
     }
   }
