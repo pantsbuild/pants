@@ -15,6 +15,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.base.specs import AddressSpecs, MaybeEmptySiblingAddresses
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.tailor import group_by_dir
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
@@ -28,6 +29,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 
 
@@ -97,13 +99,16 @@ class ParseTerraformModuleSources:
 async def setup_process_for_parse_terraform_module_sources(
     request: ParseTerraformModuleSources, parser: ParserSetup
 ) -> Process:
+    dir_paths = ", ".join(sorted(group_by_dir(request.paths).keys()))
+
     process = await Get(
         Process,
         VenvPexProcess(
             parser.pex,
             argv=request.paths,
             input_digest=request.sources_digest,
-            description="Parse Terraform module sources.",
+            description=f"Parse Terraform module sources: {dir_paths}",
+            level=LogLevel.DEBUG,
         ),
     )
     return process
