@@ -23,11 +23,11 @@ from typing import (
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
+from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import AwaitableConstraints
 from pants.engine.internals.selectors import Effect as Effect  # noqa: F401
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
-from pants.engine.rule_visitor import collect_awaitables
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -288,10 +288,11 @@ def rule_helper(func: Callable) -> Callable:
 
     There are a few restrictions:
         1. Rule helpers must be "private". I.e. start with an underscore
-        2. Rule helpers can't be rules
-        3. Rule helpers must be accessed by attributes chained from a module variable (see below)
+        2. Rule hlpers must be `async`
+        3. Rule helpers can't be rules
+        4. Rule helpers must be accessed by attributes chained from a module variable (see below)
 
-    To explain restriction 3, consider the following:
+    To explain restriction 4, consider the following:
     ```
         from some_mod import helper_function, attribute
 
@@ -301,23 +302,26 @@ def rule_helper(func: Callable) -> Callable:
 
         @rule
         async def my_rule(arg: RequestType) -> ReturnType
-            helper_function()  # OK
-            attribute.helper()  # OK (assuming `helper` is a @rule_helper)
-            attribute.otherattr.helper()  # OK (assuming `helper` is a @rule_helper)
-            some_instance.helper()  # OK (assuming `helper` is a @rule_helper)
+            await helper_function()  # OK
+            await attribute.helper()  # OK (assuming `helper` is a @rule_helper)
+            await attribute.otherattr.helper()  # OK (assuming `helper` is a @rule_helper)
+            await some_instance.helper()  # OK (assuming `helper` is a @rule_helper)
 
-            AClass().helper()  # Not OK, won't collect awaitables from `helper`
+            await AClass().helper()  # Not OK, won't collect awaitables from `helper`
 
             func_var = AClass()
-            func_var.helper()  # Not OK, won't collect awaitables from `helper`
-            arg.helper()  # Not OK, won't collect awaitables from `helper`
+            await func_var.helper()  # Not OK, won't collect awaitables from `helper`
+            await arg.helper()  # Not OK, won't collect awaitables from `helper`
     ```
     """
     if not func.__name__.startswith("_"):
         raise ValueError("@rule_helpers must be private. I.e. start with an underscore.")
 
     if hasattr(func, "rule"):
-        raise ValueError("Cannot use both @rule and @rule_helper")
+        raise ValueError("Cannot use both @rule and @rule_helper.")
+
+    if not inspect.iscoroutinefunction(func):
+        raise ValueError("@rule_helpers must be async.")
 
     setattr(func, "rule_helper", func)
     return func

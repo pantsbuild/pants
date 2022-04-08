@@ -5,8 +5,8 @@ from typing import Iterable, Tuple
 
 import pytest
 
+from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import Get, GetParseError, MultiGet
-from pants.engine.rule_visitor import collect_awaitables
 from pants.engine.rules import rule_helper
 
 # The visitor inspects the module for definitions, so these must be at module scope

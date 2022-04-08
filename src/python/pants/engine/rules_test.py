@@ -1006,3 +1006,11 @@ def test_cant_be_both_rule_and_rule_helper() -> None:
         @rule_helper
         async def _func2() -> A:
             pass
+
+
+def test_synchronous_rule_helper() -> None:
+    with pytest.raises(ValueError, match="must be async"):
+
+        @rule_helper
+        def _foo() -> A:
+            pass
