@@ -93,6 +93,8 @@ class ScalaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
     language_id = LANGUAGE_ID
     can_merge_metadata_from = ("java",)
     field_set_type = ScalaMetadataFieldSet
+    resolve_prefix = "jvm"
+    resolve_field = JvmResolveField
 
 
 @dataclass(frozen=True)

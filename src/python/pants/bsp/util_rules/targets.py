@@ -37,7 +37,14 @@ from pants.engine.fs import DigestContents, PathGlobs, Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule
-from pants.engine.target import FieldSet, SourcesField, SourcesPaths, SourcesPathsRequest, Targets
+from pants.engine.target import (
+    FieldSet,
+    SourcesField,
+    SourcesPaths,
+    SourcesPathsRequest,
+    StringField,
+    Targets,
+)
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
@@ -56,6 +63,9 @@ class BSPBuildTargetsMetadataRequest(Generic[_FS]):
     language_id: ClassVar[str]
     can_merge_metadata_from: ClassVar[tuple[str, ...]]
     field_set_type: ClassVar[Type[_FS]]
+
+    resolve_prefix: ClassVar[str]
+    resolve_field: ClassVar[Type[StringField]]
 
     field_sets: tuple[_FS, ...]
 
@@ -210,9 +220,30 @@ async def resolve_bsp_build_target_identifier(
 
 
 @rule
-async def resolve_bsp_build_target_addresses(bsp_target: BSPBuildTargetInternal) -> Targets:
+async def resolve_bsp_build_target_addresses(
+    bsp_target: BSPBuildTargetInternal,
+    union_membership: UnionMembership,
+) -> Targets:
     targets = await Get(Targets, AddressSpecs, bsp_target.specs.address_specs)
-    return targets
+    if bsp_target.definition.resolve_filter is None:
+        return targets
+
+    resolve_filter = bsp_target.definition.resolve_filter
+    resolve_prefix, matched, resolve_value = resolve_filter.partition(":")
+    if not resolve_prefix or not matched:
+        raise ValueError(
+            f"The `resolve` filter for `{bsp_target}` must have a platform or language specific "
+            f"prefix like `$lang:$filter`, but the configured value: `{resolve_filter}` did not."
+        )
+
+    resolve_fields = {
+        bbtmr.resolve_field
+        for bbtmr in union_membership.get(BSPBuildTargetsMetadataRequest)
+        if bbtmr.resolve_prefix == resolve_prefix
+    }
+    return Targets(
+        t for t in targets if any(t.get(f).value == resolve_value for f in resolve_fields)
+    )
 
 
 @rule
