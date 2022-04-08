@@ -86,6 +86,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -544,8 +545,33 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
     # Check interpreter constraints
     if len(request.interpreter_constraints) > 1:
         raise SetupPyError(
-            f"Expected a single set of interpreter constraints for {target.address}, "
-            f"got: {request.interpreter_constraints}."
+            softwrap(
+                f"""
+                Expected a single interpreter constraint for {target.address}, got:
+                {request.interpreter_constraints}.
+
+                Python distributions does not support multiple constraints, so this will need to be
+                translated into a single interpreter constraint using exclusions to get the same
+                effect.
+
+                As example, given two constraints:
+
+                    ">=2.7,<3" and ">=3.5,<3.11"
+
+                these can be combined into a single constraint using exclusions:
+
+                    ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.11"
+
+                """
+            )
+        )
+    if len(request.interpreter_constraints) > 0:
+        # Preserves the value from the SetupKwargs response, if any.
+        setup_kwargs.setdefault(
+            "python_requires",
+            # Pick the first constraint using a generator detour, as the InterpreterConstraints is
+            # based on a FrozenOrderedSet which is not indexable.
+            next(str(requirment.specifier) for requirment in request.interpreter_constraints),  # type: ignore[attr-defined]
         )
 
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
@@ -559,10 +585,6 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
                 *setup_kwargs.get("namespace_packages", []),
             ),
             "package_data": {**dict(sources.package_data), **setup_kwargs.get("package_data", {})},
-            "python_requires": next(
-                (str(requirement.specifier) for requirement in request.interpreter_constraints),  # type: ignore[attr-defined]
-                setup_kwargs.get("python_requires", None),
-            ),
             "install_requires": (*requirements, *setup_kwargs.get("install_requires", [])),
         }
     )
