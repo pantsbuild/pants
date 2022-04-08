@@ -36,6 +36,12 @@ struct Inner {
 
 pub struct PantsLogger(ArcSwap<Inner>);
 
+macro_rules! fmt_log {
+  ($log_time: expr, $log_level_marker: expr, $log_line: expr) => {
+    format!("{} {} {}\n", $log_time, $log_level_marker, $log_line)
+  };
+}
+
 impl PantsLogger {
   pub fn new() -> PantsLogger {
     PantsLogger(ArcSwap::from(Arc::new(Inner {
@@ -130,6 +136,19 @@ impl PantsLogger {
     log!(target: target, level.into(), "{}", message);
     Ok(())
   }
+
+  fn get_level_marker(&self, use_color: bool, record: &Record) -> String {
+    let level = record.level();
+    match level {
+      _ if !use_color => format!("[{}]", level).normal().clear(),
+      Level::Info => format!("[{}]", level).normal(),
+      Level::Error => format!("[{}]", level).red(),
+      Level::Warn => format!("[{}]", level).yellow(),
+      Level::Debug => format!("[{}]", level).green(),
+      Level::Trace => format!("[{}]", level).magenta(),
+    }
+    .to_string()
+  }
 }
 
 impl Log for PantsLogger {
@@ -182,7 +201,6 @@ impl Log for PantsLogger {
     }
 
     let destination = stdio::get_destination();
-    let use_color = destination.stderr_use_color();
 
     // Build the message string.
     let log_time = {
@@ -193,32 +211,27 @@ impl Log for PantsLogger {
         cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
       )
     };
-    let log_level_marker = {
-      let level = record.level();
-      match level {
-        _ if !use_color => format!("[{}]", level).normal().clear(),
-        Level::Info => format!("[{}]", level).normal(),
-        Level::Error => format!("[{}]", level).red(),
-        Level::Warn => format!("[{}]", level).yellow(),
-        Level::Debug => format!("[{}]", level).green(),
-        Level::Trace => format!("[{}]", level).magenta(),
-      }
-    };
     let log_line = if inner.show_target {
       format!("{} ({})", log_msg, record.target())
     } else {
       log_msg
     };
-    let mut log_string = format!("{} {} {}\n", log_time, log_level_marker, log_line,);
+    let uncolored_log_string = fmt_log!(log_time, self.get_level_marker(false, record), log_line);
+    let uncolored_log_bytes = uncolored_log_string.as_bytes();
+    let colored_log_string = fmt_log!(log_time, self.get_level_marker(true, record), log_line);
+    let colored_log_bytes = colored_log_string.as_bytes();
 
-    let mut log_bytes = log_string.as_bytes();
-
+    let stderr_log = if destination.stderr_use_color() {
+      colored_log_bytes
+    } else {
+      uncolored_log_bytes
+    };
     // Attempt to write to stdio, and write to the pantsd log if we fail (either because we don't
     // have a valid stdio instance, or because of an error).
-    if destination.write_stderr_raw(log_bytes).is_err() {
+    if destination.write_stderr_raw(stderr_log).is_err() {
       let mut maybe_file = inner.log_file.lock();
       if let Some(ref mut file) = *maybe_file {
-        match file.write_all(log_bytes) {
+        match file.write_all(uncolored_log_bytes) {
           Ok(()) => (),
           Err(e) => {
             // If we've failed to write to stdio, but also to our log file, our only recourse is to
@@ -232,17 +245,8 @@ impl Log for PantsLogger {
     {
       let mut maybe_per_run_file = inner.per_run_log.lock();
       if let Some(ref mut file) = *maybe_per_run_file {
-        if use_color {
-          log_string = format!(
-            "{} {} {}\n",
-            log_time,
-            format!("[{}]", record.level()).normal().clear(),
-            log_line,
-          );
-          log_bytes = log_string.as_bytes();
-        }
         // deliberately ignore errors writing to per-run log file
-        let _ = file.write_all(log_bytes);
+        let _ = file.write_all(uncolored_log_bytes);
       }
     }
   }
