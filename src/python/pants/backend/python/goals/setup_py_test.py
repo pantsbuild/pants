@@ -43,6 +43,7 @@ from pants.backend.python.goals.setup_py import (
     validate_commands,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
@@ -52,6 +53,7 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import dists, python_sources
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FileTarget, ResourcesGeneratorTarget, ResourceTarget
 from pants.core.target_types import rules as core_target_types_rules
@@ -127,9 +129,17 @@ def assert_chroot(
     expected_files: list[str],
     expected_setup_kwargs,
     addr: Address,
+    interpreter_constraints: InterpreterConstraints | None = None,
 ) -> None:
+    if interpreter_constraints is None:
+        interpreter_constraints = InterpreterConstraints(
+            PythonSetup.default_interpreter_constraints
+        )
+
     tgt = rule_runner.get_target(addr)
-    req = DistBuildChrootRequest(ExportedTarget(tgt), py2=False)
+    req = DistBuildChrootRequest(
+        ExportedTarget(tgt), interpreter_constraints=interpreter_constraints
+    )
     chroot = rule_runner.request(DistBuildChroot, [req])
     snapshot = rule_runner.request(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
@@ -137,7 +147,8 @@ def assert_chroot(
     if expected_setup_kwargs is not None:
         sources = rule_runner.request(DistBuildSources, [req])
         setup_kwargs = rule_runner.request(
-            FinalizedSetupKwargs, [GenerateSetupPyRequest(ExportedTarget(tgt), sources)]
+            FinalizedSetupKwargs,
+            [GenerateSetupPyRequest(ExportedTarget(tgt), sources, interpreter_constraints)],
         )
         assert expected_setup_kwargs == setup_kwargs.kwargs
 
@@ -147,7 +158,12 @@ def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: type[Ex
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
             DistBuildChroot,
-            [DistBuildChrootRequest(ExportedTarget(tgt), py2=False)],
+            [
+                DistBuildChrootRequest(
+                    ExportedTarget(tgt),
+                    InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+                )
+            ],
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
@@ -283,6 +299,7 @@ def test_use_generate_setup_script_package_provenance_agnostic(chroot_rule_runne
                 )
             },
             "install_requires": (),
+            "python_requires": "<4,>=3.7",
         },
         Address("src/python", target_name="foo-dist"),
     )
@@ -410,6 +427,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",), "foo.qux": ("qux.pyi",)},
             "install_requires": ("baz==1.1.1",),
+            "python_requires": "<4,>=3.7",
             "entry_points": {"console_scripts": ["foo_main = foo.qux.bin:main"]},
         },
         Address("src/python/foo", target_name="foo-dist"),
@@ -481,6 +499,7 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
             "namespace_packages": tuple(),
             "package_data": {},
             "install_requires": tuple(),
+            "python_requires": "<4,>=3.7",
             "entry_points": {
                 "console_scripts": [
                     "foo_main = foo.qux.bin:main",
@@ -533,6 +552,7 @@ def test_generate_long_description_field_from_file(chroot_rule_runner: RuleRunne
             "namespace_packages": tuple(),
             "package_data": {},
             "install_requires": tuple(),
+            "python_requires": "<4,>=3.7",
             "long_description": "Some long description.",
         },
         Address("src/python/foo", target_name="foo-dist"),
@@ -692,6 +712,7 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
             "packages": ("project",),
             "namespace_packages": (),
             "install_requires": (),
+            "python_requires": "<4,>=3.7",
             "package_data": {},
             "entry_points": {"console_scripts": ["foo = project.app:func"]},
         },
@@ -751,7 +772,12 @@ def test_get_sources() -> None:
         owner_tgt = rule_runner.get_target(Address("src/python/foo", target_name="dist"))
         srcs = rule_runner.request(
             DistBuildSources,
-            [DistBuildChrootRequest(ExportedTarget(owner_tgt), py2=False)],
+            [
+                DistBuildChrootRequest(
+                    ExportedTarget(owner_tgt),
+                    InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+                )
+            ],
         )
         chroot_snapshot = rule_runner.request(Snapshot, [srcs.digest])
 
