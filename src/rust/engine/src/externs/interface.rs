@@ -1654,7 +1654,7 @@ fn stdio_thread_set_destination(stdio_destination: &PyStdioDestination) {
 #[pyfunction]
 fn set_per_run_log_path(py: Python, log_path: Option<PathBuf>) {
   py.allow_threads(|| {
-    PANTS_LOGGER.set_per_run_logs(log_path);
+    PANTS_LOGGER.set_per_run_log(log_path);
   })
 }
 

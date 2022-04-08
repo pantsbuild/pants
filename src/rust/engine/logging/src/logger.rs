@@ -4,7 +4,6 @@ use crate::PythonLogLevel;
 
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::fmt::Write as FmtWrite;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
@@ -25,7 +24,7 @@ lazy_static! {
 }
 
 struct Inner {
-  per_run_logs: Mutex<Option<File>>,
+  per_run_log: Mutex<Option<File>>,
   log_file: Mutex<Option<File>>,
   global_level: LevelFilter,
   show_rust_3rdparty_logs: bool,
@@ -40,7 +39,7 @@ pub struct PantsLogger(ArcSwap<Inner>);
 impl PantsLogger {
   pub fn new() -> PantsLogger {
     PantsLogger(ArcSwap::from(Arc::new(Inner {
-      per_run_logs: Mutex::new(None),
+      per_run_log: Mutex::new(None),
       log_file: Mutex::new(None),
       global_level: LevelFilter::Off,
       show_rust_3rdparty_logs: true,
@@ -83,7 +82,7 @@ impl PantsLogger {
       .map_err(|err| format!("Error opening pantsd logfile: {}", err))?;
 
     PANTS_LOGGER.0.store(Arc::new(Inner {
-      per_run_logs: Mutex::default(),
+      per_run_log: Mutex::default(),
       log_file: Mutex::new(Some(log_file)),
       global_level,
       show_rust_3rdparty_logs,
@@ -105,10 +104,10 @@ impl PantsLogger {
     Ok(())
   }
 
-  pub fn set_per_run_logs(&self, per_run_log_path: Option<PathBuf>) {
+  pub fn set_per_run_log(&self, per_run_log_path: Option<PathBuf>) {
     match per_run_log_path {
       None => {
-        *self.0.load().per_run_logs.lock() = None;
+        *self.0.load().per_run_log.lock() = None;
       }
       Some(path) => {
         let file = OpenOptions::new()
@@ -117,7 +116,7 @@ impl PantsLogger {
           .open(path)
           .map_err(|err| format!("Error opening per-run logfile: {}", err))
           .unwrap();
-        *self.0.load().per_run_logs.lock() = Some(file);
+        *self.0.load().per_run_log.lock() = Some(file);
       }
     };
   }
@@ -183,46 +182,36 @@ impl Log for PantsLogger {
     }
 
     let destination = stdio::get_destination();
+    let use_color = destination.stderr_use_color();
 
     // Build the message string.
-    let log_string = {
-      let mut log_string = {
-        let cur_date = chrono::Local::now();
-        format!(
-          "{}.{:02}",
-          cur_date.format(TIME_FORMAT_STR),
-          cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
-        )
-      };
-
-      let use_color = destination.stderr_use_color();
-
+    let log_time = {
+      let cur_date = chrono::Local::now();
+      format!(
+        "{}.{:02}",
+        cur_date.format(TIME_FORMAT_STR),
+        cur_date.time().nanosecond() / 10_000_000 // Two decimal places of precision.
+      )
+    };
+    let log_level_marker = {
       let level = record.level();
-      let level_marker = match level {
+      match level {
         _ if !use_color => format!("[{}]", level).normal().clear(),
         Level::Info => format!("[{}]", level).normal(),
         Level::Error => format!("[{}]", level).red(),
         Level::Warn => format!("[{}]", level).yellow(),
         Level::Debug => format!("[{}]", level).green(),
         Level::Trace => format!("[{}]", level).magenta(),
-      };
-      write!(log_string, " {}", level_marker).unwrap();
-
-      if inner.show_target {
-        write!(log_string, " ({})", record.target()).unwrap();
-      };
-      writeln!(log_string, " {}", log_msg).unwrap();
-      log_string
-    };
-    let log_bytes = log_string.as_bytes();
-
-    {
-      let mut maybe_per_run_file = inner.per_run_logs.lock();
-      if let Some(ref mut file) = *maybe_per_run_file {
-        // deliberately ignore errors writing to per-run log file
-        let _ = file.write_all(log_bytes);
       }
-    }
+    };
+    let log_line = if inner.show_target {
+      format!("{} ({})", log_msg, record.target())
+    } else {
+      log_msg
+    };
+    let mut log_string = format!("{} {} {}\n", log_time, log_level_marker, log_line,);
+
+    let mut log_bytes = log_string.as_bytes();
 
     // Attempt to write to stdio, and write to the pantsd log if we fail (either because we don't
     // have a valid stdio instance, or because of an error).
@@ -237,6 +226,23 @@ impl Log for PantsLogger {
             debug_log!("fatal.log", "Failed to write to log file {:?}: {}", file, e);
           }
         }
+      }
+    }
+
+    {
+      let mut maybe_per_run_file = inner.per_run_log.lock();
+      if let Some(ref mut file) = *maybe_per_run_file {
+        if use_color {
+          log_string = format!(
+            "{} {} {}\n",
+            log_time,
+            format!("[{}]", record.level()).normal().clear(),
+            log_line,
+          );
+          log_bytes = log_string.as_bytes();
+        }
+        // deliberately ignore errors writing to per-run log file
+        let _ = file.write_all(log_bytes);
       }
     }
   }
