@@ -59,7 +59,7 @@ class DockerOptions(Subsystem):
             A configured registry is marked as default either by setting `default = true`
             or with an alias of `"default"`.
 
-            A `docker_image` may be pushed to subset of registries using the per registry
+            A `docker_image` may be pushed to a subset of registries using the per registry
             `skip_push` option rather then the all or nothing toggle of the field option `skip_push`
             on the `docker_image` target.
 
