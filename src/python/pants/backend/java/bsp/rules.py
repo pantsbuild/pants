@@ -53,6 +53,8 @@ class JavaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
     language_id = LANGUAGE_ID
     can_merge_metadata_from = ()
     field_set_type = JavaMetadataFieldSet
+    resolve_prefix = "jvm"
+    resolve_field = JvmResolveField
 
 
 @rule

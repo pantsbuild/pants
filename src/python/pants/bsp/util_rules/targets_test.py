@@ -4,9 +4,18 @@ import textwrap
 
 import pytest
 
+from pants.backend.java.bsp import rules as java_bsp_rules
+from pants.backend.java.compile import javac
+from pants.backend.java.target_types import JavaSourceTarget
 from pants.bsp.rules import rules as bsp_rules
+from pants.bsp.spec.base import BuildTargetIdentifier
 from pants.bsp.util_rules.targets import BSPBuildTargets, BSPTargetDefinition
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.rules import QueryRule
+from pants.engine.target import Targets
+from pants.jvm import jdk_rules
+from pants.jvm import util_rules as jvm_util_rules
+from pants.jvm.resolve import jvm_tool
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -15,8 +24,16 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *bsp_rules(),
+            *java_bsp_rules.rules(),
+            *javac.rules(),
+            *jvm_tool.rules(),
+            *jvm_util_rules.rules(),
+            *jdk_rules.rules(),
             QueryRule(BSPBuildTargets, ()),
-        ]
+            QueryRule(Targets, [BuildTargetIdentifier]),
+        ],
+        target_types=[JavaSourceTarget],
+        objects={"parametrize": Parametrize},
     )
 
 
@@ -78,3 +95,28 @@ def test_config_file_parsing(rule_runner: RuleRunner) -> None:
             ),
         ),
     }
+
+
+def test_resolve_filtering(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "lib/Example.java": "",
+            "lib/BUILD": textwrap.dedent(
+                """\
+            java_source(source='Example.java', resolve=parametrize('jvm-default', 'other'))
+            """
+            ),
+            "bsp.toml": textwrap.dedent(
+                """\
+                [groups.lib]
+                base_directory = "lib"
+                addresses = ["lib::"]
+                resolve = "jvm:other"
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(["--experimental-bsp-groups-config-files=['bsp.toml']"])
+
+    targets = rule_runner.request(Targets, [BuildTargetIdentifier("pants:lib")])
+    assert {"lib@resolve=other"} == {str(t.address) for t in targets}
