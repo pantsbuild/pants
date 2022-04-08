@@ -556,11 +556,11 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
 
                 As example, given two constraints:
 
-                    ">=2.7,<3" and ">=3.5,<3.11"
+                    >=2.7,<3 OR >=3.5,<3.11
 
                 these can be combined into a single constraint using exclusions:
 
-                    ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.11"
+                    >=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.11
 
                 """
             )

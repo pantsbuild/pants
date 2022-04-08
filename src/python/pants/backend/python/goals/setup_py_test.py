@@ -28,6 +28,7 @@ from pants.backend.python.goals.setup_py import (
     OwnedDependency,
     SetupKwargs,
     SetupKwargsRequest,
+    SetupPyError,
     SetupPyGeneration,
     declares_pkg_resources_namespace_package,
     determine_explicitly_provided_setup_kwargs,
@@ -63,7 +64,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import InvalidFieldException
 from pants.engine.unions import UnionRule
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
@@ -1398,3 +1399,39 @@ def test_no_dist_type_selected() -> None:
         "In order to package src/python/aaa:aaa at least one of 'wheel' or 'sdist' must be `True`."
         == str(wrapped_exception)
     )
+
+
+def test_too_many_interpreter_constraints(chroot_rule_runner: RuleRunner) -> None:
+    chroot_rule_runner.write_files(
+        {
+            "src/python/foo/BUILD": textwrap.dedent(
+                """
+                python_distribution(
+                    name='foo-dist',
+                    provides=setup_py(
+                        name='foo',
+                        version='1.2.3',
+                    )
+                )
+                """
+            ),
+        }
+    )
+
+    addr = Address("src/python/foo", target_name="foo-dist")
+    tgt = chroot_rule_runner.get_target(addr)
+    err = (
+        "Expected a single interpreter constraint for src/python/foo:foo-dist, "
+        "got: CPython<3,>=2.7 OR CPython<3.10,>=3.8."
+    )
+
+    with engine_error(SetupPyError, contains=err):
+        chroot_rule_runner.request(
+            DistBuildChroot,
+            [
+                DistBuildChrootRequest(
+                    ExportedTarget(tgt),
+                    InterpreterConstraints([">=2.7,<3", ">=3.8,<3.10"]),
+                )
+            ],
+        )
