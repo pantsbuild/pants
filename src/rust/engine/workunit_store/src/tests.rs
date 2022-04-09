@@ -168,7 +168,7 @@ fn create_store(
     .chain(blocked.into_iter())
     .chain(completed.into_iter())
     .collect::<Vec<_>>();
-  all.sort_by(|a, b| a.0.cmp(&b.0));
+  all.sort_by(|a, b| a.1.cmp(&b.1));
 
   // Start all workunits in SpanId order.
   let workunits = all
