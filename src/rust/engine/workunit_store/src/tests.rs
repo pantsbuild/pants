@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use internment::Intern;
 
-use crate::{Level, SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
+use crate::{Level, ParentIds, SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[test]
 fn heavy_hitters_basic() {
@@ -56,6 +56,35 @@ fn straggling_workunits_blocked_path() {
   // Test that a chain of blocked workunits do not cause their parents to be rendered.
   let ws = create_store(vec![wu_root(0)], vec![wu(1, 0), wu(2, 1)], vec![]);
   assert!(ws.straggling_workunits(Duration::from_secs(0)).is_empty());
+}
+
+#[tokio::test]
+async fn disabled_workunit_is_filtered() {
+  // Create a chain of completed workunits like: Info -> Trace -> Info (where `Trace` is below the
+  // minimum level recoded in the store).
+  let mk_meta = |level: log::Level| -> WorkunitMetadata {
+    let mut m = WorkunitMetadata::default();
+    m.level = level;
+    m
+  };
+  let ws = create_store(
+    vec![],
+    vec![],
+    vec![
+      wu_meta(0, None, mk_meta(log::Level::Info)),
+      wu_meta(1, Some(0), mk_meta(log::Level::Trace)),
+      wu_meta(2, Some(1), mk_meta(log::Level::Info)),
+    ],
+  );
+
+  // Confirm that latest_workunits reports the two Info level workunits while fixing up parent links.
+  let (_, completed) = ws.latest_workunits(Level::Info);
+  assert_eq!(completed.len(), 2);
+  assert_eq!(completed[0].parent_ids, ParentIds::new());
+  assert_eq!(
+    completed[1].parent_ids,
+    vec![SpanId(0)].into_iter().collect::<ParentIds>()
+  );
 }
 
 #[tokio::test]
