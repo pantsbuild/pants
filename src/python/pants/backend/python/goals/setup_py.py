@@ -550,7 +550,7 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
                 Expected a single interpreter constraint for {target.address}, got:
                 {request.interpreter_constraints}.
 
-                Python distributions does not support multiple constraints, so this will need to be
+                Python distributions do not support multiple constraints, so this will need to be
                 translated into a single interpreter constraint using exclusions to get the same
                 effect.
 
@@ -571,7 +571,7 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
             "python_requires",
             # Pick the first constraint using a generator detour, as the InterpreterConstraints is
             # based on a FrozenOrderedSet which is not indexable.
-            next(str(requirment.specifier) for requirment in request.interpreter_constraints),  # type: ignore[attr-defined]
+            next(str(ic.specifier) for ic in request.interpreter_constraints),  # type: ignore[attr-defined]
         )
 
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
