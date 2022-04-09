@@ -6,6 +6,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import ClassVar, Generic, Sequence, Type, TypeVar
 
 import toml
@@ -375,13 +376,21 @@ async def generate_one_bsp_build_target_request(
     if source_info.source_roots:
         roots = [build_root.pathlib_path.joinpath(p) for p in source_info.source_roots]
     else:
-        roots = [build_root.pathlib_path]
+        roots = []
+
+    base_directory: Path | None = None
+    if request.bsp_target.definition.base_directory:
+        base_directory = build_root.pathlib_path.joinpath(
+            request.bsp_target.definition.base_directory
+        )
+    elif roots:
+        base_directory = roots[0]
 
     return GenerateOneBSPBuildTargetResult(
         build_target=BuildTarget(
             id=BuildTargetIdentifier(f"pants:{request.bsp_target.name}"),
             display_name=request.bsp_target.name,
-            base_directory=roots[0].as_uri(),
+            base_directory=base_directory.as_uri() if base_directory else None,
             tags=(),
             capabilities=BuildTargetCapabilities(
                 can_compile=any(r.can_compile for r in metadata_results),
