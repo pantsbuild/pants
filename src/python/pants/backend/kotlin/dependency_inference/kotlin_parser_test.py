@@ -8,7 +8,10 @@ import pytest
 
 from pants.backend.kotlin import target_types
 from pants.backend.kotlin.dependency_inference import kotlin_parser
-from pants.backend.kotlin.dependency_inference.kotlin_parser import KotlinSourceDependencyAnalysis, KotlinImport
+from pants.backend.kotlin.dependency_inference.kotlin_parser import (
+    KotlinImport,
+    KotlinSourceDependencyAnalysis,
+)
 from pants.backend.kotlin.target_types import KotlinSourceField, KotlinSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
@@ -36,7 +39,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[KotlinSourceTarget],
     )
-    rule_runner.set_options(args=["-ldebug", "--no-process-cleanup"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -80,6 +83,4 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         ),
     )
 
-    assert analysis.imports == {
-        KotlinImport(name="java.io.File", alias=None, is_wildcard=False)
-    }
+    assert analysis.imports == {KotlinImport(name="java.io.File", alias=None, is_wildcard=False)}

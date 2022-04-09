@@ -1,8 +1,10 @@
 package org.pantsbuild.backend.kotlin.dependency_inference
 
-import kotlinx.serialization.*
-import kotlinx.serialization.json.*
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.charset.StandardCharsets
 
+import com.google.gson.Gson
 import com.intellij.openapi.util.Disposer
 import com.intellij.psi.PsiManager
 import com.intellij.testFramework.LightVirtualFile
@@ -12,19 +14,15 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.KtFile
 
-import java.io.File
-import java.io.FileWriter
 
 // KtFile: https://github.com/JetBrains/kotlin/blob/master/compiler/psi/src/org/jetbrains/kotlin/psi/KtFile.kt
 
-@Serializable
 data class KotlinImport(
     val name: String,
     val alias: String?,
     val isWildcard: Boolean,
 )
 
-@Serializable
 data class KotlinAnalysis(
     val imports: List<KotlinImport>,
 )
@@ -43,30 +41,31 @@ fun parse(code: String): KtFile {
 
 fun analyze(file: KtFile): KotlinAnalysis {
     val imports = file.importDirectives.map { importDirective ->
-      val name = importDirective.getName()
-      KotlinImport(
-        name=importDirective.getName() ?: "",
-        alias=null,
-        isWildcard=false,
-      )
+        val name = importDirective.importedFqName
+        if (name != null) {
+            KotlinImport(
+                name=name.asString(),
+                alias=importDirective.aliasName,
+                isWildcard=importDirective.isAllUnder,
+            )
+        } else {
+            null
+        }
     }
 
-    return KotlinAnalysis(imports)
+    return KotlinAnalysis(imports.filterNotNull())
 }
 
 fun main(args: Array<String>) {
     val analysisOutputPath = args[0]
-    val sourceToAnalyze = args[1]
+    val sourcePath = args[1]
 
-    val parsed = parse(sourceToAnalyze)
+    val sourceContentBytes = Files.readAllBytes(Paths.get(sourcePath))
+    val sourceContent = String(sourceContentBytes, StandardCharsets.UTF_8)
+    val parsed = parse(sourceContent)
     val analysis = analyze(parsed)
 
-    val outputFile = File(analysisOutputPath)
-        val writer = FileWriter(outputFile)
-    try {
-        val analysisOutput = Json.encodeToString(analysis)
-        writer.write(analysisOutput)
-    } finally {
-        writer.close()
-    }
+    val gson = Gson()
+    val analysisOutput = gson.toJson(analysis)
+    Files.write(Paths.get(analysisOutputPath), analysisOutput.toByteArray(StandardCharsets.UTF_8))
 }
