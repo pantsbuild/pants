@@ -230,7 +230,6 @@ class SetupKwargs:
                 "package_data",
                 "package_dir",
                 "packages",
-                "python_requires",
             }:
                 if arg in kwargs:
                     raise ValueError(
@@ -566,7 +565,7 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
             )
         )
     if len(request.interpreter_constraints) > 0:
-        # Preserves the value from the SetupKwargs response, if any.
+        # Do not replace value if already set.
         setup_kwargs.setdefault(
             "python_requires",
             # Pick the first constraint using a generator detour, as the InterpreterConstraints is
