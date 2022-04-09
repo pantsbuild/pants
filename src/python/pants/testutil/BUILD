@@ -4,6 +4,7 @@
 python_distribution(
     name="testutil_wheel",
     dependencies=[":testutil", ":pants_integration_test", ":rule_runner", ":py_typed"],
+    # This python wheel tag must align with the interpreter constraints.
     wheel_config_settings={"--global-option": ["--python-tag", "py37.py38.py39"]},
     provides=setup_py(
         name="pantsbuild.pants.testutil",
@@ -13,7 +14,9 @@ python_distribution(
 )
 
 python_sources(
-    sources=["*.py", "!rule_runner.py", "!test_base.py", "!pants_integration_test.py", "!_test.py"]
+    sources=["*.py", "!rule_runner.py", "!test_base.py", "!pants_integration_test.py", "!_test.py"],
+    # Match ICs with the python tag applied to the distribution wheel above.
+    interpreter_constraints=[">=3.7,<3.10"],
 )
 
 python_sources(
