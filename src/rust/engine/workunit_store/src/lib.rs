@@ -224,6 +224,7 @@ impl RunningWorkunitGraph {
 #[derive(Clone, Debug)]
 pub struct Workunit {
   pub name: &'static str,
+  pub level: Level,
   pub span_id: SpanId,
   // When a workunit starts, it (optionally) has a single parent. But as it runs, it
   // it may gain additional parents due to memoization.
@@ -234,16 +235,12 @@ pub struct Workunit {
 
 impl Workunit {
   fn enabled_at(&self, level: Level) -> bool {
-    self
-      .metadata
-      .as_ref()
-      .map(|m| m.level <= level)
-      .unwrap_or(false)
+    self.level <= level
   }
 
   fn log_workunit_state(&self, canceled: bool) {
     let metadata = match self.metadata.as_ref() {
-      Some(metadata) if log::log_enabled!(metadata.level) => metadata,
+      Some(metadata) if log::log_enabled!(self.level) => metadata,
       _ => return,
     };
 
@@ -253,7 +250,6 @@ impl Workunit {
       (WorkunitState::Completed { .. }, _) => "Completed:",
     };
 
-    let level = metadata.level;
     let identifier = if let Some(ref s) = metadata.desc {
       s.as_str()
     } else {
@@ -284,7 +280,7 @@ impl Workunit {
       "".to_string()
     };
 
-    log!(level, "{} {}{}", state, effective_identifier, message);
+    log!(self.level, "{} {}{}", state, effective_identifier, message);
   }
 }
 
@@ -335,29 +331,14 @@ pub enum ArtifactOutput {
   Snapshot(Arc<dyn DirectoryDigest>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub message: Option<String>,
-  pub level: Level,
   pub stdout: Option<hashing::Digest>,
   pub stderr: Option<hashing::Digest>,
   pub artifacts: Vec<(String, ArtifactOutput)>,
   pub user_metadata: Vec<(String, UserMetadataItem)>,
-}
-
-impl Default for WorkunitMetadata {
-  fn default() -> WorkunitMetadata {
-    WorkunitMetadata {
-      level: Level::Info,
-      desc: None,
-      message: None,
-      stdout: None,
-      stderr: None,
-      artifacts: Vec::new(),
-      user_metadata: Vec::new(),
-    }
-  }
 }
 
 /// Abstract id for passing user metadata items around
@@ -371,7 +352,7 @@ pub enum UserMetadataItem {
 #[derive(Clone)]
 enum StoreMsg {
   Started(Workunit),
-  Completed(SpanId, Option<WorkunitMetadata>, SystemTime),
+  Completed(SpanId, Level, Option<WorkunitMetadata>, SystemTime),
   Canceled(SpanId, SystemTime),
 }
 
@@ -417,8 +398,9 @@ impl StreamingWorkunitData {
             started_workunits.push(started);
           }
         }
-        StoreMsg::Completed(span_id, new_metadata, end_time) => {
+        StoreMsg::Completed(span_id, level, new_metadata, end_time) => {
           if let Some(mut workunit) = self.running_graph.complete(span_id, new_metadata, end_time) {
+            workunit.level = level;
             if should_emit(&workunit) {
               workunit.parent_ids = self
                 .running_graph
@@ -454,7 +436,7 @@ impl HeavyHittersData {
     while let Ok(msg) = self.receiver.try_recv() {
       match msg {
         StoreMsg::Started(started) => self.running_graph.add(started),
-        StoreMsg::Completed(span_id, new_metadata, time) => {
+        StoreMsg::Completed(span_id, _level, new_metadata, time) => {
           let _ = self.running_graph.complete(span_id, new_metadata, time);
         }
         StoreMsg::Canceled(span_id, time) => {
@@ -635,11 +617,13 @@ impl WorkunitStore {
     &self,
     span_id: SpanId,
     name: &'static str,
+    level: Level,
     parent_id: Option<SpanId>,
     metadata: Option<WorkunitMetadata>,
   ) -> Workunit {
     let started = Workunit {
       name,
+      level,
       span_id,
       parent_ids: parent_id.into_iter().collect(),
       state: WorkunitState::Started {
@@ -670,10 +654,11 @@ impl WorkunitStore {
   }
 
   fn complete_workunit_impl(&self, mut workunit: Workunit, end_time: SystemTime) {
+    let level = workunit.level;
     let span_id = workunit.span_id;
     let new_metadata = workunit.metadata.clone();
 
-    self.send(StoreMsg::Completed(span_id, new_metadata, end_time));
+    self.send(StoreMsg::Completed(span_id, level, new_metadata, end_time));
 
     let start_time = match workunit.state {
       WorkunitState::Started { start_time, .. } => start_time,
@@ -691,6 +676,7 @@ impl WorkunitStore {
   pub fn add_completed_workunit(
     &self,
     name: &'static str,
+    level: Level,
     start_time: SystemTime,
     end_time: SystemTime,
     parent_id: Option<SpanId>,
@@ -700,6 +686,7 @@ impl WorkunitStore {
 
     let workunit = Workunit {
       name,
+      level,
       span_id,
       parent_ids: parent_id.into_iter().collect(),
       state: WorkunitState::Started {
@@ -782,7 +769,8 @@ impl WorkunitStore {
   pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
     let store = WorkunitStore::new(false, Level::Trace);
     store.init_thread_state(None);
-    let workunit = store._start_workunit(SpanId(0), "testing", None, Option::default());
+    let workunit =
+      store._start_workunit(SpanId(0), "testing", Level::Info, None, Option::default());
     (store.clone(), RunningWorkunit::new(store, workunit))
   }
 }
@@ -853,7 +841,6 @@ macro_rules! in_workunit {
       let workunit_metadata =
         if store_handle.store.max_level() >= level {
           Some($crate::WorkunitMetadata {
-            level,
             $(
                   $workunit_field_name: $workunit_field_value,
             )*
@@ -867,7 +854,7 @@ macro_rules! in_workunit {
       let workunit =
         store_handle
           .store
-          ._start_workunit(span_id, $workunit_name, parent_id, workunit_metadata);
+          ._start_workunit(span_id, $workunit_name, level, parent_id, workunit_metadata);
       $crate::RunningWorkunit::new(store_handle.store.clone(), workunit)
     };
     $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
@@ -905,16 +892,19 @@ impl RunningWorkunit {
   }
 
   ///
-  /// If the workunit is enabled, receives its current metadata. If Some(metadata) is returned by
-  /// this method for a disabled workunit, the workunit will complete as enabled if the Level set
-  /// by the new metadata is high enough to re-enable it.
+  /// If the workunit is enabled, receives its current metadata. If Some((metadata, level)) is
+  /// returned by the function, the workunit will complete as enabled if the new Level is high
+  /// enough to enable it.
   ///
   pub fn update_metadata<F>(&mut self, f: F)
   where
-    F: FnOnce(Option<WorkunitMetadata>) -> Option<WorkunitMetadata>,
+    F: FnOnce(Option<(WorkunitMetadata, Level)>) -> Option<(WorkunitMetadata, Level)>,
   {
     if let Some(ref mut workunit) = self.workunit {
-      workunit.metadata = f(workunit.metadata.clone())
+      if let Some((metadata, level)) = f(workunit.metadata.clone().map(|m| (m, workunit.level))) {
+        workunit.level = level;
+        workunit.metadata = Some(metadata);
+      }
     }
   }
 

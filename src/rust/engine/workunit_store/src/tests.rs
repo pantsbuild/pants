@@ -62,18 +62,13 @@ fn straggling_workunits_blocked_path() {
 async fn disabled_workunit_is_filtered() {
   // Create a chain of completed workunits like: Info -> Trace -> Info (where `Trace` is below the
   // minimum level recoded in the store).
-  let mk_meta = |level: log::Level| -> WorkunitMetadata {
-    let mut m = WorkunitMetadata::default();
-    m.level = level;
-    m
-  };
   let ws = create_store(
     vec![],
     vec![],
     vec![
-      wu_meta(0, None, mk_meta(log::Level::Info)),
-      wu_meta(1, Some(0), mk_meta(log::Level::Trace)),
-      wu_meta(2, Some(1), mk_meta(log::Level::Info)),
+      wu_level(0, None, Level::Info),
+      wu_level(1, Some(0), Level::Trace),
+      wu_level(2, Some(1), Level::Info),
     ],
   );
 
@@ -104,12 +99,14 @@ async fn workunit_escalation_is_recorded() {
         // Ensure that it has no metadata (i.e.: is disabled).
         assert!(metadata.is_none());
 
-        // Then return new metadata to raise the workunit's level.
-        Some(WorkunitMetadata {
-          level: Level::Info,
-          desc: Some(new_desc.to_owned()),
-          ..WorkunitMetadata::default()
-        })
+        // Then return new metadata and raise the workunit's level.
+        Some((
+          WorkunitMetadata {
+            desc: Some(new_desc.to_owned()),
+            ..WorkunitMetadata::default()
+          },
+          Level::Info,
+        ))
       });
     }
   )
@@ -157,11 +154,11 @@ fn create_store(
 ) -> WorkunitStore {
   let completed_ids = completed
     .iter()
-    .map(|(span_id, _, _)| *span_id)
+    .map(|(_, span_id, _, _)| *span_id)
     .collect::<HashSet<_>>();
   let blocked_ids = blocked
     .iter()
-    .map(|(span_id, _, _)| *span_id)
+    .map(|(_, span_id, _, _)| *span_id)
     .collect::<HashSet<_>>();
   let ws = WorkunitStore::new(true, log::Level::Debug);
 
@@ -176,13 +173,14 @@ fn create_store(
   // Start all workunits in SpanId order.
   let workunits = all
     .into_iter()
-    .map(|(span_id, parent_id, metadata)| {
+    .map(|(level, span_id, parent_id, metadata)| {
       if let Some(parent_id) = parent_id {
         assert!(span_id > parent_id);
       }
       ws._start_workunit(
         span_id,
         Intern::new(format!("{}", span_id.0)).as_ref(),
+        level,
         parent_id,
         Some(metadata),
       )
@@ -207,21 +205,18 @@ fn create_store(
 
 // Used with `create_store` to quickly create a tree of anonymous workunits (with names equal to
 // their SpanIds).
-type AnonymousWorkunit = (SpanId, Option<SpanId>, WorkunitMetadata);
+type AnonymousWorkunit = (Level, SpanId, Option<SpanId>, WorkunitMetadata);
 
 fn wu_root(span_id: u64) -> AnonymousWorkunit {
-  wu_meta(span_id, None, WorkunitMetadata::default())
+  wu_level(span_id, None, Level::Info)
 }
 
 fn wu(span_id: u64, parent_id: u64) -> AnonymousWorkunit {
-  wu_meta(span_id, Some(parent_id), WorkunitMetadata::default())
+  wu_level(span_id, Some(parent_id), Level::Info)
 }
 
-fn wu_meta(
-  span_id: u64,
-  parent_id: Option<u64>,
-  mut metadata: WorkunitMetadata,
-) -> AnonymousWorkunit {
+fn wu_level(span_id: u64, parent_id: Option<u64>, level: Level) -> AnonymousWorkunit {
+  let mut metadata = WorkunitMetadata::default();
   metadata.desc = Some(format!("{}", span_id));
-  (SpanId(span_id), parent_id.map(SpanId), metadata)
+  (level, SpanId(span_id), parent_id.map(SpanId), metadata)
 }
