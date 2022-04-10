@@ -215,10 +215,7 @@ class ExceptionSink:
 
     @classmethod
     def open_pid_specific_error_stream(cls, path):
-        try:
-            ret = safe_open(path, mode="w")
-        except Exception:
-            raise
+        ret = safe_open(path, mode="w")
 
         def unlink_if_empty():
             if os.path.getsize(path) == 0:
