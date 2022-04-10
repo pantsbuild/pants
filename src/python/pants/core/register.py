@@ -5,7 +5,6 @@
 
 These are always activated and cannot be disabled.
 """
-from pants.base import build_environment
 from pants.bsp.rules import rules as bsp_rules
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals import (
@@ -45,6 +44,7 @@ from pants.core.util_rules import (
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
+from pants.vcs import git
 
 
 def rules():
@@ -66,10 +66,10 @@ def rules():
         # util_rules
         *anonymous_telemetry.rules(),
         *archive.rules(),
-        *build_environment.rules(),
         *config_files.rules(),
         *distdir.rules(),
         *external_tool.rules(),
+        *git.rules(),
         *source_files.rules(),
         *source_root.rules(),
         *stats_aggregator.rules(),

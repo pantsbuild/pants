@@ -3,88 +3,44 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
-import subprocess
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path, PurePath
 from typing import Iterable
 
+from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException
+from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
 
-class GitException(Exception):
-    pass
-
-
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class GitBinary:
+class GitWorktree:
     worktree: PurePath
     _gitdir: PurePath
-    _gitcmd: str
+    _git_binary: GitBinary
 
     def __init__(
         self,
+        binary: GitBinary,
         worktree: PathLike[str] | None = None,
-        *,
         gitdir: PathLike[str] | None = None,
-        binary: str = "git",
     ) -> None:
         """Creates a git object that assumes the git repository is in the cwd by default.
 
+        binary:    The git binary to use.
         worktree:  The path to the git repository working tree directory (typically '.').
         gitdir:    The path to the repository's git metadata directory (typically '.git').
-        binary:    The path to the git binary to use, 'git' by default.
         """
         self.worktree = Path(worktree or os.getcwd()).resolve()
         self._gitdir = Path(gitdir).resolve() if gitdir else (self.worktree / ".git")
-        self._gitcmd = binary
-
-    @classmethod
-    def mount(
-        cls, subdir: str | PurePath | None = None, *, binary: str | PurePath = "git"
-    ) -> GitBinary:
-        """Detect the git working tree above cwd and return it.
-
-        :param string subdir: The path to start searching for a git repo.
-        :param string binary: The path to the git binary to use, 'git' by default.
-        :returns: a GitBinary object that is configured to operate on the found git repo.
-        :raises: :class:`GitException` if no git repo could be found.
-        """
-        cmd = [str(binary), "rev-parse", "--show-toplevel"]
-        if subdir:
-            with pushd(str(subdir)):
-                process, out, err = cls._invoke(cmd)
-        else:
-            process, out, err = cls._invoke(cmd)
-        cls._check_result(cmd, process.returncode, err.decode())
-        return cls(worktree=PurePath(cls._cleanse(out)))
-
-    @staticmethod
-    def _invoke(cmd: list[str]) -> tuple[subprocess.Popen, bytes, bytes]:
-        try:
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except OSError as e:
-            # Binary DNE or is not executable
-            cmd_str = " ".join(cmd)
-            raise GitException(f"Failed to execute command {cmd_str}: {e!r}")
-        out, err = process.communicate()
-        return process, out, err
-
-    @classmethod
-    def _cleanse(cls, output: bytes) -> str:
-        return output.decode().strip()
-
-    @classmethod
-    def _check_result(cls, cmd: Iterable[str], result: int, failure_msg: str | None = None) -> None:
-        if result != 0:
-            cmd_str = " ".join(cmd)
-            raise GitException(failure_msg or f"{cmd_str} failed with exit code {result}")
+        self._git_binary = binary
 
     @property
     def current_rev_identifier(self):
@@ -92,11 +48,13 @@ class GitBinary:
 
     @property
     def commit_id(self):
-        return self._check_output(["rev-parse", "HEAD"])
+        return self._git_binary.invoke(self._create_git_cmdline(["rev-parse", "HEAD"]))
 
     @property
     def branch_name(self) -> str | None:
-        branch = self._check_output(["rev-parse", "--abbrev-ref", "HEAD"])
+        branch = self._git_binary.invoke(
+            self._create_git_cmdline(["rev-parse", "--abbrev-ref", "HEAD"])
+        )
         return None if branch == "HEAD" else branch
 
     def _fix_git_relative_path(self, worktree_path: str, relative_to: PurePath | str) -> str:
@@ -110,14 +68,18 @@ class GitBinary:
     ) -> set[str]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         rel_suffix = ["--", str(relative_to)]
-        uncommitted_changes = self._check_output(["diff", "--name-only", "HEAD"] + rel_suffix)
+        uncommitted_changes = self._git_binary.invoke(
+            self._create_git_cmdline(
+                ["diff", "--name-only", "HEAD"] + rel_suffix,
+            )
+        )
 
         files = set(uncommitted_changes.splitlines())
         if from_commit:
             # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
             # the changes that have occurred on the current branch.
             committed_cmd = ["diff", "--name-only", from_commit + "...HEAD"] + rel_suffix
-            committed_changes = self._check_output(committed_cmd)
+            committed_changes = self._git_binary.invoke(self._create_git_cmdline(committed_cmd))
             files.update(committed_changes.split())
         if include_untracked:
             untracked_cmd = [
@@ -126,7 +88,7 @@ class GitBinary:
                 "--exclude-standard",
                 "--full-name",
             ] + rel_suffix
-            untracked = self._check_output(untracked_cmd)
+            untracked = self._git_binary.invoke(self._create_git_cmdline(untracked_cmd))
             files.update(untracked.split())
         # git will report changed files relative to the worktree: re-relativize to relative_to
         return {self._fix_git_relative_path(f, relative_to) for f in files}
@@ -134,34 +96,51 @@ class GitBinary:
     def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         cmd = ["diff-tree", "--no-commit-id", "--name-only", "-r", diffspec]
-        files = self._check_output(cmd).split()
+        files = self._git_binary.invoke(self._create_git_cmdline(cmd)).split()
         return {self._fix_git_relative_path(f.strip(), relative_to) for f in files}
 
-    # N.B.: Only used by tests.
-    def commit(self, message: str) -> None:
-        self._check_call(["commit", "--all", "--message", message])
-
-    # N.B.: Only used by tests.
-    def add(self, *paths: PurePath) -> None:
-        self._check_call(["add", *(str(path) for path in paths)])
-
-    def _check_call(self, args: Iterable[str]) -> None:
-        cmd = self._create_git_cmdline(args)
-        self._log_call(cmd)
-        result = subprocess.call(cmd)
-        self._check_result(cmd, result)
-
-    def _check_output(self, args: Iterable[str]) -> str:
-        cmd = self._create_git_cmdline(args)
-        self._log_call(cmd)
-
-        process, out, err = self._invoke(cmd)
-
-        self._check_result(cmd, process.returncode, err.decode())
-        return self._cleanse(out)
-
     def _create_git_cmdline(self, args: Iterable[str]) -> list[str]:
-        return [self._gitcmd, f"--git-dir={self._gitdir}", f"--work-tree={self.worktree}", *args]
+        return [f"--git-dir={self._gitdir}", f"--work-tree={self.worktree}", *args]
 
-    def _log_call(self, cmd: Iterable[str]) -> None:
-        logger.debug("Executing: " + " ".join(cmd))
+
+@dataclass(frozen=True)
+class MaybeGitWorktree:
+    git_worktree: GitWorktree | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class GitWorktreeRequest:
+    gitdir: PathLike[str] | None = None
+    subdir: PathLike[str] | None = None
+
+
+@rule
+async def get_git_worktree(
+    git_worktree_request: GitWorktreeRequest, git_binary: GitBinary
+) -> MaybeGitWorktree:
+    cmd = ["rev-parse", "--show-toplevel"]
+
+    try:
+        if git_worktree_request.subdir:
+            with pushd(str(git_worktree_request.subdir)):
+                output = git_binary.invoke(cmd)
+        else:
+            output = git_binary.invoke(cmd)
+    except GitBinaryException as e:
+        logger.info(f"No git repository at {os.getcwd()}: {e!r}")
+        return MaybeGitWorktree()
+
+    git_worktree = GitWorktree(
+        binary=git_binary,
+        gitdir=git_worktree_request.gitdir,
+        worktree=PurePath(output),
+    )
+
+    logger.debug(
+        f"Detected git repository at {git_worktree.worktree} on branch {git_worktree.branch_name}"
+    )
+    return MaybeGitWorktree(git_worktree=git_worktree)
+
+
+def rules():
+    return [*collect_rules()]

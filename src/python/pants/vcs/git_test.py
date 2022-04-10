@@ -12,15 +12,16 @@ from typing import Iterator
 
 import pytest
 
+from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException
+from pants.testutil.rule_runner import run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
-from pants.vcs.git import GitBinary, GitException
+from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
 
 
 def init_repo(remote_name: str, remote: PurePath) -> None:
     subprocess.check_call(["git", "init", "--initial-branch=main"])
     subprocess.check_call(["git", "config", "user.email", "you@example.com"])
     subprocess.check_call(["git", "config", "user.name", "Your Name"])
-    subprocess.check_call(["git", "config", "commit.gpgSign", "false"])
     subprocess.check_call(["git", "remote", "add", remote_name, str(remote)])
 
 
@@ -52,9 +53,37 @@ def readme_file(worktree: Path) -> Path:
     return worktree / "README"
 
 
+def git_worktree(
+    gitdir: os.PathLike[str] | None = None,
+    subdir: os.PathLike[str] | None = None,
+    binary: os.PathLike[str] = PurePath("git"),
+) -> GitWorktree | None:
+    maybe_git_worktree: MaybeGitWorktree = run_rule_with_mocks(
+        rule=get_git_worktree,
+        rule_args=[
+            GitWorktreeRequest(gitdir=gitdir, subdir=subdir),
+            GitBinary(path=str(binary)),
+        ],
+    )
+
+    return maybe_git_worktree.git_worktree
+
+
+class MutatingGitWorktree(GitWorktree):
+    def commit(self, message: str) -> None:
+        self._git_binary.invoke(self._create_git_cmdline(["commit", "--all", "--message", message]))
+
+    def add(self, *paths: PurePath) -> None:
+        self._git_binary.invoke(self._create_git_cmdline(["add", *(str(path) for path in paths)]))
+
+
 @pytest.fixture
-def git(origin: Path, gitdir: Path, worktree: Path, readme_file: Path) -> GitBinary:
-    with environment_as(GIT_DIR=str(gitdir), GIT_WORK_TREE=str(worktree)):
+def git(
+    origin: Path, gitdir: Path, worktree: Path, readme_file: Path
+) -> Iterator[MutatingGitWorktree]:
+    with environment_as(
+        GIT_DIR=str(gitdir), GIT_WORK_TREE=str(worktree), GIT_CONFIG_GLOBAL="/dev/null"
+    ):
         init_repo("depot", origin)
 
         readme_file.touch()
@@ -85,10 +114,11 @@ def git(origin: Path, gitdir: Path, worktree: Path, readme_file: Path) -> GitBin
         readme_file.write_bytes("Hello World.\u2764".encode())
         subprocess.check_call(["git", "commit", "-am", "Update README."])
 
-    return GitBinary(gitdir=gitdir, worktree=worktree)
+    with environment_as(GIT_CONFIG_GLOBAL="/dev/null"):
+        yield MutatingGitWorktree(binary=GitBinary(path="git"), gitdir=gitdir, worktree=worktree)
 
 
-def test_integration(worktree: Path, readme_file: Path, git: GitBinary) -> None:
+def test_integration(worktree: Path, readme_file: Path, git: MutatingGitWorktree) -> None:
     assert set() == git.changed_files()
     assert {"README"} == git.changed_files(from_commit="HEAD^")
 
@@ -106,7 +136,7 @@ def test_integration(worktree: Path, readme_file: Path, git: GitBinary) -> None:
     assert set() == git.changed_files(relative_to="non-existent")
 
 
-def test_detect_worktree(tmp_path: Path, origin: PurePath, git: GitBinary) -> None:
+def test_detect_worktree(tmp_path: Path, origin: PurePath, git: MutatingGitWorktree) -> None:
     clone = tmp_path / "clone"
     clone.mkdir()
     with pushd(clone.as_posix()):
@@ -119,18 +149,20 @@ def test_detect_worktree(tmp_path: Path, origin: PurePath, git: GitBinary) -> No
             abs_cwd = clone / cwd
             abs_cwd.mkdir(parents=True, exist_ok=True)
             with pushd(str(abs_cwd)):
-                actual = GitBinary.mount().worktree
-                assert expected == actual
+                if expected:
+                    worktree = git_worktree()
+                    assert worktree and expected == worktree.worktree
+                else:
+                    assert git_worktree() is None
 
-        with pytest.raises(GitException):
-            worktree_relative_to("..", None)
+        worktree_relative_to("..", None)
         worktree_relative_to(".", clone)
         worktree_relative_to("is", clone)
         worktree_relative_to("is/a", clone)
         worktree_relative_to("is/a/dir", clone)
 
 
-def test_detect_worktree_no_cwd(tmp_path: Path, origin: PurePath, git: GitBinary) -> None:
+def test_detect_worktree_no_cwd(tmp_path: Path, origin: PurePath, git: MutatingGitWorktree) -> None:
     clone = tmp_path / "clone"
     clone.mkdir()
     with pushd(clone.as_posix()):
@@ -142,18 +174,20 @@ def test_detect_worktree_no_cwd(tmp_path: Path, origin: PurePath, git: GitBinary
             # 'expected'.
             subdir = clone / some_dir
             subdir.mkdir(parents=True, exist_ok=True)
-            actual = GitBinary.mount(subdir=subdir).worktree
-            assert expected == actual
+            if expected:
+                worktree = git_worktree(subdir=subdir)
+                assert worktree and expected == worktree.worktree
+            else:
+                assert git_worktree(subdir=subdir) is None
 
-        with pytest.raises(GitException):
-            worktree_relative_to("..", None)
+        worktree_relative_to("..", None)
         worktree_relative_to(".", clone)
         worktree_relative_to("is", clone)
         worktree_relative_to("is/a", clone)
         worktree_relative_to("is/a/dir", clone)
 
 
-def test_changes_in(gitdir: PurePath, worktree: Path, git: GitBinary) -> None:
+def test_changes_in(gitdir: PurePath, worktree: Path, git: MutatingGitWorktree) -> None:
     """Test finding changes in a diffspecs.
 
     To some extent this is just testing functionality of git not pants, since all pants says is that
@@ -208,7 +242,7 @@ def test_changes_in(gitdir: PurePath, worktree: Path, git: GitBinary) -> None:
         assert {"foo", "bar", "baz"} == git.changes_in(f"{c1}..{c4}")
 
 
-def test_commit_with_new_untracked_file_adds_file(worktree: Path, git: GitBinary) -> None:
+def test_commit_with_new_untracked_file_adds_file(worktree: Path, git: MutatingGitWorktree) -> None:
     new_file = worktree / "untracked_file"
     new_file.touch()
 
@@ -223,12 +257,14 @@ def test_commit_with_new_untracked_file_adds_file(worktree: Path, git: GitBinary
     assert set() == git.changed_files(include_untracked=True)
 
 
-def test_bad_ref_stderr_issues_13396(git: GitBinary) -> None:
-    with pytest.raises(GitException, match=re.escape("fatal: bad revision 'remote/dne...HEAD'\n")):
+def test_bad_ref_stderr_issues_13396(git: MutatingGitWorktree) -> None:
+    with pytest.raises(
+        GitBinaryException, match=re.escape("fatal: bad revision 'remote/dne...HEAD'\n")
+    ):
         git.changed_files(from_commit="remote/dne")
 
     with pytest.raises(
-        GitException,
+        GitBinaryException,
         match=re.escape(
             "fatal: ambiguous argument 'HEAD~1000': unknown revision or path not in the working "
             "tree.\n"
@@ -259,22 +295,17 @@ def executable_git(unexecutable_git: Path) -> Path:
 
 
 def test_detect_worktree_no_git(empty_path: PurePath) -> None:
-    with pytest.raises(GitException):
-        GitBinary.mount()
+    assert git_worktree() is None
 
 
 def test_detect_worktree_unexectuable_git(unexecutable_git: PurePath) -> None:
-    with pytest.raises(GitException):
-        GitBinary.mount()
-    with pytest.raises(GitException):
-        GitBinary.mount(binary=unexecutable_git)
+    assert git_worktree() is None
+    assert git_worktree(binary=unexecutable_git) is None
 
 
 def test_detect_worktree_invalid_executable_git(executable_git: PurePath) -> None:
-    with pytest.raises(GitException):
-        assert GitBinary.mount() is None
-    with pytest.raises(GitException):
-        GitBinary.mount(binary=executable_git)
+    assert git_worktree() is None
+    assert git_worktree(binary=executable_git) is None
 
 
 def test_detect_worktree_failing_git(executable_git: Path) -> None:
@@ -286,10 +317,8 @@ def test_detect_worktree_failing_git(executable_git: Path) -> None:
             """
         )
     )
-    with pytest.raises(GitException):
-        GitBinary.mount()
-    with pytest.raises(GitException):
-        GitBinary.mount(binary=executable_git)
+    assert git_worktree() is None
+    assert git_worktree(binary=executable_git) is None
 
 
 def test_detect_worktree_working_git(executable_git: Path) -> None:
@@ -302,5 +331,8 @@ def test_detect_worktree_working_git(executable_git: Path) -> None:
             """
         )
     )
-    assert expected_worktree_dir == GitBinary.mount().worktree
-    assert expected_worktree_dir == GitBinary.mount(binary=executable_git).worktree
+
+    worktree = git_worktree()
+    assert worktree and expected_worktree_dir == worktree.worktree
+    worktree = git_worktree(binary=executable_git)
+    assert worktree and expected_worktree_dir == worktree.worktree
