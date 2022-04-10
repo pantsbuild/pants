@@ -221,6 +221,7 @@ class ExceptionSink:
             raise
 
         def unlink_if_empty():
+            ret.seek(0)
             if ret.read(1) == "":
                 os.unlink(path)
 
