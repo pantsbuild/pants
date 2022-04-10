@@ -216,13 +216,12 @@ class ExceptionSink:
     @classmethod
     def open_pid_specific_error_stream(cls, path):
         try:
-            ret = safe_open(path, mode="w+")
+            ret = safe_open(path, mode="w")
         except Exception:
             raise
 
         def unlink_if_empty():
-            ret.seek(0)
-            if ret.read(1) == "":
+            if os.path.getsize(path) == 0:
                 os.unlink(path)
 
         # NB: This will only get called if nothing fatal happens, but that's precisely when we want
