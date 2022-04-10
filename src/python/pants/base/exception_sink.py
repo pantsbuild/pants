@@ -218,8 +218,11 @@ class ExceptionSink:
         ret = safe_open(path, mode="w")
 
         def unlink_if_empty():
-            if os.path.getsize(path) == 0:
-                os.unlink(path)
+            try:
+                if os.path.getsize(path) == 0:
+                    os.unlink(path)
+            except Exception:
+                pass
 
         # NB: This will only get called if nothing fatal happens, but that's precisely when we want
         # to get called. If anything fatal happens there should be an exception written to the log,
