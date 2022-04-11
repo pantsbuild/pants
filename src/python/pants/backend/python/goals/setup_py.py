@@ -86,6 +86,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +199,7 @@ class DistBuildChrootRequest:
     """A request to create a chroot for building a dist in."""
 
     exported_target: ExportedTarget
-    py2: bool  # Whether to use py2 or py3 package semantics.
+    interpreter_constraints: InterpreterConstraints
 
 
 @frozen_after_init
@@ -224,11 +225,11 @@ class SetupKwargs:
         if not _allow_banned_keys:
             for arg in {
                 "data_files",
-                "namespace_packages",
-                "package_dir",
-                "package_data",
-                "packages",
                 "install_requires",
+                "namespace_packages",
+                "package_data",
+                "package_dir",
+                "packages",
             }:
                 if arg in kwargs:
                     raise ValueError(
@@ -392,7 +393,7 @@ async def package_python_dist(
         DistBuildChroot,
         DistBuildChrootRequest(
             exported_target,
-            py2=interpreter_constraints.includes_python2(),
+            interpreter_constraints=interpreter_constraints,
         ),
     )
 
@@ -465,6 +466,7 @@ async def determine_explicitly_provided_setup_kwargs(
 class GenerateSetupPyRequest:
     exported_target: ExportedTarget
     sources: DistBuildSources
+    interpreter_constraints: InterpreterConstraints
 
 
 @dataclass(frozen=True)
@@ -484,7 +486,10 @@ async def generate_chroot(
 
     if generate_setup:
         generated_setup_py = await Get(
-            GeneratedSetupPy, GenerateSetupPyRequest(request.exported_target, sources)
+            GeneratedSetupPy,
+            GenerateSetupPyRequest(
+                request.exported_target, sources, request.interpreter_constraints
+            ),
         )
         # We currently generate a setup.py that expects to be in the source root.
         # TODO: It might make sense to generate one in the target's directory, for
@@ -535,6 +540,38 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
     target = exported_target.target
     resolved_setup_kwargs = await Get(SetupKwargs, ExportedTarget, exported_target)
     setup_kwargs = resolved_setup_kwargs.kwargs.copy()
+
+    # Check interpreter constraints
+    if len(request.interpreter_constraints) > 1:
+        raise SetupPyError(
+            softwrap(
+                f"""
+                Expected a single interpreter constraint for {target.address}, got:
+                {request.interpreter_constraints}.
+
+                Python distributions do not support multiple constraints, so this will need to be
+                translated into a single interpreter constraint using exclusions to get the same
+                effect.
+
+                As example, given two constraints:
+
+                    >=2.7,<3 OR >=3.5,<3.11
+
+                these can be combined into a single constraint using exclusions:
+
+                    >=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.11
+
+                """
+            )
+        )
+    if len(request.interpreter_constraints) > 0:
+        # Do not replace value if already set.
+        setup_kwargs.setdefault(
+            "python_requires",
+            # Pick the first constraint using a generator detour, as the InterpreterConstraints is
+            # based on a FrozenOrderedSet which is not indexable.
+            next(str(ic.specifier) for ic in request.interpreter_constraints),  # type: ignore[attr-defined]
+        )
 
     # NB: We are careful to not overwrite these values, but we also don't expect them to have been
     # set. The user must have have gone out of their way to use a `SetupKwargs` plugin, and to have
@@ -673,7 +710,8 @@ async def get_sources(
         python_files=python_files,
         resource_files=resource_files,
         init_py_digest_contents=init_py_digest_contents,
-        py2=request.py2,
+        # Whether to use py2 or py3 package semantics.
+        py2=request.interpreter_constraints.includes_python2(),
     )
     return DistBuildSources(
         digest=all_sources.stripped_source_files.snapshot.digest,
