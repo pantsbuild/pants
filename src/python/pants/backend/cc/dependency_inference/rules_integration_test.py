@@ -1,5 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from textwrap import dedent
 
 import pytest
 
@@ -27,7 +28,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_dependency_inference(rule_runner: RuleRunner) -> None:
+def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     rule_runner.set_options(["--source-root-patterns=['src/native']"])
     rule_runner.write_files(
         {
@@ -38,18 +39,39 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
             int main() {}
             """
             ),
-            "src/native/foo.h": softwrap(
+            "src/native/foo.h": dedent(
                 """\
             extern void grok();
             """
             ),
-            "src/native/foo.c": softwrap(
+            "src/native/foo.c": dedent(
                 """\
             #include <stdio.h>
             void grok() {
               printf("grok!");
             }
             """
+            ),
+            # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but
+            # not warn on the disambiguated one and should infer a dep.
+            "src/native/ambiguous/dep.h": "",
+            "src/native/ambiguous/disambiguated.h": "",
+            "src/native/ambiguous/main.c": dedent(
+                """\
+                #include "ambiguous/dep.h";
+                #include "ambiguous/disambiguated.h";
+                """
+            ),
+            "src/native/ambiguous/BUILD": dedent(
+                """\
+                cc_sources(name='dep1', sources=['dep.h', 'disambiguated.h'])
+                cc_sources(name='dep2', sources=['dep.h', 'disambiguated.h'])
+                cc_sources(
+                    name='main',
+                    sources=['main.c'],
+                    dependencies=['!./disambiguated.h:dep2'],
+                )
+                """
             ),
         }
     )
@@ -69,3 +91,16 @@ def test_dependency_inference(rule_runner: RuleRunner) -> None:
     assert run_dep_inference(
         Address("src/native", relative_file_path="foo.c")
     ) == InferredDependencies([])
+
+    caplog.clear()
+    assert run_dep_inference(
+        Address("src/native/ambiguous", target_name="main", relative_file_path="main.c")
+    ) == InferredDependencies(
+        [Address("src/native/ambiguous", target_name="dep1", relative_file_path="disambiguated.h")]
+    )
+    assert len(caplog.records) == 1
+    assert (
+        "The target src/native/ambiguous/main.c:main includes `ambiguous/dep.h`" in caplog.text
+    )
+    assert "['src/native/ambiguous/dep.h:dep1', 'src/native/ambiguous/dep.h:dep2']" in caplog.text
+    assert "disambiguated.h" not in caplog.text
