@@ -350,11 +350,6 @@ def test_requirements_field() -> None:
         f"field for the target demo:"
     ) in str(exc.value)
 
-    # Give a nice error message if it looks like they're trying to use pip VCS-style requirements.
-    with pytest.raises(InvalidFieldException) as exc:
-        PythonRequirementsField(["git+https://github.com/pypa/pip.git#egg=pip"], Address("demo"))
-    assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
-
 
 def test_parse_requirements_file() -> None:
     content = dedent(
