@@ -45,18 +45,14 @@ class GoogleJavaFormatToolLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = GoogleJavaFormatSubsystem.options_scope
 
 
-@dataclass(frozen=True)
-class Setup:
-    process: JvmProcess
-
-
-@rule(level=LogLevel.DEBUG)
-async def setup_google_java_format(
+@rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
+async def google_java_format_fmt(
     request: GoogleJavaFormatRequest,
     tool: GoogleJavaFormatSubsystem,
     jdk: InternalJdk,
-) -> Setup:
-
+) -> FmtResult:
+    if tool.skip:
+        return FmtResult.skip(formatter_name=request.name)
     lockfile_request = await Get(
         GenerateJvmLockfileFromTool, GoogleJavaFormatToolLockfileSentinel()
     )
@@ -85,29 +81,20 @@ async def setup_google_java_format(
         *request.snapshot.files,
     ]
 
-    process = JvmProcess(
-        jdk=jdk,
-        argv=args,
-        classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-        input_digest=request.snapshot.digest,
-        extra_immutable_input_digests=extra_immutable_input_digests,
-        extra_nailgun_keys=extra_immutable_input_digests,
-        output_files=request.snapshot.files,
-        description=f"Run Google Java Format on {pluralize(len(request.field_sets), 'file')}.",
-        level=LogLevel.DEBUG,
+    result = await Get(
+        ProcessResult,
+        JvmProcess(
+            jdk=jdk,
+            argv=args,
+            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
+            input_digest=request.snapshot.digest,
+            extra_immutable_input_digests=extra_immutable_input_digests,
+            extra_nailgun_keys=extra_immutable_input_digests,
+            output_files=request.snapshot.files,
+            description=f"Run Google Java Format on {pluralize(len(request.field_sets), 'file')}.",
+            level=LogLevel.DEBUG,
+        ),
     )
-
-    return Setup(process)
-
-
-@rule(desc="Format with Google Java Format", level=LogLevel.DEBUG)
-async def google_java_format_fmt(
-    request: GoogleJavaFormatRequest, tool: GoogleJavaFormatSubsystem
-) -> FmtResult:
-    if tool.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, GoogleJavaFormatRequest, request)
-    result = await Get(ProcessResult, JvmProcess, setup.process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 
