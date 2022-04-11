@@ -15,6 +15,8 @@ class CCInferSubsystem(Subsystem):
         help="Infer a target's dependencies by parsing #include statements from sources.",
     )
 
+    # TODO: This option may move to a proper `cc` subsystem once compilation is implemented. It may also
+    # change depending on how we want to model in-repo includes.
     include_from_source_roots = BoolOption(
         "--include-from-source-roots",
         default=True,

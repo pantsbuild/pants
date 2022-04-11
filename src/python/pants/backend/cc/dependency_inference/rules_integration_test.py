@@ -99,8 +99,6 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
         [Address("src/native/ambiguous", target_name="dep1", relative_file_path="disambiguated.h")]
     )
     assert len(caplog.records) == 1
-    assert (
-        "The target src/native/ambiguous/main.c:main includes `ambiguous/dep.h`" in caplog.text
-    )
+    assert "The target src/native/ambiguous/main.c:main includes `ambiguous/dep.h`" in caplog.text
     assert "['src/native/ambiguous/dep.h:dep1', 'src/native/ambiguous/dep.h:dep2']" in caplog.text
     assert "disambiguated.h" not in caplog.text
