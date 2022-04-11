@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 from pants.engine.environment import Environment
-from pants.option.option_types import StrListOption
+from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import OrderedSet
 
@@ -13,6 +13,15 @@ from pants.util.ordered_set import OrderedSet
 class RustSubsystem(Subsystem):
     options_scope = "rust"
     help = "Options for Rust support."
+
+    toolchain = StrOption(
+        "--toolchain",
+        default="stable",
+        help=(
+            "Name of a Rust toolchain to use for all builds. The toolchain name will be provided to "
+            "Rustup to find the Toolchain."
+        ),
+    )
 
     _rustup_search_paths = StrListOption(
         "--rustup-search-paths",

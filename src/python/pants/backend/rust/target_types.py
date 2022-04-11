@@ -6,6 +6,7 @@ from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, MultipleSour
 
 class RustCrateSourcesField(MultipleSourcesField):
     default = ("Cargo.toml", "src/**/*.rs", "tests/**/*.rs")
+    uses_source_roots = False
 
 
 class RustCrateTarget(Target):
