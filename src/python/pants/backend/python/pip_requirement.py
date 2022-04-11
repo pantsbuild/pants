@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import urllib.parse
 
 import pkg_resources
 
@@ -21,8 +22,35 @@ class PipRequirement:
     """
 
     @classmethod
-    def parse(cls, line: str) -> PipRequirement:
-        return cls(pkg_resources.Requirement.parse(line))
+    def parse(cls, line: str, description_of_origin: str = "") -> PipRequirement:
+        try:
+            return cls(pkg_resources.Requirement.parse(line))
+        except Exception as e:
+            scheme, netloc, path, query, fragment = urllib.parse.urlsplit(line)
+            if scheme and fragment.startswith("egg="):
+                # Try converting a pip VCS-style requirement into a PEP-440 one that can be
+                # parsed as a Requirement. E.g.,
+                # git+https://github.com/django/django.git@stable/2.1.x#egg=Django
+                # into
+                # Django@ git+https://github.com/django/django.git@stable/2.1.x
+                pep_440_vcs_url = urllib.parse.urlunsplit((scheme, netloc, path, query, ""))
+                project = fragment[4:]
+                pep_440_req_str = f"{project}@ {pep_440_vcs_url}"
+                try:
+                    ret = cls(pkg_resources.Requirement.parse(pep_440_req_str))
+                    logger.warning(
+                        "Converted a pip VCS requirement to a PEP440-compatible one:\n"
+                        f"  {line} ->\n  {pep_440_req_str}.\nYou may wish to convert this "
+                        f"directly in {description_of_origin or 'your source'} instead."
+                    )
+                    return ret
+                except Exception:
+                    # If parsing the converted URL fails for some reason, it's probably less
+                    # confusing to the user if we raise the original error instead of one for
+                    # a synthetic URL they don't directly know about.
+                    pass
+            origin_str = f" in {description_of_origin}" if description_of_origin else ""
+            raise ValueError(f"Invalid requirement '{line}'{origin_str}: {e}")
 
     def __init__(self, req: pkg_resources.Requirement):
         self._req = req
