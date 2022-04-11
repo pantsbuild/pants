@@ -21,11 +21,11 @@ FILE_1 = ConfigFile(
     content=dedent(
         """
         [DEFAULT]
-        name = "foo"
+        name = "%(env.NAME)s"
         answer = 42
         scale = 1.2
         path = "/a/b/%(answer)s"
-        embed = "%(path)s::foo"
+        embed = "%(path)s::%(name)s"
         disclaimer = '''
         Let it be known
         that.'''
@@ -62,8 +62,8 @@ FILE_1 = ConfigFile(
     ),
     default_values={
         "name": "foo",
-        "answer": "42",
-        "scale": "1.2",
+        "answer": 42,
+        "scale": 1.2,
         "path": "/a/b/42",
         "embed": "/a/b/42::foo",
         "disclaimer": "Let it be known\nthat.",
@@ -136,6 +136,7 @@ def _setup_config() -> Config:
             FileContent("file2.toml", FILE_2.content.encode()),
         ],
         seed_values={"buildroot": "fake_buildroot"},
+        env={"NAME": "foo"},
     )
     assert ["file1.toml", "file2.toml"] == parsed_config.sources()
     return parsed_config
@@ -146,6 +147,7 @@ class ConfigTest(unittest.TestCase):
         self.config = _setup_config()
         self.default_seed_values = Config._determine_seed_values(
             seed_values={"buildroot": "fake_buildroot"},
+            env={"NAME": "foo"},
         )
         self.expected_combined_values: dict[str, dict[str, list[str]]] = {
             "a": {
@@ -185,8 +187,9 @@ class ConfigTest(unittest.TestCase):
         # values for _ConfigValues.defaults are not yet interpolated.
         default_file1_values_unexpanded = {
             **FILE_1.default_values,
+            "name": "%(env.NAME)s",
             "path": "/a/b/%(answer)s",
-            "embed": "%(path)s::foo",
+            "embed": "%(path)s::%(name)s",
         }
         assert file1_values.defaults == {
             **self.default_seed_values,
@@ -196,12 +199,15 @@ class ConfigTest(unittest.TestCase):
 
     def test_get(self) -> None:
         # Check the DEFAULT section
+        # N.B.: All values read from config files are read as str and only later converted by the
+        # options parser to the expected destination type; so we ensure we're comparing strings
+        # here.
         for option, value in self.default_seed_values.items():
             # Both config files have the seed values.
-            assert self.config.get(section="DEFAULT", option=option) == [value, value]
+            assert self.config.get(section="DEFAULT", option=option) == [str(value), str(value)]
         for option, value in FILE_1.default_values.items():
             # Only FILE_1 has explicit DEFAULT values.
-            assert self.config.get(section="DEFAULT", option=option) == [value]
+            assert self.config.get(section="DEFAULT", option=option) == [str(value)]
 
         # Check the combined values.
         for section, section_values in self.expected_combined_values.items():

@@ -9,13 +9,11 @@ import re
 from abc import ABCMeta
 from typing import Any, ClassVar, TypeVar
 
-from pants.base.deprecated import deprecated
 from pants.engine.internals.selectors import AwaitableConstraints, Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
-from pants.util.docutil import doc_url
 
 
 class Subsystem(metaclass=ABCMeta):
@@ -96,20 +94,6 @@ class Subsystem(metaclass=ABCMeta):
         """Returns a ScopeInfo instance representing this Subsystem's options scope."""
         cls.validate_scope()
         return cls.create_scope_info(scope=cls.options_scope, subsystem_cls=cls)
-
-    @classmethod
-    @deprecated(
-        removal_version="2.12.0.dev2",
-        hint=(
-            "Options are now registered by declaring class attributes using the types in "
-            f"pants/option/option_types.py. See {doc_url('plugin-upgrade-guide')}"
-        ),
-    )
-    def register_options(cls, register):
-        """Register options for this Subsystem.
-
-        Subclasses may override and call register(*args, **kwargs).
-        """
 
     @classmethod
     def register_options_on_scope(cls, options):

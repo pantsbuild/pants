@@ -2085,7 +2085,12 @@ def test_explicit_file_dependencies(dependencies_rule_runner: RuleRunner) -> Non
 
 
 def test_dependency_injection(dependencies_rule_runner: RuleRunner) -> None:
-    dependencies_rule_runner.write_files({"BUILD": "smalltalk_libraries(name='target')"})
+    dependencies_rule_runner.write_files(
+        {
+            "src/smalltalk/util/f1.st": "",
+            "BUILD": "smalltalk_libraries(name='target', sources=['*.st'])",
+        }
+    )
 
     def assert_injected(deps_cls: Type[Dependencies], *, injected: List[Address]) -> None:
         provided_deps = ["//:provided"]

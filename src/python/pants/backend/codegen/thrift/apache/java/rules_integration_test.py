@@ -19,6 +19,7 @@ from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.internals import graph
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.jvm.dependency_inference import artifact_mapper
 from pants.source import source_root
 from pants.testutil.rule_runner import RuleRunner, logging
 
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
             *source_root.rules(),
             *graph.rules(),
             *stripped_source_files.rules(),
+            *artifact_mapper.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromThriftRequest]),
         ],
