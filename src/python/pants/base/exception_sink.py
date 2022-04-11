@@ -221,7 +221,7 @@ class ExceptionSink:
             try:
                 if os.path.getsize(path) == 0:
                     os.unlink(path)
-            except Exception:
+            except OSError:
                 pass
 
         # NB: This will only get called if nothing fatal happens, but that's precisely when we want
