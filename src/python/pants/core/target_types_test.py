@@ -159,6 +159,52 @@ def test_relocated_files() -> None:
     )
 
 
+def test_relocated_relocated_files() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_type_rules(),
+            *archive.rules(),
+            *source_files.rules(),
+            *system_binaries.rules(),
+            QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest]),
+            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
+            QueryRule(SourceFiles, [SourceFilesRequest]),
+        ],
+        target_types=[FilesGeneratorTarget, RelocatedFiles],
+    )
+
+    rule_runner.write_files(
+        {
+            "original_prefix/file.txt": "",
+            "BUILD": dedent(
+                """\
+                files(name="original", sources=["original_prefix/file.txt"])
+
+                relocated_files(
+                    name="relocated",
+                    files_targets=[":original"],
+                    src="original_prefix",
+                    dest="intermediate_prefix",
+                )
+
+                relocated_files(
+                    name="double_relocated",
+                    files_targets=[":relocated"],
+                    src="intermediate_prefix",
+                    dest="final_prefix",
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="double_relocated"))
+    result = rule_runner.request(
+        GeneratedSources, [RelocateFilesViaCodegenRequest(EMPTY_SNAPSHOT, tgt)]
+    )
+    assert result.snapshot.files == ("final_prefix/file.txt",)
+
+
 def test_archive() -> None:
     """Integration test for the `archive` target type.
 
