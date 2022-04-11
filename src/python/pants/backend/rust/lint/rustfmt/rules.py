@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.rust.lint.rustfmt import skip_field
 from pants.backend.rust.lint.rustfmt.skip_field import SkipRustfmtField
 from pants.backend.rust.lint.rustfmt.subsystem import RustfmtSubsystem
 from pants.backend.rust.target_types import RustCrateSourcesField
@@ -66,5 +67,6 @@ async def rustfmt_fmt(request: RustfmtRequest, rustfmt: RustfmtSubsystem) -> Fmt
 def rules():
     return [
         *collect_rules(),
+        *skip_field.rules(),
         UnionRule(FmtRequest, RustfmtRequest),
     ]
