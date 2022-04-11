@@ -11,7 +11,8 @@ from os import PathLike
 from pathlib import Path, PurePath
 from typing import Iterable
 
-from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException
+from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
 from pants.util.meta import frozen_after_init
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class GitWorktree:
+class GitWorktree(EngineAwareReturnType):
     worktree: PurePath
     _gitdir: PurePath
     _git_binary: GitBinary
@@ -41,6 +42,9 @@ class GitWorktree:
         self.worktree = Path(worktree or os.getcwd()).resolve()
         self._gitdir = Path(gitdir).resolve() if gitdir else (self.worktree / ".git")
         self._git_binary = binary
+
+    def cacheable(self) -> bool:
+        return False
 
     @property
     def current_rev_identifier(self):
@@ -104,8 +108,11 @@ class GitWorktree:
 
 
 @dataclass(frozen=True)
-class MaybeGitWorktree:
+class MaybeGitWorktree(EngineAwareReturnType):
     git_worktree: GitWorktree | None = None
+
+    def cacheable(self) -> bool:
+        return False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -116,8 +123,13 @@ class GitWorktreeRequest:
 
 @rule
 async def get_git_worktree(
-    git_worktree_request: GitWorktreeRequest, git_binary: GitBinary
+    git_worktree_request: GitWorktreeRequest,
+    maybe_git_binary: MaybeGitBinary,
 ) -> MaybeGitWorktree:
+    if not maybe_git_binary.git_binary:
+        return MaybeGitWorktree()
+
+    git_binary = maybe_git_binary.git_binary
     cmd = ["rev-parse", "--show-toplevel"]
 
     try:

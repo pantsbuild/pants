@@ -771,3 +771,35 @@ async def find_git_wrapper(_: GitBinaryRequest, git_binary: GitBinary) -> GitBin
 
 def rules():
     return [*collect_rules(), *python_bootstrap.rules()]
+
+
+# -------------------------------------------------------------------------------------------
+# Rules for fallible binaries
+# -------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MaybeGitBinary:
+    git_binary: GitBinary | None = None
+
+
+@rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
+async def maybe_find_git() -> MaybeGitBinary:
+    request = BinaryPathRequest(binary_name="git", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path
+    if not first_path:
+        return MaybeGitBinary()
+
+    return MaybeGitBinary(GitBinary(first_path.path, first_path.fingerprint))
+
+
+class MaybeGitBinaryRequest:
+    pass
+
+
+@rule
+async def maybe_find_git_wrapper(
+    _: MaybeGitBinaryRequest, maybe_git_binary: MaybeGitBinary
+) -> MaybeGitBinary:
+    return maybe_git_binary
