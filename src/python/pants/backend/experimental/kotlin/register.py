@@ -10,6 +10,7 @@ from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.package.war import rules as war_rules
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
+from pants.jvm.goals import lockfile
 
 
 def target_types():
@@ -28,6 +29,7 @@ def rules():
         *check.rules(),
         *tailor.rules(),
         *classpath.rules(),
+        *lockfile.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
         *jvm_util_rules.rules(),
