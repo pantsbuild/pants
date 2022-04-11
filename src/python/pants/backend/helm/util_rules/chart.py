@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.resolve import fetch
+from pants.backend.helm.resolve.artifacts import ResolvedHelmArtifact
 from pants.backend.helm.resolve.fetch import (
     FetchedHelmArtifact,
     FetchedHelmArtifacts,
@@ -47,6 +48,7 @@ class HelmChart:
     address: Address
     metadata: HelmChartMetadata
     snapshot: Snapshot
+    artifact: ResolvedHelmArtifact | None = None
 
     @property
     def path(self) -> str:
@@ -72,7 +74,12 @@ async def create_chart_from_artifact(fetched_artifact: FetchedHelmArtifact) -> H
             prefix=fetched_artifact.artifact.name,
         ),
     )
-    return HelmChart(fetched_artifact.address, metadata, fetched_artifact.snapshot)
+    return HelmChart(
+        fetched_artifact.address,
+        metadata,
+        fetched_artifact.snapshot,
+        artifact=fetched_artifact.artifact,
+    )
 
 
 @rule(desc="Collect all source code and subcharts of a Helm Chart", level=LogLevel.DEBUG)
@@ -145,15 +152,20 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
 
         # Include the explicitly provided subchats in the set of dependencies if not already present.
         updated_dependencies_names = {dep.name for dep in updated_dependencies}
-        remaining_first_party_subcharts = [
-            chart
-            for chart in first_party_subcharts
-            if chart.metadata.name not in updated_dependencies_names
+        remaining_subcharts = [
+            chart for chart in subcharts if chart.metadata.name not in updated_dependencies_names
         ]
-        for chart in remaining_first_party_subcharts:
-            dependency = HelmChartDependency(
-                name=chart.metadata.name, version=chart.metadata.version
-            )
+        for chart in remaining_subcharts:
+            if chart.artifact:
+                dependency = HelmChartDependency(
+                    name=chart.artifact.name,
+                    version=chart.artifact.version,
+                    repository=chart.artifact.location_url,
+                )
+            else:
+                dependency = HelmChartDependency(
+                    name=chart.metadata.name, version=chart.metadata.version
+                )
             updated_dependencies.add(dependency)
 
         # Update metadata with the information about charts' dependencies.
@@ -179,11 +191,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
     )
 
     chart_snapshot = await Get(Snapshot, AddPrefix(content_digest, metadata.name))
-    return HelmChart(
-        address=request.field_set.address,
-        metadata=metadata,
-        snapshot=chart_snapshot,
-    )
+    return HelmChart(address=request.field_set.address, metadata=metadata, snapshot=chart_snapshot)
 
 
 def rules():

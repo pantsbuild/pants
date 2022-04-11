@@ -1,15 +1,20 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
+from typing import Iterable
 
 from pants.backend.helm.resolve import artifacts
-from pants.backend.helm.resolve.artifacts import (
-    FirstPartyArtifactMapping,
-    ThirdPartyArtifactMapping,
-)
+from pants.backend.helm.resolve.artifacts import ThirdPartyHelmArtifactMapping
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.target_types import HelmChartDependenciesField, HelmChartMetaSourceField
+from pants.backend.helm.target_types import (
+    AllHelmChartTargets,
+    HelmChartDependenciesField,
+    HelmChartMetaSourceField,
+    HelmChartTarget,
+)
 from pants.backend.helm.util_rules.chart_metadata import HelmChartDependency, HelmChartMetadata
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get, MultiGet
@@ -22,11 +27,20 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import pluralize
+from pants.util.strutil import bullet_list, pluralize
 
 logger = logging.getLogger(__name__)
+
+
+class DuplicateHelmChartNamesFound(Exception):
+    def __init__(self, duplicates: Iterable[tuple[str, Address]]) -> None:
+        super().__init__(
+            f"Found more than one `{HelmChartTarget.alias}` target using the same chart name:\n\n"
+            f"{bullet_list([f'{addr} -> {name}' for name, addr in duplicates])}"
+        )
 
 
 class UnknownHelmChartDependency(Exception):
@@ -37,6 +51,36 @@ class UnknownHelmChartDependency(Exception):
         )
 
 
+class FirstPartyHelmChartMapping(FrozenDict[str, Address]):
+    pass
+
+
+@rule
+async def first_party_helm_chart_mapping(
+    all_helm_chart_tgts: AllHelmChartTargets,
+) -> FirstPartyHelmChartMapping:
+    charts_metadata = await MultiGet(
+        Get(HelmChartMetadata, HelmChartMetaSourceField, tgt[HelmChartMetaSourceField])
+        for tgt in all_helm_chart_tgts
+    )
+
+    name_addr_mapping: dict[str, Address] = {}
+    duplicate_chart_names: OrderedSet[tuple[str, Address]] = OrderedSet()
+
+    for meta, tgt in zip(charts_metadata, all_helm_chart_tgts):
+        if meta.name in name_addr_mapping:
+            duplicate_chart_names.add((meta.name, name_addr_mapping[meta.name]))
+            duplicate_chart_names.add((meta.name, tgt.address))
+            continue
+
+        name_addr_mapping[meta.name] = tgt.address
+
+    if duplicate_chart_names:
+        raise DuplicateHelmChartNamesFound(duplicate_chart_names)
+
+    return FirstPartyHelmChartMapping(name_addr_mapping)
+
+
 class InferHelmChartDependenciesRequest(InferDependenciesRequest):
     infer_from = HelmChartMetaSourceField
 
@@ -44,8 +88,8 @@ class InferHelmChartDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Inferring Helm chart dependencies", level=LogLevel.DEBUG)
 async def infer_chart_dependencies_via_metadata(
     request: InferHelmChartDependenciesRequest,
-    first_party_mapping: FirstPartyArtifactMapping,
-    third_party_mapping: ThirdPartyArtifactMapping,
+    first_party_mapping: FirstPartyHelmChartMapping,
+    third_party_mapping: ThirdPartyHelmArtifactMapping,
     subsystem: HelmSubsystem,
 ) -> InferredDependencies:
     original_addr = request.sources_field.address
@@ -58,6 +102,17 @@ async def infer_chart_dependencies_via_metadata(
         Get(HelmChartMetadata, HelmChartMetaSourceField, request.sources_field),
     )
 
+    remotes = subsystem.remotes()
+
+    def resolve_dependency_url(dependency: HelmChartDependency) -> str | None:
+        if not dependency.repository:
+            registry = remotes.default_registry
+            if registry:
+                return f"{registry.address}/{dependency.name}"
+            return None
+        else:
+            return f"{dependency.repository}/{dependency.name}"
+
     # Associate dependencies in Chart.yaml with addresses.
     dependencies: OrderedSet[Address] = OrderedSet()
     for chart_dep in metadata.dependencies:
@@ -67,7 +122,8 @@ async def infer_chart_dependencies_via_metadata(
         if first_party_dep:
             candidate_addrs.append(first_party_dep)
 
-        third_party_dep = third_party_mapping.get(chart_dep.remote_spec(subsystem.remotes()))
+        dependency_url = resolve_dependency_url(chart_dep)
+        third_party_dep = third_party_mapping.get(dependency_url) if dependency_url else None
         if third_party_dep:
             candidate_addrs.append(third_party_dep)
 

@@ -86,6 +86,7 @@ def test_collects_single_chart_sources(
     )
 
     helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(tgt)])
+    assert not helm_chart.artifact
     assert helm_chart.metadata == expected_metadata
     assert len(helm_chart.snapshot.files) == 4
     assert helm_chart.address == address
@@ -139,7 +140,7 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
                 """\
                 helm_artifact(
                   name="cert-manager",
-                  repository="@jetstack",
+                  repository="https://charts.jetstack.io",
                   artifact="cert-manager",
                   version="v0.7.0"
                 )
@@ -166,18 +167,16 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
                 - name: chart1
                   alias: dep1
                 - name: cert-manager
-                  repository: "@jetstack"
+                  repository: "https://charts.jetstack.io"
                 """
             ),
         }
     )
 
     source_root_patterns = ("/src/*",)
-    repositories_opts = """{"jetstack": {"address": "https://charts.jetstack.io"}}"""
     rule_runner.set_options(
         [
             f"--source-root-patterns={repr(source_root_patterns)}",
-            f"--helm-classic-repositories={repositories_opts}",
         ]
     )
 
@@ -210,6 +209,16 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
 def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
+            "3rdparty/helm/jetstack/BUILD": dedent(
+                """\
+                helm_artifact(
+                  name="cert-manager",
+                  repository="https://charts.jetstack.io",
+                  artifact="cert-manager",
+                  version="v0.7.0"
+                )
+                """
+            ),
             "src/chart1/BUILD": "helm_chart()",
             "src/chart1/Chart.yaml": dedent(
                 """\
@@ -218,7 +227,11 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
                 version: 0.1.0
                 """
             ),
-            "src/chart2/BUILD": """helm_chart(dependencies=["//src/chart1"])""",
+            "src/chart2/BUILD": dedent(
+                """\
+                helm_chart(dependencies=["//src/chart1", "//3rdparty/helm/jetstack:cert-manager"])
+                """
+            ),
             "src/chart2/Chart.yaml": dedent(
                 """\
                 apiVersion: v2
@@ -230,7 +243,11 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
     )
 
     source_root_patterns = ("/src/*",)
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
+    rule_runner.set_options(
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+        ]
+    )
 
     expected_metadata = HelmChartMetadata(
         name="chart2",
@@ -240,6 +257,9 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
             HelmChartDependency(
                 name="chart1",
                 version="0.1.0",
+            ),
+            HelmChartDependency(
+                name="cert-manager", version="v0.7.0", repository="https://charts.jetstack.io"
             ),
         ),
     )

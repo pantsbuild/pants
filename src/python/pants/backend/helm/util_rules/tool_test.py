@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import re
-
 import pytest
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
@@ -40,34 +38,9 @@ def rule_runner() -> RuleRunner:
 def test_initialises_basic_helm_binary(rule_runner: RuleRunner) -> None:
     helm_subsystem = rule_runner.request(HelmSubsystem, [])
     helm_binary = rule_runner.request(HelmBinary, [])
+
     assert helm_binary
     assert helm_binary.path == f"__helm/{helm_subsystem.generate_exe(Platform.current)}"
-
-
-def test_initialise_classic_repos(rule_runner: RuleRunner) -> None:
-    repositories_opts = """{"jetstack": {"address": "https://charts.jetstack.io"}}"""
-    rule_runner.set_options([f"--helm-classic-repositories={repositories_opts}"])
-
-    process = HelmProcess(
-        argv=["repo", "list"],
-        input_digest=EMPTY_DIGEST,
-        description="List installed classic repositories",
-    )
-    result = rule_runner.request(ProcessResult, [process])
-
-    # The result of the `helm repo list` command is a table with a header like
-    #    NAME     URL
-    #    alias    http://example.com/charts
-    #
-    # So to build the test expectation we parse that output keeping
-    # the repository's alias and url to be used in the comparison
-    table_rows = result.stdout.decode().splitlines()[1:]
-    configured_repos = [
-        (columns[0].strip(), columns[1].strip())
-        for columns in (re.split(r"\t+", line.rstrip()) for line in table_rows)
-    ]
-
-    assert configured_repos == [("jetstack", "https://charts.jetstack.io")]
 
 
 def test_create_helm_process(rule_runner: RuleRunner) -> None:
