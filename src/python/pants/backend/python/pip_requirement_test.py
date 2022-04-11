@@ -38,3 +38,10 @@ def test_error() -> None:
     with pytest.raises(ValueError) as exc_info:
         PipRequirement.parse("not valid! === 3.1", description_of_origin="some origin")
     assert "Invalid requirement 'not valid! === 3.1' in some origin:" in str(exc_info.value)
+
+    with pytest.raises(ValueError) as exc_info:
+        # No egg= in the fragment.
+        PipRequirement.parse("git+https://github.com/django/django.git@stable/2.1.x#a=b")
+    assert "Invalid requirement 'git+https://github.com/django/django.git@stable/2.1.x#a=b'" in str(
+        exc_info.value
+    )
