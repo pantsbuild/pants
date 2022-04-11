@@ -309,7 +309,7 @@ def _uncacheable_rule(*args, **kwargs) -> Callable:
 
 
 def rule_helper(func: Callable) -> Callable:
-    """Decorator which marks a static function as a "rule helper".
+    """Decorator which marks a function as a "rule helper".
 
     Functions marked as rule helpers are allowed to be called by rules and other rule helpers
     and can `await Get/MultiGet`. The rule parser adds these functions' awaitables to the rule's

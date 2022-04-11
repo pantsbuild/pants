@@ -9,6 +9,7 @@ import os
 import re
 from dataclasses import dataclass
 from functools import partial
+from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Mapping, Union, cast
 
 import toml
@@ -61,16 +62,20 @@ class Config:
         file_contents: Iterable[ConfigSource],
         *,
         seed_values: SeedValues | None = None,
+        env: Mapping[str, str] | None = None,
     ) -> Config:
         """Loads config from the given string payloads, with later payloads overriding earlier ones.
 
         A handful of seed values will be set to act as if specified in the loaded config file's
         DEFAULT section, and be available for use in substitutions.  The caller may override some of
         these seed values.
+
+        If an `env` is supplied, it is exposed as `env` object available for interpolation via dot
+        access of the environment variable names (e.g.: `env.HOME`).
         """
         config_values = []
         for file_content in file_contents:
-            normalized_seed_values = cls._determine_seed_values(seed_values=seed_values)
+            normalized_seed_values = cls._determine_seed_values(seed_values=seed_values, env=env)
             try:
                 config_values.append(cls._parse_toml(file_content, normalized_seed_values))
             except Exception as e:
@@ -81,7 +86,7 @@ class Config:
 
     @classmethod
     def _parse_toml(
-        cls, config_source: ConfigSource, normalized_seed_values: dict[str, str]
+        cls, config_source: ConfigSource, normalized_seed_values: dict[str, Any]
     ) -> _ConfigValues:
         """Attempt to parse as TOML, raising an exception on failure."""
         toml_values = cast(Dict[str, Any], toml.loads(config_source.content.decode()))
@@ -104,19 +109,26 @@ class Config:
             )
 
     @staticmethod
-    def _determine_seed_values(*, seed_values: SeedValues | None = None) -> dict[str, str]:
+    def _determine_seed_values(
+        *, seed_values: SeedValues | None = None, env: Mapping[str, str] | None = None
+    ) -> dict[str, Any]:
         """We pre-populate several default values to allow %([key-name])s interpolation.
 
         This sets up those defaults and checks if the user overrode any of the values.
+
+        In addition, we pre-populate any supplied env entries to allow %(env.[env-var-name])s
+        interpolation.
         """
         safe_seed_values = seed_values or {}
         buildroot = cast(str, safe_seed_values.get("buildroot", get_buildroot()))
 
-        all_seed_values: dict[str, str] = {
+        all_seed_values: dict[str, Any] = {
             "buildroot": buildroot,
             "homedir": os.path.expanduser("~"),
             "user": getpass.getuser(),
         }
+        if env:
+            all_seed_values["env"] = SimpleNamespace(**env)
 
         def update_seed_values(key: str, *, default_dir: str) -> None:
             all_seed_values[key] = cast(
@@ -187,7 +199,7 @@ class _ConfigValues:
             # that .format() does not try to improperly interpolate.
             escaped_str = value.replace("{", "{{").replace("}", "}}")
             new_style_format_str = re.sub(
-                pattern=r"%\((?P<interpolated>[a-zA-Z_0-9]*)\)s",
+                pattern=r"%\((?P<interpolated>[a-zA-Z_0-9.]+)\)s",
                 repl=r"{\g<interpolated>}",
                 string=escaped_str,
             )
@@ -205,7 +217,7 @@ class _ConfigValues:
 
         def recursively_format_str(value: str) -> str:
             # It's possible to interpolate with a value that itself has an interpolation.
-            match = re.search(r"%\(([a-zA-Z_0-9]*)\)s", value)
+            match = re.search(r"%\(([a-zA-Z_0-9.]+)\)s", value)
             if not match:
                 return value
             return recursively_format_str(value=format_str(value))
@@ -290,11 +302,8 @@ class _ConfigValues:
         return remove_val
 
     @property
-    def defaults(self) -> dict[str, str]:
-        return {
-            option: self._stringify_val_without_interpolation(option_val)
-            for option, option_val in self.section_to_values[DEFAULT_SECTION].items()
-        }
+    def defaults(self) -> dict[str, Any]:
+        return self.section_to_values[DEFAULT_SECTION].copy()
 
     def get_verification_errors(self, section_to_valid_options: dict[str, set[str]]) -> list[str]:
         error_log = []
