@@ -294,9 +294,10 @@ async def resolve_target(
         # TODO: This is an accommodation to allow using file/generator Addresses for
         # non-generator atom targets. See https://github.com/pantsbuild/pants/issues/14419.
         original_target = parametrizations.get(base_address)
-        if isinstance(
-            original_target, TargetGenerator
-        ) and not target_types_to_generate_requests.is_generator(original_target):
+        if original_target and (
+            not isinstance(original_target, TargetGenerator)
+            or not target_types_to_generate_requests.is_generator(original_target)
+        ):
             return WrappedTarget(original_target)
     target = parametrizations.get(address)
     if target is None:

@@ -71,9 +71,9 @@ from pants.testutil.rule_runner import RuleRunner
             [
                 TargetData(
                     FilesGeneratorTarget(
-                        {"sources": []}, Address("example", target_name="files_target")
+                        {"sources": ["foo.txt"]}, Address("example", target_name="files_target")
                     ),
-                    tuple(),
+                    ("foo.txt",),
                     tuple(),
                 )
             ],
@@ -87,8 +87,12 @@ from pants.testutil.rule_runner import RuleRunner
                     "dependencies": [],
                     "description": null,
                     "overrides": null,
-                    "sources": [],
-                    "sources_raw": [],
+                    "sources": [
+                      "foo.txt"
+                    ],
+                    "sources_raw": [
+                      "foo.txt"
+                    ],
                     "tags": null
                   }
                 ]
