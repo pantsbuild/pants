@@ -179,7 +179,9 @@ async def resolve_target_parametrizations(
 
     target = None
     parametrizations: list[_TargetParametrization] = []
-    generate_request = target_types_to_generate_requests.request_for(target_type)
+    generate_request: type[GenerateTargetsRequest] | None = None
+    if issubclass(target_type, TargetGenerator):
+        generate_request = target_types_to_generate_requests.request_for(target_type)
     if generate_request:
         # Split out the `propagated_fields` before construction.
         generator_fields = dict(target_adaptor.kwargs)

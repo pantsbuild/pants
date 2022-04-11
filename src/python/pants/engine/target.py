@@ -34,7 +34,7 @@ from typing import (
 
 from typing_extensions import final
 
-from pants.base.deprecated import deprecated_conditional, warn_or_error
+from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -52,7 +52,7 @@ from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized, memoized_classproperty, memoized_method, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
@@ -821,27 +821,6 @@ class AllTargetsRequest:
 # -----------------------------------------------------------------------------------------------
 
 
-@memoized
-def maybe_warn_dependencies_as_copied_field(tgt_type: type[TargetGenerator]) -> None:
-    copied_dependencies_field_types = [
-        field_type.__name__
-        for field_type in tgt_type.copied_fields
-        if issubclass(field_type, Dependencies)
-    ]
-    if copied_dependencies_field_types:
-        warn_or_error(
-            removal_version="2.12.0.dev2",
-            entity=(
-                f"using a `Dependencies` field subclass ({copied_dependencies_field_types}) "
-                "as a `TargetGenerator.copied_field`"
-            ),
-            hint=(
-                "`Dependencies` fields should be `TargetGenerator.moved_field`s, to avoid "
-                "redundant graph edges."
-            ),
-        )
-
-
 class TargetGenerator(Target):
     """A Target type which generates other Targets via installed `@rule` logic.
 
@@ -875,7 +854,18 @@ class TargetGenerator(Target):
 
     def validate(self) -> None:
         super().validate()
-        maybe_warn_dependencies_as_copied_field(type(self))
+
+        copied_dependencies_field_types = [
+            field_type.__name__
+            for field_type in type(self).copied_fields
+            if issubclass(field_type, Dependencies)
+        ]
+        if copied_dependencies_field_types:
+            raise InvalidTargetException(
+                f"Using a `Dependencies` field subclass ({copied_dependencies_field_types}) as a "
+                "`TargetGenerator.copied_field`. `Dependencies` fields should be "
+                "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
+            )
 
 
 class TargetFilesGenerator(TargetGenerator):
@@ -892,19 +882,12 @@ class TargetFilesGenerator(TargetGenerator):
         super().validate()
 
         if self.has_field(MultipleSourcesField) and not self[MultipleSourcesField].value:
-            sources_field = self[MultipleSourcesField]
-            warn_or_error(
-                removal_version="2.12.0.dev2",
-                entity=(
-                    f"specifying an empty `{sources_field.alias}` field for target generator type "
-                    f"`{self.alias}`"
-                ),
-                hint=(
-                    f"The target generator at {self.address} will not generate any targets. If its "
-                    "purpose is to act as an alias for its dependencies, then it should be "
-                    "declared as a `target(..)` generic target instead. If it is unused, then it "
-                    "should be removed."
-                ),
+            raise InvalidTargetException(
+                f"The `{self.alias}` target generator at {self.address} has an empty "
+                f"`{self[MultipleSourcesField].alias}` field; so it will not generate any targets. "
+                "If its purpose is to act as an alias for its dependencies, then it should be "
+                "declared as a `target(..)` generic target instead. If it is unused, then it "
+                "should be removed."
             )
 
 
@@ -1004,28 +987,14 @@ class GeneratedTargets(FrozenDict[Address, Target]):
         super().__init__(mapping)
 
 
-class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for tgt_cls, request in self.items():
-            # TODO: After this deprecation, the key type for this class should become
-            # `TargetGenerator`, and the `request_for` method should require a `TargetGenerator`
-            # argument, so that callers are forced to cast / check subtyping before calling.
-            deprecated_conditional(
-                lambda: not issubclass(tgt_cls, TargetGenerator),
-                removal_version="2.12.0.dev2",
-                entity="`GenerateTargetsRequest.generate_from` types which do not subclass `TargetGenerator`",
-                hint=(
-                    f"The generate_from type of `{request.__name__}` was `{tgt_cls.__name__}`, "
-                    "which does not subclass `TargetGenerator`."
-                ),
-            )
-
+class TargetTypesToGenerateTargetsRequests(
+    FrozenDict[Type[TargetGenerator], Type[GenerateTargetsRequest]]
+):
     def is_generator(self, tgt: Target) -> bool:
         """Does this target type generate other targets?"""
-        return bool(self.request_for(type(tgt)))
+        return isinstance(tgt, TargetGenerator) and bool(self.request_for(type(tgt)))
 
-    def request_for(self, tgt_cls: type[Target]) -> type[GenerateTargetsRequest] | None:
+    def request_for(self, tgt_cls: type[TargetGenerator]) -> type[GenerateTargetsRequest] | None:
         """Return the request type for the given Target, or None."""
         if issubclass(tgt_cls, TargetFilesGenerator):
             return self.get(TargetFilesGenerator)
