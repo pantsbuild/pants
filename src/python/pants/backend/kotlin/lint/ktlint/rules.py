@@ -45,16 +45,11 @@ class KtlintToolLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = KtlintSubsystem.options_scope
 
 
-@dataclass(frozen=True)
-class Setup:
-    process: JvmProcess
+@rule(desc="Format with Ktlint", level=LogLevel.DEBUG)
+async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem, jdk: InternalJdk) -> FmtResult:
+    if tool.skip:
+        return FmtResult.skip(formatter_name=request.name)
 
-
-@rule(level=LogLevel.DEBUG)
-async def setup_ktlint(
-    request: KtlintRequest,
-    jdk: InternalJdk,
-) -> Setup:
     lockfile_request = await Get(GenerateJvmLockfileFromTool, KtlintToolLockfileSentinel())
     tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))
 
@@ -69,27 +64,21 @@ async def setup_ktlint(
         *request.snapshot.files,
     ]
 
-    process = JvmProcess(
-        jdk=jdk,
-        argv=args,
-        classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
-        input_digest=request.snapshot.digest,
-        extra_immutable_input_digests=extra_immutable_input_digests,
-        extra_nailgun_keys=extra_immutable_input_digests,
-        output_files=request.snapshot.files,
-        description=f"Run Ktlint on {pluralize(len(request.field_sets), 'file')}.",
-        level=LogLevel.DEBUG,
+    result = await Get(
+        ProcessResult,
+        JvmProcess(
+            jdk=jdk,
+            argv=args,
+            classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
+            input_digest=request.snapshot.digest,
+            extra_immutable_input_digests=extra_immutable_input_digests,
+            extra_nailgun_keys=extra_immutable_input_digests,
+            output_files=request.snapshot.files,
+            description=f"Run Ktlint on {pluralize(len(request.field_sets), 'file')}.",
+            level=LogLevel.DEBUG,
+        ),
     )
 
-    return Setup(process)
-
-
-@rule(desc="Format with Ktlint", level=LogLevel.DEBUG)
-async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem) -> FmtResult:
-    if tool.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, KtlintRequest, request)
-    result = await Get(ProcessResult, JvmProcess, setup.process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 
