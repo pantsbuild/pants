@@ -7,6 +7,7 @@ import logging
 import urllib.parse
 
 import pkg_resources
+from pkg_resources.extern.packaging.requirements import InvalidRequirement  # type: ignore[import]
 
 logger = logging.getLogger(__name__)
 
@@ -25,30 +26,38 @@ class PipRequirement:
     def parse(cls, line: str, description_of_origin: str = "") -> PipRequirement:
         try:
             return cls(pkg_resources.Requirement.parse(line))
-        except Exception as e:
-            scheme, netloc, path, query, fragment = urllib.parse.urlsplit(line)
-            if scheme and fragment.startswith("egg="):
+        except InvalidRequirement as e:
+            scheme, netloc, path, query, fragment = urllib.parse.urlsplit(line, scheme="file")
+            if fragment:
                 # Try converting a pip VCS-style requirement into a PEP-440 one that can be
                 # parsed as a Requirement. E.g.,
                 # git+https://github.com/django/django.git@stable/2.1.x#egg=Django
                 # into
-                # Django@ git+https://github.com/django/django.git@stable/2.1.x
-                pep_440_vcs_url = urllib.parse.urlunsplit((scheme, netloc, path, query, ""))
-                project = fragment[4:]
-                pep_440_req_str = f"{project}@ {pep_440_vcs_url}"
-                try:
-                    ret = cls(pkg_resources.Requirement.parse(pep_440_req_str))
-                    logger.warning(
-                        "Converted a pip VCS requirement to a PEP440-compatible one:\n"
-                        f"  {line} ->\n  {pep_440_req_str}.\nYou may wish to convert this "
-                        f"directly in {description_of_origin or 'your source'} instead."
-                    )
-                    return ret
-                except Exception:
-                    # If parsing the converted URL fails for some reason, it's probably less
-                    # confusing to the user if we raise the original error instead of one for
-                    # a synthetic URL they don't directly know about.
-                    pass
+                # Django@ git+https://github.com/django/django.git@stable/2.1.x#egg=Django
+
+                # Note: In pip VCS urls the fragment is a query-style string.
+                fragment_params = urllib.parse.parse_qs(fragment)
+                egg = fragment_params.get("egg")
+                if egg:
+                    # parse_qs() ignores params with empty values by default, so we're guaranteed
+                    # that there is at least one value in this list.
+                    project = egg[0]
+                    # We recompose the URL to force the default file:// scheme to be explicit.
+                    full_url = urllib.parse.urlunsplit((scheme, netloc, path, query, fragment))
+                    pep_440_req_str = f"{project}@ {full_url}"
+                    try:
+                        ret = cls(pkg_resources.Requirement.parse(pep_440_req_str))
+                        logger.warning(
+                            "Converted a pip VCS requirement to a PEP440-compatible one:\n"
+                            f"  {line} ->\n  {pep_440_req_str}.\nYou may wish to convert this "
+                            f"directly in {description_of_origin or 'your source'} instead."
+                        )
+                        return ret
+                    except InvalidRequirement:
+                        # If parsing the converted URL fails for some reason, it's probably less
+                        # confusing to the user if we raise the original error instead of one for
+                        # a synthetic requirement string they don't directly know about.
+                        pass
             origin_str = f" in {description_of_origin}" if description_of_origin else ""
             raise ValueError(f"Invalid requirement '{line}'{origin_str}: {e}")
 

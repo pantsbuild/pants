@@ -12,11 +12,19 @@ def test_parse_simple() -> None:
     assert req.url is None
 
 
-def test_parse_old_style_vcs() -> None:
-    req = PipRequirement.parse("git+https://github.com/django/django.git@stable/2.1.x#egg=Django")
-    assert req.project_name == "Django"
+@pytest.mark.parametrize(
+    ("url", "expected_project", "expected_url"),
+    (
+        ("git+https://github.com/django/django.git@stable/2.1.x#egg=Django&a=b", "Django", ""),
+        ("file:///here#egg=foo&a=b", "foo", ""),
+        ("/path/to#egg=foo&a=b", "foo", "file:///path/to#egg=foo&a=b"),
+    ),
+)
+def test_parse_old_style_vcs(url: str, expected_project: str, expected_url: str) -> None:
+    req = PipRequirement.parse(url)
+    assert req.project_name == expected_project
     assert req.specs == []
-    assert req.url == "git+https://github.com/django/django.git@stable/2.1.x"
+    assert req.url == expected_url or url
 
 
 def test_parse_pep440_vcs() -> None:
