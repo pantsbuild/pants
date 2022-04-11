@@ -8,11 +8,11 @@ publish = false
 [dependencies]
 bytes = "1.0"
 hashing = { path = "../hashing" }
-prost = "0.9"
-prost-build = "0.9"
-prost-types = "0.9"
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots"] }
+prost = "0.10"
+prost-build = "0.10"
+prost-types = "0.10"
+tonic = { version = "0.7", features = ["transport", "codegen", "tls", "tls-roots"] }
 
 [build-dependencies]
-prost-build = "0.9"
-tonic-build = { version = "0.6", features = ["prost"] }
+prost-build = "0.10"
+tonic-build = { version = "0.7", features = ["prost"] }

@@ -31,6 +31,8 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use ::hyper::client::HttpConnector;
+use ::hyper::Uri;
 use either::Either;
 use http::header::{HeaderName, USER_AGENT};
 use http::{HeaderMap, HeaderValue};
@@ -44,6 +46,8 @@ use workunit_store::ObservationMetric;
 
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
 use crate::metrics::{NetworkMetrics, NetworkMetricsLayer};
+
+use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
 
 pub mod headers;
 pub mod hyper;
@@ -109,6 +113,52 @@ pub fn create_endpoint(
   };
 
   Ok(endpoint)
+}
+
+/// Create a Hyper client for use by gRPC users.
+///
+/// This cannot use Tonic's wrappers because Tonic removed the ability to specify rustls client
+/// config in its API in the latest version. Tonic's recommended way to use rustls now is to
+/// manually setup the connection as per the example at:
+/// https://github.com/hyperium/tonic/blob/master/examples/src/tls/client_rustls.rs
+pub fn create_endppint_rusttls(addr: &str, tls_config: &ClientConfig, _headers: &mut BTreeMap<String, String>) {
+  let mut http = HttpConnector::new();
+  http.enforce_http(false);
+
+  let connector = tower::ServiceBuilder::new()
+    .layer_fn(move |s| {
+      let tls_config = tls_config.clone();
+
+      hyper_rustls::HttpsConnectorBuilder::new()
+        .with_tls_config(tls_config)
+        .https_or_http()
+        .enable_http2()
+        .wrap_connector(s)
+    })
+    .service(http);
+
+  let client = hyper::Client::builder().build(connector);
+
+  // Hyper expects an absolute `Uri` to allow it to know which server to connect too.
+  // Currently, tonic's generated code only sets the `path_and_query` section so we
+  // are going to write a custom tower layer in front of the hyper client to add the
+  // scheme and authority.
+  let uri = Uri::from_str(addr).map_err(|_| format!("Invalid URL"))?;
+  let svc = tower::ServiceBuilder::new()
+    .map_request(move |mut req: http::Request<tonic::body::BoxBody>| {
+      let uri = Uri::builder()
+        .scheme(uri.scheme().unwrap().clone())
+        .authority(uri.authority().unwrap().clone())
+        .path_and_query(req.uri().path_and_query().unwrap().clone())
+        .build()
+        .unwrap();
+      *req.uri_mut() = uri;
+
+      req
+    })
+    .service(client);
+
+  svc
 }
 
 pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<HeaderMap, String> {

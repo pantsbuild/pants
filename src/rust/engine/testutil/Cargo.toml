@@ -11,5 +11,6 @@ bytes = "1.2"
 fs = { path = "../fs" }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
-prost = "0.9" 
+prost = "0.10"
 protos = { path = "../protos" }
+

@@ -10,19 +10,20 @@ bytes = "1.0"
 either = "1"
 futures = "0.3"
 hyper = "0.14"
+hyper-rustls = "0.23"
 http = "0.2"
 itertools = "0.10"
-rustls-native-certs = "0.5"
+rustls-native-certs = "0.6"
 lazy_static = "1"
 pin-project = "1.0"
-prost = "0.9"
+prost = "0.10"
 rand = "0.8"
-rustls = { version = "0.19", features = ["dangerous_configuration"] }
-rustls-pemfile = "0.2"
+rustls = { version = "0.20", features = ["dangerous_configuration"] }
+rustls-pemfile = "1.0"
 tokio = { version = "1.21", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-rustls = "0.22"
+tokio-rustls = "0.23"
 tokio-util = { version = "0.6", features = ["codec"] }
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tonic = { version = "0.7", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower = { version = "0.4", features = ["limit"] }
 tower-layer = "0.3"
 tower-service = "0.3"
@@ -32,8 +33,8 @@ workunit_store = { path = "../workunit_store" }
 [dev-dependencies]
 async-trait = "0.1"
 parking_lot = "0.11"
-prost-types = "0.9"
+prost-types = "0.10"
 
 [build-dependencies]
-prost-build = "0.9"
-tonic-build = "0.6"
+prost-build = "0.10"
+tonic-build = "0.7"
