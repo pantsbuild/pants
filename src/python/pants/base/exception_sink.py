@@ -1,6 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import atexit
 import datetime
 import faulthandler
 import logging
@@ -189,7 +190,7 @@ class ExceptionSink:
         shared_log_path = cls.exceptions_log_path(in_dir=new_log_location)
         assert pid_specific_log_path != shared_log_path
         try:
-            pid_specific_error_stream = safe_open(pid_specific_log_path, mode="w")
+            pid_specific_error_stream = cls.open_pid_specific_error_stream(pid_specific_log_path)
             shared_error_stream = safe_open(shared_log_path, mode="a")
         except Exception as e:
             raise cls.ExceptionSinkError(
@@ -211,6 +212,23 @@ class ExceptionSink:
         cls._log_dir = new_log_location
         cls._pid_specific_error_fileobj = pid_specific_error_stream
         cls._shared_error_fileobj = shared_error_stream
+
+    @classmethod
+    def open_pid_specific_error_stream(cls, path):
+        ret = safe_open(path, mode="w")
+
+        def unlink_if_empty():
+            try:
+                if os.path.getsize(path) == 0:
+                    os.unlink(path)
+            except OSError:
+                pass
+
+        # NB: This will only get called if nothing fatal happens, but that's precisely when we want
+        # to get called. If anything fatal happens there should be an exception written to the log,
+        # and therefore we don't want to unlink it.
+        atexit.register(unlink_if_empty)
+        return ret
 
     @classmethod
     def exceptions_log_path(cls, for_pid=None, in_dir=None):
