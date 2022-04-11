@@ -434,24 +434,29 @@ impl WrappedNode for ExecuteProcess {
     let definition = serde_json::to_string(&request)
       .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
     workunit.update_metadata(|initial| {
-      initial.map(|initial| WorkunitMetadata {
-        stdout: Some(res.stdout_digest),
-        stderr: Some(res.stderr_digest),
-        user_metadata: vec![
-          (
-            "definition".to_string(),
-            UserMetadataItem::ImmediateString(definition),
-          ),
-          (
-            "source".to_string(),
-            UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
-          ),
-          (
-            "exit_code".to_string(),
-            UserMetadataItem::ImmediateInt(res.exit_code as i64),
-          ),
-        ],
-        ..initial
+      initial.map(|(initial, level)| {
+        (
+          WorkunitMetadata {
+            stdout: Some(res.stdout_digest),
+            stderr: Some(res.stderr_digest),
+            user_metadata: vec![
+              (
+                "definition".to_string(),
+                UserMetadataItem::ImmediateString(definition),
+              ),
+              (
+                "source".to_string(),
+                UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+              ),
+              (
+                "exit_code".to_string(),
+                UserMetadataItem::ImmediateInt(res.exit_code as i64),
+              ),
+            ],
+            ..initial
+          },
+          level,
+        )
       })
     });
     if let Some(total_elapsed) = res.metadata.total_elapsed {
