@@ -15,11 +15,9 @@ class KtlintSubsystem(JvmToolBase):
     default_artifacts = ("com.pinterest:ktlint:{version}",)
     default_lockfile_resource = (
         "pants.backend.kotlin.lint.ktlint",
-        "ktlint.default.lockfile.txt",
+        "ktlint.lock",
     )
-    default_lockfile_path = (
-        "src/python/pants/backend/kotlin/lint/ktlint/ktlint.default.lockfile.txt"
-    )
+    default_lockfile_path = "src/python/pants/backend/kotlin/lint/ktlint/ktlint.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")
