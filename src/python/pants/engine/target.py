@@ -1895,7 +1895,7 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
                 raise InvalidFieldException(
                     f"The {repr(cls.alias)} field in target {address} must only have globs for the "
                     f"target's directory, i.e. it cannot include values with `**` and `{os.path.sep}`, "
-                    f"but it was set to: {sorted(value)}"
+                    f"but it was set to: {sorted(value or ())}"
                 )
 
         return value
