@@ -29,7 +29,7 @@ impl Provider {
       instance_name,
       action_cache_address,
       root_ca_certs,
-      mut headers,
+      headers,
       concurrency_limit,
       rpc_timeout,
     }: RemoteCacheProviderOptions,
@@ -40,15 +40,12 @@ impl Provider {
       None
     };
 
-    let endpoint = grpc_util::create_endpoint(
-      &action_cache_address,
-      tls_client_config.as_ref(),
-      &mut headers,
-    )
-    .await?;
+    let channel =
+      grpc_util::create_channel(&action_cache_address, tls_client_config.as_ref(), &headers)
+        .await?;
     let http_headers = headers_to_http_header_map(&headers)?;
     let channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
+      channel,
       concurrency_limit,
       http_headers,
       Some((rpc_timeout, Metric::RemoteCacheRequestTimeouts)),
