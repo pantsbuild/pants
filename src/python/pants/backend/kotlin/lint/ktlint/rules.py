@@ -95,7 +95,7 @@ async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem) -> FmtResult
 
 
 @rule
-def generate_google_java_format_lockfile_request(
+def generate_ktlint_lockfile_request(
     _: KtlintToolLockfileSentinel, tool: KtlintSubsystem
 ) -> GenerateJvmLockfileFromTool:
     return GenerateJvmLockfileFromTool.create(tool)
