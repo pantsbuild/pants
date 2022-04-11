@@ -35,7 +35,7 @@ class CCFieldSet(FieldSet):
 
 
 @dataclass(frozen=True)
-class KotlinGeneratorFieldSet(FieldSet):
+class CCGeneratorFieldSet(FieldSet):
     required_fields = (CCGeneratorSourcesField,)
 
     sources: CCGeneratorSourcesField
