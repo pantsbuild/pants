@@ -11,7 +11,7 @@ use crate::Value;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use workunit_store::{ArtifactOutput, Level, RunningWorkunit, UserMetadataItem};
+use workunit_store::{ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, WorkunitMetadata};
 
 // Note: these functions should not panic, but we also don't preserve errors (e.g. to log) because
 // we rely on MyPy to catch TypeErrors with using the APIs incorrectly. So we convert errors to
@@ -22,26 +22,26 @@ pub(crate) struct EngineAwareReturnType;
 
 impl EngineAwareReturnType {
   pub(crate) fn update_workunit(workunit: &mut RunningWorkunit, task_result: &PyAny) {
-    workunit.update_metadata(|old_metadata| {
+    workunit.update_metadata(|old| {
       let new_level = Self::level(task_result);
+
       // If the metadata already existed, or if its level changed, we need to update it.
-      let mut metadata = if new_level.is_some() || old_metadata.is_some() {
-        old_metadata.unwrap_or_default()
+      let (mut metadata, level) = if let Some((metadata, old_level)) = old {
+        (metadata, new_level.unwrap_or(old_level))
+      } else if let Some(level) = new_level {
+        (WorkunitMetadata::default(), level)
       } else {
         return None;
       };
 
-      if let Some(new_level) = new_level {
-        metadata.level = new_level;
-      }
       metadata.message = Self::message(task_result);
       metadata
         .artifacts
         .extend(Self::artifacts(task_result).unwrap_or_else(Vec::new));
       metadata
         .user_metadata
-        .extend(metadata_for(task_result).unwrap_or_else(Vec::new));
-      Some(metadata)
+        .extend(metadata_for(task_result).unwrap_or_default());
+      Some((metadata, level))
     });
   }
 
