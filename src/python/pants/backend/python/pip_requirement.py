@@ -46,13 +46,7 @@ class PipRequirement:
                     full_url = urllib.parse.urlunsplit((scheme, netloc, path, query, fragment))
                     pep_440_req_str = f"{project}@ {full_url}"
                     try:
-                        ret = cls(pkg_resources.Requirement.parse(pep_440_req_str))
-                        logger.warning(
-                            "Converted a pip VCS requirement to a PEP440-compatible one:\n"
-                            f"  {line} ->\n  {pep_440_req_str}.\nYou may wish to convert this "
-                            f"directly in {description_of_origin or 'your source'} instead."
-                        )
-                        return ret
+                        return cls(pkg_resources.Requirement.parse(pep_440_req_str))
                     except InvalidRequirement:
                         # If parsing the converted URL fails for some reason, it's probably less
                         # confusing to the user if we raise the original error instead of one for
