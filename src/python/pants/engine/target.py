@@ -1878,9 +1878,27 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
         """
     )
 
+    ban_subdirectories: ClassVar[bool] = False
+
     @property
     def globs(self) -> tuple[str, ...]:
         return self.value or ()
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        value = super().compute_value(raw_value, address)
+        if cls.ban_subdirectories:
+            invalid_globs = [glob for glob in (value or ()) if "**" in glob or os.path.sep in glob]
+            if invalid_globs:
+                raise InvalidFieldException(
+                    f"The {repr(cls.alias)} field in target {address} must only have globs for the "
+                    f"target's directory, i.e. it cannot include values with `**` and `{os.path.sep}`, "
+                    f"but it was set to: {sorted(value)}"
+                )
+
+        return value
 
 
 class OptionalSingleSourceField(SourcesField, StringField):
