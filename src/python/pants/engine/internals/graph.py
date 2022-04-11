@@ -294,10 +294,7 @@ async def resolve_target(
         # TODO: This is an accommodation to allow using file/generator Addresses for
         # non-generator atom targets. See https://github.com/pantsbuild/pants/issues/14419.
         original_target = parametrizations.get(base_address)
-        if original_target and (
-            not isinstance(original_target, TargetGenerator)
-            or not target_types_to_generate_requests.is_generator(original_target)
-        ):
+        if original_target and not target_types_to_generate_requests.is_generator(original_target):
             return WrappedTarget(original_target)
     target = parametrizations.get(address)
     if target is None:
@@ -323,8 +320,7 @@ async def resolve_targets(
     parametrizations_gets = []
     for tgt in targets:
         if (
-            isinstance(tgt, TargetGenerator)
-            and target_types_to_generate_requests.is_generator(tgt)
+            target_types_to_generate_requests.is_generator(tgt)
             and not tgt.address.is_generated_target
         ):
             generator_targets.append(tgt)
@@ -1084,11 +1080,7 @@ async def resolve_dependencies(
 
     # If it's a target generator, inject dependencies on all of its generated targets.
     generated_addresses: tuple[Address, ...] = ()
-    if (
-        isinstance(tgt, TargetGenerator)
-        and target_types_to_generate_requests.is_generator(tgt)
-        and not tgt.address.is_generated_target
-    ):
+    if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_generated_target:
         parametrizations = await Get(
             _TargetParametrizations, Address, tgt.address.maybe_convert_to_target_generator()
         )

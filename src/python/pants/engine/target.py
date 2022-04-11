@@ -852,6 +852,21 @@ class TargetGenerator(Target):
     # acting as a convenient place for them to be specified.
     moved_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    def validate(self) -> None:
+        super().validate()
+
+        copied_dependencies_field_types = [
+            field_type.__name__
+            for field_type in type(self).copied_fields
+            if issubclass(field_type, Dependencies)
+        ]
+        if copied_dependencies_field_types:
+            raise InvalidTargetException(
+                f"Using a `Dependencies` field subclass ({copied_dependencies_field_types}) as a "
+                "`TargetGenerator.copied_field`. `Dependencies` fields should be "
+                "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
+            )
+
 
 class TargetFilesGenerator(TargetGenerator):
     """A TargetGenerator which generates a Target per file matched by the generator.
@@ -869,9 +884,9 @@ class TargetFilesGenerator(TargetGenerator):
         if self.has_field(MultipleSourcesField) and not self[MultipleSourcesField].value:
             raise InvalidTargetException(
                 f"The `{self.alias}` target generator at {self.address} has an empty "
-                f"`{self[MultipleSourcesField].alias}` field will not generate any targets. If its "
-                "purpose is to act as an alias for its dependencies, then it should be declared as "
-                "a `target(..)` generic target instead. If it is unused, then it "
+                f"`{self[MultipleSourcesField].alias}` field; so it will not generate any targets. "
+                "If its purpose is to act as an alias for its dependencies, then it should be "
+                "declared as a `target(..)` generic target instead. If it is unused, then it "
                 "should be removed."
             )
 
@@ -975,9 +990,9 @@ class GeneratedTargets(FrozenDict[Address, Target]):
 class TargetTypesToGenerateTargetsRequests(
     FrozenDict[Type[TargetGenerator], Type[GenerateTargetsRequest]]
 ):
-    def is_generator(self, tgt: TargetGenerator) -> bool:
+    def is_generator(self, tgt: Target) -> bool:
         """Does this target type generate other targets?"""
-        return bool(self.request_for(type(tgt)))
+        return isinstance(tgt, TargetGenerator) and bool(self.request_for(type(tgt)))
 
     def request_for(self, tgt_cls: type[TargetGenerator]) -> type[GenerateTargetsRequest] | None:
         """Return the request type for the given Target, or None."""
