@@ -51,10 +51,6 @@ class HelmRegistry:
         if self.alias:
             remotes[f"@{self.alias}"] = self
 
-    @property
-    def ref(self) -> str:
-        return self.address
-
 
 @dataclass(frozen=True)
 class HelmRemotes:
