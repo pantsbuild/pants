@@ -1893,11 +1893,14 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
             invalid_globs = [glob for glob in (value or ()) if "**" in glob or os.path.sep in glob]
             if invalid_globs:
                 raise InvalidFieldException(
-                    f"The {repr(cls.alias)} field in target {address} must only have globs for the "
-                    f"target's directory, i.e. it cannot include values with `**` and `{os.path.sep}`, "
-                    f"but it was set to: {sorted(value or ())}"
+                    softwrap(
+                        f"""
+                        The {repr(cls.alias)} field in target {address} must only have globs for
+                        the target's directory, i.e. it cannot include values with `**` or
+                        `{os.path.sep}`. It was set to: {sorted(value or ())}
+                        """
+                    )
                 )
-
         return value
 
 
