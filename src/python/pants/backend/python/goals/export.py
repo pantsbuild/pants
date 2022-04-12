@@ -9,6 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict
 
+from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
@@ -52,7 +53,12 @@ class _ExportVenvRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class _ExportToolRequest:
+class _ExportIsortRequest:
+    pass
+
+
+@dataclass(frozen=True)
+class _ExportDocformatterRequest:
     pass
 
 
@@ -139,10 +145,10 @@ async def export_virtualenv(
 
 
 @rule
-async def export_isort(request: _ExportToolRequest, isort: Isort, pex_pex: PexPEX) -> ExportResult:
+async def export_isort(request: _ExportIsortRequest, isort: Isort, pex_pex: PexPEX) -> ExportResult:
     isort_pex = await Get(Pex, PexRequest, isort.to_pex_request())
 
-    dest = os.path.join("python", "virtualenvs")
+    dest = os.path.join("python", "virtualenvs", "tools", isort.name)
 
     merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, isort_pex.digest]))
     pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
@@ -158,9 +164,38 @@ async def export_isort(request: _ExportToolRequest, isort: Isort, pex_pex: PexPE
                     "venv",
                     "--collisions-ok",
                     "--remove=all",
-                    # FIXME: If I add an additional directory layer after the digest_root,
-                    # the export works. What value would make sense?
-                    f"{{digest_root}}/{isort.name}",
+                    f"{{digest_root}}/.tmp/{isort.name}",
+                ],
+                {"PEX_MODULE": "pex.tools"},
+            ),
+            PostProcessingCommand(["rm", "-f", pex_pex_path]),
+        ],
+    )
+
+
+@rule
+async def export_docformatter(
+    request: _ExportDocformatterRequest, docformatter: Docformatter, pex_pex: PexPEX
+) -> ExportResult:
+    docformatter_pex = await Get(Pex, PexRequest, docformatter.to_pex_request())
+
+    dest = os.path.join("python", "virtualenvs", "tools", docformatter.name)
+
+    merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, docformatter_pex.digest]))
+    pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
+    return ExportResult(
+        f"virtualenv for the tool '{docformatter.name}'",
+        dest,
+        digest=merged_digest,
+        post_processing_cmds=[
+            PostProcessingCommand(
+                [
+                    pex_pex_path,
+                    os.path.join("{digest_root}", docformatter_pex.name),
+                    "venv",
+                    "--collisions-ok",
+                    "--remove=all",
+                    f"{{digest_root}}/.tmp/{docformatter.name}",
                 ],
                 {"PEX_MODULE": "pex.tools"},
             ),
@@ -198,9 +233,10 @@ async def export_virtualenvs(
             f"To silence this error, delete {no_resolves_dest}"
         )
 
-    tool_venvs = await Get(ExportResult, _ExportToolRequest())
+    isort_venv = await Get(ExportResult, _ExportIsortRequest())
+    docformatter_venv = await Get(ExportResult, _ExportDocformatterRequest())
 
-    return ExportResults(venvs + (tool_venvs,))
+    return ExportResults(venvs + (isort_venv, docformatter_venv))
 
 
 def rules():
