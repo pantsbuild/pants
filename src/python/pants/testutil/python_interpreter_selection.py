@@ -5,8 +5,12 @@ from __future__ import annotations
 
 import os
 import subprocess
+from functools import lru_cache
 from typing import Iterable
 from unittest import skipIf
+
+import _pytest.mark.structures
+import pytest
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 
@@ -30,6 +34,7 @@ def has_python_version(version):
     return python_interpreter_path(version) is not None
 
 
+@lru_cache()
 def python_interpreter_path(version):
     """Returns the interpreter path if the current system has the specified version of python.
 
@@ -110,13 +115,26 @@ def skip_unless_python36_and_python37_present(func):
     return skip_unless_all_pythons_present(PY_36, PY_37)(func)
 
 
-def all_major_minor_python_versions(constraints: Iterable[str]) -> tuple[str, ...]:
+def all_major_minor_python_versions(
+    constraints: Iterable[str],
+) -> tuple[_pytest.mark.structures.ParameterSet, ...]:
     """All major.minor Python versions used by the interpreter constraints.
 
     This is intended to be used with `@pytest.mark.parametrize()` to run a test with every relevant
     Python interpreter.
     """
-    return InterpreterConstraints(constraints).partition_into_major_minor_versions(
+    versions = InterpreterConstraints(constraints).partition_into_major_minor_versions(
         # Please update this when new stable Python versions are released to CI.
         interpreter_universe=["2.7", "3.6", "3.7", "3.8", "3.9"]
+    )
+
+    return tuple(
+        pytest.param(
+            version,
+            marks=pytest.mark.skipif(
+                not has_python_version(version),
+                reason=f"Could not find python {version} on system. Skipping.",
+            ),
+        )
+        for version in versions
     )

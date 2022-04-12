@@ -691,7 +691,7 @@ async fn workunit_to_py_value(
       ),
       (
         externs::store_utf8(py, "level"),
-        externs::store_utf8(py, &metadata.level.to_string()),
+        externs::store_utf8(py, &workunit.level.to_string()),
       ),
     ];
 

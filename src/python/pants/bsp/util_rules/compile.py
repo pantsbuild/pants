@@ -9,7 +9,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import ClassVar, Generic, Type, TypeVar
 
-from pants.base.specs import AddressSpecs
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode, TaskId
@@ -72,7 +71,7 @@ async def compile_bsp_target(
     bsp_context: BSPContext,
     union_membership: UnionMembership,
 ) -> BSPCompileResult:
-    targets = await Get(Targets, AddressSpecs, request.bsp_target.specs.address_specs)
+    targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
     compile_request_types: FrozenOrderedSet[Type[BSPCompileRequest]] = union_membership.get(
         BSPCompileRequest
     )

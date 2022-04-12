@@ -350,7 +350,7 @@ def test_deprecated_options(caplog) -> None:
         opts = create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config)
         assert opts.for_scope(scope)[opt] == expected
         assert len(caplog.records) == 1
-        assert "will be removed in version" in caplog.text
+        assert "is scheduled to be removed in version" in caplog.text
         assert opt in caplog.text
 
     assert_deprecated(GLOBAL_SCOPE, "old1", ["--old1=x"], expected="x")
@@ -416,7 +416,7 @@ def test_deprecated_options_start_version(caplog) -> None:
         == "x"
     )
     assert len(caplog.records) == 1
-    assert "will be removed in version" in caplog.text
+    assert "is scheduled to be removed in version" in caplog.text
     assert "past_start" in caplog.text
 
 

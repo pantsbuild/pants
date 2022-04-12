@@ -7,6 +7,7 @@ import os
 import re
 from dataclasses import dataclass
 from functools import partial
+from itertools import chain
 from typing import Iterator
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
@@ -106,6 +107,17 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             repository_text, source=source, error_cls=DockerRepositoryNameError
         ).lower()
 
+    def format_names(
+        self,
+        repository: str,
+        tags: tuple[str, ...],
+        interpolation_context: DockerInterpolationContext,
+    ) -> Iterator[str]:
+        for tag in tags:
+            yield ":".join(
+                s for s in [repository, self.format_tag(tag, interpolation_context)] if s
+            )
+
     def image_refs(
         self,
         default_repository: str,
@@ -131,10 +143,8 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         """
         repository = self.format_repository(default_repository, interpolation_context)
         image_names = tuple(
-            ":".join(s for s in [repository, self.format_tag(tag, interpolation_context)] if s)
-            for tag in self.tags.value or ()
+            self.format_names(repository, self.tags.value or (), interpolation_context)
         )
-
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
             # The image name is also valid as image ref without registry.
@@ -142,8 +152,11 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
         return tuple(
             "/".join([registry.address, image_name])
-            for image_name in image_names
             for registry in registries_options
+            for image_name in chain(
+                image_names,
+                self.format_names(repository, registry.extra_image_tags, interpolation_context),
+            )
         )
 
     def get_context_root(self, default_context_root: str) -> str:

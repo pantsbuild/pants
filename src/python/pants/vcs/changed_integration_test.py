@@ -367,6 +367,7 @@ class ChangedIntegrationTest(unittest.TestCase, AbstractTestGenerator):
             assert pants_run.stdout.strip() == "src/python/sources:text"
 
     @pytest.mark.skip(reason="Unskip after rewriting these tests to stop using testprojects.")
+    @pytest.mark.no_error_if_skipped
     def test_changed_with_deleted_target_transitive(self):
         # TODO: The deleted target should be a dependee of another target. We want to make sure
         # that this causes a crash because the dependee can't find it's dependency.

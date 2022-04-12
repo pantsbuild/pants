@@ -87,7 +87,7 @@ def run_shfmt(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            ShfmtRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            ShfmtRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
     return fmt_result

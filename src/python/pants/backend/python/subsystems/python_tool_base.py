@@ -10,6 +10,7 @@ from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpe
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
+    EntireLockfile,
     PexRequirements,
     ToolCustomLockfile,
     ToolDefaultLockfile,
@@ -21,7 +22,6 @@ from pants.option.errors import OptionsError
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 class PythonToolRequirementsBase(Subsystem):
@@ -125,7 +125,7 @@ class PythonToolRequirementsBase(Subsystem):
         self,
         *,
         extra_requirements: Iterable[str] = (),
-    ) -> PexRequirements | ToolDefaultLockfile | ToolCustomLockfile:
+    ) -> PexRequirements | EntireLockfile:
         """The requirements to be used when installing the tool.
 
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
@@ -139,28 +139,29 @@ class PythonToolRequirementsBase(Subsystem):
 
         hex_digest = calculate_invalidation_digest(requirements)
 
+        lockfile: ToolDefaultLockfile | ToolCustomLockfile
         if self.lockfile == DEFAULT_TOOL_LOCKFILE:
             assert self.default_lockfile_resource is not None
-            return ToolDefaultLockfile(
+            lockfile = ToolDefaultLockfile(
                 file_content=FileContent(
                     f"{self.options_scope}_default.lock",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
                 lockfile_hex_digest=hex_digest,
-                req_strings=FrozenOrderedSet(requirements),
                 resolve_name=self.options_scope,
                 uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
                 uses_source_plugins=self.uses_requirements_from_source_plugins,
             )
-        return ToolCustomLockfile(
-            file_path=self.lockfile,
-            file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
-            lockfile_hex_digest=hex_digest,
-            req_strings=FrozenOrderedSet(requirements),
-            resolve_name=self.options_scope,
-            uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
-            uses_source_plugins=self.uses_requirements_from_source_plugins,
-        )
+        else:
+            lockfile = ToolCustomLockfile(
+                file_path=self.lockfile,
+                file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
+                lockfile_hex_digest=hex_digest,
+                resolve_name=self.options_scope,
+                uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
+                uses_source_plugins=self.uses_requirements_from_source_plugins,
+            )
+        return EntireLockfile(lockfile, complete_req_strings=tuple(requirements))
 
     @property
     def lockfile(self) -> str:

@@ -12,7 +12,6 @@ from pants.backend.go.subsystems import golang
 from pants.backend.go.subsystems.golang import GoRoot
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
@@ -40,53 +39,27 @@ class GofmtRequest(FmtRequest):
     name = GofmtSubsystem.options_scope
 
 
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_snapshot: Snapshot
-
-
-@rule(level=LogLevel.DEBUG)
-async def setup_gofmt(request: GofmtRequest, goroot: GoRoot) -> Setup:
-    source_files = await Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in request.field_sets),
-    )
-    source_files_snapshot = (
-        source_files.snapshot
-        if request.prior_formatter_result is None
-        else request.prior_formatter_result
-    )
-
+@rule(desc="Format with gofmt")
+async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem, goroot: GoRoot) -> FmtResult:
+    if gofmt.skip:
+        return FmtResult.skip(formatter_name=request.name)
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
-        *source_files_snapshot.files,
+        *request.snapshot.files,
     )
-    process = Process(
-        argv=argv,
-        input_digest=source_files_snapshot.digest,
-        output_files=source_files_snapshot.files,
-        description=f"Run gofmt on {pluralize(len(source_files_snapshot.files), 'file')}.",
-        level=LogLevel.DEBUG,
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=argv,
+            input_digest=request.snapshot.digest,
+            output_files=request.snapshot.files,
+            description=f"Run gofmt on {pluralize(len(request.snapshot.files), 'file')}.",
+            level=LogLevel.DEBUG,
+        ),
     )
-    return Setup(process=process, original_snapshot=source_files_snapshot)
-
-
-@rule(desc="Format with gofmt")
-async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem) -> FmtResult:
-    if gofmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, GofmtRequest, request)
-    result = await Get(ProcessResult, Process, setup.process)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult(
-        setup.original_snapshot,
-        output_snapshot,
-        stdout=result.stdout.decode(),
-        stderr=result.stderr.decode(),
-        formatter_name=request.name,
-    )
+    return FmtResult.create(request, result, output_snapshot)
 
 
 def rules():

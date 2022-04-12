@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
 from typing import cast
@@ -71,16 +72,31 @@ async def push_docker_images(
         )
 
     env = await Get(Environment, EnvironmentRequest(options.env_vars))
-    processes = zip(tags, docker.push_image(tags, env))
-    return PublishProcesses(
-        [
-            PublishPackages(
-                names=(tag,),
-                process=InteractiveProcess.from_process(process),
+    processes = []
+    skip_push = defaultdict(set)
+
+    for tag in tags:
+        for registry in options.registries().registries.values():
+            if tag.startswith(registry.address) and registry.skip_push:
+                skip_push[registry.alias].add(tag)
+                break
+        else:
+            processes.append(
+                PublishPackages(
+                    names=(tag,),
+                    process=InteractiveProcess.from_process(docker.push_image(tag, env)),
+                )
             )
-            for tag, process in processes
-        ]
-    )
+    if skip_push:
+        for name, skip_tags in skip_push.items():
+            processes.append(
+                PublishPackages(
+                    names=tuple(skip_tags),
+                    description=f"(by `skip_push` on registry @{name})",
+                ),
+            )
+
+    return PublishProcesses(processes)
 
 
 def rules():

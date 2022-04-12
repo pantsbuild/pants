@@ -12,7 +12,6 @@ from pants.backend.helm.goals.lint import rules as helm_lint_rules
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartTarget
 from pants.backend.helm.testutil import (
-    HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
     K8S_INGRESS_FILE_WITH_LINT_WARNINGS,
@@ -82,6 +81,7 @@ def test_lint_non_strict_chart_passing(rule_runner: RuleRunner) -> None:
 
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 0
+    assert lint_results[0].partition_description == "mychart"
 
 
 def test_lint_non_strict_chart_failing(rule_runner: RuleRunner) -> None:
@@ -161,12 +161,12 @@ def test_one_lint_result_per_chart(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/chart1/BUILD": "helm_chart()",
-            "src/chart1/Chart.yaml": HELM_CHART_FILE,
+            "src/chart1/Chart.yaml": gen_chart_file("chart1", version="0.1.0"),
             "src/chart1/values.yaml": HELM_VALUES_FILE,
             "src/chart1/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "src/chart1/templates/service.yaml": K8S_SERVICE_FILE,
             "src/chart2/BUILD": "helm_chart()",
-            "src/chart2/Chart.yaml": HELM_CHART_FILE,
+            "src/chart2/Chart.yaml": gen_chart_file("chart2", version="0.1.0"),
             "src/chart2/values.yaml": HELM_VALUES_FILE,
             "src/chart2/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "src/chart2/templates/service.yaml": K8S_SERVICE_FILE,
@@ -182,4 +182,6 @@ def test_one_lint_result_per_chart(rule_runner: RuleRunner) -> None:
     )
     assert len(lint_results) == 2
     assert lint_results[0].exit_code == 0
+    assert lint_results[0].partition_description == "chart1"
     assert lint_results[1].exit_code == 0
+    assert lint_results[1].partition_description == "chart2"

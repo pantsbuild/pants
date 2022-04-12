@@ -188,6 +188,7 @@ def test_structured_output(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.skip("Can not run interactive process from test..?")
+@pytest.mark.no_error_if_skipped
 def test_mocked_publish(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

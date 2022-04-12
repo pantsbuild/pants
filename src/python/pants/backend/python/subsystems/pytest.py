@@ -21,7 +21,6 @@ from pants.backend.python.target_types import (
     PythonTestSourceField,
     PythonTestsTimeoutField,
     SkipPythonTestsField,
-    format_invalid_requirement_string_error,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -64,7 +63,11 @@ class PyTest(PythonToolBase):
     # This should be compatible with requirements.txt, although it can be more precise.
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement` to override the version.
-    default_version = "pytest>=7,<8"
+    # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
+    # recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.
+    # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
+    #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
+    default_version = "pytest==7.0.1"
     default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
 
     default_main = ConsoleScript("pytest")
@@ -155,11 +158,7 @@ class PyTest(PythonToolBase):
             try:
                 req = PipRequirement.parse(s).project_name
             except Exception as e:
-                raise ValueError(
-                    format_invalid_requirement_string_error(
-                        s, e, description_of_origin="`[pytest].extra_requirements`"
-                    )
-                )
+                raise ValueError(f"Invalid requirement '{s}' in `[pytest].extra_requirements`: {e}")
             if canonicalize_project_name(req) == "pytest-cov":
                 return
 

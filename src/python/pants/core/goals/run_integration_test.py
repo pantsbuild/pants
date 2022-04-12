@@ -14,32 +14,35 @@ from pants.testutil.pants_integration_test import (
 
 @ensure_daemon
 def test_run_then_edit(use_pantsd: bool) -> None:
-    slow = "slow.py"
+    # These files must exist outside of a Pants `source_root` so that `coverage-py` doesn't try
+    # to collect coverage metrics for them (as they are local to the chroot and coverage will
+    # error unable to find their source)
+    dirname = "not-a-source-root"
     files = {
-        slow: dedent(
+        f"{dirname}/slow.py": dedent(
             """\
-        import time
-        time.sleep(30)
-        raise Exception("Should have been restarted by now!")
-        """
+            import time
+            time.sleep(30)
+            raise Exception("Should have been restarted by now!")
+            """
         ),
-        "BUILD": dedent(
-            f"""\
-        python_sources(name='lib')
-        pex_binary(name='bin', entry_point='{slow}', restartable=True)
-        """
+        f"{dirname}/BUILD": dedent(
+            """\
+            python_sources(name='lib')
+            pex_binary(name='bin', entry_point='slow.py', restartable=True)
+            """
         ),
     }
+    Path(dirname).mkdir(exist_ok=True)
     for name, content in files.items():
         Path(name).write_text(content)
 
     with temporary_workdir() as workdir:
-
         client_handle = run_pants_with_workdir_without_waiting(
             [
                 "--backend-packages=['pants.backend.python']",
                 "run",
-                slow,
+                f"{dirname}/slow.py",
             ],
             workdir=workdir,
             use_pantsd=use_pantsd,
@@ -50,7 +53,7 @@ def test_run_then_edit(use_pantsd: bool) -> None:
         assert client_handle.process.poll() is None
 
         # Edit the file to restart the run, and check that it re-ran
-        Path(slow).write_text('print("No longer slow!")')
+        Path(f"{dirname}/slow.py").write_text('print("No longer slow!")')
         result = client_handle.join()
         result.assert_success()
         assert result.stdout == "No longer slow!\n"

@@ -196,7 +196,11 @@ async def setup_full_package_build_request(
     all_sources = await Get(
         SourceFiles,
         SourceFilesRequest(
-            sources_fields=(tgt[ProtobufSourceField] for tgt in transitive_targets.closure),
+            sources_fields=(
+                tgt[ProtobufSourceField]
+                for tgt in transitive_targets.closure
+                if tgt.has_field(ProtobufSourceField)
+            ),
             for_sources_types=(ProtobufSourceField,),
             enable_codegen=True,
         ),

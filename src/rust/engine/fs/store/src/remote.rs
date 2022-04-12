@@ -456,7 +456,7 @@ impl ByteStore {
     async {
       in_workunit!(
         "list_missing_digests",
-        Level::Debug,
+        Level::Trace,
         |_workunit| async move {
           let store2 = store.clone();
           let client = store2.cas_client.as_ref().clone();

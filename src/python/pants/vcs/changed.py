@@ -18,6 +18,7 @@ from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
+from pants.util.strutil import softwrap
 from pants.vcs.git import GitWorktree
 
 
@@ -91,9 +92,12 @@ class ChangedOptions:
 
 class Changed(Subsystem):
     options_scope = "changed"
-    help = (
-        "Tell Pants to detect what files and targets have changed from Git.\n\n"
-        f"See {doc_url('advanced-target-selection')}."
+    help = softwrap(
+        f"""
+        Tell Pants to detect what files and targets have changed from Git.
+
+        See {doc_url('advanced-target-selection')}.
+        """
     )
 
     since = StrOption(

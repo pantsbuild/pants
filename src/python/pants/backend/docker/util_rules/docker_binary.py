@@ -91,18 +91,13 @@ class DockerBinary(BinaryPath):
             cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
-    def push_image(
-        self, tags: tuple[str, ...], env: Mapping[str, str] | None = None
-    ) -> tuple[Process, ...]:
-        return tuple(
-            Process(
-                argv=(self.path, "push", tag),
-                cache_scope=ProcessCacheScope.PER_SESSION,
-                description=f"Pushing docker image {tag}",
-                env=self._get_process_environment(env or {}),
-                immutable_input_digests=self.extra_input_digests,
-            )
-            for tag in tags
+    def push_image(self, tag: str, env: Mapping[str, str] | None = None) -> Process:
+        return Process(
+            argv=(self.path, "push", tag),
+            cache_scope=ProcessCacheScope.PER_SESSION,
+            description=f"Pushing docker image {tag}",
+            env=self._get_process_environment(env or {}),
+            immutable_input_digests=self.extra_input_digests,
         )
 
     def run_image(

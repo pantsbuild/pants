@@ -44,6 +44,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 
 @union
@@ -251,17 +252,22 @@ class TailorSubsystem(GoalSubsystem):
     check = BoolOption(
         "--check",
         default=False,
-        help=(
-            "Do not write changes to disk, only write back what would change. Return code "
-            "0 means there would be no changes, and 1 means that there would be. "
+        help=softwrap(
+            """
+            Do not write changes to disk, only write back what would change. Return code
+            0 means there would be no changes, and 1 means that there would be.
+            """
         ),
     )
     build_file_name = StrOption(
         "--build-file-name",
         default="BUILD",
-        help=(
-            "The name to use for generated BUILD files.\n\n"
-            "This must be compatible with `[GLOBAL].build_patterns`."
+        help=softwrap(
+            """
+            The name to use for generated BUILD files.
+
+            This must be compatible with `[GLOBAL].build_patterns`.
+            """
         ),
         advanced=True,
     )
@@ -279,36 +285,45 @@ class TailorSubsystem(GoalSubsystem):
     )
     _alias_mapping = DictOption[str](
         "--alias-mapping",
-        help=(
-            "A mapping from standard target type to custom type to use instead. The custom "
-            "type can be a custom target type or a macro that offers compatible functionality "
-            f"to the one it replaces (see {doc_url('macros')})."
+        help=softwrap(
+            f"""
+            A mapping from standard target type to custom type to use instead. The custom
+            type can be a custom target type or a macro that offers compatible functionality
+            to the one it replaces (see {doc_url('macros')}).
+            """
         ),
         advanced=True,
     )
     ignore_paths = StrListOption(
         "--ignore-paths",
-        help=(
-            "Do not edit or create BUILD files at these paths.\n\n"
-            "Can use literal file names and/or globs, e.g. "
-            "`['project/BUILD, 'ignore_me/**']`.\n\n"
-            "This augments the option `[GLOBAL].build_ignore`, which tells Pants to also not "
-            "_read_ BUILD files at certain paths. In contrast, this option only tells Pants to "
-            "not edit/create BUILD files at the specified paths."
+        help=softwrap(
+            """
+            Do not edit or create BUILD files at these paths.
+
+            Can use literal file names and/or globs, e.g. `['project/BUILD, 'ignore_me/**']`.
+
+            This augments the option `[GLOBAL].build_ignore`, which tells Pants to also not
+            _read_ BUILD files at certain paths. In contrast, this option only tells Pants to
+            not edit/create BUILD files at the specified paths.
+            """
         ),
         advanced=True,
     )
     _ignore_adding_targets = StrListOption(
         "--ignore-adding-targets",
-        help=(
-            "Do not add these target definitions.\n\n"
-            "Expects a list of target addresses that would normally be added by `tailor`, "
-            "e.g. `['project:tgt']`. To find these names, you can run `tailor --check`, then "
-            "combine the BUILD file path with the target's name. For example, if `tailor` "
-            "would add the target `bin` to `project/BUILD`, then the address would be "
-            "`project:bin`. If the BUILD file is at the root of your repository, use `//` for "
-            "the path, e.g. `//:bin`.\n\n"
-            "Does not work with macros."
+        help=softwrap(
+            """
+            Do not add these target definitions.
+
+            Expects a list of target addresses that would normally be added by `tailor`,
+            e.g. `['project:tgt']`. To find these names, you can run `tailor --check`, then
+            combine the BUILD file path with the target's name. For example, if `tailor`
+            would add the target `bin` to `project/BUILD`, then the address would be
+            `project:bin`. If the BUILD file is at the root of your repository, use `//` for
+            the path, e.g. `//:bin`.
+
+            Does not work with macros.
+            """
         ),
         advanced=True,
     )

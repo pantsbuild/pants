@@ -28,6 +28,7 @@ from pants.engine.target import FieldSet, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -214,6 +215,37 @@ def _check_ambiguous_request_names(
             raise AmbiguousRequestNamesError(name, request_group_set)
 
 
+def _print_results(
+    console: Console,
+    results: tuple[LintResults, ...],
+    formatter_failed: bool,
+) -> None:
+    if results:
+        console.print_stderr("")
+
+    for result in results:
+        if result.skipped:
+            continue
+        elif result.exit_code == 0:
+            sigil = console.sigil_succeeded()
+            status = "succeeded"
+        else:
+            sigil = console.sigil_failed()
+            status = "failed"
+        console.print_stderr(f"{sigil} {result.linter_name} {status}.")
+
+    if formatter_failed:
+        console.print_stderr("")
+        console.print_stderr(f"(One or more formatters failed. Run `{bin_name()} fmt` to fix.)")
+
+
+def _get_error_code(results: tuple[LintResults, ...]) -> int:
+    for result in reversed(results):
+        if result.exit_code:
+            return result.exit_code
+    return 0
+
+
 @goal_rule
 async def lint(
     console: Console,
@@ -295,7 +327,7 @@ async def lint(
     fmt_requests = (
         request_type(
             batch,
-            prior_formatter_result=source_files_snapshot.snapshot,
+            snapshot=source_files_snapshot.snapshot,
         )
         for (request_type, batch), source_files_snapshot in zip(
             batched_fmt_request_pairs, all_fmt_source_batches
@@ -325,8 +357,12 @@ async def lint(
     # NB: We must pre-sort the data for itertools.groupby() to work properly.
     sorted_all_batch_results = sorted(all_batch_results, key=key_fn)
 
+    formatter_failed = False
+
     def coerce_to_lintresult(batch_results: LintResults | FmtResult) -> tuple[LintResult, ...]:
         if isinstance(batch_results, FmtResult):
+            nonlocal formatter_failed
+            formatter_failed = formatter_failed or batch_results.did_change
             return (
                 LintResult(
                     1 if batch_results.did_change else 0,
@@ -363,22 +399,12 @@ async def lint(
         get_name=get_name,
     )
 
-    exit_code = 0
-    if all_results:
-        console.print_stderr("")
-    for results in all_results:
-        if results.skipped:
-            continue
-        elif results.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "succeeded"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
-            exit_code = results.exit_code
-        console.print_stderr(f"{sigil} {results.linter_name} {status}.")
-
-    return Lint(exit_code)
+    _print_results(
+        console,
+        all_results,
+        formatter_failed,
+    )
+    return Lint(_get_error_code(all_results))
 
 
 def rules():

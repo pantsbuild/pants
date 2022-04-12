@@ -842,37 +842,6 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
 # -----------------------------------------------------------------------------------------------
 
 
-def format_invalid_requirement_string_error(
-    value: str, e: Exception, *, description_of_origin: str
-) -> str:
-    prefix = f"Invalid requirement '{value}' in {description_of_origin}: {e}"
-    # We check if they're using Pip-style VCS requirements, and redirect them to instead use PEP
-    # 440 direct references. See https://pip.pypa.io/en/stable/reference/pip_install/#vcs-support.
-    recognized_vcs = {"git", "hg", "svn", "bzr"}
-    if all(f"{vcs}+" not in value for vcs in recognized_vcs):
-        return prefix
-    return dedent(
-        f"""\
-        {prefix}
-
-        It looks like you're trying to use a pip VCS-style requirement?
-        Instead, use a direct reference (PEP 440).
-
-        Instead of this style:
-
-            git+https://github.com/django/django.git#egg=Django
-            git+https://github.com/django/django.git@stable/2.1.x#egg=Django
-            git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8#egg=Django
-
-        Use this style, where the first value is the name of the dependency:
-
-            Django@ git+https://github.com/django/django.git
-            Django@ git+https://github.com/django/django.git@stable/2.1.x
-            Django@ git+https://github.com/django/django.git@fd209f62f1d83233cc634443cfac5ee4328d98b8
-        """
-    )
-
-
 class _PipRequirementSequenceField(Field):
     value: tuple[PipRequirement, ...]
 
@@ -899,17 +868,11 @@ class _PipRequirementSequenceField(Field):
                 result.append(v)
             elif isinstance(v, str):
                 try:
-                    parsed = PipRequirement.parse(v)
-                except Exception as e:
-                    raise InvalidFieldException(
-                        format_invalid_requirement_string_error(
-                            v,
-                            e,
-                            description_of_origin=(
-                                f"the '{cls.alias}' field for the target {address}"
-                            ),
-                        )
+                    parsed = PipRequirement.parse(
+                        v, description_of_origin=f"the '{cls.alias}' field for the target {address}"
                     )
+                except ValueError as e:
+                    raise InvalidFieldException(e)
                 result.append(parsed)
             else:
                 raise invalid_type_error
@@ -1025,17 +988,11 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
     VCS requirements will fail, with a helpful error message describing how to use PEP 440.
     """
     for i, line in enumerate(content.splitlines()):
-        line = line.strip()
-        if not line or line.startswith("#") or line.startswith("-"):
+        line, _, _ = line.partition("--")
+        line = line.strip().rstrip("\\")
+        if not line or line.startswith("#"):
             continue
-        try:
-            yield PipRequirement.parse(line)
-        except Exception as e:
-            raise ValueError(
-                format_invalid_requirement_string_error(
-                    line, e, description_of_origin=f"{rel_path} at line {i + 1}"
-                )
-            )
+        yield PipRequirement.parse(line, description_of_origin=f"{rel_path} at line {i + 1}")
 
 
 # -----------------------------------------------------------------------------------------------

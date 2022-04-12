@@ -112,7 +112,7 @@ def run_scalafmt(rule_runner: RuleRunner, targets: list[Target]) -> FmtResult:
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            ScalafmtRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            ScalafmtRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
     return fmt_result

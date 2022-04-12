@@ -59,7 +59,7 @@ def test_is_valid_scope_name() -> None:
     check_false("foo-bar-")
 
 
-def test_deprecated_register_options(caplog) -> None:
+def test_register_options_blessed(caplog) -> None:
     class GoodToGo(Subsystem):
         options_scope = "good-to-go"
 
@@ -72,22 +72,4 @@ def test_deprecated_register_options(caplog) -> None:
     )
     GoodToGo.register_options_on_scope(options)
 
-    assert not caplog.records
-
-    class OldAndDusty(Subsystem):
-        options_scope = "good-to-go"
-
-        @classmethod
-        def register_options(cls, register):
-            return super().register_options(register)
-
-    options = Options.create(
-        env={},
-        config=Config.load([]),
-        known_scope_infos=[OldAndDusty.get_scope_info()],
-        args=["./pants"],
-        bootstrap_option_values=None,
-    )
-    OldAndDusty.register_options_on_scope(options)
-
-    assert "DEPRECATED: pants.option.subsystem.register_options() will be removed" in caplog.text
+    assert not caplog.records, "The current blessed means of registering options should never warn."
