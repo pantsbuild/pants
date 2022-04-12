@@ -171,6 +171,24 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
                 return instance
         return None
 
+    def get_all_compatible_targets(self, address: Address) -> Iterator[Address]:
+        """Yield the input address itself, or any parameterized addresses which are a superset of
+        the input address.
+
+        For example, an input address `dir:tgt` may yield `(dir:tgt@k=v1, dir:tgt@k=v2)`.
+
+        If no targets are a match, will yield nothing.
+        """
+        # Check for exact matches.
+        if self.get(address) is not None:
+            yield address
+            return
+
+        for parametrization in self:
+            for parametrized_tgt in parametrization.parametrization.values():
+                if address.is_parametrized_subset_of(parametrized_tgt.address):
+                    yield parametrized_tgt.address
+
     def get_subset(self, address: Address, consumer: Target) -> Target:
         """Find the Target with the given Address, or with fields matching the given consumer."""
         # Check for exact matches.
