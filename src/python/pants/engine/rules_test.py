@@ -317,7 +317,10 @@ class TestRuleArgumentAnnotation:
             return False
 
         assert a_named_rule.rule is not None
-        assert a_named_rule.rule.canonical_name == "pants.engine.rules_test.a_named_rule"
+        assert (
+            a_named_rule.rule.canonical_name
+            == "pants.engine.rules_test.TestRuleArgumentAnnotation.test_annotations_kwargs.a_named_rule"
+        )
         assert a_named_rule.rule.desc is None
         assert a_named_rule.rule.level == LogLevel.INFO
 
@@ -442,18 +445,18 @@ class TestRuleGraph:
 
     def test_ruleset_with_valid_root(self) -> None:
         @rule
-        def a_from_b1(b: B) -> A:
+        def a_from_b(b: B) -> A:
             pass
 
-        rules = [a_from_b1, QueryRule(A, (B,))]
+        rules = [a_from_b, QueryRule(A, (B,))]
         create_scheduler(rules)
 
     def test_ruleset_with_unreachable_root(self) -> None:
         @rule
-        def a_from_b2(b: B) -> A:
+        def a_from_b(b: B) -> A:
             pass
 
-        rules = [a_from_b2, QueryRule(A, ())]
+        rules = [a_from_b, QueryRule(A, ())]
         with pytest.raises(Exception) as cm:
             create_scheduler(rules)
         assert (
@@ -544,10 +547,10 @@ class TestRuleGraph:
 
     def test_smallest_full_test(self) -> None:
         @rule
-        def a_from_suba1(suba: SubA) -> A:
+        def a_from_suba(suba: SubA) -> A:
             pass
 
-        rules = [a_from_suba1, QueryRule(A, (SubA,))]
+        rules = [a_from_suba, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules)
         assert_equal_graph_output(
             dedent(
@@ -556,9 +559,9 @@ class TestRuleGraph:
                   // queries: Query(A for SubA)
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
-                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba1))}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
                   // internal entries
-                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba1))}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
                 }}"""
             ).strip(),
             fullgraph,
@@ -566,14 +569,14 @@ class TestRuleGraph:
 
     def test_smallest_full_test_multiple_root_subject_types(self) -> None:
         @rule
-        def a_from_suba2(suba: SubA) -> A:
+        def a_from_suba(suba: SubA) -> A:
             pass
 
         @rule
-        def b_from_a1(a: A) -> B:
+        def b_from_a(a: A) -> B:
             pass
 
-        rules = [a_from_suba2, QueryRule(A, (SubA,)), b_from_a1, QueryRule(B, (A,))]
+        rules = [a_from_suba, QueryRule(A, (SubA,)), b_from_a, QueryRule(B, (A,))]
         fullgraph = self.create_full_graph(rules)
         assert_equal_graph_output(
             dedent(
@@ -582,12 +585,12 @@ class TestRuleGraph:
                   // queries: Query(A for SubA), Query(B for A)
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
-                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba2))}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
                 {fmt_non_param_edge(B, A)}
-                {fmt_non_param_edge(B, A, RuleFormatRequest(b_from_a1))}
+                {fmt_non_param_edge(B, A, RuleFormatRequest(b_from_a))}
                   // internal entries
-                {fmt_param_edge(A, A, RuleFormatRequest(b_from_a1))}
-                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba2))}
+                {fmt_param_edge(A, A, RuleFormatRequest(b_from_a))}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
                 }}"""
             ).strip(),
             fullgraph,
@@ -595,10 +598,10 @@ class TestRuleGraph:
 
     def test_single_rule_depending_on_subject_selection(self) -> None:
         @rule
-        def a_from_suba3(suba: SubA) -> A:
+        def a_from_suba(suba: SubA) -> A:
             pass
 
-        rules = [a_from_suba3, QueryRule(A, (SubA,))]
+        rules = [a_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
             dedent(
@@ -607,9 +610,9 @@ class TestRuleGraph:
                   // queries: Query(A for SubA)
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
-                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba3))}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
                   // internal entries
-                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba3))}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
                 }}"""
             ).strip(),
             subgraph,
@@ -652,18 +655,18 @@ class TestRuleGraph:
         # they intend for the Get's parameter to be consumed in the subgraph. Anything else would
         # be surprising.
         @rule
-        async def a1(sub_a: SubA) -> A:  # type: ignore[return]
+        async def a(sub_a: SubA) -> A:  # type: ignore[return]
             _ = await Get(B, C())  # noqa: F841
 
         @rule
-        def b_from_suba1(suba: SubA) -> B:
+        def b_from_suba(suba: SubA) -> B:
             pass
 
         @rule
         def suba_from_c(c: C) -> SubA:
             pass
 
-        rules = [a1, b_from_suba1, suba_from_c, QueryRule(A, (SubA,))]
+        rules = [a, b_from_suba, suba_from_c, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
             dedent(
@@ -672,11 +675,11 @@ class TestRuleGraph:
                   // queries: Query(A for SubA)
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
-                {fmt_non_param_edge(A, SubA, return_func=RuleFormatRequest(a1, gets=[("B", "C")]))}
+                {fmt_non_param_edge(A, SubA, return_func=RuleFormatRequest(a, gets=[("B", "C")]))}
                   // internal entries
-                {fmt_non_param_edge(b_from_suba1, C, return_func=RuleFormatRequest(suba_from_c))}
+                {fmt_non_param_edge(b_from_suba, C, return_func=RuleFormatRequest(suba_from_c))}
                 {fmt_param_edge(C, C, RuleFormatRequest(suba_from_c))}
-                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a1, gets=[("B", "C")]), return_func=RuleFormatRequest(b_from_suba1, C))}
+                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a, gets=[("B", "C")]), return_func=RuleFormatRequest(b_from_suba, C))}
                 }}
                 """
             ).strip(),
@@ -689,10 +692,10 @@ class TestRuleGraph:
             pass
 
         @rule
-        def b_from_suba2(suba: SubA) -> B:
+        def b_from_suba(suba: SubA) -> B:
             pass
 
-        rules = [a_from_b, b_from_suba2, QueryRule(A, (SubA,))]
+        rules = [a_from_b, b_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
             dedent(
@@ -703,8 +706,8 @@ class TestRuleGraph:
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_b))}
                   // internal entries
-                {fmt_non_param_edge(a_from_b, SubA, RuleFormatRequest(b_from_suba2))}
-                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(b_from_suba2))}
+                {fmt_non_param_edge(a_from_b, SubA, RuleFormatRequest(b_from_suba))}
+                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(b_from_suba))}
                 }}"""
             ).strip(),
             subgraph,
@@ -718,14 +721,14 @@ class TestRuleGraph:
             pass
 
         @rule
-        def a2() -> A:
+        def a() -> A:
             pass
 
         @rule
         def b_singleton() -> B:
             return B()
 
-        rules = [a_from_c, a2, b_singleton, QueryRule(A, (SubA,))]
+        rules = [a_from_c, a, b_singleton, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
         assert_equal_graph_output(
             dedent(
@@ -734,10 +737,10 @@ class TestRuleGraph:
                   // queries: Query(A for SubA)
                   // root entries
                 {fmt_non_param_edge(A, ())}
-                {fmt_non_param_edge(a2, (), rule_type=GraphVertexType.singleton)}
-                {fmt_non_param_edge(A, (), RuleFormatRequest(a2))}
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
+                {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
                   // internal entries
-                {fmt_non_param_edge(a2, (), rule_type=GraphVertexType.inner)}
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
                 }}"""
             ).strip(),
             subgraph,
@@ -751,10 +754,10 @@ class TestRuleGraph:
             pass
 
         @rule
-        def a3() -> A:
+        def a() -> A:
             pass
 
-        rules = [a_from_c, a3, QueryRule(A, (SubA,))]
+        rules = [a_from_c, a, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules, validate=False)
         assert_equal_graph_output(
             dedent(
@@ -763,10 +766,10 @@ class TestRuleGraph:
                   // queries: Query(A for SubA)
                   // root entries
                 {fmt_non_param_edge(A, ())}
-                {fmt_non_param_edge(a3, (), rule_type=GraphVertexType.singleton)}
-                {fmt_non_param_edge(A, (), RuleFormatRequest(a3))}
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
+                {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
                   // internal entries
-                {fmt_non_param_edge(a3, (), rule_type=GraphVertexType.inner)}
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
                 }}"""
             ).strip(),
             fullgraph,
@@ -823,13 +826,13 @@ class TestRuleGraph:
             pass
 
         @rule
-        def a4() -> A:
+        def a() -> A:
             pass
 
         rules = [
             b_from_c,
             a_from_b,
-            a4,
+            a,
         ]
         subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
@@ -840,10 +843,10 @@ class TestRuleGraph:
                   // root subject types: SubA
                   // root entries
                 {fmt_non_param_edge(A, ())}
-                {fmt_non_param_edge(a4, (), rule_type=GraphVertexType.singleton)}
-                {fmt_non_param_edge(A, (), RuleFormatRequest(a4))}
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
+                {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
                   // internal entries
-                {fmt_non_param_edge(a4, (), rule_type=GraphVertexType.inner)}
+                {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
                 }}"""
             ).strip(),
             subgraph,
@@ -851,14 +854,14 @@ class TestRuleGraph:
 
     def test_matching_singleton(self) -> None:
         @rule
-        def a_from_suba4(suba: SubA, b: B) -> A:
+        def a_from_suba(suba: SubA, b: B) -> A:
             return A()
 
         @rule
         def b_singleton() -> B:
             return B()
 
-        rules = [a_from_suba4, b_singleton, QueryRule(A, (SubA,))]
+        rules = [a_from_suba, b_singleton, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
             dedent(
@@ -867,11 +870,11 @@ class TestRuleGraph:
                   // queries: Query(A for SubA)
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
-                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba4))}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
                   // internal entries
                 {fmt_non_param_edge(b_singleton, (), rule_type=GraphVertexType.inner)}
                 {fmt_non_param_edge(b_singleton, (), rule_type=GraphVertexType.singleton)}
-                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a_from_suba4), return_func=RuleFormatRequest(b_singleton, ()))}
+                {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a_from_suba), return_func=RuleFormatRequest(b_singleton, ()))}
                 }}"""
             ).strip(),
             subgraph,
@@ -885,14 +888,14 @@ class TestRuleGraph:
             pass
 
         @rule
-        def a_from_suba5(suba: SubA) -> A:
+        def a_from_suba(suba: SubA) -> A:
             pass
 
         @rule
-        def b_from_a2(a: A) -> B:
+        def b_from_a(a: A) -> B:
             pass
 
-        rules = [a_from_c, a_from_suba5, b_from_a2, QueryRule(A, (SubA,))]
+        rules = [a_from_c, a_from_suba, b_from_a, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
         assert_equal_graph_output(
             dedent(
@@ -901,10 +904,10 @@ class TestRuleGraph:
                   // queries: Query(A for SubA)
                   // root entries
                 {fmt_non_param_edge(B, SubA)}
-                {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a2))}
+                {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
                   // internal entries
-                {fmt_non_param_edge(RuleFormatRequest(b_from_a2), SubA, RuleFormatRequest(a_from_suba5))}
-                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba5))}
+                {fmt_non_param_edge(RuleFormatRequest(b_from_a), SubA, RuleFormatRequest(a_from_suba))}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
                 }}"""
             ).strip(),
             subgraph,
@@ -912,11 +915,11 @@ class TestRuleGraph:
 
     def test_multiple_depend_on_same_rule(self) -> None:
         @rule
-        def a_from_suba6(suba: SubA) -> A:
+        def a_from_suba(suba: SubA) -> A:
             pass
 
         @rule
-        def b_from_a3(a: A) -> B:
+        def b_from_a(a: A) -> B:
             pass
 
         @rule
@@ -924,8 +927,8 @@ class TestRuleGraph:
             pass
 
         rules = [
-            a_from_suba6,
-            b_from_a3,
+            a_from_suba,
+            b_from_a,
             c_from_a,
             QueryRule(A, (SubA,)),
             QueryRule(B, (SubA,)),
@@ -939,15 +942,15 @@ class TestRuleGraph:
                   // queries: Query(A for SubA), Query(B for SubA), Query(C for SubA)
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
-                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba6))}
+                {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
                 {fmt_non_param_edge(B, SubA)}
-                {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a3))}
+                {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
                 {fmt_non_param_edge(C, SubA)}
                 {fmt_non_param_edge(C, SubA, RuleFormatRequest(c_from_a))}
                   // internal entries
-                {fmt_non_param_edge(b_from_a3, SubA, RuleFormatRequest(a_from_suba6))}
-                {fmt_non_param_edge(c_from_a, SubA, RuleFormatRequest(a_from_suba6))}
-                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba6))}
+                {fmt_non_param_edge(b_from_a, SubA, RuleFormatRequest(a_from_suba))}
+                {fmt_non_param_edge(c_from_a, SubA, RuleFormatRequest(a_from_suba))}
+                {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
                 }}"""
             ).strip(),
             fullgraph,
@@ -957,14 +960,14 @@ class TestRuleGraph:
     @pytest.mark.no_error_if_skipped
     def test_get_simple(self) -> None:
         @rule
-        async def a5() -> A:  # type: ignore[return]
+        async def a() -> A:  # type: ignore[return]
             _ = await Get(B, D, D())  # noqa: F841
 
         @rule
         async def b_from_d(d: D) -> B:
             pass
 
-        rules = [a5, b_from_d, QueryRule(A, (SubA,))]
+        rules = [a, b_from_d, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
             dedent(
@@ -973,10 +976,10 @@ class TestRuleGraph:
                   // queries: Query(A for SubA)
                   // root entries
                 {fmt_non_param_edge(A, ())}
-                {fmt_non_param_edge(RuleFormatRequest(a5, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
-                {fmt_non_param_edge(A, (), RuleFormatRequest(a5, gets=[("B", "D")]))}
+                {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
+                {fmt_non_param_edge(A, (), RuleFormatRequest(a, gets=[("B", "D")]))}
                   // internal entries
-                {fmt_non_param_edge(RuleFormatRequest(a5, (), gets=[("B", "D")]), D, RuleFormatRequest(b_from_d),
+                {fmt_non_param_edge(RuleFormatRequest(a, (), gets=[("B", "D")]), D, RuleFormatRequest(b_from_d),
                                     append_for_product=False)}
                 {fmt_param_edge(D, D, RuleFormatRequest(b_from_d))}
                 }}"""
@@ -995,7 +998,7 @@ class TestRuleGraph:
 
 def test_duplicated_rules() -> None:
     err = (
-        r"Redeclaring rule pants\.engine\.rules_test\.dup_a with "
+        r"Redeclaring rule pants\.engine\.rules_test\.test_duplicated_rules\.dup_a with "
         r"<function test_duplicated_rules\.<locals>\.dup_a at .*> at line \d+, previously defined "
         r"by <function test_duplicated_rules\.<locals>\.dup_a at .*> at line \d+\."
     )

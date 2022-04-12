@@ -201,7 +201,9 @@ def rule_decorator(func, **kwargs) -> Callable:
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
     # function that implements it. This is used as the workunit name.
-    effective_name = kwargs.get("canonical_name", f"{func.__module__}.{func.__name__}")
+    effective_name = kwargs.get(
+        "canonical_name", f"{func.__module__}.{func.__qualname__}".replace(".<locals>", "")
+    )
 
     # Set a default description, which is used in the dynamic UI and stacktraces.
     effective_desc = kwargs.get("desc")
