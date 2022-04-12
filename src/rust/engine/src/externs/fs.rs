@@ -159,7 +159,7 @@ impl PySnapshot {
   }
 
   fn __repr__(&self) -> PyResult<String> {
-    let (dirs, files): (Vec<_>, Vec<_>) = self.0.tree.files_and_directories();
+    let (files, dirs): (Vec<_>, Vec<_>) = self.0.tree.files_and_directories();
 
     Ok(format!(
       "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
