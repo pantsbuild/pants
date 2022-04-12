@@ -89,11 +89,11 @@ async def analyze_kotlin_source_dependencies(
 
     if len(source_files.files) > 1:
         raise ValueError(
-            f"analyze_scala_source_dependencies expects sources with exactly 1 source file, but found {len(source_files.snapshot.files)}."
+            f"analyze_kotlin_source_dependencies expects sources with exactly 1 source file, but found {len(source_files.snapshot.files)}."
         )
     elif len(source_files.files) == 0:
         raise ValueError(
-            "analyze_scala_source_dependencies expects sources with exactly 1 source file, but found none."
+            "analyze_kotlin_source_dependencies expects sources with exactly 1 source file, but found none."
         )
     source_prefix = "__source_to_analyze"
     source_path = os.path.join(source_prefix, source_files.files[0])

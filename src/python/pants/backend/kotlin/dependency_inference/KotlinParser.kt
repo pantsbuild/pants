@@ -15,7 +15,7 @@ import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.KtFile
 
 
-// KtFile: https://github.com/JetBrains/kotlin/blob/master/compiler/psi/src/org/jetbrains/kotlin/psi/KtFile.kt
+// KtFile: https://github.com/JetBrains/kotlin/blob/8bc29a30111081ee0b0dbe06d1f648a789909a27/compiler/psi/src/org/jetbrains/kotlin/psi/KtFile.kt
 
 data class KotlinImport(
     val name: String,
