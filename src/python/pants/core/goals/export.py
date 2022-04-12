@@ -39,12 +39,6 @@ class ExportRequest:
     targets: Targets
 
 
-@union
-@dataclass(frozen=True)
-class ExportToolRequest:
-    pass
-
-
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PostProcessingCommand:
@@ -123,15 +117,6 @@ async def export(
     requests = tuple(request_type(targets) for request_type in request_types)
     all_results = await MultiGet(Get(ExportResults, ExportRequest, request) for request in requests)
     flattened_results = [res for results in all_results for res in results]
-
-    tool_request_types = cast(
-        "Iterable[type[ExportToolRequest]]", union_membership.get(ExportToolRequest)
-    )
-    tool_requests = tuple(request_type() for request_type in tool_request_types)
-    tool_results = await MultiGet(
-        Get(ExportResult, ExportToolRequest, request) for request in tool_requests
-    )
-    flattened_results.extend(tool_results)
 
     prefixed_digests = await MultiGet(
         Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results

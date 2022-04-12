@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -10,15 +9,7 @@ from pants.backend.python.lint.isort.skip_field import SkipIsortField
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexRequest,
-    PexResolveInfo,
-    VenvPex,
-    VenvPexProcess,
-)
-from pants.backend.python.util_rules.pex_cli import PexPEX
-from pants.core.goals.export import ExportResult, ExportToolRequest, PostProcessingCommand
+from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -45,10 +36,6 @@ class IsortFieldSet(FieldSet):
 class IsortRequest(FmtRequest):
     field_set_type = IsortFieldSet
     name = Isort.options_scope
-
-
-class IsortExportRequest(ExportToolRequest):
-    pass
 
 
 def generate_argv(
@@ -112,41 +99,9 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 
 
-@rule(desc="Export virtualenv for isort", level=LogLevel.DEBUG)
-async def isort_export(request: IsortExportRequest, isort: Isort, pex_pex: PexPEX) -> ExportResult:
-    isort_pex = await Get(Pex, PexRequest, isort.to_pex_request())
-
-    dest = os.path.join("python", "virtualenvs", isort.name)
-
-    merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, isort_pex.digest]))
-    pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
-    return ExportResult(
-        f"virtualenv for the tool '{isort.name}'",
-        dest,
-        digest=merged_digest,
-        post_processing_cmds=[
-            PostProcessingCommand(
-                [
-                    pex_pex_path,
-                    os.path.join("{digest_root}", isort_pex.name),
-                    "venv",
-                    "--collisions-ok",
-                    "--remove=all",
-                    # FIXME: If I add an additional directory layer after the digest_root,
-                    # the export works. What value would make sense?
-                    "{digest_root}/",
-                ],
-                {"PEX_MODULE": "pex.tools"},
-            ),
-            PostProcessingCommand(["rm", "-f", pex_pex_path]),
-        ],
-    )
-
-
 def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, IsortRequest),
-        UnionRule(ExportToolRequest, IsortExportRequest),
         *pex.rules(),
     ]

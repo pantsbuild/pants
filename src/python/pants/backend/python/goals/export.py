@@ -9,10 +9,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict
 
+from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexProcess
+from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import (
@@ -48,6 +49,11 @@ class _ExportVenvRequest(EngineAwareParameter):
 
     def debug_hint(self) -> str | None:
         return self.resolve
+
+
+@dataclass(frozen=True)
+class _ExportToolRequest:
+    pass
 
 
 @rule
@@ -133,6 +139,37 @@ async def export_virtualenv(
 
 
 @rule
+async def export_isort(request: _ExportToolRequest, isort: Isort, pex_pex: PexPEX) -> ExportResult:
+    isort_pex = await Get(Pex, PexRequest, isort.to_pex_request())
+
+    dest = os.path.join("python", "virtualenvs")
+
+    merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, isort_pex.digest]))
+    pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
+    return ExportResult(
+        f"virtualenv for the tool '{isort.name}'",
+        dest,
+        digest=merged_digest,
+        post_processing_cmds=[
+            PostProcessingCommand(
+                [
+                    pex_pex_path,
+                    os.path.join("{digest_root}", isort_pex.name),
+                    "venv",
+                    "--collisions-ok",
+                    "--remove=all",
+                    # FIXME: If I add an additional directory layer after the digest_root,
+                    # the export works. What value would make sense?
+                    f"{{digest_root}}/{isort.name}",
+                ],
+                {"PEX_MODULE": "pex.tools"},
+            ),
+            PostProcessingCommand(["rm", "-f", pex_pex_path]),
+        ],
+    )
+
+
+@rule
 async def export_virtualenvs(
     request: ExportVenvsRequest, python_setup: PythonSetup, dist_dir: DistDir
 ) -> ExportResults:
@@ -161,7 +198,9 @@ async def export_virtualenvs(
             f"To silence this error, delete {no_resolves_dest}"
         )
 
-    return ExportResults(venvs)
+    tool_venvs = await Get(ExportResult, _ExportToolRequest())
+
+    return ExportResults(venvs + (tool_venvs,))
 
 
 def rules():
