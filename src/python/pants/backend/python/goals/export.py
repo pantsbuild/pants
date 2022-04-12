@@ -9,8 +9,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict, Iterable, cast
 
-from pants.backend.python.lint.docformatter.subsystem import Docformatter
-from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -57,30 +55,10 @@ class ExportPythonToolSentinel:
     """Pythion tools use this as an entry point to say how to export their tool virtualenv."""
 
 
-class IsortExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-class DocformatterExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
 @dataclass(frozen=True)
 class ExportPythonTool:
     tool_name: str
     pex_request: PexRequest
-
-
-@rule
-def isort_export(_: IsortExportSentinel, isort: Isort) -> ExportPythonTool:
-    return ExportPythonTool(tool_name=isort.name, pex_request=isort.to_pex_request())
-
-
-@rule
-def docformatter_export(
-    _: DocformatterExportSentinel, docformatter: Docformatter
-) -> ExportPythonTool:
-    return ExportPythonTool(tool_name=docformatter.name, pex_request=docformatter.to_pex_request())
 
 
 @rule
@@ -239,6 +217,4 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(ExportRequest, ExportVenvsRequest),
-        UnionRule(ExportPythonToolSentinel, IsortExportSentinel),
-        UnionRule(ExportPythonToolSentinel, DocformatterExportSentinel),
     ]
