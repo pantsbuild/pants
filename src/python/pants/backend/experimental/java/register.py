@@ -59,5 +59,5 @@ def rules():
         *run_deploy_jar.rules(),
         *war_rules(),
         *java_bsp_rules.rules(),
-        *archive.rules()
+        *archive.rules(),
     ]
