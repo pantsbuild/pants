@@ -12,7 +12,7 @@ from typing import Iterator
 
 import pytest
 
-from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException
+from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.testutil.rule_runner import run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
 from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
@@ -62,7 +62,7 @@ def git_worktree(
         rule=get_git_worktree,
         rule_args=[
             GitWorktreeRequest(gitdir=gitdir, subdir=subdir),
-            GitBinary(path=str(binary)),
+            MaybeGitBinary(git_binary=GitBinary(path=str(binary))),
         ],
     )
 
