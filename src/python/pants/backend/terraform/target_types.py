@@ -18,6 +18,7 @@ from pants.engine.target import (
 class TerraformModuleSourcesField(MultipleSourcesField):
     default = ("*.tf",)
     expected_file_extensions = (".tf",)
+    ban_subdirectories = True
 
 
 @dataclass(frozen=True)

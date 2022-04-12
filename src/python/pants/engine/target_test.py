@@ -1025,6 +1025,17 @@ def test_single_source_field_bans_globs() -> None:
         TestSingleSourceField("!f.ext", Address("project"))
 
 
+def test_multiple_sources_field_ban_subdirs() -> None:
+    class TestSources(MultipleSourcesField):
+        ban_subdirectories = True
+
+    assert TestSources(["f.ext"], Address("project")).value == ("f.ext",)
+    with pytest.raises(InvalidFieldException):
+        TestSources(["**"], Address("project"))
+    with pytest.raises(InvalidFieldException):
+        TestSources(["dir/f.ext"], Address("project"))
+
+
 # -----------------------------------------------------------------------------------------------
 # Test `ExplicitlyProvidedDependencies` helper functions
 # -----------------------------------------------------------------------------------------------
