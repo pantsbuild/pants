@@ -138,6 +138,7 @@ class GoModTarget(TargetGenerator):
 class GoPackageSourcesField(MultipleSourcesField):
     default = ("*.go", "*.s")
     expected_file_extensions = (".go", ".s")
+    ban_subdirectories = True
 
     @classmethod
     def compute_value(
@@ -148,18 +149,6 @@ class GoPackageSourcesField(MultipleSourcesField):
             raise InvalidFieldException(
                 f"The {repr(cls.alias)} field in target {address} must be set to files/globs in "
                 f"the target's directory, but it was set to {repr(value_or_default)}."
-            )
-
-        # Ban recursive globs and subdirectories. We assume that a `go_package` corresponds
-        # to exactly one directory.
-        invalid_globs = [
-            glob for glob in (value_or_default or ()) if "**" in glob or os.path.sep in glob
-        ]
-        if invalid_globs:
-            raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} must only have globs for the "
-                f"target's directory, i.e. it cannot include values with `**` and `{os.path.sep}`, "
-                f"but it was set to: {sorted(value_or_default)}"
             )
         return value_or_default
 
