@@ -2443,7 +2443,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
 
     To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,
-    tgt.get(MyField).to_unparsed_address_inputs()`.
+    tgt.get(MyField).to_unparsed_address_inputs())`.
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
