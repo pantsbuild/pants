@@ -119,7 +119,7 @@ class ScalaRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class ScalaRuntimeForResolve:
-    address: Address
+    addresses: frozenset[Address]
 
 
 @rule
@@ -144,7 +144,7 @@ async def resolve_scala_library_for_resolve(
             jvm_artifact_targets=jvm_artifact_targets,
             jvm=jvm,
         )
-        return ScalaRuntimeForResolve(list(addresses)[0])
+        return ScalaRuntimeForResolve(addresses)
     except ConflictingJvmArtifactVersion as ex:
         raise ConflictingScalaLibraryVersionInResolveError(
             request.resolve_name, scala_version, ex.found_coordinate
@@ -168,7 +168,7 @@ async def inject_scala_library_dependency(
     scala_library_target_info = await Get(
         ScalaRuntimeForResolve, ScalaRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies((scala_library_target_info.address,))
+    return InjectedDependencies(scala_library_target_info.addresses)
 
 
 @rule(desc="Inject dependency on scala plugin artifacts for Scala target.")

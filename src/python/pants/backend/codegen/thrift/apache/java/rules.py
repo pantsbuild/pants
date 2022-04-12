@@ -1,5 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from pants.backend.codegen.thrift.apache.java import subsystem
@@ -79,7 +81,7 @@ class ApacheThriftJavaRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class ApacheThriftJavaRuntimeForResolve:
-    address: Address
+    addresses: frozenset[Address]
 
 
 _LIBTHRIFT_GROUP = "org.apache.thrift"
@@ -104,7 +106,7 @@ async def resolve_apache_thrift_java_runtime_for_resolve(
             jvm_artifact_targets=jvm_artifact_targets,
             jvm=jvm,
         )
-        return ApacheThriftJavaRuntimeForResolve(list(addresses)[0])
+        return ApacheThriftJavaRuntimeForResolve(addresses)
     except MissingJvmArtifacts:
         raise MissingApacheThriftJavaRuntimeInResolveError(
             request.resolve_name,
@@ -122,10 +124,10 @@ async def inject_apache_thrift_java_dependencies(
         return InjectedDependencies()
     resolve = target[JvmResolveField].normalized_value(jvm)
 
-    scalapb_runtime_target_info = await Get(
+    dependencies_info = await Get(
         ApacheThriftJavaRuntimeForResolve, ApacheThriftJavaRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies((scalapb_runtime_target_info.address,))
+    return InjectedDependencies(dependencies_info.addresses)
 
 
 class MissingApacheThriftJavaRuntimeInResolveError(ValueError):
