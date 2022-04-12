@@ -7,7 +7,7 @@ import logging
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict
+from typing import DefaultDict, Iterable, cast
 
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.isort.subsystem import Isort
@@ -31,7 +31,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.docutil import bin_name
 from pants.util.strutil import path_safe
 
@@ -52,14 +52,35 @@ class _ExportVenvRequest(EngineAwareParameter):
         return self.resolve
 
 
-@dataclass(frozen=True)
-class _ExportIsortRequest:
+@union
+class ExportPythonToolSentinel:
+    """Pythion tools use this as an entry point to say how to export their tool virtualenv."""
+
+
+class IsortExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+class DocformatterExportSentinel(ExportPythonToolSentinel):
     pass
 
 
 @dataclass(frozen=True)
-class _ExportDocformatterRequest:
-    pass
+class ExportPythonTool:
+    tool_name: str
+    pex_request: PexRequest
+
+
+@rule
+def isort_export(_: IsortExportSentinel, isort: Isort) -> ExportPythonTool:
+    return ExportPythonTool(tool_name=isort.name, pex_request=isort.to_pex_request())
+
+
+@rule
+def docformatter_export(
+    _: DocformatterExportSentinel, docformatter: Docformatter
+) -> ExportPythonTool:
+    return ExportPythonTool(tool_name=docformatter.name, pex_request=docformatter.to_pex_request())
 
 
 @rule
@@ -145,57 +166,25 @@ async def export_virtualenv(
 
 
 @rule
-async def export_isort(request: _ExportIsortRequest, isort: Isort, pex_pex: PexPEX) -> ExportResult:
-    isort_pex = await Get(Pex, PexRequest, isort.to_pex_request())
+async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResult:
+    dest = os.path.join("python", "virtualenvs", "tools", request.tool_name)
+    pex = await Get(Pex, PexRequest, request.pex_request)
 
-    dest = os.path.join("python", "virtualenvs", "tools", isort.name)
-
-    merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, isort_pex.digest]))
+    merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, pex.digest]))
     pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
     return ExportResult(
-        f"virtualenv for the tool '{isort.name}'",
+        f"virtualenv for the tool '{request.tool_name}'",
         dest,
         digest=merged_digest,
         post_processing_cmds=[
             PostProcessingCommand(
                 [
                     pex_pex_path,
-                    os.path.join("{digest_root}", isort_pex.name),
+                    os.path.join("{digest_root}", pex.name),
                     "venv",
                     "--collisions-ok",
                     "--remove=all",
-                    f"{{digest_root}}/.tmp/{isort.name}",
-                ],
-                {"PEX_MODULE": "pex.tools"},
-            ),
-            PostProcessingCommand(["rm", "-f", pex_pex_path]),
-        ],
-    )
-
-
-@rule
-async def export_docformatter(
-    request: _ExportDocformatterRequest, docformatter: Docformatter, pex_pex: PexPEX
-) -> ExportResult:
-    docformatter_pex = await Get(Pex, PexRequest, docformatter.to_pex_request())
-
-    dest = os.path.join("python", "virtualenvs", "tools", docformatter.name)
-
-    merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, docformatter_pex.digest]))
-    pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
-    return ExportResult(
-        f"virtualenv for the tool '{docformatter.name}'",
-        dest,
-        digest=merged_digest,
-        post_processing_cmds=[
-            PostProcessingCommand(
-                [
-                    pex_pex_path,
-                    os.path.join("{digest_root}", docformatter_pex.name),
-                    "venv",
-                    "--collisions-ok",
-                    "--remove=all",
-                    f"{{digest_root}}/.tmp/{docformatter.name}",
+                    f"{{digest_root}}/.tmp/{request.tool_name}",
                 ],
                 {"PEX_MODULE": "pex.tools"},
             ),
@@ -206,7 +195,10 @@ async def export_docformatter(
 
 @rule
 async def export_virtualenvs(
-    request: ExportVenvsRequest, python_setup: PythonSetup, dist_dir: DistDir
+    request: ExportVenvsRequest,
+    python_setup: PythonSetup,
+    dist_dir: DistDir,
+    union_membership: UnionMembership,
 ) -> ExportResults:
     resolve_to_root_targets: DefaultDict[str, list[Target]] = defaultdict(list)
     for tgt in request.targets:
@@ -233,14 +225,20 @@ async def export_virtualenvs(
             f"To silence this error, delete {no_resolves_dest}"
         )
 
-    isort_venv = await Get(ExportResult, _ExportIsortRequest())
-    docformatter_venv = await Get(ExportResult, _ExportDocformatterRequest())
+    tool_export_types = cast(
+        "Iterable[type[ExportPythonToolSentinel]]", union_membership.get(ExportPythonToolSentinel)
+    )
+    all_tool_results = await MultiGet(
+        Get(ExportResult, ExportPythonToolSentinel, request()) for request in tool_export_types
+    )
 
-    return ExportResults(venvs + (isort_venv, docformatter_venv))
+    return ExportResults(venvs + all_tool_results)
 
 
 def rules():
     return [
         *collect_rules(),
         UnionRule(ExportRequest, ExportVenvsRequest),
+        UnionRule(ExportPythonToolSentinel, IsortExportSentinel),
+        UnionRule(ExportPythonToolSentinel, DocformatterExportSentinel),
     ]
