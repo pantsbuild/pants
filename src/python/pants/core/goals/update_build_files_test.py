@@ -325,10 +325,13 @@ def test_determine_renamed_fields() -> None:
         ["target(new_name = 56 ) "],
         ["target(foo=1, new_name=2)"],
         ["target(", "new_name", "=3)"],
+        ["target(overrides={'a': {'new_name': 0}})"],
+        ["target(overrides={('a',): {'new_name': 0}})"],
         # Unrelated lines.
         ["", "123", "target()", "name='new_name'"],
         ["unaffected(deprecated_name='not this target')"],
         ["target(nested=here(deprecated_name='too deep'))"],
+        ["target(overrides={'deprecated_name': {'field': 0}})"],
     ),
 )
 def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
@@ -347,6 +350,14 @@ def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
         (["tgt1 ( deprecated_name = ' ', ", ")"], ["tgt1 ( new_name = ' ', ", ")"]),
         (["tgt1(deprecated_name='')  # comment"], ["tgt1(new_name='')  # comment"]),
         (["tgt1(", "deprecated_name", "=", ")"], ["tgt1(", "new_name", "=", ")"]),
+        [
+            "target(overrides={'a': {'deprecated_name': 0}})",
+            "target(overrides={'a': {'new_name': 0}})",
+        ],
+        [
+            "target(overrides={('a',): {'deprecated_name': 0}})",
+            "target(overrides={('a',): {'new_name': 0}})",
+        ],
     ),
 )
 def test_rename_deprecated_field_types_rewrite(lines: list[str], expected: list[str]) -> None:

@@ -529,7 +529,7 @@ def maybe_rename_deprecated_fields(
         return True
 
     def parse_target(token: tokenize.TokenInfo) -> bool:
-        """Returns true if we're parsing a field name for a top level target."""
+        """Returns true if we were able to enter into a top-level target."""
         nonlocal pants_target
         nonlocal level
 
@@ -556,24 +556,23 @@ def maybe_rename_deprecated_fields(
             return next_token.type is token_type and next_token.string == string
         return False
 
-    def should_be_renamed(token: tokenize.TokenInfo) -> bool:
+    def is_candidate_field(token: tokenize.TokenInfo) -> bool:
+        """Return true if the token is a field and belongs to a target with renames."""
         nonlocal pants_target
-
         if not parse_target(token):
             return False
-
-        if pants_target not in renamed_field_types.target_field_renames:
-            return False
-
-        return (
-            next_token_is("=")
-            and token.string in renamed_field_types.target_field_renames[pants_target]
-        )
+        return pants_target in renamed_field_types.target_field_renames and next_token_is("=")
 
     updated_text_lines = list(request.lines)
     for token in tokens:
-        if not should_be_renamed(token):
+        if not is_candidate_field(token):
             continue
+        if token.string == "overrides":
+            # TODO. We can only worry about `{}` syntax for now, not `dict()`.
+            continue
+        if token.string not in renamed_field_types.target_field_renames[pants_target]:
+            continue
+
         line_index = token.start[0] - 1
         line = request.lines[line_index]
         prefix = line[: token.start[1]]
