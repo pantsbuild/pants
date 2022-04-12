@@ -44,6 +44,7 @@ from pants.core.util_rules import (
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
+from pants.vcs import git
 
 
 def rules():
@@ -68,6 +69,7 @@ def rules():
         *config_files.rules(),
         *distdir.rules(),
         *external_tool.rules(),
+        *git.rules(),
         *source_files.rules(),
         *source_root.rules(),
         *stats_aggregator.rules(),
