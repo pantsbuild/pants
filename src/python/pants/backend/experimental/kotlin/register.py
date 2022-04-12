@@ -1,6 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.backend.kotlin.compile import kotlinc
+from pants.backend.kotlin.dependency_inference.rules import rules as dep_inf_rules
 from pants.backend.kotlin.goals import check, tailor
 from pants.backend.kotlin.target_types import KotlinSourcesGeneratorTarget, KotlinSourceTarget
 from pants.backend.kotlin.target_types import rules as target_types_rules
@@ -32,6 +33,7 @@ def rules():
         *lockfile.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
+        *dep_inf_rules(),
         *jvm_util_rules.rules(),
         *jdk_rules.rules(),
         *target_types_rules(),
