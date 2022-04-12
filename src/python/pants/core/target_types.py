@@ -207,11 +207,7 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
     original_files_sources = await MultiGet(
         Get(
             HydratedSources,
-            HydrateSourcesRequest(
-                tgt.get(SourcesField),
-                for_sources_types=(FileSourceField,),
-                enable_codegen=True,
-            ),
+            HydrateSourcesRequest(tgt.get(SourcesField), for_sources_types=(FileSourceField,)),
         )
         for tgt in original_file_targets
     )
