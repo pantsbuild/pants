@@ -13,7 +13,8 @@ from typing import Iterator
 import pytest
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
-from pants.testutil.rule_runner import run_rule_with_mocks
+from pants.engine.rules import Get, rule
+from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
 from pants.vcs.git import GitWorktree, GitWorktreeRequest, MaybeGitWorktree, get_git_worktree
 
@@ -71,10 +72,14 @@ def git_worktree(
 
 class MutatingGitWorktree(GitWorktree):
     def commit(self, message: str) -> None:
-        self._git_binary.invoke(self._create_git_cmdline(["commit", "--all", "--message", message]))
+        self._git_binary._invoke_unsandboxed(
+            self._create_git_cmdline(["commit", "--all", "--message", message])
+        )
 
     def add(self, *paths: PurePath) -> None:
-        self._git_binary.invoke(self._create_git_cmdline(["add", *(str(path) for path in paths)]))
+        self._git_binary._invoke_unsandboxed(
+            self._create_git_cmdline(["add", *(str(path) for path in paths)])
+        )
 
 
 @pytest.fixture
@@ -336,3 +341,31 @@ def test_detect_worktree_working_git(executable_git: Path) -> None:
     assert worktree and expected_worktree_dir == worktree.worktree
     worktree = git_worktree(binary=executable_git)
     assert worktree and expected_worktree_dir == worktree.worktree
+
+
+def test_worktree_invalidation(origin: Path) -> None:
+    # Confirm that requesting the worktree in two different sessions results in new instances,
+    # and that the consuming `@rule` also reruns.
+    with pushd(origin.as_posix()):
+        init_repo("origin", origin)
+
+        @rule
+        async def worktree_id_string() -> str:
+            worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
+            return str(id(worktree))
+
+        rule_runner = RuleRunner(
+            rules=[
+                worktree_id_string,
+                QueryRule(str, []),
+            ]
+        )
+
+        rule_runner.set_options([], env_inherit={"PATH"})
+        worktree_id_1 = rule_runner.request(str, [])
+
+        rule_runner.new_session("second-session")
+        rule_runner.set_options([], env_inherit={"PATH"})
+        worktree_id_2 = rule_runner.request(str, [])
+
+        assert worktree_id_1 != worktree_id_2

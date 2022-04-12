@@ -211,7 +211,7 @@ class _GitInitialized(Enum):
 _Git: _GitInitialized | Git | None = _GitInitialized.NO
 
 
-@deprecated("2.14.0.dev0")
+@deprecated("2.14.0.dev0", "Use QueryRule(MaybeGitWorktree, [GitWorktreeRequest]) instead.")
 def get_git() -> Git | None:
     """Returns Git, if available."""
     global _Git

@@ -329,7 +329,12 @@ class GitBinaryException(Exception):
 
 
 class GitBinary(BinaryPath):
-    def invoke(self, cmd: list[str]) -> str:
+    def _invoke_unsandboxed(self, cmd: list[str]) -> str:
+        """Invoke the given git command, _without_ the sandboxing provided by the `Process` API.
+
+        This API is for internal use only: users should prefer to consume methods of the
+        `GitWorktree` class.
+        """
         cmd = [self.path, *cmd]
 
         self._log_call(cmd)

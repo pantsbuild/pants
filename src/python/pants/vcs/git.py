@@ -9,20 +9,25 @@ import os
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path, PurePath
-from typing import Iterable
+from typing import Any, Iterable
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
-from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
 class GitWorktree(EngineAwareReturnType):
+    """Implements a safe wrapper for un-sandboxed access to Git in the user's working copy.
+
+    This type (and any wrappers) should be marked `EngineAwareReturnType.cacheable=False`, because
+    it internally uses un-sandboxed APIs, and `@rules` which produce it should re-run in each
+    session. It additionally implements a default `__eq__` in order to prevent early-cutoff in the
+    graph, and force any consumers of the type to re-run.
+    """
+
     worktree: PurePath
     _gitdir: PurePath
     _git_binary: GitBinary
@@ -52,11 +57,11 @@ class GitWorktree(EngineAwareReturnType):
 
     @property
     def commit_id(self):
-        return self._git_binary.invoke(self._create_git_cmdline(["rev-parse", "HEAD"]))
+        return self._git_binary._invoke_unsandboxed(self._create_git_cmdline(["rev-parse", "HEAD"]))
 
     @property
     def branch_name(self) -> str | None:
-        branch = self._git_binary.invoke(
+        branch = self._git_binary._invoke_unsandboxed(
             self._create_git_cmdline(["rev-parse", "--abbrev-ref", "HEAD"])
         )
         return None if branch == "HEAD" else branch
@@ -72,7 +77,7 @@ class GitWorktree(EngineAwareReturnType):
     ) -> set[str]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         rel_suffix = ["--", str(relative_to)]
-        uncommitted_changes = self._git_binary.invoke(
+        uncommitted_changes = self._git_binary._invoke_unsandboxed(
             self._create_git_cmdline(
                 ["diff", "--name-only", "HEAD"] + rel_suffix,
             )
@@ -83,7 +88,9 @@ class GitWorktree(EngineAwareReturnType):
             # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
             # the changes that have occurred on the current branch.
             committed_cmd = ["diff", "--name-only", from_commit + "...HEAD"] + rel_suffix
-            committed_changes = self._git_binary.invoke(self._create_git_cmdline(committed_cmd))
+            committed_changes = self._git_binary._invoke_unsandboxed(
+                self._create_git_cmdline(committed_cmd)
+            )
             files.update(committed_changes.split())
         if include_untracked:
             untracked_cmd = [
@@ -92,7 +99,9 @@ class GitWorktree(EngineAwareReturnType):
                 "--exclude-standard",
                 "--full-name",
             ] + rel_suffix
-            untracked = self._git_binary.invoke(self._create_git_cmdline(untracked_cmd))
+            untracked = self._git_binary._invoke_unsandboxed(
+                self._create_git_cmdline(untracked_cmd)
+            )
             files.update(untracked.split())
         # git will report changed files relative to the worktree: re-relativize to relative_to
         return {self._fix_git_relative_path(f, relative_to) for f in files}
@@ -100,11 +109,15 @@ class GitWorktree(EngineAwareReturnType):
     def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         cmd = ["diff-tree", "--no-commit-id", "--name-only", "-r", diffspec]
-        files = self._git_binary.invoke(self._create_git_cmdline(cmd)).split()
+        files = self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd)).split()
         return {self._fix_git_relative_path(f.strip(), relative_to) for f in files}
 
     def _create_git_cmdline(self, args: Iterable[str]) -> list[str]:
         return [f"--git-dir={self._gitdir}", f"--work-tree={self.worktree}", *args]
+
+    def __eq__(self, other: Any) -> bool:
+        # NB: See the class doc regarding equality.
+        return id(self) == id(other)
 
 
 @dataclass(frozen=True)
@@ -135,9 +148,9 @@ async def get_git_worktree(
     try:
         if git_worktree_request.subdir:
             with pushd(str(git_worktree_request.subdir)):
-                output = git_binary.invoke(cmd)
+                output = git_binary._invoke_unsandboxed(cmd)
         else:
-            output = git_binary.invoke(cmd)
+            output = git_binary._invoke_unsandboxed(cmd)
     except GitBinaryException as e:
         logger.info(f"No git repository at {os.getcwd()}: {e!r}")
         return MaybeGitWorktree()

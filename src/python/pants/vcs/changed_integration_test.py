@@ -24,10 +24,14 @@ from pants.vcs.git import GitWorktree
 
 class MutatingGitWorktree(GitWorktree):
     def commit(self, message: str) -> None:
-        self._git_binary.invoke(self._create_git_cmdline(["commit", "--all", "--message", message]))
+        self._git_binary._invoke_unsandboxed(
+            self._create_git_cmdline(["commit", "--all", "--message", message])
+        )
 
     def add(self, *paths: PurePath) -> None:
-        self._git_binary.invoke(self._create_git_cmdline(["add", *(str(path) for path in paths)]))
+        self._git_binary._invoke_unsandboxed(
+            self._create_git_cmdline(["add", *(str(path) for path in paths)])
+        )
 
 
 @contextmanager
