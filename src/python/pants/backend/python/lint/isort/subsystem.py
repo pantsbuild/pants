@@ -112,7 +112,7 @@ class IsortExportSentinel(ExportPythonToolSentinel):
 
 @rule
 def isort_export(_: IsortExportSentinel, isort: Isort) -> ExportPythonTool:
-    return ExportPythonTool(tool_name=isort.name, pex_request=isort.to_pex_request())
+    return ExportPythonTool(resolve_name=isort.options_scope, pex_request=isort.to_pex_request())
 
 
 def rules():

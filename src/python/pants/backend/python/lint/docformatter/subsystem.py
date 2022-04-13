@@ -56,7 +56,9 @@ class DocformatterExportSentinel(ExportPythonToolSentinel):
 def docformatter_export(
     _: DocformatterExportSentinel, docformatter: Docformatter
 ) -> ExportPythonTool:
-    return ExportPythonTool(tool_name=docformatter.name, pex_request=docformatter.to_pex_request())
+    return ExportPythonTool(
+        resolve_name=docformatter.options_scope, pex_request=docformatter.to_pex_request()
+    )
 
 
 def rules():

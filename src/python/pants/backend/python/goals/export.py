@@ -57,7 +57,7 @@ class ExportPythonToolSentinel:
 
 @dataclass(frozen=True)
 class ExportPythonTool:
-    tool_name: str
+    resolve_name: str
     pex_request: PexRequest
 
 
@@ -152,13 +152,13 @@ async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResul
     # multiple tools are concurrently exporting. Without this prefix all the `export_tool`
     # invocations write the pex_pex to `python/virtualenvs/tools/pex`, and the `rm -f` of
     # the pex_pex path in one export will delete the binary out from under the others.
-    pex_pex_dir = f".{request.tool_name}.tmp"
+    pex_pex_dir = f".{request.resolve_name}.tmp"
     pex_pex_dest = os.path.join("{digest_root}", pex_pex_dir)
     pex_pex_digest = await Get(Digest, AddPrefix(pex_pex.digest, pex_pex_dir))
 
     merged_digest = await Get(Digest, MergeDigests([pex_pex_digest, pex.digest]))
     return ExportResult(
-        f"virtualenv for the tool '{request.tool_name}'",
+        f"virtualenv for the tool '{request.resolve_name}'",
         dest,
         digest=merged_digest,
         post_processing_cmds=[
@@ -169,7 +169,7 @@ async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResul
                     "venv",
                     "--collisions-ok",
                     "--remove=all",
-                    f"{{digest_root}}/{request.tool_name}",
+                    f"{{digest_root}}/{request.resolve_name}",
                 ],
                 {"PEX_MODULE": "pex.tools"},
             ),

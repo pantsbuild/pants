@@ -352,7 +352,7 @@ async def mypy_export(
     constraints = await Get(InterpreterConstraints, _MyPyConstraintsRequest())
 
     return ExportPythonTool(
-        tool_name=mypy.name,
+        resolve_name=mypy.options_scope,
         pex_request=mypy.to_pex_request(
             interpreter_constraints=constraints,
             extra_requirements=first_party_plugins.requirement_strings,
