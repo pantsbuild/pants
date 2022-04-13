@@ -157,9 +157,9 @@ class CoverageSubsystem(PythonToolBase):
         default=None,
         advanced=True,
         help=lambda cls: softwrap(
-            f"""Path to an INI or TOML config file understood by coverage.py
+            f"""
+            Path to an INI or TOML config file understood by coverage.py
             (https://coverage.readthedocs.io/en/stable/config.html).
-
 
             Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
@@ -174,7 +174,6 @@ class CoverageSubsystem(PythonToolBase):
             f"""
             If true, Pants will include any relevant config files during runs
             (`.coveragerc`, `setup.cfg`, `tox.ini`, and `pyproject.toml`).
-
 
             Use `[{cls.options_scope}].config` instead if your config is in a
             non-standard location.
@@ -204,7 +203,6 @@ class CoverageSubsystem(PythonToolBase):
             Use this instead of setting fail_under in a coverage.py config file,
             as the config will apply to each test separately, while you typically want this
             to apply to the combined coverage for all tests run.
-
 
             Note that you must generate at least one (non-raw) coverage report for this
             check to trigger.

@@ -185,7 +185,7 @@ class PythonSetup(Subsystem):
 
             If you need multiple resolves:
 
-              1. Via this option, define multiple resolve "names and their lockfile paths.\
+              1. Via this option, define multiple resolve names and their lockfile paths.\
                 The names should be meaningful to your repository, such as `data-science` or\
                 `pants-plugins`.
               2. Set the default with `[python].default_resolve`.

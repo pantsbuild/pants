@@ -373,7 +373,7 @@ class PexInheritPathField(StringField):
         """
         Whether to inherit the `sys.path` (aka PYTHONPATH) of the environment that the binary runs in.
 
-        Use `false` to not inherit `sys.path`; use `fallback` to inherit `sys.path`after packaged
+        Use `false` to not inherit `sys.path`; use `fallback` to inherit `sys.path` after packaged
         dependencies; and use `prefer` to inherit `sys.path` before packaged dependencies.
         """
     )
@@ -620,6 +620,7 @@ class PexBinariesOverrideField(OverridesField):
         multiple targets.
 
         For example:
+
             ```
             overrides={{
               "foo.py": {{"execution_mode": "venv"]}},
