@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -268,6 +269,39 @@ async def mypy_first_party_plugins(
 
 
 # --------------------------------------------------------------------------------------
+# Interpreter constraints
+# --------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _MyPyConstraintsRequest:
+    pass
+
+
+@rule
+async def mypy_interpreter_constraints(
+    _: _MyPyConstraintsRequest, mypy: MyPy, python_setup: PythonSetup
+) -> InterpreterConstraints:
+    constraints = mypy.interpreter_constraints
+    if mypy.options.is_default("interpreter_constraints"):
+        all_tgts = await Get(AllTargets, AllTargetsRequest())
+        all_transitive_targets = await MultiGet(
+            Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
+            for tgt in all_tgts
+            if MyPyFieldSet.is_applicable(tgt)
+        )
+        unique_constraints = {
+            InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
+            for transitive_targets in all_transitive_targets
+        }
+        code_constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
+            constraints = code_constraints
+
+    return constraints
+
+
+# --------------------------------------------------------------------------------------
 # Lockfile
 # --------------------------------------------------------------------------------------
 
@@ -291,22 +325,7 @@ async def setup_mypy_lockfile(
             mypy, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = mypy.interpreter_constraints
-    if mypy.options.is_default("interpreter_constraints"):
-        all_tgts = await Get(AllTargets, AllTargetsRequest())
-        all_transitive_targets = await MultiGet(
-            Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-            for tgt in all_tgts
-            if MyPyFieldSet.is_applicable(tgt)
-        )
-        unique_constraints = {
-            InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
-            for transitive_targets in all_transitive_targets
-        }
-        code_constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
-            constraints = code_constraints
-
+    constraints = await Get(InterpreterConstraints, _MyPyConstraintsRequest())
     return GeneratePythonLockfile.from_tool(
         mypy,
         constraints,
@@ -315,9 +334,36 @@ async def setup_mypy_lockfile(
     )
 
 
+# --------------------------------------------------------------------------------------
+# Export
+# --------------------------------------------------------------------------------------
+
+
+class MyPyExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+async def mypy_export(
+    _: MyPyExportSentinel,
+    mypy: MyPy,
+    first_party_plugins: MyPyFirstPartyPlugins,
+) -> ExportPythonTool:
+    constraints = await Get(InterpreterConstraints, _MyPyConstraintsRequest())
+
+    return ExportPythonTool(
+        tool_name=mypy.name,
+        pex_request=mypy.to_pex_request(
+            interpreter_constraints=constraints,
+            extra_requirements=first_party_plugins.requirement_strings,
+        ),
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, MyPyLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, MyPyExportSentinel),
     )
