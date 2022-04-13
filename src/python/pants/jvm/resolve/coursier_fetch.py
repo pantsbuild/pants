@@ -626,7 +626,7 @@ async def select_coursier_resolve_for_targets(
     resolve is required for multiple roots (such as when running a `repl` over unrelated code), and
     in that case there might be multiple CoarsenedTargets.
     """
-    targets = [t for ct in coarsened_targets.closure() for t in ct.members]
+    targets = list(coarsened_targets.closure())
 
     # Find a single resolve that is compatible with all targets in the closure.
     compatible_resolve: str | None = None
