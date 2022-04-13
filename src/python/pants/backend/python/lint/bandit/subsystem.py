@@ -67,10 +67,7 @@ class Bandit(PythonToolBase):
         "--config",
         default=None,
         advanced=True,
-        help=(
-            "Path to a Bandit YAML config file "
-            "(https://bandit.readthedocs.io/en/latest/config.html)."
-        ),
+        help="Path to a Bandit YAML config file (https://bandit.readthedocs.io/en/latest/config.html).",
     )
 
     @property

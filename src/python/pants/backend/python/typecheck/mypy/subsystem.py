@@ -49,6 +49,7 @@ from pants.option.option_types import (
 from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -93,52 +94,64 @@ class MyPy(PythonToolBase):
         "--config",
         default=None,
         advanced=True,
-        help=lambda cls: (
-            "Path to a config file understood by MyPy "
-            "(https://mypy.readthedocs.io/en/stable/config_file.html).\n\n"
-            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-            f"this option if the config is located in a non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            Path to a config file understood by MyPy
+            (https://mypy.readthedocs.io/en/stable/config_file.html).
+
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
         ),
     )
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,
         advanced=True,
-        help=lambda cls: (
-            "If true, Pants will include any relevant config files during "
-            "runs (`mypy.ini`, `.mypy.ini`, and `setup.cfg`)."
-            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-            f"non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include any relevant config files during runs
+            (`mypy.ini`, `.mypy.ini`, and `setup.cfg`).
+
+            Use `[{cls.options_scope}].config` instead if your config is in a non-standard location.
+            """
         ),
     )
     _source_plugins = TargetListOption(
         "--source-plugins",
         advanced=True,
-        help=(
-            "An optional list of `python_sources` target addresses to load first-party "
-            "plugins.\n\n"
-            "You must also set `plugins = path.to.module` in your `mypy.ini`, and "
-            "set the `[mypy].config` option in your `pants.toml`.\n\n"
-            "To instead load third-party plugins, set the option `[mypy].extra_requirements` "
-            "and set the `plugins` option in `mypy.ini`."
-            "Tip: it's often helpful to define a dedicated 'resolve' via "
-            "`[python].resolves` for your MyPy plugins such as 'mypy-plugins' "
-            "so that the third-party requirements used by your plugin, like `mypy`, do not "
-            "mix with the rest of your project. Read that option's help message for more info "
-            "on resolves."
+        help=softwrap(
+            """
+            An optional list of `python_sources` target addresses to load first-party plugins.
+
+            You must also set `plugins = path.to.module` in your `mypy.ini`, and
+            set the `[mypy].config` option in your `pants.toml`.
+
+            To instead load third-party plugins, set the option `[mypy].extra_requirements`
+            and set the `plugins` option in `mypy.ini`.
+            Tip: it's often helpful to define a dedicated 'resolve' via
+            `[python].resolves` for your MyPy plugins such as 'mypy-plugins'
+            so that the third-party requirements used by your plugin, like `mypy`, do not
+            mix with the rest of your project. Read that option's help message for more info
+            on resolves.
+            """
         ),
     )
     extra_type_stubs = StrListOption(
         "--extra-type-stubs",
         advanced=True,
-        help=(
-            "Extra type stub requirements to install when running MyPy.\n\n"
-            "Normally, type stubs can be installed as typical requirements, such as putting "
-            "them in `requirements.txt` or using a `python_requirement` target."
-            "Alternatively, you can use this option so that the dependencies are solely "
-            "used when running MyPy and are not runtime dependencies.\n\n"
-            "Expects a list of pip-style requirement strings, like "
-            "`['types-requests==2.25.9']`."
+        help=softwrap(
+            """
+            Extra type stub requirements to install when running MyPy.
+
+            Normally, type stubs can be installed as typical requirements, such as putting
+            them in `requirements.txt` or using a `python_requirement` target.
+            Alternatively, you can use this option so that the dependencies are solely
+            used when running MyPy and are not runtime dependencies.
+
+            Expects a list of pip-style requirement strings, like
+            `['types-requests==2.25.9']`.
+            """
         ),
     )
 

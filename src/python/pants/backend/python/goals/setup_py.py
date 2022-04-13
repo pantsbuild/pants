@@ -315,22 +315,26 @@ class SetupPyGeneration(Subsystem):
     generate_setup_default = BoolOption(
         "--generate-setup-default",
         default=True,
-        help=(
-            "The default value for the `generate_setup` field on `python_distribution` targets."
-            "Can be overridden per-target by setting that field explicitly. Set this to False "
-            "if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar). "
-            "Leave as True if you mostly rely on Pants generating setup files for you."
+        help=softwrap(
+            """
+            The default value for the `generate_setup` field on `python_distribution` targets.
+            Can be overridden per-target by setting that field explicitly. Set this to False
+            if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar).
+            Leave as True if you mostly rely on Pants generating setup files for you.
+            """
         ),
     )
 
     first_party_dependency_version_scheme = EnumOption(
         "--first-party-dependency-version-scheme",
         default=FirstPartyDependencyVersionScheme.EXACT,
-        help=(
-            "What version to set in `install_requires` when a `python_distribution` depends on "
-            "other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will "
-            "use `~=`. If `any`, will leave off the version. See "
-            "https://www.python.org/dev/peps/pep-0440/#version-specifiers."
+        help=softwrap(
+            """
+            What version to set in `install_requires` when a `python_distribution` depends on
+            other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will
+            use `~=`. If `any`, will leave off the version. See
+            https://www.python.org/dev/peps/pep-0440/#version-specifiers.
+            """
         ),
     )
 

@@ -51,7 +51,7 @@ from pants.option.global_options import OwnersNotFoundBehavior
 from pants.option.option_types import BoolOption, EnumOption, IntOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -75,79 +75,95 @@ class PythonInferSubsystem(Subsystem):
     imports = BoolOption(
         "--imports",
         default=True,
-        help=("Infer a target's imported dependencies by parsing import statements from sources."),
+        help="Infer a target's imported dependencies by parsing import statements from sources.",
     )
     string_imports = BoolOption(
         "--string-imports",
         default=False,
-        help=(
-            "Infer a target's dependencies based on strings that look like dynamic "
-            "dependencies, such as Django settings files expressing dependencies as strings. "
-            "To ignore any false positives, put `!{bad_address}` in the `dependencies` field "
-            "of your target."
+        help=softwrap(
+            """
+            Infer a target's dependencies based on strings that look like dynamic
+            dependencies, such as Django settings files expressing dependencies as strings.
+            To ignore any false positives, put `!{bad_address}` in the `dependencies` field
+            of your target.
+            """
         ),
     )
     string_imports_min_dots = IntOption(
         "--string-imports-min-dots",
         default=2,
-        help=(
-            "If --string-imports is True, treat valid-looking strings with at least this many "
-            "dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be "
-            "treated as a potential dependency if this option is set to 2 but not if set to 3."
+        help=softwrap(
+            """
+            If --string-imports is True, treat valid-looking strings with at least this many
+            dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be
+            treated as a potential dependency if this option is set to 2 but not if set to 3.
+            """
         ),
     )
     assets = BoolOption(
         "--assets",
         default=False,
-        help=(
-            "Infer a target's asset dependencies based on strings that look like Posix "
-            "filepaths, such as those given to `open` or `pkgutil.get_data`. To ignore any "
-            "false positives, put `!{bad_address}` in the `dependencies` field of your target."
+        help=softwrap(
+            """
+            Infer a target's asset dependencies based on strings that look like Posix
+            filepaths, such as those given to `open` or `pkgutil.get_data`. To ignore any
+            false positives, put `!{bad_address}` in the `dependencies` field of your target.
+            """
         ),
     )
     assets_min_slashes = IntOption(
         "--assets-min-slashes",
         default=1,
-        help=(
-            "If --assets is True, treat valid-looking strings with at least this many forward "
-            "slash characters as potential assets. E.g. `'data/databases/prod.db'` will be "
-            "treated as a potential candidate if this option is set to 2 but not to 3."
+        help=softwrap(
+            """
+            If --assets is True, treat valid-looking strings with at least this many forward
+            slash characters as potential assets. E.g. `'data/databases/prod.db'` will be
+            treated as a potential candidate if this option is set to 2 but not to 3.
+            """
         ),
     )
     inits = BoolOption(
         "--inits",
         default=False,
-        help=(
-            "Infer a target's dependencies on any `__init__.py` files in the packages "
-            "it is located in (recursively upward in the directory structure).\n\nEven if this "
-            "is disabled, Pants will still include any ancestor `__init__.py` files, only they "
-            "will not be 'proper' dependencies, e.g. they will not show up in "
-            f"`{bin_name()} dependencies` and their own dependencies will not be used.\n\nIf you "
-            "have empty `__init__.py` files, it's safe to leave this option off; otherwise, "
-            "you should enable this option."
+        help=softwrap(
+            f"""
+            Infer a target's dependencies on any `__init__.py` files in the packages
+            it is located in (recursively upward in the directory structure).
+
+            Even if this is disabled, Pants will still include any ancestor `__init__.py` files,
+            only they will not be 'proper' dependencies, e.g. they will not show up in
+            `{bin_name()} dependencies` and their own dependencies will not be used.
+
+            If you have empty `__init__.py` files, it's safe to leave this option off; otherwise,
+            you should enable this option.
+            """
         ),
     )
     conftests = BoolOption(
         "--conftests",
         default=True,
-        help=(
-            "Infer a test target's dependencies on any conftest.py files in the current "
-            "directory and ancestor directories."
+        help=softwrap(
+            """
+            Infer a test target's dependencies on any conftest.py files in the current
+            directory and ancestor directories.
+            """
         ),
     )
     entry_points = BoolOption(
         "--entry-points",
         default=True,
-        help=(
-            "Infer dependencies on targets' entry points, e.g. `pex_binary`'s "
-            "`entry_point` field, `python_awslambda`'s `handler` field and "
-            "`python_distribution`'s `entry_points` field."
+        help=softwrap(
+            """
+            Infer dependencies on targets' entry points, e.g. `pex_binary`'s
+            `entry_point` field, `python_awslambda`'s `handler` field and
+            `python_distribution`'s `entry_points` field.
+            """
         ),
     )
     unowned_dependency_behavior = EnumOption(
         "--unowned-dependency-behavior",
         default=UnownedDependencyUsage.DoNothing,
-        help=("How to handle inferred dependencies that don't have any owner."),
+        help="How to handle inferred dependencies that don't have any owner.",
     )
 
 
