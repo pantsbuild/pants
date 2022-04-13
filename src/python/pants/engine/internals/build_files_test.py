@@ -667,3 +667,11 @@ def test_address_specs_parametrize(
             for r in ("a", "b")
         },
     )
+
+    # Error on invalid targets.
+    def assert_errors(spec: AddressLiteralSpec) -> None:
+        with engine_error(ValueError):
+            resolve_address_specs(address_specs_rule_runner, [spec])
+
+    assert_errors(AddressLiteralSpec("demo", parameters=FrozenDict({"fake": "v"})))
+    assert_errors(AddressLiteralSpec("demo", parameters=FrozenDict({"resolve": "fake"})))
