@@ -12,7 +12,10 @@ import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.idea.KotlinFileType
+import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
+import org.jetbrains.kotlin.psi.namedDeclarationRecursiveVisitor
 
 
 // KtFile: https://github.com/JetBrains/kotlin/blob/8bc29a30111081ee0b0dbe06d1f648a789909a27/compiler/psi/src/org/jetbrains/kotlin/psi/KtFile.kt
@@ -25,6 +28,7 @@ data class KotlinImport(
 
 data class KotlinAnalysis(
     val imports: List<KotlinImport>,
+    val namedDeclarations: List<String>,
 )
 
 fun parse(code: String): KtFile {
@@ -52,8 +56,18 @@ fun analyze(file: KtFile): KotlinAnalysis {
             null
         }
     }
+    val visitor = object : KtTreeVisitorVoid() {
+        val symbols = ArrayList<String>()
+        override fun visitNamedDeclaration(decl: KtNamedDeclaration) {
+            val fqName = decl.getFqName()
+            if (fqName != null) {
+                symbols.add(fqName.asString())
+            }
+        }
+    }
+    visitor.visitKtFile(file, null)
 
-    return KotlinAnalysis(imports.filterNotNull())
+    return KotlinAnalysis(imports.filterNotNull(), visitor.symbols)
 }
 
 fun main(args: Array<String>) {
