@@ -39,6 +39,7 @@ from pants.option.option_types import ArgsListOption, BoolOption, IntOption, Str
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -81,18 +82,24 @@ class PyTest(PythonToolBase):
     timeouts_enabled = BoolOption(
         "--timeouts",
         default=True,
-        help="Enable test target timeouts. If timeouts are enabled then test targets with a "
-        "timeout= parameter set on their target will time out after the given number of "
-        "seconds if not completed. If no timeout is set, then either the default timeout "
-        "is used or no timeout is configured.",
+        help=softwrap(
+            """
+            Enable test target timeouts. If timeouts are enabled then test targets with a
+            timeout= parameter set on their target will time out after the given number of
+            seconds if not completed. If no timeout is set, then either the default timeout
+            is used or no timeout is configured.
+            """
+        ),
     )
     timeout_default = IntOption(
         "--timeout-default",
         default=None,
         advanced=True,
-        help=(
-            "The default timeout (in seconds) for a test target if the `timeout` field is not "
-            "set on the target."
+        help=softwrap(
+            """
+            The default timeout (in seconds) for a test target if the `timeout` field is not
+            set on the target.
+            """
         ),
     )
     timeout_maximum = IntOption(
@@ -105,29 +112,35 @@ class PyTest(PythonToolBase):
         "--junit-family",
         default="xunit2",
         advanced=True,
-        help=(
-            "The format of generated junit XML files. See "
-            "https://docs.pytest.org/en/latest/reference.html#confval-junit_family."
+        help=softwrap(
+            """
+            The format of generated junit XML files. See
+            https://docs.pytest.org/en/latest/reference.html#confval-junit_family.
+            """
         ),
     )
     execution_slot_var = StrOption(
         "--execution-slot-var",
         default=None,
         advanced=True,
-        help=(
-            "If a non-empty string, the process execution slot id (an integer) will be exposed "
-            "to tests under this environment variable name."
+        help=softwrap(
+            """
+            If a non-empty string, the process execution slot id (an integer) will be exposed
+            to tests under this environment variable name.
+            """
         ),
     )
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,
         advanced=True,
-        help=(
-            "If true, Pants will include all relevant Pytest config files (e.g. `pytest.ini`) "
-            "during runs. See "
-            "https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for where "
-            "config files should be located for Pytest to discover them."
+        help=softwrap(
+            """
+            If true, Pants will include all relevant Pytest config files (e.g. `pytest.ini`)
+            during runs. See
+            https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for where
+            config files should be located for Pytest to discover them.
+            """
         ),
     )
 

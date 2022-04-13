@@ -18,6 +18,7 @@ from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption, StrOption
 from pants.util.docutil import bin_name
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -298,28 +299,36 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
     resolve_names = StrListOption(
         "--resolve",
         advanced=False,
-        help=(
-            "Only generate lockfiles for the specified resolve(s).\n\n"
-            "Resolves are the logical names for the different lockfiles used in your project. "
-            "For your own code's dependencies, these come from the option "
-            "`[python].resolves`. For tool lockfiles, resolve "
-            "names are the options scope for that tool such as `black`, `pytest`, and "
-            "`mypy-protobuf`.\n\n"
-            f"For example, you can run `{bin_name()} generate-lockfiles --resolve=black "
-            "--resolve=pytest --resolve=data-science` to only generate lockfiles for those "
-            "two tools and your resolve named `data-science`.\n\n"
-            "If you specify an invalid resolve name, like 'fake', Pants will output all "
-            "possible values.\n\n"
-            "If not specified, Pants will generate lockfiles for all resolves."
+        help=softwrap(
+            f"""
+            Only generate lockfiles for the specified resolve(s).
+
+            Resolves are the logical names for the different lockfiles used in your project.
+            For your own code's dependencies, these come from the option
+            `[python].resolves`. For tool lockfiles, resolve
+            names are the options scope for that tool such as `black`, `pytest`, and
+            `mypy-protobuf`.
+
+            For example, you can run `{bin_name()} generate-lockfiles --resolve=black
+            --resolve=pytest --resolve=data-science` to only generate lockfiles for those
+            two tools and your resolve named `data-science`.
+
+            If you specify an invalid resolve name, like 'fake', Pants will output all
+            possible values.
+
+            If not specified, Pants will generate lockfiles for all resolves.
+            """
         ),
     )
     custom_command = StrOption(
         "--custom-command",
         advanced=True,
         default=None,
-        help=(
-            "If set, lockfile headers will say to run this command to regenerate the lockfile, "
-            f"rather than running `{bin_name()} generate-lockfiles --resolve=<name>` like normal."
+        help=softwrap(
+            f"""
+            If set, lockfile headers will say to run this command to regenerate the lockfile,
+            rather than running `{bin_name()} generate-lockfiles --resolve=<name>` like normal.
+            """
         ),
     )
 

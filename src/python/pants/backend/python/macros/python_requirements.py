@@ -41,6 +41,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class PythonRequirementsSourceField(SingleSourceField):
@@ -50,13 +51,17 @@ class PythonRequirementsSourceField(SingleSourceField):
 
 class PythonRequirementsTargetGenerator(TargetGenerator):
     alias = "python_requirements"
-    help = (
-        "Generate a `python_requirement` for each entry in a requirements.txt-style file.\n\n"
-        "This works with pip-style requirements files: "
-        "https://pip.pypa.io/en/latest/reference/requirements-file-format/. However, pip options "
-        "like `--hash` are (for now) ignored.\n\n"
-        "Instead of pip-style VCS requirements, use direct references from PEP 440: "
-        "https://www.python.org/dev/peps/pep-0440/#direct-references."
+    help = softwrap(
+        """
+        Generate a `python_requirement` for each entry in a requirements.txt-style file.
+
+        This works with pip-style requirements files:
+        https://pip.pypa.io/en/latest/reference/requirements-file-format/. However, pip options
+        like `--hash` are (for now) ignored.
+
+        Instead of pip-style VCS requirements, use direct references from PEP 440:
+        https://www.python.org/dev/peps/pep-0440/#direct-references.
+        """
     )
     generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.

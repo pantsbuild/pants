@@ -17,5 +17,5 @@ class ScalaInferSubsystem(Subsystem):
     consumed_types = BoolOption(
         "--consumed-types",
         default=True,
-        help=("Infer a target's dependencies by parsing consumed types from sources."),
+        help="Infer a target's dependencies by parsing consumed types from sources.",
     )

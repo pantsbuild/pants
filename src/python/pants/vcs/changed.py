@@ -19,7 +19,7 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
-from pants.vcs.git import Git
+from pants.vcs.git import GitWorktree
 
 
 class DependeesOption(Enum):
@@ -74,15 +74,17 @@ class ChangedOptions:
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
 
-    def changed_files(self, git: Git) -> list[str]:
+    def changed_files(self, git_worktree: GitWorktree) -> list[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:
-            return cast(List[str], git.changes_in(self.diffspec, relative_to=get_buildroot()))
+            return cast(
+                List[str], git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
+            )
 
-        changes_since = self.since or git.current_rev_identifier
+        changes_since = self.since or git_worktree.current_rev_identifier
         return cast(
             List[str],
-            git.changed_files(
+            git_worktree.changed_files(
                 from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
             ),
         )

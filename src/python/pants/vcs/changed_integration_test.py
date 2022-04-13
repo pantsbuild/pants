@@ -7,21 +7,37 @@ import shutil
 import subprocess
 import unittest
 from contextlib import contextmanager
+from pathlib import PurePath
 from textwrap import dedent
 from typing import Iterator, List, Optional
 
 import pytest
 
 from pants.base.build_environment import get_buildroot
+from pants.core.util_rules.system_binaries import GitBinary
 from pants.testutil.pants_integration_test import PantsResult, run_pants, run_pants_with_workdir
 from pants.testutil.test_base import AbstractTestGenerator
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
-from pants.vcs.git import Git
+from pants.vcs.git import GitWorktree
+
+
+class MutatingGitWorktree(GitWorktree):
+    def commit(self, message: str) -> None:
+        self._git_binary._invoke_unsandboxed(
+            self._create_git_cmdline(["commit", "--all", "--message", message])
+        )
+
+    def add(self, *paths: PurePath) -> None:
+        self._git_binary._invoke_unsandboxed(
+            self._create_git_cmdline(["add", *(str(path) for path in paths)])
+        )
 
 
 @contextmanager
-def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[Git]:
+def initialize_repo(
+    worktree: str, *, gitdir: Optional[str] = None
+) -> Iterator[MutatingGitWorktree]:
     """Initialize a git repository for the given `worktree`.
 
     NB: The given `worktree` must contain at least one file which will be committed to form an initial
@@ -29,7 +45,7 @@ def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[
 
     :param worktree: The path to the git work tree.
     :param gitdir: An optional path to the `.git` dir to use.
-    :returns: A `Git` repository object that can be used to interact with the repo.
+    :returns: A `MutatingGitWorktree` worktree object that can be used to interact with the repo.
     """
 
     @contextmanager
@@ -40,17 +56,19 @@ def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[
             with temporary_dir() as d:
                 yield d
 
-    with use_gitdir() as git_dir, environment_as(GIT_DIR=git_dir, GIT_WORK_TREE=worktree):
+    with use_gitdir() as git_dir, environment_as(
+        GIT_DIR=git_dir,
+        GIT_WORK_TREE=worktree,
+        GIT_CONFIG_GLOBAL="/dev/null",
+    ):
         subprocess.run(["git", "init"], check=True)
         subprocess.run(["git", "config", "user.email", "you@example.com"], check=True)
-        # TODO: This method inherits the global git settings, so if a developer has gpg signing on,
-        #  this will turn that off. We should probably just disable reading from the global config
-        #  somehow: https://git-scm.com/docs/git-config.
-        subprocess.run(["git", "config", "commit.gpgSign", "false"], check=True)
         subprocess.run(["git", "config", "user.name", "Your Name"], check=True)
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-am", "Add project files."], check=True)
-        yield Git.mount(subdir=worktree)
+        yield MutatingGitWorktree(
+            binary=GitBinary(path="git"), gitdir=PurePath(git_dir), worktree=PurePath(worktree)
+        )
 
 
 def lines_to_set(str_or_list):

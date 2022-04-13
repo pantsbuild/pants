@@ -10,6 +10,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
+from pants.util.strutil import softwrap
 
 
 class Shfmt(TemplatedExternalTool):
@@ -41,9 +42,11 @@ class Shfmt(TemplatedExternalTool):
         "--config-discovery",
         default=True,
         advanced=True,
-        help=(
-            "If true, Pants will include all relevant `.editorconfig` files during runs. "
-            "See https://editorconfig.org."
+        help=softwrap(
+            """
+            If true, Pants will include all relevant `.editorconfig` files during runs.
+            See https://editorconfig.org.
+            """
         ),
     )
 
