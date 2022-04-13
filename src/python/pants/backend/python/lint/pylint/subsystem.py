@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -225,33 +226,22 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
 
 
 # --------------------------------------------------------------------------------------
-# Lockfile
+# Interpreter constraints
 # --------------------------------------------------------------------------------------
 
 
-class PylintLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = Pylint.options_scope
+@dataclass(frozen=True)
+class _PylintConstraintsRequest:
+    pass
 
 
-@rule(
-    desc=(
-        "Determine all Python interpreter versions used by Pylint in your project (for "
-        "lockfile usage)"
-    ),
-    level=LogLevel.DEBUG,
-)
-async def setup_pylint_lockfile(
-    _: PylintLockfileSentinel,
+@rule
+async def pylint_interpreter_constraints(
+    _: _PylintConstraintsRequest,
     first_party_plugins: PylintFirstPartyPlugins,
-    pylint: Pylint,
     python_setup: PythonSetup,
-) -> GeneratePythonLockfile:
-    if not pylint.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            pylint, use_pex=python_setup.generate_lockfiles_with_pex
-        )
-
-    # While Pylint will run in partitions, we need a single lockfile that works with every
+) -> InterpreterConstraints:
+    # While Pylint will run in partitions, we need a set of constraints that works with every
     # partition. We must also consider any 3rd-party requirements used by 1st-party plugins.
     #
     # This first computes the constraints for each individual target, including its direct
@@ -285,7 +275,37 @@ async def setup_pylint_lockfile(
             )
         )
 
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    return InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+
+
+# --------------------------------------------------------------------------------------
+# Lockfile
+# --------------------------------------------------------------------------------------
+
+
+class PylintLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = Pylint.options_scope
+
+
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Pylint in your project (for "
+        "lockfile usage)"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def setup_pylint_lockfile(
+    _: PylintLockfileSentinel,
+    first_party_plugins: PylintFirstPartyPlugins,
+    pylint: Pylint,
+    python_setup: PythonSetup,
+) -> GeneratePythonLockfile:
+    if not pylint.uses_lockfile:
+        return GeneratePythonLockfile.from_tool(
+            pylint, use_pex=python_setup.generate_lockfiles_with_pex
+        )
+
+    constraints = await Get(InterpreterConstraints, _PylintConstraintsRequest())
     return GeneratePythonLockfile.from_tool(
         pylint,
         constraints or InterpreterConstraints(python_setup.interpreter_constraints),
@@ -294,9 +314,36 @@ async def setup_pylint_lockfile(
     )
 
 
+# --------------------------------------------------------------------------------------
+# Export
+# --------------------------------------------------------------------------------------
+
+
+class PylintExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+async def pylint_export(
+    _: PylintExportSentinel,
+    pylint: Pylint,
+    first_party_plugins: PylintFirstPartyPlugins,
+) -> ExportPythonTool:
+    constraints = await Get(InterpreterConstraints, _PylintConstraintsRequest())
+
+    return ExportPythonTool(
+        resolve_name=pylint.options_scope,
+        pex_request=pylint.to_pex_request(
+            interpreter_constraints=constraints,
+            extra_requirements=first_party_plugins.requirement_strings,
+        ),
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, PylintLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, PylintExportSentinel),
     )
