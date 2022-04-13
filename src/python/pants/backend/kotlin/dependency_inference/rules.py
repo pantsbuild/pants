@@ -17,6 +17,8 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.dependency_inference import artifact_mapper
+from pants.jvm.dependency_inference import symbol_mapper as jvm_symbol_mapper
 from pants.jvm.dependency_inference.artifact_mapper import ThirdPartyPackageToArtifactMapping
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
 from pants.jvm.subsystems import JvmSubsystem
@@ -82,5 +84,7 @@ def rules():
         *collect_rules(),
         *kotlin_parser.rules(),
         *symbol_mapper.rules(),
+        *jvm_symbol_mapper.rules(),
+        *artifact_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferKotlinSourceDependencies),
     )
