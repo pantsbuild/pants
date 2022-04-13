@@ -753,6 +753,23 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
         return (ct for root in self for ct in root.coarsened_closure(visited))
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class CoarsenedTargetsRequest:
+    """A request to get CoarsenedTargets for input roots."""
+
+    roots: Tuple[Address, ...]
+    expanded_targets: bool
+    include_special_cased_deps: bool
+
+    def __init__(
+            self, roots: Iterable[Address], *, expanded_targets: bool = False, include_special_cased_deps: bool = False
+    ) -> None:
+        self.roots = tuple(roots)
+        self.expanded_targets = expanded_targets
+        self.include_special_cased_deps = include_special_cased_deps
+
+
 @dataclass(frozen=True)
 class TransitiveTargets:
     """A set of Target roots, and their transitive, flattened, de-duped dependencies.
