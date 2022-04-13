@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -50,9 +51,21 @@ def setup_pyupgrade_lockfile(
     )
 
 
+class PyUpgradeExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+def pyupgrade_export(_: PyUpgradeExportSentinel, pyupgrade: PyUpgrade) -> ExportPythonTool:
+    return ExportPythonTool(
+        resolve_name=pyupgrade.options_scope, pex_request=pyupgrade.to_pex_request()
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, PyUpgradeLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, PyUpgradeExportSentinel),
     )
