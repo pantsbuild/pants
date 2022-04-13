@@ -1008,7 +1008,7 @@ def test_duplicated_rules() -> None:
         async def dup_a() -> A:
             return A()
 
-        @rule  # type: ignore[no-redef]
+        @rule  # type: ignore[no-redef] # noqa: F811
         async def dup_a() -> B:  # noqa: F811
             return B()
 
