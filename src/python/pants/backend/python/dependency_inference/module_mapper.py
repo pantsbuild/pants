@@ -8,6 +8,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import total_ordering
 from pathlib import PurePath
 from typing import DefaultDict, Iterable, Mapping, Tuple
 
@@ -39,9 +40,15 @@ logger = logging.getLogger(__name__)
 ResolveName = str
 
 
+@total_ordering
 class ModuleProviderType(enum.Enum):
     TYPE_STUB = enum.auto()
     IMPL = enum.auto()
+
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, ModuleProviderType):
+            return NotImplemented
+        return self.name < other.name
 
 
 @dataclass(frozen=True, order=True)
