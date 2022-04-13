@@ -185,6 +185,11 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
             return
 
         for parametrization in self:
+            if parametrization.original_target is not None and address.is_parametrized_subset_of(
+                parametrization.original_target.address
+            ):
+                yield parametrization.original_target.address
+
             for parametrized_tgt in parametrization.parametrization.values():
                 if address.is_parametrized_subset_of(parametrized_tgt.address):
                     yield parametrized_tgt.address

@@ -637,6 +637,11 @@ def test_address_specs_parametrize(
         ),
         {Address("demo", generated_name="f.txt", parameters={"resolve": "a"})},
     )
+    assert_resolved(
+        # A direct reference to the parametrized target generator.
+        AddressLiteralSpec("demo", parameters=FrozenDict({"resolve": "a"})),
+        {Address("demo", parameters={"resolve": "a"})},
+    )
 
     # A literal address for a parametrized template should be expanded with the matching targets.
     assert_resolved(
@@ -645,18 +650,20 @@ def test_address_specs_parametrize(
     )
 
     # The above affordance plays nicely with target generation.
-    # assert_resolved(AddressLiteralSpec("demo"), {*generator_resolve_a, *generator_resolve_b})
-    # assert_resolved(
-    #     AddressLiteralSpec("demo", parameters=FrozenDict({"resolve": "a"})), generator_resolve_a
-    # )
-    # assert_resolved(
-    #     AddressLiteralSpec("demo", generated_component="f.txt"),
-    #     {Address("demo", generated_name="f.txt", parameters={"resolve": r}) for r in ("a", "b")},
-    # )
-    # assert_resolved(
-    #     AddressLiteralSpec("demo/f.txt"),
-    #     {
-    #         Address("demo", relative_file_path="f.txt", parameters={"resolve": r})
-    #         for r in ("a", "b")
-    #     },
-    # )
+    assert_resolved(
+        # Note that this returns references to the two target generators. Certain goals like
+        # `test` may then later replace those with their generated targets.
+        AddressLiteralSpec("demo"),
+        {Address("demo", parameters={"resolve": r}) for r in ("a", "b")},
+    )
+    assert_resolved(
+        AddressLiteralSpec("demo", generated_component="f.txt"),
+        {Address("demo", generated_name="f.txt", parameters={"resolve": r}) for r in ("a", "b")},
+    )
+    assert_resolved(
+        AddressLiteralSpec("demo/f.txt"),
+        {
+            Address("demo", relative_file_path="f.txt", parameters={"resolve": r})
+            for r in ("a", "b")
+        },
+    )

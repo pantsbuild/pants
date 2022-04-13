@@ -99,12 +99,8 @@ def test_get_superset_targets() -> None:
 
     dir2 = Address("dir2")
 
-    dir3 = Address("dir3")
-    dir3_v1 = Address("dir3", parameters={"k": "v1"})
-    dir3_v2 = Address("dir3", parameters={"k": "v2"})
+    dir3 = Address("dir3", parameters={"k": "v"})
 
-    # Note that when a target is parameterized, the original_target should not be set in
-    # _TargetParametrization. We test what happens when this invariant is not met via `dir3`.
     params = _TargetParametrizations(
         [
             parametrization(
@@ -113,7 +109,14 @@ def test_get_superset_targets() -> None:
             ),
             parametrization(dir2, []),
             parametrization(None, []),
-            parametrization(dir3, [dir3_v1, dir3_v2]),
+            # This is what a target generator looks like in practice.
+            parametrization(
+                dir3,
+                [
+                    Address("dir3", generated_name="a", parameters={"k": "v"}),
+                    Address("dir3", generated_name="b", parameters={"k": "v"}),
+                ],
+            ),
         ]
     )
 
@@ -130,7 +133,6 @@ def test_get_superset_targets() -> None:
     assert_gets(Address("dir1", parameters={"k1": "v2"}), {dir1__k1_v2__k2_v1, dir1__k1_v2__k2_v2})
 
     assert_gets(dir3, {dir3})
-    assert_gets(dir3_v1, {dir3_v1})
 
     assert_gets(Address("fake"), set())
     assert_gets(Address("dir1", parameters={"fake": "a"}), set())
