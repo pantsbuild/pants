@@ -36,8 +36,11 @@ class ShfmtRequest(FmtRequest):
     name = Shfmt.options_scope
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_shfmt(request: ShfmtRequest, shfmt: Shfmt) -> Process:
+@rule(desc="Format with shfmt", level=LogLevel.DEBUG)
+async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
+    if shfmt.skip:
+        return FmtResult.skip(formatter_name=request.name)
+
     download_shfmt_get = Get(
         DownloadedExternalTool, ExternalToolRequest, shfmt.get_request(Platform.current)
     )
@@ -60,21 +63,17 @@ async def setup_shfmt(request: ShfmtRequest, shfmt: Shfmt) -> Process:
         *shfmt.args,
         *request.snapshot.files,
     ]
-    process = Process(
-        argv=argv,
-        input_digest=input_digest,
-        output_files=request.snapshot.files,
-        description=f"Run shfmt on {pluralize(len(request.field_sets), 'file')}.",
-        level=LogLevel.DEBUG,
+
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=argv,
+            input_digest=input_digest,
+            output_files=request.snapshot.files,
+            description=f"Run shfmt on {pluralize(len(request.field_sets), 'file')}.",
+            level=LogLevel.DEBUG,
+        ),
     )
-    return process
-
-
-@rule(desc="Format with shfmt", level=LogLevel.DEBUG)
-async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
-    if shfmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    result = await Get(ProcessResult, ShfmtRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

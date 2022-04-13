@@ -14,7 +14,7 @@ from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -61,8 +61,10 @@ def generate_argv(
     return tuple(args)
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_isort(request: IsortRequest, isort: Isort) -> Process:
+@rule(desc="Format with isort", level=LogLevel.DEBUG)
+async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
+    if isort.skip:
+        return FmtResult.skip(formatter_name=request.name)
     isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
@@ -82,8 +84,8 @@ async def setup_isort(request: IsortRequest, isort: Isort) -> Process:
         Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         VenvPexProcess(
             isort_pex,
             argv=generate_argv(request.snapshot.files, isort, is_isort5=is_isort5),
@@ -93,14 +95,6 @@ async def setup_isort(request: IsortRequest, isort: Isort) -> Process:
             level=LogLevel.DEBUG,
         ),
     )
-    return process
-
-
-@rule(desc="Format with isort", level=LogLevel.DEBUG)
-async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
-    if isort.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    result = await Get(ProcessResult, IsortRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 

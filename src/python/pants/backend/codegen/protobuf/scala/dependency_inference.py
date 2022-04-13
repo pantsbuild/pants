@@ -1,5 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
@@ -36,7 +38,7 @@ class ScalaPBRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class ScalaPBRuntimeForResolve:
-    address: Address
+    addresses: frozenset[Address]
 
 
 @rule
@@ -65,7 +67,7 @@ async def resolve_scalapb_runtime_for_resolve(
             jvm_artifact_targets=jvm_artifact_targets,
             jvm=jvm,
         )
-        return ScalaPBRuntimeForResolve(list(addresses)[0])
+        return ScalaPBRuntimeForResolve(addresses)
     except ConflictingJvmArtifactVersion as ex:
         raise ConflictingScalaPBRuntimeVersionInResolveError(
             request.resolve_name, ex.required_version, ex.found_coordinate
@@ -91,7 +93,7 @@ async def inject_scalapb_runtime_dependency(
     scalapb_runtime_target_info = await Get(
         ScalaPBRuntimeForResolve, ScalaPBRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies((scalapb_runtime_target_info.address,))
+    return InjectedDependencies(scalapb_runtime_target_info.addresses)
 
 
 class ConflictingScalaPBRuntimeVersionInResolveError(ValueError):

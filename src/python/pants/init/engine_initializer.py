@@ -42,6 +42,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
+from pants.vcs.git import rules as git_rules
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +256,7 @@ class EngineInitializer:
                 *fs.rules(),
                 *environment.rules(),
                 *desktop.rules(),
+                *git_rules(),
                 *graph.rules(),
                 *options_parsing.rules(),
                 *process.rules(),

@@ -12,7 +12,7 @@ from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -36,8 +36,10 @@ class YapfRequest(FmtRequest):
     name = Yapf.options_scope
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Process:
+@rule(desc="Format with yapf", level=LogLevel.DEBUG)
+async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
+    if yapf.skip:
+        return FmtResult.skip(formatter_name=request.name)
     yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, yapf.config_request(request.snapshot.dirs)
@@ -48,8 +50,8 @@ async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Process:
         Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         VenvPexProcess(
             yapf_pex,
             argv=(
@@ -64,14 +66,6 @@ async def setup_yapf(request: YapfRequest, yapf: Yapf) -> Process:
             level=LogLevel.DEBUG,
         ),
     )
-    return process
-
-
-@rule(desc="Format with yapf", level=LogLevel.DEBUG)
-async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
-    if yapf.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    result = await Get(ProcessResult, YapfRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

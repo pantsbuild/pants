@@ -11,7 +11,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -35,12 +35,13 @@ class DocformatterRequest(FmtRequest):
     name = Docformatter.options_scope
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_docformatter(request: DocformatterRequest, docformatter: Docformatter) -> Process:
+@rule(desc="Format with docformatter", level=LogLevel.DEBUG)
+async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
+    if docformatter.skip:
+        return FmtResult.skip(formatter_name=request.name)
     docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
-
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         VenvPexProcess(
             docformatter_pex,
             argv=(
@@ -54,14 +55,6 @@ async def setup_docformatter(request: DocformatterRequest, docformatter: Docform
             level=LogLevel.DEBUG,
         ),
     )
-    return process
-
-
-@rule(desc="Format with docformatter", level=LogLevel.DEBUG)
-async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
-    if docformatter.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    result = await Get(ProcessResult, DocformatterRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

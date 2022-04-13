@@ -11,7 +11,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -36,12 +36,14 @@ class AutoflakeRequest(FmtRequest):
     name = Autoflake.options_scope
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_autoflake(request: AutoflakeRequest, autoflake: Autoflake) -> Process:
+@rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
+async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtResult:
+    if autoflake.skip:
+        return FmtResult.skip(formatter_name=request.name)
     autoflake_pex = await Get(VenvPex, PexRequest, autoflake.to_pex_request())
 
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         VenvPexProcess(
             autoflake_pex,
             argv=(
@@ -56,14 +58,6 @@ async def setup_autoflake(request: AutoflakeRequest, autoflake: Autoflake) -> Pr
             level=LogLevel.DEBUG,
         ),
     )
-    return process
-
-
-@rule(desc="Format with Autoflake", level=LogLevel.DEBUG)
-async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtResult:
-    if autoflake.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    result = await Get(ProcessResult, AutoflakeRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 

@@ -21,7 +21,6 @@ from pants.backend.python.target_types import (
     PythonTestSourceField,
     PythonTestsTimeoutField,
     SkipPythonTestsField,
-    format_invalid_requirement_string_error,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -159,11 +158,7 @@ class PyTest(PythonToolBase):
             try:
                 req = PipRequirement.parse(s).project_name
             except Exception as e:
-                raise ValueError(
-                    format_invalid_requirement_string_error(
-                        s, e, description_of_origin="`[pytest].extra_requirements`"
-                    )
-                )
+                raise ValueError(f"Invalid requirement '{s}' in `[pytest].extra_requirements`: {e}")
             if canonicalize_project_name(req) == "pytest-cov":
                 return
 

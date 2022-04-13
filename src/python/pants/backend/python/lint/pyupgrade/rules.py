@@ -12,7 +12,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -36,12 +36,15 @@ class PyUpgradeRequest(FmtRequest):
     name = PyUpgrade.options_scope
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_pyupgrade_process(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> Process:
+@rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
+async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtResult:
+    if pyupgrade.skip:
+        return FmtResult.skip(formatter_name=request.name)
+
     pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
 
-    process = await Get(
-        Process,
+    result = await Get(
+        FallibleProcessResult,
         VenvPexProcess(
             pyupgrade_pex,
             argv=(*pyupgrade.args, *request.snapshot.files),
@@ -51,15 +54,6 @@ async def setup_pyupgrade_process(request: PyUpgradeRequest, pyupgrade: PyUpgrad
             level=LogLevel.DEBUG,
         ),
     )
-
-    return process
-
-
-@rule(desc="Format with pyupgrade", level=LogLevel.DEBUG)
-async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtResult:
-    if pyupgrade.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    result = await Get(FallibleProcessResult, PyUpgradeRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 
