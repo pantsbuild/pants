@@ -225,7 +225,7 @@ mod tests {
       .workdir_path()
       .join(test_directory.digest().hash.to_hex());
     tokio::fs::create_dir_all(&digest_dir).await.unwrap();
-    tokio::fs::set_permissions(&digest_dir, std::fs::Permissions::from_mode(0o444))
+    tokio::fs::set_permissions(&digest_dir, std::fs::Permissions::from_mode(0o555))
       .await
       .unwrap();
 
