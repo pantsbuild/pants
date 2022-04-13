@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import os.path
+from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -76,6 +78,28 @@ class Black(PythonToolBase):
         )
 
 
+@dataclass(frozen=True)
+class _BlackConstraintsRequest:
+    pass
+
+
+@rule
+async def black_interpreter_constraints(
+    _: _BlackConstraintsRequest, black: Black, python_setup: PythonSetup
+) -> InterpreterConstraints:
+    constraints = black.interpreter_constraints
+    if black.options.is_default("interpreter_constraints"):
+        all_tgts = await Get(AllTargets, AllTargetsRequest())
+        # TODO: fix to use `FieldSet.is_applicable()`.
+        code_constraints = InterpreterConstraints.create_from_targets(
+            (tgt for tgt in all_tgts if not tgt.get(SkipBlackField).value), python_setup
+        )
+        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
+            constraints = code_constraints
+
+    return constraints
+
+
 class BlackLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = Black.options_scope
 
@@ -92,18 +116,22 @@ async def setup_black_lockfile(
             black, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = black.interpreter_constraints
-    if black.options.is_default("interpreter_constraints"):
-        all_tgts = await Get(AllTargets, AllTargetsRequest())
-        # TODO: fix to use `FieldSet.is_applicable()`.
-        code_constraints = InterpreterConstraints.create_from_targets(
-            (tgt for tgt in all_tgts if not tgt.get(SkipBlackField).value), python_setup
-        )
-        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
-            constraints = code_constraints
-
+    constraints = await Get(InterpreterConstraints, _BlackConstraintsRequest())
     return GeneratePythonLockfile.from_tool(
         black, constraints, use_pex=python_setup.generate_lockfiles_with_pex
+    )
+
+
+class BlackExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+async def black_export(_: BlackExportSentinel, black: Black) -> ExportPythonTool:
+    constraints = await Get(InterpreterConstraints, _BlackConstraintsRequest())
+    return ExportPythonTool(
+        resolve_name=black.options_scope,
+        pex_request=black.to_pex_request(interpreter_constraints=constraints),
     )
 
 
@@ -112,4 +140,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, BlackLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, BlackExportSentinel),
     )
