@@ -49,6 +49,7 @@ from pants.option.option_types import (
 from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -82,51 +83,65 @@ class Flake8(PythonToolBase):
         "--config",
         default=None,
         advanced=True,
-        help=lambda cls: (
-            "Path to an INI config file understood by Flake8 "
-            "(https://flake8.pycqa.org/en/latest/user/configuration.html).\n\n"
-            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-            f"this option if the config is located in a non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            Path to an INI config file understood by Flake8
+            (https://flake8.pycqa.org/en/latest/user/configuration.html).
+
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
         ),
     )
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,
         advanced=True,
-        help=lambda cls: (
-            "If true, Pants will include any relevant config files during "
-            "runs (`.flake8`, `flake8`, `setup.cfg`, and `tox.ini`)."
-            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-            f"non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include any relevant config files during
+            runs (`.flake8`, `flake8`, `setup.cfg`, and `tox.ini`).
+
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
         ),
     )
     _source_plugins = TargetListOption(
         "--source-plugins",
         advanced=True,
-        help=(
-            "An optional list of `python_sources` target addresses to load first-party "
-            "plugins.\n\nYou must set the plugin's parent directory as a source root. For "
-            "example, if your plugin is at `build-support/flake8/custom_plugin.py`, add "
-            "'build-support/flake8' to `[source].root_patterns` in `pants.toml`. This is "
-            "necessary for Pants to know how to tell Flake8 to discover your plugin. See "
-            f"{doc_url('source-roots')}\n\nYou must also set `[flake8:local-plugins]` in "
-            "your Flake8 config file. "
-            "For example:\n\n"
-            "```\n"
-            "[flake8:local-plugins]\n"
-            "    extension =\n"
-            "        CUSTOMCODE = custom_plugin:MyChecker\n"
-            "```\n\n"
-            "While your plugin's code can depend on other first-party code and third-party "
-            "requirements, all first-party dependencies of the plugin must live in the same "
-            "directory or a subdirectory.\n\n"
-            "To instead load third-party plugins, set the option "
-            "`[flake8].extra_requirements`.\n\n"
-            "Tip: it's often helpful to define a dedicated 'resolve' via "
-            "`[python].resolves` for your Flake8 plugins such as 'flake8-plugins' "
-            "so that the third-party requirements used by your plugin, like `flake8`, do not "
-            "mix with the rest of your project. Read that option's help message for more info "
-            "on resolves."
+        help=softwrap(
+            f"""
+            An optional list of `python_sources` target addresses to load first-party plugins.
+
+            You must set the plugin's parent directory as a source root. For
+            example, if your plugin is at `build-support/flake8/custom_plugin.py`, add
+            'build-support/flake8' to `[source].root_patterns` in `pants.toml`. This is
+            necessary for Pants to know how to tell Flake8 to discover your plugin. See
+            {doc_url('source-roots')}\n\nYou must also set `[flake8:local-plugins]` in
+            your Flake8 config file.
+
+            For example:
+
+                ```
+                [flake8:local-plugins]
+                    extension =
+                        CUSTOMCODE = custom_plugin:MyChecker
+                ```
+
+            While your plugin's code can depend on other first-party code and third-party
+            requirements, all first-party dependencies of the plugin must live in the same
+            directory or a subdirectory.
+
+            To instead load third-party plugins, set the option
+            `[flake8].extra_requirements`.
+
+            Tip: it's often helpful to define a dedicated 'resolve' via
+            `[python].resolves` for your Flake8 plugins such as 'flake8-plugins'
+            so that the third-party requirements used by your plugin, like `flake8`, do not
+            mix with the rest of your project. Read that option's help message for more info
+            on resolves.
+            """
         ),
     )
 
