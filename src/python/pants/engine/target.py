@@ -763,7 +763,11 @@ class CoarsenedTargetsRequest:
     include_special_cased_deps: bool
 
     def __init__(
-            self, roots: Iterable[Address], *, expanded_targets: bool = False, include_special_cased_deps: bool = False
+        self,
+        roots: Iterable[Address],
+        *,
+        expanded_targets: bool = False,
+        include_special_cased_deps: bool = False,
     ) -> None:
         self.roots = tuple(roots)
         self.expanded_targets = expanded_targets

@@ -552,7 +552,9 @@ async def coarsened_targets(request: CoarsenedTargetsRequest) -> CoarsenedTarget
     dependency_mapping = await Get(
         _DependencyMapping,
         _DependencyMappingRequest(
-            TransitiveTargetsRequest(request.roots, include_special_cased_deps=request.include_special_cased_deps),
+            TransitiveTargetsRequest(
+                request.roots, include_special_cased_deps=request.include_special_cased_deps
+            ),
             expanded_targets=request.expanded_targets,
         ),
     )
