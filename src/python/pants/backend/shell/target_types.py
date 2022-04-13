@@ -258,7 +258,8 @@ class ShellCommandCommandField(StringField):
 class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
     help = softwrap(
-        """Specify the shell command output files and directories.
+        """
+        Specify the shell command output files and directories.
 
         Use a trailing slash on directory names, i.e. `my_dir/`.
         """

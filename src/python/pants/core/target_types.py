@@ -142,6 +142,7 @@ class RelocatedFilesDestField(StringField):
     help = softwrap(
         """
         The new prefix that you want to add to the beginning of the path, such as `data`.
+
         You can set this field to the empty string to avoid adding any new values to the path; the
         value in the `src` field will then be stripped, rather than replaced.
         """
@@ -161,9 +162,10 @@ class RelocatedFiles(Target):
         """
         Loose files with path manipulation applied.
 
-        Allows you to relocate the files at
-        runtime to something more convenient than their actual paths in your project.
-        Forexample, you can relocate `src/resources/project1/data.json` to instead be
+        Allows you to relocate the files at runtime to something more convenient than their actual
+        paths in your project.
+
+        For example, you can relocate `src/resources/project1/data.json` to instead be
         `resources/data.json`. Your other target types can then add this target to their
         `dependencies` field, rather than using the original `files` target.
 
