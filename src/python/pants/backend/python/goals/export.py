@@ -24,7 +24,7 @@ from pants.core.goals.export import (
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -145,11 +145,18 @@ async def export_virtualenv(
 
 @rule
 async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResult:
-    dest = os.path.join("python", "virtualenvs", "tools", request.tool_name)
+    dest = os.path.join("python", "virtualenvs", "tools")
     pex = await Get(Pex, PexRequest, request.pex_request)
 
-    merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, pex.digest]))
-    pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
+    # NOTE: We add a unique-per-tool prefix to the pex_pex path to avoid conflicts when
+    # multiple tools are concurrently exporting. Without this prefix all the `export_tool`
+    # invocations write the pex_pex to `python/virtualenvs/tools/pex`, and the `rm -f` of
+    # the pex_pex path in one export will delete the binary out from under the others.
+    pex_pex_dir = f".{request.tool_name}.tmp"
+    pex_pex_dest = os.path.join("{digest_root}", pex_pex_dir)
+    pex_pex_digest = await Get(Digest, AddPrefix(pex_pex.digest, pex_pex_dir))
+
+    merged_digest = await Get(Digest, MergeDigests([pex_pex_digest, pex.digest]))
     return ExportResult(
         f"virtualenv for the tool '{request.tool_name}'",
         dest,
@@ -157,16 +164,16 @@ async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResul
         post_processing_cmds=[
             PostProcessingCommand(
                 [
-                    pex_pex_path,
+                    os.path.join(pex_pex_dest, pex_pex.exe),
                     os.path.join("{digest_root}", pex.name),
                     "venv",
                     "--collisions-ok",
                     "--remove=all",
-                    f"{{digest_root}}/.tmp/{request.tool_name}",
+                    f"{{digest_root}}/{request.tool_name}",
                 ],
                 {"PEX_MODULE": "pex.tools"},
             ),
-            PostProcessingCommand(["rm", "-f", pex_pex_path]),
+            PostProcessingCommand(["rm", "-rf", pex_pex_dest]),
         ],
     )
 
