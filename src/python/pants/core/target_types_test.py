@@ -166,9 +166,8 @@ def test_relocated_relocated_files() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
-            *archive.rules(),
-            *source_files.rules(),
-            *system_binaries.rules(),
+            *archive_rules(),
+            *source_files_rules(),
             QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
