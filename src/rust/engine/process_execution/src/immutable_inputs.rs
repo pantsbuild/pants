@@ -174,4 +174,74 @@ impl ImmutableInputs {
         .collect(),
     )
   }
+
+  #[cfg(test)]
+  pub(crate) fn workdir_path(&self) -> &Path {
+    self.workdir.path()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::ImmutableInputs;
+  use fs::RelativePath;
+  use std::collections::BTreeMap;
+  use std::os::unix::fs::PermissionsExt;
+  use std::path::PathBuf;
+  use store::Store;
+  use tempfile::TempDir;
+  use testutil::data::{TestData, TestDirectory};
+
+  #[tokio::test]
+  async fn duplicate_immutable_input_digests() {
+    let executor = task_executor::Executor::new();
+
+    let base_dir = TempDir::new().unwrap();
+    tokio::fs::create_dir_all(&base_dir).await.unwrap();
+
+    let store_dir = base_dir.path().join("store");
+    tokio::fs::create_dir_all(&store_dir).await.unwrap();
+    let store = Store::local_only(executor, store_dir).unwrap();
+
+    let immutable_inputs_dir = base_dir.path().join("inputs");
+    tokio::fs::create_dir_all(&immutable_inputs_dir)
+      .await
+      .unwrap();
+    let immutable_inputs = ImmutableInputs::new(store.clone(), &immutable_inputs_dir).unwrap();
+
+    // Prepare the store to contain /pets/cats/roland.ext. We will then extract various pieces of it
+    // into Tree protos.
+    let test_directory = TestDirectory::containing_roland();
+    store
+      .store_file_bytes(TestData::roland().bytes(), false)
+      .await
+      .expect("Error saving file bytes");
+    store
+      .record_directory(&test_directory.directory(), false)
+      .await
+      .expect("Error saving dir");
+
+    let digest_dir = immutable_inputs
+      .workdir_path()
+      .join(test_directory.digest().hash.to_hex());
+    tokio::fs::create_dir_all(&digest_dir).await.unwrap();
+    tokio::fs::set_permissions(&digest_dir, std::fs::Permissions::from_mode(0o444))
+      .await
+      .unwrap();
+
+    let mapping = {
+      let mut m = BTreeMap::new();
+      m.insert(
+        RelativePath::new(PathBuf::from("foo".to_string())).unwrap(),
+        test_directory.directory_digest(),
+      );
+      m.insert(
+        RelativePath::new(PathBuf::from("bar".to_string())).unwrap(),
+        test_directory.directory_digest(),
+      );
+      m
+    };
+
+    let _ = immutable_inputs.local_paths(&mapping).await.unwrap();
+  }
 }
