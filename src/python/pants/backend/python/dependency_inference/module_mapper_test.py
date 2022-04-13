@@ -650,3 +650,29 @@ def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
         Address("", target_name="dep1"),
         Address("", target_name="dep2"),
     )
+
+
+def test_issue_15111(rule_runner: RuleRunner) -> None:
+    """Ensure we can handle when a single address implement multiple modules.
+
+    This is currently only possible with third-party targets.
+    """
+    rule_runner.write_files(
+        {"BUILD": "python_requirement(name='req', requirements=['docopt', 'types-docopt'])"}
+    )
+    rule_runner.set_options(["--python-enable-resolves"])
+    result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
+    assert result == ThirdPartyPythonModuleMapping(
+        {
+            "python-default": FrozenDict(
+                {
+                    "docopt": (
+                        ModuleProvider(Address("", target_name="req"), ModuleProviderType.IMPL),
+                        ModuleProvider(
+                            Address("", target_name="req"), ModuleProviderType.TYPE_STUB
+                        ),
+                    ),
+                }
+            )
+        }
+    )
