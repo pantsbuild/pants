@@ -141,3 +141,58 @@ def test_infer_kotlin_imports_with_cycle(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(
         InferredDependencies, [InferKotlinSourceDependencies(target_b[KotlinSourceField])]
     ) == InferredDependencies(dependencies=[target_a.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_kotlin_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
+    ambiguous_source = dedent(
+        """\
+        package org.pantsbuild.a
+        class A {}
+        """
+    )
+    rule_runner.write_files(
+        {
+            "a_one/BUILD": "kotlin_sources()",
+            "a_one/A.kt": ambiguous_source,
+            "a_two/BUILD": "kotlin_sources()",
+            "a_two/A.kt": ambiguous_source,
+            "b/BUILD": "kotlin_sources()",
+            "b/B.kt": dedent(
+                """\
+                package org.pantsbuild.b
+                import org.pantsbuild.a.A
+                class B {}
+                """
+            ),
+            "c/BUILD": dedent(
+                """\
+                kotlin_sources(
+                  dependencies=["!a_two/A.kt"],
+                )
+                """
+            ),
+            "c/C.kt": dedent(
+                """\
+                package org.pantsbuild.c
+                import org.pantsbuild.a.A
+                class C {}
+                """
+            ),
+        }
+    )
+    target_b = rule_runner.get_target(Address("b", relative_file_path="B.kt"))
+    target_c = rule_runner.get_target(Address("c", relative_file_path="C.kt"))
+
+    # Because there are two sources of `org.pantsbuild.a.A`, neither should be inferred for B. But C
+    # disambiguates with a `!`, and so gets the appropriate version.
+    caplog.clear()
+    assert rule_runner.request(
+        InferredDependencies, [InferKotlinSourceDependencies(target_b[KotlinSourceField])]
+    ) == InferredDependencies(dependencies=[])
+    assert len(caplog.records) == 1
+    assert "The target b/B.kt imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
+
+    assert rule_runner.request(
+        InferredDependencies, [InferKotlinSourceDependencies(target_c[KotlinSourceField])]
+    ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.kt")])
