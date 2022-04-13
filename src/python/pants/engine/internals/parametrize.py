@@ -171,7 +171,7 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
                 return instance
         return None
 
-    def get_all_compatible_targets(self, address: Address) -> Iterator[Address]:
+    def get_all_superset_targets(self, address: Address) -> Iterator[Address]:
         """Yield the input address itself, or any parameterized addresses which are a superset of
         the input address.
 

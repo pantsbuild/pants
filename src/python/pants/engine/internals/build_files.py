@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressSpecs
+from pants.base.specs import AddressLiteralSpec, AddressSpecs
 from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
@@ -179,7 +179,9 @@ def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFil
 
 
 @rule_helper
-async def _determine_literal_addresses_from_specs(specs: AddressSpecs) -> tuple[WrappedTarget, ...]:
+async def _determine_literal_addresses_from_specs(
+    literal_specs: tuple[AddressLiteralSpec, ...]
+) -> tuple[WrappedTarget, ...]:
     literal_addresses = await MultiGet(
         Get(
             Address,
@@ -190,13 +192,13 @@ async def _determine_literal_addresses_from_specs(specs: AddressSpecs) -> tuple[
                 spec.parameters,
             ),
         )
-        for spec in specs.literals
+        for spec in literal_specs
     )
 
     # We replace references to parametrized target templates with all their created targets. For
     # example:
     #  - dir:tgt -> (dir:tgt@k=v1, dir:tgt@k=v2)
-    #  - dir:tgt@k=v -> (dir:tgt@k=v&another=a, dir:tgt@k=v&another=b), but not anything
+    #  - dir:tgt@k=v -> (dir:tgt@k=v,another=a, dir:tgt@k=v,another=b), but not anything
     #       where @k=v is not true.
     literal_parametrizations = await MultiGet(
         Get(_TargetParametrizations, Address, address.maybe_convert_to_target_generator())
@@ -206,7 +208,7 @@ async def _determine_literal_addresses_from_specs(specs: AddressSpecs) -> tuple[
     # Note that if the address is not in the _TargetParametrizations, we must fall back to that
     # address's value. This will allow us to error that the address is invalid.
     all_candidate_addresses = itertools.chain.from_iterable(
-        list(params.get_all_compatible_targets(address)) or [address]
+        list(params.get_all_superset_targets(address)) or [address]
         for address, params in zip(literal_addresses, literal_parametrizations)
     )
 
@@ -224,7 +226,7 @@ async def addresses_from_address_specs(
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = address_specs.filter_by_global_options is False
 
-    literal_wrapped_targets = await _determine_literal_addresses_from_specs(address_specs)
+    literal_wrapped_targets = await _determine_literal_addresses_from_specs(address_specs.literals)
     matched_addresses.update(
         wrapped_tgt.target.address
         for wrapped_tgt in literal_wrapped_targets
