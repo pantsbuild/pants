@@ -3,28 +3,23 @@
 
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 from typing import Iterable, cast
 
-from pants.backend.helm.resolve.remotes import HelmRemotes
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
     AllHelmArtifactTargets,
-    AllHelmChartTargets,
     HelmArtifactFieldSet,
     HelmArtifactRegistryField,
     HelmArtifactRepositoryField,
-    HelmChartMetaSourceField,
     HelmChartTarget,
 )
-from pants.backend.helm.util_rules.chart_metadata import HelmChartMetadata
 from pants.backend.helm.util_rules.chart_metadata import rules as metadata_rules
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_method
-from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list
 
 
@@ -44,22 +39,44 @@ class DuplicateHelmChartNamesFound(Exception):
         )
 
 
+class HelmArtifactLocationSpec(ABC):
+    @property
+    def spec(self) -> str:
+        pass
+
+    @property
+    def is_url(self) -> bool:
+        return len(self.spec.split("://")) == 2
+
+    @property
+    def is_alias(self) -> bool:
+        return self.spec.startswith("@")
+
+
 @dataclass(frozen=True)
-class HelmArtifactRegistryLocation:
+class HelmArtifactRegistryLocationSpec(HelmArtifactLocationSpec):
     registry: str
     repository: str | None
 
+    @property
+    def spec(self) -> str:
+        return self.registry
+
 
 @dataclass(frozen=True)
-class HelmArtifactClassicRepositoryLocation:
+class HelmArtifactClassicRepositoryLocationSpec(HelmArtifactLocationSpec):
     repository: str
+
+    @property
+    def spec(self) -> str:
+        return self.repository
 
 
 @dataclass(frozen=True)
 class HelmArtifactRequirement:
     name: str
     version: str
-    location: HelmArtifactRegistryLocation | HelmArtifactClassicRepositoryLocation
+    location: HelmArtifactLocationSpec
 
 
 @dataclass(frozen=True)
@@ -78,11 +95,13 @@ class HelmArtifact:
         if not registry and not repository:
             raise MissingHelmArtifactLocation(field_set.address)
 
-        registry_location: HelmArtifactRegistryLocation | None = None
+        registry_location: HelmArtifactRegistryLocationSpec | None = None
         if registry:
-            registry_location = HelmArtifactRegistryLocation(registry, repository)
+            registry_location = HelmArtifactRegistryLocationSpec(registry.rstrip("/"), repository)
 
-        location = registry_location or HelmArtifactClassicRepositoryLocation(cast(str, repository))
+        location = registry_location or HelmArtifactClassicRepositoryLocationSpec(
+            cast(str, repository).rstrip("/")
+        )
         req = HelmArtifactRequirement(
             name=cast(str, field_set.artifact.value),
             version=cast(str, field_set.version.value),
@@ -95,59 +114,57 @@ class HelmArtifact:
     def name(self) -> str:
         return self.requirement.name
 
-    @memoized_method
-    def remote_address(self, remotes: HelmRemotes) -> str:
-        if isinstance(self.requirement.location, HelmArtifactRegistryLocation):
-            remote = next(remotes.get(self.requirement.location.registry))
-            repo_ref = f"{remote.address}/{self.requirement.location.repository or ''}".rstrip("/")
-        else:
-            remote = next(remotes.get(self.requirement.location.repository))
-            repo_ref = remote.alias
-
-        return f"{repo_ref}/{self.name}"
+    @property
+    def version(self) -> str:
+        return self.requirement.version
 
 
-class FirstPartyArtifactMapping(FrozenDict[str, Address]):
+@dataclass(frozen=True)
+class ResolvedHelmArtifact(HelmArtifact):
+    location_url: str
+
+    @classmethod
+    def from_unresolved(cls, artifact: HelmArtifact, *, location_url: str) -> ResolvedHelmArtifact:
+        return cls(
+            requirement=artifact.requirement,
+            address=artifact.address,
+            location_url=location_url,
+        )
+
+    @property
+    def chart_url(self) -> str:
+        return f"{self.location_url}/{self.name}"
+
+
+@rule
+def resolved_helm_artifact(artifact: HelmArtifact, subsytem: HelmSubsystem) -> ResolvedHelmArtifact:
+    remotes = subsytem.remotes()
+
+    candidate_remotes = list(remotes.get(artifact.requirement.location.spec))
+    if candidate_remotes:
+        loc_url = candidate_remotes[0].address
+        if isinstance(artifact.requirement.location, HelmArtifactRegistryLocationSpec):
+            loc_url = f"{loc_url}/{artifact.requirement.location.repository or ''}".rstrip("/")
+    else:
+        loc_url = artifact.requirement.location.spec
+
+    return ResolvedHelmArtifact.from_unresolved(artifact, location_url=loc_url)
+
+
+class ThirdPartyHelmArtifactMapping(FrozenDict[str, Address]):
     pass
 
 
 @rule
-async def first_party_artifact_mapping(
-    all_helm_chart_tgts: AllHelmChartTargets,
-) -> FirstPartyArtifactMapping:
-    charts_metadata = await MultiGet(
-        Get(HelmChartMetadata, HelmChartMetaSourceField, tgt[HelmChartMetaSourceField])
-        for tgt in all_helm_chart_tgts
+async def third_party_helm_artifact_mapping(
+    all_helm_artifact_tgts: AllHelmArtifactTargets,
+) -> ThirdPartyHelmArtifactMapping:
+    artifacts = await MultiGet(
+        Get(ResolvedHelmArtifact, HelmArtifact, HelmArtifact.from_target(tgt))
+        for tgt in all_helm_artifact_tgts
     )
-
-    name_addr_mapping: dict[str, Address] = {}
-    duplicate_chart_names: OrderedSet[tuple[str, Address]] = OrderedSet()
-
-    for meta, tgt in zip(charts_metadata, all_helm_chart_tgts):
-        if meta.name in name_addr_mapping:
-            duplicate_chart_names.add((meta.name, name_addr_mapping[meta.name]))
-            duplicate_chart_names.add((meta.name, tgt.address))
-            continue
-
-        name_addr_mapping[meta.name] = tgt.address
-
-    if duplicate_chart_names:
-        raise DuplicateHelmChartNamesFound(duplicate_chart_names)
-
-    return FirstPartyArtifactMapping(name_addr_mapping)
-
-
-class ThirdPartyArtifactMapping(FrozenDict[str, Address]):
-    pass
-
-
-@rule
-def third_party_artifact_mapping(
-    all_helm_artifact_tgts: AllHelmArtifactTargets, subsystem: HelmSubsystem
-) -> ThirdPartyArtifactMapping:
-    artifacts = [HelmArtifact.from_target(tgt) for tgt in all_helm_artifact_tgts]
-    return ThirdPartyArtifactMapping(
-        {artifact.remote_address(subsystem.remotes()): artifact.address for artifact in artifacts}
+    return ThirdPartyHelmArtifactMapping(
+        {artifact.chart_url: artifact.address for artifact in artifacts}
     )
 
 

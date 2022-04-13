@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from abc import ABC
 from dataclasses import dataclass
 from typing import Any, Iterator, cast
 
@@ -24,32 +23,15 @@ class InvalidHelmRegistryAddress(ValueError):
         )
 
 
-class InvalidHelmClassicRepositoryAddress(ValueError):
-    def __init__(self, alias: str, address: str) -> None:
-        super().__init__(
-            f"The classic repository '{alias}' can not have an OCI address URL "
-            f"(using protocol '{OCI_REGISTRY_PROTOCOL}'). The given address was instead: {address}"
-        )
-
-
 class HelmRemoteAliasNotFoundError(ValueError):
     def __init__(self, alias: str) -> None:
         super().__init__(f"There is no Helm remote configured with alias: {alias}")
 
 
 @dataclass(frozen=True)
-class HelmRemote(ABC):
+class HelmRegistry:
     address: str
     alias: str = ""
-
-    def register(self, remotes: dict[str, HelmRemote]) -> None:
-        remotes[self.address] = self
-        if self.alias:
-            remotes[f"@{self.alias}"] = self
-
-
-@dataclass(frozen=True)
-class HelmRegistry(HelmRemote):
     default: bool = False
 
     @classmethod
@@ -64,30 +46,22 @@ class HelmRegistry(HelmRemote):
         if not self.address.startswith(OCI_REGISTRY_PROTOCOL):
             raise InvalidHelmRegistryAddress(self.alias, self.address)
 
-
-@dataclass(frozen=True)
-class HelmClassicRepository(HelmRemote):
-    @classmethod
-    def from_dict(cls, alias: str, d: dict[str, Any]) -> HelmClassicRepository:
-        return cls(alias=alias, address=cast(str, d["address"]).rstrip("/"))
-
-    def __post_init__(self) -> None:
-        if self.address.startswith(OCI_REGISTRY_PROTOCOL):
-            raise InvalidHelmClassicRepositoryAddress(self.alias, self.address)
+    def register(self, remotes: dict[str, HelmRegistry]) -> None:
+        remotes[self.address] = self
+        if self.alias:
+            remotes[f"@{self.alias}"] = self
 
 
 @dataclass(frozen=True)
 class HelmRemotes:
     default: tuple[HelmRegistry, ...]
-    all: FrozenDict[str, HelmRemote]
+    all: FrozenDict[str, HelmRegistry]
 
     @classmethod
-    def from_dicts(cls, d_regs: dict[str, Any], d_repos: dict[str, Any]) -> HelmRemotes:
-        remotes: dict[str, HelmRemote] = {}
+    def from_dict(cls, d_regs: dict[str, Any]) -> HelmRemotes:
+        remotes: dict[str, HelmRegistry] = {}
         for alias, opts in d_regs.items():
             HelmRegistry.from_dict(alias, opts).register(remotes)
-        for alias, opts in d_repos.items():
-            HelmClassicRepository.from_dict(alias, opts).register(remotes)
         return cls(
             default=tuple(
                 sorted(
@@ -98,7 +72,7 @@ class HelmRemotes:
             all=FrozenDict(remotes),
         )
 
-    def get(self, *aliases_or_addresses: str) -> Iterator[HelmRemote]:
+    def get(self, *aliases_or_addresses: str) -> Iterator[HelmRegistry]:
         for alias_or_address in aliases_or_addresses:
             if alias_or_address in self.all:
                 yield self.all[alias_or_address]
@@ -108,19 +82,15 @@ class HelmRemotes:
                 yield from self.default
             elif alias_or_address.startswith(OCI_REGISTRY_PROTOCOL):
                 yield HelmRegistry(address=alias_or_address)
-            else:
-                yield HelmClassicRepository(address=alias_or_address)
 
     @memoized_method
-    def classic_repositories(self) -> tuple[HelmClassicRepository, ...]:
-        deduped_repos = {r for _, r in self.all.items() if isinstance(r, HelmClassicRepository)}
-        return tuple(deduped_repos)
+    def registries(self) -> tuple[HelmRegistry, ...]:
+        deduped_regs = {r for _, r in self.all.items() if isinstance(r, HelmRegistry)}
+        return tuple(deduped_regs)
 
     @property
     def default_registry(self) -> HelmRegistry | None:
         remote = self.all.get("default")
-        if remote:
-            return cast(HelmRegistry, remote)
         if not remote and self.default:
-            return self.default[0]
-        return None
+            remote = self.default[0]
+        return remote

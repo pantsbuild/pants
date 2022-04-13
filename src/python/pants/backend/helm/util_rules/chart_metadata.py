@@ -11,7 +11,6 @@ from typing import Any, cast
 
 import yaml
 
-from pants.backend.helm.resolve.remotes import OCI_REGISTRY_PROTOCOL, HelmRemotes
 from pants.backend.helm.target_types import HelmChartMetaSourceField
 from pants.backend.helm.util_rules.yaml_utils import snake_case_attr_dict
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -86,18 +85,6 @@ class HelmChartDependency:
         if self.import_values:
             d["import-values"] = list(self.import_values)
         return d
-
-    def remote_spec(self, remotes: HelmRemotes) -> str:
-        if not self.repository:
-            registry = remotes.default_registry
-            if registry:
-                return f"{registry.address}/{self.name}"
-            return self.name
-        elif self.repository.startswith(OCI_REGISTRY_PROTOCOL):
-            return f"{self.repository}/{self.name}"
-        else:
-            remote = remotes.all[self.repository]
-            return f"{remote.alias}/{self.name}"
 
 
 @dataclass(frozen=True)

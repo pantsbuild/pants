@@ -4,18 +4,26 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.helm.resolve import artifacts
-from pants.backend.helm.resolve.artifacts import HelmArtifact
-from pants.backend.helm.subsystems.helm import HelmSubsystem
+from pants.backend.helm.resolve.artifacts import HelmArtifact, ResolvedHelmArtifact
 from pants.backend.helm.target_types import HelmArtifactFieldSet
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, Directory, RemovePrefix, Snapshot
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestSubset,
+    Directory,
+    PathGlobs,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
@@ -28,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class FetchedHelmArtifact:
-    artifact: HelmArtifact
+    artifact: ResolvedHelmArtifact
     snapshot: Snapshot
 
     @property
@@ -70,44 +78,56 @@ class FetchHelmArfifactsRequest(EngineAwareParameter):
 
 
 @rule(desc="Fetch third party Helm Chart artifacts", level=LogLevel.DEBUG)
-async def fetch_helm_artifacts(
-    request: FetchHelmArfifactsRequest, subsystem: HelmSubsystem
-) -> FetchedHelmArtifacts:
-    remotes = subsystem.remotes()
-
+async def fetch_helm_artifacts(request: FetchHelmArfifactsRequest) -> FetchedHelmArtifacts:
     download_prefix = "__downloads"
     empty_download_digest = await Get(Digest, CreateDigest([Directory(download_prefix)]))
 
-    artifacts = [HelmArtifact.from_field_set(fs) for fs in request.field_sets]
+    artifacts = await MultiGet(
+        Get(ResolvedHelmArtifact, HelmArtifact, HelmArtifact.from_field_set(field_set))
+        for field_set in request.field_sets
+    )
+
+    def create_fetch_process(artifact: ResolvedHelmArtifact) -> HelmProcess:
+        return HelmProcess(
+            argv=[
+                "pull",
+                artifact.name,
+                "--repo",
+                artifact.location_url,
+                "--version",
+                artifact.version,
+                "--destination",
+                download_prefix,
+                "--untar",
+            ],
+            input_digest=empty_download_digest,
+            description=f"Pulling Helm Chart '{artifact.name}' with version {artifact.version}",
+            output_directories=(download_prefix,),
+        )
+
     download_results = await MultiGet(
         Get(
             ProcessResult,
-            HelmProcess(
-                argv=[
-                    "pull",
-                    artifact.remote_address(remotes),
-                    "--version",
-                    artifact.requirement.version,
-                    "--destination",
-                    download_prefix,
-                    "--untar",
-                ],
-                input_digest=empty_download_digest,
-                description=f"Pulling Helm Chart '{artifact.requirement.name}' with version {artifact.requirement.version}",
-                output_directories=(download_prefix,),
-            ),
+            HelmProcess,
+            create_fetch_process(artifact),
         )
         for artifact in artifacts
     )
 
-    stripped_artifact_snapshots = await MultiGet(
-        Get(Snapshot, RemovePrefix(result.output_digest, download_prefix))
+    stripped_artifact_digests = await MultiGet(
+        Get(Digest, RemovePrefix(result.output_digest, download_prefix))
         for result in download_results
+    )
+
+    # Avoid capturing the tarball that has been downloaded by Helm during the pull.
+    artifact_snapshots = await MultiGet(
+        Get(Snapshot, DigestSubset(digest, PathGlobs([os.path.join(artifact.name, "**")])))
+        for artifact, digest in zip(artifacts, stripped_artifact_digests)
     )
 
     fetched_artifacts = [
         FetchedHelmArtifact(artifact=artifact, snapshot=snapshot)
-        for artifact, snapshot in zip(artifacts, stripped_artifact_snapshots)
+        for artifact, snapshot in zip(artifacts, artifact_snapshots)
     ]
     logger.debug(
         f"Fetched {pluralize(len(fetched_artifacts), 'Helm artifact')} corresponding with:\n"

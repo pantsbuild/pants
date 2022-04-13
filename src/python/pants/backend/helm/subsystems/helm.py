@@ -7,12 +7,7 @@ import os
 from typing import Any
 
 from pants.backend.helm.resolve.remotes import HelmRemotes
-from pants.backend.helm.target_types import (
-    HelmArtifactRepositoryField,
-    HelmArtifactTarget,
-    HelmChartTarget,
-    HelmRegistriesField,
-)
+from pants.backend.helm.target_types import HelmChartTarget, HelmRegistriesField
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.option_types import BoolOption, DictOption
@@ -44,26 +39,6 @@ registries_help = softwrap(
     """
 )
 
-classic_repositories_help = softwrap(
-    f"""
-    Configure Helm Classic repositories. The schema for a registry entry is as follows:
-
-        {{
-            "repository-alias": {{
-                "address": "http://repository-domain:port",
-            }},
-            ...
-        }}
-
-    Classic repositories are used to provide support for Helm third party charts available at Chart Museum
-    or similar places.
-
-    To be able to reference third party charts in classic repos, you need to assign an alias to each of them
-    as per the previous schema and then declare a `{HelmArtifactTarget.alias}` target and set its
-    `{HelmArtifactRepositoryField.alias}` to the given alias of the classic repository prefixed by a `@`.
-    """
-)
-
 
 class HelmSubsystem(TemplatedExternalTool):
     options_scope = "helm"
@@ -85,9 +60,6 @@ class HelmSubsystem(TemplatedExternalTool):
     }
 
     _registries = DictOption[Any]("--registries", help=registries_help, fromfile=True)
-    _classic_repositories = DictOption[Any](
-        "--classic-repositories", help=classic_repositories_help, fromfile=True
-    )
     lint_strict = BoolOption(
         "--lint-strict", default=False, help="Enables strict linting of Helm charts"
     )
@@ -99,4 +71,4 @@ class HelmSubsystem(TemplatedExternalTool):
 
     @memoized_method
     def remotes(self) -> HelmRemotes:
-        return HelmRemotes.from_dicts(self._registries, self._classic_repositories)
+        return HelmRemotes.from_dict(self._registries)

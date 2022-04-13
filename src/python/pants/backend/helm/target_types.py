@@ -228,14 +228,22 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
 
 class HelmArtifactRegistryField(StringField):
     alias = "registry"
-    help = (
-        "Registry alias (prefixed by `@`) configured in `[helm.registries]` for the Helm artifact."
+    help = softwrap(
+        """
+        Either registry alias (prefixed by `@`) configured in `[helm.registries]` for the
+        Helm artifact or the full OCI registry URL.
+        """
     )
 
 
 class HelmArtifactRepositoryField(StringField):
     alias = "repository"
-    help = "Either an alias (prefixed by `@`) to a classic Helm repository configured in `[helm.registries]` or a path inside an OCI registry."
+    help = softwrap(
+        f"""
+        Either a HTTP(S) URL to a classic repository, or a path inside an OCI registry (when
+        `{HelmArtifactRegistryField.alias}` is provided).
+        """
+    )
 
 
 class HelmArtifactArtifactField(StringField):
