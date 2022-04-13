@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -48,9 +49,23 @@ async def setup_autoflake_lockfile(
     )
 
 
+class AutoflakeExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+def autoflake_export(_: AutoflakeExportSentinel, autoflake: Autoflake) -> ExportPythonTool:
+    return ExportPythonTool(
+        resolve_name=autoflake.options_scope, pex_request=autoflake.to_pex_request()
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, AutoflakeLockfileSentinel),
+        # NOTE: If I un-comment this line to register the rule, `./pants` starts to panic
+        # from a loop in the rule graph.
+        # UnionRule(ExportPythonToolSentinel, AutoflakeExportSentinel),
     )
