@@ -13,6 +13,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     Target,
 )
+from pants.util.strutil import softwrap
 
 
 class TerraformModuleSourcesField(MultipleSourcesField):
@@ -31,10 +32,14 @@ class TerraformFieldSet(FieldSet):
 class TerraformModuleTarget(Target):
     alias = "terraform_module"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, TerraformModuleSourcesField)
-    help = (
-        "A single Terraform module corresponding to a directory.\n\n"
-        "There must only be one `terraform_module` in a directory.\n\n"
-        "Use `terraform_modules` to generate `terraform_module` targets for less boilerplate."
+    help = softwrap(
+        """
+        A single Terraform module corresponding to a directory.
+
+        There must only be one `terraform_module` in a directory.
+
+        Use `terraform_modules` to generate `terraform_module` targets for less boilerplate.
+        """
     )
 
 
