@@ -7,6 +7,7 @@ import itertools
 from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -79,6 +80,29 @@ class Bandit(PythonToolBase):
         )
 
 
+@dataclass(frozen=True)
+class _BanditConstraintsRequest:
+    pass
+
+
+@rule
+async def bandit_interpreter_constraints(
+    _: _BanditConstraintsRequest, python_setup: PythonSetup
+) -> InterpreterConstraints:
+    # While Bandit will run in partitions, we need a set of constraints that works with every
+    # partition.
+    #
+    # This ORs all unique interpreter constraints. The net effect is that every possible Python
+    # interpreter used will be covered.
+    all_tgts = await Get(AllTargets, AllTargetsRequest())
+    unique_constraints = {
+        InterpreterConstraints.create_from_targets([tgt], python_setup)
+        for tgt in all_tgts
+        if BanditFieldSet.is_applicable(tgt)
+    }
+    return InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+
+
 class BanditLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = Bandit.options_scope
 
@@ -98,22 +122,25 @@ async def setup_bandit_lockfile(
             bandit, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    # While Bandit will run in partitions, we need a single lockfile that works with every
-    # partition.
-    #
-    # This ORs all unique interpreter constraints. The net effect is that every possible Python
-    # interpreter used will be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
-    unique_constraints = {
-        InterpreterConstraints.create_from_targets([tgt], python_setup)
-        for tgt in all_tgts
-        if BanditFieldSet.is_applicable(tgt)
-    }
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    constraints = await Get(InterpreterConstraints, _BanditConstraintsRequest())
     return GeneratePythonLockfile.from_tool(
         bandit,
         constraints or InterpreterConstraints(python_setup.interpreter_constraints),
         use_pex=python_setup.generate_lockfiles_with_pex,
+    )
+
+
+class BanditExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+async def bandit_export(_: BanditExportSentinel, bandit: Bandit) -> ExportPythonTool:
+    constraints = await Get(InterpreterConstraints, _BanditConstraintsRequest())
+
+    return ExportPythonTool(
+        resolve_name=bandit.options_scope,
+        pex_request=bandit.to_pex_request(interpreter_constraints=constraints),
     )
 
 
@@ -122,4 +149,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, BanditLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, BanditExportSentinel),
     )
