@@ -187,10 +187,9 @@ async def addresses_from_address_specs(
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = address_specs.filter_by_global_options is False
 
-    # Resolve all `AddressLiteralSpec`s. Will error on invalid addresses.
-    literal_wrapped_targets = await MultiGet(
+    literal_addresses = await MultiGet(
         Get(
-            WrappedTarget,
+            Address,
             AddressInput(
                 spec.path_component,
                 spec.target_component,
@@ -200,6 +199,30 @@ async def addresses_from_address_specs(
         )
         for spec in address_specs.literals
     )
+
+    # We replace references to parametrized target templates with all their created targets. For
+    # example:
+    #  - dir:tgt -> (dir:tgt@k=v1, dir:tgt@k=v2)
+    #  - dir:tgt@k=v -> (dir:tgt@k=v,another=a, dir:tgt@k=v,another=b), but not anything
+    #       where @k=v is not true.
+    literal_parametrizations = await MultiGet(
+        Get(_TargetParametrizations, Address, address.maybe_convert_to_target_generator())
+        for address in literal_addresses
+    )
+
+    # Note that if the address is not in the _TargetParametrizations, we must fall back to that
+    # address's value. This will allow us to error that the address is invalid.
+    all_candidate_addresses = itertools.chain.from_iterable(
+        list(params.get_all_superset_targets(address)) or [address]
+        for address, params in zip(literal_addresses, literal_parametrizations)
+    )
+
+    # We eagerly call the `WrappedTarget` rule because it will validate that every final address
+    # actually exists, such as with generated target addresses.
+    literal_wrapped_targets = await MultiGet(
+        Get(WrappedTarget, Address, addr) for addr in all_candidate_addresses
+    )
+
     matched_addresses.update(
         wrapped_tgt.target.address
         for wrapped_tgt in literal_wrapped_targets
