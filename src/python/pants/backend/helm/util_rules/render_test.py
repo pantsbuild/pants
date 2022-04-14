@@ -13,7 +13,7 @@ from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
-    K8S_SERVICE_FILE,
+    K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import chart, render, tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
@@ -57,7 +57,7 @@ def test_template_rendering(rule_runner: RuleRunner) -> None:
             "Chart.yaml": HELM_CHART_FILE,
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
         }
     )
 

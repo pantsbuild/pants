@@ -15,7 +15,7 @@ from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.testutil import (
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
-    K8S_SERVICE_FILE,
+    K8S_SERVICE_TEMPLATE,
     gen_chart_file,
 )
 from pants.backend.helm.util_rules import chart, sources, tool
@@ -74,7 +74,7 @@ def test_helm_package(rule_runner: RuleRunner) -> None:
             f"src/{chart_name}/Chart.yaml": gen_chart_file(chart_name, version=chart_version),
             f"src/{chart_name}/values.yaml": HELM_VALUES_FILE,
             f"src/{chart_name}/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            f"src/{chart_name}/templates/service.yaml": K8S_SERVICE_FILE,
+            f"src/{chart_name}/templates/service.yaml": K8S_SERVICE_TEMPLATE,
         }
     )
 
@@ -93,7 +93,7 @@ def test_helm_package_with_custom_output_path(rule_runner: RuleRunner) -> None:
             f"src/{chart_name}/Chart.yaml": gen_chart_file(chart_name, version=chart_version),
             f"src/{chart_name}/values.yaml": HELM_VALUES_FILE,
             f"src/{chart_name}/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            f"src/{chart_name}/templates/service.yaml": K8S_SERVICE_FILE,
+            f"src/{chart_name}/templates/service.yaml": K8S_SERVICE_TEMPLATE,
         }
     )
 

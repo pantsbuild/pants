@@ -13,7 +13,7 @@ from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
-    K8S_SERVICE_FILE,
+    K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import chart, tool
 from pants.core.goals.test import TestResult
@@ -48,7 +48,7 @@ def test_simple_success(rule_runner: RuleRunner) -> None:
             "Chart.yaml": HELM_CHART_FILE,
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
             "tests/BUILD": "helm_unittest_test(name='test', source='service_test.yaml')",
             "tests/service_test.yaml": dedent(
                 """\
@@ -87,7 +87,7 @@ def test_simple_failure(rule_runner: RuleRunner) -> None:
             "Chart.yaml": HELM_CHART_FILE,
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
             "tests/BUILD": "helm_unittest_test(name='test', source='service_test.yaml')",
             "tests/service_test.yaml": dedent(
                 """\

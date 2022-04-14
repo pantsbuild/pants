@@ -12,7 +12,7 @@ from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.testutil import (
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
-    K8S_SERVICE_FILE,
+    K8S_SERVICE_TEMPLATE,
     gen_chart_file,
 )
 from pants.backend.helm.util_rules import chart, sources, tool
@@ -69,7 +69,7 @@ def test_collects_single_chart_sources(
             "Chart.yaml": gen_chart_file(name, version=version, type=type, icon=icon),
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
         }
     )
 
@@ -103,7 +103,7 @@ def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: R
             ),
             "src/chart1/values.yaml": HELM_VALUES_FILE,
             "src/chart1/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "src/chart1/templates/service.yaml": K8S_SERVICE_FILE,
+            "src/chart1/templates/service.yaml": K8S_SERVICE_TEMPLATE,
             "src/chart2/BUILD": "helm_chart(dependencies=['//src/chart1'])",
             "src/chart2/Chart.yaml": dedent(
                 """\
@@ -154,7 +154,7 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
             ),
             "src/chart1/values.yaml": HELM_VALUES_FILE,
             "src/chart1/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "src/chart1/templates/service.yaml": K8S_SERVICE_FILE,
+            "src/chart1/templates/service.yaml": K8S_SERVICE_TEMPLATE,
             "src/chart2/BUILD": "helm_chart()",
             "src/chart2/Chart.yaml": dedent(
                 """\

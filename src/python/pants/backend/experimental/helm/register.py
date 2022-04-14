@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.helm.goals import lint, package, publish, tailor
+from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.target_types import (
     HelmArtifactTarget,
     HelmChartTarget,
@@ -28,6 +29,7 @@ def rules():
     return [
         *chart.rules(),
         *lint.rules(),
+        *deployment.rules(),
         *package.rules(),
         *publish.rules(),
         *tailor.rules(),

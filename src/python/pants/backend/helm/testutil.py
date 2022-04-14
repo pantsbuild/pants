@@ -123,7 +123,7 @@ HELM_CHART_FILE_V2_FULL = dedent(
   """
 )
 
-K8S_SERVICE_FILE = dedent(
+K8S_SERVICE_TEMPLATE = dedent(
     """\
   apiVersion: v1
   kind: Service
@@ -143,7 +143,7 @@ K8S_SERVICE_FILE = dedent(
   """
 )
 
-K8S_INGRESS_FILE_WITH_LINT_WARNINGS = dedent(
+K8S_INGRESS_TEMPLATE_WITH_LINT_WARNINGS = dedent(
     """\
   apiVersion: extensions/v1beta1
   kind: Ingress
@@ -166,22 +166,40 @@ K8S_INGRESS_FILE_WITH_LINT_WARNINGS = dedent(
   """
 )
 
+K8S_POD_TEMPLATE = dedent(
+    """\
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: {{ template "fullname" . }}
+      labels:
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+    spec:
+      containers:
+        - name: myapp-container
+          image: busybox:1.28
+      initContainers:
+        - name: init-service
+          image: busybox:1.29
+    """
+)
+
 K8S_POD_FILE = dedent(
     """\
-  apiVersion: v1
-  kind: Pod
-  metadata:
-    name: {{ template "fullname" . }}
-    labels:
-      chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
-  spec:
-    containers:
-      - name: myapp-container
-        image: busybox:1.28
-    initContainers:
-      - name: init-service
-        image: busybox:1.29
-  """
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: foo
+      labels:
+        chart: foo-bar
+    spec:
+      containers:
+        - name: myapp-container
+          image: busybox:1.28
+      initContainers:
+        - name: init-service
+          image: busybox:1.29
+    """
 )
 
 K8S_CRD_FILE = dedent(

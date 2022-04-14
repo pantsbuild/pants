@@ -15,6 +15,7 @@ from pants.backend.helm.testutil import (
     HELM_VALUES_FILE,
     K8S_CRD_FILE,
     K8S_SERVICE_FILE,
+    K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import sources
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
@@ -51,7 +52,7 @@ def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:
             "values.yaml": HELM_VALUES_FILE,
             "crds/foo.yml": K8S_CRD_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
             "resource.xml": "",
             "file.txt": "",
         }
@@ -97,7 +98,7 @@ def test_source_templates_includes(
             "Chart.yaml": HELM_CHART_FILE,
             "values.yaml": HELM_VALUES_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "templates/service.yaml": K8S_SERVICE_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
             "resource.xml": "",
             "file.txt": "",
         }
