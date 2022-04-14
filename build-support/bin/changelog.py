@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
 import argparse
 import datetime
+import logging
 import re
 import subprocess
+import sys
+from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum
 from textwrap import dedent
 
+import requests
 from common import die
 from packaging.version import Version
+
+logger = logging.getLogger(__name__)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -61,7 +70,60 @@ def relevant_shas(prior: str, release_branch: str) -> list[str]:
     )
 
 
-def prepare_sha(sha: str) -> str:
+class Category(Enum):
+    NewFeatures = "new feature"
+    UserAPIChanges = "user api change"
+    PluginAPIChanges = "plugin api change"
+    BugFixes = "bugfix"
+    Performance = "performance"
+    Documentation = "documentation"
+    Internal = "internal"
+
+
+@dataclass(frozen=True)
+class Entry:
+    category: Category | None
+    text: str
+
+
+def categorize(pr_num: str) -> Category | None:
+    sys.stderr.write(f"Categorizing PR#{pr_num}... ")
+    sys.stderr.flush()
+
+    def complete_categorization(category: Category | str) -> Category | None:
+        sys.stderr.write(f"{category}\n")
+        return category if isinstance(category, Category) else None
+
+    # See: https://docs.github.com/en/rest/reference/pulls
+    response = requests.get(f"https://api.github.com/repos/pantsbuild/pants/pulls/{pr_num}")
+    if not response.ok:
+        return complete_categorization(
+            f"Unable to categorize PR {pr_num}. HTTP error: "
+            f"{response.status_code} {response.reason}"
+        )
+    try:
+        data = response.json()
+    except requests.exceptions.JSONDecodeError as e:
+        return complete_categorization(
+            f"Unable to categorize PR {pr_num}. Problem decoding JSON response: {e}"
+        )
+
+    labels = data.get("labels", [])
+    for label in labels:
+        name = label.get("name", "")
+        if name.startswith("category:"):
+            try:
+                return complete_categorization(Category(name[len("category:") :]))
+            except ValueError:
+                recognized_category_labels = " ".join(f"'category:{c.value}'" for c in Category)
+                logger.warning(
+                    f"Unrecognized category label {name!r}. Recognized category labels are: "
+                    f"{recognized_category_labels}"
+                )
+    return complete_categorization("No recognized `category:*` label found.")
+
+
+def prepare_sha(sha: str) -> Entry:
     subject = (
         subprocess.run(
             ["git", "log", "-1", "--format=format:%s", sha],
@@ -73,17 +135,26 @@ def prepare_sha(sha: str) -> str:
     )
     pr_num_match = re.search(r"\(#(\d{4,5})\)\s*$", subject)
     if not pr_num_match:
-        return f"* {subject}"
+        return Entry(category=None, text=f"* {subject}")
     pr_num = pr_num_match.groups()[0]
+    category = categorize(pr_num)
     pr_url = f"https://github.com/pantsbuild/pants/pull/{pr_num}"
     subject_with_url = subject.replace(f"(#{pr_num})", f"([#{pr_num}]({pr_url}))")
-    return f"* {subject_with_url}"
+    return Entry(category=category, text=f"* {subject_with_url}")
 
 
-def instructions(new_version: str) -> str:
+def instructions(new_version: str, entries: list[Entry]) -> str:
     date = datetime.date.today().strftime("%b %d, %Y")
     version_components = new_version.split(".", maxsplit=4)
     major, minor = version_components[0], version_components[1]
+
+    entries_by_category = defaultdict(list)
+    for entry in entries:
+        entries_by_category[entry.category].append(entry.text)
+
+    def format_entries(category: Category | None) -> str:
+        return "\n{lines}".format(lines="\n\n".join(entries_by_category.get(category, [])))
+
     return dedent(
         f"""\
         Copy the below headers into `src/python/pants/notes/{major}.{minor}.x.md`. Then, put each
@@ -99,39 +170,48 @@ def instructions(new_version: str) -> str:
         ## {new_version} ({date})
 
         ### New Features
-
+        {{new_features}}
 
         ### User API Changes
-
+        {{user_api_changes}}
 
         ### Plugin API Changes
-
+        {{plugin_api_changes}}
 
         ### Bug fixes
-
+        {{bugfixes}}
 
         ### Performance
-
+        {{performance}}
 
         ### Documentation
-
+        {{documentation}}
 
         ### Internal (put these in a PR comment for review, not the release notes)
+        {{internal}}
 
         --------------------------------------------------------------------
-
+        {{uncategorized}}
         """
+    ).format(
+        new_features=format_entries(Category.NewFeatures),
+        user_api_changes=format_entries(Category.UserAPIChanges),
+        plugin_api_changes=format_entries(Category.PluginAPIChanges),
+        bugfixes=format_entries(Category.BugFixes),
+        performance=format_entries(Category.Performance),
+        documentation=format_entries(Category.Documentation),
+        internal=format_entries(Category.Internal),
+        uncategorized=format_entries(None),
     )
 
 
 def main() -> None:
     args = create_parser().parse_args()
     release_branch = determine_release_branch(args.new)
-
-    print(instructions(args.new))
     entries = [prepare_sha(sha) for sha in relevant_shas(args.prior, release_branch)]
-    print("\n\n".join(entries))
+    print(instructions(args.new, entries))
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.WARNING)
     main()

@@ -15,7 +15,7 @@ use_coverage = true
 xml_dir = "dist/test-results/"
 
 [pytest]
-args = ["--no-header", "-vv"]
+args = ["--no-header", "--noskip", "-vv"]
 
 [coverage-py]
 report = ["raw", "xml"]
@@ -30,7 +30,7 @@ ci_env_variables = [
   "GITHUB_WORKFLOW","GITHUB_JOB",  # temporary, for debugging issues w/ restricted tokens.
 ]
 restricted_token_matches =  """{
-  'GITHUB_REPOSITORY': 'pantsbuild/pants', 
+  'GITHUB_REPOSITORY': 'pantsbuild/pants',
 }"""
 
 [buildsense]

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.helm.util_rules.chart import DEFAULT_API_VERSION, ChartType
+from pants.backend.helm.util_rules.chart_metadata import DEFAULT_API_VERSION, ChartType
 
 
 def gen_chart_file(

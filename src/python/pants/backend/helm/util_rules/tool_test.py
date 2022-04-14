@@ -12,8 +12,8 @@ from pants.core.util_rules import config_files, external_tool
 from pants.engine import process
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import QueryRule, SubsystemRule
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -27,10 +27,10 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *tool.rules(),
             *process.rules(),
-            SubsystemRule(HelmSubsystem),
             QueryRule(HelmBinary, ()),
             QueryRule(HelmSubsystem, ()),
             QueryRule(Process, (HelmProcess,)),
+            QueryRule(ProcessResult, (HelmProcess,)),
         ],
     )
 
@@ -38,6 +38,7 @@ def rule_runner() -> RuleRunner:
 def test_initialises_basic_helm_binary(rule_runner: RuleRunner) -> None:
     helm_subsystem = rule_runner.request(HelmSubsystem, [])
     helm_binary = rule_runner.request(HelmBinary, [])
+
     assert helm_binary
     assert helm_binary.path == f"__helm/{helm_subsystem.generate_exe(Platform.current)}"
 

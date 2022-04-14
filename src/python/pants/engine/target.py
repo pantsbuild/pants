@@ -34,7 +34,7 @@ from typing import (
 
 from typing_extensions import final
 
-from pants.base.deprecated import deprecated_conditional, warn_or_error
+from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
@@ -52,10 +52,10 @@ from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized, memoized_classproperty, memoized_method, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import bullet_list, pluralize
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -821,27 +821,6 @@ class AllTargetsRequest:
 # -----------------------------------------------------------------------------------------------
 
 
-@memoized
-def maybe_warn_dependencies_as_copied_field(tgt_type: type[TargetGenerator]) -> None:
-    copied_dependencies_field_types = [
-        field_type.__name__
-        for field_type in tgt_type.copied_fields
-        if issubclass(field_type, Dependencies)
-    ]
-    if copied_dependencies_field_types:
-        warn_or_error(
-            removal_version="2.12.0.dev1",
-            entity=(
-                f"using a `Dependencies` field subclass ({copied_dependencies_field_types}) "
-                "as a `TargetGenerator.copied_field`"
-            ),
-            hint=(
-                "`Dependencies` fields should be `TargetGenerator.moved_field`s, to avoid "
-                "redundant graph edges."
-            ),
-        )
-
-
 class TargetGenerator(Target):
     """A Target type which generates other Targets via installed `@rule` logic.
 
@@ -875,7 +854,18 @@ class TargetGenerator(Target):
 
     def validate(self) -> None:
         super().validate()
-        maybe_warn_dependencies_as_copied_field(type(self))
+
+        copied_dependencies_field_types = [
+            field_type.__name__
+            for field_type in type(self).copied_fields
+            if issubclass(field_type, Dependencies)
+        ]
+        if copied_dependencies_field_types:
+            raise InvalidTargetException(
+                f"Using a `Dependencies` field subclass ({copied_dependencies_field_types}) as a "
+                "`TargetGenerator.copied_field`. `Dependencies` fields should be "
+                "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
+            )
 
 
 class TargetFilesGenerator(TargetGenerator):
@@ -892,19 +882,12 @@ class TargetFilesGenerator(TargetGenerator):
         super().validate()
 
         if self.has_field(MultipleSourcesField) and not self[MultipleSourcesField].value:
-            sources_field = self[MultipleSourcesField]
-            warn_or_error(
-                removal_version="2.12.0.dev1",
-                entity=(
-                    f"specifying an empty `{sources_field.alias}` field for target generator type "
-                    f"`{self.alias}`"
-                ),
-                hint=(
-                    f"The target generator at {self.address} will not generate any targets. If its "
-                    "purpose is to act as an alias for its dependencies, then it should be "
-                    "declared as a `target(..)` generic target instead. If it is unused, then it "
-                    "should be removed."
-                ),
+            raise InvalidTargetException(
+                f"The `{self.alias}` target generator at {self.address} has an empty "
+                f"`{self[MultipleSourcesField].alias}` field; so it will not generate any targets. "
+                "If its purpose is to act as an alias for its dependencies, then it should be "
+                "declared as a `target(..)` generic target instead. If it is unused, then it "
+                "should be removed."
             )
 
 
@@ -1004,28 +987,14 @@ class GeneratedTargets(FrozenDict[Address, Target]):
         super().__init__(mapping)
 
 
-class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for tgt_cls, request in self.items():
-            # TODO: After this deprecation, the key type for this class should become
-            # `TargetGenerator`, and the `request_for` method should require a `TargetGenerator`
-            # argument, so that callers are forced to cast / check subtyping before calling.
-            deprecated_conditional(
-                lambda: not issubclass(tgt_cls, TargetGenerator),
-                removal_version="2.12.0.dev0",
-                entity="`GenerateTargetsRequest.generate_from` types which do not subclass `TargetGenerator`",
-                hint=(
-                    f"The generate_from type of `{request.__name__}` was `{tgt_cls.__name__}`, "
-                    "which does not subclass `TargetGenerator`."
-                ),
-            )
-
+class TargetTypesToGenerateTargetsRequests(
+    FrozenDict[Type[TargetGenerator], Type[GenerateTargetsRequest]]
+):
     def is_generator(self, tgt: Target) -> bool:
         """Does this target type generate other targets?"""
-        return bool(self.request_for(type(tgt)))
+        return isinstance(tgt, TargetGenerator) and bool(self.request_for(type(tgt)))
 
-    def request_for(self, tgt_cls: type[Target]) -> type[GenerateTargetsRequest] | None:
+    def request_for(self, tgt_cls: type[TargetGenerator]) -> type[GenerateTargetsRequest] | None:
         """Return the request type for the given Target, or None."""
         if issubclass(tgt_cls, TargetFilesGenerator):
             return self.get(TargetFilesGenerator)
@@ -1898,16 +1867,41 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
     """
 
     alias = "sources"
-    help = (
-        "A list of files and globs that belong to this target.\n\n"
-        "Paths are relative to the BUILD file's directory. You can ignore files/globs by "
-        "prefixing them with `!`.\n\n"
-        "Example: `sources=['example.ext', 'test_*.ext', '!test_ignore.ext']`."
+    help = softwrap(
+        """
+        A list of files and globs that belong to this target.
+
+        Paths are relative to the BUILD file's directory. You can ignore files/globs by
+        prefixing them with `!`.
+
+        Example: `sources=['example.ext', 'test_*.ext', '!test_ignore.ext']`.
+        """
     )
+
+    ban_subdirectories: ClassVar[bool] = False
 
     @property
     def globs(self) -> tuple[str, ...]:
         return self.value or ()
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        value = super().compute_value(raw_value, address)
+        if cls.ban_subdirectories:
+            invalid_globs = [glob for glob in (value or ()) if "**" in glob or os.path.sep in glob]
+            if invalid_globs:
+                raise InvalidFieldException(
+                    softwrap(
+                        f"""
+                        The {repr(cls.alias)} field in target {address} must only have globs for
+                        the target's directory, i.e. it cannot include values with `**` or
+                        `{os.path.sep}`. It was set to: {sorted(value or ())}
+                        """
+                    )
+                )
+        return value
 
 
 class OptionalSingleSourceField(SourcesField, StringField):
@@ -1923,9 +1917,12 @@ class OptionalSingleSourceField(SourcesField, StringField):
     """
 
     alias = "source"
-    help = (
-        "A single file that belongs to this target.\n\n"
-        "Path is relative to the BUILD file's directory, e.g. `source='example.ext'`."
+    help = softwrap(
+        """
+        A single file that belongs to this target.
+
+        Path is relative to the BUILD file's directory, e.g. `source='example.ext'`.
+        """
     )
     required = False
     default: ClassVar[str | None] = None
@@ -2190,23 +2187,29 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     alias = "dependencies"
-    help = (
-        "Addresses to other targets that this target depends on, e.g. "
-        "['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].\n\n"
-        "This augments any dependencies inferred by Pants, such as by analyzing your imports. Use "
-        f"`{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final "
-        "result.\n\n"
-        f"See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for "
-        "more about how addresses are formed, including for generated targets. You can also run "
-        f"`{bin_name()} list ::` to find all addresses in your project, or "
-        f"`{bin_name()} list dir:` to find all addresses defined in that directory.\n\n"
-        "If the target is in the same BUILD file, you can leave off the BUILD file path, e.g. "
-        "`:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use "
-        "`./` for the file path, e.g. `./main.py:tgt`; for all other generated targets, "
-        "use `:tgt#generated_name`.\n\n"
-        "You may exclude dependencies by prefixing with `!`, e.g. "
-        "`['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are intended for false positives "
-        "with dependency inference; otherwise, simply leave off the dependency from the BUILD file."
+    help = softwrap(
+        f"""
+        Addresses to other targets that this target depends on, e.g.
+        ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
+
+        This augments any dependencies inferred by Pants, such as by analyzing your imports. Use
+        `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
+        result.
+
+        See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for
+        more about how addresses are formed, including for generated targets. You can also run
+        `{bin_name()} list ::` to find all addresses in your project, or
+        `{bin_name()} list dir:` to find all addresses defined in that directory.
+
+        If the target is in the same BUILD file, you can leave off the BUILD file path, e.g.
+        `:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use
+        `./` for the file path, e.g. `./main.py:tgt`; for all other generated targets,
+        use `:tgt#generated_name`.
+
+        You may exclude dependencies by prefixing with `!`, e.g.
+        `['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are intended for false positives
+        with dependency inference; otherwise, simply leave off the dependency from the BUILD file.
+        """
     )
     supports_transitive_excludes = False
 
@@ -2461,7 +2464,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
 
     To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,
-    tgt.get(MyField).to_unparsed_address_inputs()`.
+    tgt.get(MyField).to_unparsed_address_inputs())`.
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
@@ -2475,18 +2478,24 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 class Tags(StringSequenceField):
     alias = "tags"
-    help = (
-        "Arbitrary strings to describe a target.\n\nFor example, you may tag some test targets "
-        f"with 'integration_test' so that you could run `{bin_name()} --tag='integration_test' test ::` "
-        "to only run on targets with that tag."
+    help = softwrap(
+        f"""
+        Arbitrary strings to describe a target.
+
+        For example, you may tag some test targets with 'integration_test' so that you could run
+        `{bin_name()} --tag='integration_test' test ::`  to only run on targets with that tag.
+        """
     )
 
 
 class DescriptionField(StringField):
     alias = "description"
-    help = (
-        f"A human-readable description of the target.\n\nUse `{bin_name()} list --documented ::` to see "
-        "all targets with descriptions."
+    help = softwrap(
+        f"""
+        A human-readable description of the target.
+
+        Use `{bin_name()} list --documented ::` to see all targets with descriptions.
+        """
     )
 
 

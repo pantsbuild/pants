@@ -12,13 +12,14 @@ from pants.engine.target import (
     FieldSet,
     MultipleSourcesField,
     Target,
-    TargetGenerator,
 )
+from pants.util.strutil import softwrap
 
 
 class TerraformModuleSourcesField(MultipleSourcesField):
     default = ("*.tf",)
     expected_file_extensions = (".tf",)
+    ban_subdirectories = True
 
 
 @dataclass(frozen=True)
@@ -31,31 +32,15 @@ class TerraformFieldSet(FieldSet):
 class TerraformModuleTarget(Target):
     alias = "terraform_module"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, TerraformModuleSourcesField)
-    help = (
-        "A single Terraform module corresponding to a directory.\n\n"
-        "There must only be one `terraform_module` in a directory.\n\n"
-        "Use `terraform_modules` to generate `terraform_module` targets for less boilerplate."
+    help = softwrap(
+        """
+        A single Terraform module corresponding to a directory.
+
+        There must only be one `terraform_module` in a directory.
+
+        Use `terraform_modules` to generate `terraform_module` targets for less boilerplate.
+        """
     )
-
-
-class TerraformModulesGeneratingSourcesField(MultipleSourcesField):
-    # TODO: This currently only globs .tf files but not non-.tf files referenced by Terraform config. This
-    # should be updated to allow for the generated TerraformModule targets to capture all files in the diectory
-    # other than BUILD files.
-    default = ("**/*.tf",)
-    expected_file_extensions = (".tf",)
-
-
-class TerraformModulesGeneratorTarget(TargetGenerator):
-    alias = "terraform_modules"
-    help = (
-        "Generate a `terraform_module` target for each directory from the `sources` field "
-        "where Terraform files are present."
-    )
-    generated_target_cls = TerraformModuleTarget
-    core_fields = (*COMMON_TARGET_FIELDS, TerraformModulesGeneratingSourcesField)
-    copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies,)
 
 
 def rules():

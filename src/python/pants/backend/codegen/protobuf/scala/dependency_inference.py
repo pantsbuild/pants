@@ -1,5 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
@@ -10,8 +12,13 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, WrappedTarget
 from pants.engine.unions import UnionRule
-from pants.jvm.dependency_inference.artifact_mapper import AllJvmArtifactTargets
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmArtifactTargets,
+    ConflictingJvmArtifactVersion,
+    MissingJvmArtifacts,
+    find_jvm_artifacts_or_raise,
+)
+from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.docutil import bin_name
@@ -31,7 +38,7 @@ class ScalaPBRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class ScalaPBRuntimeForResolve:
-    address: Address
+    addresses: frozenset[Address]
 
 
 @rule
@@ -47,25 +54,28 @@ async def resolve_scalapb_runtime_for_resolve(
     scala_binary_version, _, _ = scala_version.rpartition(".")
     version = scalapb.version
 
-    for tgt in jvm_artifact_targets:
-        if tgt[JvmResolveField].normalized_value(jvm) != request.resolve_name:
-            continue
-
-        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
-        if (
-            artifact.coordinate.group != _SCALAPB_RUNTIME_GROUP
-            or artifact.coordinate.artifact != f"{_SCALAPB_RUNTIME_ARTIFACT}_{scala_binary_version}"
-        ):
-            continue
-
-        if artifact.coordinate.version != version:
-            raise ConflictingScalaPBRuntimeVersionInResolveError(
-                request.resolve_name, version, artifact.coordinate
-            )
-
-        return ScalaPBRuntimeForResolve(tgt.address)
-
-    raise MissingScalaPBRuntimeInResolveError(request.resolve_name, version, scala_binary_version)
+    try:
+        addresses = find_jvm_artifacts_or_raise(
+            required_coordinates=[
+                Coordinate(
+                    group=_SCALAPB_RUNTIME_GROUP,
+                    artifact=f"{_SCALAPB_RUNTIME_ARTIFACT}_{scala_binary_version}",
+                    version=version,
+                )
+            ],
+            resolve=request.resolve_name,
+            jvm_artifact_targets=jvm_artifact_targets,
+            jvm=jvm,
+        )
+        return ScalaPBRuntimeForResolve(addresses)
+    except ConflictingJvmArtifactVersion as ex:
+        raise ConflictingScalaPBRuntimeVersionInResolveError(
+            request.resolve_name, ex.required_version, ex.found_coordinate
+        )
+    except MissingJvmArtifacts:
+        raise MissingScalaPBRuntimeInResolveError(
+            request.resolve_name, version, scala_binary_version
+        )
 
 
 @rule
@@ -83,7 +93,7 @@ async def inject_scalapb_runtime_dependency(
     scalapb_runtime_target_info = await Get(
         ScalaPBRuntimeForResolve, ScalaPBRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies((scalapb_runtime_target_info.address,))
+    return InjectedDependencies(scalapb_runtime_target_info.addresses)
 
 
 class ConflictingScalaPBRuntimeVersionInResolveError(ValueError):

@@ -1,5 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
+from dataclasses import dataclass
 
 from pants.backend.codegen.thrift.apache.java import subsystem
 from pants.backend.codegen.thrift.apache.java.subsystem import ApacheThriftJavaSubsystem
@@ -9,7 +12,7 @@ from pants.backend.codegen.thrift.apache.rules import (
 )
 from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
 from pants.backend.java.target_types import JavaSourceField
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.build_graph.address import Address
 from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
@@ -18,9 +21,20 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     InjectDependenciesRequest,
     InjectedDependencies,
+    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.dependency_inference import artifact_mapper
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmArtifactTargets,
+    MissingJvmArtifacts,
+    UnversionedCoordinate,
+    find_jvm_artifacts_or_raise,
+)
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 
@@ -60,12 +74,78 @@ class InjectApacheThriftJavaDependencies(InjectDependenciesRequest):
     inject_for = ThriftDependenciesField
 
 
+@dataclass(frozen=True)
+class ApacheThriftJavaRuntimeForResolveRequest:
+    resolve_name: str
+
+
+@dataclass(frozen=True)
+class ApacheThriftJavaRuntimeForResolve:
+    addresses: frozenset[Address]
+
+
+_LIBTHRIFT_GROUP = "org.apache.thrift"
+_LIBTHRIFT_ARTIFACT = "libthrift"
+
+
+@rule
+async def resolve_apache_thrift_java_runtime_for_resolve(
+    request: ApacheThriftJavaRuntimeForResolveRequest,
+    jvm_artifact_targets: AllJvmArtifactTargets,
+    jvm: JvmSubsystem,
+) -> ApacheThriftJavaRuntimeForResolve:
+    try:
+        addresses = find_jvm_artifacts_or_raise(
+            required_coordinates=[
+                UnversionedCoordinate(
+                    group=_LIBTHRIFT_GROUP,
+                    artifact=_LIBTHRIFT_ARTIFACT,
+                )
+            ],
+            resolve=request.resolve_name,
+            jvm_artifact_targets=jvm_artifact_targets,
+            jvm=jvm,
+        )
+        return ApacheThriftJavaRuntimeForResolve(addresses)
+    except MissingJvmArtifacts:
+        raise MissingApacheThriftJavaRuntimeInResolveError(
+            request.resolve_name,
+        )
+
+
 @rule
 async def inject_apache_thrift_java_dependencies(
-    _: InjectApacheThriftJavaDependencies, thrift_java: ApacheThriftJavaSubsystem
+    request: InjectApacheThriftJavaDependencies, jvm: JvmSubsystem
 ) -> InjectedDependencies:
-    addresses = await Get(Addresses, UnparsedAddressInputs, thrift_java.runtime_dependencies)
-    return InjectedDependencies(addresses)
+    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    target = wrapped_target.target
+
+    if not target.has_field(JvmResolveField):
+        return InjectedDependencies()
+    resolve = target[JvmResolveField].normalized_value(jvm)
+
+    dependencies_info = await Get(
+        ApacheThriftJavaRuntimeForResolve, ApacheThriftJavaRuntimeForResolveRequest(resolve)
+    )
+    return InjectedDependencies(dependencies_info.addresses)
+
+
+class MissingApacheThriftJavaRuntimeInResolveError(ValueError):
+    def __init__(self, resolve_name: str) -> None:
+        super().__init__(
+            f"The JVM resolve `{resolve_name}` does not contain a requirement for the Apache Thrift runtime. "
+            "Since at least one JVM target type in this repository consumes a `protobuf_sources` target "
+            "in this resolve, the resolve must contain a `jvm_artifact` target for the Apache Thrift runtime.\n\n"
+            "Please add the following `jvm_artifact` target somewhere in the repository and re-run "
+            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
+            "jvm_artifact(\n"
+            f'  name="{_LIBTHRIFT_GROUP}_{_LIBTHRIFT_ARTIFACT}",\n'
+            f'  group="{_LIBTHRIFT_GROUP}",\n',
+            f'  artifact="{_LIBTHRIFT_ARTIFACT}",\n',
+            '  version="<your chosen version>",\n',
+            f'  resolve="{resolve_name}",\n',
+            ")",
+        )
 
 
 def rules():
@@ -74,4 +154,6 @@ def rules():
         *subsystem.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
         UnionRule(InjectDependenciesRequest, InjectApacheThriftJavaDependencies),
+        # Rules needed to avoid rule graph errors.
+        *artifact_mapper.rules(),
     )

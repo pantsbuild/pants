@@ -21,7 +21,6 @@ from pants.backend.python.target_types import (
     PythonTestSourceField,
     PythonTestsTimeoutField,
     SkipPythonTestsField,
-    format_invalid_requirement_string_error,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -40,6 +39,7 @@ from pants.option.option_types import ArgsListOption, BoolOption, IntOption, Str
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,11 @@ class PyTest(PythonToolBase):
     # This should be compatible with requirements.txt, although it can be more precise.
     # TODO: To fix this, we should allow using a `target_option` referring to a
     #  `python_requirement` to override the version.
-    default_version = "pytest>=7,<8"
+    # Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
+    # recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.
+    # TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
+    #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
+    default_version = "pytest==7.0.1"
     default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1"]
 
     default_main = ConsoleScript("pytest")
@@ -78,18 +82,24 @@ class PyTest(PythonToolBase):
     timeouts_enabled = BoolOption(
         "--timeouts",
         default=True,
-        help="Enable test target timeouts. If timeouts are enabled then test targets with a "
-        "timeout= parameter set on their target will time out after the given number of "
-        "seconds if not completed. If no timeout is set, then either the default timeout "
-        "is used or no timeout is configured.",
+        help=softwrap(
+            """
+            Enable test target timeouts. If timeouts are enabled then test targets with a
+            timeout= parameter set on their target will time out after the given number of
+            seconds if not completed. If no timeout is set, then either the default timeout
+            is used or no timeout is configured.
+            """
+        ),
     )
     timeout_default = IntOption(
         "--timeout-default",
         default=None,
         advanced=True,
-        help=(
-            "The default timeout (in seconds) for a test target if the `timeout` field is not "
-            "set on the target."
+        help=softwrap(
+            """
+            The default timeout (in seconds) for a test target if the `timeout` field is not
+            set on the target.
+            """
         ),
     )
     timeout_maximum = IntOption(
@@ -102,29 +112,35 @@ class PyTest(PythonToolBase):
         "--junit-family",
         default="xunit2",
         advanced=True,
-        help=(
-            "The format of generated junit XML files. See "
-            "https://docs.pytest.org/en/latest/reference.html#confval-junit_family."
+        help=softwrap(
+            """
+            The format of generated junit XML files. See
+            https://docs.pytest.org/en/latest/reference.html#confval-junit_family.
+            """
         ),
     )
     execution_slot_var = StrOption(
         "--execution-slot-var",
         default=None,
         advanced=True,
-        help=(
-            "If a non-empty string, the process execution slot id (an integer) will be exposed "
-            "to tests under this environment variable name."
+        help=softwrap(
+            """
+            If a non-empty string, the process execution slot id (an integer) will be exposed
+            to tests under this environment variable name.
+            """
         ),
     )
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,
         advanced=True,
-        help=(
-            "If true, Pants will include all relevant Pytest config files (e.g. `pytest.ini`) "
-            "during runs. See "
-            "https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for where "
-            "config files should be located for Pytest to discover them."
+        help=softwrap(
+            """
+            If true, Pants will include all relevant Pytest config files (e.g. `pytest.ini`)
+            during runs. See
+            https://docs.pytest.org/en/stable/customize.html#finding-the-rootdir for where
+            config files should be located for Pytest to discover them.
+            """
         ),
     )
 
@@ -155,11 +171,7 @@ class PyTest(PythonToolBase):
             try:
                 req = PipRequirement.parse(s).project_name
             except Exception as e:
-                raise ValueError(
-                    format_invalid_requirement_string_error(
-                        s, e, description_of_origin="`[pytest].extra_requirements`"
-                    )
-                )
+                raise ValueError(f"Invalid requirement '{s}' in `[pytest].extra_requirements`: {e}")
             if canonicalize_project_name(req) == "pytest-cov":
                 return
 

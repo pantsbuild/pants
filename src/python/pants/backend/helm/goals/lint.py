@@ -59,8 +59,10 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
         for chart, field_set in zip(charts, request.field_sets)
     )
     results = [
-        LintResult.from_fallible_process_result(process_result)
-        for process_result in process_results
+        LintResult.from_fallible_process_result(
+            process_result, partition_description=chart.metadata.name
+        )
+        for chart, process_result in zip(charts, process_results)
     ]
     return LintResults(results, linter_name=request.name)
 

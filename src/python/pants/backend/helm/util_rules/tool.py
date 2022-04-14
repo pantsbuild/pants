@@ -22,6 +22,11 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
+_HELM_CACHE_NAME = "helm"
+_HELM_CACHE_DIR = "__cache"
+_HELM_CONFIG_DIR = "__config"
+_HELM_DATA_DIR = "__data"
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
@@ -42,6 +47,18 @@ class HelmBinary:
         self.path = path
         self.immutable_input_digests = FrozenDict(immutable_input_digests)
         self.env = FrozenDict({**helm_env, **local_env})
+
+    @property
+    def config_digest(self) -> Digest:
+        return self.immutable_input_digests[_HELM_CONFIG_DIR]
+
+    @property
+    def data_digest(self) -> Digest:
+        return self.immutable_input_digests[_HELM_DATA_DIR]
+
+    @property
+    def append_only_caches(self) -> dict[str, str]:
+        return {_HELM_CACHE_NAME: _HELM_CACHE_DIR}
 
 
 @frozen_after_init
@@ -83,10 +100,6 @@ class HelmProcess:
 
 @rule(desc="Download and configure Helm", level=LogLevel.DEBUG)
 async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) -> HelmBinary:
-    cache_dir = "__cache"
-    config_dir = "__config"
-    data_dir = "__data"
-
     downloaded_binary, empty_dirs_digest = await MultiGet(
         Get(
             DownloadedExternalTool, ExternalToolRequest, helm_subsytem.get_request(Platform.current)
@@ -95,9 +108,8 @@ async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) 
             Digest,
             CreateDigest(
                 [
-                    Directory(cache_dir),
-                    Directory(config_dir),
-                    Directory(data_dir),
+                    Directory(_HELM_CONFIG_DIR),
+                    Directory(_HELM_DATA_DIR),
                 ]
             ),
         ),
@@ -108,9 +120,9 @@ async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) 
 
     helm_path = os.path.join(tool_relpath, downloaded_binary.exe)
     helm_env = {
-        "HELM_CACHE_HOME": cache_dir,
-        "HELM_CONFIG_HOME": config_dir,
-        "HELM_DATA_HOME": data_dir,
+        "HELM_CACHE_HOME": _HELM_CACHE_DIR,
+        "HELM_CONFIG_HOME": _HELM_CONFIG_DIR,
+        "HELM_DATA_HOME": _HELM_DATA_DIR,
     }
 
     # Create a digest that will get mutated during the setup process
@@ -119,31 +131,35 @@ async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) 
     # Install all global Helm plugins
     if global_plugins:
         prefixed_plugins_digests = await MultiGet(
-            Get(Digest, AddPrefix(plugin.digest, os.path.join(data_dir, "plugins", plugin.name)))
+            Get(
+                Digest,
+                AddPrefix(plugin.digest, os.path.join(_HELM_DATA_DIR, "plugins", plugin.name)),
+            )
             for plugin in global_plugins
         )
         mutable_input_digest = await Get(
             Digest, MergeDigests([mutable_input_digest, *prefixed_plugins_digests])
         )
 
-    # TODO Configure Helm classic repositories
-
-    updated_cache_digest, updated_config_digest, updated_data_digest = await MultiGet(
-        Get(Digest, DigestSubset(mutable_input_digest, PathGlobs([f"{cache_dir}/**"]))),
-        Get(Digest, DigestSubset(mutable_input_digest, PathGlobs([f"{config_dir}/**"]))),
-        Get(Digest, DigestSubset(mutable_input_digest, PathGlobs([f"{data_dir}/**"]))),
+    updated_config_digest, updated_data_digest = await MultiGet(
+        Get(
+            Digest,
+            DigestSubset(mutable_input_digest, PathGlobs([os.path.join(_HELM_CONFIG_DIR, "**")])),
+        ),
+        Get(
+            Digest,
+            DigestSubset(mutable_input_digest, PathGlobs([os.path.join(_HELM_DATA_DIR, "**")])),
+        ),
     )
-    cache_subset_digest, config_subset_digest, data_subset_digest = await MultiGet(
-        Get(Digest, RemovePrefix(updated_cache_digest, cache_dir)),
-        Get(Digest, RemovePrefix(updated_config_digest, config_dir)),
-        Get(Digest, RemovePrefix(updated_data_digest, data_dir)),
+    config_subset_digest, data_subset_digest = await MultiGet(
+        Get(Digest, RemovePrefix(updated_config_digest, _HELM_CONFIG_DIR)),
+        Get(Digest, RemovePrefix(updated_data_digest, _HELM_DATA_DIR)),
     )
 
     setup_immutable_digests = {
         **immutable_input_digests,
-        config_dir: config_subset_digest,
-        cache_dir: cache_subset_digest,
-        data_dir: data_subset_digest,
+        _HELM_CONFIG_DIR: config_subset_digest,
+        _HELM_DATA_DIR: data_subset_digest,
     }
 
     local_env = await Get(Environment, EnvironmentRequest(["HOME", "PATH"]))
@@ -171,6 +187,7 @@ def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
         env=env,
         description=request.description,
         level=request.level,
+        append_only_caches=helm_binary.append_only_caches,
         output_directories=request.output_directories,
         output_files=request.output_files,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,

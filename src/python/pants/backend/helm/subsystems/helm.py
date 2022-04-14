@@ -4,10 +4,40 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
+from pants.backend.helm.resolve.remotes import HelmRemotes
+from pants.backend.helm.target_types import HelmChartTarget, HelmRegistriesField
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import BoolOption
+from pants.option.option_types import BoolOption, DictOption
+from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
+
+registries_help = softwrap(
+    f"""
+    Configure Helm OCI registries. The schema for a registry entry is as follows:
+
+        {{
+            "registry-alias": {{
+                "address": "oci://registry-domain:port",
+                "default": bool,
+            }},
+            ...
+        }}
+
+    If no registries are provided in either a `{HelmChartTarget.alias}` target, then all default
+    addresses will be used, if any.
+
+    The `{HelmChartTarget.alias}.{HelmRegistriesField.alias}` may be provided with a list of registry
+    addresses and registry alias prefixed with `@` to be used instead of the defaults.
+
+    A configured registry is marked as default either by setting `default = true`
+    or with an alias of `"default"`.
+
+    Registries also participate in resolving third party Helm charts uplodaded to those registries.
+    """
+)
 
 
 class HelmSubsystem(TemplatedExternalTool):
@@ -29,6 +59,7 @@ class HelmSubsystem(TemplatedExternalTool):
         "macos_x86_64": "darwin-amd64",
     }
 
+    _registries = DictOption[Any]("--registries", help=registries_help, fromfile=True)
     lint_strict = BoolOption(
         "--lint-strict", default=False, help="Enables strict linting of Helm charts"
     )
@@ -37,3 +68,7 @@ class HelmSubsystem(TemplatedExternalTool):
         mapped_plat = self.default_url_platform_mapping[plat.value]
         bin_path = os.path.join(mapped_plat, "helm")
         return bin_path
+
+    @memoized_method
+    def remotes(self) -> HelmRemotes:
+        return HelmRemotes.from_dict(self._registries)

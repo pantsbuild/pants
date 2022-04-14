@@ -267,6 +267,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 assert line_pair[0] == line_pair[1]
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7622")
+    @pytest.mark.no_error_if_skipped
     def test_pantsd_filesystem_invalidation(self):
         """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
         with self.pantsd_successful_run_context() as ctx:
@@ -415,6 +416,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             os.unlink(pidpath)
 
     @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/8193")
+    @pytest.mark.no_error_if_skipped
     def test_pantsd_memory_usage(self):
         """Validates that after N runs, memory usage has increased by no more than X percent."""
         number_of_runs = 10

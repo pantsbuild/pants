@@ -39,28 +39,25 @@ class GofmtRequest(FmtRequest):
     name = GofmtSubsystem.options_scope
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_gofmt(request: GofmtRequest, goroot: GoRoot) -> Process:
+@rule(desc="Format with gofmt")
+async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem, goroot: GoRoot) -> FmtResult:
+    if gofmt.skip:
+        return FmtResult.skip(formatter_name=request.name)
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
         *request.snapshot.files,
     )
-    process = Process(
-        argv=argv,
-        input_digest=request.snapshot.digest,
-        output_files=request.snapshot.files,
-        description=f"Run gofmt on {pluralize(len(request.snapshot.files), 'file')}.",
-        level=LogLevel.DEBUG,
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=argv,
+            input_digest=request.snapshot.digest,
+            output_files=request.snapshot.files,
+            description=f"Run gofmt on {pluralize(len(request.snapshot.files), 'file')}.",
+            level=LogLevel.DEBUG,
+        ),
     )
-    return process
-
-
-@rule(desc="Format with gofmt")
-async def gofmt_fmt(request: GofmtRequest, gofmt: GofmtSubsystem) -> FmtResult:
-    if gofmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    result = await Get(ProcessResult, GofmtRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot)
 

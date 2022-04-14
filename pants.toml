@@ -30,7 +30,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.17.0",
+  "toolchain.pants.plugin==0.18.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -60,8 +60,8 @@ build_ignore.add = [
 ]
 
 ignore_warnings.add = [
-  # TODO: `toolchain.pants.plugin==0.17.0` must still use the old options system
-  "DEPRECATED: pants.option.subsystem.register_options"
+  # TODO: `toolchain.pants.plugin==0.18.0` must still use the old `get_git` implementation.
+  "DEPRECATED: pants.base.build_environment.get_git"
 ]
 
 files_not_found_behavior = "error"
@@ -91,6 +91,8 @@ root_patterns = [
   "/build-support/flake8",
   "/build-support/migration-support",
   "/pants-plugins",
+  # For `conftest.py`
+  "/",
 ]
 
 [tailor]

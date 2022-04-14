@@ -1296,7 +1296,7 @@ class BootstrapOptions:
         "--remote-cache-read-timeout-millis",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read_timeout_millis,
-        help=("Timeout value for remote cache lookups in milliseconds."),
+        help="Timeout value for remote cache lookups in milliseconds.",
     )
     remote_execution_address = StrOption(
         "--remote-execution-address",

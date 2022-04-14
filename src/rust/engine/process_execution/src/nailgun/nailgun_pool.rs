@@ -169,7 +169,7 @@ impl NailgunPool {
   ///
   /// Find the least recently used idle (but not necessarily usable) process in the pool.
   ///
-  fn find_lru_idle(pool_entries: &mut Vec<PoolEntry>) -> Result<Option<usize>, String> {
+  fn find_lru_idle(pool_entries: &mut [PoolEntry]) -> Result<Option<usize>, String> {
     // 24 hours of clock skew would be surprising?
     let mut lru_age = Instant::now() + Duration::from_secs(60 * 60 * 24);
     let mut lru = None;

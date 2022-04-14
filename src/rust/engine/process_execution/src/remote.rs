@@ -307,13 +307,11 @@ impl CommandRunner {
         Ok(time_span) => maybe_add_workunit(
           result_cached,
           "remote execution action scheduling",
+          Level::Trace,
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata {
-            level: Level::Trace,
-            ..WorkunitMetadata::default()
-          },
+          WorkunitMetadata::default(),
         ),
         Err(s) => warn!("{}", s),
       }
@@ -332,13 +330,11 @@ impl CommandRunner {
         Ok(time_span) => maybe_add_workunit(
           result_cached,
           "remote execution worker input fetching",
+          Level::Trace,
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata {
-            level: Level::Trace,
-            ..WorkunitMetadata::default()
-          },
+          WorkunitMetadata::default(),
         ),
         Err(s) => warn!("{}", s),
       }
@@ -357,13 +353,11 @@ impl CommandRunner {
         Ok(time_span) => maybe_add_workunit(
           result_cached,
           "remote execution worker command executing",
+          Level::Trace,
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata {
-            level: Level::Trace,
-            ..WorkunitMetadata::default()
-          },
+          WorkunitMetadata::default(),
         ),
         Err(s) => warn!("{}", s),
       }
@@ -382,13 +376,11 @@ impl CommandRunner {
         Ok(time_span) => maybe_add_workunit(
           result_cached,
           "remote execution worker output uploading",
+          Level::Trace,
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata {
-            level: Level::Trace,
-            ..WorkunitMetadata::default()
-          },
+          WorkunitMetadata::default(),
         ),
         Err(s) => warn!("{}", s),
       }
@@ -809,14 +801,17 @@ impl crate::CommandRunner for CommandRunner {
         let result = tokio::time::timeout(deadline_duration, result_fut).await;
         if result.is_err() {
           workunit.update_metadata(|initial| {
-            Some(WorkunitMetadata {
-              level: Level::Error,
-              desc: Some(format!(
-                "remote execution timed out after {:?}",
-                deadline_duration
-              )),
-              ..initial.unwrap_or_default()
-            })
+            let initial = initial.map(|(m, _)| m).unwrap_or_default();
+            Some((
+              WorkunitMetadata {
+                desc: Some(format!(
+                  "remote execution timed out after {:?}",
+                  deadline_duration
+                )),
+                ..initial
+              },
+              Level::Error,
+            ))
           })
         }
 
@@ -852,15 +847,16 @@ impl crate::CommandRunner for CommandRunner {
 fn maybe_add_workunit(
   result_cached: bool,
   name: &'static str,
+  level: Level,
   time_span: concrete_time::TimeSpan,
   parent_id: Option<SpanId>,
   workunit_store: &WorkunitStore,
   metadata: WorkunitMetadata,
 ) {
-  if !result_cached && workunit_store.max_level() >= metadata.level {
+  if !result_cached && workunit_store.max_level() >= level {
     let start_time: SystemTime = SystemTime::UNIX_EPOCH + time_span.start.into();
     let end_time: SystemTime = start_time + time_span.duration.into();
-    workunit_store.add_completed_workunit(name, start_time, end_time, parent_id, metadata);
+    workunit_store.add_completed_workunit(name, level, start_time, end_time, parent_id, metadata);
   }
 }
 

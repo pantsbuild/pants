@@ -4,9 +4,9 @@
 import logging
 from typing import cast
 
-from pants.base.build_environment import get_git
 from pants.base.specs import AddressLiteralSpec, AddressSpecs, FilesystemSpecs, Specs
 from pants.base.specs_parser import SpecsParser
+from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
@@ -14,6 +14,7 @@ from pants.engine.rules import QueryRule
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.vcs.changed import ChangedAddresses, ChangedOptions, ChangedRequest
+from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +51,16 @@ def calculate_specs(
     if not changed_options.provided:
         return specs
 
-    git = get_git()
-    if not git:
+    (git_binary,) = session.product_request(GitBinary, [Params(GitBinaryRequest())])
+    (maybe_git_worktree,) = session.product_request(
+        MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary)]
+    )
+    if not maybe_git_worktree.git_worktree:
         raise InvalidSpecConstraint(
             "The `--changed-*` options are only available if Git is used for the repository."
         )
     changed_request = ChangedRequest(
-        sources=tuple(changed_options.changed_files(git)),
+        sources=tuple(changed_options.changed_files(maybe_git_worktree.git_worktree)),
         dependees=changed_options.dependees,
     )
     (changed_addresses,) = session.product_request(
@@ -75,10 +79,16 @@ def calculate_specs(
                 parameters=address_input.parameters,
             )
         )
-    return Specs(AddressSpecs(address_specs, filter_by_global_options=True), FilesystemSpecs([]))
+    return Specs(
+        AddressSpecs(address_specs, filter_by_global_options=True),
+        FilesystemSpecs([]),
+        from_change_detection=True,
+    )
 
 
 def rules():
     return [
         QueryRule(ChangedAddresses, [ChangedRequest]),
+        QueryRule(GitBinary, [GitBinaryRequest]),
+        QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary]),
     ]

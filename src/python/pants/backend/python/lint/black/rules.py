@@ -15,7 +15,7 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -40,8 +40,10 @@ class BlackRequest(FmtRequest):
     name = Black.options_scope
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_black(request: BlackRequest, black: Black, python_setup: PythonSetup) -> Process:
+@rule(desc="Format with Black", level=LogLevel.DEBUG)
+async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSetup) -> FmtResult:
+    if black.skip:
+        return FmtResult.skip(formatter_name=request.name)
     # Black requires 3.6+ but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6, and 3.7.
     # However, typed-ast does not understand 3.8+, so instead we must run Black with Python 3.8+
     # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
@@ -77,8 +79,8 @@ async def setup_black(request: BlackRequest, black: Black, python_setup: PythonS
         Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         VenvPexProcess(
             black_pex,
             argv=(
@@ -95,14 +97,6 @@ async def setup_black(request: BlackRequest, black: Black, python_setup: PythonS
             level=LogLevel.DEBUG,
         ),
     )
-    return process
-
-
-@rule(desc="Format with Black", level=LogLevel.DEBUG)
-async def black_fmt(request: BlackRequest, black: Black) -> FmtResult:
-    if black.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    result = await Get(ProcessResult, BlackRequest, request)
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)
 

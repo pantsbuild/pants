@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import logging
 import os
+import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
@@ -24,6 +26,8 @@ from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize
+
+logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------------------------------
 # `BinaryPath` types
@@ -318,6 +322,44 @@ class ChmodBinary(BinaryPath):
 
 class DiffBinary(BinaryPath):
     pass
+
+
+class GitBinaryException(Exception):
+    pass
+
+
+class GitBinary(BinaryPath):
+    def _invoke_unsandboxed(self, cmd: list[str]) -> str:
+        """Invoke the given git command, _without_ the sandboxing provided by the `Process` API.
+
+        This API is for internal use only: users should prefer to consume methods of the
+        `GitWorktree` class.
+        """
+        cmd = [self.path, *cmd]
+
+        self._log_call(cmd)
+
+        try:
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except OSError as e:
+            # Binary DNE or is not executable
+            cmd_str = " ".join(cmd)
+            raise GitBinaryException(f"Failed to execute command {cmd_str}: {e!r}")
+        out, err = process.communicate()
+
+        self._check_result(cmd, process.returncode, err.decode())
+
+        return out.decode().strip()
+
+    def _check_result(
+        self, cmd: Iterable[str], result: int, failure_msg: str | None = None
+    ) -> None:
+        if result != 0:
+            cmd_str = " ".join(cmd)
+            raise GitBinaryException(failure_msg or f"{cmd_str} failed with exit code {result}")
+
+    def _log_call(self, cmd: Iterable[str]) -> None:
+        logger.debug("Executing: " + " ".join(cmd))
 
 
 # -------------------------------------------------------------------------------------------
@@ -644,6 +686,16 @@ async def find_diff() -> DiffBinary:
     return DiffBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
+async def find_git() -> GitBinary:
+    request = BinaryPathRequest(binary_name="git", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(
+        request, rationale="track changes to files in your build environment"
+    )
+    return GitBinary(first_path.path, first_path.fingerprint)
+
+
 # -------------------------------------------------------------------------------------------
 # Rules for lazy requests
 # TODO(#12946): Get rid of this when it becomes possible to use `Get()` with only one arg.
@@ -675,6 +727,10 @@ class ChmodBinaryRequest:
 
 
 class DiffBinaryRequest:
+    pass
+
+
+class GitBinaryRequest:
     pass
 
 
@@ -713,5 +769,42 @@ async def find_diff_wrapper(_: DiffBinaryRequest, diff_binary: DiffBinary) -> Di
     return diff_binary
 
 
+@rule
+async def find_git_wrapper(_: GitBinaryRequest, git_binary: GitBinary) -> GitBinary:
+    return git_binary
+
+
 def rules():
     return [*collect_rules(), *python_bootstrap.rules()]
+
+
+# -------------------------------------------------------------------------------------------
+# Rules for fallible binaries
+# -------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MaybeGitBinary:
+    git_binary: GitBinary | None = None
+
+
+@rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
+async def maybe_find_git() -> MaybeGitBinary:
+    request = BinaryPathRequest(binary_name="git", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path
+    if not first_path:
+        return MaybeGitBinary()
+
+    return MaybeGitBinary(GitBinary(first_path.path, first_path.fingerprint))
+
+
+class MaybeGitBinaryRequest:
+    pass
+
+
+@rule
+async def maybe_find_git_wrapper(
+    _: MaybeGitBinaryRequest, maybe_git_binary: MaybeGitBinary
+) -> MaybeGitBinary:
+    return maybe_git_binary
