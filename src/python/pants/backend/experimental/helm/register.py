@@ -1,7 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.helm.goals import lint, package, publish, tailor
+from pants.backend.helm.goals import deploy, lint, package, publish, tailor
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.target_types import (
     HelmArtifactTarget,
@@ -29,6 +29,7 @@ def rules():
     return [
         *chart.rules(),
         *lint.rules(),
+        *deploy.rules(),
         *deployment.rules(),
         *package.rules(),
         *publish.rules(),

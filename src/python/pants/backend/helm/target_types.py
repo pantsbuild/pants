@@ -412,6 +412,12 @@ class HelmDeploymentValuesField(DictStringToStringField):
     help = "Individual values to use when rendering a given deployment."
 
 
+class HelmDeploymentCreateNamespaceField(BoolField):
+    alias = "create_namespace"
+    default = False
+    help = "If true, the namespace will created if it doesn't exist."
+
+
 class HelmDeploymentTarget(Target):
     alias = "helm_deployment"
     core_fields = (
@@ -422,6 +428,7 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentNamespaceField,
         HelmDeploymentSkipCrdsField,
         HelmDeploymentValuesField,
+        HelmDeploymentCreateNamespaceField,
     )
     help = "A Helm chart deployment."
 
@@ -436,6 +443,7 @@ class HelmDeploymentFieldSet(FieldSet):
     description: DescriptionField
     release_name: HelmDeploymentReleaseNameField
     namespace: HelmDeploymentNamespaceField
+    create_namespace: HelmDeploymentCreateNamespaceField
     sources: HelmDeploymentSourcesField
     skip_crds: HelmDeploymentSkipCrdsField
     dependencies: HelmDeploymentDependenciesField

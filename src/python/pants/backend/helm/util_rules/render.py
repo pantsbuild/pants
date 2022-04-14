@@ -53,7 +53,7 @@ class RenderedHelmChart:
     snapshot: Snapshot
 
 
-def _sort_value_file_names(filenames: Iterable[str]) -> list[str]:
+def sort_value_file_names_for_rendering(filenames: Iterable[str]) -> list[str]:
     """Breaks the list of files into two main buckets: overrides and non-overrides, and then sorts
     each of the buckets using a path-based criteria.
 
@@ -64,7 +64,7 @@ def _sort_value_file_names(filenames: Iterable[str]) -> list[str]:
     overrides = []
     paths = map(lambda a: PurePath(a), list(filenames))
     for p in paths:
-        if "override" in p.name:
+        if "override" in p.name.lower():
             overrides.append(p)
         else:
             non_overrides.append(p)
@@ -89,7 +89,7 @@ async def render_helm_chart(request: RenderHelmChartRequest) -> RenderedHelmChar
         MergeDigests([request.chart.snapshot.digest, request.value_files.digest, empty_output_dir]),
     )
 
-    sorted_value_files = _sort_value_file_names(request.value_files.files)
+    sorted_value_files = sort_value_file_names_for_rendering(request.value_files.files)
     inline_values: list[str] = list(
         chain.from_iterable([["--set", f"{key}={value}"] for key, value in request.values.items()])
     )
