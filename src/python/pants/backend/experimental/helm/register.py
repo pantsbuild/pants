@@ -1,7 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.helm.goals import lint, package
+from pants.backend.helm.goals import lint, package, publish
 from pants.backend.helm.target_types import (
     HelmArtifactTarget,
     HelmChartTarget,
@@ -27,6 +27,7 @@ def rules():
         *chart.rules(),
         *lint.rules(),
         *package.rules(),
+        *publish.rules(),
         *test_rules(),
         *sources.rules(),
         *tool.rules(),

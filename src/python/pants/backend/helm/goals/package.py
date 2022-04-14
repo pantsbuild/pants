@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartOutputPathField
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
+from pants.backend.helm.util_rules.chart_metadata import HelmChartMetadata
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.engine.fs import (
@@ -26,6 +27,19 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class BuiltHelmArtifact(BuiltPackageArtifact):
+    metadata: HelmChartMetadata | None = None
+
+    @classmethod
+    def create(cls, relpath: str, metadata: HelmChartMetadata) -> BuiltHelmArtifact:
+        return cls(
+            relpath=relpath,
+            metadata=metadata,
+            extra_log_lines=(f"Built Helm chart artifact: {relpath}",),
+        )
 
 
 @dataclass(frozen=True)
@@ -66,8 +80,7 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
     return BuiltPackage(
         final_snapshot.digest,
         artifacts=tuple(
-            BuiltPackageArtifact(file, extra_log_lines=(f"Built Helm chart artifact: {file}",))
-            for file in final_snapshot.files
+            BuiltHelmArtifact.create(file, chart.metadata) for file in final_snapshot.files
         ),
     )
 
