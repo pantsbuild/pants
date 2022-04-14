@@ -50,27 +50,13 @@ class HelmRegistry:
         remotes[self.address] = self
         if self.alias:
             remotes[f"@{self.alias}"] = self
-            
+
     def repository_ref(self, repository: str | None) -> str:
-        repo_path = (repository or "").strip("/")
-        return f"{self.address}/{repo_path}"
+        return f"{self.address}/{repository or ''}".rstrip("/")
 
     def package_ref(self, artifact_name: str, *, repository: str | None) -> str:
         repo_ref = self.repository_ref(repository)
-        if not repo_ref.endswith("/"):
-            repo_ref += "/"
-        return f"{repo_ref}{artifact_name}"
-
-
-@dataclass(frozen=True)
-class HelmClassicRepository(HelmRemote):
-    @classmethod
-    def from_dict(cls, alias: str, d: dict[str, Any]) -> HelmClassicRepository:
-        return cls(alias=alias, address=cast(str, d["address"]).rstrip("/"))
-
-    def __post_init__(self) -> None:
-        if self.address.startswith(OCI_REGISTRY_PROTOCOL):
-            raise InvalidHelmClassicRepositoryAddress(self.alias, self.address)
+        return f"{repo_ref}/{artifact_name}"
 
     def repository_ref(self, repository: str | None) -> str:
         return f"{self.address}/{repository or ''}".rstrip("/")
