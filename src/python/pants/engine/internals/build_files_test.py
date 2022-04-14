@@ -129,7 +129,7 @@ class ResolveField(StringField):
 
 class MockTgt(Target):
     alias = "mock_tgt"
-    core_fields = (Dependencies, MultipleSourcesField, Tags)
+    core_fields = (Dependencies, MultipleSourcesField, Tags, ResolveField)
 
 
 class MockGeneratedTarget(Target):
@@ -591,16 +591,87 @@ def test_address_specs_parametrize(
             "demo/BUILD": dedent(
                 """\
                 generator(sources=['f.txt'], resolve=parametrize("a", "b"))
+                mock_tgt(sources=['f.txt'], name="not_gen", resolve=parametrize("a", "b"))
                 """
             ),
         }
     )
 
-    assert resolve_address_specs(address_specs_rule_runner, [DescendantAddresses(""),]) == {
+    def assert_resolved(spec: AddressSpec, expected: set[Address]) -> None:
+        assert resolve_address_specs(address_specs_rule_runner, [spec]) == expected
+
+    not_gen_resolve_a = Address("demo", target_name="not_gen", parameters={"resolve": "a"})
+    not_gen_resolve_b = Address("demo", target_name="not_gen", parameters={"resolve": "b"})
+    generator_resolve_a = {
         Address("demo", generated_name="f.txt", parameters={"resolve": "a"}),
-        Address("demo", generated_name="f.txt", parameters={"resolve": "b"}),
         Address("demo", relative_file_path="f.txt", parameters={"resolve": "a"}),
-        Address("demo", relative_file_path="f.txt", parameters={"resolve": "b"}),
         Address("demo", parameters={"resolve": "a"}),
-        Address("demo", parameters={"resolve": "b"}),
+        Address("demo", target_name="not_gen", parameters={"resolve": "a"}),
     }
+    generator_resolve_b = {
+        Address("demo", generated_name="f.txt", parameters={"resolve": "b"}),
+        Address("demo", relative_file_path="f.txt", parameters={"resolve": "b"}),
+        Address("demo", parameters={"resolve": "b"}),
+        Address("demo", target_name="not_gen", parameters={"resolve": "b"}),
+    }
+
+    assert_resolved(
+        DescendantAddresses(""),
+        {*generator_resolve_a, *generator_resolve_b, not_gen_resolve_a, not_gen_resolve_b},
+    )
+
+    # A literal address for a parameterized target works as expected.
+    assert_resolved(
+        AddressLiteralSpec(
+            "demo", target_component="not_gen", parameters=FrozenDict({"resolve": "a"})
+        ),
+        {not_gen_resolve_a},
+    )
+    assert_resolved(
+        AddressLiteralSpec("demo", parameters=FrozenDict({"resolve": "a"})),
+        {Address("demo", parameters={"resolve": "a"})},
+    )
+    assert_resolved(
+        AddressLiteralSpec(
+            "demo", generated_component="f.txt", parameters=FrozenDict({"resolve": "a"})
+        ),
+        {Address("demo", generated_name="f.txt", parameters={"resolve": "a"})},
+    )
+    assert_resolved(
+        # A direct reference to the parametrized target generator.
+        AddressLiteralSpec("demo", parameters=FrozenDict({"resolve": "a"})),
+        {Address("demo", parameters={"resolve": "a"})},
+    )
+
+    # A literal address for a parametrized template should be expanded with the matching targets.
+    assert_resolved(
+        AddressLiteralSpec("demo", target_component="not_gen"),
+        {not_gen_resolve_a, not_gen_resolve_b},
+    )
+
+    # The above affordance plays nicely with target generation.
+    assert_resolved(
+        # Note that this returns references to the two target generators. Certain goals like
+        # `test` may then later replace those with their generated targets.
+        AddressLiteralSpec("demo"),
+        {Address("demo", parameters={"resolve": r}) for r in ("a", "b")},
+    )
+    assert_resolved(
+        AddressLiteralSpec("demo", generated_component="f.txt"),
+        {Address("demo", generated_name="f.txt", parameters={"resolve": r}) for r in ("a", "b")},
+    )
+    assert_resolved(
+        AddressLiteralSpec("demo/f.txt"),
+        {
+            Address("demo", relative_file_path="f.txt", parameters={"resolve": r})
+            for r in ("a", "b")
+        },
+    )
+
+    # Error on invalid targets.
+    def assert_errors(spec: AddressLiteralSpec) -> None:
+        with engine_error(ValueError):
+            resolve_address_specs(address_specs_rule_runner, [spec])
+
+    assert_errors(AddressLiteralSpec("demo", parameters=FrozenDict({"fake": "v"})))
+    assert_errors(AddressLiteralSpec("demo", parameters=FrozenDict({"resolve": "fake"})))
