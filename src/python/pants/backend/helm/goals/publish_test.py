@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
 from typing import cast
 
 import pytest
@@ -98,8 +99,16 @@ def _declare_targets(rule_runner: RuleRunner) -> None:
         {
             "src/missing-registries/BUILD": """helm_chart()""",
             "src/skip-push/BUILD": """helm_chart(skip_push=True)""",
-            "src/registries/BUILD": """helm_chart(registries=["@internal", "oci://www.example.com/external"])""",
-            "src/repository/BUILD": """helm_chart(registries=["oci://www.example.com/external"], repository="mycharts")""",
+            "src/registries/BUILD": dedent(
+                """\
+                helm_chart(registries=["@internal", "oci://www.example.com/external"])
+                """
+            ),
+            "src/repository/BUILD": dedent(
+                """\
+                helm_chart(registries=["oci://www.example.com/external"], repository="mycharts")
+                """
+            ),
         }
     )
 
@@ -134,6 +143,26 @@ def test_helm_skip_push(rule_runner: RuleRunner) -> None:
         ("oci://www.example.com/internal/foo-chart-0.1.0",),
         "(by `skip_push` on src/skip-push:skip-push)",
         None,
+    )
+
+
+def test_helm_push_use_default_registries(rule_runner: RuleRunner) -> None:
+    _declare_targets(rule_runner)
+
+    registries = {"internal": {"address": "oci://www.example.com", "default": "true"}}
+    chart_metadata = HelmChartMetadata("missing-registries", "0.2.0")
+    result, helm = _run_publish(
+        rule_runner, Address("src/missing-registries"), chart_metadata, registries=registries
+    )
+
+    assert len(result) == 1
+    assert_publish(
+        result[0],
+        ("oci://www.example.com/missing-registries-0.2.0",),
+        None,
+        process_assertion(
+            argv=(helm.path, "push", "missing-registries-0.2.0.tgz", "oci://www.example.com")
+        ),
     )
 
 

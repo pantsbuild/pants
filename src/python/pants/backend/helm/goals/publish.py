@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.helm.goals.package import BuiltHelmArtifact
-from pants.backend.helm.resolve.remotes import HelmRegistry
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
@@ -64,11 +63,7 @@ async def publish_helm_chart(
         if isinstance(artifact, BuiltHelmArtifact) and artifact.metadata
     ]
 
-    registries_to_push = [
-        r
-        for r in remotes.get(*(request.field_set.registries.value or []))
-        if isinstance(r, HelmRegistry)
-    ]
+    registries_to_push = list(remotes.get(*(request.field_set.registries.value or [])))
     if not registries_to_push:
         return PublishProcesses(
             [

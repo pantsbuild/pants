@@ -136,7 +136,7 @@ class HelmChartRepositoryField(StringField):
         """
         Repository to use in the Helm registry where this chart is going to be published.
 
-        If no value is given and `default-registry-repository` is undefined too, then the chart
+        If no value is given and `[helm].default-registry-repository` is undefined too, then the chart
         will be pushed to the root of the OCI registry.
         """
     )
