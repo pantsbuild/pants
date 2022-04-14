@@ -32,9 +32,7 @@ class Protoc(TemplatedExternalTool):
     dependency_inference = BoolOption(
         "--dependency-inference",
         default=True,
-        help=(
-            "Infer Protobuf dependencies on other Protobuf files by analyzing import statements."
-        ),
+        help="Infer Protobuf dependencies on other Protobuf files by analyzing import statements.",
     )
 
     def generate_exe(self, plat: Platform) -> str:

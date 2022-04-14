@@ -22,6 +22,7 @@ from pants.option.option_types import EnumOption, StrListOption
 from pants.util.enums import match
 from pants.util.filtering import and_filters, create_filters
 from pants.util.memo import memoized
+from pants.util.strutil import softwrap
 
 
 class TargetGranularity(Enum):
@@ -32,14 +33,18 @@ class TargetGranularity(Enum):
 
 class FilterSubsystem(LineOriented, GoalSubsystem):
     name = "filter"
-    help = (
-        "Filter the input targets based on various criteria.\n\nMost of the filtering options "
-        "below are comma-separated lists of filtering criteria, with an implied logical OR between "
-        "them, so that a target passes the filter if it matches any of the criteria in the list. "
-        "A '-' prefix inverts the sense of the entire comma-separated list, so that a target "
-        "passes the filter only if it matches none of the criteria in the list.\n\nEach of the "
-        "filtering options may be specified multiple times, with an implied logical AND between "
-        "them."
+    help = softwrap(
+        """
+        Filter the input targets based on various criteria.
+
+        Most of the filtering options below are comma-separated lists of filtering criteria, with
+        an implied logical OR between them, so that a target passes the filter if it matches any of
+        the criteria in the list. A '-' prefix inverts the sense of the entire comma-separated list,
+        so that a target passes the filter only if it matches none of the criteria in the list.
+
+        Each of the filtering options may be specified multiple times, with an implied logical AND
+        between them.
+        """
     )
 
     target_type = StrListOption(
@@ -50,9 +55,11 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
     granularity = EnumOption(
         "--granularity",
         default=TargetGranularity.all_targets,
-        help=(
-            "Filter to rendering only targets declared in BUILD files, only file-level "
-            "targets, or all targets."
+        help=softwrap(
+            """
+            Filter to rendering only targets declared in BUILD files, only file-level
+            targets, or all targets.
+            """
         ),
     )
     address_regex = StrListOption(

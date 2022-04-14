@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 import re
-import textwrap
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -21,6 +20,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -74,16 +74,25 @@ class ValidationConfig:
 
 class RegexLintSubsystem(Subsystem):
     options_scope = "regex-lint"
-    help = (
-        "Lint your code using regex patterns, e.g. to check for copyright headers.\n\n"
-        "To activate this with the `lint` goal, you must set `[regex-lint].config`.\n\n"
-        "Unlike other linters, this can run on files not owned by targets, such as BUILD files. To "
-        "run on those, use `lint '**'` rather than `lint ::`, for example. Unfortunately, "
-        "`--changed-since=<sha>` does not yet cause this linter to run. We are exploring how to "
-        "improve both these gotchas."
+    help = softwrap(
+        """
+        Lint your code using regex patterns, e.g. to check for copyright headers.
+
+        To activate this with the `lint` goal, you must set `[regex-lint].config`.
+
+        Unlike other linters, this can run on files not owned by targets, such as BUILD files. To
+        run on those, use `lint '**'` rather than `lint ::`, for example. Unfortunately,
+        `--changed-since=<sha>` does not yet cause this linter to run. We are exploring how to
+        improve both these gotchas.
+        """
     )
-    schema_help = textwrap.dedent(
-        """\
+
+    _config = DictOption[Any](
+        "--config",
+        help=softwrap(
+            """
+            Config schema is as follows:
+
                 ```
                 {
                 'required_matches': {
@@ -110,17 +119,13 @@ class RegexLintSubsystem(Subsystem):
                 ]
                 }
                 ```
-                """
-    )
 
-    _config = DictOption[Any](
-        "--config",
-        help=(
-            f"Config schema is as follows:\n\n{schema_help}\n\n"
-            "Meaning: if a file matches some path pattern, its content must match all the "
-            "corresponding content patterns.\n\n"
-            "It's often helpful to load this config from a JSON or YAML file. To do that, set "
-            "`[regex-lint].config = '@path/to/config.yaml'`, for example."
+            Meaning: if a file matches some path pattern, its content must match all the
+            corresponding content patterns.
+
+            It's often helpful to load this config from a JSON or YAML file. To do that, set
+            `[regex-lint].config = '@path/to/config.yaml'`, for example.
+            """
         ),
         fromfile=True,
     )

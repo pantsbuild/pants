@@ -37,17 +37,23 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
+from pants.util.strutil import softwrap
 
 
 class PythonGoogleCloudFunctionHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "handler"
     required = True
     value: str
-    help = (
-        "Entry point to the Google Cloud Function handler.\n\nYou can specify a full module like "
-        "'path.to.module:handler_func' or use a shorthand to specify a file name, using the same "
-        "syntax as the `sources` field, e.g. 'cloud_function.py:handler_func'.\n\nYou must use the file "
-        "name shorthand for file arguments to work with this target."
+    help = softwrap(
+        """
+        Entry point to the Google Cloud Function handler.
+
+        You can specify a full module like 'path.to.module:handler_func' or use a shorthand to
+        specify a file name, using the same syntax as the `sources` field, e.g.
+        'cloud_function.py:handler_func'.
+
+        You must use the file name shorthand for file arguments to work with this target.
+        """
     )
 
     @classmethod
@@ -192,9 +198,11 @@ class PythonGoogleCloudFunctionRuntime(StringField):
     alias = "runtime"
     default = None
     valid_choices = PythonGoogleCloudFunctionRuntimes
-    help = (
-        "The identifier of the Google Cloud Function runtime to target (pythonXY). See "
-        "https://cloud.google.com/functions/docs/concepts/python-runtime."
+    help = softwrap(
+        """
+        The identifier of the Google Cloud Function runtime to target (pythonXY). See
+        https://cloud.google.com/functions/docs/concepts/python-runtime.
+        """
     )
 
     @classmethod
@@ -227,9 +235,12 @@ class PythonGoogleCloudFunctionType(StringField):
     alias = "type"
     required = True
     valid_choices = GoogleCloudFunctionTypes
-    help = (
-        "The trigger type of the cloud function. Can either be 'event' or 'http'. "
-        "See https://cloud.google.com/functions/docs/concepts/python-runtime for reference to --trigger-http."
+    help = softwrap(
+        """
+        The trigger type of the cloud function. Can either be 'event' or 'http'.
+        See https://cloud.google.com/functions/docs/concepts/python-runtime for reference to
+        --trigger-http.
+        """
     )
 
 
@@ -245,9 +256,12 @@ class PythonGoogleCloudFunction(Target):
         PythonGoogleCloudFunctionType,
         PythonResolveField,
     )
-    help = (
-        "A self-contained Python function suitable for uploading to Google Cloud Function.\n\n"
-        f"See {doc_url('python-google-cloud-function')}."
+    help = softwrap(
+        f"""
+        A self-contained Python function suitable for uploading to Google Cloud Function.
+
+        See {doc_url('python-google-cloud-function')}.
+        """
     )
 
     def validate(self) -> None:

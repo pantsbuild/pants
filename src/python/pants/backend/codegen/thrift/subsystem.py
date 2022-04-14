@@ -13,5 +13,5 @@ class ThriftSubsystem(Subsystem):
     dependency_inference = BoolOption(
         "--dependency-inference",
         default=True,
-        help=("Infer Thrift dependencies on other Thrift files by analyzing import statements."),
+        help="Infer Thrift dependencies on other Thrift files by analyzing import statements.",
     )
