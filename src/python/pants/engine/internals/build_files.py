@@ -18,7 +18,7 @@ from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpec
 from pants.engine.internals.parametrize import _TargetParametrizations
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name, doc_url
@@ -178,10 +178,15 @@ def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFil
     )
 
 
-@rule_helper
-async def _determine_literal_addresses_from_specs(
-    literal_specs: tuple[AddressLiteralSpec, ...]
-) -> tuple[WrappedTarget, ...]:
+@rule
+async def addresses_from_address_specs(
+    address_specs: AddressSpecs,
+    build_file_options: BuildFileOptions,
+    specs_filter: AddressSpecsFilter,
+) -> Addresses:
+    matched_addresses: OrderedSet[Address] = OrderedSet()
+    filtering_disabled = address_specs.filter_by_global_options is False
+
     literal_addresses = await MultiGet(
         Get(
             Address,
@@ -192,7 +197,7 @@ async def _determine_literal_addresses_from_specs(
                 spec.parameters,
             ),
         )
-        for spec in literal_specs
+        for spec in address_specs.literals
     )
 
     # We replace references to parametrized target templates with all their created targets. For
@@ -214,19 +219,10 @@ async def _determine_literal_addresses_from_specs(
 
     # We eagerly call the `WrappedTarget` rule because it will validate that every final address
     # actually exists, such as with generated target addresses.
-    return await MultiGet(Get(WrappedTarget, Address, addr) for addr in all_candidate_addresses)
+    literal_wrapped_targets = await MultiGet(
+        Get(WrappedTarget, Address, addr) for addr in all_candidate_addresses
+    )
 
-
-@rule
-async def addresses_from_address_specs(
-    address_specs: AddressSpecs,
-    build_file_options: BuildFileOptions,
-    specs_filter: AddressSpecsFilter,
-) -> Addresses:
-    matched_addresses: OrderedSet[Address] = OrderedSet()
-    filtering_disabled = address_specs.filter_by_global_options is False
-
-    literal_wrapped_targets = await _determine_literal_addresses_from_specs(address_specs.literals)
     matched_addresses.update(
         wrapped_tgt.target.address
         for wrapped_tgt in literal_wrapped_targets
