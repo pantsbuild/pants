@@ -67,7 +67,7 @@ ignore_warnings.add = [
 files_not_found_behavior = "error"
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
-remote_store_address = "grpcs://cache.toolchain.com:443"
+remote_store_address = "grpcs://staging.cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 
@@ -211,6 +211,7 @@ version_for_resolve = { "scala_parser" = '2.13.7' }
 [toolchain-setup]
 repo = "pants"
 org = "pantsbuild"
+base_url = "https://staging.app.toolchain.com"
 
 [buildsense]
 enable = false
