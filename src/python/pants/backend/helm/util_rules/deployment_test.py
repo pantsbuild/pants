@@ -43,8 +43,8 @@ def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:
             "src/foo/Chart.yaml": gen_chart_file("foo", version="1.0.0"),
             "src/bar/BUILD": dedent(
                 """\
-        helm_deployment(dependencies=["//src/foo"])
-        """
+                helm_deployment(dependencies=["//src/foo"])
+                """
             ),
         }
     )
@@ -94,8 +94,8 @@ def test_fail_when_more_than_one_chart_is_found(rule_runner: RuleRunner) -> None
     field_set = HelmDeploymentFieldSet.create(target)
 
     msg = (
-      f"The target '{field_set.address}' has too many `{HelmChartTarget.alias}` "
-      "addresses in its dependencies, it should have only one."
+        f"The target '{field_set.address}' has too many `{HelmChartTarget.alias}` "
+        "addresses in its dependencies, it should have only one."
     )
     with pytest.raises(ExecutionError, match=msg):
         rule_runner.request(HelmChart, [field_set])

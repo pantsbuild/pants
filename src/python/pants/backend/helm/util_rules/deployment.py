@@ -51,6 +51,7 @@ async def get_chart_of_deployment(field_set: HelmDeploymentFieldSet) -> HelmChar
         raise MissingHelmDeploymentChartError(field_set.address)
     if len(found_charts) > 1:
         raise TooManyChartDependenciesError(field_set.address)
+
     return HelmChartRequest.from_target(found_charts[0])
 
 
