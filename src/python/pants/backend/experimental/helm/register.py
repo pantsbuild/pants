@@ -5,6 +5,7 @@ from pants.backend.helm.goals import lint, package, publish, tailor
 from pants.backend.helm.target_types import (
     HelmArtifactTarget,
     HelmChartTarget,
+    HelmDeploymentTarget,
     HelmUnitTestTestsGeneratorTarget,
     HelmUnitTestTestTarget,
 )
@@ -17,6 +18,7 @@ def target_types():
     return [
         HelmArtifactTarget,
         HelmChartTarget,
+        HelmDeploymentTarget,
         HelmUnitTestTestTarget,
         HelmUnitTestTestsGeneratorTarget,
     ]

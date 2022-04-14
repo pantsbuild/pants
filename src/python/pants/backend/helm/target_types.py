@@ -14,6 +14,8 @@ from pants.engine.target import (
     AllTargets,
     BoolField,
     Dependencies,
+    DescriptionField,
+    DictStringToStringField,
     FieldSet,
     MultipleSourcesField,
     OverridesField,
@@ -371,6 +373,73 @@ def all_helm_artifact_targets(all_targets: AllTargets) -> AllHelmArtifactTargets
     return AllHelmArtifactTargets(
         [tgt for tgt in all_targets if HelmArtifactFieldSet.is_applicable(tgt)]
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# `helm_deployment` target
+# -----------------------------------------------------------------------------------------------
+
+
+class HelmDeploymentReleaseNameField(StringField):
+    alias = "release_name"
+    help = "Name of the release used in the deployment."
+
+
+class HelmDeploymentNamespaceField(StringField):
+    alias = "namespace"
+    help = "Kubernetes namespace for the given deployment."
+
+
+class HelmDeploymentDependenciesField(Dependencies):
+    pass
+
+
+class HelmDeploymentSkipCrdsField(BoolField):
+    alias = "skip_crds"
+    default = False
+    help = "If true, then does not install the Custom Resource Definitions that are defined in the chart."
+
+
+class HelmDeploymentSourcesField(MultipleSourcesField):
+    default = ("*.yaml", "*.yml")
+    expected_file_extensions = (".yaml", ".yml")
+    help = "Helm configuration files for a given deployment."
+
+
+class HelmDeploymentValuesField(DictStringToStringField):
+    alias = "values"
+    required = False
+    help = "Individual values to use when rendering a given deployment."
+
+
+class HelmDeploymentTarget(Target):
+    alias = "helm_deployment"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        HelmDeploymentReleaseNameField,
+        HelmDeploymentDependenciesField,
+        HelmDeploymentSourcesField,
+        HelmDeploymentNamespaceField,
+        HelmDeploymentSkipCrdsField,
+        HelmDeploymentValuesField,
+    )
+    help = "A Helm chart deployment."
+
+
+@dataclass(frozen=True)
+class HelmDeploymentFieldSet(FieldSet):
+    required_fields = (
+        HelmDeploymentDependenciesField,
+        HelmDeploymentSourcesField,
+    )
+
+    description: DescriptionField
+    release_name: HelmDeploymentReleaseNameField
+    namespace: HelmDeploymentNamespaceField
+    sources: HelmDeploymentSourcesField
+    skip_crds: HelmDeploymentSkipCrdsField
+    dependencies: HelmDeploymentDependenciesField
+    values: HelmDeploymentValuesField
 
 
 def rules():
