@@ -34,7 +34,7 @@ class ProtobufJavaRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class ProtobufJavaRuntimeForResolve:
-    address: Address
+    addresses: frozenset[Address]
 
 
 @rule
@@ -56,7 +56,7 @@ async def resolve_protobuf_java_runtime_for_resolve(
             jvm_artifact_targets=jvm_artifact_targets,
             jvm=jvm,
         )
-        return ProtobufJavaRuntimeForResolve(next(iter(addresses)))
+        return ProtobufJavaRuntimeForResolve(addresses)
     except (MissingJvmArtifacts, ConflictingJvmArtifactVersion):
         raise MissingProtobufJavaRuntimeInResolveError(request.resolve_name)
 
@@ -77,7 +77,7 @@ async def inject_protobuf_java_runtime_dependency(
         ProtobufJavaRuntimeForResolve, ProtobufJavaRuntimeForResolveRequest(resolve)
     )
 
-    return InjectedDependencies((protobuf_java_runtime_target_info.address,))
+    return InjectedDependencies(protobuf_java_runtime_target_info.addresses)
 
 
 class MissingProtobufJavaRuntimeInResolveError(ValueError):
