@@ -48,4 +48,4 @@ git checkout -b "$BRANCH_NAME" FETCH_HEAD
 git cherry-pick "$COMMIT"
 gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --body "$BODY"
 
-echo "Don't forget to remove the label/milestone from PR #$PR_NUM!"
+echo "Don't forget to remove the 'needs-cherrypick' label from PR #$PR_NUM!"
