@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressLiteralSpec, AddressSpecs
+from pants.base.specs import AddressSpecs
 from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
