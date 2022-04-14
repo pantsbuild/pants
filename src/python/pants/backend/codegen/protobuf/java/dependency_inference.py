@@ -8,8 +8,13 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, WrappedTarget
 from pants.engine.unions import UnionRule
-from pants.jvm.dependency_inference.artifact_mapper import AllJvmArtifactTargets
-from pants.jvm.resolve.common import ArtifactRequirement
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmArtifactTargets,
+    ConflictingJvmArtifactVersion,
+    MissingJvmArtifacts,
+    UnversionedCoordinate,
+    find_jvm_artifacts_or_raise,
+)
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.docutil import bin_name
@@ -39,18 +44,21 @@ async def resolve_protobuf_java_runtime_for_resolve(
     request: ProtobufJavaRuntimeForResolveRequest,
 ) -> ProtobufJavaRuntimeForResolve:
 
-    for tgt in jvm_artifact_targets:
-        if tgt[JvmResolveField].normalized_value(jvm) != request.resolve_name:
-            continue
-
-        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
-        if (
-            artifact.coordinate.group == _PROTOBUF_JAVA_RUNTIME_GROUP
-            and artifact.coordinate.artifact == _PROTOBUF_JAVA_RUNTIME_ARTIFACT
-        ):
-            return ProtobufJavaRuntimeForResolve(tgt.address)
-
-    raise MissingProtobufJavaRuntimeInResolveError(request.resolve_name)
+    try:
+        addresses = find_jvm_artifacts_or_raise(
+            required_coordinates=[
+                UnversionedCoordinate(
+                    group=_PROTOBUF_JAVA_RUNTIME_GROUP,
+                    artifact=_PROTOBUF_JAVA_RUNTIME_ARTIFACT,
+                )
+            ],
+            resolve=request.resolve_name,
+            jvm_artifact_targets=jvm_artifact_targets,
+            jvm=jvm,
+        )
+        return ProtobufJavaRuntimeForResolve(next(iter(addresses)))
+    except (MissingJvmArtifacts, ConflictingJvmArtifactVersion):
+        raise MissingProtobufJavaRuntimeInResolveError(request.resolve_name)
 
 
 @rule
