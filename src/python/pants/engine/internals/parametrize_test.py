@@ -7,8 +7,14 @@ from typing import Any
 
 import pytest
 
+from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address
-from pants.engine.internals.parametrize import Parametrize
+from pants.engine.internals.parametrize import (
+    Parametrize,
+    _TargetParametrization,
+    _TargetParametrizations,
+)
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.mark.parametrize(
@@ -74,3 +80,60 @@ def test_expand(
         (address.spec, result_fields)
         for address, result_fields in Parametrize.expand(Address("a"), fields)
     )
+
+
+def test_get_superset_targets() -> None:
+    def tgt(addr: Address) -> GenericTarget:
+        return GenericTarget({}, addr)
+
+    def parametrization(original: Address | None, params: list[Address]) -> _TargetParametrization:
+        return _TargetParametrization(
+            tgt(original) if original else None, FrozenDict({a: tgt(a) for a in params})
+        )
+
+    dir1 = Address("dir1")
+    dir1__k1_v1__k2_v1 = Address("dir1", parameters={"k1": "v1", "k2": "v1"})
+    dir1__k1_v1__k2_v2 = Address("dir1", parameters={"k1": "v1", "k2": "v2"})
+    dir1__k1_v2__k2_v1 = Address("dir1", parameters={"k1": "v2", "k2": "v1"})
+    dir1__k1_v2__k2_v2 = Address("dir1", parameters={"k1": "v2", "k2": "v2"})
+
+    dir2 = Address("dir2")
+
+    dir3 = Address("dir3", parameters={"k": "v"})
+
+    params = _TargetParametrizations(
+        [
+            parametrization(
+                None,
+                [dir1__k1_v1__k2_v1, dir1__k1_v1__k2_v2, dir1__k1_v2__k2_v1, dir1__k1_v2__k2_v2],
+            ),
+            parametrization(dir2, []),
+            parametrization(None, []),
+            # This is what a target generator looks like in practice.
+            parametrization(
+                dir3,
+                [
+                    Address("dir3", generated_name="a", parameters={"k": "v"}),
+                    Address("dir3", generated_name="b", parameters={"k": "v"}),
+                ],
+            ),
+        ]
+    )
+
+    def assert_gets(addr: Address, expected: set[Address]) -> None:
+        assert set(params.get_all_superset_targets(addr)) == expected
+
+    assert_gets(dir2, {dir2})
+
+    assert_gets(dir1__k1_v1__k2_v1, {dir1__k1_v1__k2_v1})
+    assert_gets(
+        dir1, {dir1__k1_v1__k2_v1, dir1__k1_v1__k2_v2, dir1__k1_v2__k2_v1, dir1__k1_v2__k2_v2}
+    )
+    assert_gets(Address("dir1", parameters={"k1": "v1"}), {dir1__k1_v1__k2_v1, dir1__k1_v1__k2_v2})
+    assert_gets(Address("dir1", parameters={"k1": "v2"}), {dir1__k1_v2__k2_v1, dir1__k1_v2__k2_v2})
+
+    assert_gets(dir3, {dir3})
+
+    assert_gets(Address("fake"), set())
+    assert_gets(Address("dir1", parameters={"fake": "a"}), set())
+    assert_gets(Address("dir1", parameters={"k1": "fake"}), set())
