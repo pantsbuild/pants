@@ -401,7 +401,7 @@ def test_get_all_help_info():
                     "help": "This rule is for testing info extraction only.",
                     "input_gets": (),
                     "input_types": ("Foo",),
-                    "name": "pants.help.help_info_extracter_test.rule_info_test",
+                    "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
                     "output_desc": (
                         "A Target represents an addressable set of metadata.\n\n    Set the "
                         "`help` class property with a description, which will be used in "

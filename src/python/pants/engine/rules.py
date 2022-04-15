@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import inspect
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -34,6 +35,9 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
+
+PANTS_RULES_MODULE_KEY = "__pants_rules__"
 
 
 # NB: This violates Python naming conventions of using snake_case for functions. This is because
@@ -130,6 +134,10 @@ class MissingParameterTypeAnnotation(InvalidTypeAnnotation):
     """Indicates a missing parameter type annotation for an `@rule`."""
 
 
+class DuplicateRuleError(TypeError):
+    """Invalid to overwrite `@rule`s using the same name in the same module."""
+
+
 def _ensure_type_annotation(
     *,
     type_annotation: Optional[Type],
@@ -193,7 +201,9 @@ def rule_decorator(func, **kwargs) -> Callable:
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
     # function that implements it. This is used as the workunit name.
-    effective_name = kwargs.get("canonical_name", f"{func.__module__}.{func.__name__}")
+    effective_name = kwargs.get(
+        "canonical_name", f"{func.__module__}.{func.__qualname__}".replace(".<locals>", "")
+    )
 
     # Set a default description, which is used in the dynamic UI and stacktraces.
     effective_desc = kwargs.get("desc")
@@ -206,6 +216,27 @@ def rule_decorator(func, **kwargs) -> Callable:
             "Expected to receive a value of type LogLevel for the level "
             f"argument, but got: {effective_level}"
         )
+
+    module = sys.modules[func.__module__]
+    pants_rules = getattr(module, PANTS_RULES_MODULE_KEY, None)
+    if pants_rules is None:
+        pants_rules = {}
+        setattr(module, PANTS_RULES_MODULE_KEY, pants_rules)
+
+    if effective_name not in pants_rules:
+        pants_rules[effective_name] = func
+    else:
+        prev_func = pants_rules[effective_name]
+        if prev_func.__code__ != func.__code__:
+            raise DuplicateRuleError(
+                softwrap(
+                    f"""
+                    Redeclaring rule {effective_name} with {func} at line
+                    {func.__code__.co_firstlineno}, previously defined by {prev_func} at line
+                    {prev_func.__code__.co_firstlineno}.
+                    """
+                )
+            )
 
     return _make_rule(
         func_id,
