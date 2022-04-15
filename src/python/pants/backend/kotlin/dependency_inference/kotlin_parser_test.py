@@ -77,6 +77,10 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
 
             import java.io.File
 
+            open class Foo {
+              fun grok() {}
+            }
+
             fun main(args: Array<String>) {
             }
             """
@@ -84,3 +88,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     )
 
     assert analysis.imports == {KotlinImport(name="java.io.File", alias=None, is_wildcard=False)}
+    assert analysis.named_declarations == {
+        "org.pantsbuild.backend.kotlin.Foo",
+        "org.pantsbuild.backend.kotlin.main",
+    }

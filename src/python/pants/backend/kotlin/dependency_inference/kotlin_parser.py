@@ -60,11 +60,13 @@ class KotlinImport:
 @dataclass(frozen=True)
 class KotlinSourceDependencyAnalysis:
     imports: frozenset[KotlinImport]
+    named_declarations: frozenset[str]
 
     @classmethod
     def from_json_dict(cls, d: dict) -> KotlinSourceDependencyAnalysis:
         return cls(
             imports=frozenset(KotlinImport.from_json_dict(i) for i in d["imports"]),
+            named_declarations=frozenset(d["namedDeclarations"]),
         )
 
 
