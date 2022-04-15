@@ -69,9 +69,11 @@ class HelmRegistriesField(StringSequenceField):
 class HelmSkipPushField(BoolField):
     alias = "skip_push"
     default = False
-    help = (
-        "If set to true, do not push this helm chart "
-        f"to registries when running `{bin_name()} publish`."
+    help = softwrap(
+        f"""
+        If set to true, do not push this helm chart to registries when running `{bin_name()}
+        publish`.
+        """
     )
 
 
@@ -116,11 +118,10 @@ class HelmChartOutputPathField(OutputPathField):
         `src/charts/mychart:tgt_name` might have a final path like
         `src.charts.mychart/tgt_name/mychart-0.1.0.tgz`.
 
-        When running `{bin_name()} package`, this path will be prefixed by `--distdir`
-        (e.g. `dist/`).
+        When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. `dist/`).
 
-        Warning: setting this value risks naming collisions with other package targets
-        you may have.
+        Warning: setting this value risks naming collisions with other package targets you may
+        have.
         """
     )
 

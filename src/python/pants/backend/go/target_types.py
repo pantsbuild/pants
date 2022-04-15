@@ -25,6 +25,7 @@ from pants.engine.target import (
     TargetGenerator,
     ValidNumbers,
 )
+from pants.util.strutil import softwrap
 
 # -----------------------------------------------------------------------------------------------
 # `go_third_party_package` target
@@ -33,9 +34,12 @@ from pants.engine.target import (
 
 class GoImportPathField(StringField):
     alias = "import_path"
-    help = (
-        "Import path in Go code to import this package.\n\n"
-        "This field should not be overridden; use the value from target generation."
+    help = softwrap(
+        """
+        Import path in Go code to import this package.
+
+        This field should not be overridden; use the value from target generation.
+        """
     )
     required = True
     value: str
@@ -48,12 +52,16 @@ class GoThirdPartyPackageDependenciesField(Dependencies):
 class GoThirdPartyPackageTarget(Target):
     alias = "go_third_party_package"
     core_fields = (*COMMON_TARGET_FIELDS, GoThirdPartyPackageDependenciesField, GoImportPathField)
-    help = (
-        "A package from a third-party Go module.\n\n"
-        "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
-        "target where you have your `go.mod` file, which will generate "
-        "`go_third_party_package` targets for you.\n\n"
-        "Make sure that your `go.mod` and `go.sum` files include this package's module."
+    help = softwrap(
+        """
+        A package from a third-party Go module.
+
+        You should not explicitly create this target in BUILD files. Instead, add a `go_mod`
+        target where you have your `go.mod` file, which will generate
+        `go_third_party_package` targets for you.
+
+        Make sure that your `go.mod` and `go.sum` files include this package's module.
+        """
     )
 
     def validate(self) -> None:
@@ -113,12 +121,16 @@ class GoModDependenciesField(Dependencies):
 
 class GoModTarget(TargetGenerator):
     alias = "go_mod"
-    help = (
-        "A first-party Go module (corresponding to a `go.mod` file).\n\n"
-        "Generates `go_third_party_package` targets based on the `require` directives in your "
-        "`go.mod`.\n\n"
-        "If you have third-party packages, make sure you have an up-to-date `go.sum`. Run "
-        "`go mod tidy` directly to update your `go.mod` and `go.sum`."
+    help = softwrap(
+        """
+        A first-party Go module (corresponding to a `go.mod` file).
+
+        Generates `go_third_party_package` targets based on the `require` directives in your
+        `go.mod`.
+
+        If you have third-party packages, make sure you have an up-to-date `go.sum`. Run
+        `go mod tidy` directly to update your `go.mod` and `go.sum`.
+        """
     )
     generated_target_cls = GoThirdPartyPackageTarget
     core_fields = (
@@ -165,9 +177,12 @@ class SkipGoTestsField(BoolField):
 
 class GoTestTimeoutField(IntField):
     alias = "test_timeout"
-    help = (
-        "A timeout (in seconds) when running this package's tests.\n\n"
-        "If this field is not set, the test will never time out."
+    help = softwrap(
+        """
+        A timeout (in seconds) when running this package's tests.
+
+        If this field is not set, the test will never time out.
+        """
     )
     valid_numbers = ValidNumbers.positive_and_zero
 
@@ -181,10 +196,13 @@ class GoPackageTarget(Target):
         GoTestTimeoutField,
         SkipGoTestsField,
     )
-    help = (
-        "A first-party Go package (corresponding to a directory with `.go` files).\n\n"
-        "Expects that there is a `go_mod` target in its directory or in an ancestor "
-        "directory."
+    help = softwrap(
+        """
+        A first-party Go package (corresponding to a directory with `.go` files).
+
+        Expects that there is a `go_mod` target in its directory or in an ancestor
+        directory.
+        """
     )
 
 
@@ -195,10 +213,13 @@ class GoPackageTarget(Target):
 
 class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
-    help = (
-        "Address of the `go_package` with the `main` for this binary.\n\n"
-        "If not specified, will default to the `go_package` for the same "
-        "directory as this target's BUILD file. You should usually rely on this default."
+    help = softwrap(
+        """
+        Address of the `go_package` with the `main` for this binary.
+
+        If not specified, will default to the `go_package` for the same
+        directory as this target's BUILD file. You should usually rely on this default.
+        """
     )
     value: str
 

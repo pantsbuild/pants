@@ -7,6 +7,7 @@ import logging
 
 from pants.option.option_types import DictOption
 from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
 
 DEFAULT_KOTLIN_VERSION = "1.6.0"
 
@@ -20,9 +21,11 @@ class KotlinSubsystem(Subsystem):
 
     _version_for_resolve = DictOption[str](
         "--version-for-resolve",
-        help=(
-            "A dictionary mapping the name of a resolve to the Kotlin version to use for all Kotlin "
-            "targets consuming that resolve.\n\n"
+        help=softwrap(
+            """
+            A dictionary mapping the name of a resolve to the Kotlin version to use for all Kotlin
+            targets consuming that resolve.
+            """
         ),
     )
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pants.option.option_types import ArgsListOption
 from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
 
 
 class GoTestSubsystem(Subsystem):
@@ -14,10 +15,12 @@ class GoTestSubsystem(Subsystem):
 
     args = ArgsListOption(
         example="-run TestFoo -v",
-        extra_help=(
-            "Known Go test options will be transformed into the form expected by the test "
-            "binary, e.g. `-v` becomes `-test.v`. Run `go help testflag` from the Go SDK to "
-            "learn more about the options supported by Go test binaries."
+        extra_help=softwrap(
+            """
+            Known Go test options will be transformed into the form expected by the test
+            binary, e.g. `-v` becomes `-test.v`. Run `go help testflag` from the Go SDK to
+            learn more about the options supported by Go test binaries.
+            """
         ),
         passthrough=True,
     )

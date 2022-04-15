@@ -10,6 +10,7 @@ from typing import Any, Callable, Generic, Iterator, TypeVar, Union, cast, overl
 
 from pants.option import custom_types
 from pants.util.docutil import bin_name
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -796,9 +797,11 @@ class ArgsListOption(ShellStrListOption):
             cls,  # type: ignore[arg-type]
             flag_name,
             help=(
-                lambda subsystem_cls: (
-                    f"Arguments to pass directly to {tool_name or subsystem_cls.name}, "
-                    f"e.g. `--{subsystem_cls.options_scope}-args='{example}'`.{extra_help}"
+                lambda subsystem_cls: softwrap(
+                    f"""
+                    Arguments to pass directly to {tool_name or subsystem_cls.name},
+                    e.g. `--{subsystem_cls.options_scope}-args='{example}'`.{extra_help}
+                    """
                 )
             ),
         )
