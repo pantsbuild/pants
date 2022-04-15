@@ -46,6 +46,7 @@ class HelmRegistriesField(StringSequenceField):
         By default, all configured registries with `default = true` are used.
 
         Example:
+
             # pants.toml
             [helm.registries.my-registry-alias]
             address = "oci://myregistrydomain:port"
@@ -130,6 +131,18 @@ class HelmChartLintStrictField(TriBoolField):
     help = "If set to true, enables strict linting of this Helm chart."
 
 
+class HelmChartRepositoryField(StringField):
+    alias = "repository"
+    help = softwrap(
+        """
+        Repository to use in the Helm registry where this chart is going to be published.
+
+        If no value is given and `[helm].default-registry-repository` is undefined too, then the chart
+        will be pushed to the root of the OCI registry.
+        """
+    )
+
+
 class HelmChartTarget(Target):
     alias = "helm_chart"
     core_fields = (
@@ -139,6 +152,8 @@ class HelmChartTarget(Target):
         HelmChartDependenciesField,
         HelmChartOutputPathField,
         HelmChartLintStrictField,
+        HelmChartRepositoryField,
+        HelmRegistriesField,
         HelmSkipPushField,
     )
     help = "A Helm chart."

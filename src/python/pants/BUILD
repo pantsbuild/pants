@@ -27,6 +27,8 @@ python_distribution(
         # consumers of pantsbuild.pants are using a compatible interpreter.
         # TODO(7344): the tuple syntax for ext_modules is deprecated. Use Extension once we support it.
         ext_modules=[("native_engine", {"sources": ["pants/dummy.c"]})],
+        # N.B.: Must match [python] interpreter_constraints in pants.toml.
+        python_requires=">=3.7,<3.10",
     ),
     entry_points={"console_scripts": {"pants": "src/python/pants/bin:pants"}},
 )

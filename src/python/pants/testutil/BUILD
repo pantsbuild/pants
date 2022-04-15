@@ -13,6 +13,7 @@ python_distribution(
         name="pantsbuild.pants.testutil",
         description="Test support for writing Pants plugins.",
         classifiers=["Topic :: Software Development :: Testing"],
+        # N.B.: Must match [python] interpreter_constraints in pants.toml.
         python_requires=">=3.7,<3.10",
     ),
 )

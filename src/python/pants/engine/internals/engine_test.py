@@ -500,7 +500,10 @@ class TestStreamingWorkunit(SchedulerTestBase):
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+            item
+            for item in finished
+            if item["name"]
+            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_engine_aware_rule.a_rule"
         )
         assert workunit["level"] == "ERROR"
 
@@ -524,7 +527,10 @@ class TestStreamingWorkunit(SchedulerTestBase):
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+            item
+            for item in finished
+            if item["name"]
+            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_engine_aware_param.a_rule"
         )
         assert workunit["metadata"] == {"example": "thing"}
 
@@ -553,7 +559,10 @@ class TestStreamingWorkunit(SchedulerTestBase):
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+            item
+            for item in finished
+            if item["name"]
+            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_engine_aware_none_case.a_rule"
         )
         assert workunit["level"] == "TRACE"
 
@@ -577,7 +586,10 @@ class TestStreamingWorkunit(SchedulerTestBase):
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+            item
+            for item in finished
+            if item["name"]
+            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_artifacts_on_engine_aware_type.a_rule"
         )
         artifacts = workunit["artifacts"]
         assert artifacts["some_arbitrary_key"] == EMPTY_SNAPSHOT
@@ -602,7 +614,10 @@ class TestStreamingWorkunit(SchedulerTestBase):
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+            item
+            for item in finished
+            if item["name"]
+            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_metadata_on_engine_aware_type.a_rule"
         )
 
         metadata = workunit["metadata"]
@@ -632,7 +647,10 @@ class TestStreamingWorkunit(SchedulerTestBase):
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(
-            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+            item
+            for item in finished
+            if item["name"]
+            == "pants.engine.internals.engine_test.TestStreamingWorkunit.test_metadata_non_string_key_behavior.a_rule"
         )
 
         assert workunit["metadata"] == {}
