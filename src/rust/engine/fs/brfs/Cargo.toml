@@ -16,7 +16,7 @@ futures = "0.3"
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
 libc = "0.2.112"
-log = "0.4.1"
+log = "0.4.16"
 parking_lot = "0.12"
 protobuf = { version = "2.27.1", features = ["with-bytes"] }
 store = { path = "../store" }
