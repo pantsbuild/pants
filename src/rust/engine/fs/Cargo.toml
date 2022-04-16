@@ -23,7 +23,7 @@ lazy_static = "1"
 log = "0.4"
 parking_lot = "0.12"
 protos = { path = "../protos" }
-rlimit = "0.7"
+rlimit = "0.8"
 serde = "1.0.136"
 task_executor = { path = "../task_executor" }
 workunit_store = { path = "../workunit_store" }
