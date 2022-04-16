@@ -122,7 +122,7 @@ fun analyze(file: KtFile): KotlinAnalysis {
         }
 
         // Skip recursing for imports directives and the package directive so they do not show up
-        // the consumed symbols analysis.
+        // in the consumed symbols analysis.
         override fun visitImportList(importList: KtImportList) {}
         override fun visitPackageDirective(directive: KtPackageDirective) {}
 
