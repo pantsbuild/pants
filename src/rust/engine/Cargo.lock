@@ -252,14 +252,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "cargo_metadata"
-version = "0.10.0"
+name = "camino"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8de60b887edf6d74370fc8eb177040da4847d971d6234c7b13a6da324ef0caf"
+checksum = "6f3132262930b0522068049f5870a856ab8affc80c70d08b6ecb785771a6fc23"
 dependencies = [
- "semver",
  "serde",
- "serde_derive",
+]
+
+[[package]]
+name = "cargo-platform"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbdb825da8a5df079a43676dbe042702f1707b1109f713a01420fbb4cc71fa27"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4acbb09d9ee8e23699b9634375c72795d095bf268439da88562cf9b501f181fa"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver 1.0.7",
+ "serde",
  "serde_json",
 ]
 
@@ -370,7 +389,7 @@ version = "0.0.1"
 dependencies = [
  "deepsize",
  "log",
- "prost",
+ "prost 0.10.1",
  "prost-types",
  "serde",
  "serde_derive",
@@ -865,7 +884,7 @@ dependencies = [
  "grpc_util",
  "hashing",
  "parking_lot 0.12.0",
- "prost",
+ "prost 0.10.1",
  "protos",
  "rand 0.8.5",
  "serde",
@@ -1110,7 +1129,7 @@ dependencies = [
  "hyper",
  "itertools",
  "parking_lot 0.11.2",
- "prost",
+ "prost 0.9.0",
  "prost-build",
  "prost-types",
  "rand 0.8.5",
@@ -1714,7 +1733,7 @@ dependencies = [
  "hyper",
  "log",
  "parking_lot 0.12.0",
- "prost",
+ "prost 0.10.1",
  "prost-types",
  "protos",
  "testutil",
@@ -2259,7 +2278,7 @@ dependencies = [
  "nails",
  "nix",
  "parking_lot 0.12.0",
- "prost",
+ "prost 0.10.1",
  "prost-types",
  "protos",
  "rand 0.8.5",
@@ -2299,7 +2318,7 @@ dependencies = [
  "hashing",
  "log",
  "process_execution",
- "prost",
+ "prost 0.10.1",
  "protos",
  "shlex",
  "store",
@@ -2329,7 +2348,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "444879275cb4fd84958b1a1d5420d15e6fcf7c235fe47f053c9c2a80aceb6001"
 dependencies = [
  "bytes",
- "prost-derive",
+ "prost-derive 0.9.0",
+]
+
+[[package]]
+name = "prost"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a07b0857a71a8cb765763950499cae2413c3f9cede1133478c43600d9e146890"
+dependencies = [
+ "bytes",
+ "prost-derive 0.10.1",
 ]
 
 [[package]]
@@ -2345,7 +2374,7 @@ dependencies = [
  "log",
  "multimap",
  "petgraph",
- "prost",
+ "prost 0.9.0",
  "prost-types",
  "regex",
  "tempfile",
@@ -2366,13 +2395,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
+dependencies = [
+ "anyhow",
+ "itertools",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "534b7a0e836e3c482d2693070f982e39e7611da9695d4d1f5a4b186b51faef0a"
 dependencies = [
  "bytes",
- "prost",
+ "prost 0.9.0",
 ]
 
 [[package]]
@@ -2390,7 +2432,7 @@ version = "0.0.1"
 dependencies = [
  "bytes",
  "hashing",
- "prost",
+ "prost 0.9.0",
  "prost-build",
  "prost-types",
  "tonic",
@@ -2713,7 +2755,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 dependencies = [
- "semver",
+ "semver 0.9.0",
 ]
 
 [[package]]
@@ -2849,6 +2891,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 dependencies = [
  "semver-parser",
+]
+
+[[package]]
+name = "semver"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d65bd28f48be7196d222d95b9243287f48d27aca604e08497513019ff0502cc4"
+dependencies = [
  "serde",
 ]
 
@@ -3050,7 +3100,7 @@ dependencies = [
  "mock",
  "num_cpus",
  "parking_lot 0.12.0",
- "prost",
+ "prost 0.10.1",
  "prost-types",
  "protos",
  "serde",
@@ -3228,7 +3278,7 @@ dependencies = [
  "fs",
  "grpc_util",
  "hashing",
- "prost",
+ "prost 0.10.1",
  "protos",
 ]
 
@@ -3451,8 +3501,8 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project 1.0.8",
- "prost",
- "prost-derive",
+ "prost 0.9.0",
+ "prost-derive 0.9.0",
  "rustls-native-certs",
  "tokio",
  "tokio-rustls 0.22.0",
