@@ -196,3 +196,46 @@ def test_infer_kotlin_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None
     assert rule_runner.request(
         InferredDependencies, [InferKotlinSourceDependencies(target_c[KotlinSourceField])]
     ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.kt")])
+
+
+@maybe_skip_jdk_test
+def test_infer_same_package_via_consumed_symbol(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                kotlin_sources(name = 'a')
+                """
+            ),
+            "A.kt": dedent(
+                """\
+                package org.pantsbuild.kotlin.example
+
+                class A {
+                  def grok() {}
+                }
+                """
+            ),
+            "Main.kt": dedent(
+                """\
+                package org.pantsbuild.kotlin.example
+
+                def main(args: Array<String>) {
+                  val a = A()
+                  a.grok()
+                }
+                """
+            ),
+        }
+    )
+
+    target_a = rule_runner.get_target(Address("", target_name="a", relative_file_path="A.kt"))
+    target_main = rule_runner.get_target(Address("", target_name="a", relative_file_path="Main.kt"))
+
+    assert rule_runner.request(
+        InferredDependencies, [InferKotlinSourceDependencies(target_a[KotlinSourceField])]
+    ) == InferredDependencies(dependencies=[])
+
+    assert rule_runner.request(
+        InferredDependencies, [InferKotlinSourceDependencies(target_main[KotlinSourceField])]
+    ) == InferredDependencies(dependencies=[target_a.address])

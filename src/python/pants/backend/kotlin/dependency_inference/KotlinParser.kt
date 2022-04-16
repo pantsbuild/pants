@@ -58,7 +58,7 @@ fun nameFromExpression(expression: KtExpression?): Name? {
     return if (expression is KtSimpleNameExpression) {
         (expression as KtSimpleNameExpression).getReferencedNameAsName()
     } else {
-        throw IllegalArgumentException("Can't construct name for: " + expression.javaClass.toString())
+        return null
     }
 }
 
@@ -77,7 +77,7 @@ fun fqNameFromExpression(expression: KtExpression?): FqName? {
     } else if (expression is KtSimpleNameExpression) {
         FqName.topLevel(expression.getReferencedNameAsName())
     } else {
-        throw IllegalArgumentException("Can't construct fqn for: " + expression.javaClass.toString())
+        return null
     }
 }
 fun analyze(file: KtFile): KotlinAnalysis {

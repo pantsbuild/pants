@@ -99,20 +99,22 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.backend.kotlin.Foo",
         "org.pantsbuild.backend.kotlin.main",
     }
-    assert analysis.consumed_symbols_by_scope == FrozenDict({
-        "org.pantsbuild.backend.kotlin.Foo": frozenset(
-            {
-                "X",
-                "Y",
-            }
-        ),
-        "org.pantsbuild.backend.kotlin": frozenset(
-            {
-                "Array",
-                "String",
-            }
-        ),
-    })
+    assert analysis.consumed_symbols_by_scope == FrozenDict(
+        {
+            "org.pantsbuild.backend.kotlin.Foo": frozenset(
+                {
+                    "X",
+                    "Y",
+                }
+            ),
+            "org.pantsbuild.backend.kotlin": frozenset(
+                {
+                    "Array",
+                    "String",
+                }
+            ),
+        }
+    )
     assert analysis.scopes == {
         "org.pantsbuild.backend.kotlin",
         "org.pantsbuild.backend.kotlin.Foo",
