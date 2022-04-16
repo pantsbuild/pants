@@ -3,8 +3,7 @@
 
 from __future__ import annotations
 
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
-from pants.option.option_types import ArgsListOption, DictOption, StrListOption, StrOption
+from pants.option.option_types import ArgsListOption, DictOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -23,20 +22,6 @@ class Scalac(Subsystem):
     )
 
     args = ArgsListOption(example="-encoding UTF-8")
-    plugins_global = StrListOption(
-        "--plugins-global",
-        help=softwrap(
-            """
-            A list of addresses of `scalac_plugin` targets which should be used for
-            compilation of all Scala targets in a build.
-
-            If you set this, you must also set `[scalac].plugins_global_lockfile`.
-            """
-        ),
-        advanced=True,
-        removal_version="2.12.0.dev3",
-        removal_hint="Use `--scalac-plugins-for-resolve` instead to use user resolves",
-    )
 
     # TODO: see if we can use an actual list mechanism? If not, this seems like an OK option
     default_plugins = DictOption[str](
@@ -49,21 +34,6 @@ class Scalac(Subsystem):
             that name in either its `plugin_name` field or is the same as its target name.
             """
         ),
-    )
-
-    plugins_global_lockfile = StrOption(
-        "--plugins-global-lockfile",
-        default=DEFAULT_TOOL_LOCKFILE,
-        help=softwrap(
-            """
-            The filename of the lockfile for global plugins. You must set this option to a
-            file path, e.g. '3rdparty/jvm/global_scalac_plugins.lock', if you set
-            `[scalac].plugins_global`.
-            """
-        ),
-        advanced=True,
-        removal_version="2.12.0.dev3",
-        removal_hint="Use `--scalac-plugins-for-resolve` instead, which will add plugin dependencies to JVM user resolves.",
     )
 
     def parsed_default_plugins(self) -> dict[str, list[str]]:

@@ -37,7 +37,6 @@ from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
-from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 from pants.jvm.resolve.jvm_tool import JvmToolBase
@@ -122,10 +121,6 @@ AllTools = (
         ScroogeSubsystem, backend="pants.backend.experimental.codegen.thrift.scrooge.scala"
     ),
     DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
-    DefaultTool(
-        "scalac-plugins",
-        (f"--scalac-plugins-global-lockfile={Scalac.default_plugins_lockfile_path}",),
-    ),
     DefaultTool.jvm(KtlintSubsystem, backend="pants.backend.experimental.kotlin.lint.ktlint"),
 )
 
