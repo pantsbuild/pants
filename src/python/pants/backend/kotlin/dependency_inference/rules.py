@@ -141,7 +141,7 @@ async def resolve_kotlin_runtime_for_resolve(
 
 
 @rule(desc="Inject dependency on Kotlin runtime artifacts for Kotlin targets.")
-async def inject_scala_library_dependency(
+async def inject_kotlin_stdlib_dependency(
     request: InjectKotlinRuntimeDependencyRequest,
     jvm: JvmSubsystem,
 ) -> InjectedDependencies:
