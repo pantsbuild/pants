@@ -36,7 +36,7 @@ fi
 
 COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
 TITLE=$(gh pr view "$PR_NUM" --json title --jq '.title')
-BODY_FILE=$(mktemp /tmp/github.cherrypick.XXXXXX)
+BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.$MILESTONE.XXXXXX")
 PR_CREATE_CMD=(gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --body-file "$BODY_FILE")
 BRANCH_NAME="cherry-pick-$PR_NUM-to-$MILESTONE"
 
