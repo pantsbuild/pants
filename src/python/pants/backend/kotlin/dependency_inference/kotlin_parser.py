@@ -6,6 +6,7 @@ import json
 import os
 import pkgutil
 from dataclasses import dataclass
+from typing import Iterator
 
 from pants.backend.kotlin.subsystems.kotlin import DEFAULT_KOTLIN_VERSION
 from pants.core.util_rules.source_files import SourceFiles
@@ -19,6 +20,7 @@ from pants.jvm.jdk_rules import InternalJdk, JdkEnvironment, JdkRequest, JvmProc
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.option.global_options import ProcessCleanupOption
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 _KOTLIN_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements.from_coordinates(
@@ -59,14 +61,64 @@ class KotlinImport:
 
 @dataclass(frozen=True)
 class KotlinSourceDependencyAnalysis:
+    package: str
     imports: frozenset[KotlinImport]
     named_declarations: frozenset[str]
+    consumed_symbols_by_scope: FrozenDict[str, frozenset[str]]
+    scopes: frozenset[str]
+
+    def fully_qualified_consumed_symbols(self) -> Iterator[str]:
+        """Consumed symbols qualified in various ways.
+
+        This method _will_ introduce false-positives, because we will assume that the symbol could
+        have been provided by any wildcard import in scope, as well as being declared in the current
+        package.
+        """
+
+        def scope_and_parents(scope: str) -> Iterator[str]:
+            while True:
+                yield scope
+                if scope == "":
+                    break
+                scope, _, _ = scope.rpartition(".")
+
+        for consumption_scope, consumed_symbols in self.consumed_symbols_by_scope.items():
+            parent_scopes = tuple(scope_and_parents(consumption_scope))
+            for symbol in consumed_symbols:
+                symbol_rel_prefix, dot_in_symbol, symbol_rel_suffix = symbol.partition(".")
+                if not self.scopes or dot_in_symbol:
+                    # TODO: Similar to #13545: we assume that a symbol containing a dot might already
+                    # be fully qualified.
+                    yield symbol
+                for parent_scope in parent_scopes:
+                    if parent_scope in self.scopes:
+                        # A package declaration is a parent of this scope, and any of its symbols
+                        # could be in scope.
+                        yield f"{parent_scope}.{symbol}"
+
+                    for imp in self.imports if parent_scope == self.package else ():
+                        if imp.is_wildcard:
+                            # There is a wildcard import in a parent scope.
+                            yield f"{imp.name}.{symbol}"
+                        if dot_in_symbol:
+                            # If the parent scope has an import which defines the first token of the
+                            # symbol, then it might be a relative usage of an import.
+                            if imp.alias:
+                                if imp.alias == symbol_rel_prefix:
+                                    yield f"{imp.name}.{symbol_rel_suffix}"
+                            elif imp.name.endswith(f".{symbol_rel_prefix}"):
+                                yield f"{imp.name}.{symbol_rel_suffix}"
 
     @classmethod
     def from_json_dict(cls, d: dict) -> KotlinSourceDependencyAnalysis:
         return cls(
+            package=d["package"],
             imports=frozenset(KotlinImport.from_json_dict(i) for i in d["imports"]),
             named_declarations=frozenset(d["namedDeclarations"]),
+            consumed_symbols_by_scope=FrozenDict(
+                {k: frozenset(v) for k, v in d["consumedSymbolsByScope"].items()}
+            ),
+            scopes=frozenset(d["scopes"]),
         )
 
 

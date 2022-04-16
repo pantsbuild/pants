@@ -13,3 +13,9 @@ class KotlinInferSubsystem(Subsystem):
         default=True,
         help="Infer a target's dependencies by parsing import statements from sources.",
     )
+
+    consumed_types = BoolOption(
+        "--consumed-types",
+        default=True,
+        help="Infer a target's dependencies by parsing consumed types from sources.",
+    )
