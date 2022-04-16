@@ -55,10 +55,9 @@ fun nameFromExpression(expression: KtExpression?): Name? {
     if (expression == null) {
         return null
     }
-    return if (expression is KtSimpleNameExpression) {
-        (expression as KtSimpleNameExpression).getReferencedNameAsName()
-    } else {
-        return null
+    return when (expression) {
+        is KtSimpleNameExpression -> expression.getReferencedNameAsName()
+        else -> null
     }
 }
 
@@ -67,17 +66,17 @@ fun fqNameFromExpression(expression: KtExpression?): FqName? {
         return null
     }
 
-    return if (expression is KtDotQualifiedExpression) {
-        val dotQualifiedExpression = expression as KtDotQualifiedExpression
-        val parentFqn: FqName? = fqNameFromExpression(dotQualifiedExpression.receiverExpression)
-        val child: Name = nameFromExpression(dotQualifiedExpression.selectorExpression) ?: return parentFqn
-        if (parentFqn != null) {
-            parentFqn.child(child)
-        } else null
-    } else if (expression is KtSimpleNameExpression) {
-        FqName.topLevel(expression.getReferencedNameAsName())
-    } else {
-        return null
+    return when (expression) {
+        is KtDotQualifiedExpression -> {
+            val dotQualifiedExpression = expression as KtDotQualifiedExpression
+            val parentFqn: FqName? = fqNameFromExpression(dotQualifiedExpression.receiverExpression)
+            val child: Name = nameFromExpression(dotQualifiedExpression.selectorExpression) ?: return parentFqn
+            if (parentFqn != null) {
+                parentFqn.child(child)
+            } else null
+        }
+        is KtSimpleNameExpression -> FqName.topLevel(expression.getReferencedNameAsName())
+        else -> null
     }
 }
 fun analyze(file: KtFile): KotlinAnalysis {
