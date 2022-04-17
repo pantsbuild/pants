@@ -5,7 +5,8 @@ from pants.backend.codegen.thrift.scrooge.rules import (
     GeneratedScroogeThriftSources,
     GenerateScroogeThriftSourcesRequest,
 )
-from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField
+from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField, ThriftSourceTarget, \
+    ThriftSourcesGeneratorTarget
 from pants.backend.java.target_types import JavaSourceField
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, Snapshot
@@ -18,6 +19,7 @@ from pants.engine.target import (
     InjectedDependencies,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
@@ -69,4 +71,8 @@ def rules():
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromThriftRequest),
         UnionRule(InjectDependenciesRequest, InjectScroogeJavaDependencies),
+        ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),
+        ThriftSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
+        ThriftSourceTarget.register_plugin_field(PrefixedJvmResolveField),
+        ThriftSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
     )

@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from pants.backend.codegen.thrift.scrooge import additional_fields
 from pants.backend.codegen.thrift.scrooge.additional_fields import ScroogeFinagleBoolField
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
-from pants.backend.codegen.thrift.target_types import ThriftSourceField
+from pants.backend.codegen.thrift.target_types import ThriftSourceField, ThriftSourceTarget, \
+    ThriftSourcesGeneratorTarget
 from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -19,6 +20,7 @@ from pants.jvm.goals import lockfile
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 
@@ -139,4 +141,8 @@ def rules():
         *additional_fields.rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, ScroogeToolLockfileSentinel),
+        ThriftSourceTarget.register_plugin_field(PrefixedJvmJdkField),
+        ThriftSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
+        ThriftSourceTarget.register_plugin_field(PrefixedJvmResolveField),
+        ThriftSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
     ]
