@@ -40,6 +40,10 @@ class KotlinGeneratorFieldSet(FieldSet):
     sources: KotlinGeneratorSourcesField
 
 
+class KotlinDependenciesField(Dependencies):
+    pass
+
+
 # -----------------------------------------------------------------------------------------------
 # `kotlin_source` and `kotlin_sources` targets
 # -----------------------------------------------------------------------------------------------
@@ -49,7 +53,7 @@ class KotlinSourceTarget(Target):
     alias = "kotlin_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
+        KotlinDependenciesField,
         KotlinSourceField,
         JvmResolveField,
         JvmProvidesTypesField,
@@ -71,7 +75,7 @@ class KotlinSourcesGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = KotlinSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
-        Dependencies,
+        KotlinDependenciesField,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
