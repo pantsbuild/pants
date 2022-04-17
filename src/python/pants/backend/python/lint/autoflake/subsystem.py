@@ -65,7 +65,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, AutoflakeLockfileSentinel),
-        # NOTE: If I un-comment this line to register the rule, `./pants` starts to panic
-        # from a loop in the rule graph.
-        # UnionRule(ExportPythonToolSentinel, AutoflakeExportSentinel),
+        UnionRule(ExportPythonToolSentinel, AutoflakeExportSentinel),
     )
