@@ -5,8 +5,12 @@ from pants.backend.codegen.thrift.scrooge.rules import (
     GeneratedScroogeThriftSources,
     GenerateScroogeThriftSourcesRequest,
 )
-from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField, ThriftSourceTarget, \
-    ThriftSourcesGeneratorTarget
+from pants.backend.codegen.thrift.target_types import (
+    ThriftDependenciesField,
+    ThriftSourceField,
+    ThriftSourcesGeneratorTarget,
+    ThriftSourceTarget,
+)
 from pants.backend.java.target_types import JavaSourceField
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest, Snapshot

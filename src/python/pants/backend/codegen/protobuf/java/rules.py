@@ -32,7 +32,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.target_types import JvmJdkField, PrefixedJvmJdkField, PrefixedJvmResolveField
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 

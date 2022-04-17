@@ -10,8 +10,12 @@ from pants.backend.codegen.thrift.apache.rules import (
     GeneratedThriftSources,
     GenerateThriftSourcesRequest,
 )
-from pants.backend.codegen.thrift.target_types import ThriftDependenciesField, ThriftSourceField, \
-    ThriftSourcesGeneratorTarget, ThriftSourceTarget
+from pants.backend.codegen.thrift.target_types import (
+    ThriftDependenciesField,
+    ThriftSourceField,
+    ThriftSourcesGeneratorTarget,
+    ThriftSourceTarget,
+)
 from pants.backend.java.target_types import JavaSourceField
 from pants.build_graph.address import Address
 from pants.engine.fs import AddPrefix, Digest, Snapshot

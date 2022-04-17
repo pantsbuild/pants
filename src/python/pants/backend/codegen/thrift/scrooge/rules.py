@@ -5,8 +5,11 @@ from dataclasses import dataclass
 from pants.backend.codegen.thrift.scrooge import additional_fields
 from pants.backend.codegen.thrift.scrooge.additional_fields import ScroogeFinagleBoolField
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
-from pants.backend.codegen.thrift.target_types import ThriftSourceField, ThriftSourceTarget, \
-    ThriftSourcesGeneratorTarget
+from pants.backend.codegen.thrift.target_types import (
+    ThriftSourceField,
+    ThriftSourcesGeneratorTarget,
+    ThriftSourceTarget,
+)
 from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
