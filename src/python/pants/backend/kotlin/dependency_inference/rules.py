@@ -52,6 +52,8 @@ async def infer_kotlin_dependencies_via_source_analysis(
     symbols: OrderedSet[str] = OrderedSet()
     if kotlin_infer_subsystem.imports:
         symbols.update(imp.name for imp in analysis.imports)
+    if kotlin_infer_subsystem.consumed_types:
+        symbols.update(analysis.fully_qualified_consumed_symbols())
 
     resolve = tgt[JvmResolveField].normalized_value(jvm)
 
