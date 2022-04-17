@@ -7,7 +7,6 @@ import pkgutil
 from dataclasses import dataclass
 
 from pants.backend.codegen import export_codegen_goal
-from pants.backend.codegen.protobuf.java.rules import PrefixedJvmJdkField
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.scala import dependency_inference
 from pants.backend.codegen.protobuf.scala.subsystem import PluginArtifactSpec, ScalaPBSubsystem
@@ -52,7 +51,7 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
-from pants.jvm.target_types import PrefixedJvmResolveField
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
