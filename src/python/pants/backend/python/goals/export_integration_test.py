@@ -40,6 +40,7 @@ EXPORTED_TOOLS: List[_ToolConfig] = [
     _ToolConfig(name="pyupgrade", version="2.31.1", experimental=True),
     _ToolConfig(name="yapf", version="0.32.0"),
     _ToolConfig(name="mypy", version="0.940", type="typecheck"),
+    _ToolConfig(name="pytest", version="7.1.0", type="built-in"),
 ]
 
 
@@ -58,16 +59,20 @@ def build_config(tmpdir: str) -> Mapping:
         },
     }
     for tool_config in EXPORTED_TOOLS:
+        cfg[tool_config.name] = {
+            "version": f"{tool_config.name}=={tool_config.version}",
+            "lockfile": f"{tmpdir}/3rdparty/{tool_config.name}.lock",
+        }
+
+        if tool_config.type == "built-in":
+            continue
+
         plugin_suffix = f"python.{tool_config.type}.{tool_config.name}"
 
         if tool_config.experimental:
             plugin_suffix = f"experimental.{plugin_suffix}"
 
         cfg["GLOBAL"]["backend_packages"].append(f"pants.backend.{plugin_suffix}")
-        cfg[tool_config.name] = {
-            "version": f"{tool_config.name}=={tool_config.version}",
-            "lockfile": f"{tmpdir}/3rdparty/{tool_config.name}.lock",
-        }
 
     return cfg
 
