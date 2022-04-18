@@ -517,7 +517,11 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
     assert len(partitions) == 3
 
     def assert_partition(
-        partition: PylintPartition, roots: list[Target], deps: list[Target], interpreter: str
+        partition: PylintPartition,
+        roots: list[Target],
+        deps: list[Target],
+        interpreter: str,
+        resolve: str,
     ) -> None:
         root_addresses = {t.address for t in roots}
         assert {t.address for t in partition.root_targets} == root_addresses
@@ -525,10 +529,16 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
             *root_addresses,
             *(t.address for t in deps),
         }
-        assert partition.interpreter_constraints == InterpreterConstraints([f"=={interpreter}.*"])
+        ics = [f"CPython=={interpreter}.*"]
+        assert partition.interpreter_constraints == InterpreterConstraints(ics)
+        assert partition.description() == f"{resolve}, {ics}"
 
-    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8")
-    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9")
+    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
+    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
     assert_partition(
-        partitions[2], [resolve_b_root1, resolve_b_root2], [resolve_b_dep1, resolve_b_dep2], "3.9"
+        partitions[2],
+        [resolve_b_root1, resolve_b_root2],
+        [resolve_b_dep1, resolve_b_dep2],
+        "3.9",
+        "b",
     )

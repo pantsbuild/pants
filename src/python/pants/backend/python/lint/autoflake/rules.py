@@ -6,7 +6,7 @@ from typing import Tuple
 
 from pants.backend.python.lint.autoflake.skip_field import SkipAutoflakeField
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
-from pants.backend.python.target_types import InterpreterConstraintsField, PythonSourceField
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
@@ -26,7 +26,6 @@ class AutoflakeFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
     source: PythonSourceField
-    interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
