@@ -11,7 +11,7 @@ from typing import Any, cast
 import yaml
 
 from pants.engine.collection import Collection
-from pants.engine.fs import Digest, DigestContents
+from pants.engine.fs import Digest, DigestContents, DigestSubset, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.strutil import pluralize
 
@@ -147,7 +147,11 @@ class ParseKubernetesManifests:
 
 @rule
 async def parse_kubernetes_manifests(request: ParseKubernetesManifests) -> ResourceManifests:
-    digest_contents = await Get(DigestContents, Digest, request.digest)
+    yaml_subset = await Get(
+        Digest, DigestSubset(request.digest, PathGlobs(["**/*.yaml", "**/*.yml"]))
+    )
+    digest_contents = await Get(DigestContents, Digest, yaml_subset)
+
     manifests = [
         ResourceManifest.from_dict(parsed_yaml)
         for file in digest_contents
