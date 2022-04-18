@@ -51,7 +51,12 @@ class MyPyFieldSet(FieldSet):
 class MyPyPartition:
     root_targets: FrozenOrderedSet[Target]
     closure: FrozenOrderedSet[Target]
+    resolve_description: str
     interpreter_constraints: InterpreterConstraints
+
+    def description(self) -> str:
+        ics = str(sorted(str(c) for c in self.interpreter_constraints))
+        return f"{self.resolve_description}, {ics}" if self.resolve_description else None
 
 
 class MyPyPartitions(Collection[MyPyPartition]):
@@ -272,7 +277,7 @@ async def mypy_determine_partitions(
         ].add(transitive_targets)
 
     partitions = []
-    for (_resolve, interpreter_constraints), all_transitive_targets in sorted(
+    for (resolve, interpreter_constraints), all_transitive_targets in sorted(
         resolve_and_interpreter_constraints_to_transitive_targets.items()
     ):
         combined_roots: OrderedSet[Target] = OrderedSet()
@@ -286,6 +291,7 @@ async def mypy_determine_partitions(
             MyPyPartition(
                 FrozenOrderedSet(combined_roots),
                 FrozenOrderedSet(combined_closure),
+                resolve if len(python_setup.resolves) > 1 else None,
                 interpreter_constraints,
             )
         )
