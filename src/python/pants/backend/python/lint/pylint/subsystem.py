@@ -274,8 +274,9 @@ async def pylint_interpreter_constraints(
                 python_setup,
             )
         )
+    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
 
-    return InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
 # --------------------------------------------------------------------------------------
@@ -308,7 +309,7 @@ async def setup_pylint_lockfile(
     constraints = await Get(InterpreterConstraints, _PylintConstraintsRequest())
     return GeneratePythonLockfile.from_tool(
         pylint,
-        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        constraints,
         extra_requirements=first_party_plugins.requirement_strings,
         use_pex=python_setup.generate_lockfiles_with_pex,
     )

@@ -264,7 +264,9 @@ async def flake8_interpreter_constraints(
                 python_setup,
             )
         )
-    return InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+
+    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
 # --------------------------------------------------------------------------------------
@@ -297,7 +299,7 @@ async def setup_flake8_lockfile(
     constraints = await Get(InterpreterConstraints, _Flake8ConstraintsRequest())
     return GeneratePythonLockfile.from_tool(
         flake8,
-        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        constraints,
         extra_requirements=first_party_plugins.requirement_strings,
         use_pex=python_setup.generate_lockfiles_with_pex,
     )

@@ -100,7 +100,9 @@ async def bandit_interpreter_constraints(
         for tgt in all_tgts
         if BanditFieldSet.is_applicable(tgt)
     }
-    return InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+
+    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
 class BanditLockfileSentinel(GenerateToolLockfileSentinel):
@@ -125,7 +127,7 @@ async def setup_bandit_lockfile(
     constraints = await Get(InterpreterConstraints, _BanditConstraintsRequest())
     return GeneratePythonLockfile.from_tool(
         bandit,
-        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        constraints,
         use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
