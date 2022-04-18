@@ -97,6 +97,18 @@ def checkout() -> Sequence[Step]:
             "uses": "actions/checkout@v2",
             "with": {"fetch-depth": 10},
         },
+        # Work around https://github.com/actions/checkout/issues/760
+        # See:
+        # + https://github.blog/2022-04-12-git-security-vulnerability-announced
+        # + https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-24765
+        {
+            "name": "Configure Git",
+            "run": dedent(
+                """\
+                git config --global safe.directory "$GITHUB_WORKSPACE"
+                """
+            ),
+        },
         # For a push event, the commit we care about is HEAD itself.
         # This CI currently only runs on PRs, so this is future-proofing.
         {

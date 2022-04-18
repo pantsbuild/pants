@@ -20,6 +20,10 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 10
+    - name: Configure Git
+      run: 'git config --global safe.directory "$GITHUB_WORKSPACE"
+
+        '
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -181,6 +185,10 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 10
+    - name: Configure Git
+      run: 'git config --global safe.directory "$GITHUB_WORKSPACE"
+
+        '
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -305,6 +313,10 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 10
+    - name: Configure Git
+      run: 'git config --global safe.directory "$GITHUB_WORKSPACE"
+
+        '
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -386,6 +398,10 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 10
+    - name: Configure Git
+      run: 'git config --global safe.directory "$GITHUB_WORKSPACE"
+
+        '
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -499,6 +515,10 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 10
+    - name: Configure Git
+      run: 'git config --global safe.directory "$GITHUB_WORKSPACE"
+
+        '
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -574,6 +594,10 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 10
+    - name: Configure Git
+      run: 'git config --global safe.directory "$GITHUB_WORKSPACE"
+
+        '
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -672,6 +696,10 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 10
+    - name: Configure Git
+      run: 'git config --global safe.directory "$GITHUB_WORKSPACE"
+
+        '
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
