@@ -51,7 +51,7 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate, GatherJvmCoordinatesRequest
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
-from pants.jvm.target_types import JvmJdkField, JvmResolveField
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -322,14 +322,6 @@ def generate_scalapbc_lockfile_request(
     _: ScalapbcToolLockfileSentinel, tool: ScalaPBSubsystem
 ) -> GenerateJvmLockfileFromTool:
     return GenerateJvmLockfileFromTool.create(tool)
-
-
-class PrefixedJvmJdkField(JvmJdkField):
-    alias = "jvm_jdk"
-
-
-class PrefixedJvmResolveField(JvmResolveField):
-    alias = "jvm_resolve"
 
 
 def rules():
