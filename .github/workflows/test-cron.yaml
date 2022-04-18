@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -167,7 +167,7 @@ jobs:
     runs-on: macos-10.15
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -288,7 +288,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -366,7 +366,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -453,7 +453,7 @@ jobs:
     runs-on: macos-10.15
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
