@@ -68,44 +68,64 @@ IS_PANTS_OWNER = "${{ github.repository_owner == 'pantsbuild' }}"
 # ----------------------------------------------------------------------
 
 
-def checkout() -> Sequence[Step]:
+def checkout(containerized: bool = False) -> Sequence[Step]:
     """Get prior commits and the commit message."""
-    return [
+    steps = [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
         # for details on how we get the commit message here.
         # We need to fetch a few commits back, to be able to access HEAD^2 in the PR case.
         {
             "name": "Check out code",
-            "uses": "actions/checkout@v2",
+            "uses": "actions/checkout@v3",
             "with": {"fetch-depth": 10},
         },
-        # For a push event, the commit we care about is HEAD itself.
-        # This CI currently only runs on PRs, so this is future-proofing.
-        {
-            "name": "Get commit message for branch builds",
-            "if": "github.event_name == 'push'",
-            "run": dedent(
-                """\
+    ]
+    if containerized:
+        steps.append(
+            # Work around https://github.com/actions/checkout/issues/760 for our container jobs.
+            # See:
+            # + https://github.blog/2022-04-12-git-security-vulnerability-announced
+            # + https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-24765
+            {
+                "name": "Configure Git",
+                "run": dedent(
+                    """\
+                    git config --global safe.directory "$GITHUB_WORKSPACE"
+                    """
+                ),
+            }
+        )
+    steps.extend(
+        [
+            # For a push event, the commit we care about is HEAD itself.
+            # This CI currently only runs on PRs, so this is future-proofing.
+            {
+                "name": "Get commit message for branch builds",
+                "if": "github.event_name == 'push'",
+                "run": dedent(
+                    """\
                 echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
                 echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
                 echo "EOF" >> $GITHUB_ENV
                 """
-            ),
-        },
-        # For a pull_request event, the commit we care about is the second parent of the merge
-        # commit. This CI currently only runs on PRs, so this is future-proofing.
-        {
-            "name": "Get commit message for PR builds",
-            "if": "github.event_name == 'pull_request'",
-            "run": dedent(
-                """\
+                ),
+            },
+            # For a pull_request event, the commit we care about is the second parent of the merge
+            # commit. This CI currently only runs on PRs, so this is future-proofing.
+            {
+                "name": "Get commit message for PR builds",
+                "if": "github.event_name == 'pull_request'",
+                "run": dedent(
+                    """\
                 echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
                 echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
                 echo "EOF" >> $GITHUB_ENV
                 """
-            ),
-        },
-    ]
+                ),
+            },
+        ]
+    )
+    return steps
 
 
 def setup_toolchain_auth() -> Step:
@@ -126,7 +146,7 @@ def pants_virtualenv_cache() -> Step:
         "uses": "actions/cache@v2",
         "with": {
             "path": "~/.cache/pants/pants_dev_deps\n",
-            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('pants/3rdparty/python/**', 'pants.toml') }}\n",
+            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('3rdparty/python/**', 'pants.toml') }}\n",
         },
     }
 
@@ -475,7 +495,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "env": DISABLE_REMOTE_CACHE_ENV,
                     "if": IS_PANTS_OWNER,
                     "steps": [
-                        *checkout(),
+                        *checkout(containerized=True),
                         install_rustup(),
                         {
                             "name": "Expose Pythons",
