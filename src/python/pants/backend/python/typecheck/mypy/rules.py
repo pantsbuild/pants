@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
@@ -51,12 +53,12 @@ class MyPyFieldSet(FieldSet):
 class MyPyPartition:
     root_targets: FrozenOrderedSet[Target]
     closure: FrozenOrderedSet[Target]
-    resolve_description: str
+    resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
 
     def description(self) -> str:
         ics = str(sorted(str(c) for c in self.interpreter_constraints))
-        return f"{self.resolve_description}, {ics}" if self.resolve_description else None
+        return f"{self.resolve_description}, {ics}" if self.resolve_description else ics
 
 
 class MyPyPartitions(Collection[MyPyPartition]):
