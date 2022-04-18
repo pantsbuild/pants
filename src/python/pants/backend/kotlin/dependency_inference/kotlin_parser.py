@@ -6,7 +6,7 @@ import json
 import os
 import pkgutil
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Any, Iterator
 
 from pants.backend.kotlin.subsystems.kotlin import DEFAULT_KOTLIN_VERSION
 from pants.core.util_rules.source_files import SourceFiles
@@ -57,6 +57,13 @@ class KotlinImport:
             alias=d.get("alias"),
             is_wildcard=d["isWildcard"],
         )
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "alias": self.alias,
+            "is_wildcard": self.is_wildcard,
+        }
 
 
 @dataclass(frozen=True)
@@ -120,6 +127,17 @@ class KotlinSourceDependencyAnalysis:
             ),
             scopes=frozenset(d["scopes"]),
         )
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "package": self.package,
+            "imports": [imp.to_debug_json_dict() for imp in self.imports],
+            "named_declarations": list(self.named_declarations),
+            "consumed_symbols_by_scope": {
+                k: sorted(v) for k, v in self.consumed_symbols_by_scope.items()
+            },
+            "scopes": list(self.scopes),
+        }
 
 
 @dataclass(frozen=True)
