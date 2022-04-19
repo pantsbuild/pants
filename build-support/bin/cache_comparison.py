@@ -73,14 +73,14 @@ TimeInSeconds = float
 def commits_in_range(diffspec: str, step: int) -> list[Commit]:
     all_commits = list(
         subprocess.run(
-            ["git", "log", "--format=format:%h", diffspec, "--"],
+            ["git", "rev-list", "--reverse", diffspec],
             stdout=subprocess.PIPE,
             check=True,
         )
         .stdout.decode()
         .splitlines()
     )
-    return list(reversed(all_commits))[::step]
+    return all_commits[::step]
 
 
 def timings_by_build(

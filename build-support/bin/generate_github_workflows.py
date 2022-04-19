@@ -771,7 +771,7 @@ def generate() -> dict[Path, str]:
                                   --build-diffspec="$BUILD_DIFFSPEC" \\
                                   --build-diffspec-step=$BUILD_DIFFSPEC_STEP \\
                                   --source-diffspec="$SOURCE_DIFFSPEC" \\
-                                  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP"
+                                  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP
                                 """
                             ),
                             "env": cc_env,
