@@ -10,7 +10,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 1024
+        fetch-depth: 10
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -35,21 +35,38 @@ jobs:
 
         '
     - env:
+        BASE_REF: ${{ github.event.inputs.baseRef }}
         BUILD_DIFFSPEC: ${{ github.event.inputs.buildDiffspec }}
         BUILD_DIFFSPEC_STEP: ${{ github.event.inputs.buildDiffspecStep }}
-        PANTS_ARGS: ${{ github.event.inputs.pants_args }}
+        PANTS_ARGS: ${{ github.event.inputs.pantsArgs }}
         SOURCE_DIFFSPEC: ${{ github.event.inputs.sourceDiffspec }}
         SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.sourceDiffspecStep }}
-      name: Cache comparison script
-      run: "./pants package build-support/bin/cache_comparison.py\ndist/build-support.bin/cache_comparison_py.pex\
-        \ \\\n  --args=\"$PANTS_ARGS\" \\\n  --build-diffspec=\"$BUILD_DIFFSPEC\"\
-        \ \\\n  --build-diffspec-step=$BUILD_DIFFSPEC_STEP \\\n  --source-diffspec=\"\
-        $SOURCE_DIFFSPEC\" \\\n  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP\n"
+      name: Prepare cache comparison
+      run: './pants package build-support/bin/cache_comparison.py
+
+        git fetch --no-tags --depth=1024 origin "$BASE_REF"
+
+        '
+    - env:
+        BASE_REF: ${{ github.event.inputs.baseRef }}
+        BUILD_DIFFSPEC: ${{ github.event.inputs.buildDiffspec }}
+        BUILD_DIFFSPEC_STEP: ${{ github.event.inputs.buildDiffspecStep }}
+        PANTS_ARGS: ${{ github.event.inputs.pantsArgs }}
+        SOURCE_DIFFSPEC: ${{ github.event.inputs.sourceDiffspec }}
+        SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.sourceDiffspecStep }}
+      name: Run cache comparison
+      run: "dist/build-support.bin/cache_comparison_py.pex \\\n  --args=\"$PANTS_ARGS\"\
+        \ \\\n  --build-diffspec=\"$BUILD_DIFFSPEC\" \\\n  --build-diffspec-step=$BUILD_DIFFSPEC_STEP\
+        \ \\\n  --source-diffspec=\"$SOURCE_DIFFSPEC\" \\\n  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP\n"
     timeout-minutes: 90
 name: Cache Comparison
 'on':
   workflow_dispatch:
     inputs:
+      baseRef:
+        default: main
+        required: false
+        type: string
       buildDiffspec:
         required: true
         type: string
@@ -57,7 +74,7 @@ name: Cache Comparison
         default: 1
         required: false
         type: int
-      pants_args:
+      pantsArgs:
         default: 'check lint test ::'
         required: false
         type: string
