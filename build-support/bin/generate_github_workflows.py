@@ -657,13 +657,18 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
         "cache_comparison": {
             "runs-on": "ubuntu-latest",
             "timeout-minutes": 90,
+            # TODO: This job doesn't actually need to run as a matrix, but `setup_primary_python`
+            # assumes that jobs are.
+            "strategy": {"matrix": {"python-version": [PYTHON37_VERSION]}},
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
+                *setup_primary_python(),
+                expose_all_pythons(),
                 {
                     "name": "Prepare cache comparison",
                     "run": dedent(
-                        # TODO: The fetch depth is arbitrary, but is meant to capture the
+                        # NB: The fetch depth is arbitrary, but is meant to capture the
                         # most likely `diffspecs` used as arguments.
                         """\
                                 ./pants package build-support/bin/cache_comparison.py
