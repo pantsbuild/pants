@@ -162,10 +162,9 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     * PantsDaemon, immediately on startup. The process will then default to sending stdio to the log
       until client connections arrive, at which point `stdio_destination` is used per-connection.
     """
-    console_level_filter = global_bootstrap_options.console_level_filter
     with initialize_stdio_raw(
         global_bootstrap_options.level,
-        global_bootstrap_options.level if console_level_filter is None else console_level_filter,
+        global_bootstrap_options.console_level_filter,
         global_bootstrap_options.log_show_rust_3rdparty,
         global_bootstrap_options.show_log_target,
         _get_log_levels_by_target(global_bootstrap_options),
@@ -179,7 +178,7 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
 @contextmanager
 def initialize_stdio_raw(
     global_level: LogLevel,
-    console_level_filter: LogLevel,
+    console_level_filter: LogLevel | None,
     log_show_rust_3rdparty: bool,
     show_target: bool,
     log_levels_by_target: dict[str, LogLevel],
@@ -204,7 +203,7 @@ def initialize_stdio_raw(
     try:
         raw_stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
             global_level.level,
-            console_level_filter.level,
+            None if console_level_filter is None else console_level_filter.level,
             log_show_rust_3rdparty,
             show_target,
             {k: v.level for k, v in log_levels_by_target.items()},

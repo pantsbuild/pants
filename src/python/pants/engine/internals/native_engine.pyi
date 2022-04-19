@@ -220,7 +220,7 @@ def set_per_run_log_path(path: str | None) -> None: ...
 def maybe_set_panic_handler() -> None: ...
 def stdio_initialize(
     level: int,
-    console_level_filter: int,
+    console_level_filter: int | None,
     show_rust_3rdparty_logs: bool,
     show_target: bool,
     log_levels_by_target: dict[str, int],

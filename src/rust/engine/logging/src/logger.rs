@@ -28,7 +28,7 @@ struct Inner {
   per_run_logs: Mutex<Option<File>>,
   log_file: Mutex<Option<File>>,
   global_level: LevelFilter,
-  console_level_filter: LevelFilter,
+  console_level_filter: Option<LevelFilter>,
   show_rust_3rdparty_logs: bool,
   show_target: bool,
   log_level_filters: HashMap<String, log::LevelFilter>,
@@ -44,7 +44,7 @@ impl PantsLogger {
       per_run_logs: Mutex::new(None),
       log_file: Mutex::new(None),
       global_level: LevelFilter::Off,
-      console_level_filter: LevelFilter::Off,
+      console_level_filter: Some(LevelFilter::Off),
       show_rust_3rdparty_logs: true,
       show_target: false,
       log_level_filters: HashMap::new(),
@@ -55,7 +55,7 @@ impl PantsLogger {
 
   pub fn init(
     max_level: u64,
-    max_console_level_filter: u64,
+    max_console_level_filter: Option<u64>,
     show_rust_3rdparty_logs: bool,
     show_target: bool,
     log_levels_by_target: HashMap<String, u64>,
@@ -79,14 +79,19 @@ impl PantsLogger {
       .map_err(|e| format!("Unrecognised log level from Python: {}: {}", max_level, e))?;
     let global_level: LevelFilter = max_python_level.into();
 
-    let max_python_console_level_filter: PythonLogLevel =
-      max_console_level_filter.try_into().map_err(|e| {
-        format!(
-          "Unrecognised log level from Python: {}: {}",
-          max_console_level_filter, e
-        )
-      })?;
-    let console_level_filter: LevelFilter = max_python_console_level_filter.into();
+    let console_level_filter = match max_console_level_filter {
+      None => None,
+      Some(some_max_console_level_filter) => {
+        let max_python_console_level_filter: PythonLogLevel =
+          some_max_console_level_filter.try_into().map_err(|e| {
+            format!(
+              "Unrecognised console level filter from Python: {}: {}",
+              some_max_console_level_filter, e
+            )
+          })?;
+        Some(LevelFilter::from(max_python_console_level_filter))
+      }
+    };
 
     let log_file = OpenOptions::new()
       .create(true)
@@ -237,7 +242,8 @@ impl Log for PantsLogger {
       }
     }
 
-    let should_log_to_console = record.metadata().level() <= inner.console_level_filter;
+    let should_log_to_console = inner.console_level_filter.is_none()
+      || record.metadata().level() <= inner.console_level_filter.unwrap();
     // Attempt to write to stdio, and write to the pantsd log if we fail (either because we don't
     // have a valid stdio instance, or because of an error).
     if should_log_to_console && destination.write_stderr_raw(log_bytes).is_err() {

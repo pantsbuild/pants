@@ -1580,7 +1580,7 @@ fn write_digest(
 #[pyfunction]
 fn stdio_initialize(
   level: u64,
-  console_level_filter: u64,
+  console_level_filter: Option<u64>,
   show_rust_3rdparty_logs: bool,
   show_target: bool,
   log_levels_by_target: HashMap<String, u64>,
