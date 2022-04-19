@@ -54,8 +54,8 @@ def create_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = create_parser().parse_args()
-    build_commits = commits_in_range(args.build_diffspec, args.build_diffspec_step)
-    source_commits = commits_in_range(args.source_diffspec, args.source_diffspec_step)
+    build_commits = commits_in_range(args.build_diffspec, int(args.build_diffspec_step))
+    source_commits = commits_in_range(args.source_diffspec, int(args.source_diffspec_step))
     timings = timings_by_build(
         shlex.split(args.args),
         build_commits,
@@ -89,12 +89,12 @@ def timings_by_build(
     """For each build commit, build a PEX, and then collect timings for each source commit."""
     result = []
     for build_commit in build_commits:
-        cache_namespace = f"cache-comparison-{build_commit}-{time()}"
         # Build a PEX for the commit, then ensure that `pantsd` is not running.
         checkout(build_commit)
-        run(["package", "src/python/pants/bin:pants"], cache_namespace, use_pex=False)
+        run(["package", "src/python/pants/bin:pants"], use_pex=False)
         shutil.rmtree(".pids")
         # Then collect a runtime for each commit in the range.
+        cache_namespace = f"cache-comparison-{build_commit}-{time()}"
         result.append(
             (
                 build_commit,
@@ -110,7 +110,7 @@ def timings_by_build(
 def timing_for_commit(commit: Commit, args: list[str], cache_namespace: str) -> TimeInSeconds:
     checkout(commit)
     start = time()
-    run(args, cache_namespace)
+    run(args, cache_namespace=cache_namespace)
     return time() - start
 
 
@@ -118,7 +118,7 @@ def checkout(commit: Commit) -> None:
     subprocess.run(["git", "checkout", commit], check=True)
 
 
-def run(args: list[str], cache_namespace: str, *, use_pex: bool = True) -> None:
+def run(args: list[str], *, cache_namespace: str | None = None, use_pex: bool = True) -> None:
     cmd = "dist/src.python.pants.bin/pants.pex" if use_pex else "./pants"
     subprocess.run(
         [cmd, *pants_options(cache_namespace), *args],
@@ -126,11 +126,15 @@ def run(args: list[str], cache_namespace: str, *, use_pex: bool = True) -> None:
     )
 
 
-def pants_options(cache_namespace: str) -> list[str]:
+def pants_options(cache_namespace: str | None = None) -> list[str]:
     return [
         "--no-local-cache",
         "--pants-config-files=pants.ci.toml",
-        f"--process-execution-cache-namespace={cache_namespace}",
+        *(
+            []
+            if cache_namespace is None
+            else [f"--process-execution-cache-namespace={cache_namespace}"]
+        ),
     ]
 
 

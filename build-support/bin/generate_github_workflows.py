@@ -642,7 +642,7 @@ def cache_comparison_inputs() -> tuple[dict[str, Any], dict[str, Any]]:
                 "pants_args",
                 "PANTS_ARGS",
                 "string",
-                default="check fmt lint ::",
+                default="check lint test ::",
             ),
         ]
     )
@@ -757,6 +757,7 @@ def generate() -> dict[Path, str]:
             "jobs": {
                 "cache_comparison": {
                     "runs-on": "ubuntu-latest",
+                    "timeout-minutes": 90,
                     "steps": [
                         # TODO: This depth is arbitrary, but is meant to capture the most
                         # likely `diffspecs` used as arguments.
