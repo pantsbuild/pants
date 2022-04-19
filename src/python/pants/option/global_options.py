@@ -535,7 +535,14 @@ class BootstrapOptions:
         "--level",
         default=LogLevel.INFO,
         daemon=True,
-        help="Set the logging level.",
+        help="Set the global logging level.",
+    )
+    log_file_level = EnumOption(
+        "--console-level-filter",
+        default=None,
+        enum_type=LogLevel,
+        daemon=True,
+        help="Filters the logs printed to the console to be of this level or higher.",
     )
     show_log_target = BoolOption(
         "--show-log-target",

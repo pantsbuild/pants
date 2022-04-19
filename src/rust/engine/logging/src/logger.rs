@@ -28,6 +28,7 @@ struct Inner {
   per_run_logs: Mutex<Option<File>>,
   log_file: Mutex<Option<File>>,
   global_level: LevelFilter,
+  console_level_filter: LevelFilter,
   show_rust_3rdparty_logs: bool,
   show_target: bool,
   log_level_filters: HashMap<String, log::LevelFilter>,
@@ -43,6 +44,7 @@ impl PantsLogger {
       per_run_logs: Mutex::new(None),
       log_file: Mutex::new(None),
       global_level: LevelFilter::Off,
+      console_level_filter: LevelFilter::Off,
       show_rust_3rdparty_logs: true,
       show_target: false,
       log_level_filters: HashMap::new(),
@@ -53,6 +55,7 @@ impl PantsLogger {
 
   pub fn init(
     max_level: u64,
+    max_console_level_filter: u64,
     show_rust_3rdparty_logs: bool,
     show_target: bool,
     log_levels_by_target: HashMap<String, u64>,
@@ -76,6 +79,15 @@ impl PantsLogger {
       .map_err(|e| format!("Unrecognised log level from Python: {}: {}", max_level, e))?;
     let global_level: LevelFilter = max_python_level.into();
 
+    let max_python_console_level_filter: PythonLogLevel =
+      max_console_level_filter.try_into().map_err(|e| {
+        format!(
+          "Unrecognised log level from Python: {}: {}",
+          max_console_level_filter, e
+        )
+      })?;
+    let console_level_filter: LevelFilter = max_python_console_level_filter.into();
+
     let log_file = OpenOptions::new()
       .create(true)
       .append(true)
@@ -86,6 +98,7 @@ impl PantsLogger {
       per_run_logs: Mutex::default(),
       log_file: Mutex::new(Some(log_file)),
       global_level,
+      console_level_filter,
       show_rust_3rdparty_logs,
       show_target,
       log_level_filters,
@@ -224,9 +237,10 @@ impl Log for PantsLogger {
       }
     }
 
+    let should_log_to_console = record.metadata().level() <= inner.console_level_filter;
     // Attempt to write to stdio, and write to the pantsd log if we fail (either because we don't
     // have a valid stdio instance, or because of an error).
-    if destination.write_stderr_raw(log_bytes).is_err() {
+    if should_log_to_console && destination.write_stderr_raw(log_bytes).is_err() {
       let mut maybe_file = inner.log_file.lock();
       if let Some(ref mut file) = *maybe_file {
         match file.write_all(log_bytes) {

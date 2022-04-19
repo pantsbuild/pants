@@ -1580,6 +1580,7 @@ fn write_digest(
 #[pyfunction]
 fn stdio_initialize(
   level: u64,
+  console_level_filter: u64,
   show_rust_3rdparty_logs: bool,
   show_target: bool,
   log_levels_by_target: HashMap<String, u64>,
@@ -1607,6 +1608,7 @@ fn stdio_initialize(
 
   Logger::init(
     level,
+    console_level_filter,
     show_rust_3rdparty_logs,
     show_target,
     log_levels_by_target,
