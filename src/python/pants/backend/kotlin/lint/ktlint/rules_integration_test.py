@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from pants.backend.kotlin.compile import kotlinc_plugins
 from pants.backend.kotlin.compile.kotlinc import rules as kotlinc_rules
 from pants.backend.kotlin.lint.ktlint import rules as ktlint_fmt_rules
 from pants.backend.kotlin.lint.ktlint import skip_field
@@ -35,6 +36,7 @@ def rule_runner() -> RuleRunner:
             *coursier_setup_rules(),
             *jdk_rules.rules(),
             *kotlinc_rules(),
+            *kotlinc_plugins.rules(),
             *util_rules(),
             *target_types_rules(),
             *ktlint_fmt_rules.rules(),

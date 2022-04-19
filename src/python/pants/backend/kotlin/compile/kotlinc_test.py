@@ -4,12 +4,13 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.kotlin.compile import kotlinc_plugins
 from pants.backend.kotlin.compile.kotlinc import CompileKotlinSourceRequest
 from pants.backend.kotlin.compile.kotlinc import rules as kotlinc_rules
 from pants.backend.kotlin.dependency_inference.rules import rules as kotlin_dep_inf_rules
 from pants.backend.kotlin.goals.check import KotlincCheckRequest
 from pants.backend.kotlin.goals.check import rules as kotlin_check_rules
-from pants.backend.kotlin.target_types import KotlinSourcesGeneratorTarget
+from pants.backend.kotlin.target_types import KotlincPluginTarget, KotlinSourcesGeneratorTarget
 from pants.backend.kotlin.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
@@ -48,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *jdk_rules.rules(),
             *kotlin_check_rules(),
             *kotlinc_rules(),
+            *kotlinc_plugins.rules(),
             *kotlin_dep_inf_rules(),
             *source_files.rules(),
             *target_types_rules(),
@@ -59,7 +61,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(RenderedClasspath, (CompileKotlinSourceRequest,)),
             QueryRule(ClasspathEntry, (CompileKotlinSourceRequest,)),
         ],
-        target_types=[JvmArtifactTarget, KotlinSourcesGeneratorTarget],
+        target_types=[JvmArtifactTarget, KotlinSourcesGeneratorTarget, KotlincPluginTarget],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
@@ -500,3 +502,214 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
     fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     assert fallible_result.result == CompileResult.FAILED and fallible_result.stderr
     assert "unresolved reference: joda" in fallible_result.stderr
+
+
+@maybe_skip_jdk_test
+def test_compile_with_kotlinc_plugin(rule_runner: RuleRunner) -> None:
+    allopen_coord = Coordinate(
+        group="org.jetbrains.kotlin", artifact="kotlin-allopen", version="1.6.20"
+    )
+    rule_runner.write_files(
+        {
+            "lib/BUILD": dedent(
+                f"""\
+                jvm_artifact(
+                    name = "allopen_lib",
+                    group = "{allopen_coord.group}",
+                    artifact = "{allopen_coord.artifact}",
+                    version = "{allopen_coord.version}",
+                )
+
+                kotlinc_plugin(
+                    name = "allopen",
+                    plugin_id = "org.jetbrains.kotlin.allopen",
+                    plugin_args = ["annotation=lib.MarkOpen"],
+                    # TODO: Support relative addresses.
+                    artifact = "lib:allopen_lib",
+                )
+
+                kotlin_sources()
+                """
+            ),
+            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGETS,
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(
+                entries=(
+                    *_DEFAULT_LOCKFILE_ENTRIES,
+                    CoursierLockfileEntry(
+                        coord=allopen_coord,
+                        file_name="kotlin-allopen-1.6.20.jar",
+                        direct_dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-gradle-plugin-api",
+                                    version="1.6.20",
+                                ),
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-gradle-plugin-model",
+                                    version="1.6.20",
+                                ),
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-native-utils",
+                                    version="1.6.20",
+                                ),
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-project-model",
+                                    version="1.6.20",
+                                ),
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-util-io",
+                                    version="1.6.20",
+                                ),
+                            ]
+                        ),
+                        dependencies=Coordinates(
+                            [
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-gradle-plugin-api",
+                                    version="1.6.20",
+                                ),
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-gradle-plugin-model",
+                                    version="1.6.20",
+                                ),
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-native-utils",
+                                    version="1.6.20",
+                                ),
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-project-model",
+                                    version="1.6.20",
+                                ),
+                                Coordinate(
+                                    group="org.jetbrains.kotlin",
+                                    artifact="kotlin-util-io",
+                                    version="1.6.20",
+                                ),
+                            ]
+                        ),
+                        file_digest=FileDigest(
+                            "5c67ecca01adc53379da238cb3c25b8756d715d69a2a18fa1927512429428559",
+                            29365,
+                        ),
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-gradle-plugin-api",
+                            version="1.6.20",
+                        ),
+                        file_name="kotlin-gradle-plugin-api-1.6.20.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "dd4c50bc2b9220fff58be27ca78a48bf1e120be5c4be21710a715cefe9a9df53",
+                            139597,
+                        ),
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-gradle-plugin-model",
+                            version="1.6.20",
+                        ),
+                        file_name="kotlin-gradle-plugin-model-1.6.20.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "add20d08051ce2c1a7cb0c8b0513f8b4580e24437aca39cc6144b23e0dc54709",
+                            12666,
+                        ),
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-native-utils",
+                            version="1.6.20",
+                        ),
+                        file_name="kotlin-native-utils-1.6.20.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "b58b6f0133a9eb1f5d215418908d945225db27fe7d9cd5997bb6fbd61c998d1e",
+                            92706,
+                        ),
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-project-model",
+                            version="1.6.20",
+                        ),
+                        file_name="kotlin-project-model-1.6.20.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "5cbabaeb981f0fb6271ce553b8798d5753763f693f57cad88d8325b9a9d30459",
+                            64532,
+                        ),
+                    ),
+                    CoursierLockfileEntry(
+                        coord=Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-util-io",
+                            version="1.6.20",
+                        ),
+                        file_name="kotlin-util-io-1.6.20.jar",
+                        direct_dependencies=Coordinates([]),
+                        dependencies=Coordinates([]),
+                        file_digest=FileDigest(
+                            "dbae46f5376a0cd0239d7be76d2097840215b15dae282e1ac1f8589c36bb9a56",
+                            51102,
+                        ),
+                    ),
+                )
+            ).serialize(
+                [
+                    ArtifactRequirement(allopen_coord),
+                    *_DEFAULT_LOCKFILE_REQUIREMENTS,
+                ]
+            ),
+            "lib/Grok.kt": dedent(
+                """
+                package lib
+
+                annotation class MarkOpen
+
+                @MarkOpen
+                class A {
+                  val value: Boolean = true
+                }
+
+                class B: A() {
+                  override val value = false
+                }
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        args=[
+            "--kotlin-version-for-resolve={'jvm-default': '1.6.20'}",
+            "--kotlinc-plugins-for-resolve={'jvm-default': 'org.jetbrains.kotlin.allopen'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    request = CompileKotlinSourceRequest(
+        component=expect_single_expanded_coarsened_target(
+            rule_runner, Address(spec_path="lib", relative_file_path="Grok.kt")
+        ),
+        resolve=make_resolve(rule_runner),
+    )
+    fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
+    print(f"stdout:\n{fallible_result.stdout}\nstderr:\n{fallible_result.stderr}")
+    assert fallible_result.result == CompileResult.SUCCEEDED

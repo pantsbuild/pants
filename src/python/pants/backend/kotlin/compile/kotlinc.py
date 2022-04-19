@@ -6,6 +6,12 @@ import itertools
 import logging
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet
+from pants.backend.kotlin.compile.kotlinc_plugins import (
+    KotlincPlugins,
+    KotlincPluginsForTargetRequest,
+    KotlincPluginsRequest,
+    KotlincPluginTargetsForTarget,
+)
 from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
 from pants.backend.kotlin.subsystems.kotlinc import KotlincSubsystem
 from pants.backend.kotlin.target_types import (
@@ -85,6 +91,16 @@ async def compile_kotlin_source(
         ),
     )
 
+    plugins_ = await MultiGet(
+        Get(
+            KotlincPluginTargetsForTarget,
+            KotlincPluginsForTargetRequest(target, request.resolve.name),
+        )
+        for target in request.component.members
+    )
+    plugins_request = KotlincPluginsRequest.from_target_plugins(plugins_, request.resolve)
+    local_plugins = await Get(KotlincPlugins, KotlincPluginsRequest, plugins_request)
+
     component_members_and_kotlin_source_files = [
         (target, sources)
         for target, sources in component_members_and_source_files
@@ -105,6 +121,7 @@ async def compile_kotlin_source(
         )
 
     toolcp_relpath = "__toolcp"
+    local_kotlinc_plugins_relpath = "__localplugincp"
     usercp = "__cp"
 
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
@@ -143,6 +160,7 @@ async def compile_kotlin_source(
 
     extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
+        local_kotlinc_plugins_relpath: local_plugins.classpath.digest,
     }
     extra_nailgun_keys = tuple(extra_immutable_input_digests)
     extra_immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
@@ -160,6 +178,7 @@ async def compile_kotlin_source(
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 "-d",
                 output_file,
+                *(local_plugins.args(local_kotlinc_plugins_relpath)),
                 *kotlinc.args,
                 *sorted(
                     itertools.chain.from_iterable(
