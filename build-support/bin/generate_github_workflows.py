@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Dict, Sequence, cast
@@ -86,7 +87,7 @@ def ensure_category_label() -> Sequence[Step]:
     ]
 
 
-def checkout(containerized: bool = False) -> Sequence[Step]:
+def checkout(*, containerized: bool = False, fetch_depth: int = 10) -> Sequence[Step]:
     """Get prior commits and the commit message."""
     steps = [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
@@ -95,7 +96,7 @@ def checkout(containerized: bool = False) -> Sequence[Step]:
         {
             "name": "Check out code",
             "uses": "actions/checkout@v3",
-            "with": {"fetch-depth": 10},
+            "with": {"fetch-depth": fetch_depth},
         },
     ]
     if containerized:
@@ -588,6 +589,65 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     return jobs
 
 
+@dataclass(frozen=True)
+class WorkflowInput:
+    name: str
+    env_name: str
+    type_str: str
+    default: str | int | None = None
+
+
+def workflow_dispatch_inputs(
+    workflow_inputs: Sequence[WorkflowInput],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Builds `on.workflow_dispatch.inputs` and a corresponding `env` section to consume them."""
+    inputs = {
+        wi.name: {
+            "required": (wi.default is None),
+            "type": wi.type_str,
+            **({} if wi.default is None else {"default": wi.default}),
+        }
+        for wi in workflow_inputs
+    }
+    env = {wi.env_name: ("${{ github.event.inputs." + wi.name + " }}") for wi in workflow_inputs}
+    return inputs, env
+
+
+def cache_comparison_inputs() -> tuple[dict[str, Any], dict[str, Any]]:
+    return workflow_dispatch_inputs(
+        [
+            WorkflowInput(
+                "buildDiffspec",
+                "BUILD_DIFFSPEC",
+                "string",
+            ),
+            WorkflowInput(
+                "buildDiffspecStep",
+                "BUILD_DIFFSPEC_STEP",
+                "int",
+                default=1,
+            ),
+            WorkflowInput(
+                "sourceDiffspec",
+                "SOURCE_DIFFSPEC",
+                "string",
+            ),
+            WorkflowInput(
+                "sourceDiffspecStep",
+                "SOURCE_DIFFSPEC_STEP",
+                "int",
+                default=1,
+            ),
+            WorkflowInput(
+                "pants_args",
+                "PANTS_ARGS",
+                "string",
+                default="check fmt lint ::",
+            ),
+        ]
+    )
+
+
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -686,8 +746,45 @@ def generate() -> dict[Path, str]:
         }
     )
 
+    cc_inputs, cc_env = cache_comparison_inputs()
+    cache_comparison_yaml = yaml.dump(
+        {
+            "name": "Cache Comparison",
+            # Only kicked off manually.
+            "on": {
+                "workflow_dispatch": {"inputs": cc_inputs},
+            },
+            "jobs": {
+                "cache_comparison": {
+                    "runs-on": "ubuntu-latest",
+                    "steps": [
+                        # TODO: This depth is arbitrary, but is meant to capture the most
+                        # likely `diffspecs` used as arguments.
+                        *checkout(fetch_depth=1024),
+                        {
+                            "name": "Cache comparison script",
+                            "run": dedent(
+                                """\
+                                ./pants package build-support/bin/cache_comparison.py
+                                dist/build-support.bin/cache_comparison_py.pex \\
+                                  --args="$PANTS_ARGS" \\
+                                  --build-diffspec="$BUILD_DIFFSPEC" \\
+                                  --build-diffspec-step=$BUILD_DIFFSPEC_STEP \\
+                                  --source-diffspec="$SOURCE_DIFFSPEC" \\
+                                  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP"
+                                """
+                            ),
+                            "env": cc_env,
+                        },
+                    ],
+                }
+            },
+        }
+    )
+
     return {
         Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
+        Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
         Path(".github/workflows/cancel.yaml"): f"{HEADER}\n\n{cancel_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/test-cron.yaml"): f"{HEADER}\n\n{test_cron_yaml}",
