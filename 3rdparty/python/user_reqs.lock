@@ -18,7 +18,7 @@
 //     "ijson==3.1.4",
 //     "mypy-typing-asserts==0.1.1",
 //     "packaging==21.3",
-//     "pex==2.1.80",
+//     "pex==2.1.81",
 //     "psutil==5.9.0",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -548,13 +548,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3d606eb7045904bb96f879d142aae742d0dc029033d00bdbf6e411a2b2162259",
-              "url": "https://files.pythonhosted.org/packages/02/d2/e0a7e9cfe553cc0f558cbb678af152a11f8ad9f7f16810db9e772f099c0d/pex-2.1.80-py2.py3-none-any.whl"
+              "hash": "d6e929f3412fcd23e338f4b06b1c9010def712a90fb6b81d46d70e451b33be77",
+              "url": "https://files.pythonhosted.org/packages/a2/33/3abde8e3a3e544dc002f5ef5b38115cb38a1b7bbd897a1fbc54e3ed9ff7e/pex-2.1.81-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9bd1ccbcba05a60e5a5283649cb745ed7fbe5c493d8fbd3ea9a89deb6eee62fb",
-              "url": "https://files.pythonhosted.org/packages/0e/d2/27ecc4441dde1ceb5edb4cd67f937b544ea17f38be30b85d86ef15f07382/pex-2.1.80.tar.gz"
+              "hash": "116ee43944f32e398154a71d46b71dc7e000312a75870d8b27f98732e29588b1",
+              "url": "https://files.pythonhosted.org/packages/a4/0b/bc58840c3ca355857a95e7d902eac9b9d8703cdef6e1a459607763ca492d/pex-2.1.81.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -562,7 +562,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.11,>=2.7",
-          "version": "2.1.80"
+          "version": "2.1.81"
         },
         {
           "artifacts": [
@@ -1545,7 +1545,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.80",
+  "pex_version": "2.1.81",
   "prefer_older_binary": false,
   "requirements": [
     "PyYAML<7.0,>=6.0",
@@ -1557,7 +1557,7 @@
     "ijson==3.1.4",
     "mypy-typing-asserts==0.1.1",
     "packaging==21.3",
-    "pex==2.1.80",
+    "pex==2.1.81",
     "psutil==5.9.0",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",
