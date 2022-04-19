@@ -30,7 +30,7 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -230,14 +230,8 @@ async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class _PylintConstraintsRequest:
-    pass
-
-
-@rule
-async def pylint_interpreter_constraints(
-    _: _PylintConstraintsRequest,
+@rule_helper
+async def _pylint_interpreter_constraints(
     first_party_plugins: PylintFirstPartyPlugins,
     python_setup: PythonSetup,
 ) -> InterpreterConstraints:
@@ -306,7 +300,7 @@ async def setup_pylint_lockfile(
             pylint, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = await Get(InterpreterConstraints, _PylintConstraintsRequest())
+    constraints = await _pylint_interpreter_constraints(first_party_plugins, python_setup)
     return GeneratePythonLockfile.from_tool(
         pylint,
         constraints,
@@ -329,8 +323,9 @@ async def pylint_export(
     _: PylintExportSentinel,
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
+    python_setup: PythonSetup,
 ) -> ExportPythonTool:
-    constraints = await Get(InterpreterConstraints, _PylintConstraintsRequest())
+    constraints = await _pylint_interpreter_constraints(first_party_plugins, python_setup)
 
     return ExportPythonTool(
         resolve_name=pylint.options_scope,

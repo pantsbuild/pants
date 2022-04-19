@@ -27,7 +27,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -187,15 +187,8 @@ class PyTest(PythonToolBase):
         )
 
 
-@dataclass(frozen=True)
-class _PytestConstraintsRequest:
-    pass
-
-
-@rule
-async def pytest_interprester_constraints(
-    _: _PytestConstraintsRequest, python_setup: PythonSetup
-) -> InterpreterConstraints:
+@rule_helper
+async def _pytest_interpreter_constraints(python_setup: PythonSetup) -> InterpreterConstraints:
     # Even though we run each python_tests target in isolation, we need a single set of constraints
     # that works with them all (and their transitive deps).
     #
@@ -237,7 +230,7 @@ async def setup_pytest_lockfile(
             pytest, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = await Get(InterpreterConstraints, _PytestConstraintsRequest())
+    constraints = await _pytest_interpreter_constraints(python_setup)
     return GeneratePythonLockfile.from_tool(
         pytest,
         constraints,
@@ -250,8 +243,10 @@ class PytestExportSentinel(ExportPythonToolSentinel):
 
 
 @rule
-async def pytest_export(_: PytestExportSentinel, pytest: PyTest) -> ExportPythonTool:
-    constraints = await Get(InterpreterConstraints, _PytestConstraintsRequest())
+async def pytest_export(
+    _: PytestExportSentinel, pytest: PyTest, python_setup: PythonSetup
+) -> ExportPythonTool:
+    constraints = await _pytest_interpreter_constraints(python_setup)
 
     return ExportPythonTool(
         resolve_name=pytest.options_scope,

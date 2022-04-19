@@ -20,7 +20,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import AllTargets, AllTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, FileOption, SkipOption
@@ -80,15 +80,8 @@ class Bandit(PythonToolBase):
         )
 
 
-@dataclass(frozen=True)
-class _BanditConstraintsRequest:
-    pass
-
-
-@rule
-async def bandit_interpreter_constraints(
-    _: _BanditConstraintsRequest, python_setup: PythonSetup
-) -> InterpreterConstraints:
+@rule_helper
+async def _bandit_interpreter_constraints(python_setup: PythonSetup) -> InterpreterConstraints:
     # While Bandit will run in partitions, we need a set of constraints that works with every
     # partition.
     #
@@ -124,7 +117,7 @@ async def setup_bandit_lockfile(
             bandit, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = await Get(InterpreterConstraints, _BanditConstraintsRequest())
+    constraints = await _bandit_interpreter_constraints(python_setup)
     return GeneratePythonLockfile.from_tool(
         bandit,
         constraints,
@@ -137,8 +130,10 @@ class BanditExportSentinel(ExportPythonToolSentinel):
 
 
 @rule
-async def bandit_export(_: BanditExportSentinel, bandit: Bandit) -> ExportPythonTool:
-    constraints = await Get(InterpreterConstraints, _BanditConstraintsRequest())
+async def bandit_export(
+    _: BanditExportSentinel, bandit: Bandit, python_setup: PythonSetup
+) -> ExportPythonTool:
+    constraints = await _bandit_interpreter_constraints(python_setup)
 
     return ExportPythonTool(
         resolve_name=bandit.options_scope,

@@ -30,7 +30,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -229,14 +229,8 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class _Flake8ConstraintsRequest:
-    pass
-
-
-@rule
-async def flake8_interpreter_constraints(
-    _: _Flake8ConstraintsRequest,
+@rule_helper
+async def _flake8_interpreter_constraints(
     first_party_plugins: Flake8FirstPartyPlugins,
     python_setup: PythonSetup,
 ) -> InterpreterConstraints:
@@ -296,7 +290,7 @@ async def setup_flake8_lockfile(
             flake8, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = await Get(InterpreterConstraints, _Flake8ConstraintsRequest())
+    constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
     return GeneratePythonLockfile.from_tool(
         flake8,
         constraints,
@@ -316,9 +310,12 @@ class Flake8ExportSentinel(ExportPythonToolSentinel):
 
 @rule
 async def flake8_export(
-    _: Flake8ExportSentinel, flake8: Flake8, first_party_plugins: Flake8FirstPartyPlugins
+    _: Flake8ExportSentinel,
+    flake8: Flake8,
+    first_party_plugins: Flake8FirstPartyPlugins,
+    python_setup: PythonSetup,
 ) -> ExportPythonTool:
-    constraints = await Get(InterpreterConstraints, _Flake8ConstraintsRequest())
+    constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
 
     return ExportPythonTool(
         resolve_name=flake8.options_scope,

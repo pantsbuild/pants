@@ -29,7 +29,7 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -273,14 +273,9 @@ async def mypy_first_party_plugins(
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class _MyPyConstraintsRequest:
-    pass
-
-
-@rule
-async def mypy_interpreter_constraints(
-    _: _MyPyConstraintsRequest, mypy: MyPy, python_setup: PythonSetup
+@rule_helper
+async def _mypy_interpreter_constraints(
+    mypy: MyPy, python_setup: PythonSetup
 ) -> InterpreterConstraints:
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
@@ -325,7 +320,7 @@ async def setup_mypy_lockfile(
             mypy, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = await Get(InterpreterConstraints, _MyPyConstraintsRequest())
+    constraints = await _mypy_interpreter_constraints(mypy, python_setup)
     return GeneratePythonLockfile.from_tool(
         mypy,
         constraints,
@@ -347,9 +342,10 @@ class MyPyExportSentinel(ExportPythonToolSentinel):
 async def mypy_export(
     _: MyPyExportSentinel,
     mypy: MyPy,
+    python_setup: PythonSetup,
     first_party_plugins: MyPyFirstPartyPlugins,
 ) -> ExportPythonTool:
-    constraints = await Get(InterpreterConstraints, _MyPyConstraintsRequest())
+    constraints = await _mypy_interpreter_constraints(mypy, python_setup)
 
     return ExportPythonTool(
         resolve_name=mypy.options_scope,

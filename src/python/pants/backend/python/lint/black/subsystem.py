@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os.path
-from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
@@ -17,7 +16,7 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import AllTargets, AllTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
@@ -78,14 +77,9 @@ class Black(PythonToolBase):
         )
 
 
-@dataclass(frozen=True)
-class _BlackConstraintsRequest:
-    pass
-
-
-@rule
-async def black_interpreter_constraints(
-    _: _BlackConstraintsRequest, black: Black, python_setup: PythonSetup
+@rule_helper
+async def _black_interpreter_constraints(
+    black: Black, python_setup: PythonSetup
 ) -> InterpreterConstraints:
     constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
@@ -116,7 +110,7 @@ async def setup_black_lockfile(
             black, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = await Get(InterpreterConstraints, _BlackConstraintsRequest())
+    constraints = await _black_interpreter_constraints(black, python_setup)
     return GeneratePythonLockfile.from_tool(
         black, constraints, use_pex=python_setup.generate_lockfiles_with_pex
     )
@@ -127,8 +121,10 @@ class BlackExportSentinel(ExportPythonToolSentinel):
 
 
 @rule
-async def black_export(_: BlackExportSentinel, black: Black) -> ExportPythonTool:
-    constraints = await Get(InterpreterConstraints, _BlackConstraintsRequest())
+async def black_export(
+    _: BlackExportSentinel, black: Black, python_setup: PythonSetup
+) -> ExportPythonTool:
+    constraints = await _black_interpreter_constraints(black, python_setup)
     return ExportPythonTool(
         resolve_name=black.options_scope,
         pex_request=black.to_pex_request(interpreter_constraints=constraints),
