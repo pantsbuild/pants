@@ -39,7 +39,7 @@ jobs:
       run: "./pants package build-support/bin/cache_comparison.py\ndist/build-support.bin/cache_comparison_py.pex\
         \ \\\n  --args=\"$PANTS_ARGS\" \\\n  --build-diffspec=\"$BUILD_DIFFSPEC\"\
         \ \\\n  --build-diffspec-step=$BUILD_DIFFSPEC_STEP \\\n  --source-diffspec=\"\
-        $SOURCE_DIFFSPEC\" \\\n  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP\"\n"
+        $SOURCE_DIFFSPEC\" \\\n  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP\n"
 name: Cache Comparison
 'on':
   workflow_dispatch:
