@@ -535,7 +535,7 @@ class BootstrapOptions:
         "--level",
         default=LogLevel.INFO,
         daemon=True,
-        help="Set the global logging level.",
+        help="Set the logging level.",
     )
     log_file_level = EnumOption(
         "--console-level-filter",
