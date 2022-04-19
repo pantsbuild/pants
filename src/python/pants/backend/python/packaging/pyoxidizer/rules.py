@@ -20,8 +20,9 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
     PyOxidizerTarget,
     PyOxidizerUnclassifiedResources,
 )
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.target_types import GenerateSetupField, WheelField
-from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
+from pants.backend.python.util_rules.pex import Pex, PexProcess
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.util_rules.system_binaries import BashBinary
@@ -141,7 +142,7 @@ async def package_pyoxidizer_binary(
     logger.debug(f"Configuration used for {field_set.address}: {rendered_config}")
 
     pyoxidizer_pex, config_digest = await MultiGet(
-        Get(Pex, PexRequest, pyoxidizer.to_pex_request()),
+        Get(Pex, PythonToolPexRequest(pyoxidizer)),
         Get(Digest, CreateDigest([FileContent("pyoxidizer.bzl", rendered_config.encode("utf-8"))])),
     )
     input_digest = await Get(

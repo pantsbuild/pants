@@ -12,6 +12,7 @@ from pants.backend.python.lint.pylint.subsystem import (
     PylintFieldSet,
     PylintFirstPartyPlugins,
 )
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -94,8 +95,8 @@ async def pylint_lint_partition(
 
     pylint_pex_get = Get(
         Pex,
-        PexRequest,
-        pylint.to_pex_request(
+        PythonToolPexRequest(
+            pylint,
             interpreter_constraints=partition.interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),

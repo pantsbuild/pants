@@ -9,7 +9,7 @@ from typing import Iterable
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase, PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -112,7 +112,7 @@ class IsortExportSentinel(ExportPythonToolSentinel):
 
 @rule
 def isort_export(_: IsortExportSentinel, isort: Isort) -> ExportPythonTool:
-    return ExportPythonTool(resolve_name=isort.options_scope, pex_request=isort.to_pex_request())
+    return ExportPythonTool(isort.options_scope, PythonToolPexRequest(isort))
 
 
 def rules():

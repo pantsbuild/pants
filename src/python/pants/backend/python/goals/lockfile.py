@@ -10,12 +10,16 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.subsystems import python_tool_base
 from pants.backend.python.subsystems.poetry import (
     POETRY_LAUNCHER,
     PoetrySubsystem,
     create_pyproject_toml,
 )
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.python_tool_base import (
+    PythonToolPexRequest,
+    PythonToolRequirementsBase,
+)
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -25,7 +29,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.core.goals.generate_lockfiles import (
@@ -207,9 +211,10 @@ async def generate_lockfile(
 
         _poetry_pex = await Get(
             VenvPex,
-            PexRequest,
-            poetry_subsystem.to_pex_request(
-                main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem), sources=_launcher_digest
+            PythonToolPexRequest(
+                poetry_subsystem,
+                main=EntryPoint(PurePath(POETRY_LAUNCHER.path).stem),
+                sources=_launcher_digest,
             ),
         )
 
@@ -315,6 +320,7 @@ async def setup_user_lockfile_requests(
 def rules():
     return (
         *collect_rules(),
+        *python_tool_base.rules(),
         UnionRule(GenerateLockfile, GeneratePythonLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownPythonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPythonUserResolveNames),

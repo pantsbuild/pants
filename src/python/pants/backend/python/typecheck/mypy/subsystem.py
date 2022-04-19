@@ -11,7 +11,7 @@ from typing import Iterable
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase, PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -346,8 +346,9 @@ async def mypy_export(
 ) -> ExportPythonTool:
     constraints = await _mypy_interpreter_constraints(mypy, python_setup)
     return ExportPythonTool(
-        resolve_name=mypy.options_scope,
-        pex_request=mypy.to_pex_request(
+        mypy.options_scope,
+        PythonToolPexRequest(
+            mypy,
             interpreter_constraints=constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),

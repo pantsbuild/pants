@@ -10,10 +10,11 @@ from pants.backend.python.lint.flake8.subsystem import (
     Flake8FieldSet,
     Flake8FirstPartyPlugins,
 )
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -52,8 +53,8 @@ async def flake8_lint_partition(
 ) -> LintResult:
     flake8_pex_get = Get(
         VenvPex,
-        PexRequest,
-        flake8.to_pex_request(
+        PythonToolPexRequest(
+            flake8,
             interpreter_constraints=partition.interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),

@@ -7,11 +7,12 @@ import os
 from typing import Iterable
 
 from pants.backend.python.subsystems.ipython import IPython
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import Pex
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
@@ -134,7 +135,7 @@ async def create_ipython_repl_request(
     )
 
     ipython_request = Get(
-        Pex, PexRequest, ipython.to_pex_request(interpreter_constraints=interpreter_constraints)
+        Pex, PythonToolPexRequest(ipython, interpreter_constraints=interpreter_constraints)
     )
 
     requirements_pex, sources, ipython_pex = await MultiGet(

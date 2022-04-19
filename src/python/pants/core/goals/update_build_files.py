@@ -17,8 +17,9 @@ from colors import green, red
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
@@ -290,7 +291,7 @@ class FormatWithYapfRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_yapf(
     request: FormatWithYapfRequest, yapf: Yapf
 ) -> RewrittenBuildFile:
-    yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
+    yapf_pex_get = Get(VenvPex, PythonToolPexRequest(yapf))
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, yapf.config_request(recursive_dirname(request.path))
@@ -343,7 +344,7 @@ class FormatWithBlackRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
-    black_pex_get = Get(VenvPex, PexRequest, black.to_pex_request())
+    black_pex_get = Get(VenvPex, PythonToolPexRequest(black))
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, black.config_request(recursive_dirname(request.path))

@@ -14,13 +14,13 @@ from pants.backend.awslambda.python.target_types import (
     ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.python.subsystems.lambdex import Lambdex
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.target_types import PexCompletePlatformsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     Pex,
     PexPlatforms,
-    PexRequest,
     VenvPex,
     VenvPexProcess,
 )
@@ -120,7 +120,7 @@ async def package_python_awslambda(
     )
 
     lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
-        Get(VenvPex, PexRequest, lambdex.to_pex_request()),
+        Get(VenvPex, PythonToolPexRequest(lambdex)),
         Get(Pex, PexFromTargetsRequest, pex_request),
         Get(ResolvedPythonAwsHandler, ResolvePythonAwsHandlerRequest(field_set.handler)),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),

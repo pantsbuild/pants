@@ -8,10 +8,13 @@ from pathlib import PurePath
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.python_tool_base import (
+    PythonToolPexRequest,
+    PythonToolRequirementsBase,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.base.specs import AddressSpecs, MaybeEmptySiblingAddresses
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -81,9 +84,8 @@ async def setup_parser(hcl2_parser: TerraformHcl2Parser) -> ParserSetup:
 
     parser_pex = await Get(
         VenvPex,
-        PexRequest,
-        hcl2_parser.to_pex_request(
-            main=EntryPoint(PurePath(parser_content.path).stem), sources=parser_digest
+        PythonToolPexRequest(
+            hcl2_parser, main=EntryPoint(PurePath(parser_content.path).stem), sources=parser_digest
         ),
     )
     return ParserSetup(parser_pex)

@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit, BanditFieldSet
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.core.goals.lint import REPORT_DIR, LintResult, LintResults, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -42,11 +43,8 @@ def generate_argv(source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
 
 @rule(level=LogLevel.DEBUG)
 async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> LintResult:
-
     bandit_pex_get = Get(
-        VenvPex,
-        PexRequest,
-        bandit.to_pex_request(interpreter_constraints=partition.interpreter_constraints),
+        VenvPex, PythonToolPexRequest(interpreter_constraints=partition.interpreter_constraints)
     )
 
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, bandit.config_request)

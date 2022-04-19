@@ -5,9 +5,10 @@ from dataclasses import dataclass
 
 from pants.backend.python.lint.docformatter.skip_field import SkipDocformatterField
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
@@ -39,7 +40,7 @@ class DocformatterRequest(FmtRequest):
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
     if docformatter.skip:
         return FmtResult.skip(formatter_name=request.name)
-    docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
+    docformatter_pex = await Get(VenvPex, PythonToolPexRequest(docformatter))
     result = await Get(
         ProcessResult,
         VenvPexProcess(

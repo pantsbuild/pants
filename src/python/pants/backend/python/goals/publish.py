@@ -6,9 +6,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.target_types import PythonDistribution
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.core.goals.publish import (
     PublishFieldSet,
     PublishOutputData,
@@ -171,7 +172,7 @@ async def twine_upload(
         )
 
     twine_pex, packages_digest, config_files = await MultiGet(
-        Get(VenvPex, PexRequest, twine_subsystem.to_pex_request()),
+        Get(VenvPex, PythonToolPexRequest(twine_subsystem)),
         Get(Digest, MergeDigests(pkg.digest for pkg in request.packages)),
         Get(ConfigFiles, ConfigFilesRequest, twine_subsystem.config_request()),
     )

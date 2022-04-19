@@ -5,7 +5,7 @@
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase, PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -56,9 +56,7 @@ class DocformatterExportSentinel(ExportPythonToolSentinel):
 def docformatter_export(
     _: DocformatterExportSentinel, docformatter: Docformatter
 ) -> ExportPythonTool:
-    return ExportPythonTool(
-        resolve_name=docformatter.options_scope, pex_request=docformatter.to_pex_request()
-    )
+    return ExportPythonTool(docformatter.options_scope, PythonToolPexRequest(docformatter))
 
 
 def rules():

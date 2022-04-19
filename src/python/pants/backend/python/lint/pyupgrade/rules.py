@@ -6,9 +6,10 @@ from dataclasses import dataclass
 
 from pants.backend.python.lint.pyupgrade.skip_field import SkipPyUpgradeField
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
@@ -40,9 +41,7 @@ class PyUpgradeRequest(FmtRequest):
 async def pyupgrade_fmt(request: PyUpgradeRequest, pyupgrade: PyUpgrade) -> FmtResult:
     if pyupgrade.skip:
         return FmtResult.skip(formatter_name=request.name)
-
-    pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
-
+    pyupgrade_pex = await Get(VenvPex, PythonToolPexRequest(pyupgrade))
     result = await Get(
         FallibleProcessResult,
         VenvPexProcess(

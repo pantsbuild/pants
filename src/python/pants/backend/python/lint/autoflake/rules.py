@@ -5,9 +5,10 @@ from dataclasses import dataclass
 
 from pants.backend.python.lint.autoflake.skip_field import SkipAutoflakeField
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import Snapshot
@@ -39,8 +40,7 @@ class AutoflakeRequest(FmtRequest):
 async def autoflake_fmt(request: AutoflakeRequest, autoflake: Autoflake) -> FmtResult:
     if autoflake.skip:
         return FmtResult.skip(formatter_name=request.name)
-    autoflake_pex = await Get(VenvPex, PexRequest, autoflake.to_pex_request())
-
+    autoflake_pex = await Get(VenvPex, PythonToolPexRequest(autoflake))
     result = await Get(
         ProcessResult,
         VenvPexProcess(

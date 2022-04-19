@@ -10,7 +10,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.black.skip_field import SkipBlackField
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase, PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -125,8 +125,7 @@ async def black_export(
 ) -> ExportPythonTool:
     constraints = await _black_interpreter_constraints(black, python_setup)
     return ExportPythonTool(
-        resolve_name=black.options_scope,
-        pex_request=black.to_pex_request(interpreter_constraints=constraints),
+        black.options_scope, PythonToolPexRequest(black, interpreter_constraints=constraints)
     )
 
 

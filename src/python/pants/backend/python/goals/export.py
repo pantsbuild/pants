@@ -9,10 +9,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict, Iterable, cast
 
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
+from pants.backend.python.util_rules.pex import Pex, PexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import (
@@ -65,7 +66,7 @@ class ExportPythonToolSentinel:
 @dataclass(frozen=True)
 class ExportPythonTool(EngineAwareParameter):
     resolve_name: str
-    pex_request: PexRequest
+    pex_request: PythonToolPexRequest
 
     def debug_hint(self) -> str | None:
         return self.resolve_name
@@ -156,7 +157,7 @@ async def export_virtualenv(
 @rule
 async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResult:
     dest = os.path.join("python", "virtualenvs", "tools")
-    pex = await Get(Pex, PexRequest, request.pex_request)
+    pex = await Get(Pex, PythonToolPexRequest, request.pex_request)
 
     # NOTE: We add a unique-per-tool prefix to the pex_pex path to avoid conflicts when
     # multiple tools are concurrently exporting. Without this prefix all the `export_tool`

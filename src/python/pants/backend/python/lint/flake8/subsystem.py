@@ -10,7 +10,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase, PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -316,8 +316,9 @@ async def flake8_export(
 ) -> ExportPythonTool:
     constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
     return ExportPythonTool(
-        resolve_name=flake8.options_scope,
-        pex_request=flake8.to_pex_request(
+        flake8.options_scope,
+        PythonToolPexRequest(
+            flake8,
             interpreter_constraints=constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),

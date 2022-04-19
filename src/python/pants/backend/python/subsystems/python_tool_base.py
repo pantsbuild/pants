@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.resources
+from dataclasses import dataclass
 from typing import ClassVar, Iterable, Sequence
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -15,13 +16,17 @@ from pants.backend.python.util_rules.pex_requirements import (
     ToolCustomLockfile,
     ToolDefaultLockfile,
 )
+from pants.base.deprecated import deprecated
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, FileContent
+from pants.engine.rules import collect_rules, rule
 from pants.option.errors import OptionsError
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 
@@ -188,6 +193,20 @@ class PythonToolRequirementsBase(Subsystem):
         """
         return InterpreterConstraints(self._interpreter_constraints)
 
+    @deprecated(
+        "2.13.0.dev0",
+        softwrap(
+            """
+            Use `Get(PexRequest, PythonToolPexRequest)` instead, which behaves the same as before.
+            This change allows us to implement https://github.com/pantsbuild/pants/issues/12449.
+        
+            Tip: you can directly use `Get(VenvPex, PythonToolPexRequest)`, for example, which the
+            engine will satisfy with PythonToolPexRequest -> PexRequest -> VenvPex.
+            
+            Warning: You must also make sure that you register `python_tool_base.rules()`.
+            """
+        ),
+    )
     def to_pex_request(
         self,
         *,
@@ -274,3 +293,46 @@ class PythonToolBase(PythonToolRequirementsBase):
             main=main or self.main,
             sources=sources,
         )
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class PythonToolPexRequest(EngineAwareParameter):
+    options_scope: str
+    requirements: PexRequirements | EntireLockfile
+    interpreter_constraints: InterpreterConstraints | None
+    main: MainSpecification | None
+    sources: Digest | None
+
+    def __init__(
+        self,
+        subsystem: PythonToolRequirementsBase,
+        *,
+        interpreter_constraints: InterpreterConstraints | None = None,
+        extra_requirements: Iterable[str] = (),
+        main: MainSpecification | None = None,
+        sources: Digest | None = None,
+    ) -> None:
+        self.options_scope = subsystem.options_scope
+        self.requirements = subsystem.pex_requirements(extra_requirements=extra_requirements)
+        self.interpreter_constraints = interpreter_constraints or subsystem.interpreter_constraints
+        self.sources = sources
+        self.main = (
+            subsystem.main if main is None and isinstance(subsystem, PythonToolBase) else main
+        )
+
+
+@rule
+def setup_pex_request_for_tool(request: PythonToolPexRequest) -> PexRequest:
+    return PexRequest(
+        output_filename=f"{request.options_scope.replace('-', '_')}.pex",
+        internal_only=True,
+        requirements=request.requirements,
+        interpreter_constraints=request.interpreter_constraints,
+        main=request.main,
+        sources=request.sources,
+    )
+
+
+def rules():
+    return collect_rules()

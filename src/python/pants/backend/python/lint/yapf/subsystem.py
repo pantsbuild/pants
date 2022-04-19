@@ -9,7 +9,7 @@ from typing import Iterable
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase, PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -107,7 +107,7 @@ class YapfExportSentinel(ExportPythonToolSentinel):
 
 @rule
 def yapf_export(_: YapfExportSentinel, yapf: Yapf) -> ExportPythonTool:
-    return ExportPythonTool(resolve_name=yapf.options_scope, pex_request=yapf.to_pex_request())
+    return ExportPythonTool(yapf.options_scope, PythonToolPexRequest(yapf))
 
 
 def rules():

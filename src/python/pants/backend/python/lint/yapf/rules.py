@@ -5,9 +5,10 @@ from dataclasses import dataclass
 
 from pants.backend.python.lint.yapf.skip_field import SkipYapfField
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -40,7 +41,7 @@ class YapfRequest(FmtRequest):
 async def yapf_fmt(request: YapfRequest, yapf: Yapf) -> FmtResult:
     if yapf.skip:
         return FmtResult.skip(formatter_name=request.name)
-    yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
+    yapf_pex_get = Get(VenvPex, PythonToolPexRequest(yapf))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, yapf.config_request(request.snapshot.dirs)
     )

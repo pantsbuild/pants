@@ -14,10 +14,10 @@ import toml
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase, PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -356,7 +356,7 @@ class CoverageSetup:
 
 @rule
 async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
-    pex = await Get(VenvPex, PexRequest, coverage.to_pex_request())
+    pex = await Get(VenvPex, PythonToolPexRequest(coverage))
     return CoverageSetup(pex)
 
 

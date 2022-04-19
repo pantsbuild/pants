@@ -11,9 +11,10 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     PythonProtobufSubsystem,
 )
 from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexResolveInfo, VenvPex, VenvPexRequest
+from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -100,7 +101,7 @@ async def generate_python_from_protobuf(
     mypy_pex = None
 
     if python_protobuf_subsystem.mypy_plugin:
-        mypy_request = python_protobuf_mypy_plugin.to_pex_request()
+        mypy_request = await Get(PexRequest, PythonToolPexRequest(python_protobuf_mypy_plugin))
         mypy_pex = await Get(
             VenvPex,
             VenvPexRequest(bin_names=[protoc_gen_mypy_script], pex_request=mypy_request),

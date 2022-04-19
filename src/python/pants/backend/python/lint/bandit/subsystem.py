@@ -10,7 +10,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase, PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -134,8 +134,7 @@ async def bandit_export(
 ) -> ExportPythonTool:
     constraints = await _bandit_interpreter_constraints(python_setup)
     return ExportPythonTool(
-        resolve_name=bandit.options_scope,
-        pex_request=bandit.to_pex_request(interpreter_constraints=constraints),
+        bandit.options_scope, PythonToolPexRequest(bandit, interpreter_constraints=constraints)
     )
 
 

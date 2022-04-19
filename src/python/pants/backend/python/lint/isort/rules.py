@@ -7,9 +7,10 @@ from typing import Tuple
 
 from pants.backend.python.lint.isort.skip_field import SkipIsortField
 from pants.backend.python.lint.isort.subsystem import Isort
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexResolveInfo, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
@@ -65,7 +66,7 @@ def generate_argv(
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
         return FmtResult.skip(formatter_name=request.name)
-    isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
+    isort_pex_get = Get(VenvPex, PythonToolPexRequest(isort))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
     )

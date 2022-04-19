@@ -12,7 +12,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase, PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -326,8 +326,9 @@ async def pylint_export(
 ) -> ExportPythonTool:
     constraints = await _pylint_interpreter_constraints(first_party_plugins, python_setup)
     return ExportPythonTool(
-        resolve_name=pylint.options_scope,
-        pex_request=pylint.to_pex_request(
+        pylint.options_scope,
+        PythonToolPexRequest(
+            pylint,
             interpreter_constraints=constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),

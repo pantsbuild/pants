@@ -8,6 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
+from pants.backend.python.subsystems.python_tool_base import PythonToolPexRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField, PythonSourceField
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
@@ -155,8 +156,8 @@ async def mypy_typecheck_partition(
 
     mypy_pex_get = Get(
         VenvPex,
-        PexRequest,
-        mypy.to_pex_request(
+        PythonToolPexRequest(
+            mypy,
             interpreter_constraints=tool_interpreter_constraints,
             extra_requirements=first_party_plugins.requirement_strings,
         ),
