@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class InvalidDeploymentArgs(Exception):
-    def __init__(self, *args: str) -> None:
+    def __init__(self, args: Iterable[str]) -> None:
         super().__init__(
             softwrap(
                 f"""
@@ -98,7 +98,6 @@ async def run_helm_deploy(
 
     release_name = field_set.release_name.value or field_set.address.target_name
     sorted_value_files = sort_value_file_names_for_rendering(values_files.snapshot.files)
-    inline_values = field_set.values.value or {}
 
     helm_cmd = await Get(
         Process,
@@ -118,7 +117,10 @@ async def run_helm_deploy(
                 *(("--skip-crds",) if field_set.skip_crds.value else ()),
                 *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),
                 *chain.from_iterable(
-                    [["--set", f"{key}={value}"] for key, value in inline_values.items()]
+                    [
+                        ["--set", f"{key}={value}"]
+                        for key, value in (field_set.values.value or {}).items()
+                    ]
                 ),
                 *valid_args,
             ],

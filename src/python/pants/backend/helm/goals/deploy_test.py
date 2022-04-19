@@ -17,6 +17,7 @@ from pants.core.goals.deploy import DeployProcesses
 from pants.core.util_rules import external_tool, stripped_source_files
 from pants.engine import process
 from pants.engine.addresses import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -45,7 +46,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
             "src/deployment/BUILD": dedent(
                 """\
               helm_deployment(
-                name="awesome",
+                name="foo",
                 namespace="uat",
                 dependencies=["//src/chart"],
                 sources=["*.yaml", "subdir/*.yml"]
@@ -61,18 +62,18 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
     source_root_patterns = ["/src/*"]
     rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
 
-    target = rule_runner.get_target(Address("src/deployment", target_name="awesome"))
+    target = rule_runner.get_target(Address("src/deployment", target_name="foo"))
     field_set = DeployHelmDeploymentFieldSet.create(target)
 
     helm = rule_runner.request(HelmBinary, [])
-    install_processes = rule_runner.request(DeployProcesses, [field_set])
+    deploy_processes = rule_runner.request(DeployProcesses, [field_set])
 
-    assert len(install_processes) == 1
-    assert install_processes[0].process
-    assert install_processes[0].process.argv == (
+    assert len(deploy_processes) == 1
+    assert deploy_processes[0].process
+    assert deploy_processes[0].process.argv == (
         helm.path,
         "upgrade",
-        "awesome",
+        "foo",
         "mychart",
         "--install",
         "--namespace",
@@ -80,3 +81,37 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--values",
         "values.yaml,subdir/values.yml,override-values.yaml",
     )
+
+
+def test_raises_error_when_using_invalid_passthrough_args(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/chart/BUILD": """helm_chart(registries=["oci://www.example.com/external"])""",
+            "src/chart/Chart.yaml": HELM_CHART_FILE,
+            "src/deployment/BUILD": dedent(
+                """\
+              helm_deployment(
+                name="bar",
+                namespace="uat",
+                dependencies=["//src/chart"],
+                sources=["*.yaml", "subdir/*.yml"]
+              )
+              """
+            ),
+        }
+    )
+
+    source_root_patterns = ["/src/*"]
+    deploy_args = ["--force", "--debug", "--kubeconfig=./kubeconfig", "--namespace", "foo"]
+    rule_runner.set_options(
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+            f"--experimental-deploy-args={repr(deploy_args)}",
+        ]
+    )
+
+    target = rule_runner.get_target(Address("src/deployment", target_name="bar"))
+    field_set = DeployHelmDeploymentFieldSet.create(target)
+
+    with pytest.raises(ExecutionError, match="The following command line arguments are not valid: --namespace foo."):
+        rule_runner.request(DeployProcesses, [field_set])

@@ -58,13 +58,6 @@ class HelmRegistry:
         repo_ref = self.repository_ref(repository)
         return f"{repo_ref}/{artifact_name}"
 
-    def repository_ref(self, repository: str | None) -> str:
-        return f"{self.address}/{repository or ''}".rstrip("/")
-
-    def package_ref(self, artifact_name: str, *, repository: str | None) -> str:
-        repo_ref = self.repository_ref(repository)
-        return f"{repo_ref}/{artifact_name}"
-
 
 @dataclass(frozen=True)
 class HelmRemotes:
