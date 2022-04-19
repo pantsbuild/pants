@@ -761,6 +761,7 @@ def generate() -> dict[Path, str]:
                         # TODO: This depth is arbitrary, but is meant to capture the most
                         # likely `diffspecs` used as arguments.
                         *checkout(fetch_depth=1024),
+                        setup_toolchain_auth(),
                         {
                             "name": "Cache comparison script",
                             "run": dedent(
