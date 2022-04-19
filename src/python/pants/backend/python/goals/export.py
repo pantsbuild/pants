@@ -213,8 +213,13 @@ async def export_virtualenvs(
     tool_export_types = cast(
         "Iterable[type[ExportPythonToolSentinel]]", union_membership.get(ExportPythonToolSentinel)
     )
+    # TODO: We request the `ExportPythonTool` entries independently of the `ExportResult`s because
+    # inlining the request causes a rule graph issue. Revisit after #11269.
+    all_export_tool_results = await MultiGet(
+        Get(ExportPythonTool, ExportPythonToolSentinel, request()) for request in tool_export_types
+    )
     all_tool_results = await MultiGet(
-        Get(ExportResult, ExportPythonToolSentinel, request()) for request in tool_export_types
+        Get(ExportResult, ExportPythonTool, export_tool) for export_tool in all_export_tool_results
     )
 
     return ExportResults(venvs + all_tool_results)
