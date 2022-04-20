@@ -7,12 +7,12 @@ import logging
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict
+from typing import DefaultDict, Iterable, cast
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexProcess
+from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import (
@@ -24,12 +24,12 @@ from pants.core.goals.export import (
 )
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.docutil import bin_name
 from pants.util.strutil import path_safe
 
@@ -48,6 +48,27 @@ class _ExportVenvRequest(EngineAwareParameter):
 
     def debug_hint(self) -> str | None:
         return self.resolve
+
+
+@union
+class ExportPythonToolSentinel:
+    """Python tools use this as an entry point to say how to export their tool virtualenv.
+
+    Each tool should subclass `ExportPythonToolSentinel` and set up a rule that goes from
+    the subclass -> `ExportPythonTool`. Register a union rule for the `ExportPythonToolSentinel`
+    subclass.
+
+    If the tool is in `pantsbuild/pants`, update `export_integration_test.py`.
+    """
+
+
+@dataclass(frozen=True)
+class ExportPythonTool(EngineAwareParameter):
+    resolve_name: str
+    pex_request: PexRequest
+
+    def debug_hint(self) -> str | None:
+        return self.resolve_name
 
 
 @rule
@@ -133,8 +154,46 @@ async def export_virtualenv(
 
 
 @rule
+async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResult:
+    dest = os.path.join("python", "virtualenvs", "tools")
+    pex = await Get(Pex, PexRequest, request.pex_request)
+
+    # NOTE: We add a unique-per-tool prefix to the pex_pex path to avoid conflicts when
+    # multiple tools are concurrently exporting. Without this prefix all the `export_tool`
+    # invocations write the pex_pex to `python/virtualenvs/tools/pex`, and the `rm -f` of
+    # the pex_pex path in one export will delete the binary out from under the others.
+    pex_pex_dir = f".{request.resolve_name}.tmp"
+    pex_pex_dest = os.path.join("{digest_root}", pex_pex_dir)
+    pex_pex_digest = await Get(Digest, AddPrefix(pex_pex.digest, pex_pex_dir))
+
+    merged_digest = await Get(Digest, MergeDigests([pex_pex_digest, pex.digest]))
+    return ExportResult(
+        f"virtualenv for the tool '{request.resolve_name}'",
+        dest,
+        digest=merged_digest,
+        post_processing_cmds=[
+            PostProcessingCommand(
+                [
+                    os.path.join(pex_pex_dest, pex_pex.exe),
+                    os.path.join("{digest_root}", pex.name),
+                    "venv",
+                    "--collisions-ok",
+                    "--remove=all",
+                    f"{{digest_root}}/{request.resolve_name}",
+                ],
+                {"PEX_MODULE": "pex.tools"},
+            ),
+            PostProcessingCommand(["rm", "-rf", pex_pex_dest]),
+        ],
+    )
+
+
+@rule
 async def export_virtualenvs(
-    request: ExportVenvsRequest, python_setup: PythonSetup, dist_dir: DistDir
+    request: ExportVenvsRequest,
+    python_setup: PythonSetup,
+    dist_dir: DistDir,
+    union_membership: UnionMembership,
 ) -> ExportResults:
     resolve_to_root_targets: DefaultDict[str, list[Target]] = defaultdict(list)
     for tgt in request.targets:
@@ -161,7 +220,20 @@ async def export_virtualenvs(
             f"To silence this error, delete {no_resolves_dest}"
         )
 
-    return ExportResults(venvs)
+    tool_export_types = cast(
+        "Iterable[type[ExportPythonToolSentinel]]", union_membership.get(ExportPythonToolSentinel)
+    )
+    # TODO: We request the `ExportPythonTool` entries independently of the `ExportResult`s because
+    # inlining the request causes a rule graph issue. Revisit after #11269.
+    all_export_tool_requests = await MultiGet(
+        Get(ExportPythonTool, ExportPythonToolSentinel, tool_export_type())
+        for tool_export_type in tool_export_types
+    )
+    all_tool_results = await MultiGet(
+        Get(ExportResult, ExportPythonTool, request) for request in all_export_tool_requests
+    )
+
+    return ExportResults(venvs + all_tool_results)
 
 
 def rules():

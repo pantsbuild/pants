@@ -7,6 +7,7 @@ import itertools
 from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -29,7 +30,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -224,6 +225,44 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
 
 
 # --------------------------------------------------------------------------------------
+# Interpreter constraints
+# --------------------------------------------------------------------------------------
+
+
+@rule_helper
+async def _flake8_interpreter_constraints(
+    first_party_plugins: Flake8FirstPartyPlugins,
+    python_setup: PythonSetup,
+) -> InterpreterConstraints:
+    # While Flake8 will run in partitions, we need a set of constraints that works with every
+    # partition.
+    #
+    # This ORs all unique interpreter constraints. The net effect is that every possible Python
+    # interpreter used will be covered.
+    all_tgts = await Get(AllTargets, AllTargetsRequest())
+    relevant_targets = tuple(tgt for tgt in all_tgts if Flake8FieldSet.is_applicable(tgt))
+    unique_constraints = set()
+    for tgt in relevant_targets:
+        if tgt.has_field(InterpreterConstraintsField):
+            constraints_field = tgt[InterpreterConstraintsField]
+            unique_constraints.add(
+                InterpreterConstraints.create_from_compatibility_fields(
+                    (constraints_field, *first_party_plugins.interpreter_constraints_fields),
+                    python_setup,
+                )
+            )
+    if not unique_constraints:
+        unique_constraints.add(
+            InterpreterConstraints.create_from_compatibility_fields(
+                first_party_plugins.interpreter_constraints_fields,
+                python_setup,
+            )
+        )
+    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+
+
+# --------------------------------------------------------------------------------------
 # Lockfile
 # --------------------------------------------------------------------------------------
 
@@ -250,36 +289,38 @@ async def setup_flake8_lockfile(
             flake8, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    # While Flake8 will run in partitions, we need a single lockfile that works with every
-    # partition.
-    #
-    # This ORs all unique interpreter constraints. The net effect is that every possible Python
-    # interpreter used will be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
-    relevant_targets = tuple(tgt for tgt in all_tgts if Flake8FieldSet.is_applicable(tgt))
-    unique_constraints = set()
-    for tgt in relevant_targets:
-        if tgt.has_field(InterpreterConstraintsField):
-            constraints_field = tgt[InterpreterConstraintsField]
-            unique_constraints.add(
-                InterpreterConstraints.create_from_compatibility_fields(
-                    (constraints_field, *first_party_plugins.interpreter_constraints_fields),
-                    python_setup,
-                )
-            )
-    if not unique_constraints:
-        unique_constraints.add(
-            InterpreterConstraints.create_from_compatibility_fields(
-                first_party_plugins.interpreter_constraints_fields,
-                python_setup,
-            )
-        )
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
     return GeneratePythonLockfile.from_tool(
         flake8,
-        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        constraints,
         extra_requirements=first_party_plugins.requirement_strings,
         use_pex=python_setup.generate_lockfiles_with_pex,
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Export
+# --------------------------------------------------------------------------------------
+
+
+class Flake8ExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+async def flake8_export(
+    _: Flake8ExportSentinel,
+    flake8: Flake8,
+    first_party_plugins: Flake8FirstPartyPlugins,
+    python_setup: PythonSetup,
+) -> ExportPythonTool:
+    constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
+    return ExportPythonTool(
+        resolve_name=flake8.options_scope,
+        pex_request=flake8.to_pex_request(
+            interpreter_constraints=constraints,
+            extra_requirements=first_party_plugins.requirement_strings,
+        ),
     )
 
 
@@ -289,4 +330,5 @@ def rules():
         *lockfile.rules(),
         *python_sources.rules(),
         UnionRule(GenerateToolLockfileSentinel, Flake8LockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, Flake8ExportSentinel),
     )

@@ -11,6 +11,7 @@ from typing import Iterable
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -26,7 +27,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -186,6 +187,29 @@ class PyTest(PythonToolBase):
         )
 
 
+@rule_helper
+async def _pytest_interpreter_constraints(python_setup: PythonSetup) -> InterpreterConstraints:
+    # Even though we run each python_tests target in isolation, we need a single set of constraints
+    # that works with them all (and their transitive deps).
+    #
+    # This first computes the constraints for each individual `python_test` target
+    # (which will AND across each target in the closure). Then, it ORs all unique resulting
+    # interpreter constraints. The net effect is that every possible Python interpreter used will
+    # be covered.
+    all_tgts = await Get(AllTargets, AllTargetsRequest())
+    transitive_targets_per_test = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
+        for tgt in all_tgts
+        if PythonTestFieldSet.is_applicable(tgt)
+    )
+    unique_constraints = {
+        InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
+        for transitive_targets in transitive_targets_per_test
+    }
+    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+
+
 class PytestLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = PyTest.options_scope
 
@@ -205,28 +229,26 @@ async def setup_pytest_lockfile(
             pytest, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    # Even though we run each python_tests target in isolation, we need a single lockfile that
-    # works with them all (and their transitive deps).
-    #
-    # This first computes the constraints for each individual `python_test` target
-    # (which will AND across each target in the closure). Then, it ORs all unique resulting
-    # interpreter constraints. The net effect is that every possible Python interpreter used will
-    # be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
-    transitive_targets_per_test = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-        for tgt in all_tgts
-        if PythonTestFieldSet.is_applicable(tgt)
-    )
-    unique_constraints = {
-        InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
-        for transitive_targets in transitive_targets_per_test
-    }
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    constraints = await _pytest_interpreter_constraints(python_setup)
     return GeneratePythonLockfile.from_tool(
         pytest,
-        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        constraints,
         use_pex=python_setup.generate_lockfiles_with_pex,
+    )
+
+
+class PytestExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+async def pytest_export(
+    _: PytestExportSentinel, pytest: PyTest, python_setup: PythonSetup
+) -> ExportPythonTool:
+    constraints = await _pytest_interpreter_constraints(python_setup)
+    return ExportPythonTool(
+        resolve_name=pytest.options_scope,
+        pex_request=pytest.to_pex_request(interpreter_constraints=constraints),
     )
 
 
@@ -235,4 +257,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, PytestLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, PytestExportSentinel),
     )

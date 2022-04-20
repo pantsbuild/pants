@@ -7,6 +7,7 @@ import os.path
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -105,9 +106,19 @@ def setup_isort_lockfile(
     return GeneratePythonLockfile.from_tool(isort, use_pex=python_setup.generate_lockfiles_with_pex)
 
 
+class IsortExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+def isort_export(_: IsortExportSentinel, isort: Isort) -> ExportPythonTool:
+    return ExportPythonTool(resolve_name=isort.options_scope, pex_request=isort.to_pex_request())
+
+
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, IsortLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, IsortExportSentinel),
     )
