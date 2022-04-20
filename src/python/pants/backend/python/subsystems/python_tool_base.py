@@ -199,10 +199,10 @@ class PythonToolRequirementsBase(Subsystem):
             """
             Use `Get(PexRequest, PythonToolPexRequest)` instead, which behaves the same as before.
             This change allows us to implement https://github.com/pantsbuild/pants/issues/12449.
-        
+
             Tip: you can directly use `Get(VenvPex, PythonToolPexRequest)`, for example, which the
             engine will satisfy with PythonToolPexRequest -> PexRequest -> VenvPex.
-            
+
             Warning: You must also make sure that you register `python_tool_base.rules()`.
             """
         ),
