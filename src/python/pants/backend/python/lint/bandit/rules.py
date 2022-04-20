@@ -44,7 +44,8 @@ def generate_argv(source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
 @rule(level=LogLevel.DEBUG)
 async def bandit_lint_partition(partition: BanditPartition, bandit: Bandit) -> LintResult:
     bandit_pex_get = Get(
-        VenvPex, PythonToolPexRequest(interpreter_constraints=partition.interpreter_constraints)
+        VenvPex,
+        PythonToolPexRequest(bandit, interpreter_constraints=partition.interpreter_constraints),
     )
 
     config_files_get = Get(ConfigFiles, ConfigFilesRequest, bandit.config_request)

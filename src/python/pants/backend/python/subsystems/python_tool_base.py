@@ -287,7 +287,7 @@ class PythonToolBase(PythonToolRequirementsBase):
         main: MainSpecification | None = None,
         sources: Digest | None = None,
     ) -> PexRequest:
-        return super().to_pex_request(
+        return super().to_pex_request(  # type: ignore[no-any-return]
             interpreter_constraints=interpreter_constraints,
             extra_requirements=extra_requirements,
             main=main or self.main,

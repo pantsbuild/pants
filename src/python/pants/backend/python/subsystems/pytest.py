@@ -247,7 +247,7 @@ async def pytest_export(
 ) -> ExportPythonTool:
     constraints = await _pytest_interpreter_constraints(python_setup)
     return ExportPythonTool(
-        pytest.options_scope, PythonToolPexRequest(interpreter_constraints=constraints)
+        pytest.options_scope, PythonToolPexRequest(pytest, interpreter_constraints=constraints)
     )
 
 
