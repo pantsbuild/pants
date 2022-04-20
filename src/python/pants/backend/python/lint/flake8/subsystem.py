@@ -259,7 +259,6 @@ async def _flake8_interpreter_constraints(
             )
         )
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-
     return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
@@ -316,7 +315,6 @@ async def flake8_export(
     python_setup: PythonSetup,
 ) -> ExportPythonTool:
     constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
-
     return ExportPythonTool(
         resolve_name=flake8.options_scope,
         pex_request=flake8.to_pex_request(

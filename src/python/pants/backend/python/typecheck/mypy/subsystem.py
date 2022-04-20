@@ -292,7 +292,6 @@ async def _mypy_interpreter_constraints(
         code_constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints
-
     return constraints
 
 
@@ -346,7 +345,6 @@ async def mypy_export(
     first_party_plugins: MyPyFirstPartyPlugins,
 ) -> ExportPythonTool:
     constraints = await _mypy_interpreter_constraints(mypy, python_setup)
-
     return ExportPythonTool(
         resolve_name=mypy.options_scope,
         pex_request=mypy.to_pex_request(

@@ -269,7 +269,6 @@ async def _pylint_interpreter_constraints(
             )
         )
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-
     return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
@@ -326,7 +325,6 @@ async def pylint_export(
     python_setup: PythonSetup,
 ) -> ExportPythonTool:
     constraints = await _pylint_interpreter_constraints(first_party_plugins, python_setup)
-
     return ExportPythonTool(
         resolve_name=pylint.options_scope,
         pex_request=pylint.to_pex_request(

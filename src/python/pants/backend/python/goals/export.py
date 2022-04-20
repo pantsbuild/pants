@@ -52,13 +52,23 @@ class _ExportVenvRequest(EngineAwareParameter):
 
 @union
 class ExportPythonToolSentinel:
-    """Pythion tools use this as an entry point to say how to export their tool virtualenv."""
+    """Python tools use this as an entry point to say how to export their tool virtualenv.
+
+    Each tool should subclass `ExportPythonToolSentinel` and set up a rule that goes from
+    the subclass -> `ExportPythonTool`. Register a union rule for the `ExportPythonToolSentinel`
+    subclass.
+
+    If the tool is in `pantsbuild/pants`, update `export_integration_test.py`.
+    """
 
 
 @dataclass(frozen=True)
-class ExportPythonTool:
+class ExportPythonTool(EngineAwareParameter):
     resolve_name: str
     pex_request: PexRequest
+
+    def debug_hint(self) -> str | None:
+        return self.resolve_name
 
 
 @rule
@@ -215,11 +225,12 @@ async def export_virtualenvs(
     )
     # TODO: We request the `ExportPythonTool` entries independently of the `ExportResult`s because
     # inlining the request causes a rule graph issue. Revisit after #11269.
-    all_export_tool_results = await MultiGet(
-        Get(ExportPythonTool, ExportPythonToolSentinel, request()) for request in tool_export_types
+    all_export_tool_requests = await MultiGet(
+        Get(ExportPythonTool, ExportPythonToolSentinel, tool_export_type())
+        for tool_export_type in tool_export_types
     )
     all_tool_results = await MultiGet(
-        Get(ExportResult, ExportPythonTool, export_tool) for export_tool in all_export_tool_results
+        Get(ExportResult, ExportPythonTool, request) for request in all_export_tool_requests
     )
 
     return ExportResults(venvs + all_tool_results)

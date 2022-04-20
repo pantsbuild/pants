@@ -207,7 +207,6 @@ async def _pytest_interpreter_constraints(python_setup: PythonSetup) -> Interpre
         for transitive_targets in transitive_targets_per_test
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-
     return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
@@ -247,7 +246,6 @@ async def pytest_export(
     _: PytestExportSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> ExportPythonTool:
     constraints = await _pytest_interpreter_constraints(python_setup)
-
     return ExportPythonTool(
         resolve_name=pytest.options_scope,
         pex_request=pytest.to_pex_request(interpreter_constraints=constraints),

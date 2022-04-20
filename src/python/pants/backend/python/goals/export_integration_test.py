@@ -1,6 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 import platform
 from dataclasses import dataclass
@@ -26,7 +28,7 @@ class _ToolConfig:
     name: str
     version: str
     experimental: bool = False
-    type: str = "lint"
+    backend_prefix: str | None = "lint"
 
 
 EXPORTED_TOOLS: List[_ToolConfig] = [
@@ -39,8 +41,8 @@ EXPORTED_TOOLS: List[_ToolConfig] = [
     _ToolConfig(name="pylint", version="2.13.1"),
     _ToolConfig(name="pyupgrade", version="2.31.1", experimental=True),
     _ToolConfig(name="yapf", version="0.32.0"),
-    _ToolConfig(name="mypy", version="0.940", type="typecheck"),
-    _ToolConfig(name="pytest", version="7.1.0", type="built-in"),
+    _ToolConfig(name="mypy", version="0.940", backend_prefix="typecheck"),
+    _ToolConfig(name="pytest", version="7.1.0", backend_prefix=None),
 ]
 
 
@@ -64,10 +66,10 @@ def build_config(tmpdir: str) -> Mapping:
             "lockfile": f"{tmpdir}/3rdparty/{tool_config.name}.lock",
         }
 
-        if tool_config.type == "built-in":
+        if not tool_config.backend_prefix:
             continue
 
-        plugin_suffix = f"python.{tool_config.type}.{tool_config.name}"
+        plugin_suffix = f"python.{tool_config.backend_prefix}.{tool_config.name}"
 
         if tool_config.experimental:
             plugin_suffix = f"experimental.{plugin_suffix}"
@@ -101,8 +103,7 @@ def test_export() -> None:
         export_dir = os.path.join(export_prefix, "tools", tool_config.name)
         assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
 
-        # Wanted to check the output of calling each tool pex with `--version`, but not all tools
-        # implement that flag.
+        # NOTE: Not every tool implements --version so this is the best we can do.
         lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
         expected_tool_dir = os.path.join(
             lib_dir, f"{tool_config.name}-{tool_config.version}.dist-info"

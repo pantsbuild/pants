@@ -94,7 +94,6 @@ async def _bandit_interpreter_constraints(python_setup: PythonSetup) -> Interpre
         if BanditFieldSet.is_applicable(tgt)
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-
     return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 
@@ -134,7 +133,6 @@ async def bandit_export(
     _: BanditExportSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> ExportPythonTool:
     constraints = await _bandit_interpreter_constraints(python_setup)
-
     return ExportPythonTool(
         resolve_name=bandit.options_scope,
         pex_request=bandit.to_pex_request(interpreter_constraints=constraints),

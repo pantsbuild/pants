@@ -90,7 +90,6 @@ async def _black_interpreter_constraints(
         )
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints
-
     return constraints
 
 
