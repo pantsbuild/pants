@@ -84,7 +84,7 @@ def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
         def wrapper(*args, **kwargs):
             stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
             with temporary_dir() as tempdir, initialize_stdio_raw(
-                level, False, False, {}, True, [], tempdir
+                level, level, False, False, {}, True, [], tempdir
             ), stdin_context() as stdin, stdio_destination(
                 stdin.fileno(), stdout_fileno, stderr_fileno
             ):
