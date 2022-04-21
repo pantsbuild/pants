@@ -17,7 +17,8 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
   self, safe_create_dir_all_ioerror, DirectoryDigest, GlobExpansionConjunction, GlobMatching,
-  PathGlobs, Permissions, RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
+  PathGlobs, Permissions, RelativePath, StrictGlobMatching, SymlinkBehavior,
+  EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
@@ -504,16 +505,23 @@ pub trait CapturedWorkdir {
       } else {
         workdir_path.clone()
       };
-      // Use no ignore patterns, because we are looking for explicitly listed paths.
+      // Use no ignore patterns, because we are looking for explicitly listed paths. Additionally,
+      // since we do not currently (and likely don't intend to ever) support capturing symlinks
+      // inside a Digest as symlinks, we set SymlinkBehavior::Oblivious to skip extra syscalls
+      // related to symlink awareness.
       let posix_fs = Arc::new(
-        fs::PosixFS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
-          |err| {
-            format!(
-              "Error making posix_fs to fetch local process execution output files: {}",
-              err
-            )
-          },
-        )?,
+        fs::PosixFS::new_with_symlink_behavior(
+          root,
+          fs::GitignoreStyleExcludes::empty(),
+          executor.clone(),
+          SymlinkBehavior::Oblivious,
+        )
+        .map_err(|err| {
+          format!(
+            "Error making posix_fs to fetch local process execution output files: {}",
+            err
+          )
+        })?,
       );
       CommandRunner::construct_output_snapshot(
         store.clone(),
