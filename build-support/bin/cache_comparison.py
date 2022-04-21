@@ -95,7 +95,11 @@ def timings_for_build(
 
 
 def timing_for_commit(commit: Commit, args: list[str], cache_namespace: str) -> TimeInSeconds:
+    # Checkout the commit, and ensure that the native code is built by running the `pants` script.
     checkout(commit)
+    run(["--no-pantsd", "--version"], use_pex=False)
+
+    # Then time the actual run with the PEX.
     start = time()
     run(args, cache_namespace=cache_namespace)
     return time() - start
