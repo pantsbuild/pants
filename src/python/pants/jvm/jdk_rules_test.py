@@ -10,6 +10,7 @@ import pytest
 from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.system_binaries import BashBinary
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessResult
@@ -89,6 +90,9 @@ def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--jvm-tool-jdk=adopt:1.8"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     assert "javac 1.8" in run_javac_version(rule_runner)
 
+    rule_runner.set_options(["--jvm-tool-jdk=adopt:1.14"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    assert "javac 1.14" in run_javac_version(rule_runner)
+
     rule_runner.set_options(["--jvm-tool-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
@@ -114,3 +118,62 @@ def test_parse_java_version() -> None:
     """
     )
     assert parse_jre_major_version(version2) == 11
+
+
+def test_pass_jvm_options_to_nailgun(rule_runner: RuleRunner) -> None:
+    given_jvm_options = ["-Dpants.jvm.global=true"]
+
+    # Rely JEP-330 to run a Java file from source
+    rule_runner.set_options(
+        ["--jvm-tool-jdk=adopt:1.14", f"--jvm-global-options={repr(given_jvm_options)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    classname = "EchoSystemProperties"
+    filename = f"{classname}.java"
+    file_content = textwrap.dedent(
+        f"""\
+        public class {classname} {{
+            public static void main(String[] args) {{
+                System.getProperties().list(System.out);
+            }}
+        }}
+        """
+    )
+
+    input_digest = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                [
+                    FileContent(
+                        filename,
+                        file_content.encode("utf-8"),
+                    )
+                ]
+            )
+        ],
+    )
+
+    jdk = rule_runner.request(InternalJdk, [])
+    process_result = rule_runner.request(
+        ProcessResult,
+        [
+            JvmProcess(
+                jdk=jdk,
+                argv=[filename],
+                classpath_entries=(),
+                extra_jvm_options=["-Dpants.jvm.extra=true"],
+                input_digest=input_digest,
+                description="Echo JVM System properties",
+                use_nailgun=True,
+            )
+        ],
+    )
+
+    jvm_properties = [
+        prop for prop in process_result.stdout.decode("utf-8").splitlines() if "=" in prop
+    ]
+    assert "java.specification.version=14" in jvm_properties
+    assert "pants.jvm.global=true" in jvm_properties
+    assert "pants.jvm.extra=true" in jvm_properties

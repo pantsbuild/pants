@@ -79,11 +79,11 @@ class JvmSubsystem(Subsystem):
             """
         ),
     )
-    global_jvm_options = StrListOption(
-        "--global-jvm-options",
+    global_options = StrListOption(
+        "--global-options",
         help=softwrap(
             """
-            
+            List of JVM options to pass to all JVM processes.
             """
-        )
+        ),
     )

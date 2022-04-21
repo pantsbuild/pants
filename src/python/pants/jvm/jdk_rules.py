@@ -91,17 +91,17 @@ class JdkEnvironment:
     nailgun_jar: str
     coursier: Coursier
     jre_major_version: int
+    global_jvm_options: tuple[str, ...]
 
     bin_dir: ClassVar[str] = "__jdk"
     jdk_preparation_script: ClassVar[str] = f"{bin_dir}/jdk.sh"
     java_home: ClassVar[str] = "__java_home"
 
-    def args(self, bash: BashBinary, classpath_entries: Iterable[str], jvm_opts: Iterable[str]) -> tuple[str, ...]:
+    def args(self, bash: BashBinary, classpath_entries: Iterable[str]) -> tuple[str, ...]:
         return (
             bash.path,
             self.jdk_preparation_script,
             f"{self.java_home}/bin/java",
-            *jvm_opts,
             "-cp",
             ":".join([self.nailgun_jar, *classpath_entries]),
         )
@@ -169,7 +169,9 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
 
     request = JdkRequest(jvm.tool_jdk) if jvm.tool_jdk is not None else JdkRequest.SYSTEM
     env = await Get(JdkEnvironment, JdkRequest, request)
-    return InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
+    return InternalJdk(
+        env._digest, env.nailgun_jar, env.coursier, env.jre_major_version, env.global_jvm_options
+    )
 
 
 @rule
@@ -275,6 +277,7 @@ async def prepare_jdk_environment(
                 ]
             ),
         ),
+        global_jvm_options=jvm.global_options,
         nailgun_jar=os.path.join(JdkEnvironment.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,
@@ -289,8 +292,8 @@ class JvmProcess:
     classpath_entries: tuple[str, ...]
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
-    jvm_options: tuple[str, ...]
     level: LogLevel
+    extra_jvm_options: tuple[str, ...]
     extra_nailgun_keys: tuple[str, ...]
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
@@ -308,8 +311,8 @@ class JvmProcess:
         classpath_entries: Iterable[str],
         input_digest: Digest,
         description: str,
-        jvm_options: Iterable[str] | None = None,
         level: LogLevel = LogLevel.INFO,
+        extra_jvm_options: Iterable[str] | None = None,
         extra_nailgun_keys: Iterable[str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
@@ -325,8 +328,8 @@ class JvmProcess:
         self.classpath_entries = tuple(classpath_entries)
         self.input_digest = input_digest
         self.description = description
-        self.jvm_options = tuple(jvm_options or ())
         self.level = level
+        self.extra_jvm_options = tuple(extra_jvm_options or ())
         self.extra_nailgun_keys = tuple(extra_nailgun_keys or ())
         self.output_files = tuple(output_files or ())
         self.output_directories = tuple(output_directories or ())
@@ -358,13 +361,14 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
         **jdk.env,
         **request.extra_env,
     }
+    jvm_options = [*jdk.global_jvm_options, *request.extra_jvm_options]
 
     use_nailgun = []
     if request.use_nailgun:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
 
     return Process(
-        [*jdk.args(bash, request.classpath_entries, request.jvm_options), *request.argv],
+        [*jdk.args(bash, request.classpath_entries), *jvm_options, *request.argv],
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         use_nailgun=use_nailgun,
