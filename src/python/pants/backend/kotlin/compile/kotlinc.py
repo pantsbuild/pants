@@ -115,7 +115,12 @@ async def compile_kotlin_source(
                     [
                         Coordinate(
                             group="org.jetbrains.kotlin",
-                            artifact="kotlin-compiler",
+                            artifact="kotlin-compiler-embeddable",
+                            version=kotlin_version,
+                        ),
+                        Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-scripting-compiler-embeddable",
                             version=kotlin_version,
                         ),
                     ]
