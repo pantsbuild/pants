@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.backend.go.subsystems.golang import GoRoot
-from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -67,7 +67,10 @@ async def setup_assembly_pre_compilation(
     #   that we don't need the actual definitions that would appear in go_asm.h.
     #
     # See https://go-review.googlesource.com/c/go/+/146999/8/src/cmd/go/internal/work/gc.go
-    go_asm_h_digest = await Get(Digest, CreateDigest([FileContent("go_asm.h", b"")]))
+    go_asm_h_digest, asm_tool_id = await MultiGet(
+        Get(Digest, CreateDigest([FileContent("go_asm.h", b"")])),
+        Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
+    )
     symabis_input_digest = await Get(
         Digest, MergeDigests([request.compilation_input, go_asm_h_digest])
     )
@@ -86,6 +89,9 @@ async def setup_assembly_pre_compilation(
                 "--",
                 *(f"./{request.dir_path}/{name}" for name in request.s_files),
             ),
+            env={
+                "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
+            },
             description=f"Generate symabis metadata for assembly files for {request.dir_path}",
             output_files=("symabis",),
         ),
@@ -114,6 +120,9 @@ async def setup_assembly_pre_compilation(
                     f"./{request.dir_path}/{PurePath(s_file).with_suffix('.o')}",
                     f"./{request.dir_path}/{s_file}",
                 ),
+                env={
+                    "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
+                },
                 description=f"Assemble {s_file} with Go",
                 output_files=(f"./{request.dir_path}/{PurePath(s_file).with_suffix('.o')}",),
             ),
@@ -139,8 +148,9 @@ async def setup_assembly_pre_compilation(
 async def link_assembly_post_compilation(
     request: AssemblyPostCompilationRequest,
 ) -> AssemblyPostCompilation:
-    merged_digest = await Get(
-        Digest, MergeDigests([request.compilation_result, *request.assembly_digests])
+    merged_digest, pack_tool_id = await MultiGet(
+        Get(Digest, MergeDigests([request.compilation_result, *request.assembly_digests])),
+        Get(GoSdkToolIDResult, GoSdkToolIDRequest("pack")),
     )
     pack_result = await Get(
         FallibleProcessResult,
@@ -156,6 +166,9 @@ async def link_assembly_post_compilation(
                     for name in request.s_files
                 ),
             ),
+            env={
+                "__PANTS_GO_PACK_TOOL_ID": pack_tool_id.tool_id,
+            },
             description=f"Link assembly files to Go package archive for {request.dir_path}",
             output_files=("__pkg__.a",),
         ),
