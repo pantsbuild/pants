@@ -384,7 +384,9 @@ async def generate_one_bsp_build_target_request(
             request.bsp_target.definition.base_directory
         )
     elif roots:
-        base_directory = roots[0]
+        # TODO: Technically we don't need to choose a base directory but it does guide the IDE in where
+        # to place the build target in the IDE's UI. Thus, for now, just choose the first directory.
+        base_directory = sorted(roots)[0] if roots else None
 
     return GenerateOneBSPBuildTargetResult(
         build_target=BuildTarget(
