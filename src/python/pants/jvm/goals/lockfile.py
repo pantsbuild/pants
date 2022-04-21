@@ -79,7 +79,7 @@ async def generate_jvm_lockfile(
     return GenerateLockfileResult(lockfile_digest, request.resolve_name, request.lockfile_dest)
 
 
-class RequestedJVMserResolveNames(RequestedUserResolveNames):
+class RequestedJVMUserResolveNames(RequestedUserResolveNames):
     pass
 
 
@@ -94,7 +94,7 @@ def determine_jvm_user_resolves(
     return KnownUserResolveNames(
         names=tuple(jvm_subsystem.resolves.keys()),
         option_name=f"[{jvm_subsystem.options_scope}].resolves",
-        requested_resolve_names_cls=RequestedJVMserResolveNames,
+        requested_resolve_names_cls=RequestedJVMUserResolveNames,
     )
 
 
@@ -128,7 +128,7 @@ async def validate_jvm_artifacts_for_resolve(
 
 @rule
 async def setup_user_lockfile_requests(
-    requested: RequestedJVMserResolveNames,
+    requested: RequestedJVMUserResolveNames,
     all_targets: AllTargets,
     jvm_subsystem: JvmSubsystem,
 ) -> UserGenerateLockfiles:
@@ -162,5 +162,5 @@ def rules():
         *coursier_fetch.rules(),
         UnionRule(GenerateLockfile, GenerateJvmLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownJVMUserResolveNamesRequest),
-        UnionRule(RequestedUserResolveNames, RequestedJVMserResolveNames),
+        UnionRule(RequestedUserResolveNames, RequestedJVMUserResolveNames),
     )
