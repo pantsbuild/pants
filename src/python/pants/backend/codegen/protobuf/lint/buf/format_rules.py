@@ -68,7 +68,7 @@ async def setup_buf_format(setup_request: SetupRequest, buf: BufSubsystem) -> Se
         BinaryShimsRequest,
         BinaryShimsRequest.for_paths(
             diff_binary,
-            rationale="buf format requires diff in linting mode",
+            rationale="run `buf format`",
             output_directory=".bin",
         ),
     )
@@ -107,9 +107,7 @@ async def setup_buf_format(setup_request: SetupRequest, buf: BufSubsystem) -> Se
         output_files=source_files_snapshot.files,
         description=f"Run buf format on {pluralize(len(setup_request.request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
-        env={
-            "PATH": binary_shims.bin_directory,
-        },
+        env={"PATH": binary_shims.bin_directory},
     )
     return Setup(process, original_digest=source_files_snapshot.digest)
 
