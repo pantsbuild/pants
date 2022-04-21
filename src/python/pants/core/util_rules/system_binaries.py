@@ -374,6 +374,7 @@ async def create_binary_shims(
             argv=(bash.path, "-c", script),
             description=f"Setup binary shims so that Pants can {binary_shims_request.rationale}.",
             output_directories=(bin_relpath,),
+            level=LogLevel.DEBUG,
         ),
     )
     return BinaryShims(bin_relpath, result.output_digest)
