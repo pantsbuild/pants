@@ -341,6 +341,9 @@ class ExecutionOptions:
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
 
+    child_process_max_memory_usage: int
+    child_process_default_memory_usage: int
+
     remote_store_address: str | None
     remote_store_headers: dict[str, str]
     remote_store_chunk_bytes: Any
@@ -381,6 +384,8 @@ class ExecutionOptions:
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+            child_process_max_memory_usage=bootstrap_options.child_process_max_memory_usage,
+            child_process_default_memory_usage=bootstrap_options.child_process_default_memory_usage,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
             remote_store_headers=dynamic_remote_options.store_headers,
@@ -453,6 +458,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     # Process execution setup.
+    child_process_max_memory_usage = memory_size("1GiB"),
+    child_process_default_memory_usage = memory_size("256MiB"),
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
@@ -1048,6 +1055,46 @@ class BootstrapOptions:
             """
             Path to a file containing PEM-format CA certificates used for verifying secure
             connections when downloading files required by a build.
+            """
+        ),
+    )
+    child_process_max_memory_usage = MemorySizeOption(
+        "--child-process-max-memory-usage",
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.child_process_max_memory_usage,
+        default_help_repr="1GiB",
+        help=softwrap(
+            """
+            The maximum memory usage for all child processes.
+
+            The value is participates in precomputing the pool size of child processes used by
+            Pantsd. A high value would result in a high number of child processes spawned,
+            potentially overconsuming your resources and triggering the OS' OOM killer. A low
+            value would mean a low number of child processes launched and therefore less
+            paralellism for the tasks that need those processes.
+
+            You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
+            `2GiB` or `2.12GiB`. A bare number will be in bytes.
+            """
+        ),
+    )
+    child_process_default_memory_usage = MemorySizeOption(
+        "--child-process-default-memory-usage",
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.child_process_default_memory_usage,
+        default_help_repr="256MiB",
+        help=softwrap(
+            """
+            The default memory usage for a child processes.
+
+            The value is participates in precomputing the pool size of child processes used by
+            Pantsd. A high value would result in a high number of child processes spawned,
+            potentially overconsuming your resources and triggering the OS' OOM killer. A low
+            value would mean a low number of child processes launched and therefore less
+            paralellism for the tasks that need those processes.
+
+            You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
+            `2GiB` or `2.12GiB`. A bare number will be in bytes.
             """
         ),
     )

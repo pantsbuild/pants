@@ -103,6 +103,8 @@ pub struct ExecutionStrategyOptions {
   pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
   pub remote_cache_write: bool,
+  pub child_max_memory: usize,
+  pub child_default_memory: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -191,7 +193,7 @@ impl Core {
           // while busy running scalac, keeping some javac processes idle).
           // TODO: The nailgun pool size should be configurable independent of concurrency, along
           // with per-instance memory usage. See https://github.com/pantsbuild/pants/issues/13067.
-          exec_strategy_opts.local_parallelism * 2,
+          exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
         ))
       } else {
         Box::new(local_command_runner)

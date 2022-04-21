@@ -96,11 +96,12 @@ class JdkEnvironment:
     jdk_preparation_script: ClassVar[str] = f"{bin_dir}/jdk.sh"
     java_home: ClassVar[str] = "__java_home"
 
-    def args(self, bash: BashBinary, classpath_entries: Iterable[str]) -> tuple[str, ...]:
+    def args(self, bash: BashBinary, classpath_entries: Iterable[str], jvm_opts: Iterable[str]) -> tuple[str, ...]:
         return (
             bash.path,
             self.jdk_preparation_script,
             f"{self.java_home}/bin/java",
+            *jvm_opts,
             "-cp",
             ":".join([self.nailgun_jar, *classpath_entries]),
         )
@@ -288,6 +289,7 @@ class JvmProcess:
     classpath_entries: tuple[str, ...]
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
+    jvm_options: tuple[str, ...]
     level: LogLevel
     extra_nailgun_keys: tuple[str, ...]
     output_files: tuple[str, ...]
@@ -306,6 +308,7 @@ class JvmProcess:
         classpath_entries: Iterable[str],
         input_digest: Digest,
         description: str,
+        jvm_options: Iterable[str] | None = None,
         level: LogLevel = LogLevel.INFO,
         extra_nailgun_keys: Iterable[str] | None = None,
         output_files: Iterable[str] | None = None,
@@ -322,6 +325,7 @@ class JvmProcess:
         self.classpath_entries = tuple(classpath_entries)
         self.input_digest = input_digest
         self.description = description
+        self.jvm_options = tuple(jvm_options or ())
         self.level = level
         self.extra_nailgun_keys = tuple(extra_nailgun_keys or ())
         self.output_files = tuple(output_files or ())
@@ -360,7 +364,7 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
 
     return Process(
-        [*jdk.args(bash, request.classpath_entries), *request.argv],
+        [*jdk.args(bash, request.classpath_entries, request.jvm_options), *request.argv],
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         use_nailgun=use_nailgun,

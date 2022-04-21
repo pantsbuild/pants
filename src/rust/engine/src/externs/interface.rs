@@ -246,6 +246,8 @@ impl PyExecutionStrategyOptions {
     local_enable_nailgun: bool,
     remote_cache_read: bool,
     remote_cache_write: bool,
+    child_default_memory: usize,
+    child_max_memory: usize,
   ) -> Self {
     Self(ExecutionStrategyOptions {
       local_parallelism,
@@ -255,6 +257,8 @@ impl PyExecutionStrategyOptions {
       local_enable_nailgun,
       remote_cache_read,
       remote_cache_write,
+      child_default_memory,
+      child_max_memory,
     })
   }
 }

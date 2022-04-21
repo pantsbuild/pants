@@ -207,6 +207,8 @@ class Scheduler:
             local_parallelism=execution_options.process_execution_local_parallelism,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
+            child_max_memory=execution_options.child_process_max_memory_usage,
+            child_default_memory=execution_options.child_process_default_memory_usage,
         )
 
         self._py_scheduler = native_engine.scheduler_create(
