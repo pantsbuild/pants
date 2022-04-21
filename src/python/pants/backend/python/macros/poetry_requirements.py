@@ -105,6 +105,16 @@ def get_max_tilde(parsed_version: Version) -> str:
     return f"{major}.{minor}.0"
 
 
+def get_max_wildcard(parsed_version: Version) -> str:
+    # Note: Assumes this is not a global wildcard, so parsed_version.release has
+    # at least two components.
+    release = list(parsed_version.release)
+    release[-2] += 1
+    major = release[0]
+    minor = release[1]
+    return f"{major}.{minor}.0"
+
+
 def parse_str_version(attributes: str, **kwargs: str) -> str:
     valid_specifiers = "<>!~="
     pep440_reqs = []
@@ -113,12 +123,10 @@ def parse_str_version(attributes: str, **kwargs: str) -> str:
     extras_str = kwargs["extras_str"]
     comma_split_reqs = (i.strip() for i in attributes.split(","))
     for req in comma_split_reqs:
-        is_caret = req[0] == "^"
-        # ~= is an acceptable default operator; however, ~ is not, and IS NOT the same as ~=
-        is_tilde = req[0] == "~" and req[1] != "="
-        if is_caret or is_tilde:
+
+        def parse_version(version_str: str) -> Version:
             try:
-                parsed_version = Version(req[1:])
+                return Version(version_str)
             except InvalidVersion:
                 raise InvalidVersion(
                     f'Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the '
@@ -127,12 +135,29 @@ def parse_str_version(attributes: str, **kwargs: str) -> str:
                     "that we can update Pants' Poetry macro to support this."
                 )
 
-            max_ver = get_max_caret(parsed_version) if is_caret else get_max_tilde(parsed_version)
+        if not req:
+            continue
+        if req[0] == "^":
+            parsed_version = parse_version(req[1:])
+            max_ver = get_max_caret(parsed_version)
             min_ver = f"{parsed_version.public}"
             pep440_reqs.append(f">={min_ver},<{max_ver}")
+        elif req[0] == "~" and req[1] != "=":
+            # ~= is an acceptable default operator; however, ~ is not, and IS NOT the same as ~=
+            parsed_version = parse_version(req[1:])
+            max_ver = get_max_tilde(parsed_version)
+            min_ver = f"{parsed_version.public}"
+            pep440_reqs.append(f">={min_ver},<{max_ver}")
+        elif req[-1] == "*":
+            if req != "*":  # This is not a global wildcard.
+                # To parse we replace the * with a 0.
+                parsed_version = parse_version(f"{req[:-1]}0")
+                max_ver = get_max_wildcard(parsed_version)
+                min_ver = f"{parsed_version.public}"
+                pep440_reqs.append(f">={min_ver},<{max_ver}")
         else:
             pep440_reqs.append(req if req[0] in valid_specifiers else f"=={req}")
-    return f"{proj_name}{extras_str} {','.join(pep440_reqs)}"
+    return f"{proj_name}{extras_str} {','.join(pep440_reqs)}".rstrip()
 
 
 def parse_python_constraint(constr: str | None, fp: str) -> str:
