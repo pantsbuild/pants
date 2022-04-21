@@ -592,7 +592,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
 @dataclass(frozen=True)
 class WorkflowInput:
     name: str
-    env_name: str
     type_str: str
     default: str | int | None = None
 
@@ -602,14 +601,16 @@ def workflow_dispatch_inputs(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Builds `on.workflow_dispatch.inputs` and a corresponding `env` section to consume them."""
     inputs = {
-        wi.name: {
+        wi.name.lower(): {
             "required": (wi.default is None),
             "type": wi.type_str,
             **({} if wi.default is None else {"default": wi.default}),
         }
         for wi in workflow_inputs
     }
-    env = {wi.env_name: ("${{ github.event.inputs." + wi.name + " }}") for wi in workflow_inputs}
+    env = {
+        wi.name: ("${{ github.event.inputs." + wi.name.lower() + " }}") for wi in workflow_inputs
+    }
     return inputs, env
 
 
@@ -617,35 +618,24 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     cc_inputs, cc_env = workflow_dispatch_inputs(
         [
             WorkflowInput(
-                "pantsArgs",
                 "PANTS_ARGS",
                 "string",
                 default="check lint test ::",
             ),
             WorkflowInput(
-                "baseRef",
                 "BASE_REF",
                 "string",
                 default="main",
             ),
             WorkflowInput(
-                "buildDiffspec",
-                "BUILD_DIFFSPEC",
+                "BUILD_COMMIT",
                 "string",
             ),
             WorkflowInput(
-                "buildDiffspecStep",
-                "BUILD_DIFFSPEC_STEP",
-                "int",
-                default=1,
-            ),
-            WorkflowInput(
-                "sourceDiffspec",
                 "SOURCE_DIFFSPEC",
                 "string",
             ),
             WorkflowInput(
-                "sourceDiffspecStep",
                 "SOURCE_DIFFSPEC_STEP",
                 "int",
                 default=1,
@@ -671,9 +661,9 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                         # NB: The fetch depth is arbitrary, but is meant to capture the
                         # most likely `diffspecs` used as arguments.
                         """\
-                                ./pants package build-support/bin/cache_comparison.py
-                                git fetch --no-tags --depth=1024 origin "$BASE_REF"
-                                """
+                        MODE=debug ./pants package build-support/bin/cache_comparison.py
+                        git fetch --no-tags --depth=1024 origin "$BASE_REF"
+                        """
                     ),
                     "env": cc_env,
                 },
@@ -681,13 +671,12 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                     "name": "Run cache comparison",
                     "run": dedent(
                         """\
-                                dist/build-support.bin/cache_comparison_py.pex \\
-                                  --args="$PANTS_ARGS" \\
-                                  --build-diffspec="$BUILD_DIFFSPEC" \\
-                                  --build-diffspec-step=$BUILD_DIFFSPEC_STEP \\
-                                  --source-diffspec="$SOURCE_DIFFSPEC" \\
-                                  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP
-                                """
+                        dist/build-support.bin/cache_comparison_py.pex \\
+                          --args="$PANTS_ARGS" \\
+                          --build-commit="$BUILD_COMMIT" \\
+                          --source-diffspec="$SOURCE_DIFFSPEC" \\
+                          --source-diffspec-step=$SOURCE_DIFFSPEC_STEP
+                        """
                     ),
                     "env": cc_env,
                 },

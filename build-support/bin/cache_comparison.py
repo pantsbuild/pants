@@ -15,8 +15,8 @@ from time import time
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "A (remote) cache comparison tool, which automates testing a range of Pants "
-            "builds (each in isolated cache namespaces) against a range of sources."
+            "A (remote) cache comparison tool, which automates testing a single build of Pants (in "
+            "an isolated cache namespace) against a range of source commits."
         )
     )
 
@@ -28,13 +28,8 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-b",
-        "--build-diffspec",
-        help="The diffspec (e.g.: `main~10..main`) which selects the Pants builds to compare.",
-    )
-    parser.add_argument(
-        "--build-diffspec-step",
-        default=1,
-        help="The number of commits to step by within `--build-diffspec`.",
+        "--build-commit",
+        help="The commit to build a Pants PEX from.",
     )
     parser.add_argument(
         "-s",
@@ -54,11 +49,11 @@ def create_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = create_parser().parse_args()
-    build_commits = commits_in_range(args.build_diffspec, int(args.build_diffspec_step))
+    build_commit = args.build_commit
     source_commits = commits_in_range(args.source_diffspec, int(args.source_diffspec_step))
-    timings = timings_by_build(
+    timings = timings_for_build(
         shlex.split(args.args),
-        build_commits,
+        build_commit,
         source_commits,
     )
     json.dump(timings, indent=2, fp=sys.stdout)
@@ -83,28 +78,20 @@ def commits_in_range(diffspec: str, step: int) -> list[Commit]:
     return all_commits[::step]
 
 
-def timings_by_build(
-    args: list[str], build_commits: list[Commit], source_commits: list[Commit]
-) -> list[tuple[Commit, list[TimeInSeconds]]]:
-    """For each build commit, build a PEX, and then collect timings for each source commit."""
-    result = []
-    for build_commit in build_commits:
-        # Build a PEX for the commit, then ensure that `pantsd` is not running.
-        checkout(build_commit)
-        run(["package", "src/python/pants/bin:pants"], use_pex=False)
-        shutil.rmtree(".pids")
-        # Then collect a runtime for each commit in the range.
-        cache_namespace = f"cache-comparison-{build_commit}-{time()}"
-        result.append(
-            (
-                build_commit,
-                [
-                    timing_for_commit(source_commit, args, cache_namespace)
-                    for source_commit in source_commits
-                ],
-            )
-        )
-    return result
+def timings_for_build(
+    args: list[str], build_commit: Commit, source_commits: list[Commit]
+) -> dict[Commit, TimeInSeconds]:
+    """Build a PEX from the build commit, and then collect timings for each source commit."""
+    # Build a PEX for the commit, then ensure that `pantsd` is not running.
+    checkout(build_commit)
+    run(["package", "src/python/pants/bin:pants"], use_pex=False)
+    shutil.rmtree(".pids")
+    # Then collect a runtime for each commit in the range.
+    cache_namespace = f"cache-comparison-{build_commit}-{time()}"
+    return {
+        source_commit: timing_for_commit(source_commit, args, cache_namespace)
+        for source_commit in source_commits
+    }
 
 
 def timing_for_commit(commit: Commit, args: list[str], cache_namespace: str) -> TimeInSeconds:
