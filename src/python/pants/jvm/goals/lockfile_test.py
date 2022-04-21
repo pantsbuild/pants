@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import cast
 
 import pytest
 
@@ -82,6 +83,37 @@ def test_generate_lockfile(rule_runner: RuleRunner) -> None:
         metadata=JVMLockfileMetadata.new(artifacts),
     )
     assert CoursierResolvedLockfile.from_serialized(digest_contents[0].content) == expected
+
+
+@maybe_skip_jdk_test
+def test_artifact_collision(rule_runner: RuleRunner) -> None:
+    # Test that an artifact with fully populated but identical fields can be generated.
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                def mk(name):
+                  jvm_artifact(
+                      name=name,
+                      group='group',
+                      artifact='artifact',
+                      version='1',
+                      jar='jar.jar',
+                      excludes=['ex:clude'],
+                  )
+
+                mk('one')
+                mk('two')
+                """
+            ),
+        }
+    )
+
+    result = rule_runner.request(
+        UserGenerateLockfiles, [RequestedJVMUserResolveNames(["jvm-default"])]
+    )
+    # Because each instance of the jar field is unique.
+    assert len(cast(GenerateJvmLockfile, result[0]).artifacts) == 2
 
 
 @maybe_skip_jdk_test
