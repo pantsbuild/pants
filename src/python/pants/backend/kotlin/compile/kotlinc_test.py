@@ -6,6 +6,7 @@ import pytest
 
 from pants.backend.kotlin.compile.kotlinc import CompileKotlinSourceRequest
 from pants.backend.kotlin.compile.kotlinc import rules as kotlinc_rules
+from pants.backend.kotlin.dependency_inference.rules import rules as kotlin_dep_inf_rules
 from pants.backend.kotlin.goals.check import KotlincCheckRequest
 from pants.backend.kotlin.goals.check import rules as kotlin_check_rules
 from pants.backend.kotlin.target_types import KotlinSourcesGeneratorTarget
@@ -47,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *jdk_rules.rules(),
             *kotlin_check_rules(),
             *kotlinc_rules(),
+            *kotlin_dep_inf_rules(),
             *source_files.rules(),
             *target_types_rules(),
             *testutil.rules(),
@@ -63,75 +65,134 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-DEFAULT_LOCKFILE = TestCoursierWrapper(
-    CoursierResolvedLockfile(
-        (
-            CoursierLockfileEntry(
-                coord=Coordinate(
-                    group="org.jetbrains.kotlin", artifact="kotlin-stdlib", version="1.6.0"
+_DEFAULT_LOCKFILE_ENTRIES = (
+    CoursierLockfileEntry(
+        coord=Coordinate(group="org.jetbrains.kotlin", artifact="kotlin-stdlib", version="1.6.20"),
+        file_name="org.jetbrains.kotlin_kotlin-stdlib_1.6.20.jar",
+        direct_dependencies=Coordinates(
+            [
+                Coordinate(
+                    group="org.jetbrains.kotlin",
+                    artifact="kotlin-stdlib-common",
+                    version="1.6.20",
                 ),
-                file_name="org.jetbrains.kotlin_kotlin-stdlib_1.6.0.jar",
-                direct_dependencies=Coordinates(
-                    [
-                        Coordinate(
-                            group="org.jetbrains.kotlin",
-                            artifact="kotlin-stdlib-common",
-                            version="1.6.0",
-                        ),
-                        Coordinate(
-                            group="org.jetbrains.annotations",
-                            artifact="annotations",
-                            version="13.0",
-                        ),
-                    ]
+                Coordinate(
+                    group="org.jetbrains.annotations",
+                    artifact="annotations",
+                    version="13.0",
                 ),
-                dependencies=Coordinates(),
-                file_digest=FileDigest(
-                    "115daea30b0d484afcf2360237b9d9537f48a4a2f03f3cc2a16577dfc6e90342", 1508076
-                ),
-            ),
-            CoursierLockfileEntry(
-                coord=Coordinate(
-                    group="org.jetbrains.kotlin", artifact="kotlin-stdlib-common", version="1.6.0"
-                ),
-                file_name="org.jetbrains.kotlin_kotlin-stdlib-common_1.6.0.jar",
-                direct_dependencies=Coordinates(),
-                dependencies=Coordinates(),
-                file_digest=FileDigest(
-                    "644a7257c23b51a1fd5068960e40922e3e52c219f11ece3e040a3abc74823f22", 200616
-                ),
-            ),
-            CoursierLockfileEntry(
-                coord=Coordinate(
-                    group="org.jetbrains.annotations", artifact="annotations", version="13.0"
-                ),
-                file_name="org.jetbrains.annotations_annotations_13.0.jar",
-                direct_dependencies=Coordinates(),
-                dependencies=Coordinates(),
-                file_digest=FileDigest(
-                    "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478", 17536
-                ),
-            ),
-        )
-    )
-).serialize(
-    [
-        ArtifactRequirement(
-            coordinate=Coordinate(
-                group="org.jetbrains.kotlin", artifact="kotlin-stdlib", version="1.6.0"
-            )
+            ]
         ),
-    ]
+        dependencies=Coordinates(),
+        file_digest=FileDigest(
+            "eeb51c2b67b26233fd81d0bc4f8044ec849718890905763ceffd84a31e2cb799",
+            1509405,
+        ),
+    ),
+    CoursierLockfileEntry(
+        coord=Coordinate(
+            group="org.jetbrains.kotlin",
+            artifact="kotlin-stdlib-common",
+            version="1.6.20",
+        ),
+        file_name="org.jetbrains.kotlin_kotlin-stdlib-common_1.6.20.jar",
+        direct_dependencies=Coordinates(),
+        dependencies=Coordinates(),
+        file_digest=FileDigest(
+            "8da40a2520d30dcb1012176fe93d24e82d08a3e346c37e0343b0fb6f64f6be01",
+            200631,
+        ),
+    ),
+    CoursierLockfileEntry(
+        coord=Coordinate(
+            group="org.jetbrains.annotations",
+            artifact="annotations",
+            version="13.0",
+        ),
+        file_name="org.jetbrains.annotations_annotations_13.0.jar",
+        direct_dependencies=Coordinates(),
+        dependencies=Coordinates(),
+        file_digest=FileDigest(
+            "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478",
+            17536,
+        ),
+    ),
+    CoursierLockfileEntry(
+        coord=Coordinate(
+            group="org.jetbrains.kotlin",
+            artifact="kotlin-script-runtime",
+            version="1.6.20",
+        ),
+        file_name="kotlin-script-runtime-1.6.20.jar",
+        direct_dependencies=Coordinates(),
+        dependencies=Coordinates(),
+        file_digest=FileDigest(
+            "3fee5cea54449e18ce5a770c3c4849f0f855d8b061f7d0bd2a032110922c0206",
+            42319,
+        ),
+    ),
+    CoursierLockfileEntry(
+        coord=Coordinate(
+            group="org.jetbrains.kotlin",
+            artifact="kotlin-reflect",
+            version="1.6.20",
+        ),
+        file_name="kotlin-reflect-1.6.20.jar",
+        direct_dependencies=Coordinates(),
+        dependencies=Coordinates(),
+        file_digest=FileDigest(
+            "234b60bd2c49b391ac550afee4ca9a92e485d8c5ae5faa98cdaf7feba1794042",
+            3058829,
+        ),
+    ),
 )
 
+_DEFAULT_LOCKFILE_REQUIREMENTS = [
+    ArtifactRequirement(
+        coordinate=Coordinate(
+            group="org.jetbrains.kotlin", artifact="kotlin-stdlib", version="1.6.20"
+        )
+    ),
+    ArtifactRequirement(
+        Coordinate(
+            group="org.jetbrains.kotlin",
+            artifact="kotlin-reflect",
+            version="1.6.20",
+        )
+    ),
+    ArtifactRequirement(
+        Coordinate(
+            group="org.jetbrains.kotlin",
+            artifact="kotlin-script-runtime",
+            version="1.6.20",
+        )
+    ),
+]
 
-DEFAULT_KOTLIN_STDLIB_TARGET = dedent(
+DEFAULT_LOCKFILE = TestCoursierWrapper(
+    CoursierResolvedLockfile(entries=_DEFAULT_LOCKFILE_ENTRIES)
+).serialize(_DEFAULT_LOCKFILE_REQUIREMENTS)
+
+
+DEFAULT_KOTLIN_STDLIB_TARGETS = dedent(
     """\
     jvm_artifact(
-      name="org.jetbrains.kotlin_kotlin-stdlib_1.6.0",
+      name="org.jetbrains.kotlin_kotlin-stdlib_1.6.20",
       group="org.jetbrains.kotlin",
       artifact="kotlin-stdlib",
-      version="1.6.0",
+      version="1.6.20",
+    )
+    jvm_artifact(
+      name="org.jetbrains.kotlin_kotlin-script-runtime_1.6.20",
+      group="org.jetbrains.kotlin",
+      artifact="kotlin-script-runtime",
+      version="1.6.20",
+    )
+    jvm_artifact(
+      name="org.jetbrains.kotlin_kotlin-reflect_1.6.20",
+      group="org.jetbrains.kotlin",
+      artifact="kotlin-reflect",
+      version="1.6.20",
     )
     """
 )
@@ -173,7 +234,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
+            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGETS,
             "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
             "ExampleLib.kt": KOTLIN_LIB_SOURCE,
         }
@@ -218,23 +279,17 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                     name = 'main',
                     dependencies = [
                         'lib:lib',
-                        # TODO: Remove this once kotlin stdlib dep is injected.
-                        "3rdparty/jvm:org.jetbrains.kotlin_kotlin-stdlib_1.6.0",
                     ]
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
+            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGETS,
             "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
             "Example.kt": KOTLIN_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
                 kotlin_sources(
                     name = 'lib',
-                    dependencies = [
-                        # TODO: Remove this once kotlin stdlib dep is injected.
-                        "3rdparty/jvm:org.jetbrains.kotlin_kotlin-stdlib_1.6.0",
-                    ],
                 )
                 """
             ),
@@ -269,15 +324,11 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """\
                 kotlin_sources(
                     name = 'main',
-                    dependencies = [
-                        # TODO: Remove this once kotlin stdlib dep is injected.
-                        "3rdparty/jvm:org.jetbrains.kotlin_kotlin-stdlib_1.6.0",
-                    ],
                 )
                 """
             ),
             "Example.kt": KOTLIN_LIB_MAIN_SOURCE,
-            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
+            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGETS,
             "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
         }
     )
@@ -295,9 +346,6 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
     joda_coord = Coordinate(group="joda-time", artifact="joda-time", version="2.10.10")
-    kotlin_stdlib_coord = Coordinate(
-        group="org.jetbrains.kotlin", artifact="kotlin-stdlib", version="1.6.0"
-    )
     resolved_joda_lockfile = TestCoursierWrapper.new(
         entries=(
             CoursierLockfileEntry(
@@ -310,52 +358,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                     serialized_bytes_length=644419,
                 ),
             ),
-            CoursierLockfileEntry(
-                coord=Coordinate(
-                    group="org.jetbrains.kotlin", artifact="kotlin-stdlib", version="1.6.0"
-                ),
-                file_name="org.jetbrains.kotlin_kotlin-stdlib_1.6.0.jar",
-                direct_dependencies=Coordinates(
-                    [
-                        Coordinate(
-                            group="org.jetbrains.kotlin",
-                            artifact="kotlin-stdlib-common",
-                            version="1.6.0",
-                        ),
-                        Coordinate(
-                            group="org.jetbrains.annotations",
-                            artifact="annotations",
-                            version="13.0",
-                        ),
-                    ]
-                ),
-                dependencies=Coordinates(),
-                file_digest=FileDigest(
-                    "115daea30b0d484afcf2360237b9d9537f48a4a2f03f3cc2a16577dfc6e90342", 1508076
-                ),
-            ),
-            CoursierLockfileEntry(
-                coord=Coordinate(
-                    group="org.jetbrains.kotlin", artifact="kotlin-stdlib-common", version="1.6.0"
-                ),
-                file_name="org.jetbrains.kotlin_kotlin-stdlib-common_1.6.0.jar",
-                direct_dependencies=Coordinates(),
-                dependencies=Coordinates(),
-                file_digest=FileDigest(
-                    "644a7257c23b51a1fd5068960e40922e3e52c219f11ece3e040a3abc74823f22", 200616
-                ),
-            ),
-            CoursierLockfileEntry(
-                coord=Coordinate(
-                    group="org.jetbrains.annotations", artifact="annotations", version="13.0"
-                ),
-                file_name="org.jetbrains.annotations_annotations_13.0.jar",
-                direct_dependencies=Coordinates(),
-                dependencies=Coordinates(),
-                file_digest=FileDigest(
-                    "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478", 17536
-                ),
-            ),
+            *_DEFAULT_LOCKFILE_ENTRIES,
         )
     )
     rule_runner.write_files(
@@ -372,15 +375,13 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
                     name = 'main',
                     dependencies = [
                         ":joda-time_joda-time",
-                        # TODO: Remove this once kotlin stdlib dep is injected.
-                        "3rdparty/jvm:org.jetbrains.kotlin_kotlin-stdlib_1.6.0",
                     ],
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
+            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGETS,
             "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize(
-                [ArtifactRequirement(joda_coord), ArtifactRequirement(kotlin_stdlib_coord)]
+                [ArtifactRequirement(joda_coord), *_DEFAULT_LOCKFILE_REQUIREMENTS]
             ),
             "Example.kt": dedent(
                 """
@@ -424,14 +425,10 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunn
                 """\
                 kotlin_sources(
                     name = 'main',
-                    dependencies = [
-                        # TODO: Remove this once kotlin stdlib dep is injected.
-                        "3rdparty/jvm:org.jetbrains.kotlin_kotlin-stdlib_1.6.0",
-                    ],
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
+            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGETS,
             "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
             "Example.kt": dedent(
                 """
@@ -474,14 +471,10 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
                 kotlin_sources(
                     name = 'main',
                     # `joda-time` needs to be here for compile to succeed
-                    dependencies = [
-                        # TODO: Remove this once kotlin stdlib dep is injected.
-                        "3rdparty/jvm:org.jetbrains.kotlin_kotlin-stdlib_1.6.0",
-                    ],
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGET,
+            "3rdparty/jvm/BUILD": DEFAULT_KOTLIN_STDLIB_TARGETS,
             "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
             "Example.kt": dedent(
                 """

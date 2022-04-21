@@ -9,7 +9,7 @@ from pants.option.option_types import DictOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
-DEFAULT_KOTLIN_VERSION = "1.6.0"
+DEFAULT_KOTLIN_VERSION = "1.6.20"
 
 _logger = logging.getLogger(__name__)
 

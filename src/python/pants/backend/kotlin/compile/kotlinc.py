@@ -83,13 +83,13 @@ async def compile_kotlin_source(
         ),
     )
 
-    component_members_and_scala_source_files = [
+    component_members_and_kotlin_source_files = [
         (target, sources)
         for target, sources in component_members_and_source_files
         if sources.snapshot.digest != EMPTY_DIGEST
     ]
 
-    if not component_members_and_scala_source_files:
+    if not component_members_and_kotlin_source_files:
         # Is a generator, and so exports all of its direct deps.
         exported_digest = await Get(
             Digest, MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
@@ -115,7 +115,12 @@ async def compile_kotlin_source(
                     [
                         Coordinate(
                             group="org.jetbrains.kotlin",
-                            artifact="kotlin-compiler",
+                            artifact="kotlin-compiler-embeddable",
+                            version=kotlin_version,
+                        ),
+                        Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-scripting-compiler-embeddable",
                             version=kotlin_version,
                         ),
                     ]
@@ -125,7 +130,10 @@ async def compile_kotlin_source(
         Get(
             Digest,
             MergeDigests(
-                (sources.snapshot.digest for _, sources in component_members_and_scala_source_files)
+                (
+                    sources.snapshot.digest
+                    for _, sources in component_members_and_kotlin_source_files
+                )
             ),
         ),
         Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
@@ -153,7 +161,7 @@ async def compile_kotlin_source(
                 *sorted(
                     itertools.chain.from_iterable(
                         sources.snapshot.files
-                        for _, sources in component_members_and_scala_source_files
+                        for _, sources in component_members_and_kotlin_source_files
                     )
                 ),
             ],
