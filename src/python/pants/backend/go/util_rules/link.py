@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.engine.fs import Digest
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -30,6 +30,7 @@ class LinkedGoBinary:
 
 @rule
 async def link_go_binary(request: LinkGoBinaryRequest) -> LinkedGoBinary:
+    link_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("link"))
     result = await Get(
         ProcessResult,
         GoSdkProcess(
@@ -44,6 +45,9 @@ async def link_go_binary(request: LinkGoBinaryRequest) -> LinkedGoBinary:
                 "-buildmode=exe",  # seen in `go build -x` output
                 *request.archives,
             ),
+            env={
+                "__PANTS_GO_LINK_TOOL_ID": link_tool_id.tool_id,
+            },
             description=f"Link Go binary: {request.output_filename}",
             output_files=(request.output_filename,),
         ),
