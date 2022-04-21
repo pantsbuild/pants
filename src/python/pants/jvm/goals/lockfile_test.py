@@ -11,6 +11,7 @@ from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGene
 from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import DigestContents, FileDigest
+from pants.engine.internals.parametrize import Parametrize
 from pants.jvm.goals import lockfile
 from pants.jvm.goals.lockfile import GenerateJvmLockfile, RequestedJVMUserResolveNames
 from pants.jvm.resolve.common import (
@@ -23,7 +24,6 @@ from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierReso
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
-from pants.engine.internals.parametrize import Parametrize
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
