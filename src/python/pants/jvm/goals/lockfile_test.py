@@ -23,6 +23,7 @@ from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierReso
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
+from pants.engine.internals.parametrize import Parametrize
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -43,6 +44,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(GenerateLockfileResult, [GenerateJvmLockfile]),
         ],
         target_types=[JvmArtifactTarget],
+        objects={"parametrize": Parametrize},
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -84,25 +86,16 @@ def test_generate_lockfile(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_multiple_resolves(rule_runner: RuleRunner) -> None:
-    # TODO: Adjust to use https://github.com/pantsbuild/pants/pull/14408 for the
-    # duplicated artifact.
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
                 jvm_artifact(
-                    name='hamcrest_a',
+                    name='hamcrest',
                     group='org.hamcrest',
                     artifact='hamcrest-core',
                     version="1.3",
-                    resolve="a",
-                )
-                jvm_artifact(
-                    name='hamcrest_b',
-                    group='org.hamcrest',
-                    artifact='hamcrest-core',
-                    version="1.3",
-                    resolve="b",
+                    resolve=parametrize("a", "b"),
                 )
 
                 jvm_artifact(
