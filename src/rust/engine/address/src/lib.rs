@@ -43,7 +43,8 @@ pub struct SpecInput<'a> {
 
 peg::parser! {
     grammar parsers() for str {
-        rule path() -> &'input str = s:$([^':' | '@' | '#']*) { s }
+        rule path() -> &'input str =
+            s:$(([^':' | '@' | '#'] / ("@" !parameter()))*) { s }
 
         rule target_name() -> &'input str
             = quiet!{ s:$([^'#' | '@' | ':']+) { s } }
