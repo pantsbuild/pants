@@ -7,6 +7,7 @@ import logging
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet
 from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
+from pants.backend.kotlin.subsystems.kotlinc import KotlincSubsystem
 from pants.backend.kotlin.target_types import (
     KotlinFieldSet,
     KotlinGeneratorFieldSet,
@@ -49,6 +50,7 @@ def compute_output_jar_filename(ctgt: CoarsenedTarget) -> str:
 @rule(desc="Compile with kotlinc")
 async def compile_kotlin_source(
     kotlin: KotlinSubsystem,
+    kotlinc: KotlincSubsystem,
     request: CompileKotlinSourceRequest,
 ) -> FallibleClasspathEntry:
     # Request classpath entries for our direct dependencies.
@@ -158,6 +160,7 @@ async def compile_kotlin_source(
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 "-d",
                 output_file,
+                *kotlinc.args,
                 *sorted(
                     itertools.chain.from_iterable(
                         sources.snapshot.files
