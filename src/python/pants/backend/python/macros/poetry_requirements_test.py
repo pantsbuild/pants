@@ -75,6 +75,21 @@ def test_max_tilde(test, exp) -> None:
 @pytest.mark.parametrize(
     "test, exp",
     [
+        ("*", ""),
+        ("1.*", ">=1.0,<2.0.0"),
+        ("1.2.*", ">=1.2.0,<1.3.0"),
+    ],
+)
+def test_wildcard(test, exp) -> None:
+    assert (
+        parse_str_version(test, proj_name="foo", file_path="", extras_str="")
+        == f"foo {exp}".rstrip()
+    )
+
+
+@pytest.mark.parametrize(
+    "test, exp",
+    [
         ("~1.0.0rc0", ">=1.0.0rc0,<1.1.0"),
         ("^1.0.0rc0", ">=1.0.0rc0,<2.0.0"),
         ("~1.2.3", ">=1.2.3,<1.3.0"),
@@ -362,6 +377,9 @@ def test_parse_multi_reqs() -> None:
 
     [tool.poetry.group.mygroup.dependencies]
     myrequirement = "1.2.3"
+    awildcard = "6.7.*"
+    anotherwildcard = "44.*"
+    aglobalwildcard = "*"
 
     [tool.poetry.group.mygroup2.dependencies]
     myrequirement2 = "1.2.3"
@@ -378,6 +396,9 @@ def test_parse_multi_reqs() -> None:
     actual_reqs = {
         PipRequirement.parse("junk[security]@ https://github.com/myrepo/junk.whl"),
         PipRequirement.parse("myrequirement==1.2.3"),
+        PipRequirement.parse("awildcard>=6.7.0,<6.8.0"),
+        PipRequirement.parse("anotherwildcard>=44.0,<45.0.0"),
+        PipRequirement.parse("aglobalwildcard"),
         PipRequirement.parse("myrequirement2==1.2.3"),
         PipRequirement.parse("poetry@ git+https://github.com/python-poetry/poetry.git@v1.1.1"),
         PipRequirement.parse('requests[security, random]<3.0.0,>=2.25.1; python_version > "2.7"'),
