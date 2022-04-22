@@ -34,7 +34,8 @@ pub struct AddressInput<'a> {
 
 peg::parser! {
     grammar relative_address_parser() for str {
-        rule path() -> &'input str = s:$([^':' | '@' | '#']*) { s }
+        rule path() -> &'input str =
+            s:$(([^':' | '@' | '#'] / ("@" !parameter()))*) { s }
 
         rule target_name() -> &'input str
             = quiet!{ s:$([^'#' | '@']+) { s } }
