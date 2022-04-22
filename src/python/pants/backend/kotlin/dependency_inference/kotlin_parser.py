@@ -8,7 +8,6 @@ import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from pants.backend.kotlin.subsystems.kotlin import DEFAULT_KOTLIN_VERSION
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, DigestContents, Directory, FileContent
@@ -21,36 +20,17 @@ from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.option.global_options import ProcessCleanupOption
-from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
-
-class KotlinParserTool(JvmToolBase):
-    options_scope = "kotlin-parser"
-    name = "Kotlin Parser for Dependency Inference"
-    help = "Kotlin Parser for Dependency Inference"
-
-    default_version = DEFAULT_KOTLIN_VERSION
-    default_artifacts = (
-        "org.jetbrains.kotlin:kotlin-compiler:{version}",
-        "org.jetbrains.kotlin:kotlin-stdlib:{version}",
-        "com.google.code.gson:gson:2.9.0",
-    )
-    default_lockfile_resource = (
-        "pants.backend.kotlin.dependency_inference",
-        "kotlin_parser.lock",
-    )
-    default_lockfile_path = (
-        "src/python/pants/backend/kotlin/dependency_inference/kotlin_parser.lock"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)
+_PARSER_KOTLIN_VERSION = "1.6.20"
 
 
 class KotlinParserToolLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = KotlinParserTool.options_scope
+    resolve_name = "kotlin-parser"
 
 
 @dataclass(frozen=True)
@@ -272,7 +252,7 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
                         Coordinate(
                             group="org.jetbrains.kotlin",
                             artifact="kotlin-compiler-embeddable",
-                            version=DEFAULT_KOTLIN_VERSION,  # TODO: Pull from resolve or hard-code Kotlin version?
+                            version=_PARSER_KOTLIN_VERSION,  # TODO: Pull from resolve or hard-code Kotlin version?
                         ),
                     ]
                 ),
@@ -325,9 +305,25 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
 
 @rule
 def generate_kotlin_parser_lockfile_request(
-    _: KotlinParserToolLockfileSentinel, tool: KotlinParserTool
+    _: KotlinParserToolLockfileSentinel,
 ) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
+    return GenerateJvmLockfileFromTool(
+        artifact_inputs=FrozenOrderedSet(
+            {
+                f"org.jetbrains.kotlin:kotlin-compiler:{_PARSER_KOTLIN_VERSION}",
+                f"org.jetbrains.kotlin:kotlin-stdlib:{_PARSER_KOTLIN_VERSION}",
+                "com.google.code.gson:gson:2.9.0",
+            }
+        ),
+        artifact_option_name="n/a",
+        lockfile_option_name="n/a",
+        resolve_name=KotlinParserToolLockfileSentinel.resolve_name,
+        lockfile_dest="src/python/pants/backend/kotlin/dependency_inference/kotlin_parser.lock",
+        default_lockfile_resource=(
+            "pants.backend.kotlin.dependency_inference",
+            "kotlin_parser.lock",
+        ),
+    )
 
 
 def rules():
