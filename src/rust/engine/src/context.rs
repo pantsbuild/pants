@@ -184,7 +184,17 @@ impl Core {
     let maybe_nailgunnable_local_command_runner: Result<Box<dyn CommandRunner>, String> =
       if exec_strategy_opts.local_enable_nailgun {
         if exec_strategy_opts.child_default_memory > exec_strategy_opts.child_max_memory {
-          Err("Nailgun can not be started as the total amount of memory requested is smaller than the memory allocation for a single process.".to_string())
+          Err(format!(
+            "\
+            Nailgun pool can not be initialised as the total amount of memory allowed is \
+            smaller than the memory allocation for a single child process.
+            
+            - total child process memory allowed: {child_max_memory}
+            - default child process memory: {child_default_memory}
+            ",
+            child_max_memory = exec_strategy_opts.child_max_memory,
+            child_default_memory = exec_strategy_opts.child_default_memory
+          ))
         } else {
           Ok(Box::new(nailgun::CommandRunner::new(
             local_command_runner,
