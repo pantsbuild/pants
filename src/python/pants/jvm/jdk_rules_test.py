@@ -178,26 +178,3 @@ def test_pass_jvm_options_to_nailgun(rule_runner: RuleRunner) -> None:
     assert "pants.jvm.global=true" in jvm_properties
     assert "pants.jvm.extra=true" in jvm_properties
 
-
-def test_invalid_child_process_options_raises_execution_error(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(
-        ["--child-process-max-memory-usage=256MiB", "--child-process-default-memory-usage=512MiB"],
-        env_inherit=PYTHON_BOOTSTRAP_ENV,
-    )
-
-    jdk = rule_runner.request(InternalJdk, [])
-    expected_err_msg = "Nailgun pool can not be initialised as the total amount of memory allowed"
-    with pytest.raises(ExecutionError, match=expected_err_msg):
-        rule_runner.request(
-            ProcessResult,
-            [
-                JvmProcess(
-                    jdk=jdk,
-                    argv=["com.example.DummyMainClass"],
-                    classpath_entries=(),
-                    input_digest=EMPTY_DIGEST,
-                    description="",
-                    use_nailgun=True,
-                )
-            ],
-        )
