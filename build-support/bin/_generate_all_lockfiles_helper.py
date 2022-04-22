@@ -37,7 +37,6 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
-from pants.backend.scala.dependency_inference.scala_parser import ScalaParserTool
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
@@ -116,7 +115,6 @@ AllTools = (
     # JVM
     DefaultTool.jvm(JUnit),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),
-    DefaultTool.jvm(ScalaParserTool),
     DefaultTool.jvm(ScalafmtSubsystem),
     DefaultTool.jvm(ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"),
     DefaultTool.jvm(Scalatest),

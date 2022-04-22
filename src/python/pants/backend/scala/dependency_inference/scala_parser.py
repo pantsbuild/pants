@@ -29,9 +29,8 @@ from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.option.global_options import ProcessCleanupOption
-from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -43,29 +42,8 @@ _PARSER_SCALA_VERSION = "2.13.8"
 _PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.rpartition(".")[0]
 
 
-class ScalaParserTool(JvmToolBase):
-    options_scope = "scala-parser"
-    name = "Scala Parser for Dependency Inference"
-    help = "Scala Parser for Dependency Inference"
-
-    default_version = "<n/a>"
-    # Note: These requirements must be kept in sync with the corresponding `jvm_artifact` targets for
-    # the `scala_parser_dev` resolve.
-    default_artifacts = (
-        f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.4.30",
-        f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
-        f"org.scala-lang:scala-library:{_PARSER_SCALA_VERSION}",
-    )
-    default_lockfile_resource = (
-        "pants.backend.scala.dependency_inference",
-        "scala_parser.lock",
-    )
-    default_lockfile_path = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
-
-
 class ScalaParserToolLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = ScalaParserTool.options_scope
+    resolve_name = "scala-parser"
 
 
 @dataclass(frozen=True)
@@ -363,9 +341,25 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
 
 @rule
 def generate_scala_parser_lockfile_request(
-    _: ScalaParserToolLockfileSentinel, tool: ScalaParserTool
+    _: ScalaParserToolLockfileSentinel,
 ) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
+    return GenerateJvmLockfileFromTool(
+        artifact_inputs=FrozenOrderedSet(
+            {
+                f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.4.30",
+                f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
+                f"org.scala-lang:scala-library:{_PARSER_SCALA_VERSION}",
+            }
+        ),
+        artifact_option_name="n/a",
+        lockfile_option_name="n/a",
+        resolve_name=ScalaParserToolLockfileSentinel.resolve_name,
+        lockfile_dest="src/python/pants/backend/scala/dependency_inference/scala_parser.lock",
+        default_lockfile_resource=(
+            "pants.backend.scala.dependency_inference",
+            "scala_parser.lock",
+        ),
+    )
 
 
 def rules():
