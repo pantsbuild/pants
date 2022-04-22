@@ -20,10 +20,10 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.option.global_options import ProcessCleanupOption
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -31,27 +31,8 @@ logger = logging.getLogger(__name__)
 _LAUNCHER_BASENAME = "PantsJavaParserLauncher.java"
 
 
-class JavaParserTool(JvmToolBase):
-    options_scope = "java-parser"
-    name = "Java Parser for Dependency Inference"
-    help = "Java Parser for Dependency Inference"
-
-    default_version = "<n/a>"
-    default_artifacts = (
-        "com.fasterxml.jackson.core:jackson-databind:2.12.4",
-        "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.4",
-        "com.github.javaparser:javaparser-symbol-solver-core:3.23.0",
-    )
-    default_lockfile_resource = (
-        "pants.backend.java.dependency_inference",
-        "java_parser.lock",
-    )
-    default_lockfile_path = "src/python/pants/backend/java/dependency_inference/java_parser.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
-
-
 class JavaParserToolLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = JavaParserTool.options_scope
+    resolve_name = "java-parser"
 
 
 @dataclass(frozen=True)
@@ -230,9 +211,25 @@ async def build_processors(jdk: InternalJdk) -> JavaParserCompiledClassfiles:
 
 @rule
 def generate_java_parser_lockfile_request(
-    _: JavaParserToolLockfileSentinel, tool: JavaParserTool
+    _: JavaParserToolLockfileSentinel,
 ) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
+    return GenerateJvmLockfileFromTool(
+        artifact_inputs=FrozenOrderedSet(
+            {
+                "com.fasterxml.jackson.core:jackson-databind:2.12.4",
+                "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.4",
+                "com.github.javaparser:javaparser-symbol-solver-core:3.23.0",
+            }
+        ),
+        artifact_option_name="n/a",
+        lockfile_option_name="n/a",
+        resolve_name=JavaParserToolLockfileSentinel.resolve_name,
+        lockfile_dest="src/python/pants/backend/java/dependency_inference/java_parser.lock",
+        default_lockfile_resource=(
+            "pants.backend.java.dependency_inference",
+            "java_parser.lock",
+        ),
+    )
 
 
 def rules():
