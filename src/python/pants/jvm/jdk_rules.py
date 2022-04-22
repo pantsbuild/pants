@@ -127,6 +127,16 @@ class InternalJdk(JdkEnvironment):
     firstparty or thirdparty code (such as for codegen, or analysis of source files).
     """
 
+    @classmethod
+    def from_jdk_environment(cls, env: JdkEnvironment) -> InternalJdk:
+        return cls(
+            env._digest,
+            env.nailgun_jar,
+            env.coursier,
+            env.jre_major_version,
+            env.global_jvm_options,
+        )
+
 
 VERSION_REGEX = re.compile(r"version \"(.+?)\"")
 
@@ -169,9 +179,7 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
 
     request = JdkRequest(jvm.tool_jdk) if jvm.tool_jdk is not None else JdkRequest.SYSTEM
     env = await Get(JdkEnvironment, JdkRequest, request)
-    return InternalJdk(
-        env._digest, env.nailgun_jar, env.coursier, env.jre_major_version, env.global_jvm_options
-    )
+    return InternalJdk.from_jdk_environment(env)
 
 
 @rule

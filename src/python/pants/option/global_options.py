@@ -458,8 +458,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     # Process execution setup.
-    child_process_max_memory_usage = memory_size("1GiB"),
-    child_process_default_memory_usage = memory_size("256MiB"),
+    child_process_max_memory_usage=memory_size("1GiB"),
+    child_process_default_memory_usage=memory_size("256MiB"),
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,

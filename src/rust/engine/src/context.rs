@@ -181,29 +181,36 @@ impl Core {
       exec_strategy_opts.local_cleanup,
     );
 
-    let maybe_nailgunnable_local_command_runner: Box<dyn CommandRunner> =
+    let maybe_nailgunnable_local_command_runner: Result<Box<dyn CommandRunner>, String> =
       if exec_strategy_opts.local_enable_nailgun {
-        Box::new(nailgun::CommandRunner::new(
-          local_command_runner,
-          local_execution_root_dir.to_path_buf(),
-          store.clone(),
-          executor.clone(),
-          // We set the nailgun pool size to twice the number that will ever be active in order to
-          // keep warm but idle processes for task fingerprints which are not currently busy (e.g.
-          // while busy running scalac, keeping some javac processes idle).
-          // TODO: The nailgun pool size should be configurable independent of concurrency, along
-          // with per-instance memory usage. See https://github.com/pantsbuild/pants/issues/13067.
-          exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
-        ))
+        if exec_strategy_opts.child_default_memory > exec_strategy_opts.child_max_memory {
+          Err("Nailgun can not be started as the total amount of memory requested is smaller than the memory allocation for a single process.".to_string())
+        } else {
+          Ok(Box::new(nailgun::CommandRunner::new(
+            local_command_runner,
+            local_execution_root_dir.to_path_buf(),
+            store.clone(),
+            executor.clone(),
+            // We set the nailgun pool size to twice the number that will ever be active in order to
+            // keep warm but idle processes for task fingerprints which are not currently busy (e.g.
+            // while busy running scalac, keeping some javac processes idle).
+            // TODO: The nailgun pool size should be configurable independent of concurrency, along
+            // with per-instance memory usage. See https://github.com/pantsbuild/pants/issues/13067.
+            exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
+          )))
+        }
       } else {
-        Box::new(local_command_runner)
+        Ok(Box::new(local_command_runner))
       };
-
-    Ok(Box::new(bounded::CommandRunner::new(
-      executor,
-      maybe_nailgunnable_local_command_runner,
-      exec_strategy_opts.local_parallelism,
-    )))
+  
+      maybe_nailgunnable_local_command_runner.map(|runner| {
+        let bounded_runner: Box<dyn CommandRunner> = Box::new(bounded::CommandRunner::new(
+          executor,
+          runner,
+          exec_strategy_opts.local_parallelism,
+        ));
+        bounded_runner
+      })
   }
 
   fn make_command_runner(

@@ -15,7 +15,6 @@ from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
 
