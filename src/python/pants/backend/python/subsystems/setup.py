@@ -89,19 +89,22 @@ class PythonSetup(Subsystem):
         "--enable-resolves",
         default=False,
         help=softwrap(
-            """
+            f"""
             Set to true to enable lockfiles for user code. See `[python].resolves` for an
             explanation of this feature.
 
             Warning: the `generate-lockfiles` goal does not yet work if you have local
-            requirements. Support is coming in a future Pants release.
+            requirements, regardless of using Pex vs. Poetry for the lockfile generator.
+            Support is coming in a future Pants release. In the meantime, the workaround is to host
+            the files in a custom repository with `[python-repos]`
+            ({doc_url('3rdparty-dependencies#custom-repositories')}).
 
             You may also run into issues generating lockfiles when using Poetry as the generator,
             rather than Pex. See the option `[python].lockfile_generator` for more
             information.
 
-            Mutually exclusive with `[python].requirement_constraints`. We strongly recommend this
-            instead:
+            This option is mutually exclusive with `[python].requirement_constraints`. We strongly
+            recommend using this option because it:
 
               1. Uses `--hash` to validate that all downloaded files are expected, which reduces\
                 the risk of supply chain attacks.
@@ -148,7 +151,7 @@ class PythonSetup(Subsystem):
 
             If a target can work with multiple resolves, you can either use the `parametrize`
             mechanism or manually create a distinct target per resolve. See {doc_url("targets")}
-            about `parametrize`.
+            for information about `parametrize`.
 
             For example:
 
@@ -292,13 +295,11 @@ class PythonSetup(Subsystem):
             lockfile file instead of just the relevant subset.
 
             We generally do not recommend this if `[python].lockfile_generator` is set to `"pex"`
-            thanks to performance enhancements we've made. (Pants will only install the subset of
-            the lockfile you need for any particular task, whereas before it would install the
-            entire lockfile and then extract the subset. This gives you fine-grained caching, and
-            avoids installing unnecessary requirements.)
+            thanks to performance enhancements we've made. When using Pex lockfiles, you should
+            get similar performance to using this option but without the downsides mentioned below.
 
-            Otherwise, this option can improve
-            performance and reduce cache size, but has two consequences: 1) All cached test
+            Otherwise, if not using Pex lockfiles, this option can improve
+            performance and reduce cache size. But it has two consequences: 1) All cached test
             results will be invalidated if any requirement in the lockfile changes, rather
             than just those that depend on the changed requirement. 2) Requirements unneeded
             by a test/run/repl will be present on the sys.path, which might in rare cases
@@ -320,8 +321,7 @@ class PythonSetup(Subsystem):
             use this constraints file to determine which versions to use.
 
             Mutually exclusive with `[python].enable_resolves`, which we generally recommend as an
-            improvement over constraints file, including due to less supply chain risk thanks to
-            `--hash` support.
+            improvement over constraints file.
 
             See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more
             information on the format of constraint files and how constraints are applied in
