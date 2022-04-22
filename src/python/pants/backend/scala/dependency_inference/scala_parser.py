@@ -9,6 +9,7 @@ import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import (
     AddPrefix,
@@ -23,64 +24,44 @@ from pants.engine.fs import (
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.option.global_options import ProcessCleanupOption
+from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
-PARSER_SCALA_VERSION = "2.13.7"
-SCALAMETA_VERSION = "4.4.30"
-CIRCE_VERSION = "0.14.1"
 
-PARSER_SCALA_VERSION_MAJOR_MINOR = ".".join(PARSER_SCALA_VERSION.split(".")[0:2])
+class ScalaParserTool(JvmToolBase):
+    options_scope = "scala-parser"
+    name = "Scala Parser for Dependency Inference"
+    help = "Scala Parser for Dependency Inference"
 
-SCALAMETA_DEPENDENCIES = [
-    Coordinate.from_coord_str(s)
-    for s in [
+    default_version = "<n/a>"
+    # Note: These requirements must be kept in sync with the corresponding `jvm_artifact` targets for
+    # the `scala_parser_dev` resolve.
+    default_artifacts = (
         "org.scalameta:scalameta_2.13:4.4.30",
-        "org.scala-lang:scala-library:2.13.7",
-        "com.thesamet.scalapb:scalapb-runtime_2.13:0.11.4",
-        "org.scalameta:parsers_2.13:4.4.30",
-        "org.scala-lang:scala-compiler:2.13.7",
-        "net.java.dev.jna:jna:5.8.0",
-        "org.scalameta:trees_2.13:4.4.30",
-        "org.scalameta:common_2.13:4.4.30",
-        "com.lihaoyi:sourcecode_2.13:0.2.7",
-        "org.jline:jline:3.20.0",
-        "org.scalameta:fastparse-v2_2.13:2.3.1",
-        "org.scala-lang.modules:scala-collection-compat_2.13:2.4.4",
-        "org.scala-lang:scalap:2.13.7",
-        "org.scala-lang:scala-reflect:2.13.7",
-        "com.google.protobuf:protobuf-java:3.15.8",
-        "com.thesamet.scalapb:lenses_2.13:0.11.4",
-        "com.lihaoyi:geny_2.13:0.6.5",
-    ]
-]
-
-
-CIRCE_DEPENDENCIES = [
-    Coordinate.from_coord_str(s)
-    for s in [
         "io.circe:circe-generic_2.13:0.14.1",
-        "org.typelevel:simulacrum-scalafix-annotations_2.13:0.5.4",
-        "org.typelevel:cats-core_2.13:2.6.1",
-        "org.scala-lang:scala-library:2.13.6",
-        "io.circe:circe-numbers_2.13:0.14.1",
-        "com.chuusai:shapeless_2.13:2.3.7",
-        "io.circe:circe-core_2.13:0.14.1",
-        "org.typelevel:cats-kernel_2.13:2.6.1",
-    ]
-]
+        "org.scala-lang:scala-library:2.13.8",
+    )
+    default_lockfile_resource = (
+        "pants.backend.scala.dependency_inference",
+        "scala_parser.lock",
+    )
+    default_lockfile_path = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
+    default_lockfile_url = git_url(default_lockfile_path)
 
-SCALA_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements.from_coordinates(
-    SCALAMETA_DEPENDENCIES + CIRCE_DEPENDENCIES
-)
+
+class ScalaParserToolLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = ScalaParserTool.options_scope
 
 
 @dataclass(frozen=True)
@@ -220,10 +201,14 @@ async def analyze_scala_source_dependencies(
     processorcp_relpath = "__processorcp"
     toolcp_relpath = "__toolcp"
 
-    (tool_classpath, prefixed_source_files_digest,) = await MultiGet(
+    parser_lockfile_request = await Get(
+        GenerateJvmLockfileFromTool, ScalaParserToolLockfileSentinel()
+    )
+
+    tool_classpath, prefixed_source_files_digest = await MultiGet(
         Get(
             ToolClasspath,
-            ToolClasspathRequest(artifact_requirements=SCALA_PARSER_ARTIFACT_REQUIREMENTS),
+            ToolClasspathRequest(lockfile=parser_lockfile_request),
         ),
         Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
     )
@@ -295,6 +280,10 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
 
     parser_source = FileContent("ScalaParser.scala", parser_source_content)
 
+    parser_lockfile_request = await Get(
+        GenerateJvmLockfileFromTool, ScalaParserToolLockfileSentinel()
+    )
+
     tool_classpath, parser_classpath, source_digest = await MultiGet(
         Get(
             ToolClasspath,
@@ -305,17 +294,17 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-compiler",
-                            version=PARSER_SCALA_VERSION,
+                            version="2.13.8",
                         ),
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-library",
-                            version=PARSER_SCALA_VERSION,
+                            version="2.13.8",
                         ),
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-reflect",
-                            version=PARSER_SCALA_VERSION,
+                            version="2.13.8",
                         ),
                     ]
                 ),
@@ -323,9 +312,7 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
         ),
         Get(
             ToolClasspath,
-            ToolClasspathRequest(
-                prefix="__parsercp", artifact_requirements=SCALA_PARSER_ARTIFACT_REQUIREMENTS
-            ),
+            ToolClasspathRequest(prefix="__parsercp", lockfile=parser_lockfile_request),
         ),
         Get(Digest, CreateDigest([parser_source, Directory(dest_dir)])),
     )
@@ -370,5 +357,15 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
     return ScalaParserCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
+@rule
+def generate_scala_parser_lockfile_request(
+    _: ScalaParserToolLockfileSentinel, tool: ScalaParserTool
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
+
+
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(GenerateToolLockfileSentinel, ScalaParserToolLockfileSentinel),
+    )
