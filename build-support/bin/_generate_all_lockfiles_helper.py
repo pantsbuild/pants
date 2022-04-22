@@ -15,6 +15,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import Pyth
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
+from pants.backend.java.dependency_inference.java_parser import JavaParserTool
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.kotlin.dependency_inference.kotlin_parser import KotlinParserTool
@@ -113,6 +114,7 @@ AllTools = (
     DefaultTool.python(DockerfileParser, backend="pants.backend.docker"),
     DefaultTool.python(TwineSubsystem),
     # JVM
+    DefaultTool.jvm(JavaParserTool),
     DefaultTool.jvm(JUnit),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),
     DefaultTool.jvm(ScalafmtSubsystem),
