@@ -39,6 +39,10 @@ from pants.util.ordered_set import FrozenOrderedSet
 logger = logging.getLogger(__name__)
 
 
+_PARSER_SCALA_VERSION = "2.13.8"
+_PARSER_SCALA_BINARY_VERSION = _PARSER_SCALA_VERSION.rpartition(".")[0]
+
+
 class ScalaParserTool(JvmToolBase):
     options_scope = "scala-parser"
     name = "Scala Parser for Dependency Inference"
@@ -48,9 +52,9 @@ class ScalaParserTool(JvmToolBase):
     # Note: These requirements must be kept in sync with the corresponding `jvm_artifact` targets for
     # the `scala_parser_dev` resolve.
     default_artifacts = (
-        "org.scalameta:scalameta_2.13:4.4.30",
-        "io.circe:circe-generic_2.13:0.14.1",
-        "org.scala-lang:scala-library:2.13.8",
+        f"org.scalameta:scalameta_{_PARSER_SCALA_BINARY_VERSION}:4.4.30",
+        f"io.circe:circe-generic_{_PARSER_SCALA_BINARY_VERSION}:0.14.1",
+        f"org.scala-lang:scala-library:{_PARSER_SCALA_VERSION}",
     )
     default_lockfile_resource = (
         "pants.backend.scala.dependency_inference",
@@ -294,17 +298,17 @@ async def setup_scala_parser_classfiles(jdk: InternalJdk) -> ScalaParserCompiled
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-compiler",
-                            version="2.13.8",
+                            version=_PARSER_SCALA_VERSION,
                         ),
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-library",
-                            version="2.13.8",
+                            version=_PARSER_SCALA_VERSION,
                         ),
                         Coordinate(
                             group="org.scala-lang",
                             artifact="scala-reflect",
-                            version="2.13.8",
+                            version=_PARSER_SCALA_VERSION,
                         ),
                     ]
                 ),
