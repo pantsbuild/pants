@@ -51,12 +51,12 @@ class PythonSetup(Subsystem):
             """
             The Python interpreters your codebase is compatible with.
 
+            These constraints are used as the default value for the `interpreter_constraints`
+            field of Python targets.
+
             Specify with requirement syntax, e.g. 'CPython>=2.7,<3' (A CPython interpreter with
             version >=2.7 AND version <3) or 'PyPy' (A pypy interpreter of any version). Multiple
             constraint strings will be ORed together.
-
-            These constraints are used as the default value for the `interpreter_constraints`
-            field of Python targets.
             """
         ),
         advanced=True,
@@ -85,77 +85,30 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    requirement_constraints = FileOption(
-        "--requirement-constraints",
-        default=None,
-        help=softwrap(
-            """
-            When resolving third-party requirements for your own code (vs. tools you run),
-            use this constraints file to determine which versions to use.
-
-            This only applies when resolving user requirements, rather than tools you run
-            like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g.
-            `[black].lockfile`.
-
-            See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more
-            information on the format of constraint files and how constraints are applied in
-            Pex and pip.
-
-            Mutually exclusive with `[python].enable_resolves`.
-            """
-        ),
-        advanced=True,
-        mutually_exclusive_group="lockfile",
-    )
-    resolve_all_constraints = BoolOption(
-        "--resolve-all-constraints",
-        default=True,
-        help=softwrap(
-            """
-            If enabled, when resolving requirements, Pants will first resolve your entire
-            constraints file as a single global resolve. Then, if the code uses a subset of
-            your constraints file, Pants will extract the relevant requirements from that
-            global resolve so that only what's actually needed gets used. If disabled, Pants
-            will not use a global resolve and will resolve each subset of your requirements
-            independently.
-
-            Usually this option should be enabled because it can result in far fewer resolves.
-
-            Requires [python].requirement_constraints to be set.
-            """
-        ),
-        advanced=True,
-    )
     enable_resolves = BoolOption(
         "--enable-resolves",
         default=False,
         help=softwrap(
             """
-            Set to true to enable the multiple resolves mechanism. See
-            `[python].resolves` for an explanation of this feature.
+            Set to true to enable lockfiles for user code. See `[python].resolves` for an
+            explanation of this feature.
 
-            Warning: the `generate-lockfiles` goal does not yet work if you have VCS (Git)
-            requirements and local requirements. Support is coming in a future Pants release. You
-            can still use multiple resolves, but you must manually generate your lockfiles rather
-            than using the `generate-lockfiles` goal, e.g. by running `pip freeze`. Specifically,
-            set up `[python].resolves` to point to your manually generated lockfile paths, and
-            then set `[python].resolves_generate_lockfiles = false` in `pants.toml`.
+            Warning: the `generate-lockfiles` goal does not yet work if you have local
+            requirements. Support is coming in a future Pants release.
 
             You may also run into issues generating lockfiles when using Poetry as the generator,
             rather than Pex. See the option `[python].lockfile_generator` for more
             information.
 
-            The resolves feature offers three major benefits compared to
-            `[python].requirement_constraints`:
+            Mutually exclusive with `[python].requirement_constraints`. We strongly recommend this
+            instead:
 
               1. Uses `--hash` to validate that all downloaded files are expected, which reduces\
                 the risk of supply chain attacks.
               2. Enforces that all transitive dependencies are in the lockfile, whereas\
                 constraints allow you to leave off dependencies. This ensures your build is more\
                 stable and reduces the risk of supply chain attacks.
-              3. Allows you to have multiple resolves in your repository.
-
-            Mutually exclusive with `[python].requirement_constraints`.
+              3. Allows you to have multiple lockfiles in your repository.
             """
         ),
         advanced=True,
@@ -169,16 +122,9 @@ class PythonSetup(Subsystem):
             A mapping of logical names to lockfile paths used in your project.
 
             Many organizations only need a single resolve for their whole project, which is
-            a good default and the simplest thing to do. However, you may need multiple
+            a good default and often the simplest thing to do. However, you may need multiple
             resolves, such as if you use two conflicting versions of a requirement in
             your repository.
-
-            For now, Pants only has first-class support for disjoint resolves, meaning that
-            you cannot ergonomically set a `python_requirement` or `python_source` target,
-            for example, to work with multiple resolves. Practically, this means that you
-            cannot yet ergonomically reuse common code, such as util files, across projects
-            using different resolves. Support for overlapping resolves is coming in Pants 2.11
-            through a new 'parametrization' feature.
 
             If you only need a single resolve, run `{bin_name()} generate-lockfiles` to
             generate the lockfile.
@@ -199,6 +145,16 @@ class PythonSetup(Subsystem):
               5. Update any targets like `python_source` / `python_sources`,\
                 `python_test` / `python_tests`, and `pex_binary` which need to set a non-default\
                 resolve with the `resolve` field.
+
+            If a target can work with multiple resolves, you can either use the `parametrize`
+            mechanism or manually create a distinct target per resolve. See {doc_url("targets")}
+            about `parametrize`.
+
+            For example:
+
+                python_sources(
+                    resolve=parametrize("data-science", "web-app"),
+                )
 
             You can name the lockfile paths what you would like; Pants does not expect a
             certain file extension or location.
@@ -232,44 +188,20 @@ class PythonSetup(Subsystem):
             this option, you can override each resolve to use certain interpreter
             constraints, such as `{'data-science': ['==3.8.*']}`.
 
+            Warning: this does NOT impact the interpreter constraints used by targets within the
+            resolve, which is instead set by the option `[python.interpreter_constraints` and the
+            `interpreter_constraints` field. It only impacts how the lockfile is generated.
+
             Pants will validate that the interpreter constraints of your code using a
             resolve are compatible with that resolve's own constraints. For example, if your
             code is set to use ['==3.9.*'] via the `interpreter_constraints` field, but it's
-            also using a resolve whose interpreter constraints are set to ['==3.7.*'], then
+            using a resolve whose interpreter constraints are set to ['==3.7.*'], then
             Pants will error explaining the incompatibility.
 
             The keys must be defined as resolves in `[python].resolves`.
             """
         ),
         advanced=True,
-    )
-    no_binary = StrListOption(
-        "--no-binary",
-        help=softwrap(
-            """
-            Do not use binary packages (i.e., wheels) for these 3rdparty projects. Also
-            accepts :all: to disable all binary packages. Note that some packages are tricky to
-            compile and may fail to install when this option is used on them.
-            See https://pip.pypa.io/en/stable/cli/pip_install/#install-no-binary for details.
-            Note: Only takes effect if you use lockfiles, and set lockfile_generator = "pex"
-            in the [python] section of your config file. You must regenerate the lockfile after
-            changing this option.
-            """
-        ),
-    )
-    only_binary = StrListOption(
-        "--only-binary",
-        help=softwrap(
-            """
-            Do not use source packages (i.e., sdists) for these 3rdparty projects. Also
-            accepts :all: to disable all source packages. Packages without binary distributions
-            will fail to install when this option is used on them.
-            See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for details.
-            Note: Only takes effect if you use lockfiles, and set lockfile_generator = "pex"
-            in the [python] section of your config file. You must regenerate the lockfile after
-            changing this option.
-            """
-        ),
     )
     invalid_lockfile_behavior = EnumOption(
         "--invalid-lockfile-behavior",
@@ -296,8 +228,13 @@ class PythonSetup(Subsystem):
             f"""
             Whether to use Pex or Poetry with the `generate-lockfiles` goal.
 
-            Poetry does not work with `[python-repos]` for custom indexes/cheeseshops. If you use
-            this feature, you should use Pex.
+            Poetry does not support these features:
+
+              1) `[python-repos]` for custom indexes/cheeseshops.
+              2) VCS (Git) requirements.
+              3) `[GLOBAL].ca_certs_path`.
+
+            If you use any of these features, you should use Pex.
 
             Several users have also had issues with how Poetry's lockfile generation handles
             environment markers for transitive dependencies; certain dependencies end up with
@@ -311,7 +248,8 @@ class PythonSetup(Subsystem):
             `generate-lockfiles` goal. Alternatively, use Pex for generation.
 
             Finally, installing from a Poetry-generated lockfile is slower than installing from a
-            Pex lockfile.
+            Pex lockfile. When using a Pex lockfile, Pants will only install the subset needed
+            for the current task.
 
             However, Pex lockfile generation is a new feature. Given how vast the Python packaging
             ecosystem is, it is possible you may experience edge cases / bugs we haven't yet
@@ -323,6 +261,7 @@ class PythonSetup(Subsystem):
             interoperability with tools like IDEs.
             """
         ),
+        advanced=True,
     )
     resolves_generate_lockfiles = BoolOption(
         "--resolves-generate-lockfiles",
@@ -333,7 +272,8 @@ class PythonSetup(Subsystem):
             running the `generate-lockfiles` goal.
 
             This is intended to allow you to manually generate lockfiles as a workaround for the
-            issues described in the `[python].enable_resolves` option.
+            issues described in the `[python].lockfile_generator` option, if you are not yet ready
+            to use Pex.
 
             If you set this to False, Pants will not attempt to validate the metadata headers
             for your user lockfiles. This is useful so that you can keep
@@ -349,7 +289,15 @@ class PythonSetup(Subsystem):
         help=softwrap(
             """
             If enabled, when running binaries, tests, and repls, Pants will use the entire
-            lockfile/constraints file instead of just the relevant subset. This can improve
+            lockfile file instead of just the relevant subset.
+
+            We generally do not recommend this if `[python].lockfile_generator` is set to `"pex"`
+            thanks to performance enhancements we've made. (Pants will only install the subset of
+            the lockfile you need for any particular task, whereas before it would install the
+            entire lockfile and then extract the subset. This gives you fine-grained caching, and
+            avoids installing unnecessary requirements.)
+
+            Otherwise, this option can improve
             performance and reduce cache size, but has two consequences: 1) All cached test
             results will be invalidated if any requirement in the lockfile changes, rather
             than just those that depend on the changed requirement. 2) Requirements unneeded
@@ -362,6 +310,82 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+    )
+    requirement_constraints = FileOption(
+        "--requirement-constraints",
+        default=None,
+        help=softwrap(
+            """
+            When resolving third-party requirements for your own code (vs. tools you run),
+            use this constraints file to determine which versions to use.
+
+            Mutually exclusive with `[python].enable_resolves`, which we generally recommend as an
+            improvement over constraints file, including due to less supply chain risk thanks to
+            `--hash` support.
+
+            See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more
+            information on the format of constraint files and how constraints are applied in
+            Pex and pip.
+
+            This only applies when resolving user requirements, rather than tools you run
+            like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g.
+            `[black].lockfile`.
+            """
+        ),
+        advanced=True,
+        mutually_exclusive_group="lockfile",
+    )
+    resolve_all_constraints = BoolOption(
+        "--resolve-all-constraints",
+        default=True,
+        help=softwrap(
+            """
+            (Only relevant when using `[python].requirement_constraints.`) If enabled, when
+            resolving requirements, Pants will first resolve your entire
+            constraints file as a single global resolve. Then, if the code uses a subset of
+            your constraints file, Pants will extract the relevant requirements from that
+            global resolve so that only what's actually needed gets used. If disabled, Pants
+            will not use a global resolve and will resolve each subset of your requirements
+            independently.
+
+            Usually this option should be enabled because it can result in far fewer resolves.
+            """
+        ),
+        advanced=True,
+    )
+    no_binary = StrListOption(
+        "--no-binary",
+        help=softwrap(
+            """
+            Do not use binary packages (i.e., wheels) for these 3rdparty projects.
+
+            Also accepts `:all:` to disable all binary packages.
+
+            Note that some packages are tricky to compile and may fail to install when this option
+            is used on them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-no-binary
+            for details.
+
+            Note: Only takes effect if you use Pex lockfiles. Set
+            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
+            """
+        ),
+    )
+    only_binary = StrListOption(
+        "--only-binary",
+        help=softwrap(
+            """
+            Do not use source packages (i.e., sdists) for these 3rdparty projects.
+
+            Also accepts `:all:` to disable all source packages.
+
+            Packages without binary distributions will fail to install when this option is used on
+            them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for
+            details.
+
+            Note: Only takes effect if you use Pex lockfiles. Set
+            `[python].lockfile_generator = "pex"` and run the `generate-lockfiles` goal.
+            """
+        ),
     )
     resolver_manylinux = StrOption(
         "--resolver-manylinux",
