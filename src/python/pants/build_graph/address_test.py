@@ -69,6 +69,10 @@ def test_address_input_parse_spec() -> None:
     # Parameters
     assert_parsed("a@k=v", path_component="a", parameters={"k": "v"})
     assert_parsed("a@k1=v1,k2=v2", path_component="a", parameters={"k1": "v1", "k2": "v2"})
+    assert_parsed("a@t", path_component="a@t")
+    assert_parsed("a@=", path_component="a@=")
+    assert_parsed("a@t,y", path_component="a@t,y")
+    assert_parsed("a@2.png:../t", path_component="a@2.png", target_component="../t")
 
     # Absolute spec
     assert_parsed("//a/b/c", path_component="a/b/c")
@@ -107,11 +111,6 @@ def test_address_input_parse_bad_path_component(spec: str) -> None:
     "spec,expected",
     [
         ("a:", "non-empty target name"),
-        ("a@t", "one or more key=value pairs"),
-        ("a@=", "one or more key=value pairs"),
-        ("a@t=", "one or more key=value pairs"),
-        ("a@t,y", "one or more key=value pairs"),
-        ("a@t=,y", "one or more key=value pairs"),
         ("a#", "non-empty generated target name"),
     ],
 )
