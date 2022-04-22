@@ -86,4 +86,5 @@ class JvmSubsystem(Subsystem):
             List of JVM options to pass to all JVM processes.
             """
         ),
+        advanced=True,
     )
