@@ -10,7 +10,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 1024
+        fetch-depth: 10
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -29,36 +29,70 @@ jobs:
         echo "EOF" >> $GITHUB_ENV
 
         '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - env:
-        BUILD_DIFFSPEC: ${{ github.event.inputs.buildDiffspec }}
-        BUILD_DIFFSPEC_STEP: ${{ github.event.inputs.buildDiffspecStep }}
+        BASE_REF: ${{ github.event.inputs.base_ref }}
+        BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
-        SOURCE_DIFFSPEC: ${{ github.event.inputs.sourceDiffspec }}
-        SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.sourceDiffspecStep }}
-      name: Cache comparison script
-      run: "./pants package build-support/bin/cache_comparison.py\ndist/build-support.bin/cache_comparison_py.pex\
-        \ \\\n  --args=\"$PANTS_ARGS\" \\\n  --build-diffspec=\"$BUILD_DIFFSPEC\"\
-        \ \\\n  --build-diffspec-step=$BUILD_DIFFSPEC_STEP \\\n  --source-diffspec=\"\
-        $SOURCE_DIFFSPEC\" \\\n  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP\n"
+        SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
+        SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
+      name: Prepare cache comparison
+      run: 'MODE=debug ./pants package build-support/bin/cache_comparison.py
+
+        git fetch --no-tags --depth=1024 origin "$BASE_REF"
+
+        '
+    - env:
+        BASE_REF: ${{ github.event.inputs.base_ref }}
+        BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
+        PANTS_ARGS: ${{ github.event.inputs.pants_args }}
+        SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
+        SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
+      name: Run cache comparison
+      run: "dist/build-support.bin/cache_comparison_py.pex \\\n  --args=\"$PANTS_ARGS\"\
+        \ \\\n  --build-commit=\"$BUILD_COMMIT\" \\\n  --source-diffspec=\"$SOURCE_DIFFSPEC\"\
+        \ \\\n  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP\n"
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
 name: Cache Comparison
 'on':
   workflow_dispatch:
     inputs:
-      buildDiffspec:
+      base_ref:
+        default: main
+        required: false
+        type: string
+      build_commit:
         required: true
         type: string
-      buildDiffspecStep:
-        default: 1
-        required: false
-        type: int
       pants_args:
-        default: 'check fmt lint ::'
+        default: 'check lint test ::'
         required: false
         type: string
-      sourceDiffspec:
+      source_diffspec:
         required: true
         type: string
-      sourceDiffspecStep:
+      source_diffspec_step:
         default: 1
         required: false
         type: int

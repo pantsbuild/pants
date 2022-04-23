@@ -87,7 +87,7 @@ def ensure_category_label() -> Sequence[Step]:
     ]
 
 
-def checkout(*, containerized: bool = False, fetch_depth: int = 10) -> Sequence[Step]:
+def checkout(*, containerized: bool = False) -> Sequence[Step]:
     """Get prior commits and the commit message."""
     steps = [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
@@ -96,7 +96,7 @@ def checkout(*, containerized: bool = False, fetch_depth: int = 10) -> Sequence[
         {
             "name": "Check out code",
             "uses": "actions/checkout@v3",
-            "with": {"fetch-depth": fetch_depth},
+            "with": {"fetch-depth": 10},
         },
     ]
     if containerized:
@@ -592,7 +592,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
 @dataclass(frozen=True)
 class WorkflowInput:
     name: str
-    env_name: str
     type_str: str
     default: str | int | None = None
 
@@ -602,50 +601,90 @@ def workflow_dispatch_inputs(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Builds `on.workflow_dispatch.inputs` and a corresponding `env` section to consume them."""
     inputs = {
-        wi.name: {
+        wi.name.lower(): {
             "required": (wi.default is None),
             "type": wi.type_str,
             **({} if wi.default is None else {"default": wi.default}),
         }
         for wi in workflow_inputs
     }
-    env = {wi.env_name: ("${{ github.event.inputs." + wi.name + " }}") for wi in workflow_inputs}
+    env = {
+        wi.name: ("${{ github.event.inputs." + wi.name.lower() + " }}") for wi in workflow_inputs
+    }
     return inputs, env
 
 
-def cache_comparison_inputs() -> tuple[dict[str, Any], dict[str, Any]]:
-    return workflow_dispatch_inputs(
+def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
+    cc_inputs, cc_env = workflow_dispatch_inputs(
         [
             WorkflowInput(
-                "buildDiffspec",
-                "BUILD_DIFFSPEC",
+                "PANTS_ARGS",
+                "string",
+                default="check lint test ::",
+            ),
+            WorkflowInput(
+                "BASE_REF",
+                "string",
+                default="main",
+            ),
+            WorkflowInput(
+                "BUILD_COMMIT",
                 "string",
             ),
             WorkflowInput(
-                "buildDiffspecStep",
-                "BUILD_DIFFSPEC_STEP",
-                "int",
-                default=1,
-            ),
-            WorkflowInput(
-                "sourceDiffspec",
                 "SOURCE_DIFFSPEC",
                 "string",
             ),
             WorkflowInput(
-                "sourceDiffspecStep",
                 "SOURCE_DIFFSPEC_STEP",
                 "int",
                 default=1,
             ),
-            WorkflowInput(
-                "pants_args",
-                "PANTS_ARGS",
-                "string",
-                default="check fmt lint ::",
-            ),
         ]
     )
+
+    jobs = {
+        "cache_comparison": {
+            "runs-on": "ubuntu-latest",
+            "timeout-minutes": 90,
+            # TODO: This job doesn't actually need to run as a matrix, but `setup_primary_python`
+            # assumes that jobs are.
+            "strategy": {"matrix": {"python-version": [PYTHON37_VERSION]}},
+            "steps": [
+                *checkout(),
+                setup_toolchain_auth(),
+                *setup_primary_python(),
+                expose_all_pythons(),
+                {
+                    "name": "Prepare cache comparison",
+                    "run": dedent(
+                        # NB: The fetch depth is arbitrary, but is meant to capture the
+                        # most likely `diffspecs` used as arguments.
+                        """\
+                        MODE=debug ./pants package build-support/bin/cache_comparison.py
+                        git fetch --no-tags --depth=1024 origin "$BASE_REF"
+                        """
+                    ),
+                    "env": cc_env,
+                },
+                {
+                    "name": "Run cache comparison",
+                    "run": dedent(
+                        """\
+                        dist/build-support.bin/cache_comparison_py.pex \\
+                          --args="$PANTS_ARGS" \\
+                          --build-commit="$BUILD_COMMIT" \\
+                          --source-diffspec="$SOURCE_DIFFSPEC" \\
+                          --source-diffspec-step=$SOURCE_DIFFSPEC_STEP
+                        """
+                    ),
+                    "env": cc_env,
+                },
+            ],
+        }
+    }
+
+    return jobs, cc_inputs
 
 
 # ----------------------------------------------------------------------
@@ -746,40 +785,15 @@ def generate() -> dict[Path, str]:
         }
     )
 
-    cc_inputs, cc_env = cache_comparison_inputs()
+    cc_jobs, cc_inputs = cache_comparison_jobs_and_inputs()
     cache_comparison_yaml = yaml.dump(
         {
             "name": "Cache Comparison",
-            # Only kicked off manually.
-            "on": {
-                "workflow_dispatch": {"inputs": cc_inputs},
-            },
-            "jobs": {
-                "cache_comparison": {
-                    "runs-on": "ubuntu-latest",
-                    "steps": [
-                        # TODO: This depth is arbitrary, but is meant to capture the most
-                        # likely `diffspecs` used as arguments.
-                        *checkout(fetch_depth=1024),
-                        {
-                            "name": "Cache comparison script",
-                            "run": dedent(
-                                """\
-                                ./pants package build-support/bin/cache_comparison.py
-                                dist/build-support.bin/cache_comparison_py.pex \\
-                                  --args="$PANTS_ARGS" \\
-                                  --build-diffspec="$BUILD_DIFFSPEC" \\
-                                  --build-diffspec-step=$BUILD_DIFFSPEC_STEP \\
-                                  --source-diffspec="$SOURCE_DIFFSPEC" \\
-                                  --source-diffspec-step=$SOURCE_DIFFSPEC_STEP
-                                """
-                            ),
-                            "env": cc_env,
-                        },
-                    ],
-                }
-            },
-        }
+            # Kicked off manually.
+            "on": {"workflow_dispatch": {"inputs": cc_inputs}},
+            "jobs": cc_jobs,
+        },
+        Dumper=NoAliasDumper,
     )
 
     return {
