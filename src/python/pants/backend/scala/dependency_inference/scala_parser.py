@@ -9,7 +9,7 @@ import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import (
     AddPrefix,
@@ -354,7 +354,8 @@ def generate_scala_parser_lockfile_request(
         artifact_option_name="n/a",
         lockfile_option_name="n/a",
         resolve_name=ScalaParserToolLockfileSentinel.resolve_name,
-        lockfile_dest="src/python/pants/backend/scala/dependency_inference/scala_parser.lock",
+        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
+        write_lockfile_dest="src/python/pants/backend/scala/dependency_inference/scala_parser.lock",
         default_lockfile_resource=(
             "pants.backend.scala.dependency_inference",
             "scala_parser.lock",
