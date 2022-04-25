@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import base64
 import gzip
 import tarfile
 import zipfile
@@ -62,6 +63,19 @@ def test_extract_tar(rule_runner: RuleRunner, compression: str) -> None:
     extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
     digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
+
+
+def test_extract_tarlz4(rule_runner: RuleRunner):
+    archive_content = base64.b64decode(
+        b"BCJNGGRAp9MAAACfdG1wL21zZy8AAQBI+AAwMDAwNzc1ADAwMDE3NTEIAAQCAP8HADE0MjMxNTUzMjAxADAxNDQwM"
+        b"gAgNZQASAUCAPUFdXN0YXIgIABqb3NodWFjYW5ub24dAAcCAA8gAA0PAgCkBAACf3R4dC50eHTGAEIA5QE4NjY0+"
+        b"AEECAIDAgAUNQAC7zQwNzAAMDE1NzYyACAwjgBCCwIADwAC7FtwYW50cxMBDwIA"
+        b"///////////////////////////////////////////////3UAAAAAAAAAAAABhrfd0="
+    )
+    input_snapshot = rule_runner.make_snapshot({"test.tar.lz4": archive_content})
+    extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    assert digest_contents == DigestContents([FileContent("tmp/msg/txt.txt", b"pants")])
 
 
 def test_extract_gz(rule_runner: RuleRunner) -> None:

@@ -92,7 +92,7 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
     archive_path = snapshot.files[0]
     is_zip = archive_path.endswith(".zip")
     is_tar = archive_path.endswith(
-        (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
+        (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz", ".tar.lz4")
     )
     is_gz = not is_tar and archive_path.endswith(".gz")
     if not is_zip and not is_tar and not is_gz:

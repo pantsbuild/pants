@@ -309,7 +309,8 @@ class TarBinary(BinaryPath):
     def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
         # Note that the `output_dir` must already exist.
         # The caller should validate that it's a valid `.tar` file.
-        return (self.path, "xf", archive_path, "-C", extract_path)
+        prog_args = ("-Ilz4",) if archive_path.endswith(".lz4") else ()
+        return (self.path, *prog_args, "-xf", archive_path, "-C", extract_path)
 
 
 class MkdirBinary(BinaryPath):
