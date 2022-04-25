@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import pkg_resources
 
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
@@ -224,7 +224,8 @@ def generate_java_parser_lockfile_request(
         artifact_option_name="n/a",
         lockfile_option_name="n/a",
         resolve_name=JavaParserToolLockfileSentinel.resolve_name,
-        lockfile_dest="src/python/pants/backend/java/dependency_inference/java_parser.lock",
+        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
+        write_lockfile_dest="src/python/pants/backend/java/dependency_inference/java_parser.lock",
         default_lockfile_resource=(
             "pants.backend.java.dependency_inference",
             "java_parser.lock",
