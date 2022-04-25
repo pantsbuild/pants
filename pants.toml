@@ -201,7 +201,8 @@ default_resolve = "jvm_testprojects"
 jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 # A resolve for the java_parser, which is shipped with Pants, and invoked with its own isolated
 # classpath. Consequently, we isolate it to its own lockfile.
-# Note: The jvm_artifact targets in this resolve must be kept in sync with `JavaParserTool`.
+# Note: The jvm_artifact targets in this resolve must be kept in sync with the requirements
+# in `generate_java_parser_lockfile_request`.
 java_parser_dev = "src/python/pants/backend/java/dependency_inference/java_parser.lock"
 # Has the same isolation requirements as `java_parser`.
 scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
