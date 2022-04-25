@@ -77,63 +77,28 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
-    requirement_constraints = FileOption(
-        "--requirement-constraints",
-        default=None,
-        help=(
-            "When resolving third-party requirements for your own code (vs. tools you run), "
-            "use this constraints file to determine which versions to use.\n\n"
-            "This only applies when resolving user requirements, rather than tools you run "
-            "like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g. "
-            "`[black].lockfile`.\n\n"
-            "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
-            "information on the format of constraint files and how constraints are applied in "
-            "Pex and pip.\n\n"
-            "Mutually exclusive with `[python].enable_resolves`."
-        ),
-        advanced=True,
-        mutually_exclusive_group="lockfile",
-    )
-    resolve_all_constraints = BoolOption(
-        "--resolve-all-constraints",
-        default=True,
-        help=(
-            "If enabled, when resolving requirements, Pants will first resolve your entire "
-            "constraints file as a single global resolve. Then, if the code uses a subset of "
-            "your constraints file, Pants will extract the relevant requirements from that "
-            "global resolve so that only what's actually needed gets used. If disabled, Pants "
-            "will not use a global resolve and will resolve each subset of your requirements "
-            "independently."
-            "\n\nUsually this option should be enabled because it can result in far fewer "
-            "resolves."
-            "\n\nRequires [python].requirement_constraints to be set."
-        ),
-        advanced=True,
-    )
     enable_resolves = BoolOption(
         "--enable-resolves",
         default=False,
         help=(
-            "Set to true to enable the multiple resolves mechanism. See "
+            "Set to true to enable lockfiles for user code. See "
             "`[python].resolves` for an explanation of this feature.\n\n"
-            "Warning: the `generate-lockfiles` goal does not yet work if you have VCS (Git) "
-            "requirements and local requirements. Support is coming in a future Pants release. You "
-            "can still use multiple resolves, but you must manually generate your lockfiles rather "
-            "than using the `generate-lockfiles` goal, e.g. by running `pip freeze`. Specifically, "
-            "set up `[python].resolves` to point to your manually generated lockfile paths, and "
-            "then set `[python].resolves_generate_lockfiles = false` in `pants.toml`.\n\n"
+            "Warning: the `generate-lockfiles` goal does not yet work if you have local "
+            "requirements, regardless of using Pex vs. Poetry for the lockfile generator. "
+            "Support is coming in a future Pants release. In the meantime, the workaround is to "
+            "host the files in a custom repository with `[python-repos]` "
+            f"({doc_url('3rdparty-dependencies#custom-repositories')}).\n\n"
             "You may also run into issues generating lockfiles when using Poetry as the generator, "
             "rather than Pex. See the option `[python].lockfile_generator` for more "
             "information.\n\n"
-            "The resolves feature offers three major benefits compared to "
-            "`[python].requirement_constraints`:\n\n"
+            "This option is mutually exclusive with `[python].requirement_constraints`. We "
+            "strongly recommend using this option because it:\n\n"
             "  1. Uses `--hash` to validate that all downloaded files are expected, which "
             "reduces the risk of supply chain attacks.\n"
             "  2. Enforces that all transitive dependencies are in the lockfile, whereas "
             "constraints allow you to leave off dependencies. This ensures your build is more "
             "stable and reduces the risk of supply chain attacks.\n"
-            "  3. Allows you to have multiple resolves in your repository.\n\n"
-            "Mutually exclusive with `[python].requirement_constraints`."
+            "  3. Allows you to have multiple resolves in your repository."
         ),
         advanced=True,
         mutually_exclusive_group="lockfile",
@@ -144,15 +109,9 @@ class PythonSetup(Subsystem):
         help=(
             "A mapping of logical names to lockfile paths used in your project.\n\n"
             "Many organizations only need a single resolve for their whole project, which is "
-            "a good default and the simplest thing to do. However, you may need multiple "
+            "a good default and often the simplest thing to do. However, you may need multiple "
             "resolves, such as if you use two conflicting versions of a requirement in "
             "your repository.\n\n"
-            "For now, Pants only has first-class support for disjoint resolves, meaning that "
-            "you cannot ergonomically set a `python_requirement` or `python_source` target, "
-            "for example, to work with multiple resolves. Practically, this means that you "
-            "cannot yet ergonomically reuse common code, such as util files, across projects "
-            "using different resolves. Support for overlapping resolves is coming in Pants 2.11 "
-            "through a new 'parametrization' feature.\n\n"
             f"If you only need a single resolve, run `{bin_name()} generate-lockfiles` to "
             "generate the lockfile.\n\n"
             "If you need multiple resolves:\n\n"
@@ -171,6 +130,12 @@ class PythonSetup(Subsystem):
             "  5. Update any targets like `python_source` / `python_sources`, "
             "`python_test` / `python_tests`, and `pex_binary` which need to set a non-default "
             "resolve with the `resolve` field.\n\n"
+            "If a target can work with multiple resolves, you can either use the `parametrize` "
+            f"mechanism or manually create a distinct target per resolve. See {doc_url('targets')} "
+            "for information about `parametrize`. For example:\n\n"
+            "    python_sources(\n"
+            "        resolve=parametrize(data-science', 'web-app'),\n"
+            "    )\n\n"
             "You can name the lockfile paths what you would like; Pants does not expect a "
             "certain file extension or location.\n\n"
             "Only applies if `[python].enable_resolves` is true."
@@ -195,10 +160,13 @@ class PythonSetup(Subsystem):
             "global interpreter constraints set in `[python].interpreter_constraints`. With "
             "this option, you can override each resolve to use certain interpreter "
             "constraints, such as `{'data-science': ['==3.8.*']}`.\n\n"
+            "Warning: this does NOT impact the interpreter constraints used by targets within the "
+            "resolve, which is instead set by the option `[python.interpreter_constraints` and the "
+            "`interpreter_constraints` field. It only impacts how the lockfile is generated.\n\n"
             "Pants will validate that the interpreter constraints of your code using a "
             "resolve are compatible with that resolve's own constraints. For example, if your "
             "code is set to use ['==3.9.*'] via the `interpreter_constraints` field, but it's "
-            "also using a resolve whose interpreter constraints are set to ['==3.7.*'], then "
+            "using a resolve whose interpreter constraints are set to ['==3.7.*'], then "
             "Pants will error explaining the incompatibility.\n\n"
             "The keys must be defined as resolves in `[python].resolves`."
         ),
@@ -223,8 +191,11 @@ class PythonSetup(Subsystem):
         default=LockfileGenerator.POETRY,
         help=(
             "Whether to use Pex or Poetry with the `generate-lockfiles` goal.\n\n"
-            "Poetry does not work with `[python-repos]` for custom indexes/cheeseshops. If you use "
-            "this feature, you should use Pex.\n\n"
+            "Poetry does not support these features:\n\n"
+            "  1) `[python-repos]` for custom indexes/cheeseshops.\n"
+            "  2) VCS (Git) requirements.\n"
+            "  3) `[GLOBAL].ca_certs_path`\n\n."
+            "If you use any of these features, you should use Pex.\n\n"
             "Several users have also had issues with how Poetry's lockfile generation handles "
             "environment markers for transitive dependencies; certain dependencies end up with "
             "nonsensical environment markers which cause the dependency to not be installed, then "
@@ -236,8 +207,9 @@ class PythonSetup(Subsystem):
             "`[isort].extra_requirements`. Then, regenerate the lockfile(s) with the "
             "`generate-lockfiles` goal. Alternatively, use Pex for generation.\n\n"
             "Finally, installing from a Poetry-generated lockfile is slower than installing from a "
-            "Pex lockfile.\n\n"
-            "However, Pex lockfile generation is a new feature. Given how vast the Python packaging "
+            "Pex lockfile. When using a Pex lockfile, Pants will only install the subset needed "
+            "for the current task.\n\n"
+            "However, Pex lockfile generation is a beta feature. Given how vast the Python packaging "
             "ecosystem is, it is possible you may experience edge cases / bugs we haven't yet "
             "covered. Bug reports are appreciated! "
             "https://github.com/pantsbuild/pants/issues/new/choose\n\n"
@@ -245,6 +217,7 @@ class PythonSetup(Subsystem):
             f"`{bin_name()} export` goal for Pants to create a virtual environment for "
             f"interoperability with tools like IDEs."
         ),
+        advanced=True,
     )
     resolves_generate_lockfiles = BoolOption(
         "--resolves-generate-lockfiles",
@@ -253,7 +226,8 @@ class PythonSetup(Subsystem):
             "If False, Pants will not attempt to generate lockfiles for `[python].resolves` when "
             "running the `generate-lockfiles` goal.\n\n"
             "This is intended to allow you to manually generate lockfiles as a workaround for the "
-            "issues described in the `[python].enable_resolves` option.\n\n"
+            "issues described in the `[python].lockfile_generator` option, if you are not yet "
+            "ready to use Pex.\n\n"
             "If you set this to False, Pants will not attempt to validate the metadata headers "
             "for your user lockfiles. This is useful so that you can keep "
             "`[python].invalid_lockfile_behavior` to `error` or `warn` if you'd like so that tool "
@@ -266,8 +240,13 @@ class PythonSetup(Subsystem):
         default=False,
         help=(
             "If enabled, when running binaries, tests, and repls, Pants will use the entire "
-            "lockfile/constraints file instead of just the relevant subset. This can improve "
-            "performance and reduce cache size, but has two consequences: 1) All cached test "
+            "lockfile/constraints file instead of just the relevant subset.\n\n"
+            "We generally do not recommend this if `[python].lockfile_generator` is set to `'pex'` "
+            "thanks to performance enhancements we've made. When using Pex lockfiles, you should "
+            "get similar performance to using this option but without the downsides mentioned "
+            "below.\n\n"
+            "Otherwise, if not using Pex lockfiles, this option can improve performance and reduce "
+            "cache size. But it has two consequences: 1) All cached test "
             "results will be invalidated if any requirement in the lockfile changes, rather "
             "than just those that depend on the changed requirement. 2) Requirements unneeded "
             "by a test/run/repl will be present on the sys.path, which might in rare cases "
@@ -275,6 +254,40 @@ class PythonSetup(Subsystem):
             "This option does not affect packaging deployable artifacts, such as "
             "PEX files, wheels and cloud functions, which will still use just the exact "
             "subset of requirements needed."
+        ),
+        advanced=True,
+    )
+    requirement_constraints = FileOption(
+        "--requirement-constraints",
+        default=None,
+        help=(
+            "When resolving third-party requirements for your own code (vs. tools you run), "
+            "use this constraints file to determine which versions to use.\n\n"
+            "Mutually exclusive with `[python].enable_resolves`, which we generally recommend as "
+            "an improvement over constraints file.\n\n"
+            "See https://pip.pypa.io/en/stable/user_guide/#constraints-files for more "
+            "information on the format of constraint files and how constraints are applied in "
+            "Pex and pip.\n\n"
+            "This only applies when resolving user requirements, rather than tools you run "
+            "like Black and Pytest. To constrain tools, set `[tool].lockfile`, e.g. "
+            "`[black].lockfile`."
+        ),
+        advanced=True,
+        mutually_exclusive_group="lockfile",
+    )
+    resolve_all_constraints = BoolOption(
+        "--resolve-all-constraints",
+        default=True,
+        help=(
+            "(Only relevant when using `[python].requirement_constraints.`) "
+            "If enabled, when resolving requirements, Pants will first resolve your entire "
+            "constraints file as a single global resolve. Then, if the code uses a subset of "
+            "your constraints file, Pants will extract the relevant requirements from that "
+            "global resolve so that only what's actually needed gets used. If disabled, Pants "
+            "will not use a global resolve and will resolve each subset of your requirements "
+            "independently."
+            "\n\nUsually this option should be enabled because it can result in far fewer "
+            "resolves."
         ),
         advanced=True,
     )
