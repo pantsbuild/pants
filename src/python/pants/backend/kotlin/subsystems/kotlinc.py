@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from pants.util.strutil import softwrap
 from pants.option.option_types import ArgsListOption, DictOption
 from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
 
 
 class KotlincSubsystem(Subsystem):

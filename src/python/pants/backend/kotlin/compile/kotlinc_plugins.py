@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Iterator
 
-from pants.backend.kotlin.subsystems.kotlinc import Kotlinc
+from pants.backend.kotlin.subsystems.kotlinc import KotlincSubsystem
 from pants.backend.kotlin.target_types import (
     KotlincConsumedPluginIdsField,
     KotlincPluginArgsField,
@@ -112,7 +112,7 @@ async def resolve_kotlinc_plugins_for_target(
     request: KotlincPluginsForTargetRequest,
     all_kotlinc_plugins: AllKotlincPluginTargets,
     jvm: JvmSubsystem,
-    kotlinc: Kotlinc,
+    kotlinc: KotlincSubsystem,
 ) -> KotlincPluginTargetsForTarget:
     target = request.target
     resolve = request.resolve_name
