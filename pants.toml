@@ -203,7 +203,8 @@ jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 # classpath. Consequently, we isolate it to its own lockfile.
 java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
 # Has the same isolation requirements as `java_parser`.
-# Note: The jvm_artifact targets in this resolve must be kept in sync with `ScalaParserTool`.
+# Note: The jvm_artifact targets in this resolve must be kept in sync with with the requirements
+# in `generate_scala_parser_lockfile_request`.
 scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
 
 [scala]
