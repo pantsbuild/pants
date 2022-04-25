@@ -17,7 +17,6 @@ from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
-from pants.backend.kotlin.dependency_inference.kotlin_parser import KotlinParserTool
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
@@ -122,7 +121,6 @@ AllTools = (
         ScroogeSubsystem, backend="pants.backend.experimental.codegen.thrift.scrooge.scala"
     ),
     DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
-    DefaultTool.jvm(KotlinParserTool, backend="pants.backend.experimental.kotlin"),
     DefaultTool.jvm(KtlintSubsystem, backend="pants.backend.experimental.kotlin.lint.ktlint"),
 )
 
