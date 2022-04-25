@@ -51,6 +51,7 @@ from pants.engine.target import (
     AllUnexpandedTargets,
     CoarsenedTarget,
     CoarsenedTargets,
+    CoarsenedTargetsRequest,
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -542,16 +543,19 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
 
 
 @rule
-async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
+def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
+    return CoarsenedTargetsRequest(addresses)
+
+
+@rule
+async def coarsened_targets(request: CoarsenedTargetsRequest) -> CoarsenedTargets:
     dependency_mapping = await Get(
         _DependencyMapping,
         _DependencyMappingRequest(
-            # NB: We set include_special_cased_deps=True because although computing CoarsenedTargets
-            # requires a transitive graph walk (to ensure that all cycles are actually detected),
-            # the resulting CoarsenedTargets instance is not itself transitive: everything not directly
-            # involved in a cycle with one of the input Addresses is discarded in the output.
-            TransitiveTargetsRequest(addresses, include_special_cased_deps=True),
-            expanded_targets=False,
+            TransitiveTargetsRequest(
+                request.roots, include_special_cased_deps=request.include_special_cased_deps
+            ),
+            expanded_targets=request.expanded_targets,
         ),
     )
     addresses_to_targets = {
@@ -568,7 +572,7 @@ async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
 
     coarsened_targets: dict[Address, CoarsenedTarget] = {}
     root_coarsened_targets = []
-    root_addresses_set = set(addresses)
+    root_addresses_set = set(request.roots)
     for component in components:
         component = sorted(component)
         component_set = set(component)

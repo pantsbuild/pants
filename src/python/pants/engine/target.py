@@ -24,6 +24,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -689,6 +690,25 @@ class CoarsenedTarget(EngineAwareParameter):
         """The addresses and type aliases of all members of the cycle."""
         return bullet_list(sorted(f"{t.address.spec}\t({type(t).alias})" for t in self.members))
 
+    def closure(self, visited: Set[CoarsenedTarget] | None = None) -> Iterator[Target]:
+        """All Targets reachable from this root."""
+        return (t for ct in self.coarsened_closure(visited) for t in ct.members)
+
+    def coarsened_closure(
+        self, visited: Set[CoarsenedTarget] | None = None
+    ) -> Iterator[CoarsenedTarget]:
+        """All CoarsenedTargets reachable from this root."""
+
+        visited = visited or set()
+        queue = deque([self])
+        while queue:
+            ct = queue.popleft()
+            if ct in visited:
+                continue
+            visited.add(ct)
+            yield ct
+            queue.extend(ct.dependencies)
+
     def __hash__(self) -> int:
         return self._hashcode
 
@@ -718,18 +738,40 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
     To collect all reachable CoarsenedTarget members, use `def closure`.
     """
 
-    def closure(self) -> Iterator[CoarsenedTarget]:
-        """All CoarsenedTargets reachable from these CoarsenedTarget roots."""
+    def by_address(self) -> dict[Address, CoarsenedTarget]:
+        """Compute a mapping from Address to containing CoarsenedTarget."""
+        return {t.address: ct for ct in self for t in ct.members}
 
-        visited = set()
-        queue = deque(self)
-        while queue:
-            ct = queue.popleft()
-            if ct in visited:
-                continue
-            visited.add(ct)
-            yield ct
-            queue.extend(ct.dependencies)
+    def closure(self) -> Iterator[Target]:
+        """All Targets reachable from these CoarsenedTarget roots."""
+        visited: Set[CoarsenedTarget] = set()
+        return (t for root in self for t in root.closure(visited))
+
+    def coarsened_closure(self) -> Iterator[CoarsenedTarget]:
+        """All CoarsenedTargets reachable from these CoarsenedTarget roots."""
+        visited: Set[CoarsenedTarget] = set()
+        return (ct for root in self for ct in root.coarsened_closure(visited))
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class CoarsenedTargetsRequest:
+    """A request to get CoarsenedTargets for input roots."""
+
+    roots: Tuple[Address, ...]
+    expanded_targets: bool
+    include_special_cased_deps: bool
+
+    def __init__(
+        self,
+        roots: Iterable[Address],
+        *,
+        expanded_targets: bool = False,
+        include_special_cased_deps: bool = False,
+    ) -> None:
+        self.roots = tuple(roots)
+        self.expanded_targets = expanded_targets
+        self.include_special_cased_deps = include_special_cased_deps
 
 
 @dataclass(frozen=True)
