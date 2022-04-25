@@ -209,7 +209,7 @@ class PythonSetup(Subsystem):
             "Finally, installing from a Poetry-generated lockfile is slower than installing from a "
             "Pex lockfile. When using a Pex lockfile, Pants will only install the subset needed "
             "for the current task.\n\n"
-            "However, Pex lockfile generation is a new feature. Given how vast the Python packaging "
+            "However, Pex lockfile generation is a beta feature. Given how vast the Python packaging "
             "ecosystem is, it is possible you may experience edge cases / bugs we haven't yet "
             "covered. Bug reports are appreciated! "
             "https://github.com/pantsbuild/pants/issues/new/choose\n\n"
