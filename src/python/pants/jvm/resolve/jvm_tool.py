@@ -159,7 +159,8 @@ class GenerateJvmLockfileFromTool:
     artifact_option_name: str
     lockfile_option_name: str
     resolve_name: str
-    lockfile_dest: str
+    read_lockfile_dest: str  # Path to lockfile when reading, or DEFAULT_TOOL_LOCKFILE to read from resource.
+    write_lockfile_dest: str  # Path to lockfile when generating the lockfile.
     default_lockfile_resource: tuple[str, str]
 
     @classmethod
@@ -169,7 +170,8 @@ class GenerateJvmLockfileFromTool:
             artifact_option_name=f"[{tool.options_scope}].artifacts",
             lockfile_option_name=f"[{tool.options_scope}].lockfile",
             resolve_name=tool.options_scope,
-            lockfile_dest=tool.lockfile,
+            read_lockfile_dest=tool.lockfile,
+            write_lockfile_dest=tool.lockfile,
             default_lockfile_resource=tool.default_lockfile_resource,
         )
 
@@ -183,7 +185,9 @@ async def setup_lockfile_request_from_tool(
         GatherJvmCoordinatesRequest(request.artifact_inputs, request.artifact_option_name),
     )
     return GenerateJvmLockfile(
-        artifacts=artifacts, resolve_name=request.resolve_name, lockfile_dest=request.lockfile_dest
+        artifacts=artifacts,
+        resolve_name=request.resolve_name,
+        lockfile_dest=request.write_lockfile_dest,
     )
 
 
