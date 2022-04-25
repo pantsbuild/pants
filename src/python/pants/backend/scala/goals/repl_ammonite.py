@@ -4,7 +4,9 @@
 import importlib.resources
 import itertools
 
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.repl import ReplImplementation, ReplRequest
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     AddPrefix,
@@ -17,15 +19,15 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import BashBinary, Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest
+from pants.engine.target import Dependencies, DependenciesRequest, CoarsenedTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.jdk_rules import JdkSetup
-from pants.jvm.resolve.coursier_fetch import MaterializedClasspath, MaterializedClasspathRequest
-from pants.jvm.resolve.jvm_tool import JvmToolBase, JvmToolLockfileRequest, JvmToolLockfileSentinel
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import JvmToolBase, GenerateJvmLockfileFromTool
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
@@ -47,8 +49,8 @@ class AmmoniteSubsystem(JvmToolBase):
     )
 
 
-class AmmoniteReplToolLockfileSentinel(JvmToolLockfileSentinel):
-    options_scope = AmmoniteSubsystem.options_scope
+class AmmoniteReplToolLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = AmmoniteSubsystem.options_scope
 
 
 class AmmoniteRepl(ReplImplementation):
@@ -61,87 +63,84 @@ class AmmoniteRunnerClassfiles(ClasspathEntry):
 
 @rule(level=LogLevel.DEBUG)
 async def create_scala_repl_request(
-    repl: AmmoniteRepl,
+    request: AmmoniteRepl,
     bash: BashBinary,
-    jdk_setup: JdkSetup,
     ammonite: AmmoniteSubsystem,
     runner_classfiles: AmmoniteRunnerClassfiles,
 ) -> ReplRequest:
-    dependencies_for_each_target = await MultiGet(
-        Get(Addresses, DependenciesRequest(tgt[Dependencies])) for tgt in repl.targets
-    )
-    dependencies = list(itertools.chain.from_iterable(dependencies_for_each_target))
-
-    runner_relpath = "__processorcp"
-
-    user_classpath, tool_classpath, prefixed_runner_classfiles_digest = await MultiGet(
-        # user_classpath, tool_classpath = await MultiGet(
-        Get(Classpath, Addresses(dependencies)),
+    user_classpath, lockfile_request = await MultiGet(
+        Get(Classpath, Addresses, request.addresses),
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
-                prefix="__toolcp",
-                lockfiles=(ammonite.resolved_lockfile(),),
-            ),
-        ),
-        Get(Digest, AddPrefix(runner_classfiles.digest, runner_relpath)),
+            GenerateJvmLockfileFromTool, AmmoniteReplToolLockfileSentinel()
+        )
+    )
+
+    roots = await Get(CoarsenedTargets, Addresses, request.addresses)
+    environs = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(target)) for target in roots
+    )
+    jdk = max(environs, key=lambda j: j.jre_major_version)
+
+    tool_classpath = await Get(
+        ToolClasspath,
+        ToolClasspathRequest(
+            prefix="__toolcp",
+            lockfile=lockfile_request,
+        )
     )
 
     user_classpath_prefix = "__cp"
-    prefixed_user_classpath = await Get(
-        Digest, AddPrefix(user_classpath.content.digest, user_classpath_prefix)
+    prefixed_user_classpath = await MultiGet(
+        Get(Digest, AddPrefix(d, user_classpath_prefix)) for d in user_classpath.digests()
+    )
+
+    # TODO: Manually merging the `immutable_input_digests` since InteractiveProcess doesn't
+    # support them yet. See https://github.com/pantsbuild/pants/issues/13852.
+    jdk_digests = await MultiGet(
+        Get(Digest, AddPrefix(digest, relpath))
+        for relpath, digest in jdk.immutable_input_digests.items()
     )
 
     repl_digest = await Get(
         Digest,
-        MergeDigests(
-            [
-                prefixed_user_classpath,
-                tool_classpath.content.digest,
-                prefixed_runner_classfiles_digest,
-                jdk_setup.digest,
-            ]
-        ),
+        MergeDigests([*prefixed_user_classpath, tool_classpath.content.digest, *jdk_digests]),
     )
+
     ss = await Get(Snapshot, Digest, repl_digest)
     print(f"DIGEST: {ss.files}")
 
     return ReplRequest(
         digest=repl_digest,
         args=[
-            *jdk_setup.args(
+            *jdk.args(
                 bash,
                 [
                     *tool_classpath.classpath_entries(),
                     *user_classpath.classpath_entries(user_classpath_prefix),
-                    runner_relpath,
                 ],
             ),
             "-Dscala.usejavacp=true",
             "ammonite.integration.AmmoniteRunner",
         ],
-        extra_env=jdk_setup.env,
+        extra_env=jdk.env,
         run_in_workspace=False,
-        append_only_caches=jdk_setup.append_only_caches,
+        append_only_caches=jdk.append_only_caches,
     )
 
 
 @rule
 async def generate_ammonite_lockfile_request(
     _: AmmoniteReplToolLockfileSentinel, ammonite: AmmoniteSubsystem
-) -> JvmToolLockfileRequest:
-    return JvmToolLockfileRequest.from_tool(ammonite)
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.from_tool(ammonite)
 
 
 @rule
 async def setup_ammonite_runner_classfiles(
-    bash: BashBinary, jdk_setup: JdkSetup, ammonite: AmmoniteSubsystem
+    bash: BashBinary, ammonite: AmmoniteSubsystem
 ) -> AmmoniteRunnerClassfiles:
     dest_dir = "classfiles"
 
-    # runner_source_content = pkgutil.get_data(
-    #     "pants.backend.scala.goals", "AmmoniteRunner.scala"
-    # )
     runner_source_content = importlib.resources.read_binary(
         "pants.backend.scala.goals", "AmmoniteRunner.scala"
     )
@@ -150,12 +149,16 @@ async def setup_ammonite_runner_classfiles(
 
     runner_source = FileContent("AmmoniteRunner.scala", runner_source_content)
 
+    lockfile_request = await Get(
+        GenerateJvmLockfileFromTool, AmmoniteReplToolLockfileSentinel()
+    )
+
     tool_classpath, source_digest = await MultiGet(
         Get(
-            MaterializedClasspath,
-            MaterializedClasspathRequest(
+            ToolClasspath,
+            ToolClasspathRequest(
                 prefix="__toolcp",
-                lockfiles=(ammonite.resolved_lockfile(),),
+                lockfile=lockfile_request,
             ),
         ),
         Get(
@@ -207,9 +210,16 @@ async def setup_ammonite_runner_classfiles(
     return AmmoniteRunnerClassfiles(digest=stripped_classfiles_digest)
 
 
+@rule
+def generate_ammonite_lockfile_request(
+    _: AmmoniteReplToolLockfileSentinel, tool: AmmoniteSubsystem
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool.create(tool)
+
+
 def rules():
     return [
         *collect_rules(),
-        UnionRule(JvmToolLockfileSentinel, AmmoniteReplToolLockfileSentinel),
+        UnionRule(GenerateToolLockfileSentinel, AmmoniteReplToolLockfileSentinel),
         UnionRule(ReplImplementation, AmmoniteRepl),
     ]
