@@ -8,7 +8,7 @@ import pkgutil
 from dataclasses import dataclass
 from typing import Any, Iterator
 
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix
@@ -318,7 +318,8 @@ def generate_kotlin_parser_lockfile_request(
         artifact_option_name="n/a",
         lockfile_option_name="n/a",
         resolve_name=KotlinParserToolLockfileSentinel.resolve_name,
-        lockfile_dest="src/python/pants/backend/kotlin/dependency_inference/kotlin_parser.lock",
+        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
+        write_lockfile_dest="src/python/pants/backend/kotlin/dependency_inference/kotlin_parser.lock",
         default_lockfile_resource=(
             "pants.backend.kotlin.dependency_inference",
             "kotlin_parser.lock",
