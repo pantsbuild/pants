@@ -52,7 +52,8 @@ class JVMLockfileFixture:
 class JvmLockfilePlugin:
     def pytest_configure(self, config):
         config.addinivalue_line(
-            "markers", "jvm_lockfile(path, requirements): mark test to configure a `jvm_lockfile` fixture"
+            "markers",
+            "jvm_lockfile(path, requirements): mark test to configure a `jvm_lockfile` fixture",
         )
 
     @pytest.fixture
@@ -72,7 +73,9 @@ class JvmLockfilePlugin:
             [ArtifactRequirement(coordinate) for coordinate in definition.coordinates]
         )
         if not lockfile.metadata:
-            raise ValueError(f"Expected JVM lockfile {definition.lockfile_rel_path} to have metadata.")
+            raise ValueError(
+                f"Expected JVM lockfile {definition.lockfile_rel_path} to have metadata."
+            )
         if not lockfile.metadata.is_valid_for(artifact_reqs, LockfileContext.TOOL):
             # TODO: Fill in "SCRIPT."
             raise ValueError(
