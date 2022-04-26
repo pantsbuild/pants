@@ -26,7 +26,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -64,7 +64,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     request: JavaInferredDependenciesAndExportsRequest,
     java_infer_subsystem: JavaInferSubsystem,
     jvm: JvmSubsystem,
-    symbol_mapping: FirstPartySymbolMapping,
+    symbol_mapping: SymbolMapping,
 ) -> JavaInferredDependencies:
     if not java_infer_subsystem.imports and not java_infer_subsystem.consumed_types:
         return JavaInferredDependencies(FrozenOrderedSet([]), FrozenOrderedSet([]))

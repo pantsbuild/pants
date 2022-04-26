@@ -41,7 +41,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     MissingJvmArtifacts,
     find_jvm_artifacts_or_raise,
 )
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
 from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -57,7 +57,7 @@ async def infer_scala_dependencies_via_source_analysis(
     request: InferScalaSourceDependencies,
     scala_infer_subsystem: ScalaInferSubsystem,
     jvm: JvmSubsystem,
-    symbol_mapping: FirstPartySymbolMapping,
+    symbol_mapping: SymbolMapping,
 ) -> InferredDependencies:
     if not scala_infer_subsystem.imports:
         return InferredDependencies([])

@@ -12,7 +12,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Targets
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
 
 
 class DumpFirstPartyDepMapSubsystem(GoalSubsystem):
@@ -26,9 +26,9 @@ class DumpFirstPartyDepMap(Goal):
 
 @goal_rule
 async def dump_dep_inference_data(
-    console: Console, first_party_dep_map: FirstPartySymbolMapping
+    console: Console, symbol_mapping: SymbolMapping
 ) -> DumpFirstPartyDepMap:
-    console.write_stdout(json.dumps(first_party_dep_map.to_json_dict()))
+    console.write_stdout(json.dumps(symbol_mapping.to_json_dict()))
     return DumpFirstPartyDepMap(exit_code=0)
 
 

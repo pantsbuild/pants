@@ -235,7 +235,7 @@ def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTarg
     )
 
 
-class ThirdPartyPackageToArtifactMapping(FrozenDict[_ResolveName, FrozenTrieNode]):
+class ThirdPartySymbolMapping(FrozenDict[_ResolveName, FrozenTrieNode]):
     """The third party symbols provided by all `jvm_artifact` targets."""
 
 
@@ -267,11 +267,11 @@ async def find_available_third_party_artifacts(
 
 
 @rule
-async def compute_java_third_party_artifact_mapping(
+async def compute_java_third_party_symbol_mapping(
     java_infer_subsystem: JavaInferSubsystem,
     available_artifacts: AvailableThirdPartyArtifacts,
     all_jvm_type_providing_tgts: AllJvmTypeProvidingTargets,
-) -> ThirdPartyPackageToArtifactMapping:
+) -> ThirdPartySymbolMapping:
     """Implements the mapping logic from the `jvm_artifact` and `java-infer` help."""
 
     def symbol_from_package_pattern(package_pattern: str) -> tuple[str, bool]:
@@ -313,7 +313,7 @@ async def compute_java_third_party_artifact_mapping(
             for mapping in mappings.values():
                 mapping.insert(provides_type, [], first_party=True, recursive=False)
 
-    return ThirdPartyPackageToArtifactMapping(
+    return ThirdPartySymbolMapping(
         FrozenDict(
             (resolve_name, FrozenTrieNode(mapping)) for resolve_name, mapping in mappings.items()
         )

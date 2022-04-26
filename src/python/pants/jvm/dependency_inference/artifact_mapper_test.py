@@ -22,7 +22,7 @@ from pants.engine.target import Dependencies, DependenciesRequest
 from pants.jvm.dependency_inference.artifact_mapper import (
     FrozenTrieNode,
     MutableTrieNode,
-    ThirdPartyPackageToArtifactMapping,
+    ThirdPartySymbolMapping,
 )
 from pants.jvm.dependency_inference.symbol_mapper import JvmFirstPartyPackageMappingException
 from pants.jvm.jdk_rules import rules as java_util_rules
@@ -54,7 +54,7 @@ def rule_runner() -> RuleRunner:
             *system_binaries.rules(),
             *util_rules(),
             QueryRule(Addresses, [DependenciesRequest]),
-            QueryRule(ThirdPartyPackageToArtifactMapping, []),
+            QueryRule(ThirdPartySymbolMapping, []),
         ],
         objects={"parametrize": Parametrize},
         target_types=[
@@ -128,7 +128,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
         }
     )
 
-    mapping = rule_runner.request(ThirdPartyPackageToArtifactMapping, [])
+    mapping = rule_runner.request(ThirdPartySymbolMapping, [])
     root_node = mapping["jvm-default"]
 
     # Handy trie traversal function to placate mypy

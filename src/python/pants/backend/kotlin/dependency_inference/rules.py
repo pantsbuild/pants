@@ -30,7 +30,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
     find_jvm_artifacts_or_raise,
 )
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
 from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -46,7 +46,7 @@ async def infer_kotlin_dependencies_via_source_analysis(
     request: InferKotlinSourceDependencies,
     kotlin_infer_subsystem: KotlinInferSubsystem,
     jvm: JvmSubsystem,
-    symbol_mapping: FirstPartySymbolMapping,
+    symbol_mapping: SymbolMapping,
 ) -> InferredDependencies:
     if not kotlin_infer_subsystem.imports:
         return InferredDependencies([])
