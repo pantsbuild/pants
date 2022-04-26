@@ -980,3 +980,28 @@ def test_get_context_root(
 )
 def test_parse_image_id_from_docker_build_output(expected: str, stdout: str, stderr: str) -> None:
     assert expected == parse_image_id_from_docker_build_output(stdout.encode(), stderr.encode())
+
+
+@pytest.mark.parametrize(
+    "raw_values, expect_raises, image_refs",
+    [
+        (dict(name="lowercase"), no_exception(), ("lowercase:latest",)),
+        (dict(name="CamelCase"), no_exception(), ("camelcase:latest",)),
+        (dict(image_tags=["CamelCase"]), no_exception(), ("image:CamelCase",)),
+        (dict(registries=["REG1.example.net"]), no_exception(), ("REG1.example.net/image:latest",)),
+    ],
+)
+def test_image_ref_formatting(
+    raw_values: dict, expect_raises: ContextManager, image_refs: tuple[str, ...]
+) -> None:
+    address = Address("test", target_name=raw_values.pop("name", "image"))
+    tgt = DockerImageTarget(raw_values, address)
+    field_set = DockerFieldSet.create(tgt)
+    default_repository = "{name}"
+    registries = DockerRegistries.from_dict({})
+    interpolation_context = DockerInterpolationContext.from_dict({})
+    with expect_raises:
+        assert (
+            field_set.image_refs(default_repository, registries, interpolation_context)
+            == image_refs
+        )
