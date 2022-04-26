@@ -1085,7 +1085,7 @@ class BootstrapOptions:
         default_help_repr="256MiB",
         help=softwrap(
             """
-            The default memory usage for a child processes.
+            The default memory usage for a child process.
 
             The value is participates in precomputing the pool size of child processes used by
             Pantsd. A high value would result in a high number of child processes spawned,
