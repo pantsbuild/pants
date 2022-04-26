@@ -14,6 +14,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmTypeProvidingTargets,
     FrozenTrieNode,
+    ThirdPartyPackageToArtifactMapping,
 )
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmProvidesTypesField, JvmResolveField
@@ -53,7 +54,7 @@ class SymbolMap(FrozenDict[_ResolveName, FrozenTrieNode]):
 
 @dataclass(frozen=True)
 class FirstPartySymbolMapping:
-    """The merged first party symbols provided by all inference implementations."""
+    """The merged first and third party symbols provided by all inference implementations."""
 
     mapping_roots: FrozenDict[_ResolveName, FrozenTrieNode]
 
@@ -73,12 +74,13 @@ class FirstPartySymbolMapping:
 
 
 @rule(level=LogLevel.DEBUG)
-async def merge_first_party_module_mappings(
+async def merge_symbol_mappings(
     union_membership: UnionMembership,
     targets_that_provide_types: AllJvmTypeProvidingTargets,
     jvm: JvmSubsystem,
+    third_party_mapping: ThirdPartyPackageToArtifactMapping,
 ) -> FirstPartySymbolMapping:
-    all_mappings = await MultiGet(
+    all_firstparty_mappings = await MultiGet(
         Get(
             SymbolMap,
             FirstPartyMappingRequest,
@@ -86,6 +88,10 @@ async def merge_first_party_module_mappings(
         )
         for marker_cls in union_membership.get(FirstPartyMappingRequest)
     )
+    all_mappings: list[FrozenDict[_ResolveName, FrozenTrieNode]] = [
+        *all_firstparty_mappings,
+        third_party_mapping,
+    ]
 
     resolves = {resolve for mapping in all_mappings for resolve in mapping.keys()}
     mapping = FirstPartySymbolMapping(

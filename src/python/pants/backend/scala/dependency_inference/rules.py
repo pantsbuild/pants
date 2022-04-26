@@ -39,7 +39,6 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
     ConflictingJvmArtifactVersion,
     MissingJvmArtifacts,
-    ThirdPartyPackageToArtifactMapping,
     find_jvm_artifacts_or_raise,
 )
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
@@ -58,8 +57,7 @@ async def infer_scala_dependencies_via_source_analysis(
     request: InferScalaSourceDependencies,
     scala_infer_subsystem: ScalaInferSubsystem,
     jvm: JvmSubsystem,
-    first_party_symbol_map: FirstPartySymbolMapping,
-    third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
+    symbol_mapping: FirstPartySymbolMapping,
 ) -> InferredDependencies:
     if not scala_infer_subsystem.imports:
         return InferredDependencies([])
@@ -82,9 +80,7 @@ async def infer_scala_dependencies_via_source_analysis(
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
-        first_party_matches = first_party_symbol_map.addresses_for_symbol(symbol, resolve)
-        third_party_matches = third_party_artifact_mapping.addresses_for_symbol(symbol, resolve)
-        matches = first_party_matches.union(third_party_matches)
+        matches = symbol_mapping.addresses_for_symbol(symbol, resolve)
         if not matches:
             continue
 

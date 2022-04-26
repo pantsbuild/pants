@@ -201,9 +201,10 @@ class FrozenTrieNode:
         if not isinstance(other, FrozenTrieNode):
             return False
         return (
-            self._children == other._children
-            and self.recursive == other.recursive
+            self.recursive == other.recursive
+            and self.first_party == other.first_party
             and self.addresses == other.addresses
+            and self._children == other._children
         )
 
     def __repr__(self):
@@ -234,16 +235,8 @@ def find_all_jvm_provides_fields(targets: AllTargets) -> AllJvmTypeProvidingTarg
     )
 
 
-@dataclass(frozen=True)
-class ThirdPartyPackageToArtifactMapping:
-    mapping_roots: FrozenDict[_ResolveName, FrozenTrieNode]
-
-    def addresses_for_symbol(self, symbol: str, resolve: str) -> FrozenOrderedSet[Address]:
-        node = self.mapping_roots.get(resolve)
-        # Note that it's possible to have a resolve with no associated artifacts.
-        if not node:
-            return FrozenOrderedSet()
-        return node.addresses_for_symbol(symbol)
+class ThirdPartyPackageToArtifactMapping(FrozenDict[_ResolveName, FrozenTrieNode]):
+    """The third party symbols provided by all `jvm_artifact` targets."""
 
 
 @rule

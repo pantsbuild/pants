@@ -129,7 +129,7 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     )
 
     mapping = rule_runner.request(ThirdPartyPackageToArtifactMapping, [])
-    root_node = mapping.mapping_roots["jvm-default"]
+    root_node = mapping["jvm-default"]
 
     # Handy trie traversal function to placate mypy
     def traverse(*children) -> FrozenTrieNode:
