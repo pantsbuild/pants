@@ -275,6 +275,7 @@ async def prepare_jdk_environment(
             ]
         ),
     )
+
     return JdkEnvironment(
         _digest=await Get(
             Digest,

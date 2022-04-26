@@ -10,6 +10,7 @@ from pants.util.strutil import (
     ensure_binary,
     ensure_text,
     first_paragraph,
+    fmt_memory_size,
     hard_wrap,
     path_safe,
     pluralize,
@@ -299,3 +300,11 @@ def test_softwrap_multiline() -> None:
         )
     )
     assert softwrap("A\n\n\nB") == "A\n\nB"
+
+
+def test_fmt_memory_sizes() -> None:
+    assert fmt_memory_size(312) == "312 bytes"
+    assert fmt_memory_size(2 * 1024) == "2.0 KiB"
+    assert fmt_memory_size(2.2 * 1024 * 1024) == "2.2 MiB"
+    assert fmt_memory_size(4.1 * 1024 * 1024 * 1024) == "4.1 GiB"
+    assert fmt_memory_size(3.21 * 1024 * 1024 * 1024 * 1024) == "3287.04 GiB"

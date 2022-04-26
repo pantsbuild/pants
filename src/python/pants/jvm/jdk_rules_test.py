@@ -177,4 +177,3 @@ def test_pass_jvm_options_to_nailgun(rule_runner: RuleRunner) -> None:
     assert "java.specification.version=14" in jvm_properties
     assert "pants.jvm.global=true" in jvm_properties
     assert "pants.jvm.extra=true" in jvm_properties
-

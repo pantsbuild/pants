@@ -258,3 +258,17 @@ def softwrap(text: str) -> str:
             result_strs.append(" ")
 
     return "".join(result_strs).rstrip()
+
+
+_MEMORY_UNITS = ["bytes", "KiB", "MiB", "GiB"]
+
+
+def fmt_memory_size(value: int) -> str:
+    rem = value
+    unit_idx = 0
+
+    while rem >= 1024 and unit_idx < len(_MEMORY_UNITS) - 1:
+        rem = rem / 1024
+        unit_idx += 1
+
+    return f"{rem} {_MEMORY_UNITS[unit_idx]}"

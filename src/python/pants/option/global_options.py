@@ -50,7 +50,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.osutil import CPU_COUNT
-from pants.util.strutil import softwrap
+from pants.util.strutil import fmt_memory_size, softwrap
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
@@ -1087,11 +1087,8 @@ class BootstrapOptions:
             """
             The default memory usage for a child process.
 
-            The value is participates in precomputing the pool size of child processes used by
-            Pantsd. A high value would result in a high number of child processes spawned,
-            potentially overconsuming your resources and triggering the OS' OOM killer. A low
-            value would mean a low number of child processes launched and therefore less
-            paralellism for the tasks that need those processes.
+            Check the documentation for the `child-process-max-memory-usage` for advice on
+            how to choose an appropriate value for this option.
 
             You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
             `2GiB` or `2.12GiB`. A bare number will be in bytes.
@@ -1595,6 +1592,23 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             raise OptionsError(
                 "--rule-threads-core values less than 2 are not supported, but it was set to "
                 f"{opts.rule_threads_core}."
+            )
+
+        if (
+            opts.child_process_max_memory_usage is not None
+            and opts.child_process_max_memory_usage < opts.child_process_default_memory_usage
+        ):
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    Nailgun pool can not be initialised as the total amount of memory allowed is \
+                    smaller than the memory allocation for a single child process.
+                    
+                    - total child process memory allowed: {fmt_memory_size(opts.child_process_max_memory_usage)}
+
+                    - default child process memory: {fmt_memory_size(opts.child_process_default_memory_usage)}
+                    """
+                )
             )
 
         if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):

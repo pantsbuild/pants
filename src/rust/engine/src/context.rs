@@ -1,6 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::cmp::max;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
 use std::future::Future;
@@ -181,46 +182,31 @@ impl Core {
       exec_strategy_opts.local_cleanup,
     );
 
-    let maybe_nailgunnable_local_command_runner: Result<Box<dyn CommandRunner>, String> =
+    let maybe_nailgunnable_local_command_runner: Box<dyn CommandRunner> =
       if exec_strategy_opts.local_enable_nailgun {
-        if exec_strategy_opts.child_default_memory > exec_strategy_opts.child_max_memory {
-          Err(format!(
-            "\
-            Nailgun pool can not be initialised as the total amount of memory allowed is \
-            smaller than the memory allocation for a single child process.
-            
-            - total child process memory allowed: {child_max_memory}
-            - default child process memory: {child_default_memory}
-            ",
-            child_max_memory = exec_strategy_opts.child_max_memory,
-            child_default_memory = exec_strategy_opts.child_default_memory
-          ))
-        } else {
-          Ok(Box::new(nailgun::CommandRunner::new(
-            local_command_runner,
-            local_execution_root_dir.to_path_buf(),
-            store.clone(),
-            executor.clone(),
-            // We set the nailgun pool size to twice the number that will ever be active in order to
-            // keep warm but idle processes for task fingerprints which are not currently busy (e.g.
-            // while busy running scalac, keeping some javac processes idle).
-            // TODO: The nailgun pool size should be configurable independent of concurrency, along
-            // with per-instance memory usage. See https://github.com/pantsbuild/pants/issues/13067.
+        Box::new(nailgun::CommandRunner::new(
+          local_command_runner,
+          local_execution_root_dir.to_path_buf(),
+          store.clone(),
+          executor.clone(),
+          // We set the nailgun pool size the number of instances that fit within the memory
+          // parameters configured.
+          // TODO: The nailgun pool size should be configurable independent of concurrency, along
+          // with per-instance memory usage. See https://github.com/pantsbuild/pants/issues/13067.
+          max(
+            1,
             exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
-          )))
-        }
+          ),
+        ))
       } else {
-        Ok(Box::new(local_command_runner))
+        Box::new(local_command_runner)
       };
-  
-      maybe_nailgunnable_local_command_runner.map(|runner| {
-        let bounded_runner: Box<dyn CommandRunner> = Box::new(bounded::CommandRunner::new(
-          executor,
-          runner,
-          exec_strategy_opts.local_parallelism,
-        ));
-        bounded_runner
-      })
+
+    Ok(Box::new(bounded::CommandRunner::new(
+      executor,
+      maybe_nailgunnable_local_command_runner,
+      exec_strategy_opts.local_parallelism,
+    )))
   }
 
   fn make_command_runner(
