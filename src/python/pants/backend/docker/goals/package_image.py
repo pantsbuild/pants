@@ -77,9 +77,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         source = DockerInterpolationContext.TextSource(
             address=self.address, target_alias="docker_image", field_alias=self.tags.alias
         )
-        return interpolation_context.format(
-            tag, source=source, error_cls=DockerImageTagValueError
-        ).lower()
+        return interpolation_context.format(tag, source=source, error_cls=DockerImageTagValueError)
 
     def format_repository(
         self, default_repository: str, interpolation_context: DockerInterpolationContext
