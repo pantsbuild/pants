@@ -21,6 +21,7 @@ from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import Dependencies, DependenciesRequest
 from pants.jvm.dependency_inference.artifact_mapper import (
     FrozenTrieNode,
+    MutableTrieNode,
     ThirdPartyPackageToArtifactMapping,
 )
 from pants.jvm.dependency_inference.symbol_mapper import JvmFirstPartyPackageMappingException
@@ -36,6 +37,7 @@ from pants.testutil.rule_runner import (
     engine_error,
     logging,
 )
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @pytest.fixture
@@ -64,6 +66,20 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
+
+
+def test_trie_node_merge_basic() -> None:
+    one = MutableTrieNode()
+    one.insert("a/b/c", [Address("1")], recursive=True, first_party=False)
+    one.insert("a/b/c/d", [Address("2")], recursive=False, first_party=False)
+    two = MutableTrieNode()
+    two.insert("a/b/c/d", [Address("3")], recursive=False, first_party=False)
+
+    merged = FrozenTrieNode.merge([one.frozen(), two.frozen()])
+    assert list(merged) == [
+        ("a/b/c", True, FrozenOrderedSet([Address("1")]), False),
+        ("a/b/c/d", False, FrozenOrderedSet([Address("2"), Address("3")]), False),
+    ]
 
 
 @logging

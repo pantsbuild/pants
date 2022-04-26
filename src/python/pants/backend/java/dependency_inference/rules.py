@@ -126,7 +126,7 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()
     for typ in types:
-        first_party_matches = first_party_dep_map.symbols.addresses_for_symbol(typ, resolve=resolve)
+        first_party_matches = first_party_dep_map.addresses_for_symbol(typ, resolve)
         third_party_matches = (
             third_party_artifact_mapping.addresses_for_symbol(typ, resolve)
             if java_infer_subsystem.third_party_imports

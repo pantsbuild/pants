@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, DefaultDict, Iterable, Tuple
+from typing import Any, DefaultDict, Iterable, Iterator, Tuple
 
 from pants.backend.java.subsystems.java_infer import JavaInferSubsystem
 from pants.build_graph.address import Address
@@ -63,12 +63,36 @@ class MutableTrieNode:
         self.addresses: OrderedSet[Address] = OrderedSet()
         self.first_party: bool = False
 
-    def ensure_child(self, name: str) -> MutableTrieNode:
+    def _ensure_child(self, name: str) -> MutableTrieNode:
         if name in self.children:
             return self.children[name]
         node = MutableTrieNode()
         self.children[name] = node
         return node
+
+    def insert(
+        self,
+        symbol: str,
+        addresses: Iterable[Address],
+        *,
+        first_party: bool,
+        recursive: bool = False,
+    ) -> None:
+        imp_parts = symbol.split(".")
+        current_node = self
+        for imp_part in imp_parts:
+            child_node = current_node._ensure_child(imp_part)
+            current_node = child_node
+
+        current_node.addresses.update(addresses)
+        current_node.first_party = first_party
+        current_node.recursive = recursive
+
+    def frozen(self) -> FrozenTrieNode:
+        return FrozenTrieNode(self)
+
+
+FrozenTrieNodeItem = Tuple[str, bool, FrozenOrderedSet[Address], bool]
 
 
 @frozen_after_init
@@ -101,9 +125,74 @@ class FrozenTrieNode:
     def first_party(self) -> bool:
         return self._first_party
 
+    def addresses_for_symbol(self, symbol: str) -> FrozenOrderedSet[Address]:
+        current_node = self
+        imp_parts = symbol.split(".")
+
+        found_nodes = []
+        for imp_part in imp_parts:
+            child_node_opt = current_node.find_child(imp_part)
+            if not child_node_opt:
+                break
+            found_nodes.append(child_node_opt)
+            current_node = child_node_opt
+
+        if not found_nodes:
+            return FrozenOrderedSet()
+
+        # If the length of the found nodes equals the number of parts of the package path, then
+        # there is an exact match.
+        if len(found_nodes) == len(imp_parts):
+            return found_nodes[-1].addresses
+
+        # Otherwise, check for the first found node (in reverse order) to match recursively, and
+        # use its coordinate.
+        for found_node in reversed(found_nodes):
+            if found_node.recursive:
+                return found_node.addresses
+
+        # Nothing matched so return no match.
+        return FrozenOrderedSet()
+
     @property
     def addresses(self) -> FrozenOrderedSet[Address]:
         return self._addresses
+
+    @classmethod
+    def merge(cls, nodes: Iterable[FrozenTrieNode]) -> FrozenTrieNode:
+        """Merges the given `FrozenTrieNode` instances.
+
+        TODO: This is currently implemented as merging-from-scratch, but could be trie-aware.
+        """
+        result = MutableTrieNode()
+        for node in nodes:
+            for symbol, recursive, addresses, first_party in node:
+                result.insert(symbol, addresses, recursive=recursive, first_party=first_party)
+        return FrozenTrieNode(result)
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "children": {name: child.to_json_dict() for name, child in self._children.items()},
+            **({"addresses": [str(a) for a in self._addresses]} if self._addresses else {}),
+            "recursive": self._recursive,
+            "first_party": self._first_party,
+        }
+
+    def _iter_helper(self, symbol: list[str]) -> Iterator[FrozenTrieNodeItem]:
+        if symbol and self._addresses:
+            yield (".".join(symbol), self._recursive, self._addresses, self._first_party)
+        for name, child in self._children.items():
+            symbol.append(name)
+            yield from child._iter_helper(symbol)
+            symbol.pop()
+
+    def __iter__(self) -> Iterator[FrozenTrieNodeItem]:
+        """Iterates through all nodes in the trie.
+
+        TODO: This is primarily used in `FrozenTrieNode.merge`: if that method switches to
+        trie-aware merging, this should likely be removed.
+        """
+        yield from self._iter_helper([])
 
     def __hash__(self) -> int:
         return hash((self._children, self._recursive, self._addresses))
@@ -150,40 +239,11 @@ class ThirdPartyPackageToArtifactMapping:
     mapping_roots: FrozenDict[_ResolveName, FrozenTrieNode]
 
     def addresses_for_symbol(self, symbol: str, resolve: str) -> FrozenOrderedSet[Address]:
-        imp_parts = symbol.split(".")
-
+        node = self.mapping_roots.get(resolve)
         # Note that it's possible to have a resolve with no associated artifacts.
-        current_node = self.mapping_roots.get(resolve)
-        if not current_node:
+        if not node:
             return FrozenOrderedSet()
-
-        found_nodes = []
-        for imp_part in imp_parts:
-            child_node_opt = current_node.find_child(imp_part)
-            if not child_node_opt:
-                break
-            found_nodes.append(child_node_opt)
-            current_node = child_node_opt
-
-        if not found_nodes:
-            return FrozenOrderedSet()
-
-        # If the length of the found nodes equals the number of parts of the package path, then
-        # there is an exact match.
-        if len(found_nodes) == len(imp_parts):
-            best_match = found_nodes[-1]
-            if best_match.first_party:
-                return FrozenOrderedSet()  # The first-party symbol mapper should provide this dep
-            return found_nodes[-1].addresses
-
-        # Otherwise, check for the first found node (in reverse order) to match recursively, and
-        # use its coordinate.
-        for found_node in reversed(found_nodes):
-            if found_node.recursive:
-                return found_node.addresses
-
-        # Nothing matched so return no match.
-        return FrozenOrderedSet()
+        return node.addresses_for_symbol(symbol)
 
 
 @rule
@@ -221,26 +281,12 @@ async def compute_java_third_party_artifact_mapping(
 ) -> ThirdPartyPackageToArtifactMapping:
     """Implements the mapping logic from the `jvm_artifact` and `java-infer` help."""
 
-    def insert(
-        mapping: MutableTrieNode,
-        package_pattern: str,
-        addresses: Iterable[Address],
-        first_party: bool,
-    ) -> None:
-        imp_parts = package_pattern.split(".")
-        recursive = False
-        if imp_parts[-1] == "**":
-            recursive = True
-            imp_parts = imp_parts[0:-1]
-
-        current_node = mapping
-        for imp_part in imp_parts:
-            child_node = current_node.ensure_child(imp_part)
-            current_node = child_node
-
-        current_node.addresses.update(addresses)
-        current_node.first_party = first_party
-        current_node.recursive = recursive
+    def symbol_from_package_pattern(package_pattern: str) -> tuple[str, bool]:
+        wildcard_suffix = ".**"
+        if package_pattern.endswith(wildcard_suffix):
+            return package_pattern[: -len(wildcard_suffix)], True
+        else:
+            return package_pattern, False
 
     # Build a default mapping from coord to package.
     # TODO: Consider inverting the definitions of these mappings.
@@ -265,13 +311,14 @@ async def compute_java_third_party_artifact_mapping(
             packages = (f"{coord.group}.**",)
         mapping = mappings[resolve_name]
         for package in packages:
-            insert(mapping, package, addresses, first_party=False)
+            symbol, recursive = symbol_from_package_pattern(package)
+            mapping.insert(symbol, addresses, first_party=False, recursive=recursive)
 
     # Mark types that have strong first-party declarations as first-party
     for tgt in all_jvm_type_providing_tgts:
         for provides_type in tgt[JvmProvidesTypesField].value or []:
             for mapping in mappings.values():
-                insert(mapping, provides_type, [], first_party=True)
+                mapping.insert(provides_type, [], first_party=True, recursive=False)
 
     return ThirdPartyPackageToArtifactMapping(
         FrozenDict(

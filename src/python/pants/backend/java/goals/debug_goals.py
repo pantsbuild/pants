@@ -28,7 +28,7 @@ class DumpFirstPartyDepMap(Goal):
 async def dump_dep_inference_data(
     console: Console, first_party_dep_map: FirstPartySymbolMapping
 ) -> DumpFirstPartyDepMap:
-    console.write_stdout(json.dumps(first_party_dep_map.symbols.to_json_dict()))
+    console.write_stdout(json.dumps(first_party_dep_map.to_json_dict()))
     return DumpFirstPartyDepMap(exit_code=0)
 
 

@@ -3,18 +3,23 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Any
 
 from pants.build_graph.address import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
-from pants.jvm.dependency_inference.artifact_mapper import AllJvmTypeProvidingTargets
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmTypeProvidingTargets,
+    FrozenTrieNode,
+)
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmProvidesTypesField, JvmResolveField
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -24,43 +29,11 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 
 
+_ResolveName = str
+
+
 class JvmFirstPartyPackageMappingException(Exception):
     pass
-
-
-class SymbolMap:
-    """A mapping of JVM package names to owning addresses."""
-
-    def __init__(self):
-        self._symbol_map: dict[tuple[str, str], set[Address]] = defaultdict(set)
-
-    def add_symbol(self, symbol: str, address: Address, *, resolve: str):
-        """Declare a single Address as a provider of a symbol."""
-        self._symbol_map[(resolve, symbol)].add(address)
-
-    def addresses_for_symbol(self, symbol: str, *, resolve: str) -> frozenset[Address]:
-        """Returns the set of addresses that provide the passed symbol.
-
-        :param symbol: a fully-qualified JVM symbol (e.g. `foo.bar.Thing`).
-        :param resolve: name of resolve name in which to check for symbol.
-        """
-        return frozenset(self._symbol_map[(resolve, symbol)])
-
-    def merge(self, other: SymbolMap) -> None:
-        """Merge 'other' into this dependency map."""
-        for (resolve, symbol), addresses in other._symbol_map.items():
-            self._symbol_map[(resolve, symbol)] |= addresses
-
-    def to_json_dict(self):
-        return {
-            "symbol_map": {
-                f"{resolve}/{sym}": [str(addr) for addr in addrs]
-                for (resolve, sym), addrs in self._symbol_map.items()
-            },
-        }
-
-    def __repr__(self) -> str:
-        return f"SymbolMap({json.dumps(self.to_json_dict())})"
 
 
 @union
@@ -74,11 +47,29 @@ class FirstPartyMappingRequest:
     """
 
 
+class SymbolMap(FrozenDict[_ResolveName, FrozenTrieNode]):
+    """The first party symbols provided by a single inference implementation."""
+
+
 @dataclass(frozen=True)
 class FirstPartySymbolMapping:
-    """A merged mapping of package names to owning addresses."""
+    """The merged first party symbols provided by all inference implementations."""
 
-    symbols: SymbolMap
+    mapping_roots: FrozenDict[_ResolveName, FrozenTrieNode]
+
+    def addresses_for_symbol(self, symbol: str, resolve: str) -> FrozenOrderedSet[Address]:
+        node = self.mapping_roots.get(resolve)
+        # Note that it's possible to have a resolve with no associated artifacts.
+        if not node:
+            return FrozenOrderedSet()
+        return node.addresses_for_symbol(symbol)
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "symbol_map": {
+                resolve: node.to_json_dict() for resolve, node in self.mapping_roots.items()
+            }
+        }
 
 
 @rule(level=LogLevel.DEBUG)
@@ -96,9 +87,18 @@ async def merge_first_party_module_mappings(
         for marker_cls in union_membership.get(FirstPartyMappingRequest)
     )
 
-    merged_dep_map = SymbolMap()
-    for dep_map in all_mappings:
-        merged_dep_map.merge(dep_map)
+    resolves = {resolve for mapping in all_mappings for resolve in mapping.keys()}
+    mapping = FirstPartySymbolMapping(
+        FrozenDict(
+            (
+                resolve,
+                FrozenTrieNode.merge(
+                    mapping[resolve] for mapping in all_mappings if resolve in mapping
+                ),
+            )
+            for resolve in resolves
+        )
+    )
 
     # `experimental_provides_types` ("`provides`") can be declared on a `java_sources` target,
     # so each generated `java_source` target will have that `provides` annotation. All that matters
@@ -113,14 +113,14 @@ async def merge_first_party_module_mappings(
 
     # Check that at least one address declared by each `provides` value actually provides the type:
     for (resolve, provided_type), provided_addresses in provided_types.items():
-        symbol_addresses = merged_dep_map.addresses_for_symbol(provided_type, resolve=resolve)
+        symbol_addresses = mapping.addresses_for_symbol(provided_type, resolve=resolve)
         if not provided_addresses.intersection(symbol_addresses):
             raise JvmFirstPartyPackageMappingException(
                 f"The target {next(iter(provided_addresses))} declares that it provides the JVM type "
                 f"`{provided_type}`, however, it does not appear to actually provide that type."
             )
 
-    return FirstPartySymbolMapping(merged_dep_map)
+    return mapping
 
 
 def rules():

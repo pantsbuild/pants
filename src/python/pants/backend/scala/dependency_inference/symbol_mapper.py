@@ -2,6 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections import defaultdict
+from typing import Mapping
+
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -10,6 +13,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
+from pants.jvm.dependency_inference.artifact_mapper import MutableTrieNode
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -46,14 +50,14 @@ async def map_first_party_scala_targets_to_symbols(
         source_analysis,
     )
 
-    symbol_map = SymbolMap()
+    mapping: Mapping[str, MutableTrieNode] = defaultdict(MutableTrieNode)
     for (address, resolve), analysis in address_and_analysis:
         for symbol in analysis.provided_symbols:
-            symbol_map.add_symbol(symbol, address, resolve=resolve)
+            mapping[resolve].insert(symbol, [address], first_party=True)
         for symbol in analysis.provided_symbols_encoded:
-            symbol_map.add_symbol(symbol, address, resolve=resolve)
+            mapping[resolve].insert(symbol, [address], first_party=True)
 
-    return symbol_map
+    return SymbolMap((resolve, node.frozen()) for resolve, node in mapping.items())
 
 
 def rules():
