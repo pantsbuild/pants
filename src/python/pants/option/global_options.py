@@ -1067,8 +1067,8 @@ class BootstrapOptions:
             """
             The maximum memory usage for all child processes.
 
-            The value is participates in precomputing the pool size of child processes used by
-            Pantsd. A high value would result in a high number of child processes spawned,
+            This value participates in precomputing the pool size of child processes used by
+            `pantsd`. A high value would result in a high number of child processes spawned,
             potentially overconsuming your resources and triggering the OS' OOM killer. A low
             value would mean a low number of child processes launched and therefore less
             paralellism for the tasks that need those processes.
