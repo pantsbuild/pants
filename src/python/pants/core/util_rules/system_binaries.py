@@ -306,10 +306,12 @@ class TarBinary(BinaryPath):
         )
         return (self.path, f"c{compression}f", output_filename, *input_files)
 
-    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
+    def extract_archive_argv(
+        self, archive_path: str, extract_path: str, *, archive_suffix: str
+    ) -> tuple[str, ...]:
         # Note that the `output_dir` must already exist.
         # The caller should validate that it's a valid `.tar` file.
-        prog_args = ("-Ilz4",) if archive_path.endswith(".lz4") else ()
+        prog_args = ("-Ilz4",) if archive_suffix == ".tar.lz4" else ()
         return (self.path, *prog_args, "-xf", archive_path, "-C", extract_path)
 
 
