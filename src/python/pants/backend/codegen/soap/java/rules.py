@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from pants.backend.codegen.soap.java import extra_fields
 from pants.backend.codegen.soap.java.extra_fields import JavaModuleField, JavaPackageField
 from pants.backend.codegen.soap.java.jaxws import JaxWsTools
-from pants.backend.codegen.soap.target_types import WsdlSourceField
+from pants.backend.codegen.soap.target_types import (
+    WsdlSourceField,
+    WsdlSourcesGeneratorTarget,
+    WsdlSourceTarget,
+)
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -38,6 +42,7 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
@@ -183,4 +188,8 @@ def rules():
         *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromWsdlRequest),
         UnionRule(GenerateToolLockfileSentinel, JaxWsToolsLockfileSentinel),
+        WsdlSourceTarget.register_plugin_field(PrefixedJvmJdkField),
+        WsdlSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
+        WsdlSourceTarget.register_plugin_field(PrefixedJvmResolveField),
+        WsdlSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
     ]

@@ -32,7 +32,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.target_types import JvmJdkField
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
@@ -121,10 +121,6 @@ async def generate_java_from_protobuf(
     return GeneratedSources(source_root_restored)
 
 
-class PrefixedJvmJdkField(JvmJdkField):
-    alias = "jvm_jdk"
-
-
 def rules():
     return [
         *collect_rules(),
@@ -132,4 +128,6 @@ def rules():
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
+        ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
     ]

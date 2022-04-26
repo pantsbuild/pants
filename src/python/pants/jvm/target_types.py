@@ -62,6 +62,14 @@ class JvmJdkField(StringField):
     )
 
 
+class PrefixedJvmJdkField(JvmJdkField):
+    alias = "jvm_jdk"
+
+
+class PrefixedJvmResolveField(JvmResolveField):
+    alias = "jvm_resolve"
+
+
 # -----------------------------------------------------------------------------------------------
 # `jvm_artifact` targets
 # -----------------------------------------------------------------------------------------------
