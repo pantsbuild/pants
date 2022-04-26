@@ -171,8 +171,9 @@ async def setup_pex_cli_process(
     if request.concurrency_available > 0:
         global_args.extend(["--jobs", "{pants_concurrency}"])
 
-    if pex_runtime_env.verbosity > 0:
-        global_args.append(f"-{'v' * pex_runtime_env.verbosity}")
+    verbosity_args = (
+        [f"-{'v' * pex_runtime_env.verbosity}"] if pex_runtime_env.verbosity > 0 else []
+    )
 
     resolve_args = (
         [*cert_args, "--python-path", create_path_env_var(pex_env.interpreter_search_paths)]
@@ -182,6 +183,7 @@ async def setup_pex_cli_process(
     args = [
         *global_args,
         *request.subcommand,
+        *verbosity_args,
         *resolve_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
         # the end.
