@@ -3,6 +3,7 @@
 
 import base64
 import gzip
+import subprocess
 import tarfile
 import zipfile
 from io import BytesIO
@@ -66,6 +67,9 @@ def test_extract_tar(rule_runner: RuleRunner, compression: str) -> None:
 
 
 def test_extract_tarlz4(rule_runner: RuleRunner):
+    if subprocess.run(["lz4", "--help"], check=False).returncode != 0:
+        pytest.skip(reason="lz4 not on PATH")
+
     archive_content = base64.b64decode(
         b"BCJNGGRAp9MAAACfdG1wL21zZy8AAQBI+AAwMDAwNzc1ADAwMDE3NTEIAAQCAP8HADE0MjMxNTUzMjAxADAxNDQwM"
         b"gAgNZQASAUCAPUFdXN0YXIgIABqb3NodWFjYW5ub24dAAcCAA8gAA0PAgCkBAACf3R4dC50eHTGAEIA5QE4NjY0+"
