@@ -25,6 +25,8 @@ class JavaInferSubsystem(Subsystem):
         "--third-party-imports",
         default=True,
         help="Infer a target's third-party dependencies using Java import statements.",
+        removal_version="2.13.0.dev0",
+        removal_hint="Controlled by the `--imports` flag.",
     )
     # TODO: Move to `coursier` or a generic `jvm` subsystem.
     third_party_import_mapping = DictOption[Any](
