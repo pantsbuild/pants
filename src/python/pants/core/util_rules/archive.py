@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import PurePath
 
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.system_binaries import SEARCH_PATHS
@@ -72,33 +73,58 @@ async def create_archive(request: CreateArchive) -> Digest:
 
 
 @dataclass(frozen=True)
+class MaybeExtractArchiveRequest:
+    """A request to extract a single archive file (otherwise returns the input digest).
+
+    :param digest: The digest of the archive to maybe extract. If the archive contains a single file
+        which matches a known suffix, the `ExtractedArchive` will contain the extracted digest.
+        Otherwise the `ExtractedArchive` will contain this digest.
+    :param use_suffix: If provided, extracts the single file archive as if it had this suffix.
+        Useful in situations where the file is archived then renamed.
+        (E.g. A Python `.whl` is a renamed `.zip`, so the client should provide `".zip"`)
+    """
+
+    digest: Digest
+    use_suffix: str | None = None
+
+
+@dataclass(frozen=True)
 class ExtractedArchive:
     """The result of extracting an archive."""
 
     digest: Digest
 
 
+@rule
+async def convert_digest_to_MaybeExtractArchiveRequest(
+    digest: Digest,
+) -> MaybeExtractArchiveRequest:
+    """Backwards-compatibility helper."""
+    return MaybeExtractArchiveRequest(digest)
+
+
 @rule(desc="Extracting an archive file", level=LogLevel.DEBUG)
-async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
+async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> ExtractedArchive:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
     extract_archive_dir = "__extract_archive_dir"
     snapshot, output_dir_digest = await MultiGet(
-        Get(Snapshot, Digest, digest),
+        Get(Snapshot, Digest, request.digest),
         Get(Digest, CreateDigest([Directory(extract_archive_dir)])),
     )
     if len(snapshot.files) != 1:
-        return ExtractedArchive(digest)
+        return ExtractedArchive(request.digest)
 
     archive_path = snapshot.files[0]
-    is_zip = archive_path.endswith(".zip")
-    is_tar = archive_path.endswith(
+    archive_suffix = request.use_suffix or "".join(PurePath(archive_path).suffixes)
+    is_zip = archive_suffix.endswith(".zip")
+    is_tar = archive_suffix.endswith(
         (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz", ".tar.lz4")
     )
-    is_gz = not is_tar and archive_path.endswith(".gz")
+    is_gz = not is_tar and archive_suffix.endswith(".gz")
     if not is_zip and not is_tar and not is_gz:
-        return ExtractedArchive(digest)
+        return ExtractedArchive(request.digest)
 
-    merge_digest_get = Get(Digest, MergeDigests((digest, output_dir_digest)))
+    merge_digest_get = Get(Digest, MergeDigests((request.digest, output_dir_digest)))
     if is_zip:
         input_digest, unzip_binary = await MultiGet(
             merge_digest_get,
@@ -111,7 +137,9 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
             merge_digest_get,
             Get(TarBinary, TarBinaryRequest()),
         )
-        argv = tar_binary.extract_archive_argv(archive_path, extract_archive_dir)
+        argv = tar_binary.extract_archive_argv(
+            archive_path, extract_archive_dir, archive_suffix=archive_suffix
+        )
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
     else:
@@ -133,8 +161,8 @@ async def maybe_extract_archive(digest: Digest) -> ExtractedArchive:
             output_directories=(extract_archive_dir,),
         ),
     )
-    digest = await Get(Digest, RemovePrefix(result.output_digest, extract_archive_dir))
-    return ExtractedArchive(digest)
+    resulting_digest = await Get(Digest, RemovePrefix(result.output_digest, extract_archive_dir))
+    return ExtractedArchive(resulting_digest)
 
 
 def rules():
