@@ -100,8 +100,8 @@ class ProtobufSourcesOverridesField(OverridesField):
         ProtobufSourceTarget.alias,
         (
             "overrides={\n"
-            '  "foo.proto": {"grpc": True]},\n'
-            '  "bar.proto": {"description": "our user model"]},\n'
+            '  "foo.proto": {"grpc": True},\n'
+            '  "bar.proto": {"description": "our user model"},\n'
             '  ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
             "}"
         ),
