@@ -14,6 +14,7 @@ from pants.engine.unions import UnionMembership, union
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmTypeProvidingTargets,
     FrozenTrieNode,
+    SymbolNamespace,
     ThirdPartySymbolMapping,
 )
 from pants.jvm.subsystems import JvmSubsystem
@@ -58,11 +59,13 @@ class SymbolMapping:
 
     mapping_roots: FrozenDict[_ResolveName, FrozenTrieNode]
 
-    def addresses_for_symbol(self, symbol: str, resolve: str) -> FrozenOrderedSet[Address]:
+    def addresses_for_symbol(
+        self, symbol: str, resolve: str
+    ) -> FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]]:
         node = self.mapping_roots.get(resolve)
         # Note that it's possible to have a resolve with no associated artifacts.
         if not node:
-            return FrozenOrderedSet()
+            return FrozenDict()
         return node.addresses_for_symbol(symbol)
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -120,7 +123,11 @@ async def merge_symbol_mappings(
     # Check that at least one address declared by each `provides` value actually provides the type:
     for (resolve, provided_type), provided_addresses in provided_types.items():
         symbol_addresses = mapping.addresses_for_symbol(provided_type, resolve=resolve)
-        if not provided_addresses.intersection(symbol_addresses):
+        logger.info(f"addresses for {provided_type} in {resolve}:\n  {symbol_addresses}")
+        if not any(
+            provided_addresses.intersection(ns_addresses)
+            for ns_addresses in symbol_addresses.values()
+        ):
             raise JvmFirstPartyPackageMappingException(
                 f"The target {next(iter(provided_addresses))} declares that it provides the JVM type "
                 f"`{provided_type}`, however, it does not appear to actually provide that type."

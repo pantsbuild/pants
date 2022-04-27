@@ -120,26 +120,23 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()
     for typ in types:
-        matches = symbol_mapping.addresses_for_symbol(typ, resolve)
-        if not matches:
-            continue
+        for matches in symbol_mapping.addresses_for_symbol(typ, resolve).values():
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                matches,
+                address,
+                import_reference="type",
+                context=f"The target {address} imports `{typ}`",
+            )
+            maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
 
-        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-            matches,
-            address,
-            import_reference="type",
-            context=f"The target {address} imports `{typ}`",
-        )
-        maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
-
-        if maybe_disambiguated:
-            dependencies.add(maybe_disambiguated)
-            if typ in export_types:
-                exports.add(maybe_disambiguated)
-        else:
-            # Exports from explicitly provided dependencies:
-            explicitly_provided_exports = set(matches) & set(explicitly_provided_deps.includes)
-            exports.update(explicitly_provided_exports)
+            if maybe_disambiguated:
+                dependencies.add(maybe_disambiguated)
+                if typ in export_types:
+                    exports.add(maybe_disambiguated)
+            else:
+                # Exports from explicitly provided dependencies:
+                explicitly_provided_exports = set(matches) & set(explicitly_provided_deps.includes)
+                exports.update(explicitly_provided_exports)
 
     # Files do not export themselves. Don't be silly.
     if address in exports:

@@ -80,20 +80,17 @@ async def infer_scala_dependencies_via_source_analysis(
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
-        matches = symbol_mapping.addresses_for_symbol(symbol, resolve)
-        if not matches:
-            continue
+        for matches in symbol_mapping.addresses_for_symbol(symbol, resolve).values():
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                matches,
+                address,
+                import_reference="type",
+                context=f"The target {address} imports `{symbol}`",
+            )
 
-        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-            matches,
-            address,
-            import_reference="type",
-            context=f"The target {address} imports `{symbol}`",
-        )
-
-        maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
-        if maybe_disambiguated:
-            dependencies.add(maybe_disambiguated)
+            maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
+            if maybe_disambiguated:
+                dependencies.add(maybe_disambiguated)
 
     return InferredDependencies(dependencies)
 
