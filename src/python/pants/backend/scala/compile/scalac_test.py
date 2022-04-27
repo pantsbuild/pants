@@ -37,6 +37,7 @@ from pants.jvm.testutil import (
     maybe_skip_jdk_test,
 )
 from pants.jvm.util_rules import rules as util_rules
+from pants.testutil.lockfile_fixture import JVMLockfileFixture
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
 
@@ -64,6 +65,10 @@ def rule_runner() -> RuleRunner:
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
+
+LOCKFILE_REQUIREMENTS = pytest.mark.jvm_lockfile(
+    path="scala-library.test.lock", requirements=["org.scala-lang:scala-library:2.13.6"]
+)
 
 DEFAULT_LOCKFILE = TestCoursierWrapper(
     CoursierResolvedLockfile(
@@ -142,7 +147,8 @@ SCALA_LIB_MAIN_SOURCE = dedent(
 
 
 @maybe_skip_jdk_test
-def test_compile_no_deps(rule_runner: RuleRunner) -> None:
+@LOCKFILE_REQUIREMENTS
+def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -153,7 +159,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 """
             ),
             "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "ExampleLib.scala": SCALA_LIB_SOURCE,
         }
     )
