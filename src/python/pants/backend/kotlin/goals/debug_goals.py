@@ -39,7 +39,7 @@ async def dump_kotlin_source_analysis(
         {"address": str(fs.address), **analysis.to_debug_json_dict()}
         for (fs, analysis) in zip(kotlin_source_field_sets, kotlin_source_analysis)
     ]
-    console.write_stdout(json.dumps(kotlin_source_analysis_json))
+    console.print_stdout(json.dumps(kotlin_source_analysis_json))
     return DumpKotlinSourceAnalysis(exit_code=0)
 
 

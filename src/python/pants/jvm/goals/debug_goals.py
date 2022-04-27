@@ -20,7 +20,7 @@ class JvmSymbolMap(Goal):
 
 @goal_rule
 async def jvm_symbol_map(console: Console, symbol_mapping: SymbolMapping) -> JvmSymbolMap:
-    console.write_stdout(json.dumps(symbol_mapping.to_json_dict()))
+    console.print_stdout(json.dumps(symbol_mapping.to_json_dict()))
     return JvmSymbolMap(exit_code=0)
 
 

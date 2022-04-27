@@ -49,6 +49,16 @@ class AvailableThirdPartyArtifacts(
     """Maps coordinates and resolve names to target `Address`es and declared packages."""
 
 
+# A namespace for a symbol which defines the scope for name collisions and ambiguity. For example:
+# if a JVM language allows the same symbol to be declared in an unambiguous way in multiple files
+# (such as Scala `package objects` declaring a type alias for a class/object in another file) it
+# can use a non-default namespace name of its choice.
+SymbolNamespace = str
+
+
+DEFAULT_SYMBOL_NAMESPACE: SymbolNamespace = "default"
+
+
 class MutableTrieNode:
     __slots__ = [
         "children",
@@ -60,7 +70,7 @@ class MutableTrieNode:
     def __init__(self):
         self.children: dict[str, MutableTrieNode] = {}
         self.recursive: bool = False
-        self.addresses: OrderedSet[Address] = OrderedSet()
+        self.addresses: dict[SymbolNamespace, OrderedSet[Address]] = defaultdict(OrderedSet)
         self.first_party: bool = False
 
     def _ensure_child(self, name: str) -> MutableTrieNode:
@@ -76,6 +86,7 @@ class MutableTrieNode:
         addresses: Iterable[Address],
         *,
         first_party: bool,
+        namespace: SymbolNamespace = DEFAULT_SYMBOL_NAMESPACE,
         recursive: bool = False,
     ) -> None:
         imp_parts = symbol.split(".")
@@ -84,7 +95,7 @@ class MutableTrieNode:
             child_node = current_node._ensure_child(imp_part)
             current_node = child_node
 
-        current_node.addresses.update(addresses)
+        current_node.addresses[namespace].update(addresses)
         current_node.first_party = first_party
         current_node.recursive = recursive
 
@@ -92,7 +103,7 @@ class MutableTrieNode:
         return FrozenTrieNode(self)
 
 
-FrozenTrieNodeItem = Tuple[str, bool, FrozenOrderedSet[Address], bool]
+FrozenTrieNodeItem = Tuple[str, bool, FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]], bool]
 
 
 @frozen_after_init
@@ -111,7 +122,9 @@ class FrozenTrieNode:
             children[key] = FrozenTrieNode(child)
         self._children: FrozenDict[str, FrozenTrieNode] = FrozenDict(children)
         self._recursive: bool = node.recursive
-        self._addresses: FrozenOrderedSet[Address] = FrozenOrderedSet(node.addresses)
+        self._addresses: FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]] = FrozenDict(
+            {ns: FrozenOrderedSet(addresses) for ns, addresses in node.addresses.items()}
+        )
         self._first_party: bool = node.first_party
 
     def find_child(self, name: str) -> FrozenTrieNode | None:
@@ -125,7 +138,9 @@ class FrozenTrieNode:
     def first_party(self) -> bool:
         return self._first_party
 
-    def addresses_for_symbol(self, symbol: str) -> FrozenOrderedSet[Address]:
+    def addresses_for_symbol(
+        self, symbol: str
+    ) -> FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]]:
         current_node = self
         imp_parts = symbol.split(".")
 
@@ -138,7 +153,7 @@ class FrozenTrieNode:
             current_node = child_node_opt
 
         if not found_nodes:
-            return FrozenOrderedSet()
+            return FrozenDict()
 
         # If the length of the found nodes equals the number of parts of the package path, then
         # there is an exact match.
@@ -152,10 +167,10 @@ class FrozenTrieNode:
                 return found_node.addresses
 
         # Nothing matched so return no match.
-        return FrozenOrderedSet()
+        return FrozenDict()
 
     @property
-    def addresses(self) -> FrozenOrderedSet[Address]:
+    def addresses(self) -> FrozenDict[SymbolNamespace, FrozenOrderedSet[Address]]:
         return self._addresses
 
     @classmethod
@@ -166,8 +181,15 @@ class FrozenTrieNode:
         """
         result = MutableTrieNode()
         for node in nodes:
-            for symbol, recursive, addresses, first_party in node:
-                result.insert(symbol, addresses, recursive=recursive, first_party=first_party)
+            for symbol, recursive, address_namespaces, first_party in node:
+                for namespace, addresses in address_namespaces.items():
+                    result.insert(
+                        symbol,
+                        addresses,
+                        recursive=recursive,
+                        first_party=first_party,
+                        namespace=namespace,
+                    )
         return FrozenTrieNode(result)
 
     def to_json_dict(self) -> dict[str, Any]:

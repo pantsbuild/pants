@@ -20,6 +20,7 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import Dependencies, DependenciesRequest
 from pants.jvm.dependency_inference.artifact_mapper import (
+    DEFAULT_SYMBOL_NAMESPACE,
     FrozenTrieNode,
     MutableTrieNode,
     ThirdPartySymbolMapping,
@@ -30,13 +31,8 @@ from pants.jvm.resolve import jvm_tool
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import (
-    PYTHON_BOOTSTRAP_ENV,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    logging,
-)
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -77,12 +73,21 @@ def test_trie_node_merge_basic() -> None:
 
     merged = FrozenTrieNode.merge([one.frozen(), two.frozen()])
     assert list(merged) == [
-        ("a/b/c", True, FrozenOrderedSet([Address("1")]), False),
-        ("a/b/c/d", False, FrozenOrderedSet([Address("2"), Address("3")]), False),
+        (
+            "a/b/c",
+            True,
+            FrozenDict({DEFAULT_SYMBOL_NAMESPACE: FrozenOrderedSet([Address("1")])}),
+            False,
+        ),
+        (
+            "a/b/c/d",
+            False,
+            FrozenDict({DEFAULT_SYMBOL_NAMESPACE: FrozenOrderedSet([Address("2"), Address("3")])}),
+            False,
+        ),
     ]
 
 
-@logging
 @maybe_skip_jdk_test
 def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
@@ -143,22 +148,24 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
         return node
 
     # Provided by `JVM_ARTFACT_MAPPINGS.`
-    assert set(traverse("org", "junit").addresses) == {
+    assert set(traverse("org", "junit").addresses[DEFAULT_SYMBOL_NAMESPACE]) == {
         Address("", target_name="junit_junit"),
     }
 
     # Provided by options.
-    assert set(traverse("io", "github", "frenchtoast", "savory").addresses) == {
+    assert set(
+        traverse("io", "github", "frenchtoast", "savory").addresses[DEFAULT_SYMBOL_NAMESPACE]
+    ) == {
         Address("", target_name="github-frenchtoast_savory"),
     }
 
     # Provided on the `jvm_artifact`.
-    assert set(traverse("but", "let", "us", "pretend").addresses) == {
+    assert set(traverse("but", "let", "us", "pretend").addresses[DEFAULT_SYMBOL_NAMESPACE]) == {
         Address("", target_name="does.not_exist"),
     }
 
     # Defaulting to the `group`.
-    assert set(traverse("is", "a", "total").addresses) == {
+    assert set(traverse("is", "a", "total").addresses[DEFAULT_SYMBOL_NAMESPACE]) == {
         Address("", target_name="is.a.total_mystery"),
     }
 

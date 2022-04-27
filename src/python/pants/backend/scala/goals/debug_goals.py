@@ -37,7 +37,7 @@ async def dump_scala_source_analysis(targets: Targets, console: Console) -> Dump
         {"address": str(fs.address), **analysis.to_debug_json_dict()}
         for (fs, analysis) in zip(scala_source_field_sets, scala_source_analysis)
     ]
-    console.write_stdout(json.dumps(scala_source_analysis_json))
+    console.print_stdout(json.dumps(scala_source_analysis_json))
     return DumpScalaSourceAnalysis(exit_code=0)
 
 
