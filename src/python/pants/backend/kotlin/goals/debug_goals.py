@@ -12,6 +12,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Targets
+from pants.jvm.goals import debug_goals
 
 
 class DumpKotlinSourceAnalysisSubsystem(GoalSubsystem):
@@ -46,4 +47,5 @@ def rules():
     return [
         *collect_rules(),
         *kotlin_rules(),
+        *debug_goals.rules(),
     ]

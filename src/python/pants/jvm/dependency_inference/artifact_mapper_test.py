@@ -21,7 +21,8 @@ from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import Dependencies, DependenciesRequest
 from pants.jvm.dependency_inference.artifact_mapper import (
     FrozenTrieNode,
-    ThirdPartyPackageToArtifactMapping,
+    MutableTrieNode,
+    ThirdPartySymbolMapping,
 )
 from pants.jvm.dependency_inference.symbol_mapper import JvmFirstPartyPackageMappingException
 from pants.jvm.jdk_rules import rules as java_util_rules
@@ -36,6 +37,7 @@ from pants.testutil.rule_runner import (
     engine_error,
     logging,
 )
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @pytest.fixture
@@ -52,7 +54,7 @@ def rule_runner() -> RuleRunner:
             *system_binaries.rules(),
             *util_rules(),
             QueryRule(Addresses, [DependenciesRequest]),
-            QueryRule(ThirdPartyPackageToArtifactMapping, []),
+            QueryRule(ThirdPartySymbolMapping, []),
         ],
         objects={"parametrize": Parametrize},
         target_types=[
@@ -64,6 +66,20 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
+
+
+def test_trie_node_merge_basic() -> None:
+    one = MutableTrieNode()
+    one.insert("a/b/c", [Address("1")], recursive=True, first_party=False)
+    one.insert("a/b/c/d", [Address("2")], recursive=False, first_party=False)
+    two = MutableTrieNode()
+    two.insert("a/b/c/d", [Address("3")], recursive=False, first_party=False)
+
+    merged = FrozenTrieNode.merge([one.frozen(), two.frozen()])
+    assert list(merged) == [
+        ("a/b/c", True, FrozenOrderedSet([Address("1")]), False),
+        ("a/b/c/d", False, FrozenOrderedSet([Address("2"), Address("3")]), False),
+    ]
 
 
 @logging
@@ -112,8 +128,8 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
         }
     )
 
-    mapping = rule_runner.request(ThirdPartyPackageToArtifactMapping, [])
-    root_node = mapping.mapping_roots["jvm-default"]
+    mapping = rule_runner.request(ThirdPartySymbolMapping, [])
+    root_node = mapping["jvm-default"]
 
     # Handy trie traversal function to placate mypy
     def traverse(*children) -> FrozenTrieNode:
