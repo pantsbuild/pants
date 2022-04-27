@@ -53,14 +53,16 @@ class JVMLockfileFixture:
     def requirements_as_jvm_artifact_targets(self) -> str:
         targets = ""
         for requirement in self.requirements:
-            targets += textwrap.dedent(f"""\
+            targets += textwrap.dedent(
+                f"""\
             jvm_artifact(
               name="{requirement.coordinate.group}_{requirement.coordinate.artifact}_{requirement.coordinate.version}",
               group="{requirement.coordinate.group}",
               artifact="{requirement.coordinate.artifact}",
               version="{requirement.coordinate.version}",
             )
-            """)
+            """
+            )
         return targets
 
 
