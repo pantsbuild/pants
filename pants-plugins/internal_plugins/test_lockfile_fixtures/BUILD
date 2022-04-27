@@ -4,6 +4,6 @@
 python_sources(
     dependencies=[
         # TODO: This dependency was not inferred for some (yet unknown) reason.
-        "src/python/pants/testutil/lockfile_fixture.py"
+        "src/python/pants/testutil"
     ]
 )
