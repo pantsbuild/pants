@@ -37,7 +37,7 @@ async def dump_java_source_analysis(targets: Targets, console: Console) -> DumpJ
         {"address": str(fs.address), **analysis.to_debug_json_dict()}
         for (fs, analysis) in zip(java_source_field_sets, java_source_analysis)
     ]
-    console.write_stdout(json.dumps(java_source_analysis_json))
+    console.print_stdout(json.dumps(java_source_analysis_json))
     return DumpJavaSourceAnalysis(exit_code=0)
 
 
