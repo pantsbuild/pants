@@ -50,6 +50,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import bullet_list
 
 _logger = logging.getLogger(__name__)
 
@@ -292,26 +293,34 @@ class GenerateOneBSPBuildTargetResult:
     digest: Digest = EMPTY_DIGEST
 
 
-def find_metadata_merge_order(
-    metadata_request_types: Sequence[Type[BSPBuildTargetsMetadataRequest]],
-) -> Sequence[Type[BSPBuildTargetsMetadataRequest]]:
-    if len(metadata_request_types) <= 1:
-        return metadata_request_types
+def merge_metadata(
+    metadata_results_by_request_type: Sequence[
+        tuple[type[BSPBuildTargetsMetadataRequest], BSPBuildTargetsMetadataResult]
+    ],
+) -> BSPData | None:
+    if not metadata_results_by_request_type:
+        return None
+    if len(metadata_results_by_request_type) == 1:
+        return metadata_results_by_request_type[0][1].metadata
 
     # Naive algorithm (since we only support Java and Scala backends), find the metadata request type that cannot
-    # merge from another and put that first.
-    if len(metadata_request_types) != 2:
+    # merge from another and use that one.
+    if len(metadata_results_by_request_type) != 2:
         raise AssertionError(
             "BSP core rules only support naive ordering of language-backend metadata. Contact Pants developers."
         )
-    if not metadata_request_types[0].can_merge_metadata_from:
-        return metadata_request_types
-    elif not metadata_request_types[1].can_merge_metadata_from:
-        return list(reversed(metadata_request_types))
+    if not metadata_results_by_request_type[0][0].can_merge_metadata_from:
+        metadata_index = 1
+    elif not metadata_results_by_request_type[1][0].can_merge_metadata_from:
+        metadata_index = 0
     else:
         raise AssertionError(
             "BSP core rules only support naive ordering of language-backend metadata. Contact Pants developers."
         )
+
+    # Pretend to merge the metadata into a single piece of metadata, but really just choose the metadata
+    # from the selected provider.
+    return metadata_results_by_request_type[metadata_index][1].metadata
 
 
 @rule
@@ -323,49 +332,42 @@ async def generate_one_bsp_build_target_request(
     # Find all Pants targets that are part of this BSP build target.
     targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
 
-    # Classify the targets by the language backends that claim them to provide metadata for them.
-    field_sets_by_lang_id: dict[str, OrderedSet[FieldSet]] = defaultdict(OrderedSet)
-    # lang_ids_by_field_set: dict[Type[FieldSet], set[str]] = defaultdict(set)
+    # Classify the targets by the language backends that claim to provide metadata for them.
+    field_sets_by_request_type: dict[
+        type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]
+    ] = defaultdict(OrderedSet)
     metadata_request_types: FrozenOrderedSet[
         Type[BSPBuildTargetsMetadataRequest]
     ] = union_membership.get(BSPBuildTargetsMetadataRequest)
-    metadata_request_types_by_lang_id = {
-        metadata_request_type.language_id: metadata_request_type
-        for metadata_request_type in metadata_request_types
-    }
+    metadata_request_types_by_lang_id: dict[str, type[BSPBuildTargetsMetadataRequest]] = {}
+    for metadata_request_type in metadata_request_types:
+        previous = metadata_request_types_by_lang_id.get(metadata_request_type.language_id)
+        if previous:
+            raise ValueError(
+                f"Multiple implementations claim to support `{metadata_request_type.language_id}`:"
+                f"{bullet_list([previous.__name__, metadata_request_type.__name__])}"
+                "\n"
+                "Do you have conflicting language support backends enabled?"
+            )
+        metadata_request_types_by_lang_id[metadata_request_type.language_id] = metadata_request_type
+
     for tgt in targets:
         for metadata_request_type in metadata_request_types:
             field_set_type: Type[FieldSet] = metadata_request_type.field_set_type
             if field_set_type.is_applicable(tgt):
-                field_sets_by_lang_id[metadata_request_type.language_id].add(
-                    field_set_type.create(tgt)
-                )
-                # lang_ids_by_field_set[field_set_type].add(metadata_request_type.language_id)
+                field_sets_by_request_type[metadata_request_type].add(field_set_type.create(tgt))
 
-    # TODO: Consider how to check whether the provided languages are compatible or whether compatible resolves
-    # selected.
-
-    # Request each language backend to provide metadata for the BuildTarget.
+    # Request each language backend to provide metadata for the BuildTarget, and then merge it.
     metadata_results = await MultiGet(
         Get(
             BSPBuildTargetsMetadataResult,
             BSPBuildTargetsMetadataRequest,
-            metadata_request_types_by_lang_id[lang_id](field_sets=tuple(field_sets)),
+            request_type(field_sets=tuple(field_sets)),
         )
-        for lang_id, field_sets in field_sets_by_lang_id.items()
+        for request_type, field_sets in field_sets_by_request_type.items()
     )
-    metadata_results_by_lang_id = {
-        lang_id: metadata_result
-        for lang_id, metadata_result in zip(field_sets_by_lang_id.keys(), metadata_results)
-    }
+    metadata = merge_metadata(list(zip(field_sets_by_request_type.keys(), metadata_results)))
 
-    # Pretend to merge the metadata into a single piece of metadata, but really just choose the metadata
-    # from the last provider.
-    metadata_merge_order = find_metadata_merge_order(
-        [metadata_request_types_by_lang_id[lang_id] for lang_id in field_sets_by_lang_id.keys()]
-    )
-    # TODO: None if no metadata obtained.
-    metadata = metadata_results_by_lang_id[metadata_merge_order[-1].language_id].metadata
     digest = await Get(Digest, MergeDigests([r.digest for r in metadata_results]))
 
     # Determine "base directory" for this build target using source roots.
@@ -398,7 +400,7 @@ async def generate_one_bsp_build_target_request(
                 can_run=any(r.can_run for r in metadata_results),
                 can_debug=any(r.can_debug for r in metadata_results),
             ),
-            language_ids=tuple(sorted(field_sets_by_lang_id.keys())),
+            language_ids=tuple(sorted(req.language_id for req in field_sets_by_request_type)),
             dependencies=(),
             data=metadata,
         ),
