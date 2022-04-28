@@ -58,15 +58,24 @@ _FS = TypeVar("_FS", bound=FieldSet)
 
 @union
 @dataclass(frozen=True)
+class BSPResolveFilterRequest(Generic[_FS]):
+    resolve_prefix: ClassVar[str]
+    resolve_field: ClassVar[Type[StringField]]
+
+
+@dataclass(frozen=True)
+class BSPResolveFilter:
+    include: Callable[[str], bool]
+
+
+@union
+@dataclass(frozen=True)
 class BSPBuildTargetsMetadataRequest(Generic[_FS]):
     """Hook to allow language backends to provide metadata for BSP build targets."""
 
     language_id: ClassVar[str]
     can_merge_metadata_from: ClassVar[tuple[str, ...]]
     field_set_type: ClassVar[Type[_FS]]
-
-    resolve_prefix: ClassVar[str]
-    resolve_field: ClassVar[Type[StringField]]
 
     field_sets: tuple[_FS, ...]
 
@@ -237,11 +246,17 @@ async def resolve_bsp_build_target_addresses(
             f"prefix like `$lang:$filter`, but the configured value: `{resolve_filter}` did not."
         )
 
-    resolve_fields = {
-        bbtmr.resolve_field
-        for bbtmr in union_membership.get(BSPBuildTargetsMetadataRequest)
+    requests = union_membership.get(BSPResolveFilterRequest)
+    filters = await MultiGet(
+        Get(BSPResolveFilter, BSPResolveFilterRequest, request)
+        for request in requests
+    )
+
+    resolve_field_filters = [
+        bbtmr.resolve_field, 
+        for bbtmr, resolve_filter in zip(requests, filters)
         if bbtmr.resolve_prefix == resolve_prefix
-    }
+    ]
     return Targets(
         t for t in targets if any(t.get(f).value == resolve_value for f in resolve_fields)
     )
