@@ -184,19 +184,27 @@ impl Core {
 
     let maybe_nailgunnable_local_command_runner: Box<dyn CommandRunner> =
       if exec_strategy_opts.local_enable_nailgun {
+        // We set the nailgun pool size the number of instances that fit within the memory
+        // parameters configured when a max child process memory has been given.
+        // Otherwise, pool size will be double of the local parallelism so we can always keep
+        // a jvm warmed up.
+        let pool_size: usize;
+        if exec_strategy_opts.child_max_memory > 0 {
+          pool_size = max(
+            1,
+            exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
+          );
+        } else {
+          pool_size = exec_strategy_opts.local_parallelism * 2;
+        }
+
         Box::new(nailgun::CommandRunner::new(
           local_command_runner,
           local_execution_root_dir.to_path_buf(),
           store.clone(),
           executor.clone(),
-          // We set the nailgun pool size the number of instances that fit within the memory
-          // parameters configured.
-          // TODO: The nailgun pool size should be configurable independent of concurrency, along
-          // with per-instance memory usage. See https://github.com/pantsbuild/pants/issues/13067.
-          max(
-            1,
-            exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
-          ),
+          pool_size,
+          exec_strategy_opts.child_default_memory,
         ))
       } else {
         Box::new(local_command_runner)

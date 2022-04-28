@@ -349,6 +349,12 @@ class JvmProcess:
         self.extra_env = FrozenDict(extra_env or {})
         self.use_nailgun = use_nailgun
 
+        if not use_nailgun and extra_jvm_options:
+            raise AssertionError(
+                "`JvmProcess` expecified jvm options, but has `use_nailgun=False`. Either "
+                "specify `extra_jvm_options=None` or `use_nailgun=True`."
+            )
+
         if not use_nailgun and extra_nailgun_keys:
             raise AssertionError(
                 "`JvmProcess` specified nailgun keys, but has `use_nailgun=False`. Either "
@@ -370,7 +376,10 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
         **jdk.env,
         **request.extra_env,
     }
-    jvm_options = [*jdk.global_jvm_options, *request.extra_jvm_options]
+
+    jvm_options = []
+    if request.use_nailgun:
+        jvm_options = [*jdk.global_jvm_options, *request.extra_jvm_options]
 
     use_nailgun = []
     if request.use_nailgun:

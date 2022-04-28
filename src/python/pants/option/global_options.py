@@ -341,7 +341,7 @@ class ExecutionOptions:
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
 
-    child_process_max_memory_usage: int
+    child_process_max_memory_usage: int | None
     child_process_default_memory_usage: int
 
     remote_store_address: str | None
@@ -458,7 +458,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     # Process execution setup.
-    child_process_max_memory_usage=memory_size("1GiB"),
+    child_process_max_memory_usage=None,
     child_process_default_memory_usage=memory_size("256MiB"),
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
@@ -1061,7 +1061,7 @@ class BootstrapOptions:
     child_process_max_memory_usage = MemorySizeOption(
         "--child-process-max-memory-usage",
         advanced=True,
-        default=DEFAULT_EXECUTION_OPTIONS.child_process_max_memory_usage,
+        default=None,
         default_help_repr="1GiB",
         help=softwrap(
             """
@@ -1603,7 +1603,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                     f"""
                     Nailgun pool can not be initialised as the total amount of memory allowed is \
                     smaller than the memory allocation for a single child process.
-                    
+
                     - total child process memory allowed: {fmt_memory_size(opts.child_process_max_memory_usage)}
 
                     - default child process memory: {fmt_memory_size(opts.child_process_default_memory_usage)}

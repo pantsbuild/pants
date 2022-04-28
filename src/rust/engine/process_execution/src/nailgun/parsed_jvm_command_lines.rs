@@ -13,7 +13,8 @@ pub struct ParsedJVMCommandLines {
 
 impl ParsedJVMCommandLines {
   ///
-  /// Given a list of args that one would likely pass to a java call,
+  /// Given a list of args that one would likely pass to a java call
+  /// and an interpolation context for the JVM flags,
   /// we automatically split it to generate two argument lists:
   ///  - nailgun arguments: The list of arguments needed to start the nailgun server.
   ///    These arguments include everything in the arg list up to (but not including) the main class.

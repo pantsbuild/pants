@@ -85,13 +85,13 @@ def test_java_binary_bogus_version_fails(rule_runner: RuleRunner) -> None:
 @pytest.mark.no_error_if_skipped
 def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     # default version is 1.11
-    assert "javac 11.0" in run_javac_version(rule_runner)
+    assert 'openjdk version "11.0' in run_javac_version(rule_runner)
 
     rule_runner.set_options(["--jvm-tool-jdk=adopt:1.8"], env_inherit=PYTHON_BOOTSTRAP_ENV)
-    assert "javac 1.8" in run_javac_version(rule_runner)
+    assert 'openjdk version "1.8' in run_javac_version(rule_runner)
 
     rule_runner.set_options(["--jvm-tool-jdk=adopt:1.14"], env_inherit=PYTHON_BOOTSTRAP_ENV)
-    assert "javac 1.14" in run_javac_version(rule_runner)
+    assert 'openjdk version "14"' in run_javac_version(rule_runner)
 
     rule_runner.set_options(["--jvm-tool-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
@@ -120,6 +120,7 @@ def test_parse_java_version() -> None:
     assert parse_jre_major_version(version2) == 11
 
 
+@maybe_skip_jdk_test
 def test_pass_jvm_options_to_nailgun(rule_runner: RuleRunner) -> None:
     global_jvm_options = ["-Dpants.jvm.global=true"]
 

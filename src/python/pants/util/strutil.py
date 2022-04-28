@@ -268,7 +268,7 @@ def fmt_memory_size(value: int) -> str:
     unit_idx = 0
 
     while rem >= 1024 and unit_idx < len(_MEMORY_UNITS) - 1:
-        rem = rem / 1024
+        rem = int(rem / 1024)
         unit_idx += 1
 
     return f"{rem} {_MEMORY_UNITS[unit_idx]}"
