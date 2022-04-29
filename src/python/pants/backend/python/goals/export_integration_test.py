@@ -27,22 +27,28 @@ SOURCES = {
 class _ToolConfig:
     name: str
     version: str
-    experimental: bool = False
-    backend_prefix: str | None = "lint"
+    backend: str | None
+    dist_info_prefix: str | None = None
 
 
 EXPORTED_TOOLS: List[_ToolConfig] = [
-    _ToolConfig(name="autoflake", version="1.3.1", experimental=True),
-    _ToolConfig(name="bandit", version="1.6.2"),
-    _ToolConfig(name="black", version="22.3.0"),
-    _ToolConfig(name="docformatter", version="1.3.1"),
-    _ToolConfig(name="flake8", version="4.0.1"),
-    _ToolConfig(name="isort", version="5.10.1"),
-    _ToolConfig(name="pylint", version="2.13.1"),
-    _ToolConfig(name="pyupgrade", version="2.31.1", experimental=True),
-    _ToolConfig(name="yapf", version="0.32.0"),
-    _ToolConfig(name="mypy", version="0.940", backend_prefix="typecheck"),
-    _ToolConfig(name="pytest", version="7.1.0", backend_prefix=None),
+    _ToolConfig(name="autoflake", version="1.3.1", backend="experimental.python.lint.autoflake"),
+    _ToolConfig(name="bandit", version="1.6.2", backend="python.lint.bandit"),
+    _ToolConfig(name="black", version="22.3.0", backend="python.lint.black"),
+    _ToolConfig(name="docformatter", version="1.3.1", backend="python.lint.docformatter"),
+    _ToolConfig(name="flake8", version="4.0.1", backend="python.lint.flake8"),
+    _ToolConfig(name="isort", version="5.10.1", backend="python.lint.isort"),
+    _ToolConfig(name="pylint", version="2.13.1", backend="python.lint.pylint"),
+    _ToolConfig(name="pyupgrade", version="2.31.1", backend="experimental.python.lint.pyupgrade"),
+    _ToolConfig(name="yapf", version="0.32.0", backend="python.lint.yapf"),
+    _ToolConfig(name="mypy", version="0.940", backend="python.typecheck.mypy"),
+    _ToolConfig(name="pytest", version="7.1.0", backend=None),
+    _ToolConfig(
+        name="import-linter",
+        version="1.2.5",
+        backend="python.lint.import_linter",
+        dist_info_prefix="import_linter",
+    ),
 ]
 
 
@@ -66,15 +72,9 @@ def build_config(tmpdir: str) -> Mapping:
             "lockfile": f"{tmpdir}/3rdparty/{tool_config.name}.lock",
         }
 
-        if not tool_config.backend_prefix:
+        if not tool_config.backend:
             continue
-
-        plugin_suffix = f"python.{tool_config.backend_prefix}.{tool_config.name}"
-
-        if tool_config.experimental:
-            plugin_suffix = f"experimental.{plugin_suffix}"
-
-        cfg["GLOBAL"]["backend_packages"].append(f"pants.backend.{plugin_suffix}")
+        cfg["GLOBAL"]["backend_packages"].append(f"pants.backend.{tool_config.backend}")
 
     return cfg
 
@@ -105,8 +105,11 @@ def test_export() -> None:
 
         # NOTE: Not every tool implements --version so this is the best we can do.
         lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
+        dist_info_prefix = tool_config.dist_info_prefix
+        if not dist_info_prefix:
+            dist_info_prefix = tool_config.name
         expected_tool_dir = os.path.join(
-            lib_dir, f"{tool_config.name}-{tool_config.version}.dist-info"
+            lib_dir, f"{dist_info_prefix}-{tool_config.version}.dist-info"
         )
         assert os.path.isdir(
             expected_tool_dir

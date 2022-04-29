@@ -231,6 +231,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.python.lint.black",
         "pants.backend.python.lint.docformatter",
         "pants.backend.python.lint.flake8",
+        "pants.backend.python.lint.import_linter",
         "pants.backend.python.lint.isort",
         "pants.backend.python.lint.pylint",
         "pants.backend.python.lint.yapf",

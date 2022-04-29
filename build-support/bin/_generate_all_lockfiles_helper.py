@@ -24,6 +24,7 @@ from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.flake8.subsystem import Flake8
+from pants.backend.python.lint.import_linter.subsystem import ImportLinter
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
@@ -97,6 +98,9 @@ AllTools = (
     DefaultTool.python(Black),
     DefaultTool.python(Docformatter),
     DefaultTool.python(Flake8, source_plugins=True),
+    DefaultTool.python(
+        ImportLinter, backend="pants.backend.python.lint.import_linter", source_plugins=True
+    ),
     DefaultTool.python(Isort),
     DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),
     DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),

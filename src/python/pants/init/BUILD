@@ -46,6 +46,7 @@ target(
         "src/python/pants/backend/python/lint/black",
         "src/python/pants/backend/python/lint/docformatter",
         "src/python/pants/backend/python/lint/flake8",
+        "src/python/pants/backend/python/lint/import_linter",
         "src/python/pants/backend/python/lint/isort",
         "src/python/pants/backend/python/lint/pylint",
         "src/python/pants/backend/python/lint/yapf",
