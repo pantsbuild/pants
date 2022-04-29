@@ -37,7 +37,7 @@ from pants.jvm.testutil import (
     maybe_skip_jdk_test,
 )
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.lockfile_fixture import JVMLockfileFixture
+from internal_plugins.test_lockfile_fixtures import JVMLockfileFixture
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
 
