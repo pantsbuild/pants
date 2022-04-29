@@ -100,15 +100,27 @@ def test_config_file_parsing(rule_runner: RuleRunner) -> None:
 def test_resolve_filtering(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "lib/Example.java": "",
+            "lib/Example1.java": "",
+            "lib/Example2.java": "",
             "lib/BUILD": textwrap.dedent(
                 """\
-            java_source(source='Example.java', resolve=parametrize('jvm-default', 'other'))
-            """
+                java_source(name='lib1', source='Example1.java')
+
+                java_source(
+                    name='lib2',
+                    source='Example2.java',
+                    resolve=parametrize('jvm-default', 'other')
+                )
+                """
             ),
             "bsp.toml": textwrap.dedent(
                 """\
-                [groups.lib]
+                [groups.lib_jvm_default]
+                base_directory = "lib"
+                addresses = ["lib::"]
+                resolve = "jvm:jvm-default"
+
+                [groups.lib_other]
                 base_directory = "lib"
                 addresses = ["lib::"]
                 resolve = "jvm:other"
@@ -116,7 +128,15 @@ def test_resolve_filtering(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    rule_runner.set_options(["--experimental-bsp-groups-config-files=['bsp.toml']"])
+    rule_runner.set_options(
+        [
+            "--experimental-bsp-groups-config-files=['bsp.toml']",
+            "--jvm-resolves={'jvm-default': 'unused', 'other': 'unused'}",
+        ]
+    )
 
-    targets = rule_runner.request(Targets, [BuildTargetIdentifier("pants:lib")])
-    assert {"lib@resolve=other"} == {str(t.address) for t in targets}
+    targets = rule_runner.request(Targets, [BuildTargetIdentifier("pants:lib_jvm_default")])
+    assert {"lib:lib1", "lib:lib2@resolve=jvm-default"} == {str(t.address) for t in targets}
+
+    targets = rule_runner.request(Targets, [BuildTargetIdentifier("pants:lib_other")])
+    assert {"lib:lib2@resolve=other"} == {str(t.address) for t in targets}
