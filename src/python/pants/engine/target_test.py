@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import string
 from collections import namedtuple
 from dataclasses import dataclass
 from enum import Enum
@@ -13,6 +14,7 @@ from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, Pa
 from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
+    CoarsenedTarget,
     DictStringToStringField,
     DictStringToStringSequenceField,
     ExplicitlyProvidedDependencies,
@@ -440,6 +442,35 @@ def test_target_residence_dir() -> None:
         FortranTarget({}, Address("some_dir/subdir"), residence_dir="another_dir").residence_dir
         == "another_dir"
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# Test CoarsenedTarget
+# -----------------------------------------------------------------------------------------------
+
+
+def test_coarsened_target_equality() -> None:
+    a, b = (FortranTarget({}, Address(name)) for name in string.ascii_lowercase[:2])
+
+    def ct(members: List[Target], dependencies: List[CoarsenedTarget] = []):
+        return CoarsenedTarget(members, dependencies)
+
+    assert ct([]) == ct([])
+
+    assert ct([a]) == ct([a])
+    assert ct([a]) != ct([b])
+
+    # Unique instances.
+    assert ct([], [ct([a])]) == ct([], [ct([a])])
+    assert ct([], [ct([a])]) != ct([], [ct([b])])
+
+    # Create two root CTs (with unique `id`s), which contain some reused instances.
+    def nested():
+        ct_a = ct([a])
+        return ct([], [ct_a, ct([], [ct_a])])
+
+    assert id(nested()) != id(nested())
+    assert nested() == nested()
 
 
 # -----------------------------------------------------------------------------------------------

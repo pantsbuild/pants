@@ -712,15 +712,30 @@ class CoarsenedTarget(EngineAwareParameter):
     def __hash__(self) -> int:
         return self._hashcode
 
+    def _eq_helper(self, other: CoarsenedTarget, equal_items: set[tuple[int, int]]) -> bool:
+        key = (id(self), id(other))
+        if key[0] == key[1] or key in equal_items:
+            return True
+
+        is_eq = (
+            self._hashcode == other._hashcode
+            and self.members == other.members
+            and len(self.dependencies) == len(other.dependencies)
+            and all(
+                l._eq_helper(r, equal_items) for l, r in zip(self.dependencies, other.dependencies)
+            )
+        )
+
+        # NB: We only track equal items because any non-equal item will cause the entire
+        # operation to shortcircuit.
+        if is_eq:
+            equal_items.add(key)
+        return is_eq
+
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, CoarsenedTarget):
             return NotImplemented
-        return (
-            self._hashcode == other._hashcode
-            and self.members == other.members
-            # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
-            and self.dependencies == other.dependencies
-        )
+        return self._eq_helper(other, set())
 
     def __str__(self) -> str:
         if len(self.members) > 1:
@@ -751,6 +766,16 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
         """All CoarsenedTargets reachable from these CoarsenedTarget roots."""
         visited: Set[CoarsenedTarget] = set()
         return (ct for root in self for ct in root.coarsened_closure(visited))
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, CoarsenedTargets):
+            return NotImplemented
+        equal_items: set[tuple[int, int]] = set()
+        return len(self) == len(other) and all(
+            l._eq_helper(r, equal_items) for l, r in zip(self, other)
+        )
+
+    __hash__ = Tuple.__hash__
 
 
 @frozen_after_init
