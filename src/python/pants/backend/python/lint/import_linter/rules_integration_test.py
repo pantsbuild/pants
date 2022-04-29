@@ -34,7 +34,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *import_linter_rules(),
             *import_linter_subsystem_rules(),
-            *dependency_inference_rules.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(LintResults, (ImportLinterRequest,)),

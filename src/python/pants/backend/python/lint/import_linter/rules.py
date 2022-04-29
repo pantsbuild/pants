@@ -17,8 +17,10 @@ from pants.backend.python.lint.import_linter.subsystem import (
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
+from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -165,4 +167,10 @@ async def import_linter_lint(
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintTargetsRequest, ImportLinterRequest), *pex.rules()]
+    return [
+        *collect_rules(),
+        *pex.rules(),
+        *pex_from_targets.rules(),
+        *python_sources.rules(),
+        UnionRule(LintTargetsRequest, ImportLinterRequest),
+    ]
