@@ -41,10 +41,10 @@ def create_parser() -> argparse.ArgumentParser:
 
 def determine_release_branch(new_version_str: str) -> str:
     new_version = Version(new_version_str)
-    # Use the main branch for all dev releases, and for the first rc (which creates a stable branch).
+    # Use the main branch for all dev releases, and for the first alpha (which creates a stable branch).
     use_main_branch = new_version.is_devrelease or (
         new_version.pre
-        and "rc0" == "".join(str(p) for p in new_version.pre)
+        and "a0" == "".join(str(p) for p in new_version.pre)
         and new_version.micro == 0
     )
     release_branch = "main" if use_main_branch else f"{new_version.major}.{new_version.minor}.x"

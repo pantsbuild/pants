@@ -38,8 +38,8 @@ class PantsRequirementsTargetGenerator(TargetGenerator):
 
         Because the Plugin API is not yet stable, the version is set automatically for you
         to improve stability. If you're currently using a dev release, the version will be set to
-        that exact dev release. If you're using a release candidate (rc) or stable release, the
-        version will allow any non-dev-release release within the release series, e.g.
+        that exact dev release. If you're using an alpha release, release candidate (rc), or stable
+        release, the version will allow any non-dev-release release within the release series, e.g.
         `>={MAJOR_MINOR}.0rc0,<{PANTS_SEMVER.major}.{PANTS_SEMVER.minor + 1}`.
 
         (If this versioning scheme does not work for you, you can directly create
@@ -67,7 +67,7 @@ def determine_version() -> str:
     # this is much less likely.
     #
     # So, we require exact matches when developing against a dev release, but only require
-    # matching the release series if on an rc or stable release.
+    # matching the release series if on an alpha release, rc, or stable release.
     #
     # If this scheme does not work for users, they can:
     #
@@ -78,7 +78,7 @@ def determine_version() -> str:
         f"=={PANTS_SEMVER}"
         if PANTS_SEMVER.is_devrelease
         else (
-            f">={PANTS_SEMVER.major}.{PANTS_SEMVER.minor}.0rc0,"
+            f">={PANTS_SEMVER.major}.{PANTS_SEMVER.minor}.0a0,"
             f"<{PANTS_SEMVER.major}.{PANTS_SEMVER.minor + 1}"
         )
     )
