@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import ClassVar, Generic, Sequence, Type, TypeVar
 
 import toml
+from typing_extensions import Protocol
 
 from pants.base.build_root import BuildRoot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -43,7 +44,7 @@ from pants.engine.target import (
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
-    StringField,
+    Target,
     Targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -58,14 +59,34 @@ _FS = TypeVar("_FS", bound=FieldSet)
 
 @union
 @dataclass(frozen=True)
-class BSPResolveFilterRequest(Generic[_FS]):
+class BSPResolveFieldFactoryRequest(Generic[_FS]):
+    """Requests an implementation of `BSPResolveFieldFactory` which can filter resolve fields.
+
+    TODO: This is to work around the fact that Field value defaulting cannot have arbitrary
+    subsystem requirements, and so `JvmResolveField` and `PythonResolveField` have methods
+    which compute the true value of the field given a subsytem argument. Consumers need to
+    be type aware, and `@rules` cannot have dynamic requirements.
+
+    See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
+    (including Field registrations) to have `@rule_helper` methods, which would allow the
+    computation of an AsyncFields to directly require a subsystem.
+    """
+
     resolve_prefix: ClassVar[str]
-    resolve_field: ClassVar[Type[StringField]]
+
+
+# TODO: Workaround for https://github.com/python/mypy/issues/5485, because we cannot directly use
+# a Callable.
+class _ResolveFieldFactory(Protocol):
+    def __call__(self, target: Target) -> str | None:
+        pass
 
 
 @dataclass(frozen=True)
-class BSPResolveFilter:
-    include: Callable[[str], bool]
+class BSPResolveFieldFactoryResult:
+    """Computes the resolve field value for a Target, if applicable."""
+
+    resolve_field_value: _ResolveFieldFactory
 
 
 @union
@@ -246,19 +267,17 @@ async def resolve_bsp_build_target_addresses(
             f"prefix like `$lang:$filter`, but the configured value: `{resolve_filter}` did not."
         )
 
-    requests = union_membership.get(BSPResolveFilterRequest)
-    filters = await MultiGet(
-        Get(BSPResolveFilter, BSPResolveFilterRequest, request)
-        for request in requests
+    # TODO: See `BSPResolveFieldFactoryRequest` re: this awkwardness.
+    factories = await MultiGet(
+        Get(BSPResolveFieldFactoryResult, BSPResolveFieldFactoryRequest, request())
+        for request in union_membership.get(BSPResolveFieldFactoryRequest)
+        if request.resolve_prefix == resolve_prefix
     )
 
-    resolve_field_filters = [
-        bbtmr.resolve_field, 
-        for bbtmr, resolve_filter in zip(requests, filters)
-        if bbtmr.resolve_prefix == resolve_prefix
-    ]
     return Targets(
-        t for t in targets if any(t.get(f).value == resolve_value for f in resolve_fields)
+        t
+        for t in targets
+        if any((factory.resolve_field_value)(t) == resolve_value for factory in factories)
     )
 
 
