@@ -26,9 +26,12 @@ from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmJdkField
+from pants.option.global_options import GlobalOptions
+from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty, frozen_after_init
+from pants.util.strutil import fmt_memory_size, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -349,12 +352,6 @@ class JvmProcess:
         self.extra_env = FrozenDict(extra_env or {})
         self.use_nailgun = use_nailgun
 
-        if not use_nailgun and extra_jvm_options:
-            raise AssertionError(
-                "`JvmProcess` expecified jvm options, but has `use_nailgun=False`. Either "
-                "specify `extra_jvm_options=None` or `use_nailgun=True`."
-            )
-
         if not use_nailgun and extra_nailgun_keys:
             raise AssertionError(
                 "`JvmProcess` specified nailgun keys, but has `use_nailgun=False`. Either "
@@ -362,8 +359,13 @@ class JvmProcess:
             )
 
 
+_JVM_HEAP_SIZE_UNITS = ["", "k", "m", "g"]
+
+
 @rule
-async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
+async def jvm_process(
+    bash: BashBinary, request: JvmProcess, global_options: GlobalOptions
+) -> Process:
 
     jdk = request.jdk
 
@@ -377,9 +379,30 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
         **request.extra_env,
     }
 
-    jvm_options = []
-    if request.use_nailgun:
-        jvm_options = [*jdk.global_jvm_options, *request.extra_jvm_options]
+    def valid_jvm_opt(opt: str) -> str:
+        if opt.startswith("-Xmx"):
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Invalid value for JVM options: {opt}.
+
+                    For setting a maximum heap size for the JVM child processes, use
+                    `[GLOBAL].child_process_default_memory_usage` option instead.
+
+                    Run `{bin_name()} help-advanced global` for more information.
+                    """
+                )
+            )
+        return opt
+
+    max_heap_size = fmt_memory_size(
+        global_options.child_process_default_memory_usage, units=_JVM_HEAP_SIZE_UNITS
+    )
+    jvm_user_options = [*jdk.global_jvm_options, *request.extra_jvm_options]
+    jvm_options = [
+        f"-Xmx{max_heap_size}",
+        *[valid_jvm_opt(opt) for opt in jvm_user_options],
+    ]
 
     use_nailgun = []
     if request.use_nailgun:

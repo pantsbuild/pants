@@ -13,7 +13,7 @@ from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess, parse_jre_major_version
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -37,6 +37,8 @@ def rule_runner() -> RuleRunner:
             *system_binaries.rules(),
             QueryRule(BashBinary, ()),
             QueryRule(InternalJdk, ()),
+            QueryRule(Process, (JvmProcess,)),
+            QueryRule(ProcessResult, (Process,)),
             QueryRule(ProcessResult, (JvmProcess,)),
         ],
     )
@@ -44,10 +46,10 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def run_javac_version(rule_runner: RuleRunner) -> str:
+def javac_version_proc(rule_runner: RuleRunner) -> Process:
     jdk = rule_runner.request(InternalJdk, [])
-    process_result = rule_runner.request(
-        ProcessResult,
+    return rule_runner.request(
+        Process,
         [
             JvmProcess(
                 jdk=jdk,
@@ -60,6 +62,13 @@ def run_javac_version(rule_runner: RuleRunner) -> str:
                 use_nailgun=False,
             )
         ],
+    )
+
+
+def run_javac_version(rule_runner: RuleRunner) -> str:
+    process_result = rule_runner.request(
+        ProcessResult,
+        [javac_version_proc(rule_runner)],
     )
     return "\n".join(
         [process_result.stderr.decode("utf-8"), process_result.stdout.decode("utf-8")],
@@ -121,12 +130,40 @@ def test_parse_java_version() -> None:
 
 
 @maybe_skip_jdk_test
-def test_pass_jvm_options_to_nailgun(rule_runner: RuleRunner) -> None:
+def test_inclue_default_heap_size_in_jvm_options(rule_runner: RuleRunner) -> None:
+    proc = javac_version_proc(rule_runner)
+    assert "-Xmx512m" in proc.argv
+
+
+@maybe_skip_jdk_test
+def test_inclue_child_mem_constraint_in_jvm_options(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        ["--child-process-default-memory-usage=1GiB"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    proc = javac_version_proc(rule_runner)
+    assert "-Xmx1g" in proc.argv
+
+
+@maybe_skip_jdk_test
+def test_error_if_users_specify_max_heap_as_jvm_option(rule_runner: RuleRunner) -> None:
+    global_jvm_options = ["-Xmx1g"]
+    rule_runner.set_options(
+        [f"--jvm-global-options={repr(global_jvm_options)}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    with pytest.raises(ExecutionError, match="Invalid value for JVM options: -Xmx1g."):
+        javac_version_proc(rule_runner)
+
+
+@maybe_skip_jdk_test
+def test_pass_jvm_options_to_java_program(rule_runner: RuleRunner) -> None:
     global_jvm_options = ["-Dpants.jvm.global=true"]
 
     # Rely on JEP-330 to run a Java file from source so we don´t need a compile step.
     rule_runner.set_options(
-        ["--jvm-tool-jdk=adopt:1.14", f"--jvm-global-options={repr(global_jvm_options)}"],
+        ["--jvm-tool-jdk=adopt:1.11", f"--jvm-global-options={repr(global_jvm_options)}"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
@@ -167,7 +204,7 @@ def test_pass_jvm_options_to_nailgun(rule_runner: RuleRunner) -> None:
                 extra_jvm_options=["-Dpants.jvm.extra=true"],
                 input_digest=input_digest,
                 description="Echo JVM System properties",
-                use_nailgun=True,
+                use_nailgun=False,
             )
         ],
     )
@@ -175,6 +212,6 @@ def test_pass_jvm_options_to_nailgun(rule_runner: RuleRunner) -> None:
     jvm_properties = [
         prop for prop in process_result.stdout.decode("utf-8").splitlines() if "=" in prop
     ]
-    assert "java.specification.version=14" in jvm_properties
+    assert "java.specification.version=11" in jvm_properties
     assert "pants.jvm.global=true" in jvm_properties
     assert "pants.jvm.extra=true" in jvm_properties

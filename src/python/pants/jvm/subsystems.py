@@ -81,7 +81,6 @@ class JvmSubsystem(Subsystem):
     )
     global_options = StrListOption(
         "--global-options",
-        default=["-Xmx${PANTS_MAX_MEM_MB}m"],
         help=softwrap(
             """
             List of JVM options to pass to all JVM processes.

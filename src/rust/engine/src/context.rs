@@ -204,7 +204,6 @@ impl Core {
           store.clone(),
           executor.clone(),
           pool_size,
-          exec_strategy_opts.child_default_memory,
         ))
       } else {
         Box::new(local_command_runner)

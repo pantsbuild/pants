@@ -302,9 +302,16 @@ def test_softwrap_multiline() -> None:
     assert softwrap("A\n\n\nB") == "A\n\nB"
 
 
-def test_fmt_memory_sizes() -> None:
-    assert fmt_memory_size(312) == "312 bytes"
-    assert fmt_memory_size(2 * 1024) == "2.0 KiB"
-    assert fmt_memory_size(2 * 1024 * 1024) == "2 MiB"
-    assert fmt_memory_size(4 * 1024 * 1024 * 1024) == "4 GiB"
-    assert fmt_memory_size(3 * 1024 * 1024 * 1024 * 1024) == "3287.04 GiB"
+_TEST_MEMORY_SIZES_PARAMS = [
+    (312, "312B"),
+    (1028, "1028B"),
+    (2 * 1024, "2KiB"),
+    (2 * 1024 * 1024, "2MiB"),
+    (4 * 1024 * 1024 * 1024, "4GiB"),
+    (2 * 1024 * 1024 * 1024 * 1024, "2048GiB"),
+]
+
+
+@pytest.mark.parametrize("mem_size, expected", _TEST_MEMORY_SIZES_PARAMS)
+def test_fmt_memory_sizes(mem_size: int, expected: str) -> None:
+    assert fmt_memory_size(mem_size) == expected

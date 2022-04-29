@@ -260,15 +260,15 @@ def softwrap(text: str) -> str:
     return "".join(result_strs).rstrip()
 
 
-_MEMORY_UNITS = ["bytes", "KiB", "MiB", "GiB"]
+_MEMORY_UNITS = ["B", "KiB", "MiB", "GiB"]
 
 
-def fmt_memory_size(value: int) -> str:
-    rem = value
+def fmt_memory_size(value: int, *, units: Iterable[str] = _MEMORY_UNITS) -> str:
+    amount = value
     unit_idx = 0
 
-    while rem >= 1024 and unit_idx < len(_MEMORY_UNITS) - 1:
-        rem = int(rem / 1024)
+    while (amount >= 1024 and amount % 1024 == 0) and unit_idx < len(units) - 1:
+        amount = int(amount / 1024)
         unit_idx += 1
 
-    return f"{rem} {_MEMORY_UNITS[unit_idx]}"
+    return f"{int(amount)}{units[unit_idx]}"

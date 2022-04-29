@@ -24,11 +24,6 @@ mod parsed_jvm_command_lines;
 #[cfg(test)]
 mod parsed_jvm_command_lines_tests;
 
-mod interpolation_context;
-#[cfg(test)]
-mod interpolation_context_tests;
-
-use interpolation_context::InterpolationContext;
 use nailgun_pool::NailgunPool;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
 
@@ -90,7 +85,6 @@ pub struct CommandRunner {
   inner: super::local::CommandRunner,
   nailgun_pool: NailgunPool,
   executor: Executor,
-  max_memory_per_process: usize,
 }
 
 impl CommandRunner {
@@ -100,13 +94,11 @@ impl CommandRunner {
     store: Store,
     executor: Executor,
     nailgun_pool_size: usize,
-    max_memory_per_process: usize,
   ) -> Self {
     CommandRunner {
       inner: runner,
       nailgun_pool: NailgunPool::new(workdir_base, nailgun_pool_size, store, executor.clone()),
       executor,
-      max_memory_per_process,
     }
   }
 
@@ -114,8 +106,6 @@ impl CommandRunner {
     format!("nailgun_server_{}", main_class)
   }
 }
-
-static MBYTES: usize = 1024 * 1024;
 
 #[async_trait]
 impl super::CommandRunner for CommandRunner {
@@ -143,13 +133,6 @@ impl super::CommandRunner for CommandRunner {
         // Separate argument lists, to form distinct EPRs for
         //  1. starting the nailgun server
         //  2. running the client against it
-
-        let mut interpolation = InterpolationContext::new();
-        interpolation.set(
-          "PANTS_MAX_MEM_MB".to_string(),
-          (self.max_memory_per_process / MBYTES).to_string(),
-        );
-
         let ParsedJVMCommandLines {
           nailgun_args,
           client_args,
@@ -166,15 +149,8 @@ impl super::CommandRunner for CommandRunner {
           client_main_class,
           client_args,
         );
-        let server_req = construct_nailgun_server_request(
-          req,
-          server_input_digests,
-          &nailgun_name,
-          nailgun_args
-            .iter()
-            .map(|arg| interpolation.format(arg.clone()))
-            .collect(),
-        );
+        let server_req =
+          construct_nailgun_server_request(req, server_input_digests, &nailgun_name, nailgun_args);
         trace!("Running request under nailgun:\n {:#?}", &client_req);
 
         // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
