@@ -264,9 +264,16 @@ _MEMORY_UNITS = ["B", "KiB", "MiB", "GiB"]
 
 
 def fmt_memory_size(value: int, *, units: Iterable[str] = _MEMORY_UNITS) -> str:
+    """Formats a numeric value as amount of bytes alongside the biggest byte-based unit from the
+    list that represents the same amount without using decimals."""
+
+    if not units:
+        return str(value)
+
     amount = value
     unit_idx = 0
 
+    units = tuple(units)
     while (amount >= 1024 and amount % 1024 == 0) and unit_idx < len(units) - 1:
         amount = int(amount / 1024)
         unit_idx += 1
