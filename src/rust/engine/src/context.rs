@@ -188,15 +188,14 @@ impl Core {
         // parameters configured when a max child process memory has been given.
         // Otherwise, pool size will be double of the local parallelism so we can always keep
         // a jvm warmed up.
-        let pool_size: usize;
-        if exec_strategy_opts.child_max_memory > 0 {
-          pool_size = max(
+        let pool_size: usize = if exec_strategy_opts.child_max_memory > 0 {
+          max(
             1,
             exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
-          );
+          )
         } else {
-          pool_size = exec_strategy_opts.local_parallelism * 2;
-        }
+          exec_strategy_opts.local_parallelism * 2
+        };
 
         Box::new(nailgun::CommandRunner::new(
           local_command_runner,
