@@ -341,8 +341,8 @@ class ExecutionOptions:
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
 
-    child_process_max_memory_usage: int | None
-    child_process_default_memory_usage: int
+    process_total_child_memory_usage: int | None
+    process_per_child_memory_usage: int
 
     remote_store_address: str | None
     remote_store_headers: dict[str, str]
@@ -384,8 +384,8 @@ class ExecutionOptions:
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
-            child_process_max_memory_usage=bootstrap_options.child_process_max_memory_usage,
-            child_process_default_memory_usage=bootstrap_options.child_process_default_memory_usage,
+            process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
+            process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
             remote_store_headers=dynamic_remote_options.store_headers,
@@ -458,8 +458,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     # Process execution setup.
-    child_process_max_memory_usage=None,
-    child_process_default_memory_usage=memory_size("512MiB"),
+    process_total_child_memory_usage=None,
+    process_per_child_memory_usage=memory_size("512MiB"),
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
@@ -1058,7 +1058,7 @@ class BootstrapOptions:
             """
         ),
     )
-    child_process_max_memory_usage = MemorySizeOption(
+    process_total_child_memory_usage = MemorySizeOption(
         "--process-total-child-memory-usage",
         advanced=True,
         default=None,
@@ -1073,21 +1073,24 @@ class BootstrapOptions:
             value would mean a low number of child processes launched and therefore less
             paralellism for the tasks that need those processes.
 
+            If setting this value, consider also setting a value for the `process-per-child-memory-usage`
+            option too.
+
             You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
             `2GiB` or `2.12GiB`. A bare number will be in bytes.
             """
         ),
     )
-    child_process_default_memory_usage = MemorySizeOption(
+    process_per_child_memory_usage = MemorySizeOption(
         "--process-per-child-memory-usage",
         advanced=True,
-        default=DEFAULT_EXECUTION_OPTIONS.child_process_default_memory_usage,
+        default=DEFAULT_EXECUTION_OPTIONS.process_per_child_memory_usage,
         default_help_repr="512MiB",
         help=softwrap(
             """
             The default memory usage for a child process.
 
-            Check the documentation for the `child-process-max-memory-usage` for advice on
+            Check the documentation for the `process-total-child-memory-usage` for advice on
             how to choose an appropriate value for this option.
 
             You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
@@ -1595,8 +1598,8 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             )
 
         if (
-            opts.child_process_max_memory_usage is not None
-            and opts.child_process_max_memory_usage < opts.child_process_default_memory_usage
+            opts.process_total_child_memory_usage is not None
+            and opts.process_total_child_memory_usage < opts.process_per_child_memory_usage
         ):
             raise OptionsError(
                 softwrap(
@@ -1604,9 +1607,9 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                     Nailgun pool can not be initialised as the total amount of memory allowed is \
                     smaller than the memory allocation for a single child process.
 
-                    - total child process memory allowed: {fmt_memory_size(opts.child_process_max_memory_usage)}
+                    - total child process memory allowed: {fmt_memory_size(opts.process_total_child_memory_usage)}
 
-                    - default child process memory: {fmt_memory_size(opts.child_process_default_memory_usage)}
+                    - default child process memory: {fmt_memory_size(opts.process_per_child_memory_usage)}
                     """
                 )
             )

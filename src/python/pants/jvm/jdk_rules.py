@@ -387,7 +387,7 @@ async def jvm_process(
                     Invalid value for JVM options: {opt}.
 
                     For setting a maximum heap size for the JVM child processes, use
-                    `[GLOBAL].child_process_default_memory_usage` option instead.
+                    `[GLOBAL].process_per_child_memory_usage` option instead.
 
                     Run `{bin_name()} help-advanced global` for more information.
                     """
@@ -396,7 +396,7 @@ async def jvm_process(
         return opt
 
     max_heap_size = fmt_memory_size(
-        global_options.child_process_default_memory_usage, units=_JVM_HEAP_SIZE_UNITS
+        global_options.process_per_child_memory_usage, units=_JVM_HEAP_SIZE_UNITS
     )
     jvm_user_options = [*jdk.global_jvm_options, *request.extra_jvm_options]
     jvm_options = [

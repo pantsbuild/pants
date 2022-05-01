@@ -138,7 +138,7 @@ def test_inclue_default_heap_size_in_jvm_options(rule_runner: RuleRunner) -> Non
 @maybe_skip_jdk_test
 def test_inclue_child_mem_constraint_in_jvm_options(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
-        ["--child-process-default-memory-usage=1GiB"],
+        ["--process-per-child-memory-usage=1GiB"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     proc = javac_version_proc(rule_runner)
