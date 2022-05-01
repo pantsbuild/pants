@@ -1059,7 +1059,7 @@ class BootstrapOptions:
         ),
     )
     child_process_max_memory_usage = MemorySizeOption(
-        "--child-process-max-memory-usage",
+        "--process-total-child-memory-usage",
         advanced=True,
         default=None,
         default_help_repr="1GiB",
