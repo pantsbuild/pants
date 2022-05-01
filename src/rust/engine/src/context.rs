@@ -184,7 +184,7 @@ impl Core {
 
     let maybe_nailgunnable_local_command_runner: Box<dyn CommandRunner> =
       if exec_strategy_opts.local_enable_nailgun {
-        // We set the nailgun pool size the number of instances that fit within the memory
+        // We set the nailgun pool size to the number of instances that fit within the memory
         // parameters configured when a max child process memory has been given.
         // Otherwise, pool size will be double of the local parallelism so we can always keep
         // a jvm warmed up.
