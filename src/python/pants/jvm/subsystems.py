@@ -79,3 +79,16 @@ class JvmSubsystem(Subsystem):
             """
         ),
     )
+    global_options = StrListOption(
+        "--global-options",
+        help=softwrap(
+            """
+            List of JVM options to pass to all JVM processes.
+
+            Options set here will be used by any JVM processes required by Pants, with
+            the exception of heap memory settings like `-Xmx`, which need to be set
+            using `[GLOBAL].process_total_child_memory_usage` and `[GLOBAL].process_per_child_memory_usage`.
+            """
+        ),
+        advanced=True,
+    )
