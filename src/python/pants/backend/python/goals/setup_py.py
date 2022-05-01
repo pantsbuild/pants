@@ -912,7 +912,7 @@ def find_packages(
     return (
         tuple(sorted(packages)),
         tuple(sorted(namespace_packages)),
-        tuple((pkg, tuple(sorted(files))) for pkg, files in package_data.items()),
+        tuple((pkg, tuple(sorted(files))) for pkg, files in sorted(package_data.items())),
     )
 
 
