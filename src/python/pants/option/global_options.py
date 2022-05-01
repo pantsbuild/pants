@@ -1079,7 +1079,7 @@ class BootstrapOptions:
         ),
     )
     child_process_default_memory_usage = MemorySizeOption(
-        "--child-process-default-memory-usage",
+        "--process-per-child-memory-usage",
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.child_process_default_memory_usage,
         default_help_repr="512MiB",
