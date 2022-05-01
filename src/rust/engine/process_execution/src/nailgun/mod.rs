@@ -139,6 +139,7 @@ impl super::CommandRunner for CommandRunner {
           client_main_class,
           ..
         } = ParsedJVMCommandLines::parse_command_lines(&req.argv)?;
+
         let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
         let (client_input_digests, server_input_digests) =
           req.input_digests.nailgun_client_and_server();
