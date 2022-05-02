@@ -52,7 +52,6 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -511,19 +510,8 @@ async def generate_chroot(
                 targets=transitive_targets.closure, include_resources=True, include_files=True
             ),
         )
-        source_digest = source_files.source_files.snapshot.digest
-        # To get the stripped target directory we need a dummy path under it. Note that this
-        # is just a dummy string, required because our source root stripping mechanism assumes
-        # that paths are files and starts searching from the parent dir. It doesn't correspond
-        # to an actual file on disk, so there are no collision issues.
-        stripped = await Get(
-            StrippedFileName,
-            StrippedFileNameRequest(
-                os.path.join(request.exported_target.target.address.spec_path, "dummy.py")
-            ),
-        )
-        working_directory = os.path.dirname(stripped.value)
-        chroot_digest = source_digest
+        chroot_digest = source_files.source_files.snapshot.digest
+        working_directory = request.exported_target.target.address.spec_path
     return DistBuildChroot(chroot_digest, working_directory)
 
 
