@@ -58,7 +58,7 @@ class SetuptoolsLockfileSentinel(GenerateToolLockfileSentinel):
 async def setup_setuptools_lockfile(
     _: SetuptoolsLockfileSentinel, setuptools: Setuptools, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    if not setuptools.uses_requirements_from_source_plugins:
+    if not setuptools.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             setuptools, use_pex=python_setup.generate_lockfiles_with_pex
         )
