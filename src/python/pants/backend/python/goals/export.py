@@ -14,8 +14,10 @@ from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_cli import PexPEX
+from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import (
+    ExportError,
     ExportRequest,
     ExportResult,
     ExportResults,
@@ -95,7 +97,7 @@ async def export_virtualenv(
 
     # Note that an internal-only pex will always have the `python` field set.
     # See the build_pex() rule in pex.py.
-    interpreter = requirements_pex.python
+    interpreter = cast(PythonExecutable, requirements_pex.python)
 
     # Get the full python version (including patch #), so we can use it as the venv name.
     res = await Get(
@@ -147,7 +149,12 @@ async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResul
     # TODO: Unify export_virtualenv() and export_tool(), since their implementations mostly overlap.
     dest = os.path.join("python", "virtualenvs", "tools")
     pex = await Get(Pex, PexRequest, request.pex_request)
-    interpreter = pex.python
+    if not request.pex_request.internal_only:
+        raise ExportError(f"The PexRequest for {request.resolve_name} must be internal_only.")
+
+    # Note that an internal-only pex will always have the `python` field set.
+    # See the build_pex() rule in pex.py.
+    interpreter = cast(PythonExecutable, pex.python)
 
     # NOTE: We add a unique-per-tool prefix to the pex_pex path to avoid conflicts when
     # multiple tools are concurrently exporting. Without this prefix all the `export_tool`
