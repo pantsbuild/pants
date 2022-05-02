@@ -12,8 +12,9 @@ from typing import DefaultDict, Iterable, cast
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
+from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_cli import PexPEX
+from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.core.goals.export import (
     ExportError,
@@ -26,7 +27,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -86,39 +87,28 @@ async def export_virtualenv(
             request.root_python_targets, python_setup
         ) or InterpreterConstraints(python_setup.interpreter_constraints)
 
-    min_interpreter = interpreter_constraints.snap_to_minimum(python_setup.interpreter_universe)
-    if not min_interpreter:
-        err_msg = (
-            (
-                f"The resolve '{request.resolve}' (from `[python].resolves`) has invalid interpreter "
-                f"constraints, which are set via `[python].resolves_to_interpreter_constraints`: "
-                f"{interpreter_constraints}. Could not determine the minimum compatible interpreter."
-            )
-            if request.resolve
-            else (
-                "The following interpreter constraints were computed for all the targets for which "
-                f"export was requested: {interpreter_constraints}. There is no python interpreter "
-                "compatible with these constraints. Please restrict the target set to one that shares "
-                "a compatible interpreter."
-            )
-        )
-        raise ExportError(err_msg)
-
     requirements_pex = await Get(
         Pex,
         RequirementsPexRequest(
             (tgt.address for tgt in request.root_python_targets),
-            hardcoded_interpreter_constraints=min_interpreter,
+            hardcoded_interpreter_constraints=interpreter_constraints,
         ),
     )
+
+    # Note that an internal-only pex will always have the `python` field set.
+    # See the build_pex() rule in pex.py.
+    interpreter = cast(PythonExecutable, requirements_pex.python)
 
     # Get the full python version (including patch #), so we can use it as the venv name.
     res = await Get(
         ProcessResult,
-        PexProcess(
-            pex=requirements_pex,
+        Process(
             description="Get interpreter version",
-            argv=["-c", "import sys; print('.'.join(str(x) for x in sys.version_info[0:3]))"],
+            argv=[
+                interpreter.path,
+                "-c",
+                "import sys; print('.'.join(str(x) for x in sys.version_info[0:3]))",
+            ],
         ),
     )
     py_version = res.stdout.strip().decode()
@@ -132,12 +122,13 @@ async def export_virtualenv(
     merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, requirements_pex.digest]))
     pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
     return ExportResult(
-        f"virtualenv for the resolve '{request.resolve}' (using {min_interpreter})",
+        f"virtualenv for the resolve '{request.resolve}' (using Python {py_version})",
         dest,
         digest=merged_digest,
         post_processing_cmds=[
             PostProcessingCommand(
                 [
+                    interpreter.path,
                     pex_pex_path,
                     os.path.join("{digest_root}", requirements_pex.name),
                     "venv",
@@ -155,8 +146,15 @@ async def export_virtualenv(
 
 @rule
 async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResult:
+    # TODO: Unify export_virtualenv() and export_tool(), since their implementations mostly overlap.
     dest = os.path.join("python", "virtualenvs", "tools")
     pex = await Get(Pex, PexRequest, request.pex_request)
+    if not request.pex_request.internal_only:
+        raise ExportError(f"The PexRequest for {request.resolve_name} must be internal_only.")
+
+    # Note that an internal-only pex will always have the `python` field set.
+    # See the build_pex() rule in pex.py.
+    interpreter = cast(PythonExecutable, pex.python)
 
     # NOTE: We add a unique-per-tool prefix to the pex_pex path to avoid conflicts when
     # multiple tools are concurrently exporting. Without this prefix all the `export_tool`
@@ -174,6 +172,7 @@ async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResul
         post_processing_cmds=[
             PostProcessingCommand(
                 [
+                    interpreter.path,
                     os.path.join(pex_pex_dest, pex_pex.exe),
                     os.path.join("{digest_root}", pex.name),
                     "venv",
