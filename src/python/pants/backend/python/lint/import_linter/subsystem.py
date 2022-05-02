@@ -66,7 +66,6 @@ class ImportLinter(PythonToolBase):
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("lint")
-    # TODO(?): args = ArgsListOption()
     config = FileOption(
         "--config",
         default=None,
@@ -116,10 +115,10 @@ class ImportLinter(PythonToolBase):
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
-            check_existence=[".import_linter"],
+            check_existence=[".importlinter"],
             check_content={
-                "setup.cfg": b"[import_linter]",
-                "pyproject.toml": b"[tool.import_linter]",
+                "setup.cfg": b"[importlinter]",
+                "pyproject.toml": b"[importlinter]",
             },
         )
 

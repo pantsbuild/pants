@@ -6,7 +6,6 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.lint.import_linter.rules import (
     ImportLinterPartitions,
     ImportLinterRequest,
@@ -40,6 +39,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ImportLinterPartitions, (ImportLinterRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget, PythonSourceTarget],
+        preserve_tmpdirs=True,
     )
 
 
@@ -56,13 +56,15 @@ def run_import_linter(
     return result.results
 
 
-CONFIG = """[importlinter]
+CONFIG_BASE = """[importlinter]
 root_packages=
     one
     two
     three
 include_external_packages = True
+"""
 
+FORBIDDEN_CONTRACT = """
 [importlinter:contract:1]
 name = Forbidden Contract
 type = forbidden
@@ -71,6 +73,24 @@ source_modules =
 forbidden_modules =
     two
     three.foo
+"""
+
+INDEPENDENCE_CONTRACT = """
+[importlinter:contract:2]
+name = Independence Contract
+type = independence
+modules =
+    one
+    two
+"""
+
+LAYERS_CONTRACT = """
+[importlinter:contract:3]
+name = Layers Contract
+type = layers
+layers =
+    three.bar
+    three
 """
 
 
@@ -82,25 +102,24 @@ forbidden_modules =
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
         {
-            ".importlinter": CONFIG,
+            ".importlinter": f"{CONFIG_BASE}\n{FORBIDDEN_CONTRACT}\n{INDEPENDENCE_CONTRACT}\n{LAYERS_CONTRACT}",
             "one/BUILD": "python_sources()",
-            "one/__init__.py": "",
-            "one/one.py": "import three.bar",
+            "one/__init__.py": "import three.bar",
             "two/BUILD": "python_sources()",
             "two/__init__.py": "",
-            "two/two.py": "import one",
             "three/BUILD": "python_sources()",
             "three/__init__.py": "",
-            "three/three.py": "import two",
-            "three/foo/BUILD": "python_sources()",
-            "three/foo/__init__.py": "",
-            "three/foo/foo.py": "import one",
+            "three/foo.py": "import one",
+            "three/bar.py": "import three",
         }
     )
-    tgt = rule_runner.get_target(Address("one", relative_file_path="one.py"))
+    tgts = [
+        rule_runner.get_target(Address("one", relative_file_path="__init__.py")),
+        rule_runner.get_target(Address("three", relative_file_path="foo.py")),
+    ]
     result = run_import_linter(
         rule_runner,
-        [tgt],
+        tgts,
         extra_args=[f"--import-linter-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
     assert len(result) == 1
