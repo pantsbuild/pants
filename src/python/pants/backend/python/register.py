@@ -39,6 +39,7 @@ from pants.backend.python.target_types import (
     PythonTestsGeneratorTarget,
     PythonTestTarget,
     PythonTestUtilsGeneratorTarget,
+    SetuptoolsSCMVersion,
 )
 from pants.backend.python.util_rules import (
     ancestor_files,
@@ -100,6 +101,7 @@ def target_types():
         PythonTestsGeneratorTarget,
         PythonTestTarget,
         PythonTestUtilsGeneratorTarget,
+        SetuptoolsSCMVersion,
         # Macros.
         PipenvRequirementsTargetGenerator,
         PoetryRequirementsTargetGenerator,

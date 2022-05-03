@@ -121,8 +121,9 @@ async def export_virtualenv(
 
     merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, requirements_pex.digest]))
     pex_pex_path = os.path.join("{digest_root}", pex_pex.exe)
+    maybe_resolve_str = f"for the resolve '{request.resolve}' " if request.resolve else ""
     return ExportResult(
-        f"virtualenv for the resolve '{request.resolve}' (using Python {py_version})",
+        f"virtualenv {maybe_resolve_str}(using Python {py_version})",
         dest,
         digest=merged_digest,
         post_processing_cmds=[
