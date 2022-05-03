@@ -428,15 +428,17 @@ def _invalid_user_lockfile_error(
     if InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
         yield (
             f"- The targets use interpreter constraints (`{user_interpreter_constraints}`) that "
-            "are not compatible with those used to generate the lockfile "
+            "are not a subset of those used to generate the lockfile "
             f"(`{metadata.valid_for_interpreter_constraints}`).\nThe lockfile's interpreter "
             f"constraints are set by the option `[python].resolves_to_interpreter_constraints`, "
-            f"which determines how the lockfile is generated. Note that that option does not "
-            f"impact your own code's interpreter constraints in any way, which must be set via "
-            f"`[python].interpreter_constraints` and the `interpreter_constraints` field "
-            f"({doc_url('python-interpreter-compatibility')}).\nTo fix this, you can either adjust "
-            f"the interpreter constraints of the targets using the resolve "
-            f"'{lockfile.resolve_name}', or adjust `[python].resolves_to_interpreter_constraints` "
+            f"which determines how the lockfile is generated. Note that that option only changes "
+            f"how the lockfile is generated; you must still set interpreter constraints for "
+            f"targets via `[python].interpreter_constraints` and the `interpreter_constraints` "
+            f"field ({doc_url('python-interpreter-compatibility')}). All targets must have "
+            f"interpreter constraints that are a subset of their resolve's constraints.\n"
+            f"To fix this, you can either adjust the interpreter constraints of the targets "
+            f"which use the resolve '{lockfile.resolve_name}', or adjust "
+            f"`[python].resolves_to_interpreter_constraints` "
             f"then run `generate-lockfiles`.\n\n"
         )
 
