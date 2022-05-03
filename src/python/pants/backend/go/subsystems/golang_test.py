@@ -10,16 +10,16 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.go.subsystems.golang import GoRoot
+from pants.backend.go.subsystems.golang import GoRoot, compatible_go_version
 from pants.backend.go.subsystems.golang import rules as golang_rules
 from pants.core.util_rules.system_binaries import BinaryNotFoundError
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.contextutil import temporary_dir
-from pants.util.frozendict import FrozenDict
 
 EXPECTED_VERSION = "1.17"
+EXPECTED_VERSION_NEXT_RELEASE = "1.18"
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def get_goroot(rule_runner: RuleRunner, binary_names_to_scripts: list[tuple[str,
         rule_runner.set_options(
             [
                 f"--golang-go-search-paths={repr(binary_dirs)}",
-                f"--golang-expected-version={EXPECTED_VERSION}",
+                f"--golang-minimum-expected-version={EXPECTED_VERSION}",
             ],
             env_inherit={"PATH"},
         )
@@ -76,6 +76,14 @@ def test_find_valid_binary(rule_runner: RuleRunner) -> None:
         env_output={"GOROOT": "/valid/patch_binary"},
     )
     assert get_goroot(rule_runner, [("go", valid_with_patch)]).path == "/valid/patch_binary"
+
+    valid_later_release = mock_go_binary(
+        version_output=f"go version go{EXPECTED_VERSION_NEXT_RELEASE} darwin/arm64",
+        env_output={"GOROOT": "/valid/subsequent_release"},
+    )
+    assert (
+        get_goroot(rule_runner, [("go", valid_later_release)]).path == "/valid/subsequent_release"
+    )
 
     # Should still work even if there are other Go versions with an invalid version.
     invalid_version = mock_go_binary(
@@ -116,14 +124,16 @@ def test_no_valid_versions(rule_runner: RuleRunner) -> None:
         get_goroot(rule_runner, [("go", invalid1), ("go", invalid2)])
     exc = e.value.wrapped_exceptions[0]
     assert isinstance(exc, BinaryNotFoundError)
-    assert "Cannot find a `go` binary with the expected version" in str(exc)
+    assert "Cannot find a `go` binary compatible with the minimum version" in str(exc)
 
 
-def test_valid_go_version() -> None:
-    go_root = GoRoot("", "1.15", FrozenDict())
+def test_compatible_go_version() -> None:
+    def check(version: str, expected: bool) -> None:
+        assert compatible_go_version(compiler_version="1.15", target_version=version) is expected
+
     for v in range(16):
-        assert go_root.is_compatible_version(f"1.{v}") is True
+        check(f"1.{v}", True)
     for v in range(17, 40):
-        assert go_root.is_compatible_version(f"1.{v}") is False
+        check(f"1.{v}", False)
     for v in range(2, 4):
-        assert go_root.is_compatible_version(f"{v}.0") is False
+        check(f"{v}.0", False)
