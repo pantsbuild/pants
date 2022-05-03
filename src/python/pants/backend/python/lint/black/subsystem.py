@@ -81,13 +81,13 @@ class BlackLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc="Determine if Black should use Python 3.8+ (for lockfile usage)",
+    desc="Determine Black interpreter constraints (for lockfile generation)",
     level=LogLevel.DEBUG,
 )
 async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    if not black.uses_lockfile:
+    if not black.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             black, use_pex=python_setup.generate_lockfiles_with_pex
         )

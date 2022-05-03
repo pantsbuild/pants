@@ -229,7 +229,7 @@ async def setup_flake8_lockfile(
     flake8: Flake8,
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    if not flake8.uses_lockfile:
+    if not flake8.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             flake8, use_pex=python_setup.generate_lockfiles_with_pex
         )

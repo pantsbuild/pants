@@ -222,7 +222,7 @@ class PylintLockfileSentinel(GenerateToolLockfileSentinel):
 @rule(
     desc=(
         "Determine all Python interpreter versions used by Pylint in your project (for "
-        "lockfile usage)"
+        "lockfile generation)"
     ),
     level=LogLevel.DEBUG,
 )
@@ -232,7 +232,7 @@ async def setup_pylint_lockfile(
     pylint: Pylint,
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    if not pylint.uses_lockfile:
+    if not pylint.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             pylint, use_pex=python_setup.generate_lockfiles_with_pex
         )

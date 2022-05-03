@@ -89,14 +89,14 @@ class BanditLockfileSentinel(GenerateToolLockfileSentinel):
 @rule(
     desc=(
         "Determine all Python interpreter versions used by Bandit in your project (for lockfile "
-        "usage)"
+        "generation)"
     ),
     level=LogLevel.DEBUG,
 )
 async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    if not bandit.uses_lockfile:
+    if not bandit.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             bandit, use_pex=python_setup.generate_lockfiles_with_pex
         )
