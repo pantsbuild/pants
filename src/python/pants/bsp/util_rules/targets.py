@@ -18,7 +18,13 @@ from pants.base.specs import AddressSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.bsp.goal import BSPGoal
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BSPData, BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
+from pants.bsp.spec.base import (
+    BSPData,
+    BuildTarget,
+    BuildTargetCapabilities,
+    BuildTargetIdentifier,
+    StatusCode,
+)
 from pants.bsp.spec.targets import (
     DependencyModule,
     DependencyModulesItem,
@@ -108,12 +114,6 @@ class BSPBuildTargetsMetadataResult:
 
     # Metadata for the `data` field of the final `BuildTarget`.
     metadata: BSPData | None = None
-
-    # Build capabilities
-    can_compile: bool = False
-    can_test: bool = False
-    can_run: bool = False
-    can_debug: bool = False
 
     # Output to write into `.pants.d/bsp` for access by IDE.
     digest: Digest = EMPTY_DIGEST
@@ -366,6 +366,13 @@ async def generate_one_bsp_build_target_request(
     # Find all Pants targets that are part of this BSP build target.
     targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
 
+    # Determine whether the targets are compilable.
+    can_compile = any(
+        req_type.field_set_type.is_applicable(t)  # type: ignore[misc]
+        for req_type in union_membership[BSPCompileRequest]
+        for t in targets
+    )
+
     # Classify the targets by the language backends that claim to provide metadata for them.
     field_sets_by_request_type: dict[
         type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]
@@ -429,10 +436,11 @@ async def generate_one_bsp_build_target_request(
             base_directory=base_directory.as_uri() if base_directory else None,
             tags=(),
             capabilities=BuildTargetCapabilities(
-                can_compile=any(r.can_compile for r in metadata_results),
-                can_test=any(r.can_test for r in metadata_results),
-                can_run=any(r.can_run for r in metadata_results),
-                can_debug=any(r.can_debug for r in metadata_results),
+                can_compile=can_compile,
+                can_debug=False,
+                # TODO: See https://github.com/pantsbuild/pants/issues/15050.
+                can_run=False,
+                can_test=False,
             ),
             language_ids=tuple(sorted(req.language_id for req in field_sets_by_request_type)),
             dependencies=(),
@@ -637,6 +645,31 @@ async def bsp_dependency_modules(
     return DependencyModulesResult(
         tuple(DependencyModulesItem(target=r.bsp_target_id, modules=r.modules) for r in responses)
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# Compile request.
+# See https://build-server-protocol.github.io/docs/specification.html#compile-request
+# -----------------------------------------------------------------------------------------------
+
+
+@union
+@dataclass(frozen=True)
+class BSPCompileRequest(Generic[_FS]):
+    """Hook to allow language backends to compile targets."""
+
+    field_set_type: ClassVar[Type[_FS]]
+
+    bsp_target: BSPBuildTargetInternal
+    field_sets: tuple[_FS, ...]
+
+
+@dataclass(frozen=True)
+class BSPCompileResult:
+    """Result of compilation of a target capable of target compilation."""
+
+    status: StatusCode
+    output_digest: Digest
 
 
 def rules():

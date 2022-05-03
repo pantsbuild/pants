@@ -10,11 +10,12 @@ from pants.backend.java.target_types import JavaFieldSet, JavaSourceField
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode
-from pants.bsp.util_rules.compile import BSPCompileRequest, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
+    BSPCompileRequest,
+    BSPCompileResult,
     BSPResolveFieldFactoryRequest,
     BSPResolveFieldFactoryResult,
 )
@@ -78,9 +79,7 @@ def bsp_resolve_field_factory(
 async def bsp_resolve_java_metadata(
     _: JavaBSPBuildTargetsMetadataRequest,
 ) -> BSPBuildTargetsMetadataResult:
-    return BSPBuildTargetsMetadataResult(
-        can_compile=True,
-    )
+    return BSPBuildTargetsMetadataResult()
 
 
 # -----------------------------------------------------------------------------------------------

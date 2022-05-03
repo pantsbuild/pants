@@ -24,11 +24,12 @@ from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier, StatusCode
 from pants.bsp.spec.targets import DependencyModule
-from pants.bsp.util_rules.compile import BSPCompileRequest, BSPCompileResult
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
     BSPBuildTargetsMetadataRequest,
     BSPBuildTargetsMetadataResult,
+    BSPCompileRequest,
+    BSPCompileResult,
     BSPDependencyModulesRequest,
     BSPDependencyModulesResult,
     BSPResolveFieldFactoryRequest,
@@ -173,7 +174,11 @@ async def bsp_resolve_scala_metadata(
 ) -> BSPBuildTargetsMetadataResult:
     resolves = {fs.resolve.normalized_value(jvm) for fs in request.field_sets}
     if len(resolves) > 1:
-        raise ValueError("Cannot provide Scala metadata for multiple resolves.")
+        raise ValueError(
+            "Cannot provide Scala metadata for multiple resolves. Please set the "
+            "`resolve = jvm:$resolve` field in your `[experimental-bsp].groups_config_files` to "
+            "select the relevant resolve to use."
+        )
     resolve = list(resolves)[0]
     scala_version = scala.version_for_resolve(resolve)
 
@@ -194,7 +199,6 @@ async def bsp_resolve_scala_metadata(
             platform=ScalaPlatform.JVM,
             jars=scala_jar_uris,
         ),
-        can_compile=True,
         digest=scala_runtime.content.digest,
     )
 
