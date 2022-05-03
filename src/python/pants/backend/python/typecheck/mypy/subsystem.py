@@ -305,7 +305,7 @@ class MyPyLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc="Determine if MyPy should use Python 3.8+ (for lockfile usage)",
+    desc="Determine MyPy interpreter constraints (for lockfile generation)",
     level=LogLevel.DEBUG,
 )
 async def setup_mypy_lockfile(
@@ -314,7 +314,7 @@ async def setup_mypy_lockfile(
     mypy: MyPy,
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    if not mypy.uses_lockfile:
+    if not mypy.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             mypy, use_pex=python_setup.generate_lockfiles_with_pex
         )
@@ -337,7 +337,7 @@ class MyPyExportSentinel(ExportPythonToolSentinel):
     pass
 
 
-@rule
+@rule(desc="Determine MyPy interpreter constraints (for `export` goal)", level=LogLevel.DEBUG)
 async def mypy_export(
     _: MyPyExportSentinel,
     mypy: MyPy,

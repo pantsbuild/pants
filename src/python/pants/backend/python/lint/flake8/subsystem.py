@@ -274,7 +274,7 @@ class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
 @rule(
     desc=(
         "Determine all Python interpreter versions used by Flake8 in your project (for lockfile "
-        "usage)"
+        "generation)"
     ),
     level=LogLevel.DEBUG,
 )
@@ -284,7 +284,7 @@ async def setup_flake8_lockfile(
     flake8: Flake8,
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    if not flake8.uses_lockfile:
+    if not flake8.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             flake8, use_pex=python_setup.generate_lockfiles_with_pex
         )
@@ -307,7 +307,13 @@ class Flake8ExportSentinel(ExportPythonToolSentinel):
     pass
 
 
-@rule
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Flake8 in your project (for "
+        "`export` goal)"
+    ),
+    level=LogLevel.DEBUG,
+)
 async def flake8_export(
     _: Flake8ExportSentinel,
     flake8: Flake8,

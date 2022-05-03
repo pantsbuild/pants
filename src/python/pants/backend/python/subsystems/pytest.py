@@ -217,14 +217,14 @@ class PytestLockfileSentinel(GenerateToolLockfileSentinel):
 @rule(
     desc=(
         "Determine all Python interpreter versions used by Pytest in your project (for "
-        "lockfile usage)"
+        "lockfile generation)"
     ),
     level=LogLevel.DEBUG,
 )
 async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    if not pytest.uses_lockfile:
+    if not pytest.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             pytest, use_pex=python_setup.generate_lockfiles_with_pex
         )
@@ -241,7 +241,13 @@ class PytestExportSentinel(ExportPythonToolSentinel):
     pass
 
 
-@rule
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Pytest in your project (for "
+        "`export` goal)"
+    ),
+    level=LogLevel.DEBUG,
+)
 async def pytest_export(
     _: PytestExportSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> ExportPythonTool:
