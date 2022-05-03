@@ -217,6 +217,12 @@ class PexRequest(EngineAwareParameter):
                 f"Given platform constraints {self.platforms} for internal only pex request: "
                 f"{self}."
             )
+        if self.internal_only and self.complete_platforms:
+            raise ValueError(
+                "Internal only PEXes can only constrain interpreters with interpreter_constraints."
+                f"Given complete_platform constraints {self.complete_platforms} for internal only "
+                f"pex request: {self}."
+            )
         if self.python and self.platforms:
             raise ValueError(
                 "Only one of platforms or a specific interpreter may be set. Got "
@@ -347,6 +353,7 @@ async def build_pex(
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
     # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
     if request.platforms or request.complete_platforms:
+        # Note that this means that this is not an internal-only pex.
         # TODO(#9560): consider validating that these platforms are valid with the interpreter
         #  constraints.
         argv.extend(request.platforms.generate_pex_arg_list())
