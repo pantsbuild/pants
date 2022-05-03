@@ -27,7 +27,7 @@ class Hadolint(TemplatedExternalTool):
     default_url_platform_mapping = {
         "macos_arm64": "Darwin-x86_64",
         "macos_x86_64": "Darwin-x86_64",
-        "linux_arm64": "linux.aarch64",
+        "linux_arm64": "Linux-arm64",
         "linux_x86_64": "Linux-x86_64",
     }
 
