@@ -49,13 +49,16 @@ class SetuptoolsLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc="Determine all Python interpreter versions used by setuptools in your project",
+    desc=(
+        "Determine all Python interpreter versions used by setuptools in your project "
+        "(for lockfile generation)"
+    ),
     level=LogLevel.DEBUG,
 )
 async def setup_setuptools_lockfile(
     _: SetuptoolsLockfileSentinel, setuptools: Setuptools, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    if not setuptools.uses_lockfile:
+    if not setuptools.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             setuptools, use_pex=python_setup.generate_lockfiles_with_pex
         )
