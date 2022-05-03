@@ -43,6 +43,7 @@ from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
+    PythonSourceFiles,
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
@@ -51,7 +52,6 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressSpecs, AscendantAddresses
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -182,7 +182,7 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
 
 @dataclass(frozen=True)
 class DistBuildSources:
-    """The sources required to build a distribution.
+    """The source-root-stripped sources required to build a distribution with a generated setup.py.
 
     Includes some information derived from analyzing the source, namely the packages, namespace
     packages and resource files in the source.
@@ -486,9 +486,8 @@ async def generate_chroot(
     if generate_setup is None:
         generate_setup = subsys.generate_setup_default
 
-    sources = await Get(DistBuildSources, DistBuildChrootRequest, request)
-
     if generate_setup:
+        sources = await Get(DistBuildSources, DistBuildChrootRequest, request)
         generated_setup_py = await Get(
             GeneratedSetupPy,
             GenerateSetupPyRequest(
@@ -501,18 +500,18 @@ async def generate_chroot(
         working_directory = ""
         chroot_digest = await Get(Digest, MergeDigests((sources.digest, generated_setup_py.digest)))
     else:
-        # To get the stripped target directory we need a dummy path under it. Note that this
-        # is just a dummy string, required because our source root stripping mechanism assumes
-        # that paths are files and starts searching from the parent dir. It doesn't correspond
-        # to an actual file on disk, so there are no collision issues.
-        stripped = await Get(
-            StrippedFileName,
-            StrippedFileNameRequest(
-                os.path.join(request.exported_target.target.address.spec_path, "dummy.py")
+        transitive_targets = await Get(
+            TransitiveTargets,
+            TransitiveTargetsRequest([request.exported_target.target.address]),
+        )
+        source_files = await Get(
+            PythonSourceFiles,
+            PythonSourceFilesRequest(
+                targets=transitive_targets.closure, include_resources=True, include_files=True
             ),
         )
-        working_directory = os.path.dirname(stripped.value)
-        chroot_digest = sources.digest
+        chroot_digest = source_files.source_files.snapshot.digest
+        working_directory = request.exported_target.target.address.spec_path
     return DistBuildChroot(chroot_digest, working_directory)
 
 

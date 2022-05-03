@@ -183,7 +183,7 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
             "src/python/foo/resources/js/code.js": "",
             "files/BUILD": 'file(source="README.txt")',
             "files/README.txt": "",
-            "src/python/BUILD": textwrap.dedent(
+            "BUILD": textwrap.dedent(
                 """
                 python_distribution(
                     name='foo-dist',
@@ -199,13 +199,14 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
                 python_sources(name="setup", dependencies=["src/python/foo"])
                 """
             ),
-            "src/python/setup.py": textwrap.dedent(
+            "setup.py": textwrap.dedent(
                 """
                 from setuptools import setup
 
                 setup(
                     name = "foo",
                     version = "1.2.3",
+                    package_dir={"": "src/python"},
                     packages = ["foo"],
                 )
                 """
@@ -230,15 +231,15 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
         [
             "setup.py",
             "files/README.txt",
-            "foo/bar/__init__.py",
-            "foo/bar/bar.py",
-            "foo/bar/bar.pyi",
-            "foo/resources/js/code.js",
-            "foo/__init__.py",
-            "foo/foo.py",
+            "src/python/foo/bar/__init__.py",
+            "src/python/foo/bar/bar.py",
+            "src/python/foo/bar/bar.pyi",
+            "src/python/foo/resources/js/code.js",
+            "src/python/foo/__init__.py",
+            "src/python/foo/foo.py",
         ],
         None,
-        Address("src/python", target_name="foo-dist"),
+        Address("", target_name="foo-dist"),
     )
 
 
