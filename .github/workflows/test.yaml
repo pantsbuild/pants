@@ -49,9 +49,9 @@ jobs:
 
         '
     - name: Cache Rust toolchain
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.58.1-*
 
           ~/.rustup/update-hashes
@@ -60,10 +60,10 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -75,10 +75,10 @@ jobs:
 
           '
     - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
+          ''pants.toml'') }}-v1
 
           '
         path: '~/.cache/pants/pants_dev_deps
@@ -91,9 +91,9 @@ jobs:
         '
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
+        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -199,9 +199,9 @@ jobs:
 
         '
     - name: Cache Rust toolchain
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.58.1-*
 
           ~/.rustup/update-hashes
@@ -210,10 +210,10 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -225,10 +225,10 @@ jobs:
 
           '
     - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
+          ''pants.toml'') }}-v1
 
           '
         path: '~/.cache/pants/pants_dev_deps
@@ -241,9 +241,9 @@ jobs:
         '
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
+        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -400,9 +400,9 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Rust toolchain
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1
         path: '~/.rustup/toolchains/1.58.1-*
 
           ~/.rustup/update-hashes
@@ -411,10 +411,10 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -500,10 +500,10 @@ jobs:
 
         '
     - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
+          ''pants.toml'') }}-v1
 
           '
         path: '~/.cache/pants/pants_dev_deps
@@ -598,10 +598,10 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
+          ''pants.toml'') }}-v1
 
           '
         path: '~/.cache/pants/pants_dev_deps
@@ -680,10 +680,10 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
+          ''pants.toml'') }}-v1
 
           '
         path: '~/.cache/pants/pants_dev_deps
