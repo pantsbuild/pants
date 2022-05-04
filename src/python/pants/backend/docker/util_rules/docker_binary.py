@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import os
+import textwrap
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -18,7 +18,8 @@ from pants.core.util_rules.system_binaries import (
     BinaryShimsRequest,
 )
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import Digest
+from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.logging import LogLevel
@@ -30,31 +31,16 @@ from pants.util.strutil import pluralize
 class DockerBinary(BinaryPath):
     """The `docker` binary."""
 
-    extra_env: Mapping[str, str]
     extra_input_digests: Mapping[str, Digest] | None
 
     def __init__(
         self,
         path: str,
         fingerprint: str | None = None,
-        extra_env: Mapping[str, str] | None = None,
         extra_input_digests: Mapping[str, Digest] | None = None,
     ) -> None:
-        self.extra_env = {} if extra_env is None else extra_env
         self.extra_input_digests = extra_input_digests
         super().__init__(path, fingerprint)
-
-    def _get_process_environment(self, env: Mapping[str, str]) -> Mapping[str, str]:
-        if not self.extra_env:
-            return env
-
-        res = {**self.extra_env, **env}
-
-        # Merge the PATH entries, in case they are present in both `env` and `self.extra_env`.
-        res["PATH"] = os.pathsep.join(
-            p for p in (m.get("PATH") for m in (self.extra_env, env)) if p
-        )
-        return res
 
     def build_image(
         self,
@@ -85,7 +71,7 @@ class DockerBinary(BinaryPath):
                 f"Building docker image {tags[0]}"
                 + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else "")
             ),
-            env=self._get_process_environment(env),
+            env=env or {},
             input_digest=digest,
             immutable_input_digests=self.extra_input_digests,
             cache_scope=ProcessCacheScope.PER_SESSION,
@@ -96,7 +82,7 @@ class DockerBinary(BinaryPath):
             argv=(self.path, "push", tag),
             cache_scope=ProcessCacheScope.PER_SESSION,
             description=f"Pushing docker image {tag}",
-            env=self._get_process_environment(env or {}),
+            env=env or {},
             immutable_input_digests=self.extra_input_digests,
         )
 
@@ -112,7 +98,7 @@ class DockerBinary(BinaryPath):
             argv=(self.path, "run", *(docker_run_args or []), tag, *(image_args or [])),
             cache_scope=ProcessCacheScope.PER_SESSION,
             description=f"Running docker image {tag}",
-            env=self._get_process_environment(env or {}),
+            env=env or {},
             immutable_input_digests=self.extra_input_digests,
         )
 
@@ -139,6 +125,7 @@ async def find_docker(
     if not docker_options.tools:
         return DockerBinary(first_path.path, first_path.fingerprint)
 
+    tools_path = ".shims"
     tools = await Get(
         BinaryShims,
         BinaryShimsRequest,
@@ -149,14 +136,42 @@ async def find_docker(
             search_path=search_path,
         ),
     )
-    tools_path = ".shims"
-    extra_env = {"PATH": os.path.join(tools_path, tools.bin_directory)}
-    extra_input_digests = {tools_path: tools.digest}
+
+    # In addition to the docker-tool shims we generate above, we generate a shim for the
+    # `docker` CLI itself. This shim ensures that the _absolute path_ to the `.shim/bin`
+    # directory populated above is on the `PATH` for the CLI.
+    #
+    # It's important that we use the absolute path to `.shims/bin` because the use of a
+    # relative path raises an error. The error comes from the `LookPath` function in the
+    # `golang.org/x/sys/execabs` package, which the `docker` CLI started using as of
+    # https://github.com/docker/cli/commit/8d199d5bba9db46b6610bd959d815ce7197402b3. The
+    # error condition was added purposefully by the core Go team, and it's since been
+    # ported to `os/exec` in the Go stdlib (see https://github.com/golang/go/issues/43724).
+    #
+    # Using a shim script for the docker CLI here is ugly, but as far as I can tell it's
+    # the only way to dynamically invoke/inject the value of `$(pwd)` for the docker processes
+    # into an env value. Trying to set `{"PATH": "$(pwd)/.shims/bin"}` in the `env` field
+    # for the returned `DockerBinary` instance doesn't work because the values in that map
+    # are shell-escaped before they are written to `__run.sh`.
+    docker_shim_script = FileContent(
+        "__run_docker.sh",
+        textwrap.dedent(
+            f"""\
+            #!/bin/bash
+            export PATH="$(pwd)/{tools_path}/{tools.bin_directory}:${{PATH}}"
+            exec "{first_path.path}" "${{@}}"
+            """
+        ).encode("utf-8"),
+        is_executable=True,
+    )
+    docker_shim_digest = await Get(Digest, CreateDigest([docker_shim_script]))
+
+    shims_digest = await Get(Digest, MergeDigests([tools.digest, docker_shim_digest]))
+    extra_input_digests = {tools_path: shims_digest}
 
     return DockerBinary(
-        first_path.path,
+        f"{tools_path}/{docker_shim_script.path}",
         first_path.fingerprint,
-        extra_env=extra_env,
         extra_input_digests=extra_input_digests,
     )
 
