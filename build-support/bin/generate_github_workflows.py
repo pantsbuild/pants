@@ -165,7 +165,7 @@ def pants_virtualenv_cache() -> Step:
         "uses": "actions/cache@v3",
         "with": {
             "path": "~/.cache/pants/pants_dev_deps\n",
-            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('3rdparty/python/**', 'pants.toml') }}\n",
+            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('3rdparty/python/**', 'pants.toml') }}-v1\n",
         },
     }
 
@@ -202,7 +202,7 @@ def rust_caches() -> Sequence[Step]:
             "uses": "actions/cache@v3",
             "with": {
                 "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                "key": "${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}",
+                "key": "${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1",
             },
         },
         {
@@ -210,7 +210,7 @@ def rust_caches() -> Sequence[Step]:
             "uses": "actions/cache@v3",
             "with": {
                 "path": "~/.cargo/registry\n~/.cargo/git\n",
-                "key": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}\n",
+                "key": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}-v1\n",
                 "restore-keys": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-\n",
             },
         },
@@ -239,7 +239,7 @@ def install_go() -> Step:
 def bootstrap_caches() -> Sequence[Step]:
     return [
         *rust_caches(),
-        # pants_virtualenv_cache(),
+        pants_virtualenv_cache(),
         # NB: This caching is only intended for the bootstrap jobs to avoid them needing to
         # re-compile when possible. Compare to the upload-artifact and download-artifact actions,
         # which are how the bootstrap jobs share the compiled binaries with the other jobs like
@@ -255,7 +255,7 @@ def bootstrap_caches() -> Sequence[Step]:
             "uses": "actions/cache@v3",
             "with": {
                 "path": "\n".join(NATIVE_FILES),
-                "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}\n",
+                "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1\n",
             },
         },
     ]
@@ -404,7 +404,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 download_apache_thrift(),
                 *setup_primary_python(),
                 expose_all_pythons(),
-                # pants_virtualenv_cache(),
+                pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
@@ -421,7 +421,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
-                # pants_virtualenv_cache(),
+                pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
                 {
@@ -475,7 +475,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 install_jdk(),
                 *setup_primary_python(),
                 expose_all_pythons(),
-                # pants_virtualenv_cache(),
+                pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
                 {

@@ -7,7 +7,7 @@
 # The script defaults to running with either Python 3.7 or Python 3.8. To use another Python version,
 # prefix the script with `PY=python3.8`.
 
-set -eox pipefail
+set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -44,11 +44,6 @@ function exec_pants_bare() {
 
   # Redirect activation and native bootstrap to ensure that they don't interfere with stdout.
   activate_pants_venv 1>&2
-
-  ls -l "$(venv_dir)"
-  ls -l "$(venv_dir)/bin"
-  "$(venv_dir)/bin/python" --version
-
   bootstrap_native_code 1>&2
 
   if [ -n "${USE_NATIVE_PANTS}" ]; then
