@@ -120,7 +120,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
 
         if not (self.log and self.has_histogram_module):
             return
-        from hdrh.histogram import HdrHistogram
+        from hdrh.histogram import HdrHistogram  # pants: no-infer-dep
 
         histograms = context.get_observation_histograms()["histograms"]
         if not histograms:
