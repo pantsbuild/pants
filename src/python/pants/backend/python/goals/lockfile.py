@@ -72,7 +72,7 @@ class GeneratePythonLockfile(GenerateLockfile):
         rather than the option `--interpreter-constraints`, you must pass the arg
         `interpreter_constraints`.
         """
-        if not subsystem.uses_lockfile:
+        if not subsystem.uses_custom_lockfile:
             return cls(
                 requirements=FrozenOrderedSet(),
                 interpreter_constraints=InterpreterConstraints(),
