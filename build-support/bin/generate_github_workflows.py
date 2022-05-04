@@ -142,10 +142,10 @@ def setup_toolchain_auth() -> Step:
 def pants_virtualenv_cache() -> Step:
     return {
         "name": "Cache Pants Virtualenv",
-        "uses": "actions/cache@v2",
+        "uses": "actions/cache@v3",
         "with": {
             "path": "~/.cache/pants/pants_dev_deps\n",
-            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('3rdparty/python/**', 'pants.toml') }}\n",
+            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('3rdparty/python/**', 'pants.toml') }}-v1\n",
         },
     }
 
@@ -179,18 +179,18 @@ def rust_caches() -> Sequence[Step]:
     return [
         {
             "name": "Cache Rust toolchain",
-            "uses": "actions/cache@v2",
+            "uses": "actions/cache@v3",
             "with": {
                 "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                "key": "${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}",
+                "key": "${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1",
             },
         },
         {
             "name": "Cache Cargo",
-            "uses": "actions/cache@v2",
+            "uses": "actions/cache@v3",
             "with": {
                 "path": "~/.cargo/registry\n~/.cargo/git\n",
-                "key": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}\n",
+                "key": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}-v1\n",
                 "restore-keys": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-\n",
             },
         },
@@ -232,10 +232,10 @@ def bootstrap_caches() -> Sequence[Step]:
         },
         {
             "name": "Cache native engine",
-            "uses": "actions/cache@v2",
+            "uses": "actions/cache@v3",
             "with": {
                 "path": "\n".join(NATIVE_FILES),
-                "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}\n",
+                "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1\n",
             },
         },
     ]
