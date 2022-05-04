@@ -75,7 +75,14 @@ class PythonInferSubsystem(Subsystem):
     imports = BoolOption(
         "--imports",
         default=True,
-        help="Infer a target's imported dependencies by parsing import statements from sources.",
+        help=softwrap(
+            """
+            Infer a target's imported dependencies by parsing import statements from sources.
+
+            To ignore a false positive, you can either put `# pants: no-infer-dep` on the line of
+            the import or put `!{bad_address}` in the `dependencies` field of your target.
+            """
+        ),
     )
     string_imports = BoolOption(
         "--string-imports",
@@ -84,6 +91,7 @@ class PythonInferSubsystem(Subsystem):
             """
             Infer a target's dependencies based on strings that look like dynamic
             dependencies, such as Django settings files expressing dependencies as strings.
+
             To ignore any false positives, put `!{bad_address}` in the `dependencies` field
             of your target.
             """
@@ -163,7 +171,19 @@ class PythonInferSubsystem(Subsystem):
     unowned_dependency_behavior = EnumOption(
         "--unowned-dependency-behavior",
         default=UnownedDependencyUsage.DoNothing,
-        help="How to handle inferred dependencies that don't have any owner.",
+        help=softwrap(
+            """
+            How to handle imports that don't have an inferrable owner.
+            
+            Usually when an import cannot be inferred, it represents an issue like Pants not being
+            properly configured, e.g. targets not set up. Often, missing dependencies will result
+            in confusing runtime errors like `ModuleNotFoundError`, so this option can be helpful
+            to error more eagerly.
+
+            To ignore any false positives, either add `# pants: no-infer-dep` to the line of the
+            import or put the import inside a `try: except ImportError:` block.
+            """
+        ),
     )
 
 
@@ -249,25 +269,51 @@ def _maybe_warn_unowned(
     unowned_imports: Iterable[str],
     parsed_imports: ParsedPythonImports,
 ) -> None:
-    if unowned_imports and unowned_dependency_behavior is not UnownedDependencyUsage.DoNothing:
-        unowned_imports_with_lines = [
-            f"{module_name} ({file}:{parsed_imports[module_name].lineno})"
-            for module_name in sorted(unowned_imports)
-        ]
-        raise_error = unowned_dependency_behavior is UnownedDependencyUsage.RaiseError
-        log = logger.error if raise_error else logger.warning
-        log(
-            f"The following imports in {address} have no owners:\n\n{bullet_list(unowned_imports_with_lines)}\n\n"
-            "If you are expecting this import to be provided by your own firstparty code, ensure that it is contained within a source root. "
-            "Otherwise if you are using a requirements file, consider adding the relevant package.\n"
-            "Otherwise consider declaring a `python_requirement_library` target, which can then be inferred.\n"
-            f"See {doc_url('python-third-party-dependencies')}"
-        )
+    if not unowned_imports or unowned_dependency_behavior is UnownedDependencyUsage.DoNothing:
+        return
+    unowned_imports_with_lines = [
+        f"{module_name} (line: {parsed_imports[module_name].lineno})"
+        for module_name in sorted(unowned_imports)
+    ]
+    msg = softwrap(
+        f"""
+        Pants cannot infer owners for the following imports in the file {file} (from the target
+        {address}): 
 
-        if raise_error:
-            raise UnownedDependencyError(
-                "One or more unowned dependencies detected. Check logs for more details."
-            )
+        {bullet_list(unowned_imports_with_lines)}
+
+        If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the 
+        import line.
+
+        Is the import from a third-party dependency? Some common issues:
+
+          * Pants does not know about the requirement, i.e. there is not a `python_requirement`\
+          target for it. You can run `./pants filter --target-type=python_requirement ::` to see\
+          all `python_requirement` targets you have. If you are using `requirements.txt`, Poetry,\
+          or Pipenv, make sure you have `python_requirements`, `poetry_requirements`, and\
+          `pipenv_requirements` target generators, respectively. Double check that the requirement\
+          is in the respective file like `requirements.txt`.
+          * The third-party requirement exposes modules different than Pants's default, e.g. 
+          * TODO: ambiguity
+          * TODO: multiple resolves, but only if relevant
+
+        Is the import from first-party code? Some common issues:
+
+          * The file does not exist.
+          * The file is missing an owning target like `python_sources`. Run `./pants list\
+          path/to/file.py` to see if there are any owners. If not, run `./pants tailor` to generate\
+          targets.
+          * The source root is not correctly set up, which is how Pants knows for example that the\
+          file `src/py/my_project/app.py` exposes the module `my_project.app`. See\
+          {doc_url('source-roots')}.
+          * TODO: ambiguity
+          * TODO: multiple resolves, but only if relevant
+        """
+    )
+    if unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
+        logger.warning(msg)
+    else:
+        raise UnownedDependencyError(msg)
 
 
 @rule(desc="Inferring Python dependencies by analyzing source")
