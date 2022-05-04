@@ -44,6 +44,11 @@ function exec_pants_bare() {
 
   # Redirect activation and native bootstrap to ensure that they don't interfere with stdout.
   activate_pants_venv 1>&2
+
+  ls -l "$(venv_dir)"
+  ls -l "$(venv_dir)/bin"
+  "$(venv_dir)/bin/python" --version
+
   bootstrap_native_code 1>&2
 
   if [ -n "${USE_NATIVE_PANTS}" ]; then
@@ -59,9 +64,6 @@ function exec_pants_bare() {
     fi
     set -e
   fi
-
-  ls -l "$(venv_dir)"
-  ls -l "$(venv_dir)/bin"
 
   # shellcheck disable=SC2086
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
