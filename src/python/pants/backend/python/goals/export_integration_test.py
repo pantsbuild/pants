@@ -69,7 +69,9 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
             assert len(result.post_processing_cmds) == 2
 
             ppc0 = result.post_processing_cmds[0]
-            assert ppc0.argv == (
+            assert ppc0.argv[1:] == (
+                # The first arg is the full path to the python interpreter, which we
+                # don't easily know here, so we ignore it in this comparison.
                 os.path.join("{digest_root}", ".", "pex"),
                 os.path.join("{digest_root}", "requirements.pex"),
                 "venv",
