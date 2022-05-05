@@ -347,6 +347,59 @@ async fn jdk_symlink() {
 }
 
 #[tokio::test]
+#[cfg(unix)]
+async fn test_update_env() {
+  let mut env: BTreeMap<String, String> = BTreeMap::new();
+  env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
+
+  let work_dir = TempDir::new().unwrap();
+  let mut req = Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone());
+  local::update_env(&work_dir.path(), &mut req);
+
+  let path = format!("/usr/bin:{}/bin", work_dir.path().to_str().unwrap());
+
+  assert_eq!(&path, req.env.get(&"PATH".to_string()).unwrap());
+}
+
+#[tokio::test]
+async fn test_chroot_placeholder() {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  let mut env: BTreeMap<String, String> = BTreeMap::new();
+  env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
+
+  let work_tmpdir = TempDir::new().unwrap();
+  let work_root = work_tmpdir.path().to_owned();
+
+  let result = run_command_locally_in_dir(
+    Process::new(vec!["/usr/bin/env".to_owned()]).env(env.clone()),
+    work_root.clone(),
+    false,
+    &mut workunit,
+    None,
+    None,
+  )
+  .await
+  .unwrap();
+
+  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
+  let got_env: BTreeMap<String, String> = stdout
+    .split("\n")
+    .filter(|line| !line.is_empty())
+    .map(|line| line.splitn(2, "="))
+    .map(|mut parts| {
+      (
+        parts.next().unwrap().to_string(),
+        parts.next().unwrap_or("").to_string(),
+      )
+    })
+    .collect();
+
+  let path = format!("/usr/bin:{}", work_root.to_str().unwrap());
+  assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
+  assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
+}
+
+#[tokio::test]
 async fn test_directory_preservation() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
