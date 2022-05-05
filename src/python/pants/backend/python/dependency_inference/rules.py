@@ -268,6 +268,8 @@ def _maybe_warn_unowned(
     unowned_dependency_behavior: UnownedDependencyUsage,
     unowned_imports: Iterable[str],
     parsed_imports: ParsedPythonImports,
+    resolve: str,
+    project_uses_multiple_resolves: bool,
 ) -> None:
     if not unowned_imports or unowned_dependency_behavior is UnownedDependencyUsage.DoNothing:
         return
@@ -275,6 +277,21 @@ def _maybe_warn_unowned(
         f"{module_name} (line: {parsed_imports[module_name].lineno})"
         for module_name in sorted(unowned_imports)
     ]
+    resolves_short_line = (
+        "\n  * Multiple resolves. See below." if project_uses_multiple_resolves else ""
+    )
+    resolves_long_line = (
+        (
+            "\n  * Multiple resolves. A target may exist for the import, but not share the same "
+            f"resolve of `{resolve}` from the target {address}. Pants only can infer dependencies "
+            f"on targets using the same resolve. You may need to set the `resolve=` field for "
+            f"whichever target provides that import (and possibly use the `parametrize` mechanism "
+            f"if that code should work with multiple resolves). See "
+            f"{doc_url('python-third-party-dependencies#multiple-lockfiles')}."
+        )
+        if project_uses_multiple_resolves
+        else ""
+    )
     msg = softwrap(
         f"""
         Pants cannot infer owners for the following imports in the file {file} (from the target
@@ -285,17 +302,18 @@ def _maybe_warn_unowned(
         If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the 
         import line.
 
-        Is the import from a third-party dependency? Some common issues:
+        Is the import from a third-party dependency (see
+        {doc_url("python-third-party-dependencies")})? Some common issues:
 
           * Pants does not know about the requirement, i.e. there is not a `python_requirement`\
           target for it. You can run `./pants filter --target-type=python_requirement ::` to see\
-          all `python_requirement` targets you have. If you are using `requirements.txt`, Poetry,\
+          all `python_requirement` targets. If you are using `requirements.txt`, Poetry,\
           or Pipenv, make sure you have `python_requirements`, `poetry_requirements`, and\
           `pipenv_requirements` target generators, respectively. Double check that the requirement\
           is in the respective file like `requirements.txt`.
-          * The third-party requirement exposes modules different than Pants's default, e.g. 
-          * TODO: ambiguity
-          * TODO: multiple resolves, but only if relevant
+          * The third-party requirement exposes modules different than Pants's default, e.g.\
+          `ansicolors` exposing `colors`. Set the `modules` or `module_mapping` fields.
+          * Ambiguity. See below.{resolves_short_line}
 
         Is the import from first-party code? Some common issues:
 
@@ -306,8 +324,11 @@ def _maybe_warn_unowned(
           * The source root is not correctly set up, which is how Pants knows for example that the\
           file `src/py/my_project/app.py` exposes the module `my_project.app`. See\
           {doc_url('source-roots')}.
-          * TODO: ambiguity
-          * TODO: multiple resolves, but only if relevant
+          * Ambiguity. See below.{resolves_short_line}
+
+        Some common issues with both first and third-party imports:
+
+          * Ambiguity. See above logs if there are warnings and instructions.{resolves_long_line}
         """
     )
     if unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
@@ -350,8 +371,9 @@ async def infer_python_dependencies_via_source(
         ExplicitlyProvidedDependencies, DependenciesRequest(tgt[Dependencies])
     )
 
+    resolve = tgt[PythonResolveField].normalized_value(python_setup)
+
     if parsed_imports:
-        resolve = tgt[PythonResolveField].normalized_value(python_setup)
         import_deps, unowned_imports = _get_imports_info(
             address=tgt.address,
             owners_per_import=await MultiGet(
@@ -382,6 +404,8 @@ async def infer_python_dependencies_via_source(
         python_infer_subsystem.unowned_dependency_behavior,
         unowned_imports,
         parsed_imports,
+        resolve=resolve,
+        project_uses_multiple_resolves=len(python_setup.resolves) > 1,
     )
 
     return InferredDependencies(sorted(inferred_deps))
