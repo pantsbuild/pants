@@ -1,17 +1,18 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import dataclasses
-import os
 
 from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode
 from pants.bsp.util_rules.targets import BSPCompileRequest, BSPCompileResult
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, DigestEntries
-from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
+from pants.engine.fs import AddPrefix, Digest, MergeDigests
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import rule_helper
+from pants.engine.rules import collect_rules, rule_helper
 from pants.engine.target import CoarsenedTargets
+from pants.jvm import classpath
+from pants.jvm.classpath import LooseClassfiles
 from pants.jvm.compile import (
+    ClasspathEntry,
     ClasspathEntryRequest,
     ClasspathEntryRequestFactory,
     FallibleClasspathEntry,
@@ -50,29 +51,32 @@ async def _jvm_bsp_compile(
         for coarsened_target in coarsened_targets
     )
 
-    status = StatusCode.OK
-    if any(r.exit_code != 0 for r in results):
-        status = StatusCode.ERROR
+    entries = FallibleClasspathEntry.if_all_succeeded(results)
+    if entries is None:
+        return BSPCompileResult(
+            status=StatusCode.ERROR,
+            output_digest=EMPTY_DIGEST,
+        )
 
-    output_digest = EMPTY_DIGEST
-    if status == StatusCode.OK:
-        output_entries = []
-        for result in results:
-            if not result.output:
-                continue
-            entries = await Get(DigestEntries, Digest, result.output.digest)
-            output_entries.extend(
-                [
-                    dataclasses.replace(
-                        entry,
-                        path=f"{jvm_classes_directory(request.bsp_target.bsp_target_id)}/{os.path.basename(entry.path)}",
-                    )
-                    for entry in entries
-                ]
-            )
-        output_digest = await Get(Digest, CreateDigest(output_entries))
+    # NB: We are not including the transitive dependencies here: only the targets actually matched
+    # by the roots. All others are exposed as transitive module dependencies.
+    loose_classfiles = await MultiGet(
+        Get(LooseClassfiles, ClasspathEntry, entry) for entry in entries
+    )
+    merged_loose_classfiles = await Get(Digest, MergeDigests(lc.digest for lc in loose_classfiles))
+    output_digest = await Get(
+        Digest,
+        AddPrefix(merged_loose_classfiles, jvm_classes_directory(request.bsp_target.bsp_target_id)),
+    )
 
     return BSPCompileResult(
-        status=status,
+        status=StatusCode.OK,
         output_digest=output_digest,
     )
+
+
+def rules():
+    return [
+        *collect_rules(),
+        *classpath.rules(),
+    ]

@@ -48,6 +48,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
+from pants.jvm.bsp.compile import rules as jvm_compile_rules
 from pants.jvm.bsp.spec import MavenDependencyModule, MavenDependencyModuleArtifact
 from pants.jvm.compile import ClasspathEntryRequestFactory
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
@@ -421,6 +422,7 @@ async def bsp_scala_compile_request(
 def rules():
     return (
         *collect_rules(),
+        *jvm_compile_rules(),
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
         UnionRule(BSPBuildTargetsMetadataRequest, ScalaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPResolveFieldFactoryRequest, ScalaBSPResolveFieldFactoryRequest),

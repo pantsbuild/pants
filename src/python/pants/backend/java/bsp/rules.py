@@ -22,6 +22,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
+from pants.jvm.bsp.compile import rules as jvm_compile_rules
 from pants.jvm.compile import ClasspathEntryRequestFactory
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -141,6 +142,7 @@ async def bsp_java_compile_request(
 def rules():
     return (
         *collect_rules(),
+        *jvm_compile_rules(),
         UnionRule(BSPLanguageSupport, JavaBSPLanguageSupport),
         UnionRule(BSPResolveFieldFactoryRequest, JavaBSPResolveFieldFactoryRequest),
         UnionRule(BSPBuildTargetsMetadataRequest, JavaBSPBuildTargetsMetadataRequest),
