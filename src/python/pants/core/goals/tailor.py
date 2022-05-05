@@ -30,6 +30,8 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import (
     AllUnexpandedTargets,
+    MultipleSourcesField,
+    SingleSourceField,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -64,7 +66,9 @@ class PutativeTargetsSearchPaths:
 @memoized
 def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
     for field in tgt_type.core_fields:
-        if issubclass(field, SourcesField):
+        if issubclass(field, SingleSourceField):
+            return (field.default,) or tuple()
+        if issubclass(field, MultipleSourcesField):
             return field.default or tuple()
     return tuple()
 
@@ -123,7 +127,8 @@ class PutativeTarget:
         if name is None:
             name = os.path.basename(path)
 
-        explicit_sources = (kwargs or {}).get("sources")
+        kwargs = kwargs or {}
+        explicit_sources = (kwargs["source"],) if "source" in kwargs else kwargs.get("sources")
         if explicit_sources is not None and not isinstance(explicit_sources, tuple):
             raise TypeError(
                 "Explicit sources passed to PutativeTarget.for_target_type must be a Tuple[str]."
@@ -136,7 +141,9 @@ class PutativeTarget:
                 f"address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)}, "
                 "but this target type does not have a `sources` field."
             )
-        owned_sources = explicit_sources or default_sources or tuple()
+        owned_sources = {
+            os.path.join(path, f) for f in explicit_sources or default_sources or tuple()
+        }
         return cls(
             path,
             name,

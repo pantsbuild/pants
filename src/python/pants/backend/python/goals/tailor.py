@@ -121,22 +121,42 @@ async def find_putative_targets(
 
     if python_setup.tailor_requirements_targets:
         # Find requirements files.
-        all_requirements_files = await Get(
-            Paths, PathGlobs, req.search_paths.path_globs("*requirements*.txt")
+        (
+            all_requirements_files,
+            all_pipenv_lockfile_files,
+            all_pyproject_toml_contents,
+        ) = await MultiGet(
+            Get(Paths, PathGlobs, req.search_paths.path_globs("*requirements*.txt")),
+            Get(Paths, PathGlobs, req.search_paths.path_globs("Pipfile.lock")),
+            Get(DigestContents, PathGlobs, req.search_paths.path_globs("pyproject.toml")),
         )
         unowned_requirements_files = set(all_requirements_files.files) - set(all_owned_sources)
-        for req_file in unowned_requirements_files:
-            path, name = os.path.split(req_file)
-            pts.append(
-                PutativeTarget(
-                    path=path,
-                    name=name,
-                    type_alias="python_requirements",
-                    triggering_sources=[req_file],
-                    owned_sources=[req_file],
-                    kwargs={} if name == "requirements.txt" else {"source": name},
+        unowned_pipenv_files = set(all_pipenv_lockfile_files.files) - set(all_owned_sources)
+        unowned_poetry_files = {
+            fc.path for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content
+        } - set(all_owned_sources)
+
+        def add_req_targets(files: set[str], alias: str) -> None:
+            for fp in files:
+                path, name = os.path.split(fp)
+                pts.append(
+                    PutativeTarget(
+                        path=path,
+                        name=name,
+                        type_alias=alias,
+                        triggering_sources=[fp],
+                        owned_sources=[fp],
+                        kwargs=(
+                            {}
+                            if alias != "python_requirements" or name == "requirements.txt"
+                            else {"source": name}
+                        ),
+                    )
                 )
-            )
+
+        add_req_targets(unowned_requirements_files, "python_requirements")
+        add_req_targets(unowned_pipenv_files, "pipenv_requirements")
+        add_req_targets(unowned_poetry_files, "poetry_requirements")
 
     if python_setup.tailor_pex_binary_targets:
         # Find binary targets.
