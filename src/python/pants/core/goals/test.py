@@ -345,23 +345,6 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="Path to write test reports to. Must be relative to the build root.",
     )
-    xml_dir = StrOption(
-        "--xml-dir",
-        metavar="<DIR>",
-        removal_version="2.13.0.dev0",
-        removal_hint=(
-            "Set the `report` option in [test] scope to emit reports to a standard location under "
-            "dist/. Set the `report-dir` option to customize that location."
-        ),
-        default=None,
-        advanced=True,
-        help=softwrap(
-            """
-            Specifying a directory causes Junit XML result files to be emitted under
-            that dir for each test run that supports producing them.
-            """
-        ),
-    )
     extra_env_vars = StrListOption(
         "--extra-env-vars",
         help=softwrap(
@@ -448,10 +431,8 @@ async def run_tests(
                 path_prefix=str(distdir.relpath / "test" / result.address.path_safe_spec),
             )
 
-    if test_subsystem.report or test_subsystem.xml_dir:
-        report_dir = (
-            test_subsystem.report_dir(distdir) if test_subsystem.report else test_subsystem.xml_dir
-        )
+    if test_subsystem.report:
+        report_dir = test_subsystem.report_dir(distdir)
         merged_reports = await Get(
             Digest,
             MergeDigests(result.xml_results.digest for result in results if result.xml_results),

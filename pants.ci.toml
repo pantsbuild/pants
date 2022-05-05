@@ -12,7 +12,6 @@ memory_summary = true
 
 [test]
 use_coverage = true
-xml_dir = "dist/test-results/"
 
 [pytest]
 args = ["--no-header", "--noskip", "-vv"]

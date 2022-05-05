@@ -107,7 +107,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 def test_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            ".hadolint.yaml": "ignored: [DL3006, DL3011]",
+            ".hadolint.yaml": "ignored: [DL3006, DL3061, DL3011]",
             "a/Dockerfile": BAD_FILE,
             "a/BUILD": "docker_image()",
             "b/Dockerfile": BAD_FILE,
