@@ -161,18 +161,6 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
             """
         ),
     )
-    fix_python_macros = BoolOption(
-        "--fix-python-macros",
-        default=False,
-        help="Deprecated.",
-        removal_version="2.13.0.dev0",
-        removal_hint=softwrap(
-            """
-            No longer does anything as the old macros have been removed in favor of target
-            generators.
-            """
-        ),
-    )
 
 
 class UpdateBuildFilesGoal(Goal):
