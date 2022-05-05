@@ -434,7 +434,7 @@ class PythonSetup(Subsystem):
             """
             If true, add `python_requirements` target generators with the `tailor` goal for
             requirements files.
-            
+
             This matches any file with the pattern `*requirements*.txt`. You will need to manually
             add `python_requirements` for different file names like `reqs.txt`.
             """
