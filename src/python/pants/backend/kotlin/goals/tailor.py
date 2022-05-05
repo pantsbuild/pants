@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
+from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
 from pants.backend.kotlin.target_types import KotlinSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -37,20 +38,23 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
 async def find_putative_targets(
     req: PutativeKotlinTargetsRequest,
     all_owned_sources: AllOwnedSources,
+    kotlin_subsystem: KotlinSubsystem,
 ) -> PutativeTargets:
-    all_kotlin_files_globs = req.search_paths.path_globs("*.kt")
-    all_kotlin_files = await Get(Paths, PathGlobs, all_kotlin_files_globs)
-    unowned_kotlin_files = set(all_kotlin_files.files) - set(all_owned_sources)
-    classified_unowned_kotlin_files = classify_source_files(unowned_kotlin_files)
-
     putative_targets = []
-    for tgt_type, paths in classified_unowned_kotlin_files.items():
-        for dirname, filenames in group_by_dir(paths).items():
-            putative_targets.append(
-                PutativeTarget.for_target_type(
-                    tgt_type, path=dirname, name=None, triggering_sources=sorted(filenames)
+
+    if kotlin_subsystem.tailor_source_targets:
+        all_kotlin_files_globs = req.search_paths.path_globs("*.kt")
+        all_kotlin_files = await Get(Paths, PathGlobs, all_kotlin_files_globs)
+        unowned_kotlin_files = set(all_kotlin_files.files) - set(all_owned_sources)
+        classified_unowned_kotlin_files = classify_source_files(unowned_kotlin_files)
+
+        for tgt_type, paths in classified_unowned_kotlin_files.items():
+            for dirname, filenames in group_by_dir(paths).items():
+                putative_targets.append(
+                    PutativeTarget.for_target_type(
+                        tgt_type, path=dirname, name=None, triggering_sources=sorted(filenames)
+                    )
                 )
-            )
 
     return PutativeTargets(putative_targets)
 

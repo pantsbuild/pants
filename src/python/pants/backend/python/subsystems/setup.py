@@ -399,16 +399,30 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+
+    tailor_source_targets = BoolOption(
+        "--tailor-source-targets",
+        default=True,
+        help=softwrap(
+            """
+            If true, add `python_sources`, `python_tests`, and `python_test_utils` targets with
+            the `tailor` goal."""
+        ),
+        advanced=True,
+    )
     tailor_ignore_solitary_init_files = BoolOption(
         "--tailor-ignore-solitary-init-files",
         default=True,
         help=softwrap(
             """
-            Don't tailor `python_sources` targets for solitary `__init__.py` files, as
-            those usually exist as import scaffolding rather than true library code.
+            If true, don't add `python_sources` targets for solitary `__init__.py` files with the
+            `tailor` goal.
 
-            Set to False if you commonly have packages containing real code in
-            `__init__.py` and there are no other .py files in the package.
+            Solitary `__init__.py` files usually exist as import scaffolding rather than true
+            library code, so it can be noisy to add BUILD files.
+
+            Set to false if you commonly have packages containing real code in
+            `__init__.py` without other `.py` files in the package.
             """
         ),
         advanced=True,
@@ -416,15 +430,29 @@ class PythonSetup(Subsystem):
     tailor_requirements_targets = BoolOption(
         "--tailor-requirements-targets",
         default=True,
-        help="Tailor python_requirements() targets for requirements files.",
+        help=softwrap(
+            """
+            If true, add `python_requirements` target generators with the `tailor` goal for
+            requirements files.
+
+            This matches any file with the pattern `*requirements*.txt`. You will need to manually
+            add `python_requirements` for different file names like `reqs.txt`.
+            """
+        ),
         advanced=True,
     )
     tailor_pex_binary_targets = BoolOption(
         "--tailor-pex-binary-targets",
         default=True,
-        help="Tailor pex_binary() targets for Python entry point files.",
+        help=softwrap(
+            """
+            If true, add `pex_binary` targets for Python files with a `__main__` clause with the
+            `tailor` goal.
+            """
+        ),
         advanced=True,
     )
+
     macos_big_sur_compatibility = BoolOption(
         "--macos-big-sur-compatibility",
         default=False,

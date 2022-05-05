@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from pants.option.option_types import DictOption
+from pants.option.option_types import BoolOption, DictOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -32,6 +32,16 @@ class ScalaSubsystem(Subsystem):
             maintained for a resolve. To support multiple Scala versions, use multiple resolves.
             """
         ),
+    )
+    tailor_source_targets = BoolOption(
+        "--tailor-source-targets",
+        default=True,
+        help=softwrap(
+            """
+            If true, add `scala_sources`, `scala_junit_tests`, and `scalatest_tests` targets with
+            the `tailor` goal."""
+        ),
+        advanced=True,
     )
 
     def version_for_resolve(self, resolve: str) -> str:

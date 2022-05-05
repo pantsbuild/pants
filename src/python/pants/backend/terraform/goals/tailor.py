@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.terraform.target_types import TerraformModuleTarget
+from pants.backend.terraform.tool import TerraformTool
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -28,8 +29,12 @@ class PutativeTerraformTargetsRequest(PutativeTargetsRequest):
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Terraform targets to create")
 async def find_putative_terrform_module_targets(
     request: PutativeTerraformTargetsRequest,
+    terraform: TerraformTool,
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
+    if not terraform.tailor:
+        return PutativeTargets()
+
     all_terraform_files = await Get(Paths, PathGlobs, request.search_paths.path_globs("*.tf"))
     unowned_terraform_files = set(all_terraform_files.files) - set(all_owned_sources)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from pants.option.option_types import DictOption
+from pants.option.option_types import BoolOption, DictOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -27,6 +27,12 @@ class KotlinSubsystem(Subsystem):
             targets consuming that resolve.
             """
         ),
+    )
+    tailor_source_targets = BoolOption(
+        "--tailor-source-targets",
+        default=True,
+        help="If true, add `kotlin_sources` targets with the `tailor` goal.",
+        advanced=True,
     )
 
     def version_for_resolve(self, resolve: str) -> str:

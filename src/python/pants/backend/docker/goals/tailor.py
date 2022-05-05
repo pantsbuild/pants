@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageSourceField, DockerImageTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -27,8 +28,11 @@ class PutativeDockerTargetsRequest(PutativeTargetsRequest):
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Docker targets to create")
 async def find_putative_targets(
-    req: PutativeDockerTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeDockerTargetsRequest, all_owned_sources: AllOwnedSources, docker: DockerOptions
 ) -> PutativeTargets:
+    if not docker.tailor:
+        return PutativeTargets()
+
     all_dockerfiles = await Get(Paths, PathGlobs, req.search_paths.path_globs("*Dockerfile*"))
     unowned_dockerfiles = set(all_dockerfiles.files) - set(all_owned_sources)
     pts = []

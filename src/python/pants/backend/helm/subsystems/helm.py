@@ -76,6 +76,12 @@ class HelmSubsystem(TemplatedExternalTool):
             """
         ),
     )
+    tailor = BoolOption(
+        "--tailor",
+        default=True,
+        help="If true, add `helm_chart` targets with the `tailor` goal.",
+        advanced=True,
+    )
 
     def generate_exe(self, plat: Platform) -> str:
         mapped_plat = self.default_url_platform_mapping[plat.value]

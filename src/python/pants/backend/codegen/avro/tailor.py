@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.avro.avro_subsystem import AvroSubsystem
 from pants.backend.codegen.avro.target_types import AvroSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -27,8 +28,13 @@ class PutativeAvroTargetsRequest(PutativeTargetsRequest):
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Protobuf targets to create")
 async def find_putative_targets(
-    req: PutativeAvroTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeAvroTargetsRequest,
+    all_owned_sources: AllOwnedSources,
+    avro_subsystem: AvroSubsystem,
 ) -> PutativeTargets:
+    if not avro_subsystem.tailor:
+        return PutativeTargets()
+
     all_avsc_files, all_avpr_files, all_avdl_files = await MultiGet(
         Get(Paths, PathGlobs, req.search_paths.path_globs("*.avsc")),
         Get(Paths, PathGlobs, req.search_paths.path_globs("*.avpr")),
