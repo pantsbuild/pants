@@ -193,7 +193,8 @@ def test_validate_user_lockfiles(
 
     contains("You are using the lockfile at lock.txt to install the resolve `a`")
     contains(
-        "The targets use requirements that are not in the lockfile: ['bad-req']", if_=invalid_reqs
+        "The targets depend on requirements that are not in the lockfile: ['bad-req']",
+        if_=invalid_reqs,
     )
     contains("The targets use interpreter constraints", if_=invalid_constraints)
     contains("./pants generate-lockfiles --resolve=a`")
