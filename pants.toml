@@ -131,6 +131,7 @@ lockfile_generator = "pex"
 
 [python-infer]
 assets = true
+unowned_dependency_behavior = "error"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
