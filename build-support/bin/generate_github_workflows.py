@@ -139,17 +139,6 @@ def setup_toolchain_auth() -> Step:
     }
 
 
-def pants_virtualenv_cache() -> Step:
-    return {
-        "name": "Cache Pants Virtualenv",
-        "uses": "actions/cache@v3",
-        "with": {
-            "path": "~/.cache/pants/pants_dev_deps\n",
-            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('3rdparty/python/**', 'pants.toml') }}-v1\n",
-        },
-    }
-
-
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
@@ -219,7 +208,6 @@ def install_go() -> Step:
 def bootstrap_caches() -> Sequence[Step]:
     return [
         *rust_caches(),
-        pants_virtualenv_cache(),
         # NB: This caching is only intended for the bootstrap jobs to avoid them needing to
         # re-compile when possible. Compare to the upload-artifact and download-artifact actions,
         # which are how the bootstrap jobs share the compiled binaries with the other jobs like
@@ -377,7 +365,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 download_apache_thrift(),
                 *setup_primary_python(),
                 expose_all_pythons(),
-                pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
                 {"name": "Run Python tests", "run": "./pants test ::\n"},
@@ -394,7 +381,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
-                pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
                 {
@@ -446,7 +432,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 install_jdk(),
                 *setup_primary_python(),
                 expose_all_pythons(),
-                pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
                 {
