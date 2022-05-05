@@ -18,6 +18,6 @@ class ThriftSubsystem(Subsystem):
     tailor = BoolOption(
         "--tailor",
         default=True,
-        help="If true, add `thrift-sources` targets with the `tailor` goal.",
+        help="If true, add `thrift_sources` targets with the `tailor` goal.",
         advanced=True,
     )
