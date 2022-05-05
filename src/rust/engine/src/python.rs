@@ -425,7 +425,7 @@ impl Failure {
       locals.set_item("tb", tb).unwrap();
       locals.set_item("val", &val).unwrap();
       py.eval(
-        "''.join(traceback.format_exception(value=val, tb=tb))",
+        "''.join(traceback.format_exception(None, value=val, tb=tb))",
         None,
         Some(locals),
       )
