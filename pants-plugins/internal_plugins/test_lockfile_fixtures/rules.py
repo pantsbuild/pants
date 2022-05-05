@@ -18,8 +18,6 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.base.specs import AddressSpecs
-from pants.base.specs_parser import SpecsParser
 from pants.core.goals.tailor import group_by_dir
 from pants.core.goals.test import TestExtraEnv
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
@@ -29,7 +27,7 @@ from pants.engine.fs import CreateDigest, DigestContents, FileContent, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
@@ -55,7 +53,7 @@ class CollectionPlugin:
 
 
 collection_plugin = CollectionPlugin()
-pytest.main(["--collect-only", "src/python/pants"], plugins=[collection_plugin])
+pytest.main(["--collect-only", *sys.argv[1:]], plugins=[collection_plugin])
 output = []
 cwd = Path.cwd()
 for item in collection_plugin.collected:
@@ -108,35 +106,33 @@ async def collect_fixture_configs(
     pytest: PyTest,
     python_setup: PythonSetup,
     test_extra_env: TestExtraEnv,
+    targets: Targets,
 ) -> CollectedJVMLockfileFixtureConfigs:
-    specs_parser = SpecsParser()
-    specs = specs_parser.parse_specs(["src/python/pants::"])
-    targets = await Get(Targets, AddressSpecs, specs.address_specs)
     addresses = [tgt.address for tgt in targets]
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
     all_targets = transitive_targets.closure
 
     interpreter_constraints = InterpreterConstraints.create_from_targets(all_targets, python_setup)
 
-    requirements_pex_get = Get(Pex, RequirementsPexRequest(addresses))
-    pytest_pex_get = Get(
-        Pex,
-        PexRequest(
-            output_filename="pytest.pex",
-            requirements=pytest.pex_requirements(),
-            interpreter_constraints=interpreter_constraints,
-            internal_only=True,
+    pytest_pex, requirements_pex, prepared_sources, root_sources = await MultiGet(
+        Get(
+            Pex,
+            PexRequest(
+                output_filename="pytest.pex",
+                requirements=pytest.pex_requirements(),
+                interpreter_constraints=interpreter_constraints,
+                internal_only=True,
+            ),
         ),
-    )
-
-    prepared_sources_get = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
-    )
-
-    (pytest_pex, requirements_pex, prepared_sources,) = await MultiGet(
-        pytest_pex_get,
-        requirements_pex_get,
-        prepared_sources_get,
+        Get(Pex, RequirementsPexRequest(addresses)),
+        Get(
+            PythonSourceFiles,
+            PythonSourceFilesRequest(all_targets, include_files=True, include_resources=True),
+        ),
+        Get(
+            PythonSourceFiles,
+            PythonSourceFilesRequest(targets),
+        ),
     )
 
     script_content = FileContent(
@@ -187,17 +183,20 @@ async def collect_fixture_configs(
         Process,
         VenvPexProcess(
             pytest_runner_pex,
-            argv=[*prepared_sources.source_files.files],
+            argv=[name for name in root_sources.source_files.files if name.endswith(".py")],
             extra_env=extra_env,
             input_digest=input_digest,
             output_files=("tests.json",),
             description="Collect test lockfile requirements from all tests.",
             level=LogLevel.DEBUG,
+            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
 
     result = await Get(ProcessResult, Process, process)
     digest_contents = await Get(DigestContents, Digest, result.output_digest)
+    assert len(digest_contents) == 1
+    assert digest_contents[0].path == "tests.json"
     raw_config_data = json.loads(digest_contents[0].content)
 
     configs = []
@@ -255,7 +254,7 @@ async def internal_render_test_lockfile_fixtures(
     console: Console,
 ) -> InternalGenerateTestLockfileFixturesGoal:
     if not rendered_fixtures:
-        console.write_stdout("No test lockfile fixtures found.")
+        console.write_stdout("No test lockfile fixtures found.\n")
         return InternalGenerateTestLockfileFixturesGoal(exit_code=0)
 
     digest_contents = [

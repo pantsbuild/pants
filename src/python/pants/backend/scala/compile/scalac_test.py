@@ -9,6 +9,7 @@ from textwrap import dedent
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixture
 from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
@@ -37,7 +38,6 @@ from pants.jvm.testutil import (
     maybe_skip_jdk_test,
 )
 from pants.jvm.util_rules import rules as util_rules
-from internal_plugins.test_lockfile_fixtures import JVMLockfileFixture
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, logging
 
 

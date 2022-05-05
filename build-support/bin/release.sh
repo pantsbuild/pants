@@ -33,6 +33,4 @@ fi
 # NB: This must align with $PY for the native wheel to be built correctly.
 export PANTS_PYTHON_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
 
-exec ./pants \
-  --backend-packages='-["internal_plugins.test_lockfile_fixtures"]' \
-  run build-support/bin/_release_helper.py -- "$@"
+exec ./pants run build-support/bin/_release_helper.py -- "$@"
