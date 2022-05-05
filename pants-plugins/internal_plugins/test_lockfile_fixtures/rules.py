@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from pathlib import PurePath
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixtureDefinition
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
@@ -34,7 +35,6 @@ from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsReq
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
-from pants.testutil.lockfile_fixture import JVMLockfileFixtureDefinition
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
