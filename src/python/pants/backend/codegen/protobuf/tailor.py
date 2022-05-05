@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -27,8 +28,11 @@ class PutativeProtobufTargetsRequest(PutativeTargetsRequest):
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Protobuf targets to create")
 async def find_putative_targets(
-    req: PutativeProtobufTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeProtobufTargetsRequest, all_owned_sources: AllOwnedSources, protoc: Protoc
 ) -> PutativeTargets:
+    if not protoc.tailor:
+        return PutativeTargets()
+
     all_proto_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.proto"))
     unowned_proto_files = set(all_proto_files.files) - set(all_owned_sources)
     pts = [

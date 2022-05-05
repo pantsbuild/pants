@@ -90,33 +90,34 @@ async def find_putative_targets(
     all_owned_sources: AllOwnedSources,
     python_setup: PythonSetup,
 ) -> PutativeTargets:
-    # Find library/test/test_util targets.
-
-    all_py_files_globs: PathGlobs = req.search_paths.path_globs("*.py")
-    all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
-    unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
-    classified_unowned_py_files = classify_source_files(unowned_py_files)
     pts = []
-    for tgt_type, paths in classified_unowned_py_files.items():
-        for dirname, filenames in group_by_dir(paths).items():
-            name: str | None
-            if issubclass(tgt_type, PythonTestsGeneratorTarget):
-                name = "tests"
-            elif issubclass(tgt_type, PythonTestUtilsGeneratorTarget):
-                name = "test_utils"
-            else:
-                name = None
-            if (
-                python_setup.tailor_ignore_solitary_init_files
-                and tgt_type == PythonSourcesGeneratorTarget
-                and filenames == {"__init__.py"}
-            ):
-                continue
-            pts.append(
-                PutativeTarget.for_target_type(
-                    tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
+
+    if python_setup.tailor_source_targets:
+        # Find library/test/test_util targets.
+        all_py_files_globs: PathGlobs = req.search_paths.path_globs("*.py")
+        all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
+        unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
+        classified_unowned_py_files = classify_source_files(unowned_py_files)
+        for tgt_type, paths in classified_unowned_py_files.items():
+            for dirname, filenames in group_by_dir(paths).items():
+                name: str | None
+                if issubclass(tgt_type, PythonTestsGeneratorTarget):
+                    name = "tests"
+                elif issubclass(tgt_type, PythonTestUtilsGeneratorTarget):
+                    name = "test_utils"
+                else:
+                    name = None
+                if (
+                    python_setup.tailor_ignore_solitary_init_files
+                    and tgt_type == PythonSourcesGeneratorTarget
+                    and filenames == {"__init__.py"}
+                ):
+                    continue
+                pts.append(
+                    PutativeTarget.for_target_type(
+                        tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
+                    )
                 )
-            )
 
     if python_setup.tailor_requirements_targets:
         # Find requirements files.

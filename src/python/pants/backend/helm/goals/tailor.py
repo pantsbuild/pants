@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from itertools import chain
 
+from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartTarget
 from pants.backend.helm.util_rules.chart_metadata import HELM_CHART_METADATA_FILENAMES
 from pants.core.goals.tailor import (
@@ -28,8 +29,13 @@ class PutativeHelmChartTargetsRequest(PutativeTargetsRequest):
 
 @rule(desc="Determine candidate Helm chart targets to create", level=LogLevel.DEBUG)
 async def find_putative_helm_targets(
-    request: PutativeHelmChartTargetsRequest, all_owned_sources: AllOwnedSources
+    request: PutativeHelmChartTargetsRequest,
+    all_owned_sources: AllOwnedSources,
+    helm_subsystem: HelmSubsystem,
 ) -> PutativeTargets:
+    if not helm_subsystem.tailor:
+        return PutativeTargets()
+
     found_chart_paths = await MultiGet(
         Get(Paths, PathGlobs, request.search_paths.path_globs(filename))
         for filename in HELM_CHART_METADATA_FILENAMES

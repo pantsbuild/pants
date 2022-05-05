@@ -214,6 +214,13 @@ class DockerOptions(Subsystem):
         advanced=True,
     )
 
+    tailor = BoolOption(
+        "--tailor",
+        default=True,
+        help="If true, add `docker_image` targets with the `tailor` goal.",
+        advanced=True,
+    )
+
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._build_args)))

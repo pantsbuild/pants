@@ -15,3 +15,9 @@ class ThriftSubsystem(Subsystem):
         default=True,
         help="Infer Thrift dependencies on other Thrift files by analyzing import statements.",
     )
+    tailor = BoolOption(
+        "--tailor",
+        default=True,
+        help="If true, add `thrift-sources` targets with the `tailor` goal.",
+        advanced=True,
+    )

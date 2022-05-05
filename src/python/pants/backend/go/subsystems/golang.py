@@ -17,7 +17,7 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.option.option_types import StrListOption, StrOption
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -90,6 +90,40 @@ class GolangSubsystem(Subsystem):
             Environment variables to set when invoking the `go` tool.
             Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
             or just `ENV_VAR` to copy the value from Pants's own environment.
+            """
+        ),
+        advanced=True,
+    )
+
+    tailor_go_mod_targets = BoolOption(
+        "--tailor-go-mod-targets",
+        default=True,
+        help=softwrap(
+            """
+            If true, add a `go_mod` target with the `tailor` goal wherever there is a
+            `go.mod` file.
+            """
+        ),
+        advanced=True,
+    )
+    tailor_package_targets = BoolOption(
+        "--tailor-package-targets",
+        default=True,
+        help=softwrap(
+            """
+            If true, add a `go_package` target with the `tailor` goal in every directory with a
+            `.go` file.
+            """
+        ),
+        advanced=True,
+    )
+    tailor_binary_targets = BoolOption(
+        "--tailor-binary-targets",
+        default=True,
+        help=softwrap(
+            """
+            If true, add a `go_binary` target with the `tailor` goal in every directory with a
+            `.go` file with `package main`.
             """
         ),
         advanced=True,
