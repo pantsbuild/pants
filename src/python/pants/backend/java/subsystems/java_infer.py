@@ -21,13 +21,6 @@ class JavaInferSubsystem(Subsystem):
         default=True,
         help="Infer a target's dependencies by parsing consumed types from sources.",
     )
-    third_party_imports = BoolOption(
-        "--third-party-imports",
-        default=True,
-        help="Infer a target's third-party dependencies using Java import statements.",
-        removal_version="2.13.0.dev0",
-        removal_hint="Controlled by the `--imports` flag.",
-    )
     # TODO: Move to `coursier` or a generic `jvm` subsystem.
     third_party_import_mapping = DictOption[Any](
         "--third-party-import-mapping",

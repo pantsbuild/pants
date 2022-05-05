@@ -608,6 +608,8 @@ pub trait CapturedWorkdir {
 ///
 /// This matches the behavior of interactive processes executed by the `run` goal.
 ///
+/// TODO: align this with the code path for interactive processes. Related issue #14386.
+///
 pub fn update_env(workdir_path: &Path, req: &mut Process) {
   if let Some(workdir) = workdir_path.to_str() {
     for value in req.env.values_mut() {

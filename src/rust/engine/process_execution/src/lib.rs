@@ -334,6 +334,9 @@ impl Default for InputDigests {
 ///
 /// A process to be executed.
 ///
+/// When executing a `Process` using the `local::CommandRunner`, any `{chroot}` placeholders in the
+/// environment variables are replaced with the temporary sandbox path.
+///
 #[derive(DeepSizeOf, Derivative, Clone, Debug, Eq, Serialize)]
 #[derivative(PartialEq, Hash)]
 pub struct Process {
