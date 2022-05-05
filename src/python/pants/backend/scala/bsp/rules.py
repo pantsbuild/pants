@@ -2,9 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import dataclasses
 import logging
-import os
 from dataclasses import dataclass
 
 from pants.backend.scala.bsp.spec import (
@@ -22,7 +20,7 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier, StatusCode
+from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier
 from pants.bsp.spec.targets import DependencyModule
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
@@ -36,15 +34,7 @@ from pants.bsp.util_rules.targets import (
     BSPResolveFieldFactoryResult,
 )
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    DigestEntries,
-    FileEntry,
-    Workspace,
-)
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileEntry, Workspace
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule
@@ -57,12 +47,9 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
 from pants.jvm.bsp.spec import MavenDependencyModule, MavenDependencyModuleArtifact
-from pants.jvm.compile import (
-    ClasspathEntryRequest,
-    ClasspathEntryRequestFactory,
-    FallibleClasspathEntry,
-)
+from pants.jvm.compile import ClasspathEntryRequestFactory
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
@@ -260,7 +247,7 @@ async def handle_bsp_scalac_options_request(
             options=(),
             classpath=tuple(classpath),
             class_directory=build_root.pathlib_path.joinpath(
-                f".pants.d/bsp/jvm/resolves/{resolve.name}/classes"
+                f".pants.d/bsp/{jvm_classes_directory(request.bsp_target_id)}"
             ).as_uri(),
         )
     )
@@ -427,46 +414,8 @@ async def bsp_scala_compile_request(
     request: ScalaBSPCompileRequest,
     classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> BSPCompileResult:
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses([fs.address for fs in request.field_sets])
-    )
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
-
-    results = await MultiGet(
-        Get(
-            FallibleClasspathEntry,
-            ClasspathEntryRequest,
-            classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
-        )
-        for coarsened_target in coarsened_targets
-    )
-
-    status = StatusCode.OK
-    if any(r.exit_code != 0 for r in results):
-        status = StatusCode.ERROR
-
-    output_digest = EMPTY_DIGEST
-    if status == StatusCode.OK:
-        output_entries = []
-        for result in results:
-            if not result.output:
-                continue
-            entries = await Get(DigestEntries, Digest, result.output.digest)
-            output_entries.extend(
-                [
-                    dataclasses.replace(
-                        entry,
-                        path=f"jvm/resolves/{resolve.name}/lib/{os.path.basename(entry.path)}",
-                    )
-                    for entry in entries
-                ]
-            )
-        output_digest = await Get(Digest, CreateDigest(output_entries))
-
-    return BSPCompileResult(
-        status=status,
-        output_digest=output_digest,
-    )
+    result: BSPCompileResult = await _jvm_bsp_compile(request, classpath_entry_request)
+    return result
 
 
 def rules():
