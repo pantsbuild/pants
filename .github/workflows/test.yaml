@@ -74,16 +74,6 @@ jobs:
         restore-keys: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v3
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}-v1
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
-
-          '
     - id: get-engine-hash
       name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
@@ -222,16 +212,6 @@ jobs:
 
           '
         restore-keys: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-
-
-          '
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v3
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}-v1
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
 
           '
     - id: get-engine-hash
@@ -503,16 +483,6 @@ jobs:
         }}.*'']" >> $GITHUB_ENV
 
         '
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v3
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}-v1
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
-
-          '
     - name: Download native binaries
       uses: actions/download-artifact@v2
       with:
@@ -601,16 +571,6 @@ jobs:
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v3
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}-v1
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
-
-          '
     - name: Download native binaries
       uses: actions/download-artifact@v2
       with:
@@ -683,16 +643,6 @@ jobs:
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v3
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}-v1
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
-
-          '
     - name: Download native binaries
       uses: actions/download-artifact@v2
       with:
