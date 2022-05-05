@@ -70,7 +70,7 @@ _image_ref_regexp = re.compile(
 
 def main(cmd: str, args: list[str]) -> None:
     # import here to allow the rest of the file to be tested without a dependency on dockerfile
-    from dockerfile import Command, parse_file, parse_string
+    from dockerfile import Command, parse_file, parse_string  # pants: no-infer-dep
 
     @dataclass(frozen=True)
     class ParsedDockerfile:
