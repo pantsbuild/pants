@@ -174,7 +174,7 @@ class PythonInferSubsystem(Subsystem):
         help=softwrap(
             """
             How to handle imports that don't have an inferrable owner.
-            
+
             Usually when an import cannot be inferred, it represents an issue like Pants not being
             properly configured, e.g. targets not set up. Often, missing dependencies will result
             in confusing runtime errors like `ModuleNotFoundError`, so this option can be helpful
@@ -295,18 +295,18 @@ def _maybe_warn_unowned(
     msg = softwrap(
         f"""
         Pants cannot infer owners for the following imports in the file {file} (from the target
-        {address}): 
+        {address}):
 
         {bullet_list(unowned_imports_with_lines)}
 
-        If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the 
+        If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the
         import line.
 
         Is the import from a third-party dependency (see
         {doc_url("python-third-party-dependencies")})? Some common issues:
 
           * Pants does not know about the requirement, i.e. there is not a `python_requirement`\
-          target for it. You can run `./pants filter --target-type=python_requirement ::` to see\
+          target for it. You can run `{bin_name()} filter --target-type=python_requirement ::` to see\
           all `python_requirement` targets. If you are using `requirements.txt`, Poetry,\
           or Pipenv, make sure you have `python_requirements`, `poetry_requirements`, and\
           `pipenv_requirements` target generators, respectively. Double check that the requirement\
@@ -318,8 +318,8 @@ def _maybe_warn_unowned(
         Is the import from first-party code? Some common issues:
 
           * The file does not exist.
-          * The file is missing an owning target like `python_sources`. Run `./pants list\
-          path/to/file.py` to see if there are any owners. If not, run `./pants tailor` to generate\
+          * The file is missing an owning target like `python_sources`. Run `{bin_name()} list\
+          path/to/file.py` to see if there are any owners. If not, run `{bin_name()} tailor` to generate\
           targets.
           * The source root is not correctly set up, which is how Pants knows for example that the\
           file `src/py/my_project/app.py` exposes the module `my_project.app`. See\
