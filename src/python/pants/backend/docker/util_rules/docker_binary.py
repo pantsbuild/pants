@@ -150,7 +150,7 @@ async def find_docker(
         ),
     )
     tools_path = ".shims"
-    extra_env = {"PATH": os.path.join(tools_path, tools.bin_directory)}
+    extra_env = {"PATH": os.path.join("{chroot}", tools_path, tools.bin_directory)}
     extra_input_digests = {tools_path: tools.digest}
 
     return DockerBinary(
