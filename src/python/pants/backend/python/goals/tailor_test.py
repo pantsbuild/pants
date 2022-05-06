@@ -11,6 +11,7 @@ from pants.backend.python.goals.tailor import (
     classify_source_files,
     is_entry_point,
 )
+from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.target_types import (
     PexBinary,
     PythonSourcesGeneratorTarget,
@@ -69,8 +70,8 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     )
     rule_runner.write_files(
         {
-            "3rdparty/requirements.txt": "",
             "3rdparty/requirements-test.txt": "",
+            "already_owned/requirements.txt": "",
             **{
                 f"src/python/foo/{fp}": ""
                 for fp in (
@@ -92,7 +93,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
             PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
             AllOwnedSources(
                 [
-                    "3rdparty/requirements.txt",
+                    "already_owned/requirements.txt",
                     "src/python/foo/bar/__init__.py",
                     "src/python/foo/bar/baz1.py",
                 ]
@@ -102,13 +103,11 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     assert (
         PutativeTargets(
             [
-                PutativeTarget(
-                    "3rdparty",
-                    "requirements-test.txt",
-                    "python_requirements",
-                    ("3rdparty/requirements-test.txt",),
-                    ("3rdparty/requirements-test.txt",),
-                    addressable=True,
+                PutativeTarget.for_target_type(
+                    PythonRequirementsTargetGenerator,
+                    path="3rdparty",
+                    name="requirements-test.txt",
+                    triggering_sources=["3rdparty/requirements-test.txt"],
                     kwargs={"source": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(
