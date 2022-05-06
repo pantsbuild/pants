@@ -56,8 +56,8 @@ class Parametrize:
                 raise Exception(
                     f"In {self}:\n  Positional argument `{arg}` contained separator characters "
                     f"(`{'`,`'.join(banned_chars)}`).\n\n"
-                    "To use `{arg}` as a parameter, you can pass it as a keyword argument to "
-                    "give it an alias. For example: `parametrize(short_memorable_name='{arg}')`"
+                    f"To use `{arg}` as a parameter, you can pass it as a keyword argument to "
+                    f"give it an alias. For example: `parametrize(short_memorable_name='{arg}')`"
                 )
             parameters[arg] = arg
         return parameters
