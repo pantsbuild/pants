@@ -173,7 +173,19 @@ class PythonToolRequirementsBase(Subsystem):
 
     @property
     def uses_lockfile(self) -> bool:
+        """Return true if the tool is installed from a lockfile.
+
+        Note that this lockfile may be the default lockfile Pants distributes.
+        """
         return self.register_lockfile and self.lockfile != NO_TOOL_LOCKFILE
+
+    @property
+    def uses_custom_lockfile(self) -> bool:
+        """Return true if the tool is installed from a custom lockfile the user sets up."""
+        return self.register_lockfile and self.lockfile not in (
+            NO_TOOL_LOCKFILE,
+            DEFAULT_TOOL_LOCKFILE,
+        )
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:
