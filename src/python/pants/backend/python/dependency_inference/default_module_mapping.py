@@ -86,6 +86,7 @@ DEFAULT_MODULE_MAPPING = {
     "psycopg2-binary": ("psycopg2",),
     "pycrypto": ("Crypto",),
     "pyhamcrest": ("hamcrest",),
+    "pygithub": ("github",),
     "pygobject": ("gi",),
     "pyjwt": ("jwt",),
     "pyopenssl": ("OpenSSL",),
