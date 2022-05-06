@@ -11,12 +11,16 @@ import subprocess
 import sys
 from time import time
 
+from pants.util.strutil import softwrap
+
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "A (remote) cache comparison tool, which automates testing a single build of Pants (in "
-            "an isolated cache namespace) against a range of source commits."
+        description=softwrap(
+            """
+            A (remote) cache comparison tool, which automates testing a single build of Pants (in
+            an isolated cache namespace) against a range of source commits.
+            """
         )
     )
 
@@ -34,9 +38,11 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-s",
         "--source-diffspec",
-        help=(
-            "The diffspec (e.g.: `main~10..main`) which selects the Pants-repo source commits "
-            "to run each Pants build against."
+        help=softwrap(
+            """
+            The diffspec (e.g.: `main~10..main`) which selects the Pants-repo source commits
+            to run each Pants build against.
+            """
         ),
     )
     parser.add_argument(

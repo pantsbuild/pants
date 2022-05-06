@@ -286,9 +286,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Configure Git
-      run: 'git config --global safe.directory "$GITHUB_WORKSPACE"
-
-        '
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -682,9 +680,7 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
-
-        '
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
     - if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v2

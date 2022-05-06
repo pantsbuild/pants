@@ -7,6 +7,8 @@ import argparse
 import subprocess
 from pathlib import Path
 
+from pants.util.strutil import bullet_list, softwrap
+
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate contributor list")
@@ -40,9 +42,13 @@ def sorted_contributors(range: str) -> list[str]:
 
 def update_contributors_md() -> None:
     Path("CONTRIBUTORS.md").write_text(
-        "Created by running `./pants run build-support/bin/contributors.py`.\n\n+ "
-        + "\n+ ".join(sorted_contributors(range="HEAD"))
-        + "\n"
+        softwrap(
+            f"""
+            Created by running `./pants run build-support/bin/contributors.py`
+
+            {bullet_list(sorted_contributors(range="HEAD"), bullet="+")}
+            """
+        )
     )
 
 

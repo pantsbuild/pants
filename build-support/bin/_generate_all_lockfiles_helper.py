@@ -40,6 +40,7 @@ from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 from pants.jvm.resolve.jvm_tool import JvmToolBase
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -127,35 +128,43 @@ AllTools = (
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "Generate lockfiles for internal usage + default tool lockfiles that we distribute. "
-            "This script makes sure that tool lockfiles are generated with the correct values."
+        description=softwrap(
+            """
+            Generate lockfiles for internal usage + default tool lockfiles that we distribute.
+            This script makes sure that tool lockfiles are generated with the correct values.
+            """
         ),
         prog="generate_all_lockfiles.sh",
     )
     parser.add_argument(
         "--internal",
         action="store_true",
-        help=(
-            "Regenerate all internal lockfiles. Use this when you change our "
-            "`requirements.txt` and/or internal config of tools, like adding a new Flake8 plugin."
+        help=softwrap(
+            """
+            Regenerate all internal lockfiles. Use this when you change our
+            `requirements.txt` and/or internal config of tools, like adding a new Flake8 plugin.
+            """
         ),
     )
     parser.add_argument(
         "--tool",
         nargs="*",
-        help=(
-            "Regenerate these default tool lockfile(s). Use this when bumping default versions "
-            "of particular tools. Valid options: "
-            f"{sorted(tool.resolve_name for tool in AllTools)}"
+        help=softwrap(
+            f"""
+            Regenerate these default tool lockfile(s). Use this when bumping default versions
+            of particular tools. Valid options:
+            {sorted(tool.resolve_name for tool in AllTools)}
+            """
         ),
     )
     parser.add_argument(
         "--pex",
         action="store_true",
-        help=(
-            "Use when bumping the PEX version. (Will regenerate our internal user lockfile & "
-            "the Lambdex tool's lockfile.)"
+        help=softwrap(
+            """
+            Use when bumping the PEX version. (Will regenerate our internal user lockfile &
+            the Lambdex tool's lockfile.)
+            """
         ),
     )
     parser.add_argument(

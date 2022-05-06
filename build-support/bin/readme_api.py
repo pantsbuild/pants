@@ -28,6 +28,8 @@ from typing import Any, TypeVar, Union, cast
 
 import requests
 
+from pants.util.strutil import softwrap
+
 logger = logging.getLogger(__name__)
 
 
@@ -96,9 +98,11 @@ class DocRef(ReadmeEntity):
             return super().field_value_from_api_response(field_name, field_type, val)
 
     def __str__(self):
-        return (
-            f"DocRef(id={self.id}, slug={self.slug}, title={self.title}, "
-            f"order={self.order}, hidden={self.hidden})"
+        return softwrap(
+            f"""
+            DocRef(id={self.id}, slug={self.slug}, title={self.title},
+            order={self.order}, hidden={self.hidden})
+            """
         )
 
 
@@ -116,9 +120,11 @@ class Doc(ReadmeEntity):
     parentDoc: str = ""  # May be omitted in API responses if doc has no parent.
 
     def __str__(self):
-        return (
-            f"Doc(id={self.id}, category={self.category}, slug={self.slug}, "
-            f"title={self.title}, body={self.body[:20]}...)"
+        return softwrap(
+            f"""
+            Doc(id={self.id}, category={self.category}, slug={self.slug},
+            title={self.title}, body={self.body[:20]}...)
+            """
         )
 
 

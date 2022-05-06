@@ -9,6 +9,8 @@ from typing import Iterable
 
 from common import die
 
+from pants.util.strutil import bullet_list, softwrap
+
 
 def main() -> None:
     rust_files = find_files("src/rust/engine", extension=".rs")
@@ -44,10 +46,18 @@ def check_banned_import(
 ) -> None:
     bad_files = filter_files(files, snippet_regex=bad_import_regex)
     if bad_files:
-        bad_files_str = "\n".join(sorted(bad_files))
+        bad_files_str = bullet_list(sorted(bad_files))
         die(
-            f"Found forbidden imports matching `{bad_import_regex}`. Instead, you should use "
-            f"`{correct_import_message}`. Bad files:\n{bad_files_str}"
+            softwrap(
+                f"""
+                Found forbidden imports matching `{bad_import_regex}`. Instead, you should use
+                `{correct_import_message}`.
+
+                Bad files:
+
+                {bad_files_str}
+                """
+            )
         )
 
 

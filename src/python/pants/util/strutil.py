@@ -160,7 +160,7 @@ def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> list[str]:
     ]
 
 
-def bullet_list(elements: Iterable[str], max_elements: int = -1) -> str:
+def bullet_list(elements: Iterable[str], max_elements: int = -1, *, bullet: str = "*") -> str:
     """Format a bullet list with padding.
 
     Callers should normally use `\n\n` before and (if relevant) after this so that the bullets
@@ -179,8 +179,8 @@ def bullet_list(elements: Iterable[str], max_elements: int = -1) -> str:
                 f"... and {len(elements)-max_elements+1} more",
             )
 
-    sep = "\n  * "
-    return f"  * {sep.join(elements)}"
+    sep = f"\n  {bullet} "
+    return f"  {bullet} {sep.join(elements)}"
 
 
 def first_paragraph(s: str) -> str:

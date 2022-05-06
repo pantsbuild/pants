@@ -20,6 +20,8 @@ from functools import partial
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional, Set, Union
 
+from pants.util.strutil import softwrap
+
 
 def main() -> None:
     args = create_parser().parse_args()
@@ -114,8 +116,12 @@ class GlobFunction(NamedTuple):
             return None
         if not all(isinstance(arg, ast.Str) for arg in glob_func.args):
             logging.warning(
-                f"Could not parse the globs in {build_file} at line {glob_func.lineno}. Likely, you are "
-                f"using variables instead of raw strings. Please manually update."
+                softwrap(
+                    f"""
+                    Could not parse the globs in {build_file} at line {glob_func.lineno}. Likely,
+                    you are using variables instead of raw strings. Please manually update.
+                    """
+                )
             )
             return None
         include_globs: List[str] = [arg.s for arg in glob_func.args]  # type: ignore[attr-defined]
@@ -144,8 +150,12 @@ class GlobFunction(NamedTuple):
             ]
             if not all(isinstance(arg, (ast.Call, ast.Str)) for arg in combined_exclude_elements):
                 logging.warning(
-                    f"Could not parse the exclude globs in {build_file} at line {glob_func.lineno}. Likely, "
-                    f"you are using variables instead of raw strings. Please manually update."
+                    softwrap(
+                        f"""
+                        Could not parse the globs in {build_file} at line {glob_func.lineno}. Likely,
+                        you are using variables instead of raw strings. Please manually update.
+                        """
+                    )
                 )
                 return None
             exclude_globs = [arg.s for arg in combined_exclude_elements if isinstance(arg, ast.Str)]
@@ -183,9 +193,11 @@ def use_single_quotes(line: str) -> bool:
 def warning_msg(
     *, build_file: Path, lineno: int, field_name: str, replacement: str, script_restriction: str
 ) -> str:
-    return (
-        f"Could not update {build_file} at line {lineno}. This script {script_restriction}. Please "
-        f"manually update the `{field_name}` field to `{replacement}`."
+    return softwrap(
+        f"""
+        Could not update {build_file} at line {lineno}. This script {script_restriction}. Please
+        manually update the `{field_name}` field to `{replacement}`.
+        """
     )
 
 
@@ -195,9 +207,11 @@ SCRIPT_RESTRICTIONS = {
     "sources_must_be_single_line": (
         "can only safely update the `sources` field when its declared on a single line"
     ),
-    "sources_must_be_distinct_line": (
-        "can only safely update the `sources` field when it's declared on a new distinct line, "
-        "separate from the target type and other fields"
+    "sources_must_be_distinct_line": softwrap(
+        """
+        can only safely update the `sources` field when it's declared on a new distinct line,
+        separate from the target type and other fields
+        """
     ),
 }
 
