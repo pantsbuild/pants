@@ -16,6 +16,13 @@ from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list
 
 
+def _named_args_explanation(arg: str) -> str:
+    return (
+        f"To use `{arg}` as a parameter, you can pass it as a keyword argument to "
+        f"give it an alias. For example: `parametrize(short_memorable_name={arg})`"
+    )
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Parametrize:
@@ -43,21 +50,20 @@ class Parametrize:
             if not isinstance(arg, str):
                 raise Exception(
                     f"In {self}:\n  Positional arguments must be strings, but "
-                    f"`{arg}` was a `{type(arg).__name__}`."
+                    f"`{arg!r}` was a `{type(arg).__name__}`.\n\n"
+                    + _named_args_explanation(f"{arg!r}")
                 )
             previous_arg = parameters.get(arg)
             if previous_arg is not None:
                 raise Exception(
                     f"In {self}:\n  Positional arguments cannot have the same name as "
-                    f"keyword arguments. `{arg}` was also defined as `{arg}={previous_arg}`."
+                    f"keyword arguments. `{arg}` was also defined as `{arg}={previous_arg!r}`."
                 )
             banned_chars = BANNED_CHARS_IN_PARAMETERS & set(arg)
             if banned_chars:
                 raise Exception(
                     f"In {self}:\n  Positional argument `{arg}` contained separator characters "
-                    f"(`{'`,`'.join(banned_chars)}`).\n\n"
-                    f"To use `{arg}` as a parameter, you can pass it as a keyword argument to "
-                    f"give it an alias. For example: `parametrize(short_memorable_name='{arg}')`"
+                    f"(`{'`,`'.join(banned_chars)}`).\n\n" + _named_args_explanation(arg)
                 )
             parameters[arg] = arg
         return parameters
