@@ -1507,12 +1507,10 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         "--build-ignore",
         help=softwrap(
             """
-            Paths to ignore when identifying BUILD files.
+            Path globs or literals to ignore when identifying BUILD files.
 
             This does not affect any other filesystem operations; use `--pants-ignore` for
             that instead.
-
-            Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).
             """
         ),
         advanced=True,
@@ -1683,6 +1681,13 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         validate_remote_headers("remote_execution_headers")
         validate_remote_headers("remote_store_headers")
+
+        illegal_build_ignores = [i for i in opts.build_ignore if i.startswith("!")]
+        if illegal_build_ignores:
+            raise OptionsError(
+                "The `--build-ignore` option does not support negated globs, but was "
+                f"given: {illegal_build_ignores}."
+            )
 
     @staticmethod
     def create_py_executor(bootstrap_options: OptionValueContainer) -> PyExecutor:
