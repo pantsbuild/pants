@@ -130,14 +130,10 @@ async def find_putative_targets(
             Get(Paths, PathGlobs, req.search_paths.path_globs("Pipfile.lock")),
             Get(DigestContents, PathGlobs, req.search_paths.path_globs("pyproject.toml")),
         )
-        unowned_requirements_files = set(all_requirements_files.files) - set(all_owned_sources)
-        unowned_pipenv_files = set(all_pipenv_lockfile_files.files) - set(all_owned_sources)
-        unowned_poetry_files = {
-            fc.path for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content
-        } - set(all_owned_sources)
 
-        def add_req_targets(files: set[str], alias: str) -> None:
-            for fp in files:
+        def add_req_targets(files: Iterable[str], alias: str) -> None:
+            unowned_files = set(files) - set(all_owned_sources)
+            for fp in unowned_files:
                 path, name = os.path.split(fp)
                 pts.append(
                     PutativeTarget(
@@ -145,7 +141,7 @@ async def find_putative_targets(
                         name=name,
                         type_alias=alias,
                         triggering_sources=[fp],
-                        owned_sources=[fp],
+                        owned_sources=[name],
                         kwargs=(
                             {}
                             if alias != "python_requirements" or name == "requirements.txt"
@@ -154,9 +150,12 @@ async def find_putative_targets(
                     )
                 )
 
-        add_req_targets(unowned_requirements_files, "python_requirements")
-        add_req_targets(unowned_pipenv_files, "pipenv_requirements")
-        add_req_targets(unowned_poetry_files, "poetry_requirements")
+        add_req_targets(all_requirements_files.files, "python_requirements")
+        add_req_targets(all_pipenv_lockfile_files.files, "pipenv_requirements")
+        add_req_targets(
+            {fc.path for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content},
+            "poetry_requirements",
+        )
 
     if python_setup.tailor_pex_binary_targets:
         # Find binary targets.
