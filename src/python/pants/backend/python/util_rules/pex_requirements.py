@@ -405,7 +405,7 @@ def _invalid_user_lockfile_error(
     ) else f"synthetically created at {lockfile.file_content.path}"
     yield (
         f" to install the resolve `{lockfile.resolve_name}` (from `[python].resolves`). However, "
-        "it is not compatible with the current targets:\n\n"
+        "it is not compatible with the current targets because:\n\n"
     )
 
     if InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH in validation.failure_reasons:
@@ -419,7 +419,7 @@ def _invalid_user_lockfile_error(
         # python_requirement targets that aren't in that code's resolve.
         not_in_lock = sorted(str(r) for r in user_requirements - metadata.requirements)
         yield (
-            f"- The targets use requirements that are not in the lockfile: {not_in_lock}\n"
+            f"- The targets depend on requirements that are not in the lockfile: {not_in_lock}\n"
             f"This most often happens when adding a new requirement to your project, or bumping "
             f"requirement versions. You can fix this by regenerating the lockfile with "
             f"`generate-lockfiles`.\n\n"
@@ -428,18 +428,24 @@ def _invalid_user_lockfile_error(
     if InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
         yield (
             f"- The targets use interpreter constraints (`{user_interpreter_constraints}`) that "
-            "are not compatible with those used to generate the lockfile "
-            f"(`{metadata.valid_for_interpreter_constraints}`). You can fix this by either "
-            f"adjusting your targets to use different interpreter constraints "
-            f"({doc_url('python-interpreter-compatibility')}) or by generating the lockfile with "
-            f"different interpreter constraints by setting the option "
-            f"`[python].resolves_to_interpreter_constraints`, then running `generate-lockfiles`.\n\n"
+            "are not a subset of those used to generate the lockfile "
+            f"(`{metadata.valid_for_interpreter_constraints}`).\nThe lockfile's interpreter "
+            f"constraints are set by the option `[python].resolves_to_interpreter_constraints`, "
+            f"which determines how the lockfile is generated. Note that that option only changes "
+            f"how the lockfile is generated; you must still set interpreter constraints for "
+            f"targets via `[python].interpreter_constraints` and the `interpreter_constraints` "
+            f"field ({doc_url('python-interpreter-compatibility')}). All targets must have "
+            f"interpreter constraints that are a subset of their resolve's constraints.\n"
+            f"To fix this, you can either adjust the interpreter constraints of the targets "
+            f"which use the resolve '{lockfile.resolve_name}', or adjust "
+            f"`[python].resolves_to_interpreter_constraints` "
+            f"then run `generate-lockfiles`.\n\n"
         )
 
     yield "To regenerate your lockfile, "
     yield f"run `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}`." if isinstance(
         lockfile, Lockfile
-    ) else f"Update your plugin generating this object: {lockfile}"
+    ) else f"update your plugin generating this object: {lockfile}"
 
 
 def rules():
