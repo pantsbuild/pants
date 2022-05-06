@@ -35,7 +35,7 @@ def test_to_parameters_success(
 @pytest.mark.parametrize(
     "exception_str,args,kwargs",
     [
-        ("Positional arguments must be strings", [1], {}),
+        ("Positional arguments must be strings, but `[1]` was a", [[1]], {}),
         (
             "Positional arguments cannot have the same name as keyword arguments",
             ["x"],
