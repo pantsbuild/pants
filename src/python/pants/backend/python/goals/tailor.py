@@ -133,7 +133,7 @@ async def find_putative_targets(
                     name=name,
                     type_alias="python_requirements",
                     triggering_sources=[req_file],
-                    owned_sources=[req_file],
+                    owned_sources=[name],
                     kwargs={} if name == "requirements.txt" else {"source": name},
                 )
             )
