@@ -164,15 +164,6 @@ def test_bullet_list_max_elements() -> None:
     )
 
 
-def test_bullet_list_bullet() -> None:
-    assert bullet_list(list("abc"), bullet="-") == (
-        """\
-  - a
-  - b
-  - c"""
-    )
-
-
 def test_softwrap_multiline() -> None:
     assert (
         softwrap("The version of the prior release, e.g. `2.0.0.dev0` or `2.0.0rc1`.")
@@ -252,6 +243,25 @@ def test_softwrap_multiline() -> None:
             "    ...\n"
             "\n"
             "Ah, if there's a steady paycheck in it, I'll believe anything you say."
+        )
+    )
+    assert (
+        softwrap(
+            """
+                Do you believe in:
+                    UFOs
+                    astral projections
+                    mental telepathy
+                    ...
+            """
+        )
+        == (
+            "Do you believe in:"
+            "\n"
+            "    UFOs\n"
+            "    astral projections\n"
+            "    mental telepathy\n"
+            "    ..."
         )
     )
     assert (

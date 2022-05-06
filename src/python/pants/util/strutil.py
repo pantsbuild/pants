@@ -160,7 +160,7 @@ def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> list[str]:
     ]
 
 
-def bullet_list(elements: Iterable[str], max_elements: int = -1, *, bullet: str = "*") -> str:
+def bullet_list(elements: Iterable[str], max_elements: int = -1) -> str:
     """Format a bullet list with padding.
 
     Callers should normally use `\n\n` before and (if relevant) after this so that the bullets
@@ -179,8 +179,8 @@ def bullet_list(elements: Iterable[str], max_elements: int = -1, *, bullet: str 
                 f"... and {len(elements)-max_elements+1} more",
             )
 
-    sep = f"\n  {bullet} "
-    return f"  {bullet} {sep.join(elements)}"
+    sep = "\n  * "
+    return f"  * {sep.join(elements)}"
 
 
 def first_paragraph(s: str) -> str:
@@ -230,6 +230,8 @@ def softwrap(text: str) -> str:
         - Replaces all occurrences of multiple spaces in a sentence with a single space
         - Replaces all occurrences of multiple newlines with exactly 2 newlines
         - Replaces singular newlines with a space (to turn a paragraph into one long line)
+            - Unless the following line is indented, in which case the newline and indentation
+              are preserved.
         - Double-newlines are preserved
         - Extra indentation is preserved, and also preserves the indented line's ending
             (If your indented line needs to be continued due to it being longer than the suggested
@@ -250,8 +252,8 @@ def softwrap(text: str) -> str:
     result_strs = []
     for i, line in enumerate(lines):
         line = _super_space_re.sub(r"\1 \2", line)
-        next_line = lines[i + 1] if i + 1 < len(lines) else None
-        if "\n" in (line, next_line) or line.startswith(" "):
+        next_line = lines[i + 1] if i + 1 < len(lines) else ""
+        if "\n" in (line, next_line) or line.startswith(" ") or next_line.startswith(" "):
             result_strs.append(line)
         else:
             result_strs.append(line.rstrip())

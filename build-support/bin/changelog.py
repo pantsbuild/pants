@@ -19,8 +19,6 @@ import requests
 from common import die
 from packaging.version import Version
 
-from pants.util.strutil import softwrap
-
 logger = logging.getLogger(__name__)
 
 
@@ -51,12 +49,8 @@ def determine_release_branch(new_version_str: str) -> str:
     )
     release_branch = "main" if use_main_branch else f"{new_version.major}.{new_version.minor}.x"
     branch_confirmation = input(
-        softwrap(
-            f"""
-            Have you recently pulled from upstream on the branch `{release_branch}`?
-            This is needed to ensure the changelog is exhaustive. [Y/n]
-            """
-        )
+        f"Have you recently pulled from upstream on the branch `{release_branch}`? "
+        "This is needed to ensure the changelog is exhaustive. [Y/n]"
     )
     if branch_confirmation and branch_confirmation.lower() != "y":
         die(f"Please checkout to the branch `{release_branch}` and pull from upstream. ")
@@ -104,12 +98,8 @@ def categorize(pr_num: str) -> Category | None:
     response = requests.get(f"https://api.github.com/repos/pantsbuild/pants/pulls/{pr_num}")
     if not response.ok:
         return complete_categorization(
-            softwrap(
-                f"""
-                Unable to categorize PR {pr_num}. HTTP error:
-                {response.status_code} {response.reason}
-                """
-            )
+            f"Unable to categorize PR {pr_num}. HTTP error: "
+            f"{response.status_code} {response.reason}"
         )
     try:
         data = response.json()
@@ -127,12 +117,8 @@ def categorize(pr_num: str) -> Category | None:
             except ValueError:
                 recognized_category_labels = " ".join(f"'category:{c.value}'" for c in Category)
                 logger.warning(
-                    softwrap(
-                        f"""
-                        Unrecognized category label {name!r}. Recognized category labels are:
-                        {recognized_category_labels}
-                        """
-                    )
+                    f"Unrecognized category label {name!r}. Recognized category labels are: "
+                    f"{recognized_category_labels}"
                 )
     return complete_categorization("No recognized `category:*` label found.")
 

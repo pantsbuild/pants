@@ -25,6 +25,7 @@ import os
 import pkgutil
 import re
 import subprocess
+import textwrap
 from html.parser import HTMLParser
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, cast
@@ -269,9 +270,16 @@ def run_pants_help_all() -> dict[str, Any]:
         logger.error(
             softwrap(
                 f"""
-            Running {argv} failed with exit code {run.returncode}.\n\nstdout:\n{run.stdout}
-            \n\nstderr:\n{run.stderr}
-            """
+                Running {argv} failed with exit code {run.returncode}.
+
+                stdout:
+
+                {textwrap.indent(run.stdout, ''*4)}
+
+                stderr:
+
+                {textwrap.indent(run.stderr, ''*4)}
+                """
             )
         )
         raise

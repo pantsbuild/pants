@@ -14,8 +14,6 @@ import re
 from pathlib import Path
 from typing import Dict, List
 
-from pants.util.strutil import softwrap
-
 
 def main() -> None:
     args = create_parser().parse_args()
@@ -36,13 +34,9 @@ def main() -> None:
             print(f"Would create {new_path} with the following content:\n\n{joined_new_content}")
         else:
             logging.info(
-                softwrap(
-                    f"""
-                    Created {new_path}. There are likely some remaining issues that need manual
-                    attention. Please copy the file into https://www.toml-lint.com or open with your editor
-                    to fix any remaining issues.
-                    """
-                )
+                f"Created {new_path}. There are likely some remaining issues that need manual "
+                "attention. Please copy the file into https://www.toml-lint.com or open with your editor "
+                "to fix any remaining issues."
             )
             new_path.write_text(joined_new_content)
 

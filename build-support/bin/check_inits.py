@@ -7,8 +7,6 @@ from pathlib import Path
 
 from common import die
 
-from pants.util.strutil import softwrap
-
 DIRS_TO_CHECK = (
     "src",
     "tests",
@@ -26,12 +24,8 @@ def main() -> None:
     non_empty_inits = [f for f in files if bool(f.read_text())]
     if non_empty_inits:
         die(
-            softwrap(
-                f"""
-                All `__init__.py` file should be empty, but the following had content:
-                {', '.join(str(f) for f in non_empty_inits)}
-                """
-            )
+            "All `__init__.py` file should be empty, but the following had content: "
+            f"{', '.join(str(f) for f in non_empty_inits)}"
         )
 
 
