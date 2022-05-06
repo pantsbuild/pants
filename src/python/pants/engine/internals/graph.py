@@ -509,7 +509,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     )
 
 
-@rule(desc="Resolve transitive targets")
+@rule(desc="Resolve transitive targets", level=LogLevel.DEBUG)
 async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots."""
 
@@ -547,7 +547,7 @@ def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
     return CoarsenedTargetsRequest(addresses)
 
 
-@rule
+@rule(desc="Resolve coarsened targets", level=LogLevel.DEBUG)
 async def coarsened_targets(request: CoarsenedTargetsRequest) -> CoarsenedTargets:
     dependency_mapping = await Get(
         _DependencyMapping,

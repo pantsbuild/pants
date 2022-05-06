@@ -258,17 +258,10 @@ async def mypy_typecheck_partition(
     )
 
 
-# TODO(#15241): Improve the performance of this, especially by not needing to calculate transitive
-#  targets per field set. Doing that would require changing how we calculate interpreter
-#  constraints to be more like how we determine resolves, i.e. only inspecting the root target
-#  (and later validating the closure is compatible).
 @rule(desc="Determine if necessary to partition MyPy input", level=LogLevel.DEBUG)
 async def mypy_determine_partitions(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
 ) -> MyPyPartitions:
-    # When determining how to batch by interpreter constraints, we must consider the entire
-    # transitive closure _per-root_ to get the final resulting constraints. See the method
-    # comment.
     coarsened_targets = await Get(
         CoarsenedTargets,
         CoarsenedTargetsRequest(
@@ -277,20 +270,37 @@ async def mypy_determine_partitions(
     )
     coarsened_targets_by_address = coarsened_targets.by_address()
 
+    ics = InterpreterConstraints.compute_for_targets(coarsened_targets, python_setup)
+    if ics is None:
+        # TODO: This case should be removed after the deprecation in `compute_for_targets`
+        # triggers.
+        interpreter_constraints_by_coarsened_target = {
+            ct: (
+                InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
+                or mypy.interpreter_constraints
+            )
+            for ct in coarsened_targets
+        }
+    else:
+        interpreter_constraints_by_coarsened_target = {
+            ct: ic for ct, ic in zip(coarsened_targets, ics) if ic is not None
+        }
+
     resolve_and_interpreter_constraints_to_coarsened_targets: Mapping[
         tuple[str, InterpreterConstraints],
         tuple[OrderedSet[MyPyFieldSet], OrderedSet[CoarsenedTarget]],
     ] = defaultdict(lambda: (OrderedSet(), OrderedSet()))
     for root in request.field_sets:
         ct = coarsened_targets_by_address[root.address]
-        # NB: If there is a cycle in the roots, we still only take the first resolve, as the other
+        # If there is a cycle in the roots, we still only take the first resolve, as the other
         # members will be validated when the partition is actually built.
         resolve = ct.representative[PythonResolveField].normalized_value(python_setup)
-        # NB: We need to consume the entire un-memoized closure here. See the method comment.
-        interpreter_constraints = (
-            InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
-            or mypy.interpreter_constraints
-        )
+        interpreter_constraints = interpreter_constraints_by_coarsened_target.get(ct)
+        # If a CoarsenedTarget did not have IntepreterConstraints, then it's because it didn't
+        # contain any targets with the field, and so there is no point checking it.
+        if interpreter_constraints is None:
+            continue
+
         roots, root_cts = resolve_and_interpreter_constraints_to_coarsened_targets[
             (resolve, interpreter_constraints)
         ]
@@ -302,7 +312,7 @@ async def mypy_determine_partitions(
             FrozenOrderedSet(roots),
             FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
             resolve if len(python_setup.resolves) > 1 else None,
-            interpreter_constraints,
+            interpreter_constraints or mypy.interpreter_constraints,
         )
         for (resolve, interpreter_constraints), (roots, root_cts) in sorted(
             resolve_and_interpreter_constraints_to_coarsened_targets.items()

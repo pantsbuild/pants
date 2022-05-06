@@ -13,7 +13,7 @@ from pants.backend.python.lint.pylint.subsystem import (
     PylintFirstPartyPlugins,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField, PythonResolveField
+from pants.backend.python.target_types import PythonResolveField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
@@ -177,20 +177,10 @@ async def pylint_lint_partition(
     )
 
 
-# TODO(#15241): Improve the performance of this, especially by not needing to calculate transitive
-#  targets per field set. Doing that would require changing how we calculate interpreter
-#  constraints to be more like how we determine resolves, i.e. only inspecting the root target
-#  (and later validating the closure is compatible).
 @rule(desc="Determine if necessary to partition Pylint input", level=LogLevel.DEBUG)
 async def pylint_determine_partitions(
     request: PylintRequest, python_setup: PythonSetup, first_party_plugins: PylintFirstPartyPlugins
 ) -> PylintPartitions:
-    # We batch targets by their interpreter constraints + resolve to ensure, for example, that all
-    # Python targets run together and all Python 3 targets run together.
-    #
-    # Note that Pylint uses the AST of the interpreter that runs it. So, we include any plugin
-    # targets in this interpreter constraints calculation. However, we don't have to consider the
-    # resolve of the plugin targets, per https://github.com/pantsbuild/pants/issues/14320.
     coarsened_targets = await Get(
         CoarsenedTargets,
         CoarsenedTargetsRequest(
@@ -199,39 +189,50 @@ async def pylint_determine_partitions(
     )
     coarsened_targets_by_address = coarsened_targets.by_address()
 
+    ics = InterpreterConstraints.compute_for_targets(coarsened_targets, python_setup)
+    if ics is None:
+        # TODO: This case will be removed after the deprecation in `compute_for_targets`
+        # triggers.
+        interpreter_constraints_by_coarsened_target = {
+            ct: InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
+            for ct in coarsened_targets
+        }
+    else:
+        interpreter_constraints_by_coarsened_target = {
+            ct: ic for ct, ic in zip(coarsened_targets, ics) if ic is not None
+        }
+
     resolve_and_interpreter_constraints_to_coarsened_targets: Mapping[
         tuple[str, InterpreterConstraints],
         tuple[OrderedSet[PylintFieldSet], OrderedSet[CoarsenedTarget]],
     ] = defaultdict(lambda: (OrderedSet(), OrderedSet()))
     for root in request.field_sets:
         ct = coarsened_targets_by_address[root.address]
-        # NB: If there is a cycle in the roots, we still only take the first resolve, as the other
+        # If there is a cycle in the roots, we still only take the first resolve, as the other
         # members will be validated when the partition is actually built.
         resolve = ct.representative[PythonResolveField].normalized_value(python_setup)
-        # NB: We need to consume the entire un-memoized closure here. See the method comment.
-        interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-            (
-                *(
-                    tgt[InterpreterConstraintsField]
-                    for tgt in ct.closure()
-                    if tgt.has_field(InterpreterConstraintsField)
-                ),
-                *first_party_plugins.interpreter_constraints_fields,
-            ),
-            python_setup,
-        )
+        interpreter_constraints = interpreter_constraints_by_coarsened_target.get(ct)
+        # If a CoarsenedTarget did not have IntepreterConstraints, then it's because it didn't
+        # contain any targets with the field, and so there is no point checking it.
+        if interpreter_constraints is None:
+            continue
+
         roots, root_cts = resolve_and_interpreter_constraints_to_coarsened_targets[
             (resolve, interpreter_constraints)
         ]
         roots.add(root)
         root_cts.add(ct)
 
+    first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
+        first_party_plugins.interpreter_constraints_fields, python_setup
+    )
+
     return PylintPartitions(
         PylintPartition(
             FrozenOrderedSet(roots),
             FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
             resolve if len(python_setup.resolves) > 1 else None,
-            interpreter_constraints,
+            InterpreterConstraints.merge((interpreter_constraints, first_party_ics)),
         )
         for (resolve, interpreter_constraints), (roots, root_cts) in sorted(
             resolve_and_interpreter_constraints_to_coarsened_targets.items()

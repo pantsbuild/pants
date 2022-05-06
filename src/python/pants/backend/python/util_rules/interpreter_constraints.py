@@ -6,7 +6,7 @@ from __future__ import annotations
 import functools
 import itertools
 from collections import defaultdict
-from typing import Iterable, Iterator, Sequence, TypeVar
+from typing import Iterable, Iterator, Sequence, Tuple, TypeVar
 
 from pkg_resources import Requirement
 from typing_extensions import Protocol
@@ -15,7 +15,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.target import Target
+from pants.engine.target import CoarsenedTarget, Target
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -75,6 +75,108 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         except ValueError:
             parsed_requirement = Requirement.parse(f"CPython{constraint}")
         return parsed_requirement
+
+    @classmethod
+    def compute_for_targets(
+        cls, cts: Sequence[CoarsenedTarget], python_setup: PythonSetup
+    ) -> list[InterpreterConstraints | None] | None:
+        """Compute the InterpreterConstraints for the given (Coarsened)Target instances.
+
+        If any reachable target has ICs which are not compatible with its dependencies (i.e., are
+        not a subset), then the entire result is None. TODO: When the deprecations below trigger,
+        this should turn into an error, and the return value should become infallible.
+
+        If a (Coarsened)Target root does not have ICs of its own, then its entry in the return value
+        will be None.
+        """
+
+        RawConstraints = Tuple[str, ...]
+
+        # A local cache of `ic1.contains(ic2)` checks.
+        # NB: Does not memoize failure, because validation shortcircuits if any check fails.
+        contains_memo: set[tuple[RawConstraints, RawConstraints]] = set()
+
+        def contains(a: RawConstraints, b: RawConstraints) -> bool:
+            key = (a, b)
+            if key in contains_memo:
+                return True
+            if not InterpreterConstraints(a).contains(
+                InterpreterConstraints(b), python_setup.interpreter_universe
+            ):
+                return False
+            contains_memo.add(key)
+            return True
+
+        interpreter_constraints: dict[CoarsenedTarget, set[RawConstraints]] = {}
+
+        def compute(ct: CoarsenedTarget) -> set[RawConstraints] | None:
+            """Validate a CoarsenedTarget, and return its computed constraints.
+
+            A CT will only have multiple constraints if it is acting as an alias for its
+            dependencies, because it doesn't have constraints of its own.
+            """
+            ics = interpreter_constraints.get(ct)
+            if ics is not None:
+                return ics
+
+            # Validate that all members of a cycle have the same ICs.
+            ics = {
+                tgt[InterpreterConstraintsField].value_or_global_default(python_setup)
+                for tgt in ct.members
+                if tgt.has_field(InterpreterConstraintsField)
+            }
+
+            if len(ics) > 1:
+                # TODO: Render deprecation warning here, eventually error.
+                return None
+
+            # Collect the distinct interpreter constraints of dependencies.
+            dependency_interpreter_constraints = set()
+            for dependency in ct.dependencies:
+                dependency_ics = compute(dependency)
+                if dependency_ics is None:
+                    return None
+                dependency_interpreter_constraints.update(dependency_ics)
+
+            if ics:
+                single_ics = next(iter(ics))
+                # Validate that the ICs for dependencies are all compatible with our own.
+                if not all(
+                    contains(d_ics, single_ics) for d_ics in dependency_interpreter_constraints
+                ):
+                    # TODO: Render deprecation warning here, eventually error.
+                    return None
+            else:
+                # If there are no interpreter constraints in a CT, then it acts like an alias for
+                # the targets it points to.
+                ics = dependency_interpreter_constraints
+
+            interpreter_constraints[ct] = ics
+            return ics
+
+        def canonical(ics: set[RawConstraints]) -> InterpreterConstraints | None:
+            """If a CoarsenedTarget has multiple ICs, it's because it didn't have any of its own."""
+            if len(ics) == 1:
+                return InterpreterConstraints(next(iter(ics)))
+            else:
+                return None
+
+        result = []
+        for ct in cts:
+            root_ics = compute(ct)
+            if root_ics is None:
+                # TODO: When the deprecation triggers, `compute` should eagerly raise instead.
+                return None
+            result.append(canonical(root_ics))
+        return result
+
+    @classmethod
+    def merge(cls, ics: Iterable[InterpreterConstraints]) -> InterpreterConstraints:
+        return InterpreterConstraints(
+            cls.merge_constraint_sets(
+                tuple(str(requirement) for requirement in ic) for ic in ics if ic
+            )
+        )
 
     @classmethod
     def merge_constraint_sets(cls, constraint_sets: Iterable[Iterable[str]]) -> list[Requirement]:
@@ -352,6 +454,8 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         This is restricted to the set of minor Python versions specified in `universe`.
         """
+        if self == other:
+            return True
         this = self.enumerate_python_versions(interpreter_universe)
         that = other.enumerate_python_versions(interpreter_universe)
         return this.issuperset(that)
