@@ -273,11 +273,9 @@ def run_pants_help_all() -> dict[str, Any]:
                 Running {argv} failed with exit code {run.returncode}.
 
                 stdout:
-
                 {textwrap.indent(run.stdout, ''*4)}
 
                 stderr:
-
                 {textwrap.indent(run.stderr, ''*4)}
                 """
             )
