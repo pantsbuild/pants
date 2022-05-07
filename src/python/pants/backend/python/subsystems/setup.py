@@ -432,11 +432,15 @@ class PythonSetup(Subsystem):
         default=True,
         help=softwrap(
             """
-            If true, add `python_requirements` target generators with the `tailor` goal for
-            requirements files.
+            If true, add `python_requirements`, `poetry_requirements`, and `pipenv_requirements`
+            target generators with the `tailor` goal.
 
-            This matches any file with the pattern `*requirements*.txt`. You will need to manually
-            add `python_requirements` for different file names like `reqs.txt`.
+            `python_requirements` targets are added for any file that matches the pattern
+            `*requirements*.txt`. You will need to manually add `python_requirements` for different
+            file names like `reqs.txt`.
+
+            `poetry_requirements` targets are added for `pyproject.toml` files with `[tool.poetry`
+            in them.
             """
         ),
         advanced=True,
