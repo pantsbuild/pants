@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import Mapping, Tuple
+from typing import Tuple
 
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
@@ -13,8 +12,7 @@ from pants.backend.python.lint.pylint.subsystem import (
     PylintFirstPartyPlugins,
 )
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField
-from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules import partition, pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     Pex,
@@ -35,10 +33,10 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, CoarsenedTargetsRequest, Target
+from pants.engine.target import CoarsenedTargets, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 
@@ -181,47 +179,9 @@ async def pylint_lint_partition(
 async def pylint_determine_partitions(
     request: PylintRequest, python_setup: PythonSetup, first_party_plugins: PylintFirstPartyPlugins
 ) -> PylintPartitions:
-    coarsened_targets = await Get(
-        CoarsenedTargets,
-        CoarsenedTargetsRequest(
-            (field_set.address for field_set in request.field_sets), expanded_targets=True
-        ),
+    resolve_and_interpreter_constraints_to_coarsened_targets = (
+        await partition._by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
-    coarsened_targets_by_address = coarsened_targets.by_address()
-
-    ics = InterpreterConstraints.compute_for_targets(coarsened_targets, python_setup)
-    if ics is None:
-        # TODO: This case will be removed after the deprecation in `compute_for_targets`
-        # triggers.
-        interpreter_constraints_by_coarsened_target = {
-            ct: InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
-            for ct in coarsened_targets
-        }
-    else:
-        interpreter_constraints_by_coarsened_target = {
-            ct: ic for ct, ic in zip(coarsened_targets, ics) if ic is not None
-        }
-
-    resolve_and_interpreter_constraints_to_coarsened_targets: Mapping[
-        tuple[str, InterpreterConstraints],
-        tuple[OrderedSet[PylintFieldSet], OrderedSet[CoarsenedTarget]],
-    ] = defaultdict(lambda: (OrderedSet(), OrderedSet()))
-    for root in request.field_sets:
-        ct = coarsened_targets_by_address[root.address]
-        # If there is a cycle in the roots, we still only take the first resolve, as the other
-        # members will be validated when the partition is actually built.
-        resolve = ct.representative[PythonResolveField].normalized_value(python_setup)
-        interpreter_constraints = interpreter_constraints_by_coarsened_target.get(ct)
-        # If a CoarsenedTarget did not have IntepreterConstraints, then it's because it didn't
-        # contain any targets with the field, and so there is no point checking it.
-        if interpreter_constraints is None:
-            continue
-
-        roots, root_cts = resolve_and_interpreter_constraints_to_coarsened_targets[
-            (resolve, interpreter_constraints)
-        ]
-        roots.add(root)
-        root_cts.add(ct)
 
     first_party_ics = InterpreterConstraints.create_from_compatibility_fields(
         first_party_plugins.interpreter_constraints_fields, python_setup
