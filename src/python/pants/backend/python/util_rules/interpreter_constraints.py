@@ -13,12 +13,14 @@ from typing_extensions import Protocol
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import CoarsenedTarget, Target
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import bullet_list
 
 
 # This protocol allows us to work with any arbitrary FieldSet. See
@@ -127,29 +129,63 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             }
 
             if len(ics) > 1:
-                # TODO: Render deprecation warning here, eventually error.
+                # TODO: When the deprecation is removed, this message should convert into an exception,
+                # and the function should become infallible.
+                warn_or_error(
+                    removal_version="2.14.0.dev2",
+                    entity="the `interpreter_constraints` field differing between targets in a cycle",
+                    hint=(
+                        "The following targets are involved in a cycle (which is supported), but "
+                        "have differing `interpreter_constraints` fields (which is deprecated).\n"
+                        "Interpreter constraints:\n"
+                        f"{bullet_list(str(ic) for ic in ics)}\n"
+                        "Targets:\n"
+                        f"{ct.bullet_list()}"
+                    ),
+                )
                 return None
 
             # Collect the distinct interpreter constraints of dependencies.
-            dependency_interpreter_constraints = set()
+            dependency_interpreter_constraints = defaultdict(list)
             for dependency in ct.dependencies:
                 dependency_ics = compute(dependency)
                 if dependency_ics is None:
                     return None
-                dependency_interpreter_constraints.update(dependency_ics)
+                for d_ics in dependency_ics:
+                    dependency_interpreter_constraints[d_ics].append(dependency)
 
             if ics:
                 single_ics = next(iter(ics))
                 # Validate that the ICs for dependencies are all compatible with our own.
-                if not all(
-                    contains(d_ics, single_ics) for d_ics in dependency_interpreter_constraints
-                ):
-                    # TODO: Render deprecation warning here, eventually error.
+                non_subset_items = [
+                    f"{d_ics}: {', '.join(str(t) for t in targets)}"
+                    for d_ics, targets in dependency_interpreter_constraints.items()
+                    if not contains(d_ics, single_ics)
+                ]
+                if non_subset_items:
+                    # TODO: When the deprecation is removed, this message should convert into an exception,
+                    # and the function should become infallible.
+                    warn_or_error(
+                        removal_version="2.14.0.dev2",
+                        entity=(
+                            "the `interpreter_constraints` of a target not being a subset "
+                            "of its dependencies' `interpreter_constraints`"
+                        ),
+                        hint=(
+                            f"The target {ct} has the `interpreter_constraints` {single_ics}, which "
+                            "are not a subset of the `interpreter_constraints` of some of its "
+                            "dependencies:\n"
+                            f"{bullet_list(non_subset_items)}\n\n"
+                            f"To fix this, you should likely adjust {ct}'s "
+                            "`interpreter_constraints` to match the narrowest range in the "
+                            "above list."
+                        ),
+                    )
                     return None
             else:
                 # If there are no interpreter constraints in a CT, then it acts like an alias for
                 # the targets it points to.
-                ics = dependency_interpreter_constraints
+                ics = set(dependency_interpreter_constraints)
 
             interpreter_constraints[ct] = ics
             return ics
