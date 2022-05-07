@@ -25,6 +25,7 @@ import os
 import pkgutil
 import re
 import subprocess
+import textwrap
 from html.parser import HTMLParser
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, cast
@@ -36,6 +37,7 @@ from readme_api import DocRef, ReadmeAPI
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.help.help_info_extracter import to_help_str
+from pants.util.strutil import softwrap
 from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
@@ -78,8 +80,12 @@ def determine_pants_version(no_prompt: bool) -> str:
     )
     if key_confirmation and key_confirmation.lower() != "y":
         die(
-            "Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change "
-            "src/python/pants/VERSION."
+            softwrap(
+                """
+                Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change
+                src/python/pants/VERSION.
+                """
+            )
         )
     return version
 
@@ -183,17 +189,25 @@ def create_parser() -> argparse.ArgumentParser:
         "--sync",
         action="store_true",
         default=False,
-        help="Whether to sync the generated reference docs to the docsite. "
-        "If unset, will generate markdown files to the path in --output "
-        "instead.  If set, --api-key must be set.",
+        help=softwrap(
+            """
+            Whether to sync the generated reference docs to the docsite.
+            If unset, will generate markdown files to the path in --output
+            instead.  If set, --api-key must be set.
+            """
+        ),
     )
     parser.add_argument(
         "--output",
         default=PosixPath(os.path.sep) / "tmp" / "pants_docs" / "help" / "option",
         type=Path,
-        help="Path to a directory under which we generate the markdown files. "
-        "Useful for viewing the files locally when testing and debugging "
-        "the renderer.",
+        help=softwrap(
+            """
+            Path to a directory under which we generate the markdown files.
+            Useful for viewing the files locally when testing and debugging
+            the renderer.
+            """
+        ),
     )
     parser.add_argument("--api-key", help="The readme.io API key to use. Required for --sync.")
     return parser
@@ -254,8 +268,17 @@ def run_pants_help_all() -> dict[str, Any]:
         run.check_returncode()
     except subprocess.CalledProcessError:
         logger.error(
-            f"Running {argv} failed with exit code {run.returncode}.\n\nstdout:\n{run.stdout}"
-            f"\n\nstderr:\n{run.stderr}"
+            softwrap(
+                f"""
+                Running {argv} failed with exit code {run.returncode}.
+
+                stdout:
+                {textwrap.indent(run.stdout, " " * 4)}
+
+                stderr:
+                {textwrap.indent(run.stderr, " " * 4)}
+                """
+            )
         )
         raise
     return cast("dict[str, Any]", json.loads(run.stdout))

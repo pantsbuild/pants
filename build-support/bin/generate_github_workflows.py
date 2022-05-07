@@ -14,6 +14,8 @@ import toml
 import yaml
 from common import die
 
+from pants.util.strutil import softwrap
+
 HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
@@ -79,9 +81,13 @@ def ensure_category_label() -> Sequence[Step]:
             "with": {
                 "mode": "exactly",
                 "count": 1,
-                "labels": "category:new feature, category:user api change, "
-                "category:plugin api change, category:performance, category:bugfix, "
-                "category:documentation, category:internal",
+                "labels": softwrap(
+                    """
+                    category:new feature, category:user api change,
+                    category:plugin api change, category:performance, category:bugfix,
+                    category:documentation, category:internal
+                    """
+                ),
             },
         }
     ]
@@ -107,11 +113,7 @@ def checkout(*, containerized: bool = False) -> Sequence[Step]:
             # + https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-24765
             {
                 "name": "Configure Git",
-                "run": dedent(
-                    """\
-                    git config --global safe.directory "$GITHUB_WORKSPACE"
-                    """
-                ),
+                "run": 'git config --global safe.directory "$GITHUB_WORKSPACE"',
             }
         )
     steps.extend(
@@ -465,9 +467,11 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 setup_toolchain_auth(),
                 {
                     "name": "Run Python tests",
-                    "run": (
-                        "./pants --tag=+platform_specific_behavior test :: "
-                        "-- -m platform_specific_behavior\n"
+                    "run": softwrap(
+                        """
+                        ./pants --tag=+platform_specific_behavior test ::
+                        -- -m platform_specific_behavior
+                        """
                     ),
                 },
                 upload_log_artifacts(name="python-test-macos"),

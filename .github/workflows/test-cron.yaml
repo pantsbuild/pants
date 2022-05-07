@@ -499,9 +499,7 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
-
-        '
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
     - if: always()
       name: Upload pants.log
       uses: actions/upload-artifact@v2
