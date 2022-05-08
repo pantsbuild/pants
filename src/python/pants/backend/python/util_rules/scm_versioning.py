@@ -33,14 +33,14 @@ class SCMVersioningError(Exception):
 
 # Note that even though setuptools_scm is Python-centric, we could easily use it to generate
 # version data for use in other languages!
-class GeneratePythonFromSetuptoolsCMRequest(GenerateSourcesRequest):
+class GeneratePythonFromSetuptoolsSCMRequest(GenerateSourcesRequest):
     input = SetuptoolsSCMDummySourceField
     output = PythonSourceField
 
 
 @rule
-async def generate_python_from_setuptools_scm_config(
-    request: GeneratePythonFromSetuptoolsCMRequest,
+async def generate_python_from_setuptools_scm(
+    request: GeneratePythonFromSetuptoolsSCMRequest,
     setuptools_scm: SetuptoolsSCM,
 ) -> GeneratedSources:
     # A GitWorktreeRequest is uncacheable, so this enclosing rule will run every time its result
@@ -99,5 +99,5 @@ async def generate_python_from_setuptools_scm_config(
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateSourcesRequest, GeneratePythonFromSetuptoolsCMRequest),
+        UnionRule(GenerateSourcesRequest, GeneratePythonFromSetuptoolsSCMRequest),
     )
