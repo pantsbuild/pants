@@ -16,6 +16,8 @@ from pants.bsp.util_rules.targets import (
     BSPCompileResult,
     BSPResolveFieldFactoryRequest,
     BSPResolveFieldFactoryResult,
+    BSPResourcesRequest,
+    BSPResourcesResult,
 )
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
@@ -23,6 +25,8 @@ from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
 from pants.jvm.bsp.compile import rules as jvm_compile_rules
+from pants.jvm.bsp.resources import _jvm_bsp_resources
+from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.compile import ClasspathEntryRequestFactory
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -35,6 +39,7 @@ _logger = logging.getLogger(__name__)
 class JavaBSPLanguageSupport(BSPLanguageSupport):
     language_id = LANGUAGE_ID
     can_compile = True
+    can_provide_resources = True
 
 
 @dataclass(frozen=True)
@@ -139,13 +144,34 @@ async def bsp_java_compile_request(
     return result
 
 
+# -----------------------------------------------------------------------------------------------
+# Resources Request
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class JavaBSPResourcesRequest(BSPResourcesRequest):
+    field_set_type = JavaFieldSet
+
+
+@rule
+async def bsp_java_resources_request(
+    request: JavaBSPResourcesRequest,
+    build_root: BuildRoot,
+) -> BSPResourcesResult:
+    result: BSPResourcesResult = await _jvm_bsp_resources(request, build_root)
+    return result
+
+
 def rules():
     return (
         *collect_rules(),
         *jvm_compile_rules(),
+        *jvm_resources_rules(),
         UnionRule(BSPLanguageSupport, JavaBSPLanguageSupport),
         UnionRule(BSPResolveFieldFactoryRequest, JavaBSPResolveFieldFactoryRequest),
         UnionRule(BSPBuildTargetsMetadataRequest, JavaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPHandlerMapping, JavacOptionsHandlerMapping),
         UnionRule(BSPCompileRequest, JavaBSPCompileRequest),
+        UnionRule(BSPResourcesRequest, JavaBSPResourcesRequest),
     )

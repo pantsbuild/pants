@@ -32,6 +32,8 @@ from pants.bsp.util_rules.targets import (
     BSPDependencyModulesResult,
     BSPResolveFieldFactoryRequest,
     BSPResolveFieldFactoryResult,
+    BSPResourcesRequest,
+    BSPResourcesResult,
 )
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileEntry, Workspace
@@ -49,6 +51,8 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
 from pants.jvm.bsp.compile import rules as jvm_compile_rules
+from pants.jvm.bsp.resources import _jvm_bsp_resources
+from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import MavenDependencyModule, MavenDependencyModuleArtifact
 from pants.jvm.compile import ClasspathEntryRequestFactory
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
@@ -70,6 +74,7 @@ _logger = logging.getLogger(__name__)
 class ScalaBSPLanguageSupport(BSPLanguageSupport):
     language_id = LANGUAGE_ID
     can_compile = True
+    can_provide_resources = True
 
 
 @dataclass(frozen=True)
@@ -419,10 +424,30 @@ async def bsp_scala_compile_request(
     return result
 
 
+# -----------------------------------------------------------------------------------------------
+# Resources Request
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ScalaBSPResourcesRequest(BSPResourcesRequest):
+    field_set_type = ScalaFieldSet
+
+
+@rule
+async def bsp_scala_resources_request(
+    request: ScalaBSPResourcesRequest,
+    build_root: BuildRoot,
+) -> BSPResourcesResult:
+    result: BSPResourcesResult = await _jvm_bsp_resources(request, build_root)
+    return result
+
+
 def rules():
     return (
         *collect_rules(),
         *jvm_compile_rules(),
+        *jvm_resources_rules(),
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
         UnionRule(BSPBuildTargetsMetadataRequest, ScalaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPResolveFieldFactoryRequest, ScalaBSPResolveFieldFactoryRequest),
@@ -430,5 +455,6 @@ def rules():
         UnionRule(BSPHandlerMapping, ScalaMainClassesHandlerMapping),
         UnionRule(BSPHandlerMapping, ScalaTestClassesHandlerMapping),
         UnionRule(BSPCompileRequest, ScalaBSPCompileRequest),
+        UnionRule(BSPResourcesRequest, ScalaBSPResourcesRequest),
         UnionRule(BSPDependencyModulesRequest, ScalaBSPDependencyModulesRequest),
     )

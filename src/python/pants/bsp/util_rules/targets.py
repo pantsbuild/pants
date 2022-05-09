@@ -16,7 +16,6 @@ from pants.base.build_root import BuildRoot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressSpecs, Specs
 from pants.base.specs_parser import SpecsParser
-from pants.bsp.spec.base import BSPData, BuildTarget, BuildTargetIdentifier, Uri
 from pants.bsp.goal import BSPGoal
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import (
@@ -25,6 +24,7 @@ from pants.bsp.spec.base import (
     BuildTargetCapabilities,
     BuildTargetIdentifier,
     StatusCode,
+    Uri,
 )
 from pants.bsp.spec.targets import (
     DependencyModule,
