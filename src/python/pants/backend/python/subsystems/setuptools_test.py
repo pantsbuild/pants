@@ -23,7 +23,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             QueryRule(GeneratePythonLockfile, [SetuptoolsLockfileSentinel]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
-        objects={"setup_py": PythonArtifact},
+        objects={"python_artifact": PythonArtifact},
     )
 
     global_constraint = "==3.9.*"
@@ -49,7 +49,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
             """
         ),
@@ -62,7 +62,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
             """
         ),
@@ -75,7 +75,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
             """
         ),
@@ -94,14 +94,14 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             python_distribution(
                 name="dist1",
                 dependencies=[":lib1"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
 
             python_sources(name="lib2", interpreter_constraints=["==3.5.*"])
             python_distribution(
                 name="dist2",
                 dependencies=[":lib2"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
             """
         ),
@@ -114,14 +114,14 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             python_distribution(
                 name="dist1",
                 dependencies=[":lib1"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
 
             python_sources(name="lib2", interpreter_constraints=[">=3.5"])
             python_distribution(
                 name="dist2",
                 dependencies=[":lib2"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
             """
         ),
@@ -134,21 +134,21 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             python_distribution(
                 name="dist1",
                 dependencies=[":lib1"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
 
             python_sources(name="lib2", interpreter_constraints=["==2.7.*"])
             python_distribution(
                 name="dist2",
                 dependencies=[":lib2"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
 
             python_sources(name="lib3", interpreter_constraints=[">=3.6"])
             python_distribution(
                 name="dist3",
                 dependencies=[":lib3"],
-                provides=setup_py(name="dist"),
+                provides=python_artifact(name="dist"),
             )
             """
         ),
