@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections import defaultdict
 from enum import Enum
 from pathlib import PurePath
-from typing import Iterable, Iterator, cast
+from typing import DefaultDict, Iterable, Iterator, cast
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -16,6 +17,7 @@ from pants.backend.python.dependency_inference.default_unowned_dependencies impo
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
+    ResolveName,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonAssetPaths,
@@ -35,7 +37,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.core import target_types
 from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllAssetTargetsRequest
 from pants.core.util_rules import stripped_source_files
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, SubsystemRule, rule, rule_helper
 from pants.engine.target import (
@@ -44,6 +46,7 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferDependenciesRequest,
     InferredDependencies,
+    Targets,
     WrappedTarget,
 )
 from pants.engine.unions import UnionRule
@@ -267,22 +270,63 @@ async def _handle_unowned_imports(
     address: Address,
     file: str,
     unowned_dependency_behavior: UnownedDependencyUsage,
+    python_setup: PythonSetup,
     unowned_imports: Iterable[str],
     parsed_imports: ParsedPythonImports,
     resolve: str,
 ) -> None:
     if not unowned_imports or unowned_dependency_behavior is UnownedDependencyUsage.DoNothing:
         return
+
+    other_resolves_snippet = ""
+    if len(python_setup.resolves) > 1:
+        other_owners_from_other_resolves = await MultiGet(
+            Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=None))
+            for imported_module in unowned_imports
+        )
+        other_owners_as_targets = await MultiGet(
+            Get(Targets, Addresses(owners.unambiguous + owners.unambiguous))
+            for owners in other_owners_from_other_resolves
+        )
+
+        imports_to_other_owners: DefaultDict[str, list[tuple[ResolveName, Address]]] = defaultdict(
+            list
+        )
+        for imported_module, targets in zip(unowned_imports, other_owners_as_targets):
+            for t in targets:
+                other_owner_resolve = t[PythonResolveField].normalized_value(python_setup)
+                if other_owner_resolve != resolve:
+                    imports_to_other_owners[imported_module].append(
+                        (t.address, other_owner_resolve)
+                    )
+
+        if imports_to_other_owners:
+            other_resolves_lines = []
+            for import_module, other_owners in sorted(imports_to_other_owners.items()):
+                owners_txt = ", ".join(
+                    f"'{other_resolve}' from {addr}" for addr, other_resolve in other_owners
+                )
+                other_resolves_lines.append(f"{import_module}: {owners_txt}")
+            other_resolves_snippet = "\n\n" + softwrap(
+                f"""
+                These imports are not in the resolve used by the target (`{resolve}`), but they
+                were present in other resolves:
+
+                {bullet_list(other_resolves_lines)}\n\n
+                """
+            )
+
     unowned_imports_with_lines = [
         f"{module_name} (line: {parsed_imports[module_name].lineno})"
         for module_name in sorted(unowned_imports)
     ]
+
     msg = softwrap(
         f"""
         Pants cannot infer owners for the following imports in the file {file} (from the target
         {address}):
 
-        {bullet_list(unowned_imports_with_lines)}
+        {bullet_list(unowned_imports_with_lines)}{other_resolves_snippet}
 
         If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the
         import line. Otherwise, see
@@ -360,6 +404,7 @@ async def infer_python_dependencies_via_source(
         tgt.address,
         request.sources_field.file_path,
         python_infer_subsystem.unowned_dependency_behavior,
+        python_setup,
         unowned_imports,
         parsed_imports,
         resolve=resolve,
