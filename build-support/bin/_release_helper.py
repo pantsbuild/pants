@@ -854,6 +854,9 @@ def build_pex(fetch: bool) -> None:
         Path(tmpdir, "BUILD_ROOT").touch()
         # We also need to filter out Pants options like `PANTS_CONFIG_FILES`.
         env = {k: v for k, v in env.items() if not k.startswith("PANTS_")}
+        # Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
+        # otherwise inclusion of that plugin will fail due to its `pytest` import not being included in the pex.
+        env["PANTS_BACKEND_PACKAGES"] = '-["internal_plugins.test_lockfile_fixtures"]'
         subprocess.run([validated_pex_path, "--version"], env=env, check=True, cwd=dest.parent)
     green(f"Validated {dest}")
 
