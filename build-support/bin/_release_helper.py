@@ -73,6 +73,13 @@ _expected_owners = {"benjyw", "John.Sirois", "stuhood"}
 _expected_maintainers = {"EricArellano", "gshuflin", "illicitonion", "wisechengyi"}
 
 
+# Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
+# otherwise inclusion of that plugin will fail due to its `pytest` import not being included in the pex.
+DISABLED_BACKENDS_CONFIG = {
+    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures"]',
+}
+
+
 class PackageAccessValidator:
     @classmethod
     def validate_all(cls):
@@ -298,6 +305,10 @@ def validate_pants_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[st
                 ],
                 check=True,
                 stdout=subprocess.PIPE,
+                env={
+                    **os.environ,
+                    **DISABLED_BACKENDS_CONFIG,
+                },
             )
             .stdout.decode()
             .strip()
@@ -852,8 +863,9 @@ def build_pex(fetch: bool) -> None:
         shutil.copyfile(dest, validated_pex_path)
         validated_pex_path.chmod(0o777)
         Path(tmpdir, "BUILD_ROOT").touch()
-        # We also need to filter out Pants options like `PANTS_CONFIG_FILES`.
+        # We also need to filter out Pants options like `PANTS_CONFIG_FILES` and disable certain internal backends.
         env = {k: v for k, v in env.items() if not k.startswith("PANTS_")}
+        env.update(DISABLED_BACKENDS_CONFIG)
         subprocess.run([validated_pex_path, "--version"], env=env, check=True, cwd=dest.parent)
     green(f"Validated {dest}")
 
