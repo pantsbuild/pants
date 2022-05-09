@@ -45,6 +45,7 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     NestedDictStringToStringField,
+    OptionalSingleSourceField,
     OverridesField,
     ScalarField,
     SecondaryOwnerMixin,
@@ -1347,5 +1348,80 @@ class PythonDistribution(Target):
         A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
         See {doc_url('python-distributions')}.
+        """
+    )
+
+
+class VCSVersionDummySourceField(OptionalSingleSourceField):
+    """A dummy SourceField for participation in the codegen machinery."""
+
+    alias = "_dummy_source"  # Leading underscore omits the field from help.
+    help = "A version string generated from VCS information"
+
+
+class VersionTagRegexField(StringField):
+    default = r"^(?:[\w-]+-)?(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$"
+    alias = "tag_regex"
+    help = softwrap(
+        """
+        A Python regex string to extract the version string from a VCS tag.
+
+        The regex needs to contain either a single match group, or a group named version,
+        that captures the actual version information.
+
+        Note that this is unrelated to the tags field and Pants's own tags concept.
+
+        See https://github.com/pypa/setuptools_scm for implementation details.
+        """
+    )
+
+
+class VersionGenerateToField(StringField):
+    required = True
+    alias = "generate_to"
+    help = softwrap(
+        """
+        Generate the version data to this relative path, using the template field.
+
+        Note that the generated output will not be written to disk in the source tree, but
+        will be available as a generated dependency to code that depends on this target.
+        """
+    )
+
+
+class VersionTemplateField(StringField):
+    required = True
+    alias = "template"
+    help = softwrap(
+        """
+        Generate the version data using this format string, which takes a version format kwarg.
+
+        E.g., 'version = "{version}"'
+        """
+    )
+
+
+class VCSVersion(Target):
+    alias = "vcs_version"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        VersionTagRegexField,
+        VCSVersionDummySourceField,
+        VersionGenerateToField,
+        VersionTemplateField,
+    )
+    help = softwrap(
+        f"""
+        Generates a version string from VCS state.
+
+        Uses a constrained but useful subset of the full functionality of setuptools_scm
+        (https://github.com/pypa/setuptools_scm). These constraints avoid pitfalls in the
+        interaction of setuptools_scm with Pants's hermetic environments.
+
+        In particular, we ignore any existing setuptools_scm config. Instead you must provide
+        a subset of that config in this target's fields.
+
+        If you need functionality that is not currently exposed here, please reach out to us at
+        {doc_url("getting-help")}.
         """
     )
