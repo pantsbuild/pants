@@ -16,6 +16,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressSpecs, Specs
 from pants.base.specs_parser import SpecsParser
+from pants.bsp.spec.base import BSPData, BuildTarget, BuildTargetIdentifier, Uri
 from pants.bsp.goal import BSPGoal
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import (
@@ -669,6 +670,31 @@ class BSPCompileResult:
     """Result of compilation of a target capable of target compilation."""
 
     status: StatusCode
+    output_digest: Digest
+
+
+# -----------------------------------------------------------------------------------------------
+# Resources request.
+# See https://build-server-protocol.github.io/docs/specification.html#resources-request
+# -----------------------------------------------------------------------------------------------
+
+
+@union
+@dataclass(frozen=True)
+class BSPResourcesRequest(Generic[_FS]):
+    """Hook to allow language backends to provide resources for targets."""
+
+    field_set_type: ClassVar[Type[_FS]]
+
+    bsp_target: BSPBuildTargetInternal
+    field_sets: tuple[_FS, ...]
+
+
+@dataclass(frozen=True)
+class BSPResourcesResult:
+    """Resources for a target."""
+
+    resources: tuple[Uri, ...]
     output_digest: Digest
 
 
