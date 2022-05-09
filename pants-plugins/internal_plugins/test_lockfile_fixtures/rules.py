@@ -221,7 +221,7 @@ async def gather_lockfile_fixtures() -> RenderedJVMLockfileFixtures:
         lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, artifact_reqs)
         serialized_lockfile = JVMLockfileMetadata.new(artifact_reqs).add_header_to_lockfile(
             lockfile.to_serialized(),
-            regenerate_command=f"{bin_name()} {InternalGenerateTestLockfileFixturesSubsystem.name}",
+            regenerate_command=f"{bin_name()} {InternalGenerateTestLockfileFixturesSubsystem.name} ::",
             delimeter="#",
         )
 

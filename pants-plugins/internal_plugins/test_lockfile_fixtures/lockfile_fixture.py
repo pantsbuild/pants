@@ -10,6 +10,7 @@ import pytest
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import LockfileContext
+from pants.util.docutil import bin_name
 
 
 @dataclass(frozen=True)
@@ -77,9 +78,10 @@ class JvmLockfilePlugin:
                 f"Expected JVM lockfile {definition.lockfile_rel_path} to have metadata."
             )
         if not lockfile.metadata.is_valid_for(artifact_reqs, LockfileContext.TOOL):
-            # TODO: Fill in "SCRIPT."
             raise ValueError(
-                f"Lockfile fixture {definition.lockfile_rel_path} is not valid. Please re-generate it using SCRIPT."
+                f"Lockfile fixture {definition.lockfile_rel_path} is not valid. "
+                "Please re-generate it using: "
+                f"{bin_name()} internal-generate-test-lockfile-fixtures ::"
             )
 
         return JVMLockfileFixture(lockfile, lockfile_contents.decode(), artifact_reqs)
