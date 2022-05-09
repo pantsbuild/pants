@@ -4,6 +4,7 @@ from textwrap import dedent
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixture
 from pants.backend.kotlin.compile import kotlinc_plugins
 from pants.backend.kotlin.compile.kotlinc import CompileKotlinSourceRequest
 from pants.backend.kotlin.compile.kotlinc import rules as kotlinc_rules
@@ -30,7 +31,6 @@ from pants.jvm.testutil import (
     maybe_skip_jdk_test,
 )
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.lockfile_fixture import JVMLockfileFixture
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 
