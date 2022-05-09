@@ -15,7 +15,7 @@ from pants.util.docutil import git_url
 class SetuptoolsSCM(PythonToolBase):
     options_scope = "setuptools-scm"
     help = (
-        "A tool for generating versions from SCM metadata (https://github.com/pypa/setuptools_scm)."
+        "A tool for generating versions from VCS metadata (https://github.com/pypa/setuptools_scm)."
     )
 
     default_version = "setuptools-scm==6.4.2"

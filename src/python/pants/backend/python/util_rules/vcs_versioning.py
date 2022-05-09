@@ -10,10 +10,10 @@ import toml
 from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.target_types import (
     PythonSourceField,
-    SetuptoolsSCMDummySourceField,
-    SetuptoolsSCMTagRegexField,
-    SetuptoolsSCMWriteToField,
-    SetuptoolsSCMWriteToTemplateField,
+    VCSVersionDummySourceField,
+    VersionGenerateToField,
+    VersionTagRegexField,
+    VersionTemplateField,
 )
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.engine.fs import CreateDigest, FileContent
@@ -27,14 +27,14 @@ from pants.util.logging import LogLevel
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
 
 
-class SCMVersioningError(Exception):
+class VCSVersioningError(Exception):
     pass
 
 
 # Note that even though setuptools_scm is Python-centric, we could easily use it to generate
 # version data for use in other languages!
 class GeneratePythonFromSetuptoolsSCMRequest(GenerateSourcesRequest):
-    input = SetuptoolsSCMDummySourceField
+    input = VCSVersionDummySourceField
     output = PythonSourceField
 
 
@@ -47,7 +47,10 @@ async def generate_python_from_setuptools_scm(
     # is needed, meaning it will always return a result based on the current underlying git state.
     maybe_git_worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
     if not maybe_git_worktree.git_worktree:
-        raise SCMVersioningError("Not running in a git worktree")
+        raise VCSVersioningError(
+            f"Trying to determine the version for the {request.protocol_target.address} target at "
+            f"{request.protocol_target.address}, but you are not running in a git worktree."
+        )
 
     # Generate the setuptools_scm config. We don't use any existing pyproject.toml config,
     # because we don't want to let setuptools_scm itself write the output file. This is because
@@ -57,7 +60,7 @@ async def generate_python_from_setuptools_scm(
     # directory" and "where should I write output to".
     config: dict[str, dict[str, dict[str, str]]] = {}
     tool_config = config.setdefault("tool", {}).setdefault("setuptools_scm", {})
-    tag_regex = request.protocol_target[SetuptoolsSCMTagRegexField].value
+    tag_regex = request.protocol_target[VersionTagRegexField].value
     if tag_regex:
         tool_config["tag_regex"] = tag_regex
     config_path = "pyproject.synthetic.toml"
@@ -87,8 +90,8 @@ async def generate_python_from_setuptools_scm(
         ),
     )
     version = result.stdout.decode().strip()
-    write_to = cast(str, request.protocol_target[SetuptoolsSCMWriteToField].value)
-    write_to_template = cast(str, request.protocol_target[SetuptoolsSCMWriteToTemplateField].value)
+    write_to = cast(str, request.protocol_target[VersionGenerateToField].value)
+    write_to_template = cast(str, request.protocol_target[VersionTemplateField].value)
     output_content = write_to_template.format(version=version)
     output_snapshot = await Get(
         Snapshot, CreateDigest([FileContent(write_to, output_content.encode())])
