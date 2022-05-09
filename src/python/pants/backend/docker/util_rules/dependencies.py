@@ -1,19 +1,16 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+from pathlib import PurePath
+
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.target_types import DockerImageDependenciesField
-from pants.base.specs import AddressSpecs, MaybeEmptySiblingAddresses
-from pants.core.goals.package import PackageFieldSet
+from pants.core.goals.package import AllPackageableTargets, OutputPathField
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import (
-    FieldSetsPerTarget,
-    FieldSetsPerTargetRequest,
-    InjectDependenciesRequest,
-    InjectedDependencies,
-    Targets,
-)
+from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
 from pants.engine.unions import UnionRule
 
 
@@ -22,34 +19,49 @@ class InjectDockerDependencies(InjectDependenciesRequest):
 
 
 @rule
-async def inject_docker_dependencies(request: InjectDockerDependencies) -> InjectedDependencies:
-    """Inspects COPY instructions in the Dockerfile for references to known packagable targets."""
+async def inject_docker_dependencies(
+    request: InjectDockerDependencies, all_packageable_targets: AllPackageableTargets
+) -> InjectedDependencies:
+    """Inspects the Dockerfile for references to known packagable targets."""
     dockerfile_info = await Get(
         DockerfileInfo, DockerfileInfoRequest(request.dependencies_field.address)
     )
 
-    # Parse all putative target addresses.
-    putative_addresses = await Get(
-        Addresses,
-        UnparsedAddressInputs(
-            dockerfile_info.putative_target_addresses,
-            owning_address=dockerfile_info.address,
-        ),
+    putative_image_addresses = set(
+        await Get(
+            Addresses,
+            UnparsedAddressInputs(
+                dockerfile_info.from_image_addresses,
+                owning_address=dockerfile_info.address,
+            ),
+        )
     )
+    maybe_output_paths = set(dockerfile_info.copy_source_paths)
 
-    # Get the target for those addresses that are known.
-    directories = {address.spec_path for address in putative_addresses}
-    all_addresses = await Get(Addresses, AddressSpecs(map(MaybeEmptySiblingAddresses, directories)))
-    targets = await Get(
-        Targets, Addresses((address for address in putative_addresses if address in all_addresses))
-    )
+    # NB: There's no easy way of knowing the output path's default file ending as there could
+    # be none or it could be dynamic. Instead of forcing clients to tell us, we just use all the
+    # possible ones from the Dockerfile. In rare cases we over-infer, but it is relatively harmelss.
+    possible_file_endings = {PurePath(path).suffix[1:] or None for path in maybe_output_paths}
+    inject_addresses = []
+    for target in all_packageable_targets:
+        if target.address in putative_image_addresses:
+            inject_addresses.append(target.address)
+            continue
 
-    # Only keep those targets that we can "package".
-    package = await Get(FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, targets))
-    referenced_targets = (
-        field_sets[0].address for field_sets in package.collection if len(field_sets) > 0
-    )
-    return InjectedDependencies(Addresses(referenced_targets))
+        output_path_field = target.get(OutputPathField)
+        if not output_path_field:
+            continue
+
+        possible_output_paths = {
+            output_path_field.value_or_default(file_ending=file_ending)
+            for file_ending in possible_file_endings
+        }
+        for output_path in possible_output_paths:
+            if output_path in maybe_output_paths:
+                inject_addresses.append(target.address)
+                break
+
+    return InjectedDependencies(Addresses(inject_addresses))
 
 
 def rules():
