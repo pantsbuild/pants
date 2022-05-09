@@ -145,6 +145,7 @@ async def infer_cc_source_dependencies(
         )
         if maybe_relative_address:
             result.add(maybe_relative_address)
+            continue
 
         # Otherwise try source roots.
         if cc_infer.include_from_source_roots:
