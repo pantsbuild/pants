@@ -37,7 +37,7 @@ from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllA
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import Get, MultiGet, SubsystemRule, rule
+from pants.engine.rules import Get, MultiGet, SubsystemRule, rule, rule_helper
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -262,14 +262,14 @@ def _get_imports_info(
     return inferred_deps, unowned_imports
 
 
-def _maybe_warn_unowned(
+@rule_helper
+async def _handle_unowned_imports(
     address: Address,
     file: str,
     unowned_dependency_behavior: UnownedDependencyUsage,
     unowned_imports: Iterable[str],
     parsed_imports: ParsedPythonImports,
     resolve: str,
-    project_uses_multiple_resolves: bool,
 ) -> None:
     if not unowned_imports or unowned_dependency_behavior is UnownedDependencyUsage.DoNothing:
         return
@@ -277,21 +277,6 @@ def _maybe_warn_unowned(
         f"{module_name} (line: {parsed_imports[module_name].lineno})"
         for module_name in sorted(unowned_imports)
     ]
-    resolves_short_line = (
-        "\n  * Multiple resolves. See below." if project_uses_multiple_resolves else ""
-    )
-    resolves_long_line = (
-        (
-            "\n  * Multiple resolves. A target may exist for the import, but not share the same "
-            f"resolve of `{resolve}` from the target {address}. Pants only can infer dependencies "
-            f"on targets using the same resolve. You may need to set the `resolve=` field for "
-            f"whichever target provides that import (and possibly use the `parametrize` mechanism "
-            f"if that code should work with multiple resolves). See "
-            f"{doc_url('python-third-party-dependencies#multiple-lockfiles')}."
-        )
-        if project_uses_multiple_resolves
-        else ""
-    )
     msg = softwrap(
         f"""
         Pants cannot infer owners for the following imports in the file {file} (from the target
@@ -300,35 +285,8 @@ def _maybe_warn_unowned(
         {bullet_list(unowned_imports_with_lines)}
 
         If you do not expect an import to be inferrable, add `# pants: no-infer-dep` to the
-        import line.
-
-        Is the import from a third-party dependency (see
-        {doc_url("python-third-party-dependencies")})? Some common issues:
-
-          * Pants does not know about the requirement, i.e. there is not a `python_requirement`\
-          target for it. You can run `{bin_name()} filter --target-type=python_requirement ::` to see\
-          all `python_requirement` targets. If you are using `requirements.txt`, Poetry,\
-          or Pipenv, make sure you have `python_requirements`, `poetry_requirements`, and\
-          `pipenv_requirements` target generators, respectively. Double check that the requirement\
-          is in the respective file like `requirements.txt`.
-          * The third-party requirement exposes modules different than Pants's default, e.g.\
-          `ansicolors` exposing `colors`. Set the `modules` or `module_mapping` fields.
-          * Ambiguity. See below.{resolves_short_line}
-
-        Is the import from first-party code? Some common issues:
-
-          * The file does not exist.
-          * The file is missing an owning target like `python_sources`. Run `{bin_name()} list\
-          path/to/file.py` to see if there are any owners. If not, run `{bin_name()} tailor` to generate\
-          targets.
-          * The source root is not correctly set up, which is how Pants knows for example that the\
-          file `src/py/my_project/app.py` exposes the module `my_project.app`. See\
-          {doc_url('source-roots')}.
-          * Ambiguity. See below.{resolves_short_line}
-
-        Some common issues with both first and third-party imports:
-
-          * Ambiguity. See above logs if there are warnings and instructions.{resolves_long_line}
+        import line. Otherwise, see
+        {doc_url('troubleshooting#import-errors-and-missing-dependencies')} for common problems.
         """
     )
     if unowned_dependency_behavior is UnownedDependencyUsage.LogWarning:
@@ -398,14 +356,13 @@ async def infer_python_dependencies_via_source(
             )
         )
 
-    _maybe_warn_unowned(
+    _ = await _handle_unowned_imports(
         tgt.address,
         request.sources_field.file_path,
         python_infer_subsystem.unowned_dependency_behavior,
         unowned_imports,
         parsed_imports,
         resolve=resolve,
-        project_uses_multiple_resolves=len(python_setup.resolves) > 1,
     )
 
     return InferredDependencies(sorted(inferred_deps))
