@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import itertools
-import textwrap
 from textwrap import dedent
 
 import pytest
@@ -21,13 +20,13 @@ from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Addresses
-from pants.engine.fs import FileDigest
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
+from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget
@@ -62,50 +61,15 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JvmArtifactTarget, ScalaSourcesGeneratorTarget, ScalacPluginTarget],
     )
-    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        args=["--scala-version-for-resolve={'jvm-default':'2.13.8'}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     return rule_runner
 
 
-LOCKFILE_REQUIREMENTS = pytest.mark.jvm_lockfile(
-    path="scala-library.test.lock", requirements=["org.scala-lang:scala-library:2.13.6"]
-)
-
-DEFAULT_LOCKFILE = TestCoursierWrapper(
-    CoursierResolvedLockfile(
-        (
-            CoursierLockfileEntry(
-                coord=Coordinate(
-                    group="org.scala-lang", artifact="scala-library", version="2.13.6"
-                ),
-                file_name="org.scala-lang_scala-library_2.13.6.jar",
-                direct_dependencies=Coordinates(),
-                dependencies=Coordinates(),
-                file_digest=FileDigest(
-                    "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a", 5955737
-                ),
-            ),
-        )
-    )
-).serialize(
-    [
-        ArtifactRequirement(
-            coordinate=Coordinate(
-                group="org.scala-lang", artifact="scala-library", version="2.13.6"
-            )
-        )
-    ]
-)
-
-
-DEFAULT_SCALA_LIBRARY_TARGET = textwrap.dedent(
-    """\
-    jvm_artifact(
-      name="org.scala-lang_scala-library_2.13.6",
-      group="org.scala-lang",
-      artifact="scala-library",
-      version="2.13.6",
-    )
-    """
+scala_stdlib_jvm_lockfile = pytest.mark.jvm_lockfile(
+    path="scala-library-2.13.test.lock", requirements=["org.scala-lang:scala-library:2.13.8"]
 )
 
 
@@ -147,7 +111,7 @@ SCALA_LIB_MAIN_SOURCE = dedent(
 
 
 @maybe_skip_jdk_test
-@LOCKFILE_REQUIREMENTS
+@scala_stdlib_jvm_lockfile
 def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
@@ -158,7 +122,7 @@ def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixtu
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
             "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "ExampleLib.scala": SCALA_LIB_SOURCE,
         }
@@ -193,7 +157,8 @@ def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixtu
 
 
 @maybe_skip_jdk_test
-def test_compile_no_deps_jdk_12(rule_runner: RuleRunner) -> None:
+@scala_stdlib_jvm_lockfile
+def test_compile_no_deps_jdk_12(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -204,8 +169,8 @@ def test_compile_no_deps_jdk_12(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "ExampleLib.scala": SCALA_LIB_JDK12_SOURCE,
         }
     )
@@ -221,7 +186,10 @@ def test_compile_no_deps_jdk_12(rule_runner: RuleRunner) -> None:
 
 @logging
 @maybe_skip_jdk_test
-def test_compile_jdk_12_file_fails_on_jdk_11(rule_runner: RuleRunner) -> None:
+@scala_stdlib_jvm_lockfile
+def test_compile_jdk_12_file_fails_on_jdk_11(
+    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -232,8 +200,8 @@ def test_compile_jdk_12_file_fails_on_jdk_11(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "ExampleLib.scala": SCALA_LIB_JDK12_SOURCE,
         }
     )
@@ -254,7 +222,8 @@ def test_compile_jdk_12_file_fails_on_jdk_11(rule_runner: RuleRunner) -> None:
 
 @logging
 @maybe_skip_jdk_test
-def test_compile_with_deps(rule_runner: RuleRunner) -> None:
+@scala_stdlib_jvm_lockfile
+def test_compile_with_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -267,8 +236,8 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -301,7 +270,10 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
+@scala_stdlib_jvm_lockfile
+def test_compile_with_missing_dep_fails(
+    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -312,8 +284,8 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """
             ),
             "Example.scala": SCALA_LIB_MAIN_SOURCE,
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
         }
     )
     request = CompileScalaSourceRequest(
@@ -331,55 +303,26 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
-    joda_coord = Coordinate(group="joda-time", artifact="joda-time", version="2.10.10")
-    scala_library_coord = Coordinate(
-        group="org.scala-lang", artifact="scala-library", version="2.13.6"
-    )
-    resolved_joda_lockfile = TestCoursierWrapper.new(
-        entries=(
-            CoursierLockfileEntry(
-                coord=joda_coord,
-                file_name="joda-time-2.10.10.jar",
-                direct_dependencies=Coordinates([]),
-                dependencies=Coordinates([]),
-                file_digest=FileDigest(
-                    fingerprint="dd8e7c92185a678d1b7b933f31209b6203c8ffa91e9880475a1be0346b9617e3",
-                    serialized_bytes_length=644419,
-                ),
-            ),
-            CoursierLockfileEntry(
-                coord=scala_library_coord,
-                file_name="org.scala-lang_scala-library_2.13.6.jar",
-                direct_dependencies=Coordinates([]),
-                dependencies=Coordinates([]),
-                file_digest=FileDigest(
-                    "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
-                    5955737,
-                ),
-            ),
-        )
-    )
+@pytest.mark.jvm_lockfile(
+    path="joda-time.test.lock",
+    requirements=[
+        "joda-time:joda-time:2.10.10",
+        "org.scala-lang:scala-library:2.13.8",
+    ],
+)
+def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
-                f"""\
-                jvm_artifact(
-                    name = "joda-time_joda-time",
-                    group = "{joda_coord.group}",
-                    artifact = "{joda_coord.artifact}",
-                    version = "{joda_coord.version}",
-                )
+                """\
                 scala_sources(
                     name = 'main',
-                    dependencies = [":joda-time_joda-time"],
+                    dependencies = ["3rdparty/jvm:joda-time_joda-time"],
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": resolved_joda_lockfile.serialize(
-                [ArtifactRequirement(joda_coord), ArtifactRequirement(scala_library_coord)]
-            ),
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -417,7 +360,10 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunner) -> None:
+@scala_stdlib_jvm_lockfile
+def test_compile_with_undeclared_jvm_artifact_target_fails(
+    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -427,8 +373,8 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunn
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -458,7 +404,10 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(rule_runner: RuleRunn
 
 
 @maybe_skip_jdk_test
-def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: RuleRunner) -> None:
+@scala_stdlib_jvm_lockfile
+def test_compile_with_undeclared_jvm_artifact_dependency_fails(
+    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -475,8 +424,8 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "Example.scala": dedent(
                 """
                 package org.pantsbuild.example
@@ -505,64 +454,36 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(rule_runner: Rule
     assert "error: object joda is not a member of package org" in fallible_result.stderr
 
 
+acyclic_jvm_lockfile = pytest.mark.jvm_lockfile(
+    path="acyclic.test.lock",
+    requirements=[
+        "com.lihaoyi:acyclic_2.13:0.2.1",
+        "org.scala-lang:scala-library:2.13.8",
+    ],
+)
+
+
 @maybe_skip_jdk_test
-def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
-    acyclic_coord = Coordinate(group="com.lihaoyi", artifact="acyclic_2.13", version="0.2.1")
-    scala_library_coord = Coordinate(
-        group="org.scala-lang", artifact="scala-library", version="2.13.6"
-    )
+@acyclic_jvm_lockfile
+def test_compile_with_scalac_plugin(
+    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "lib/BUILD": dedent(
-                f"""\
-                jvm_artifact(
-                    name = "acyclic_lib",
-                    group = "{acyclic_coord.group}",
-                    artifact = "{acyclic_coord.artifact}",
-                    version = "{acyclic_coord.version}",
-                    packages=["acyclic.**"],
-                )
-
+                """\
                 scalac_plugin(
                     name = "acyclic",
-                    artifact = ":acyclic_lib",
+                    artifact = "3rdparty/jvm:com.lihaoyi_acyclic_2.13",
                 )
 
                 scala_sources(
-                  dependencies=[':acyclic_lib'],
+                  dependencies=["3rdparty/jvm:com.lihaoyi_acyclic_2.13"],
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(
-                entries=(
-                    CoursierLockfileEntry(
-                        coord=acyclic_coord,
-                        file_name="acyclic_2.13-0.2.1.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "4bc4656140ad5e4802fedcdbe920ec7c92dbebf5e76d1c60d35676a314481944",
-                            62534,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=scala_library_coord,
-                        file_name="org.scala-lang_scala-library_2.13.6.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
-                            5955737,
-                        ),
-                    ),
-                )
-            ).serialize(
-                [
-                    ArtifactRequirement(coordinate=acyclic_coord),
-                    ArtifactRequirement(scala_library_coord),
-                ]
-            ),
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "lib/A.scala": dedent(
                 """
                 package lib
@@ -586,6 +507,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(
         args=[
+            "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
             "--scalac-plugins-for-resolve={'jvm-default': 'acyclic'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
@@ -603,26 +525,17 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_compile_with_local_scalac_plugin(rule_runner: RuleRunner) -> None:
-    acyclic_coord = Coordinate(group="com.lihaoyi", artifact="acyclic_2.13", version="0.2.1")
-    scala_library_coord = Coordinate(
-        group="org.scala-lang", artifact="scala-library", version="2.13.6"
-    )
+@acyclic_jvm_lockfile
+def test_compile_with_local_scalac_plugin(
+    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "lib/BUILD": dedent(
-                f"""\
-                jvm_artifact(
-                    name = "acyclic_lib",
-                    group = "{acyclic_coord.group}",
-                    artifact = "{acyclic_coord.artifact}",
-                    version = "{acyclic_coord.version}",
-                    packages=["acyclic.**"],
-                )
-
+                """\
                 scalac_plugin(
                     name = "acyclic",
-                    artifact = ":acyclic_lib",
+                    artifact = "3rdparty/jvm:com.lihaoyi_acyclic_2.13",
                 )
 
                 scala_sources(
@@ -630,36 +543,8 @@ def test_compile_with_local_scalac_plugin(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(
-                entries=(
-                    CoursierLockfileEntry(
-                        coord=acyclic_coord,
-                        file_name="acyclic_2.13-0.2.1.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "4bc4656140ad5e4802fedcdbe920ec7c92dbebf5e76d1c60d35676a314481944",
-                            62534,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=scala_library_coord,
-                        file_name="org.scala-lang_scala-library_2.13.6.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
-                            5955737,
-                        ),
-                    ),
-                )
-            ).serialize(
-                [
-                    ArtifactRequirement(coordinate=acyclic_coord),
-                    ArtifactRequirement(scala_library_coord),
-                ]
-            ),
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "lib/A.scala": dedent(
                 """
                 package lib
@@ -682,7 +567,9 @@ def test_compile_with_local_scalac_plugin(rule_runner: RuleRunner) -> None:
         }
     )
     rule_runner.set_options(
-        args=[],
+        args=[
+            "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
@@ -698,154 +585,42 @@ def test_compile_with_local_scalac_plugin(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
-def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
-    better_monadic_coord = Coordinate(
-        group="com.olegpy", artifact="better-monadic-for_2.13", version="0.3.1"
-    )
-    kind_projector_coord = Coordinate(
-        group="org.typelevel", artifact="kind-projector_2.13.6", version="0.13.2"
-    )
-    scala_compiler_coord = Coordinate(
-        group="org.scala-lang", artifact="scala-compiler", version="2.13.6"
-    )
-    scala_library_coord = Coordinate(
-        group="org.scala-lang", artifact="scala-library", version="2.13.6"
-    )
-    scala_reflect_coord = Coordinate(
-        group="org.scala-lang", artifact="scala-reflect", version="2.13.6"
-    )
-    jna_coord = Coordinate(group="net.java.dev.jna", artifact="jna", version="5.3.1")
-    jline_coord = Coordinate(group="org.jline", artifact="jline", version="3.19.0")
+@pytest.mark.jvm_lockfile(
+    path="multiple-scalac-plugins.test.lock",
+    requirements=[
+        "com.olegpy:better-monadic-for_2.13:0.3.1",
+        "org.typelevel:kind-projector_2.13.8:0.13.2",
+        "org.scala-lang:scala-compiler:2.13.8",
+        "org.scala-lang:scala-library:2.13.8",
+        "org.scala-lang:scala-reflect:2.13.8",
+        "net.java.dev.jna:jna:5.3.1",
+        "org.jline:jline:3.19.0",
+    ],
+)
+def test_compile_with_multiple_scalac_plugins(
+    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "lib/BUILD": dedent(
-                f"""\
+                """\
                 scala_sources()
-
-                jvm_artifact(
-                    name="kind-projector-lib",
-                    group="{kind_projector_coord.group}",
-                    artifact="{kind_projector_coord.artifact}",
-                    version="{kind_projector_coord.version}",
-                )
 
                 scalac_plugin(
                     name="kind-projector",
                     plugin_name="kind-projector",
-                    artifact=":kind-projector-lib",
-                )
-
-                jvm_artifact(
-                    name="better-monadic-for-lib",
-                    group="{better_monadic_coord.group}",
-                    artifact="{better_monadic_coord.artifact}",
-                    version="{better_monadic_coord.version}",
+                    artifact="3rdparty/jvm:org.typelevel_kind-projector_2.13.8",
                 )
 
                 scalac_plugin(
                     name="better-monadic-for",
                     plugin_name="bm4",
-                    artifact=":better-monadic-for-lib",
+                    artifact="3rdparty/jvm:com.olegpy_better-monadic-for_2.13",
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(
-                entries=(
-                    CoursierLockfileEntry(
-                        coord=better_monadic_coord,
-                        file_name="com.olegpy_better-monadic-for_2.13_0.3.1.jar",
-                        direct_dependencies=Coordinates(
-                            [scala_compiler_coord, scala_library_coord]
-                        ),
-                        dependencies=Coordinates([scala_compiler_coord, scala_library_coord]),
-                        file_digest=FileDigest(
-                            "fac649fa7de697d1f98d3f814c4b70f5372c547fa41778383e22cee6c16084f5",
-                            130370,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=jna_coord,
-                        file_name="net.java.dev.jna_jna_5.3.1.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "01cb505c0698d0f7acf3524c7e73acb7dc424a5bae5e9c86ce44075ab32bc4ee",
-                            1505196,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=jline_coord,
-                        file_name="org.jline_jline_3.19.0.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "c99ddcfa5431cab88d1cd40fd63bec6ab5a3fe2e83877051198539af66592a46",
-                            987021,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=scala_compiler_coord,
-                        file_name="org.scala-lang_scala-compiler_2.13.6.jar",
-                        direct_dependencies=Coordinates(
-                            [jna_coord, jline_coord, scala_library_coord, scala_reflect_coord]
-                        ),
-                        dependencies=Coordinates(
-                            [jna_coord, jline_coord, scala_library_coord, scala_reflect_coord]
-                        ),
-                        file_digest=FileDigest(
-                            "310d263d622a3d016913e94ee00b119d270573a5ceaa6b21312d69637fd9eec1",
-                            12010571,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=scala_library_coord,
-                        file_name="org.scala-lang_scala-library_2.13.6.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
-                            5955737,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=scala_reflect_coord,
-                        file_name="org.scala-lang_scala-reflect_2.13.6.jar",
-                        direct_dependencies=Coordinates([scala_library_coord]),
-                        dependencies=Coordinates([scala_library_coord]),
-                        file_digest=FileDigest(
-                            "f713593809b387c60935bb9a940dfcea53bd0dbf8fdc8d10739a2896f8ac56fa",
-                            3769997,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=kind_projector_coord,
-                        file_name="org.typelevel_kind-projector_2.13.6_0.13.2.jar",
-                        direct_dependencies=Coordinates(
-                            [scala_compiler_coord, scala_library_coord]
-                        ),
-                        dependencies=Coordinates(
-                            [
-                                scala_compiler_coord,
-                                scala_reflect_coord,
-                                scala_library_coord,
-                                jna_coord,
-                                jline_coord,
-                            ]
-                        ),
-                        file_digest=FileDigest(
-                            "3d713d02bbe0d52b01c22ac11a50970460114f32b339f3ea429d52461d6c39ff",
-                            44257,
-                        ),
-                    ),
-                )
-            ).serialize(
-                [
-                    ArtifactRequirement(scala_library_coord),
-                    ArtifactRequirement(better_monadic_coord),
-                    ArtifactRequirement(kind_projector_coord),
-                ]
-            ),
+            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "lib/A.scala": dedent(
                 """\
                 trait Functor[F[_]] {
@@ -882,6 +657,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(
         args=[
+            "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
             "--scalac-plugins-for-resolve={'jvm-default': 'bm4,kind-projector'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
@@ -896,6 +672,10 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
     rule_runner.request(RenderedClasspath, [request])
 
 
+# TODO: This test demonstrates the limits of the current structure of the test lockfiles support: It
+# needs multiple lockfiles, but `jvm_lockfile` is essentially a singleton because the relevant
+# `pytest.mark.jvm_lockfile` can only be applied once. Separate fixture functions do not help, each with
+# their own `pytest.mark.jvm_lockfile`, because those marks are ignored for fixture functions.
 @maybe_skip_jdk_test
 def test_compile_with_multiple_scala_versions(rule_runner: RuleRunner) -> None:
     scala_library_coord_2_12 = Coordinate(
