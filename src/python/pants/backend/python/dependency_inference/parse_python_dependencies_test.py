@@ -114,6 +114,10 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
 
         if TYPE_CHECKING:
             from project.circular_dep import CircularDep
+        else:
+            from non_typechecking import something
+
+        from more_non_typechecking import somethingelse
         """
     )
     assert_deps_parsed(
@@ -132,7 +136,9 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "multiline_import1.not_ignored2": ImpInfo(lineno=23, weak=False),
             "multiline_import1.not_ignored3": ImpInfo(lineno=24, weak=False),
             "multiline_import2.not_ignored": ImpInfo(lineno=27, weak=False),
-            "project.circular_dep.CircularDep": ImpInfo(lineno=30, weak=False),
+            "project.circular_dep.CircularDep": ImpInfo(lineno=30, weak=True),
+            "non_typechecking.something": ImpInfo(lineno=32, weak=False),
+            "more_non_typechecking.somethingelse": ImpInfo(lineno=34, weak=False),
         },
     )
 

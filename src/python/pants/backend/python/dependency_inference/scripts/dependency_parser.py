@@ -25,7 +25,7 @@ class AstVisitor(ast.NodeVisitor):
 
         # Each of these maps module_name to first lineno of occurance
         # N.B. use `setdefault` when adding imports
-        # (See `ParsedPythonImportInfo` in ../parse_python_imports.py for the delineation of
+        # (See `ParsedPythonImportInfo` in ../parse_python_dependencies.py for the delineation of
         #   weak/strong)
         self.strong_imports = {}
         self.weak_imports = {}
@@ -140,6 +140,18 @@ class AstVisitor(ast.NodeVisitor):
     def visit_Try(self, node):
         self.visit_TryExcept(node)
         for stmt in node.finalbody:
+            self.visit(stmt)
+
+    def visit_If(self, node):
+        if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
+            self._weaken_strong_imports = True
+        else:
+            # In case the test is an __import__ call for example.
+            self.visit(node.test)
+        for stmt in node.body:
+            self.visit(stmt)
+        self._weaken_strong_imports = False
+        for stmt in node.orelse:
             self.visit(stmt)
 
     def visit_Call(self, node):
