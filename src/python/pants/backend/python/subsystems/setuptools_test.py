@@ -40,7 +40,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 
     # If no dependencies for python_distribution, fall back to global [python] constraints.
-    assert_ics("python_distribution(provides=setup_py(name='dist'))", [global_constraint])
+    assert_ics("python_distribution(provides=python_artifact(name='dist'))", [global_constraint])
 
     assert_ics(
         dedent(

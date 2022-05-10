@@ -436,7 +436,7 @@ async def package_python_dist(
 
     # Get any extra build-time environment (e.g., native extension requirements).
     build_env_requests = []
-    build_env_request_types = union_membership[DistBuildEnvironmentRequest]
+    build_env_request_types = union_membership.get(DistBuildEnvironmentRequest)
     for build_env_request_type in build_env_request_types:
         if build_env_request_type.is_applicable(dist_tgt):
             build_env_requests.append(
