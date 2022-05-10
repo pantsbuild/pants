@@ -40,7 +40,9 @@ async def inject_docker_dependencies(
 
     # NB: There's no easy way of knowing the output path's default file ending as there could
     # be none or it could be dynamic. Instead of forcing clients to tell us, we just use all the
-    # possible ones from the Dockerfile. In rare cases we over-infer, but it is relatively harmelss.
+    # possible ones from the Dockerfile. In rare cases we over-infer, but it is relatively harmless.
+    # NB: The suffix gets an `or None` `pathlib` includes the ".", but `OutputPathField` doesnt
+    # expect it (if you give it "", it'll leave a trailing ".").
     possible_file_endings = {PurePath(path).suffix[1:] or None for path in maybe_output_paths}
     inject_addresses = []
     for target in all_packageable_targets:
@@ -49,9 +51,6 @@ async def inject_docker_dependencies(
             continue
 
         output_path_field = target.get(OutputPathField)
-        if not output_path_field:
-            continue
-
         possible_output_paths = {
             output_path_field.value_or_default(file_ending=file_ending)
             for file_ending in possible_file_endings

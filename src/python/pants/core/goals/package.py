@@ -102,7 +102,7 @@ class AllPackageableTargets(Targets):
     pass
 
 
-@rule(desc="Find all Python targets in project", level=LogLevel.DEBUG)
+@rule(desc="Find all packageable targets in project", level=LogLevel.DEBUG)
 async def find_all_packageable_targets(all_targets: AllTargets) -> AllPackageableTargets:
     fs_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, all_targets)

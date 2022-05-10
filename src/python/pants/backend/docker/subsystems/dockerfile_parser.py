@@ -15,6 +15,7 @@ from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
+from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.addresses import Address
@@ -201,5 +202,6 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
+        *pex.rules(),
         UnionRule(GenerateToolLockfileSentinel, DockerfileParserLockfileSentinel),
     )

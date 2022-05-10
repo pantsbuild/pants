@@ -71,8 +71,7 @@ def main(cmd: str, args: list[str]) -> None:
                     # Do not consider COPY --from=... instructions etc.
                     continue
                 # The last element of copy.value is the destination.
-                for source in copy.value[:-1]:
-                    yield source
+                yield from copy.value[:-1]
 
         def from_image_addresses(self) -> Iterator[str]:
             build_args = {
