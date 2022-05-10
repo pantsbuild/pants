@@ -676,6 +676,10 @@ class BSPCompileResult:
 # -----------------------------------------------------------------------------------------------
 # Resources request.
 # See https://build-server-protocol.github.io/docs/specification.html#resources-request
+#
+# NB: This method is used only for the _indexing_ of resources, and not to add them to the
+# classpath (in the case of JVM targets). BSPCompileRequest implementations need to handle
+# movement of resources to accessible classpath entries.
 # -----------------------------------------------------------------------------------------------
 
 

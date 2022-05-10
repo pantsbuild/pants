@@ -18,6 +18,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.strutil import path_safe
 
 
@@ -42,13 +43,21 @@ async def _jvm_bsp_compile(
     )
     resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
 
+    # TODO: We include the (non-3rdparty) transitive dependencies here, because each project
+    # currently only has a single BuildTarget. This has the effect of including `resources` targets,
+    # which are referenced by BuildTargets (via `buildTarget/resources`), rather than necessarily
+    # being owned by any particular BuildTarget.
+    #
+    # To resolve #15051, this will no longer be transitive, and so `resources` will need to be
+    # attached-to/referenced-by nearby BuildTarget(s) instead (most likely: direct dependent(s)).
     results = await MultiGet(
         Get(
             FallibleClasspathEntry,
             ClasspathEntryRequest,
             classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
         )
-        for coarsened_target in coarsened_targets
+        for coarsened_target in coarsened_targets.coarsened_closure()
+        if not any(JvmArtifactFieldSet.is_applicable(t) for t in coarsened_target.members)
     )
 
     entries = FallibleClasspathEntry.if_all_succeeded(results)
@@ -58,8 +67,6 @@ async def _jvm_bsp_compile(
             output_digest=EMPTY_DIGEST,
         )
 
-    # NB: We are not including the transitive dependencies here: only the targets actually matched
-    # by the roots. All others are exposed as transitive module dependencies.
     loose_classfiles = await MultiGet(
         Get(LooseClassfiles, ClasspathEntry, entry) for entry in entries
     )
