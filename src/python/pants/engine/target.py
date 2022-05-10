@@ -6,6 +6,7 @@ from __future__ import annotations
 import collections.abc
 import dataclasses
 import enum
+import glob
 import itertools
 import logging
 import os.path
@@ -1098,6 +1099,10 @@ def _generate_file_level_targets(
     `overrides` allows changing the fields for particular targets. It expects the full file path
      as the key.
     """
+
+    # paths have already been globbed, and new path will also be globbed
+    # therefore, paths should be glob escaped
+    paths = (glob.escape(path) for path in paths)
 
     def generate_address(base_address: Address, relativized_fp: str) -> Address:
         return (
