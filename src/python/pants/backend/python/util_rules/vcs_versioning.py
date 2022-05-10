@@ -3,25 +3,37 @@
 
 from __future__ import annotations
 
-from typing import cast
+from collections import defaultdict
+from typing import DefaultDict, cast
 
 import toml
 
+from pants.backend.python.dependency_inference.module_mapper import (
+    FirstPartyPythonMappingImpl,
+    FirstPartyPythonMappingImplMarker,
+    ModuleProvider,
+    ModuleProviderType,
+    ResolveName,
+)
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.target_types import (
+    PythonResolveField,
     PythonSourceField,
+    VCSVersion,
     VCSVersionDummySourceField,
     VersionGenerateToField,
     VersionTagRegexField,
     VersionTemplateField,
 )
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import GeneratedSources, GenerateSourcesRequest
+from pants.engine.target import AllTargets, GeneratedSources, GenerateSourcesRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
@@ -99,8 +111,49 @@ async def generate_python_from_setuptools_scm(
     return GeneratedSources(output_snapshot)
 
 
+# This is only used to register our implementation with the plugin hook via unions.
+class PythonVCSVersionMappingMarker(FirstPartyPythonMappingImplMarker):
+    pass
+
+
+class VCSVersionPythonResolveField(PythonResolveField):
+    alias = "python_resolve"
+
+
+@rule
+async def map_to_python_modules(
+    all_targets: AllTargets,
+    python_setup: PythonSetup,
+    _: PythonVCSVersionMappingMarker,
+) -> FirstPartyPythonMappingImpl:
+    suffix = ".py"
+
+    targets = [
+        tgt
+        for tgt in all_targets
+        if tgt.has_field(VersionGenerateToField)
+        and cast(str, tgt[VersionGenerateToField].value).endswith(suffix)
+    ]
+    stripped_files = await MultiGet(
+        Get(StrippedFileName, StrippedFileNameRequest(cast(str, tgt[VersionGenerateToField].value)))
+        for tgt in targets
+    )
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
+    for tgt, stripped_file in zip(targets, stripped_files):
+        resolve = tgt[PythonResolveField].normalized_value(python_setup)
+        module = stripped_file.value[: -len(suffix)].replace("/", ".")
+        resolves_to_modules_to_providers[resolve][module].append(
+            ModuleProvider(tgt.address, ModuleProviderType.IMPL)
+        )
+    return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromSetuptoolsSCMRequest),
+        UnionRule(FirstPartyPythonMappingImplMarker, PythonVCSVersionMappingMarker),
+        VCSVersion.register_plugin_field(VCSVersionPythonResolveField),
     )
