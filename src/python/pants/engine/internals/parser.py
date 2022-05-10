@@ -102,6 +102,7 @@ class Parser:
         symbols: dict[str, Any] = {
             **object_aliases.objects,
             "build_file_dir": lambda: PurePath(parse_state.rel_path()),
+            "build_root_dir": lambda: PurePath(build_root),
         }
         symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 

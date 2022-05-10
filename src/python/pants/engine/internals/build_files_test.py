@@ -245,7 +245,8 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
                         "helloworld/util",
                         "helloworld/util:tests",
                     ],
-                    build_file_dir=f"build file's dir is: {build_file_dir()}"
+                    build_file_dir=f"build file's dir is: {build_file_dir()}",
+                    build_root_dir=f"build root's dir is: {build_root_dir()}",
                 )
                 """
             )
@@ -265,6 +266,9 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     # when encountering this, but it's fine at this stage.
     assert target_adaptor.kwargs["fake_field"] == 42
     assert target_adaptor.kwargs["build_file_dir"] == "build file's dir is: helloworld/dir"
+    assert target_adaptor.kwargs["build_root_dir"].startswith(
+        "build root's dir is: /tmp/_BUILD_ROOT"
+    )
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
