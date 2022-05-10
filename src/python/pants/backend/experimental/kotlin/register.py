@@ -5,10 +5,13 @@ from pants.backend.kotlin.dependency_inference.rules import rules as dep_inf_rul
 from pants.backend.kotlin.goals import check, tailor
 from pants.backend.kotlin.target_types import (
     KotlincPluginTarget,
+    KotlinJunitTestsGeneratorTarget,
+    KotlinJunitTestTarget,
     KotlinSourcesGeneratorTarget,
-    KotlinSourceTarget, KotlinJunitTestTarget, KotlinJunitTestsGeneratorTarget,
+    KotlinSourceTarget,
 )
 from pants.backend.kotlin.target_types import rules as target_types_rules
+from pants.backend.kotlin.test.junit import rules as kotlin_junit_rules
 from pants.core.util_rules import source_files, system_binaries
 from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
 from pants.jvm import util_rules as jvm_util_rules
@@ -17,7 +20,6 @@ from pants.jvm.package import deploy_jar, war
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
 from pants.jvm.test.junit import rules as jvm_junit_rules
-from pants.backend.kotlin.test.junit import rules as kotlin_junit_rules
 
 
 def target_types():
