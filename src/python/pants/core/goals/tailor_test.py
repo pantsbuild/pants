@@ -607,7 +607,7 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
         _ = PutativeTarget.for_target_type(FortranModule, "dir", "dir", ["a.f90"])
     expected_msg = (
         "A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90, "
-        "but this target type does not have a `sources` field."
+        "but this target type does not have a `source` or `sources` field."
     )
     assert str(excinfo.value) == expected_msg
 
