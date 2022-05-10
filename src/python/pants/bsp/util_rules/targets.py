@@ -24,6 +24,7 @@ from pants.bsp.spec.base import (
     BuildTargetCapabilities,
     BuildTargetIdentifier,
     StatusCode,
+    Uri,
 )
 from pants.bsp.spec.targets import (
     DependencyModule,
@@ -669,6 +670,35 @@ class BSPCompileResult:
     """Result of compilation of a target capable of target compilation."""
 
     status: StatusCode
+    output_digest: Digest
+
+
+# -----------------------------------------------------------------------------------------------
+# Resources request.
+# See https://build-server-protocol.github.io/docs/specification.html#resources-request
+#
+# NB: This method is used only for the _indexing_ of resources, and not to add them to the
+# classpath (in the case of JVM targets). BSPCompileRequest implementations need to handle
+# movement of resources to accessible classpath entries.
+# -----------------------------------------------------------------------------------------------
+
+
+@union
+@dataclass(frozen=True)
+class BSPResourcesRequest(Generic[_FS]):
+    """Hook to allow language backends to provide resources for targets."""
+
+    field_set_type: ClassVar[Type[_FS]]
+
+    bsp_target: BSPBuildTargetInternal
+    field_sets: tuple[_FS, ...]
+
+
+@dataclass(frozen=True)
+class BSPResourcesResult:
+    """Resources for a target."""
+
+    resources: tuple[Uri, ...]
     output_digest: Digest
 
 

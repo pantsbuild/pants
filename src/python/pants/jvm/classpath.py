@@ -15,6 +15,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,7 @@ async def loose_classfiles(
                 output_directories=(dest_dir,),
                 description=f"Extract {filename}",
                 immutable_input_digests=dict(ClasspathEntry.immutable_inputs([classpath_entry])),
+                level=LogLevel.TRACE,
             ),
         )
         for filename in ClasspathEntry.immutable_inputs_args([classpath_entry])
