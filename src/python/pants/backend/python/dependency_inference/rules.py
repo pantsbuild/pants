@@ -375,7 +375,7 @@ async def infer_python_dependencies_via_source(
 
     unowned_behavior = python_infer_subsystem.unowned_dependency_behavior
     if unowned_imports and unowned_behavior is not UnownedDependencyUsage.DoNothing:
-        other_owners_as_targets = ()
+        other_owners_as_targets: tuple[Targets, ...] = ()
         if len(python_setup.resolves) > 1:
             other_owners_from_other_resolves = await MultiGet(
                 Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=None))
