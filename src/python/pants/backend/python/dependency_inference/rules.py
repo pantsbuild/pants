@@ -285,11 +285,11 @@ async def _handle_unowned_imports(
             for imported_module in unowned_imports
         )
         other_owners_as_targets = await MultiGet(
-            Get(Targets, Addresses(owners.unambiguous + owners.unambiguous))
+            Get(Targets, Addresses(owners.unambiguous + owners.ambiguous))
             for owners in other_owners_from_other_resolves
         )
 
-        imports_to_other_owners: DefaultDict[str, list[tuple[ResolveName, Address]]] = defaultdict(
+        imports_to_other_owners: DefaultDict[str, list[tuple[Address, ResolveName]]] = defaultdict(
             list
         )
         for imported_module, targets in zip(unowned_imports, other_owners_as_targets):
@@ -304,7 +304,7 @@ async def _handle_unowned_imports(
             other_resolves_lines = []
             for import_module, other_owners in sorted(imports_to_other_owners.items()):
                 owners_txt = ", ".join(
-                    f"'{other_resolve}' from {addr}" for addr, other_resolve in other_owners
+                    f"'{other_resolve}' from {addr}" for addr, other_resolve in sorted(other_owners)
                 )
                 other_resolves_lines.append(f"{import_module}: {owners_txt}")
             other_resolves_snippet = "\n\n" + softwrap(
@@ -323,8 +323,7 @@ async def _handle_unowned_imports(
 
     msg = softwrap(
         f"""
-        Pants cannot infer owners for the following imports in the file {file} (from the target
-        {address}):
+        Pants cannot infer owners for the following imports in the target {address}:
 
         {bullet_list(unowned_imports_with_lines)}{other_resolves_snippet}
 

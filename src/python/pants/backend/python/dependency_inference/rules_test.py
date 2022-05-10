@@ -23,6 +23,7 @@ from pants.backend.python.target_types import (
     PythonRequirementTarget,
     PythonSourceField,
     PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestUtilsGeneratorTarget,
 )
@@ -30,10 +31,11 @@ from pants.backend.python.util_rules import ancestor_files
 from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
-from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.rules import SubsystemRule
 from pants.engine.target import InferredDependencies
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
+from pants.util.strutil import softwrap
 
 
 def test_infer_python_imports(caplog) -> None:
@@ -415,8 +417,9 @@ def test_infer_python_conftests() -> None:
     )
 
 
-def test_infer_python_strict(caplog) -> None:
-    rule_runner = RuleRunner(
+@pytest.fixture
+def imports_rule_runner() -> RuleRunner:
+    return RuleRunner(
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
@@ -425,13 +428,17 @@ def test_infer_python_strict(caplog) -> None:
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],
         target_types=[
+            PythonSourceTarget,
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
             PythonRequirementsTargetGenerator,
         ],
+        objects={"parametrize": Parametrize},
     )
 
-    rule_runner.write_files(
+
+def test_infer_python_strict(imports_rule_runner: RuleRunner, caplog) -> None:
+    imports_rule_runner.write_files(
         {
             "src/python/cheesey.py": dedent(
                 """\
@@ -443,46 +450,38 @@ def test_infer_python_strict(caplog) -> None:
         }
     )
 
-    def run_dep_inference(
-        address: Address,
-        unowned_dependency_behavior: str,
-    ) -> InferredDependencies:
-        rule_runner.set_options(
+    def run_dep_inference(unowned_dependency_behavior: str) -> InferredDependencies:
+        imports_rule_runner.set_options(
             [
                 f"--python-infer-unowned-dependency-behavior={unowned_dependency_behavior}",
                 "--python-infer-string-imports",
-                "--source-root-patterns=src/python",
             ],
-            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+            env_inherit=PYTHON_BOOTSTRAP_ENV,
         )
-        target = rule_runner.get_target(address)
-        return rule_runner.request(
+        target = imports_rule_runner.get_target(
+            Address("src/python", relative_file_path="cheesey.py")
+        )
+        return imports_rule_runner.request(
             InferredDependencies,
             [InferPythonImportDependencies(target[PythonSourceField])],
         )
 
-    # First test with "warning"
-    run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), "warning")
+    run_dep_inference("warning")
     assert len(caplog.records) == 1
-    assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
-    assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
+    assert (
+        "cannot infer owners for the following imports in the target src/python/cheesey.py:"
+        in caplog.text
+    )
+    assert "  * venezuelan_beaver_cheese (line: 1)" in caplog.text
     assert "japanese.sage.derby" not in caplog.text
 
-    # Now test with "error"
-    caplog.clear()
-    with pytest.raises(ExecutionError) as exc_info:
-        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), "error")
-
-    assert isinstance(exc_info.value.wrapped_exceptions[0], UnownedDependencyError)
-    assert len(caplog.records) == 2  # one for the error being raised and one for our message
-    assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
-    assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
-    assert "japanese.sage.derby" not in caplog.text
+    with engine_error(UnownedDependencyError, contains="src/python/cheesey.py"):
+        run_dep_inference("error")
 
     caplog.clear()
 
     # All modes should be fine if the module is explicitly declared as a requirement
-    rule_runner.write_files(
+    imports_rule_runner.write_files(
         {
             "src/python/BUILD": dedent(
                 """\
@@ -497,11 +496,11 @@ def test_infer_python_strict(caplog) -> None:
         }
     )
     for mode in UnownedDependencyUsage:
-        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
+        run_dep_inference(mode.value)
         assert not caplog.records
 
     # All modes should be fine if the module is implictly found via requirements.txt
-    rule_runner.write_files(
+    imports_rule_runner.write_files(
         {
             "src/python/requirements.txt": "venezuelan_beaver_cheese==1.0.0",
             "src/python/BUILD": dedent(
@@ -513,16 +512,63 @@ def test_infer_python_strict(caplog) -> None:
         }
     )
     for mode in UnownedDependencyUsage:
-        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
+        run_dep_inference(mode.value)
         assert not caplog.records
 
     # All modes should be fine if the module is owned by a first party
-    rule_runner.write_files(
+    imports_rule_runner.write_files(
         {
             "src/python/venezuelan_beaver_cheese.py": "",
             "src/python/BUILD": "python_sources()",
         }
     )
     for mode in UnownedDependencyUsage:
-        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
+        run_dep_inference(mode.value)
         assert not caplog.records
+
+
+def test_infer_python_strict_multiple_resolves(imports_rule_runner: RuleRunner) -> None:
+    imports_rule_runner.write_files(
+        {
+            "project/utils.py": "",
+            "project/app.py": "import project.utils",
+            "project/BUILD": dedent(
+                """\
+                python_source(
+                    name="utils",
+                    source="utils.py",
+                    resolve=parametrize("a", "b"),
+                )
+
+                python_source(
+                    name="app",
+                    source="app.py",
+                    resolve="z",
+                )
+                """
+            ),
+        }
+    )
+
+    imports_rule_runner.set_options(
+        [
+            "--python-infer-unowned-dependency-behavior=error",
+            "--python-enable-resolves",
+            "--python-resolves={'a': '', 'b': '', 'z': ''}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    tgt = imports_rule_runner.get_target(Address("project", target_name="app"))
+    expected_error = softwrap(
+        """
+        These imports are not in the resolve used by the target (`z`), but they were present in
+        other resolves:
+
+          * project.utils: 'a' from project:utils@resolve=a, 'b' from project:utils@resolve=b
+        """
+    )
+    with engine_error(UnownedDependencyError, contains=expected_error):
+        imports_rule_runner.request(
+            InferredDependencies, [InferPythonImportDependencies(tgt[PythonSourceField])]
+        )
