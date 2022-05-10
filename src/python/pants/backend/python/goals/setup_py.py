@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
+from pathlib import PurePath
 from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
@@ -41,6 +42,7 @@ from pants.backend.python.util_rules.dists import (
 )
 from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import Pex
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -80,6 +82,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
 from pants.option.subsystem import Subsystem
+from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -370,10 +373,31 @@ class NoDistTypeSelected(ValueError):
     pass
 
 
+@union
+@dataclass(frozen=True)
+class DistBuildEnvironmentRequest:
+    target_addresses: tuple[Address, ...]
+    interpreter_constraints: InterpreterConstraints
+
+    @classmethod
+    def is_applicable(cls, tgt: Target) -> bool:
+        # Union members should override.
+        return False
+
+
+@dataclass(frozen=True)
+class DistBuildEnvironment:
+    """Various extra information that might be needed to build a dist."""
+
+    extra_build_time_requirements: tuple[Pex, ...]
+    extra_build_time_inputs: Digest
+
+
 @rule
 async def package_python_dist(
     field_set: PythonDistributionFieldSet,
     python_setup: PythonSetup,
+    union_membership: UnionMembership,
 ) -> BuiltPackage:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
@@ -401,13 +425,52 @@ async def package_python_dist(
         ),
     )
 
+    # Find the source roots for the build-time 1stparty deps (e.g., deps of setup.py).
+    source_roots_result = await Get(
+        SourceRootsResult,
+        SourceRootsRequest(
+            files=[], dirs={PurePath(tgt.address.spec_path) for tgt in transitive_targets.closure}
+        ),
+    )
+    source_roots = tuple(sorted({sr.path for sr in source_roots_result.path_to_root.values()}))
+
+    # Get any extra build-time environment (e.g., native extension requirements).
+    build_env_requests = []
+    build_env_request_types = union_membership.get(DistBuildEnvironmentRequest)
+    for build_env_request_type in build_env_request_types:
+        if build_env_request_type.is_applicable(dist_tgt):
+            build_env_requests.append(
+                build_env_request_type(
+                    tuple(tt.address for tt in transitive_targets.closure), interpreter_constraints
+                )
+            )
+
+    build_envs = await MultiGet(
+        [
+            Get(DistBuildEnvironment, DistBuildEnvironmentRequest, build_env_request)
+            for build_env_request in build_env_requests
+        ]
+    )
+    extra_build_time_requirements = tuple(
+        itertools.chain.from_iterable(
+            build_env.extra_build_time_requirements for build_env in build_envs
+        )
+    )
+    input_digest = await Get(
+        Digest,
+        MergeDigests(
+            [chroot.digest, *(build_env.extra_build_time_inputs for build_env in build_envs)]
+        ),
+    )
+
     # We prefix the entire chroot, and run with this prefix as the cwd, so that we can capture
     # any changes setup made within it without also capturing other artifacts of the pex
     # process invocation.
     chroot_prefix = "chroot"
     working_directory = os.path.join(chroot_prefix, chroot.working_directory)
-    prefixed_chroot = await Get(Digest, AddPrefix(chroot.digest, chroot_prefix))
-    build_system = await Get(BuildSystem, BuildSystemRequest(prefixed_chroot, working_directory))
+    prefixed_input = await Get(Digest, AddPrefix(input_digest, chroot_prefix))
+    build_system = await Get(BuildSystem, BuildSystemRequest(prefixed_input, working_directory))
+
     setup_py_result = await Get(
         DistBuildResult,
         DistBuildRequest(
@@ -415,11 +478,13 @@ async def package_python_dist(
             interpreter_constraints=interpreter_constraints,
             build_wheel=wheel,
             build_sdist=sdist,
-            input=prefixed_chroot,
+            input=prefixed_input,
             working_directory=working_directory,
+            build_time_source_roots=source_roots,
             target_address_spec=exported_target.target.address.spec,
             wheel_config_settings=wheel_config_settings,
             sdist_config_settings=sdist_config_settings,
+            extra_build_time_requirements=extra_build_time_requirements,
         ),
     )
     dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)

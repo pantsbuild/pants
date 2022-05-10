@@ -9,6 +9,8 @@ files(name="coordinated_runs_directory", sources=["coordinated_runs/**/*"])
 
 files(name="hello_directory", sources=["hello/**/*"])
 
+files(name="mypyc_fib_directory", sources=["mypyc_fib/**/*"])
+
 files(name="native_directory", sources=["native/**/*"])
 
 files(name="no_build_file_directory", sources=["no_build_file/**/*"])

@@ -12,3 +12,11 @@ python_tests(
     # We want to make sure the default lockfile works for both macOS and Linux.
     tags=["platform_specific_behavior"],
 )
+python_tests(
+    name="mypyc_integration_test",
+    sources=["mypyc_integration_test.py"],
+    dependencies=["testprojects/src/python:mypyc_fib_directory"],
+    timeout=120,
+    # We want to make sure we can build with mypyc on both macOS and Linux.
+    tags=["platform_specific_behavior"],
+)

@@ -12,10 +12,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
+import pytest
+
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 from pants.util.dirutil import safe_rmtree
 
 
+@pytest.mark.platform_specific_behavior
 def test_native_code() -> None:
     dist_dir = "dist"
     pyver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"

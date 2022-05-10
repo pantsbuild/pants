@@ -14,7 +14,7 @@ import toml
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -116,10 +116,13 @@ class DistBuildRequest:
     build_sdist: bool
     input: Digest
     working_directory: str  # Relpath within the input digest.
+    build_time_source_roots: tuple[str, ...]  # Source roots for 1st party build-time deps.
 
     target_address_spec: str | None = None  # Only needed for logging etc.
     wheel_config_settings: FrozenDict[str, tuple[str, ...]] | None = None
     sdist_config_settings: FrozenDict[str, tuple[str, ...]] | None = None
+
+    extra_build_time_requirements: tuple[Pex, ...] = tuple()
 
 
 @dataclass(frozen=True)
@@ -191,6 +194,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
             output_filename="build_backend.pex",
             internal_only=True,
             requirements=request.build_system.requires,
+            pex_path=request.extra_build_time_requirements,
             interpreter_constraints=request.interpreter_constraints,
         ),
     )
@@ -209,10 +213,11 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
 
     merged_digest = await Get(Digest, MergeDigests((request.input, backend_shim_digest)))
 
+    extra_env = {
+        "PEX_EXTRA_SYS_PATH": os.pathsep.join(request.build_time_source_roots),
+    }
     if python_setup.macos_big_sur_compatibility and is_macos_big_sur():
-        extra_env = {"MACOSX_DEPLOYMENT_TARGET": "10.16"}
-    else:
-        extra_env = {}
+        extra_env["MACOSX_DEPLOYMENT_TARGET"] = "10.16"
 
     result = await Get(
         ProcessResult,
