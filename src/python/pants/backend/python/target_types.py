@@ -1413,10 +1413,6 @@ class VersionTemplateField(StringField):
     )
 
 
-class ProtobufPythonResolveField(PythonResolveField):
-    alias = "python_resolve"
-
-
 class VCSVersion(Target):
     alias = "vcs_version"
     core_fields = (

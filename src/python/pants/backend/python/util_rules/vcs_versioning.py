@@ -33,7 +33,7 @@ from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import AllTargets, GeneratedSources, GenerateSourcesRequest
+from pants.engine.target import AllTargets, GeneratedSources, GenerateSourcesRequest, Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
@@ -120,9 +120,19 @@ class VCSVersionPythonResolveField(PythonResolveField):
     alias = "python_resolve"
 
 
+class AllVCSVersionTargets(Targets):
+    # This class exists so map_to_python_modules isn't invalidated on any change to any target.
+    pass
+
+
+@rule(desc="Find all vcs_version targets in project", level=LogLevel.DEBUG)
+def find_all_protobuf_targets(targets: AllTargets) -> AllVCSVersionTargets:
+    return AllVCSVersionTargets(tgt for tgt in targets if tgt.has_field(VersionGenerateToField))
+
+
 @rule
 async def map_to_python_modules(
-    all_targets: AllTargets,
+    vcs_version_targets: AllVCSVersionTargets,
     python_setup: PythonSetup,
     _: PythonVCSVersionMappingMarker,
 ) -> FirstPartyPythonMappingImpl:
@@ -130,9 +140,8 @@ async def map_to_python_modules(
 
     targets = [
         tgt
-        for tgt in all_targets
-        if tgt.has_field(VersionGenerateToField)
-        and cast(str, tgt[VersionGenerateToField].value).endswith(suffix)
+        for tgt in vcs_version_targets
+        if cast(str, tgt[VersionGenerateToField].value).endswith(suffix)
     ]
     stripped_files = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(cast(str, tgt[VersionGenerateToField].value)))
