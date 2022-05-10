@@ -13,11 +13,16 @@ from pants.backend.docker.util_rules.dependencies import (
     InjectDockerDependencies,
     inject_docker_dependencies,
 )
+from pants.backend.go.goals import package_binary as package_go_binary
+from pants.backend.go.target_types import GoBinaryTarget
+from pants.backend.python import target_types_rules as py_target_types_rules
 from pants.backend.python.goals import package_pex_binary
-from pants.backend.python.target_types import PexBinary
+from pants.backend.python.target_types import PexBinariesGeneratorTarget, PexBinary
 from pants.backend.python.util_rules import pex
+from pants.core.goals import package
 from pants.engine.addresses import Address
-from pants.engine.target import InjectedDependencies
+from pants.engine.target import GenerateTargetsRequest, InjectedDependencies
+from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -27,13 +32,22 @@ def rule_runner() -> RuleRunner:
         rules=[
             *dockerfile.rules(),
             *dockerfile_parser.rules(),
+            package.find_all_packageable_targets,
             *package_image.rules(),
             *package_pex_binary.rules(),
+            *package_go_binary.rules(),
             *pex.rules(),
             inject_docker_dependencies,
+            py_target_types_rules.generate_targets_from_pex_binaries,
+            UnionRule(GenerateTargetsRequest, py_target_types_rules.GenerateTargetsFromPexBinaries),
             QueryRule(InjectedDependencies, (InjectDockerDependencies,)),
         ],
-        target_types=[DockerImageTarget, PexBinary],
+        target_types=[
+            DockerImageTarget,
+            PexBinary,
+            PexBinariesGeneratorTarget,
+            GoBinaryTarget,
+        ],
     )
     rule_runner.set_options(
         [],
@@ -42,30 +56,72 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "files",
+    [
+        pytest.param(
+            [
+                (
+                    "project/image/test/BUILD",
+                    dedent(
+                        """\
+                        docker_image(name="base")
+                        docker_image(name="image")
+                        """
+                    ),
+                ),
+                ("project/image/test/Dockerfile", "{dockerfile}"),
+            ],
+            id="source Dockerfile",
+        ),
+        pytest.param(
+            [
+                (
+                    "project/image/test/BUILD",
+                    dedent(
+                        """\
+                        docker_image(name="base")
+                        docker_image(name="image", instructions=[{dockerfile!r}])
+                        """
+                    ),
+                ),
+            ],
+            id="generate Dockerfile",
+        ),
+    ],
+)
+def test_inject_docker_dependencies(files, rule_runner: RuleRunner) -> None:
+    dockerfile_content = dedent(
+        """\
+            ARG BASE_IMAGE=:base
+            FROM $BASE_IMAGE
+            ENTRYPOINT ["./entrypoint"]
+            COPY project.hello.main.py/main_binary.pex /entrypoint
+            COPY project.hello.main.py/cmd1_py.pex /entrypoint
+            COPY project.hello.main.go/go_bin /entrypoint
+        """
+    )
+
     rule_runner.write_files(
         {
-            "project/image/test/BUILD": dedent(
-                """\
-                docker_image(name="base")
-                docker_image(name="image")
-                """
-            ),
-            "project/image/test/Dockerfile": dedent(
-                """\
-                ARG BASE_IMAGE=:base
-                FROM $BASE_IMAGE
-                ENTRYPOINT ["./entrypoint"]
-                COPY project.hello.main/main_binary.pex /entrypoint
-                """
-            ),
-            "project/hello/main/BUILD": dedent(
+            **{
+                filename: content.format(dockerfile=dockerfile_content)
+                for filename, content in files
+            },
+            "project/hello/main/py/BUILD": dedent(
                 """\
                 pex_binary(name="main_binary")
+                pex_binaries(name="cmds", entry_points=["cmd1.py"])
+                """
+            ),
+            "project/hello/main/go/BUILD": dedent(
+                """\
+                go_binary(name="go_bin")
                 """
             ),
         }
     )
+
     tgt = rule_runner.get_target(Address("project/image/test", target_name="image"))
     injected = rule_runner.request(
         InjectedDependencies,
@@ -73,7 +129,9 @@ def test_inject_docker_dependencies(rule_runner: RuleRunner) -> None:
     )
     assert injected == InjectedDependencies(
         [
-            Address("project/hello/main", target_name="main_binary"),
             Address("project/image/test", target_name="base"),
+            Address("project/hello/main/py", target_name="main_binary"),
+            Address("project/hello/main/py", target_name="cmds", generated_name="cmd1.py"),
+            Address("project/hello/main/go", target_name="go_bin"),
         ]
     )
