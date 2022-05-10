@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import functools
+import glob
 import itertools
 import logging
 import os.path
@@ -1393,7 +1394,7 @@ async def generate_file_targets(
     return _generate_file_level_targets(
         type(request.generator).generated_target_cls,
         request.generator,
-        sources_paths.files,
+        (glob.escape(file) for file in sources_paths.files),
         request.template_address,
         request.template,
         request.overrides,
