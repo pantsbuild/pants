@@ -55,10 +55,11 @@ def rule_runner() -> RuleRunner:
         ),
     ],
 )
-def test_putative_target_addresses(files: list[tuple[str, str]], rule_runner: RuleRunner) -> None:
+def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunner) -> None:
     dockerfile_content = dedent(
         """\
-        FROM base
+        ARG BASE_IMAGE=:base
+        FROM $BASE_IMAGE
         COPY some.target/binary.pex some.target/tool.pex /bin
         COPY --from=scratch this.is/ignored.pex /opt
         COPY binary another/cli.pex tool /bin
@@ -71,10 +72,13 @@ def test_putative_target_addresses(files: list[tuple[str, str]], rule_runner: Ru
 
     addr = Address("test")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
-    assert info.putative_target_addresses == (
-        "some/target:binary",
-        "some/target:tool",
-        "another:cli",
+    assert info.from_image_addresses == (":base",)
+    assert info.copy_source_paths == (
+        "some.target/binary.pex",
+        "some.target/tool.pex",
+        "binary",
+        "another/cli.pex",
+        "tool",
     )
 
 

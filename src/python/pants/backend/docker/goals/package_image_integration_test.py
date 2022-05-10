@@ -7,9 +7,8 @@ import pytest
 
 from pants.backend.docker.goals.package_image import DockerFieldSet
 from pants.backend.docker.rules import rules as docker_rules
-from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.python.util_rules import pex
+from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
@@ -22,9 +21,8 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *docker_rules(),
-            *parser_rules(),
-            *pex.rules(),
             *source_files_rules(),
+            package.find_all_packageable_targets,
             QueryRule(BuiltPackage, [DockerFieldSet]),
         ],
         target_types=[DockerImageTarget],

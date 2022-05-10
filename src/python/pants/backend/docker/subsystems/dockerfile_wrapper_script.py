@@ -14,30 +14,6 @@ from typing import Iterator
 #
 
 
-_pex_target_regexp = re.compile(
-    r"""
-    (?# optional path, one level with dot-separated parts)
-    (?:(?P<path>(?:\w[.0-9_-]?)+) /)?
-
-    (?# binary name, with .pex file extension)
-    (?P<name>(?:\w[.0-9_-]?)+) \.pex$
-    """,
-    re.VERBOSE,
-)
-
-
-def translate_to_address(value: str) -> str | None:
-    # Translate something that resembles a packaged pex binary to its corresponding target
-    # address. E.g. src.python.tool/bin.pex => src/python/tool:bin
-    pex = re.match(_pex_target_regexp, value)
-    if pex:
-        path = (pex.group("path") or "").replace(".", "/")
-        name = pex.group("name")
-        return ":".join([path, name])
-
-    return None
-
-
 _address_regexp = re.compile(
     r"""
     (?://)?[^:# ]*:[^:#!@?/\= ]+(?:\#[^:#!@?= ]+)?$
@@ -89,16 +65,13 @@ def main(cmd: str, args: list[str]) -> None:
                 if command.cmd.upper() == command_name:
                     yield command
 
-        def copy_source_addresses(self) -> Iterator[str]:
+        def copy_source_paths(self) -> Iterator[str]:
             for copy in self.get_all("COPY"):
                 if copy.flags:
                     # Do not consider COPY --from=... instructions etc.
                     continue
                 # The last element of copy.value is the destination.
-                for source in copy.value[:-1]:
-                    address = translate_to_address(source)
-                    if address:
-                        yield address
+                yield from copy.value[:-1]
 
         def from_image_addresses(self) -> Iterator[str]:
             build_args = {
@@ -112,12 +85,6 @@ def main(cmd: str, args: list[str]) -> None:
             for image_build_arg in self.from_image_build_args():
                 if image_build_arg in build_args:
                     yield build_args[image_build_arg]
-
-        def putative_target_addresses(self) -> tuple[str, ...]:
-            addresses: list[str] = []
-            addresses.extend(self.copy_source_addresses())
-            addresses.extend(self.from_image_addresses())
-            return tuple(addresses)
 
         def from_baseimages(self) -> Iterator[tuple[str, tuple[str, ...]]]:
             for idx, cmd in enumerate(self.get_all("FROM")):
@@ -189,8 +156,11 @@ def main(cmd: str, args: list[str]) -> None:
             return tuple(chain(*(cmd.value[:-1] for cmd in self.get_all("COPY"))))
 
     for parsed in map(ParsedDockerfile.from_file, args):
-        if cmd == "putative-targets":
-            for addr in parsed.putative_target_addresses():
+        if cmd == "from-image-addresses":
+            for addr in parsed.from_image_addresses():
+                print(addr)
+        elif cmd == "copy-source-paths":
+            for addr in parsed.copy_source_paths():
                 print(addr)
         elif cmd == "version-tags":
             for tag in parsed.baseimage_tags():
