@@ -376,7 +376,7 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(
 @pytest.mark.jvm_lockfile(
     path="kotlinc-allopen.test.lock",
     requirements=[f"org.jetbrains.kotlin:kotlin-allopen:{_KOTLIN_VERSION}"]
-                 + KOTLIN_STDLIB_REQUIREMENTS,
+    + KOTLIN_STDLIB_REQUIREMENTS,
 )
 def test_compile_with_kotlinc_plugin(
     rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
