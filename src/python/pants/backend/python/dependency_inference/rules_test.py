@@ -530,10 +530,17 @@ def test_infer_python_strict(imports_rule_runner: RuleRunner, caplog) -> None:
 def test_infer_python_strict_multiple_resolves(imports_rule_runner: RuleRunner) -> None:
     imports_rule_runner.write_files(
         {
+            "project/base.py": "",
             "project/utils.py": "",
-            "project/app.py": "import project.utils",
+            "project/app.py": "import project.base\nimport project.utils",
             "project/BUILD": dedent(
                 """\
+                python_source(
+                    name="base",
+                    source="base.py",
+                    resolve="a",
+                )
+
                 python_source(
                     name="utils",
                     source="utils.py",
@@ -565,6 +572,7 @@ def test_infer_python_strict_multiple_resolves(imports_rule_runner: RuleRunner) 
         These imports are not in the resolve used by the target (`z`), but they were present in
         other resolves:
 
+          * project.base: 'a' from project:base
           * project.utils: 'a' from project:utils@resolve=a, 'b' from project:utils@resolve=b
         """
     )
