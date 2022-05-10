@@ -52,6 +52,8 @@ python_tests(
     name="setup_py_integration",
     sources=["setup_py_integration_test.py"],
     dependencies=["testprojects/src/python:native_directory"],
+    # We want to make sure the native builds work for both macOS and Linux.
+    tags=["platform_specific_behavior"],
     timeout=180,
 )
 

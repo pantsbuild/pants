@@ -9,9 +9,12 @@ import sys
 import venv
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from pants.testutil.pants_integration_test import run_pants
 
 
+@pytest.mark.platform_specific_behavior
 def test_mypyc_build() -> None:
     dist_dir = "dist"
     pyver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
