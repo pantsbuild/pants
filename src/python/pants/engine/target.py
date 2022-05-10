@@ -1100,8 +1100,8 @@ def _generate_file_level_targets(
      as the key.
     """
 
-    # paths have already been globbed, and new path will also be globbed
-    # therefore, paths should be glob escaped
+    # Paths have already been globbed, and new path will also be globbed
+    # therefore, paths should be glob escaped.
     paths = (glob.escape(path) for path in paths)
 
     def generate_address(base_address: Address, relativized_fp: str) -> Address:
