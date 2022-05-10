@@ -19,12 +19,25 @@ from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
+from pants.util.strutil import softwrap
 
 
 class UsesMyPycField(BoolField):
     alias = "uses_mypyc"
     default = False
-    help = "If true, this distribution is built using mypyc."
+    help = softwrap(
+        """
+        If true, this distribution is built using mypyc.
+
+        In this case, Pants will build the distribution in an environment that includes
+        mypy, as configured in the `[mypy]` subsystem, including plugins, config files,
+        extra type stubs, and the distribution's own requirements (which normally would not
+        be needed at build time, but in this case may provide necessary type annotations).
+
+        You will typically set this field on distributions whose setup.py uses
+        mypyc.build.mypycify(). See https://mypyc.readthedocs.io/en/latest/index.html .
+        """
+    )
 
 
 @dataclass(frozen=True)
