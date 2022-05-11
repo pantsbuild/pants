@@ -14,7 +14,7 @@ from pants.base.specs import AddressLiteralSpec, AddressSpecs
 from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
-from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
+from pants.engine.internals.mapper import AddressFamily, AddressMap, SpecsFilter
 from pants.engine.internals.parametrize import _TargetParametrizations
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -172,8 +172,8 @@ async def find_target_adaptor(address: Address) -> TargetAdaptor:
 
 
 @rule
-def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFilter:
-    return AddressSpecsFilter(
+def setup_address_specs_filter(global_options: GlobalOptions) -> SpecsFilter:
+    return SpecsFilter(
         tags=global_options.tag, exclude_target_regexps=global_options.exclude_target_regexp
     )
 
@@ -221,7 +221,7 @@ async def _determine_literal_addresses_from_specs(
 async def addresses_from_address_specs(
     address_specs: AddressSpecs,
     build_file_options: BuildFileOptions,
-    specs_filter: AddressSpecsFilter,
+    specs_filter: SpecsFilter,
 ) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = address_specs.filter_by_global_options is False
