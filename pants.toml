@@ -112,7 +112,7 @@ ignore_adding_targets = [
   "src/python/pants/backend/go/go_sources/embedcfg:bin",
   "src/python/pants/backend/go/go_sources/generate_testmain:bin",
   "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
-  "src/python/pants/backend/python/dependency_inference/scripts:import_parser0",
+  "src/python/pants/backend/python/dependency_inference/scripts:dependency_parser0",
   "src/python/pants/backend/terraform:hcl2_parser0",
 ]
 
