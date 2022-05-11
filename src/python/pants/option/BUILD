@@ -5,10 +5,10 @@ python_sources()
 
 python_tests(
     name="tests",
-    dependencies=[
-        # Used by `options_bootstrapper_test` and `config_test`.
-        "//BUILD_ROOT:files",
-        "//pants.toml:files",
-    ],
     timeout=300,
+    overrides={
+        ("options_bootstrapper_test.py", "config_test.py"): {
+            "dependencies": ["//BUILD_ROOT:files", "//pants.toml:files"],
+        },
+    },
 )
