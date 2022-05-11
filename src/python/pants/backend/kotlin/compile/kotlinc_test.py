@@ -65,7 +65,7 @@ def rule_runner() -> RuleRunner:
 
 
 _KOTLIN_VERSION = "1.6.20"
-_KOTLIN_STDLIB_REQUIREMENTS = [
+KOTLIN_STDLIB_REQUIREMENTS = [
     f"org.jetbrains.kotlin:kotlin-stdlib:{_KOTLIN_VERSION}",
     f"org.jetbrains.kotlin:kotlin-reflect:{_KOTLIN_VERSION}",
     f"org.jetbrains.kotlin:kotlin-script-runtime:{_KOTLIN_VERSION}",
@@ -73,7 +73,7 @@ _KOTLIN_STDLIB_REQUIREMENTS = [
 
 kotlin_stdlib_jvm_lockfile = pytest.mark.jvm_lockfile(
     path="kotlin-stdlib.test.lock",
-    requirements=_KOTLIN_STDLIB_REQUIREMENTS,
+    requirements=KOTLIN_STDLIB_REQUIREMENTS,
 )
 
 
@@ -230,7 +230,7 @@ def test_compile_with_missing_dep_fails(
 @maybe_skip_jdk_test
 @pytest.mark.jvm_lockfile(
     path="kotlin-stdlib-with-joda.test.lock",
-    requirements=["joda-time:joda-time:2.10.10"] + _KOTLIN_STDLIB_REQUIREMENTS,
+    requirements=["joda-time:joda-time:2.10.10"] + KOTLIN_STDLIB_REQUIREMENTS,
 )
 def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
@@ -376,7 +376,7 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(
 @pytest.mark.jvm_lockfile(
     path="kotlinc-allopen.test.lock",
     requirements=[f"org.jetbrains.kotlin:kotlin-allopen:{_KOTLIN_VERSION}"]
-    + _KOTLIN_STDLIB_REQUIREMENTS,
+    + KOTLIN_STDLIB_REQUIREMENTS,
 )
 def test_compile_with_kotlinc_plugin(
     rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture

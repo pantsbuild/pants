@@ -17,7 +17,12 @@ from pants.engine.target import (
     Target,
     TargetFilesGenerator,
 )
-from pants.jvm.target_types import JvmJdkField, JvmProvidesTypesField, JvmResolveField
+from pants.jvm.target_types import (
+    JunitTestSourceField,
+    JvmJdkField,
+    JvmProvidesTypesField,
+    JvmResolveField,
+)
 from pants.util.strutil import softwrap
 
 
@@ -103,6 +108,55 @@ class KotlinSourcesGeneratorTarget(TargetFilesGenerator):
         JvmProvidesTypesField,
     )
     help = "Generate a `kotlin_source` target for each file in the `sources` field."
+
+
+# -----------------------------------------------------------------------------------------------
+# `kotlin_junit_tests`
+# -----------------------------------------------------------------------------------------------
+
+
+class KotlinJunitTestSourceField(KotlinSourceField, JunitTestSourceField):
+    pass
+
+
+class KotlinJunitTestDependenciesField(KotlinDependenciesField):
+    pass
+
+
+class KotlinJunitTestTarget(Target):
+    alias = "kotlin_junit_test"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        KotlinJunitTestDependenciesField,
+        KotlinJunitTestSourceField,
+        KotlincConsumedPluginIdsField,
+        JvmResolveField,
+        JvmJdkField,
+        JvmProvidesTypesField,
+    )
+    help = "A single Kotlin test, run with JUnit."
+
+
+class KotlinJunitTestsGeneratorSourcesField(KotlinGeneratorSourcesField):
+    default = ("*Test.kt",)
+
+
+class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
+    alias = "kotlin_junit_tests"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        KotlinJunitTestsGeneratorSourcesField,
+    )
+    generated_target_cls = KotlinJunitTestTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        KotlinJunitTestDependenciesField,
+        KotlincConsumedPluginIdsField,
+        JvmResolveField,
+        JvmJdkField,
+        JvmProvidesTypesField,
+    )
+    help = "Generate a `kotlin_junit_test` target for each file in the `sources` field."
 
 
 # -----------------------------------------------------------------------------------------------
