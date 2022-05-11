@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 
 import pytest
@@ -10,6 +12,7 @@ from pants.backend.python.dependency_inference.rules import (
     InferConftestDependencies,
     InferInitDependencies,
     InferPythonImportDependencies,
+    InitFilesInference,
     PythonInferSubsystem,
     UnownedDependencyError,
     UnownedDependencyUsage,
@@ -315,7 +318,8 @@ def test_infer_python_assets(caplog) -> None:
     )
 
 
-def test_infer_python_inits() -> None:
+@pytest.mark.parametrize("behavior", InitFilesInference)
+def test_infer_python_inits(behavior: InitFilesInference) -> None:
     rule_runner = RuleRunner(
         rules=[
             *ancestor_files.rules(),
@@ -328,44 +332,50 @@ def test_infer_python_inits() -> None:
         target_types=[PythonSourcesGeneratorTarget],
     )
     rule_runner.set_options(
-        ["--python-infer-inits", "--source-root-patterns=src/python"],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        [f"--python-infer-init-files={behavior.value}"], env_inherit=PYTHON_BOOTSTRAP_ENV
     )
-
     rule_runner.write_files(
         {
-            "src/python/root/__init__.py": "",
+            "src/python/root/__init__.py": "content",
             "src/python/root/BUILD": "python_sources()",
             "src/python/root/mid/__init__.py": "",
             "src/python/root/mid/BUILD": "python_sources()",
-            "src/python/root/mid/leaf/__init__.py": "",
+            "src/python/root/mid/leaf/__init__.py": "content",
             "src/python/root/mid/leaf/f.py": "",
             "src/python/root/mid/leaf/BUILD": "python_sources()",
-            "src/python/type_stub/__init__.pyi": "",
+            "src/python/type_stub/__init__.pyi": "content",
             "src/python/type_stub/foo.pyi": "",
             "src/python/type_stub/BUILD": "python_sources()",
         }
     )
 
-    def run_dep_inference(address: Address) -> InferredDependencies:
+    def check(address: Address, expected: list[Address]) -> None:
         target = rule_runner.get_target(address)
-        return rule_runner.request(
+        result = rule_runner.request(
             InferredDependencies,
             [InferInitDependencies(target[PythonSourceField])],
         )
+        if behavior == InitFilesInference.never:
+            assert not result
+        else:
+            assert result == InferredDependencies(expected)
 
-    assert run_dep_inference(
-        Address("src/python/root/mid/leaf", relative_file_path="f.py")
-    ) == InferredDependencies(
+    check(
+        Address("src/python/root/mid/leaf", relative_file_path="f.py"),
         [
             Address("src/python/root", relative_file_path="__init__.py"),
-            Address("src/python/root/mid", relative_file_path="__init__.py"),
+            *(
+                []
+                if behavior is InitFilesInference.content_only
+                else [Address("src/python/root/mid", relative_file_path="__init__.py")]
+            ),
             Address("src/python/root/mid/leaf", relative_file_path="__init__.py"),
         ],
     )
-    assert run_dep_inference(
-        Address("src/python/type_stub", relative_file_path="foo.pyi")
-    ) == InferredDependencies([Address("src/python/type_stub", relative_file_path="__init__.pyi")])
+    check(
+        Address("src/python/type_stub", relative_file_path="foo.pyi"),
+        [Address("src/python/type_stub", relative_file_path="__init__.pyi")],
+    )
 
 
 def test_infer_python_conftests() -> None:
