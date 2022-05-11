@@ -36,25 +36,18 @@ from pants.bsp.util_rules.targets import (
     BSPResourcesResult,
 )
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileEntry, Workspace
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileEntry, MergeDigests, Workspace
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule
-from pants.engine.target import (
-    CoarsenedTargets,
-    FieldSet,
-    Target,
-    Targets,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
 from pants.jvm.bsp.compile import rules as jvm_compile_rules
 from pants.jvm.bsp.resources import _jvm_bsp_resources
 from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import MavenDependencyModule, MavenDependencyModuleArtifact
-from pants.jvm.compile import ClasspathEntryRequestFactory
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
@@ -332,6 +325,7 @@ def get_entry_for_coord(
 async def scala_bsp_dependency_modules(
     request: ScalaBSPDependencyModulesRequest,
     build_root: BuildRoot,
+    classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> BSPDependencyModulesResult:
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses([fs.address for fs in request.field_sets])
@@ -339,41 +333,31 @@ async def scala_bsp_dependency_modules(
     resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
     lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)
 
-    # TODO: Can this use ClasspathEntryRequest?
-    transitive_targets = await Get(
-        TransitiveTargets,
-        TransitiveTargetsRequest(
-            roots=[
-                tgt.address
-                for coarsened_target in coarsened_targets
-                for tgt in coarsened_target.members
-            ]
-        ),
+    applicable_lockfile_entries: dict[CoursierLockfileEntry, CoarsenedTarget] = {}
+    for ct in coarsened_targets.coarsened_closure():
+        for tgt in ct.members:
+            if not JvmArtifactFieldSet.is_applicable(tgt):
+                continue
+
+            artifact_requirement = ArtifactRequirement.from_jvm_artifact_target(tgt)
+            entry = get_entry_for_coord(lockfile, artifact_requirement.coordinate)
+            if not entry:
+                _logger.warning(
+                    f"No lockfile entry for {artifact_requirement.coordinate} in resolve {resolve.name}."
+                )
+                continue
+            applicable_lockfile_entries[entry] = ct
+
+    classpath_entries = await MultiGet(
+        Get(
+            ClasspathEntry,
+            ClasspathEntryRequest,
+            classpath_entry_request.for_targets(component=target, resolve=resolve),
+        )
+        for target in applicable_lockfile_entries.values()
     )
 
-    artifact_requirements = [
-        ArtifactRequirement.from_jvm_artifact_target(tgt)
-        for tgt in transitive_targets.closure
-        if JvmArtifactFieldSet.is_applicable(tgt)
-    ]
-
-    applicable_lockfile_entries: set[CoursierLockfileEntry] = set()
-    for artifact_requirement in artifact_requirements:
-        entry = get_entry_for_coord(lockfile, artifact_requirement.coordinate)
-        if not entry:
-            _logger.warning(
-                f"No lockfile entry for {artifact_requirement.coordinate} in resolve {resolve.name}."
-            )
-            continue
-        applicable_lockfile_entries.add(entry)
-
-    resolve_digest = await Get(
-        Digest,
-        CreateDigest(
-            [FileEntry(entry.file_name, entry.file_digest) for entry in applicable_lockfile_entries]
-        ),
-    )
-
+    resolve_digest = await Get(Digest, MergeDigests(cpe.digest for cpe in classpath_entries))
     resolve_digest = await Get(
         Digest, AddPrefix(resolve_digest, f"jvm/resolves/{resolve.name}/lib")
     )
@@ -387,16 +371,17 @@ async def scala_bsp_dependency_modules(
                 name=entry.coord.artifact,
                 version=entry.coord.version,
                 scope=None,
-                artifacts=(
+                artifacts=tuple(
                     MavenDependencyModuleArtifact(
                         uri=build_root.pathlib_path.joinpath(
-                            f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{entry.file_name}"
+                            f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{filename}"
                         ).as_uri()
-                    ),
+                    )
+                    for filename in cp_entry.filenames
                 ),
             ),
         )
-        for entry in applicable_lockfile_entries
+        for entry, cp_entry in zip(applicable_lockfile_entries, classpath_entries)
     ]
 
     return BSPDependencyModulesResult(
