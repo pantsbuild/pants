@@ -6,7 +6,7 @@ import os
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Iterable, Mapping, Optional, Tuple, Sequence
+from typing import ClassVar, Iterable, Mapping, Optional, Sequence, Tuple
 
 from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Addresses
@@ -17,7 +17,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
-from pants.engine.target import FilteredTargets, Targets, Target
+from pants.engine.target import FilteredTargets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, StrOption
