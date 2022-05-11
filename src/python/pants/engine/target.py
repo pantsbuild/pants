@@ -1102,7 +1102,7 @@ def _generate_file_level_targets(
 
     # Paths will have already been globbed, so they should be escaped. See
     # https://github.com/pantsbuild/pants/issues/15381.
-    paths = (glob_stdlib.escape(path) for path in paths)
+    paths = [glob_stdlib.escape(path) for path in paths]
 
     def generate_address(base_address: Address, relativized_fp: str) -> Address:
         return (
