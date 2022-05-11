@@ -15,6 +15,7 @@ import pytest
 from pants.base.specs import (
     AddressLiteralSpec,
     AddressSpecs,
+    DescendantAddresses,
     FileGlobSpec,
     FileLiteralSpec,
     FilesystemSpec,
@@ -57,6 +58,7 @@ from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     FieldSet,
+    FilteredTargets,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -142,6 +144,7 @@ def transitive_targets_rule_runner() -> RuleRunner:
             QueryRule(CoarsenedTargets, [Addresses]),
             QueryRule(Targets, [DependenciesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
+            QueryRule(FilteredTargets, [Specs]),
         ],
         target_types=[MockTarget, MockTargetGenerator, MockGeneratedTarget],
     )
@@ -622,6 +625,66 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
         AllUnexpandedTargets, [AllTargetsRequest()]
     )
     assert {t.address for t in all_unexpanded} == {*expected, Address("", target_name="generator")}
+
+
+def test_filtered_targets(transitive_targets_rule_runner: RuleRunner) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "addr_specs/f1.txt": "",
+            "addr_specs/f2.txt": "",
+            "addr_specs/BUILD": dedent(
+                """\
+                generator(
+                    sources=["*.txt"],
+                    tags=["a"],
+                    overrides={"f2.txt": {"tags": ["b"]}},
+                )
+
+                target(name='t', tags=["a"])
+                """
+            ),
+            "fs_specs/f1.txt": "",
+            "fs_specs/f2.txt": "",
+            "fs_specs/BUILD": dedent(
+                """\
+                generator(
+                    sources=["*.txt"],
+                    tags=["a"],
+                    overrides={"f2.txt": {"tags": ["b"]}},
+                )
+
+                target(name='t', sources=["f1.txt"], tags=["a"])
+                """
+            ),
+        }
+    )
+    specs = Specs(
+        AddressSpecs([DescendantAddresses("addr_specs")], filter_by_global_options=True),
+        FilesystemSpecs([FileGlobSpec("fs_specs/*.txt")]),
+    )
+
+    def check(tags_option: str | None, expected: set[Address]) -> None:
+        if tags_option:
+            transitive_targets_rule_runner.set_options([f"--tag={tags_option}"])
+        result = transitive_targets_rule_runner.request(FilteredTargets, [specs])
+        assert {t.address for t in result} == expected
+
+    addr_f1 = Address("addr_specs", relative_file_path="f1.txt")
+    addr_f2 = Address("addr_specs", relative_file_path="f2.txt")
+    addr_direct = Address("addr_specs", target_name="t")
+
+    fs_f1 = Address("fs_specs", relative_file_path="f1.txt")
+    fs_f2 = Address("fs_specs", relative_file_path="f2.txt")
+    fs_direct = Address("fs_specs", target_name="t")
+
+    all_a_tags = {addr_f1, addr_direct, fs_f1, fs_direct}
+    all_b_tags = {addr_f2, fs_f2}
+
+    check(None, {*all_a_tags, *all_b_tags})
+    check("a", all_a_tags)
+    check("b", all_b_tags)
+    check("-a", all_b_tags)
+    check("-b", all_a_tags)
 
 
 def test_resolve_specs_snapshot() -> None:
