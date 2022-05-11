@@ -665,8 +665,17 @@ fn interactive_process(
       command.arg(arg);
     }
 
+    let mut env = env;
     if let Some(ref tempdir) = maybe_tempdir {
       command.current_dir(tempdir.path());
+
+      // Replace any references to `{chroot}` in the environment variables with the path to the
+      // temporary directory. This matches `engine.process_execution.local:update_env()`.
+      for value in env.values_mut() {
+        if value.contains("{chroot}") {
+          *value = value.replace("{chroot}", tempdir.path().to_str().unwrap());
+        }
+      }
     }
 
     command.env_clear();
