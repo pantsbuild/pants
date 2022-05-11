@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Iterable, Mapping, cast
+from typing import Iterable, Mapping, cast, Sequence
 
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
@@ -17,7 +17,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Effect, Get, MultiGet
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.target import FilteredTargets, Targets
+from pants.engine.target import FilteredTargets, Targets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.util.dirutil import safe_rmtree
 from pants.util.frozendict import FrozenDict
@@ -36,7 +36,7 @@ class ExportRequest:
     Subclass and install a member of this type to export data.
     """
 
-    targets: Targets
+    targets: Sequence[Target]
 
 
 @frozen_after_init

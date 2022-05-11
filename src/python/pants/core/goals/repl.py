@@ -6,7 +6,7 @@ import os
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Iterable, Mapping, Optional, Tuple
+from typing import ClassVar, Iterable, Mapping, Optional, Tuple, Sequence
 
 from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Addresses
@@ -17,7 +17,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
-from pants.engine.target import FilteredTargets, Targets
+from pants.engine.target import FilteredTargets, Targets, Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, StrOption
@@ -37,7 +37,7 @@ class ReplImplementation(ABC):
 
     name: ClassVar[str]
 
-    targets: Targets
+    targets: Sequence[Target]
     chroot: str  # Absolute path of the chroot the sources will be materialized to.
 
     def in_chroot(self, relpath: str) -> str:

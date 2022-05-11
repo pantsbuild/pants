@@ -653,7 +653,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             UnexpandedTargets, AddressSpecs(deleted_candidate_specs, filter_by_global_options=True)
         )
     else:
-        live_get = Get(Targets, AddressSpecs(live_candidate_specs, filter_by_global_options=True))
+        live_get = Get(Targets, AddressSpecs(live_candidate_specs))
         deleted_get = Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs))
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
