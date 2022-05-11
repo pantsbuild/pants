@@ -5,9 +5,14 @@ python_sources()
 
 python_tests(
     name="tests",
-    timeout=300,
     overrides={
-        ("options_bootstrapper_test.py", "config_test.py"): {
+        (
+            "config_test.py",
+            "global_options_test.py",
+            "options_test.py",
+            "options_bootstrapper_test.py",
+            "subsystem_test.py",
+        ): {
             "dependencies": ["//BUILD_ROOT:files", "//pants.toml:files"],
         },
     },
