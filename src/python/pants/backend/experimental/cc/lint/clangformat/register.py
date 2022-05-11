@@ -11,9 +11,13 @@ from __future__ import annotations
 from typing import Iterable
 
 from pants.backend.cc.lint.clangformat import rules as clangformat_rules
+from pants.backend.cc.lint.clangformat import skip_field
 from pants.engine.rules import Rule
 from pants.engine.unions import UnionRule
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return clangformat_rules.rules()
+    return (
+        *clangformat_rules.rules(),
+        *skip_field.rules(),
+    )

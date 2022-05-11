@@ -1,6 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 from typing import Iterable
 
@@ -25,7 +27,7 @@ class ClangFormat(PythonToolBase):
     default_main = ConsoleScript("clang-format")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--version")
