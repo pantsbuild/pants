@@ -13,12 +13,12 @@ python_tests(
         "mypyc_integration_test.py": {
             "dependencies": ["testprojects/src/python:mypyc_fib_directory"],
             "tags": ["platform_specific_behavior"],
-            "timeout": 120,
+            "timeout": 220,
         },
         "subsystem_test.py": {"timeout": 180},
         "rules_integration_test.py": {
             "tags": ["platform_specific_behavior"],
-            "timeout": 180,
+            "timeout": 480,
         },
     },
 )

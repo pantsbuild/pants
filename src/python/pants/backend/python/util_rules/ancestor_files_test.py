@@ -11,7 +11,6 @@ from pants.backend.python.util_rules.ancestor_files import (
     AncestorFilesRequest,
     putative_ancestor_files,
 )
-from pants.engine.fs import DigestContents
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -28,68 +27,42 @@ def rule_runner() -> RuleRunner:
 def assert_injected(
     rule_runner: RuleRunner,
     *,
-    source_roots: list[str],
-    original_declared_files: list[str],
-    original_undeclared_files: list[str],
+    input_files: list[str],
+    empty_files: list[str],
+    nonempty_files: list[str],
     expected_discovered: list[str],
+    ignore_empty_files: bool,
 ) -> None:
-    rule_runner.set_options([f"--source-root-patterns={source_roots}"])
-    rule_runner.write_files(
-        {
-            **{f: "# undeclared" for f in original_undeclared_files},
-            **{f: "# declared" for f in original_declared_files},
-        }
-    )
+    rule_runner.write_files({**{f: "" for f in empty_files}, **{f: "foo" for f in nonempty_files}})
     request = AncestorFilesRequest(
-        requested=("__init__.py",), input_files=tuple(original_declared_files)
+        requested=("__init__.py",),
+        input_files=tuple(input_files),
+        ignore_empty_files=ignore_empty_files,
     )
     result = rule_runner.request(AncestorFiles, [request]).snapshot
     assert list(result.files) == sorted(expected_discovered)
 
-    materialized_result = rule_runner.request(DigestContents, [result.digest])
-    for file_content in materialized_result:
-        path = file_content.path
-        if not path.endswith("__init__.py"):
-            continue
-        assert path in original_declared_files or path in expected_discovered
-        expected = b"# declared" if path in original_declared_files else b"# undeclared"
-        assert file_content.content == expected
 
-
-def test_unstripped(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("ignore_empty_files", [False, True])
+def test_rule(rule_runner: RuleRunner, ignore_empty_files: bool) -> None:
     assert_injected(
         rule_runner,
-        source_roots=["src/python", "tests/python"],
-        original_declared_files=[
+        input_files=[
             "src/python/project/lib.py",
             "src/python/project/subdir/__init__.py",
             "src/python/project/subdir/lib.py",
             "src/python/no_init/lib.py",
         ],
-        original_undeclared_files=[
+        nonempty_files=[
             "src/python/__init__.py",
-            "src/python/project/__init__.py",
             "tests/python/project/__init__.py",
         ],
-        expected_discovered=["src/python/__init__.py", "src/python/project/__init__.py"],
-    )
-
-
-def test_unstripped_source_root_at_buildroot(rule_runner: RuleRunner) -> None:
-    assert_injected(
-        rule_runner,
-        source_roots=["/"],
-        original_declared_files=[
-            "project/lib.py",
-            "project/subdir/__init__.py",
-            "project/subdir/lib.py",
-            "no_init/lib.py",
-        ],
-        original_undeclared_files=[
-            "__init__.py",
-            "project/__init__.py",
-        ],
-        expected_discovered=["__init__.py", "project/__init__.py"],
+        empty_files=["src/python/project/__init__.py"],
+        ignore_empty_files=ignore_empty_files,
+        expected_discovered=(
+            ["src/python/__init__.py"]
+            + ([] if ignore_empty_files else ["src/python/project/__init__.py"])
+        ),
     )
 
 
