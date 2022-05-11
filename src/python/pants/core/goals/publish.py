@@ -240,6 +240,7 @@ async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
             outputs.append(pub.get_output_data(published=False, status=status))
             continue
 
+        logger.debug(f"Execute {pub.process}")
         res = await Effect(InteractiveProcessResult, InteractiveProcess, pub.process)
         if res.exit_code == 0:
             sigil = console.sigil_succeeded()
