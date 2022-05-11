@@ -328,6 +328,7 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
             ),
             "demo/f1.txt": "",
             "demo/f2.txt": "",
+            "demo/f[3].txt": "",
             "demo/subdir/f.txt": "",
             "demo/subdir/f.another_ext": "",
             "demo/subdir/BUILD": "mock_tgt(name='another_ext', sources=['f.another_ext'])",
@@ -363,6 +364,8 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
             Address("demo", generated_name="f1.txt"),
             Address("demo", relative_file_path="f2.txt"),
             Address("demo", generated_name="f2.txt"),
+            Address("demo", relative_file_path="f[[]3].txt"),
+            Address("demo", generated_name="f[[]3].txt"),
         },
     )
     assert_resolved(
@@ -382,6 +385,8 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
         Address("demo", generated_name="f1.txt"),
         Address("demo", relative_file_path="f2.txt"),
         Address("demo", generated_name="f2.txt"),
+        Address("demo", relative_file_path="f[[]3].txt"),
+        Address("demo", generated_name="f[[]3].txt"),
         Address("demo", relative_file_path="subdir/f.txt"),
         Address("demo", generated_name="subdir/f.txt"),
         Address("demo/subdir", target_name="another_ext"),
@@ -396,6 +401,8 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
             Address("demo", generated_name="f1.txt"),
             Address("demo", relative_file_path="f2.txt"),
             Address("demo", generated_name="f2.txt"),
+            Address("demo", relative_file_path="f[[]3].txt"),
+            Address("demo", generated_name="f[[]3].txt"),
         },
     )
 
