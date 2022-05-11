@@ -71,6 +71,14 @@ class UnownedDependencyUsage(Enum):
     DoNothing = "ignore"
 
 
+class InitFilesInference(Enum):
+    """How to handle inference for __init__.py files."""
+
+    always = "always"
+    content_only = "content_only"
+    never = "never"
+
+
 class PythonInferSubsystem(Subsystem):
     options_scope = "python-infer"
     help = "Options controlling which dependencies will be inferred for Python targets."
@@ -133,6 +141,28 @@ class PythonInferSubsystem(Subsystem):
             """
         ),
     )
+
+    init_files = EnumOption(
+        "--init-files",
+        help=softwrap(
+            f"""
+            Infer a target's dependencies on any `__init__.py` files in the packages
+            it is located in (recursively upward in the directory structure).
+
+            Even if this is set to `never` or `content_only`, Pants will still always include any
+            ancestor `__init__.py` files in the sandbox. Only, they will not be "proper"
+            dependencies, e.g. they will not show up in `{bin_name()} dependencies` and their own
+            dependencies will not be used.
+
+            By default, Pants only adds a "proper" dependency if there is content in the 
+            `__init__.py` file. This makes sure that dependencies are added when likely necessary
+            to build, while also avoiding adding unnecessary dependencies. While accurate, those
+            unnecessary dependencies can complicate setting metadata like the
+            `interpreter_constraints` and `resolve` fields.
+            """
+        ),
+        default=InitFilesInference.content_only,
+    )
     inits = BoolOption(
         "--inits",
         default=False,
@@ -149,7 +179,14 @@ class PythonInferSubsystem(Subsystem):
             you should enable this option.
             """
         ),
+        removal_version="2.14.0.dev1",
+        removal_hint=(
+            "Use the more powerful option `[python-infer].init_files`. For identical"
+            "behavior, set to 'always'. Otherwise, we recommend the default of `content_only` "
+            "(simply delete the option `[python-infer].inits` to trigger the default)."
+        ),
     )
+
     conftests = BoolOption(
         "--conftests",
         default=True,
@@ -268,7 +305,6 @@ def _get_imports_info(
 @rule_helper
 async def _handle_unowned_imports(
     address: Address,
-    file: str,
     unowned_dependency_behavior: UnownedDependencyUsage,
     python_setup: PythonSetup,
     unowned_imports: Iterable[str],
@@ -401,7 +437,6 @@ async def infer_python_dependencies_via_source(
 
     _ = await _handle_unowned_imports(
         tgt.address,
-        request.sources_field.file_path,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,
         unowned_imports,
@@ -420,14 +455,24 @@ class InferInitDependencies(InferDependenciesRequest):
 async def infer_python_init_dependencies(
     request: InferInitDependencies, python_infer_subsystem: PythonInferSubsystem
 ) -> InferredDependencies:
-    if not python_infer_subsystem.inits:
+    if (
+        not python_infer_subsystem.options.is_default("inits") and not python_infer_subsystem.inits
+    ) or python_infer_subsystem.init_files is InitFilesInference.never:
         return InferredDependencies([])
 
+    ignore_empty_files = (
+        python_infer_subsystem.options.is_default("inits")
+        and python_infer_subsystem.init_files is InitFilesInference.content_only
+    )
     fp = request.sources_field.file_path
     assert fp is not None
     init_files = await Get(
         AncestorFiles,
-        AncestorFilesRequest(input_files=(fp,), requested=("__init__.py", "__init__.pyi")),
+        AncestorFilesRequest(
+            input_files=(fp,),
+            requested=("__init__.py", "__init__.pyi"),
+            ignore_empty_files=ignore_empty_files,
+        ),
     )
     owners = await MultiGet(Get(Owners, OwnersRequest((f,))) for f in init_files.snapshot.files)
     return InferredDependencies(itertools.chain.from_iterable(owners))
