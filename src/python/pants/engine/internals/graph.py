@@ -644,14 +644,13 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # glob.
     live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
     deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
+    live_get = (
+        Get(FilteredTargets, AddressSpecs(live_candidate_specs, filter_by_global_options=True))
+        if owners_request.filter_by_global_options
+        else Get(Targets, AddressSpecs(live_candidate_specs))
+    )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(
-        Get(
-            FilteredTargets,
-            AddressSpecs(
-                live_candidate_specs,
-                filter_by_global_options=owners_request.filter_by_global_options,
-            ),
-        ),
+        live_get,
         Get(
             UnexpandedTargets,
             AddressSpecs(

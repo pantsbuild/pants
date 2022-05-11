@@ -12,9 +12,9 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
-    SpecsFilter,
     DifferingFamiliesError,
     DuplicateNameError,
+    SpecsFilter,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
