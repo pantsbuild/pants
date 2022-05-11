@@ -29,10 +29,12 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
+    CoarsenedTargets,
+    CoarsenedTargetsRequest,
     FieldSet,
     Target,
     TransitiveTargets,
@@ -280,15 +282,24 @@ async def _mypy_interpreter_constraints(
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
         all_tgts = await Get(AllTargets, AllTargetsRequest())
-        all_transitive_targets = await MultiGet(
-            Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-            for tgt in all_tgts
-            if MyPyFieldSet.is_applicable(tgt)
+
+        coarsened_targets = await Get(
+            CoarsenedTargets,
+            CoarsenedTargetsRequest(
+                (tgt.address for tgt in all_tgts if MyPyFieldSet.is_applicable(tgt)),
+                expanded_targets=True,
+            ),
         )
-        unique_constraints = {
-            InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
-            for transitive_targets in all_transitive_targets
-        }
+
+        ics = InterpreterConstraints.compute_for_targets(coarsened_targets, python_setup)
+        if ics is None:
+            unique_constraints = {
+                InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
+                for ct in coarsened_targets
+            }
+        else:
+            unique_constraints = {ic for ic in ics if ic}
+
         code_constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints

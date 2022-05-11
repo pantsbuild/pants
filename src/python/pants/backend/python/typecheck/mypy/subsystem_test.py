@@ -212,7 +212,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             python_sources(name='lib2', dependencies=[":lib1"], interpreter_constraints=['==3.9.*'])
             """
         ),
-        [">=3.8,==3.9.*"],
+        ["==3.9.*"],
     )
     assert_lockfile_request(
         dedent(
