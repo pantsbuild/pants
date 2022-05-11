@@ -91,6 +91,8 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
+    ValidatedDependencies,
+    ValidateDependenciesRequest,
     WrappedTarget,
     _generate_file_level_targets,
 )
@@ -1134,18 +1136,34 @@ async def resolve_dependencies(
             for addr in special_cased_field.to_unparsed_address_inputs().values
         )
 
-    result = {
-        addr
-        for addr in (
-            *generated_addresses,
-            *explicitly_provided_includes,
-            *itertools.chain.from_iterable(injected),
-            *itertools.chain.from_iterable(inferred),
-            *special_cased,
+    result = Addresses(
+        sorted(
+            {
+                addr
+                for addr in (
+                    *generated_addresses,
+                    *explicitly_provided_includes,
+                    *itertools.chain.from_iterable(injected),
+                    *itertools.chain.from_iterable(inferred),
+                    *special_cased,
+                )
+                if addr not in explicitly_provided.ignores
+            }
         )
-        if addr not in explicitly_provided.ignores
-    }
-    return Addresses(sorted(result))
+    )
+
+    # Validate dependencies.
+    _ = await MultiGet(
+        Get(
+            ValidatedDependencies,
+            ValidateDependenciesRequest,
+            vd_request_type(vd_request_type.field_set_type.create(tgt), result),  # type: ignore[misc]
+        )
+        for vd_request_type in union_membership.get(ValidateDependenciesRequest)
+        if vd_request_type.field_set_type.is_applicable(tgt)  # type: ignore[misc]
+    )
+
+    return result
 
 
 @rule(desc="Resolve addresses")

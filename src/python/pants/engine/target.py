@@ -36,7 +36,7 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.deprecated import warn_or_error
-from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -2515,6 +2515,28 @@ class InferredDependencies:
 
     def __iter__(self) -> Iterator[Address]:
         return iter(self.dependencies)
+
+
+FS = TypeVar("FS", bound="FieldSet")
+
+
+@union
+@dataclass(frozen=True)
+class ValidateDependenciesRequest(Generic[FS], ABC):
+    """A request to validate dependencies after they have been computed.
+
+    An implementing rule should raise an exception if dependencies are invalid.
+    """
+
+    field_set_type: ClassVar[Type[FS]]
+
+    field_set: FS
+    dependencies: Addresses
+
+
+@dataclass(frozen=True)
+class ValidatedDependencies:
+    pass
 
 
 class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
