@@ -12,9 +12,9 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
-    AddressSpecsFilter,
     DifferingFamiliesError,
     DuplicateNameError,
+    SpecsFilter,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -130,8 +130,8 @@ def test_address_family_duplicate_names() -> None:
         )
 
 
-def test_address_specs_filter_tags() -> None:
-    specs_filter = AddressSpecsFilter(tags=["-a", "+b"])
+def test_specs_filter() -> None:
+    specs_filter = SpecsFilter(tags=["-a", "+b"], exclude_target_regexps=["skip-me"])
 
     class MockTgt(Target):
         alias = "tgt"
@@ -142,11 +142,12 @@ def test_address_specs_filter_tags() -> None:
 
     untagged_tgt = make_tgt(name="untagged")
     b_tagged_tgt = make_tgt(name="b-tagged", tags=["b"])
+    b_tagged_exclude_regex_tgt = make_tgt(name="skip-me", tags=["b"])
     a_and_b_tagged_tgt = make_tgt(name="a-and-b-tagged", tags=["a", "b"])
 
     def matches(tgt: MockTgt) -> bool:
         return specs_filter.matches(tgt)
 
-    assert matches(untagged_tgt) is False
     assert matches(b_tagged_tgt) is True
-    assert matches(a_and_b_tagged_tgt) is False
+    for t in (untagged_tgt, b_tagged_exclude_regex_tgt, a_and_b_tagged_tgt):
+        assert matches(t) is False

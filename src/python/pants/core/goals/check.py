@@ -21,7 +21,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
-from pants.engine.target import Targets
+from pants.engine.target import FilteredTargets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption
 from pants.util.logging import LogLevel
@@ -160,7 +160,7 @@ class Check(Goal):
 async def check(
     console: Console,
     workspace: Workspace,
-    targets: Targets,
+    targets: FilteredTargets,
     dist_dir: DistDir,
     union_membership: UnionMembership,
     check_subsystem: CheckSubsystem,
