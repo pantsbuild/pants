@@ -4,19 +4,18 @@
 from __future__ import annotations
 
 import itertools
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField, PythonSourceField
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
     MyPyConfigFile,
     MyPyFirstPartyPlugins,
 )
-from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules import partition, pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
@@ -31,13 +30,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    CoarsenedTarget,
-    CoarsenedTargets,
-    CoarsenedTargetsRequest,
-    FieldSet,
-    Target,
-)
+from pants.engine.target import CoarsenedTargets, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -258,51 +251,21 @@ async def mypy_typecheck_partition(
     )
 
 
-# TODO(#15241): Improve the performance of this, especially by not needing to calculate transitive
-#  targets per field set. Doing that would require changing how we calculate interpreter
-#  constraints to be more like how we determine resolves, i.e. only inspecting the root target
-#  (and later validating the closure is compatible).
 @rule(desc="Determine if necessary to partition MyPy input", level=LogLevel.DEBUG)
 async def mypy_determine_partitions(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
 ) -> MyPyPartitions:
-    # When determining how to batch by interpreter constraints, we must consider the entire
-    # transitive closure _per-root_ to get the final resulting constraints. See the method
-    # comment.
-    coarsened_targets = await Get(
-        CoarsenedTargets,
-        CoarsenedTargetsRequest(
-            (field_set.address for field_set in request.field_sets), expanded_targets=True
-        ),
-    )
-    coarsened_targets_by_address = coarsened_targets.by_address()
 
-    resolve_and_interpreter_constraints_to_coarsened_targets: Mapping[
-        tuple[str, InterpreterConstraints],
-        tuple[OrderedSet[MyPyFieldSet], OrderedSet[CoarsenedTarget]],
-    ] = defaultdict(lambda: (OrderedSet(), OrderedSet()))
-    for root in request.field_sets:
-        ct = coarsened_targets_by_address[root.address]
-        # NB: If there is a cycle in the roots, we still only take the first resolve, as the other
-        # members will be validated when the partition is actually built.
-        resolve = ct.representative[PythonResolveField].normalized_value(python_setup)
-        # NB: We need to consume the entire un-memoized closure here. See the method comment.
-        interpreter_constraints = (
-            InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
-            or mypy.interpreter_constraints
-        )
-        roots, root_cts = resolve_and_interpreter_constraints_to_coarsened_targets[
-            (resolve, interpreter_constraints)
-        ]
-        roots.add(root)
-        root_cts.add(ct)
+    resolve_and_interpreter_constraints_to_coarsened_targets = (
+        await partition._by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
+    )
 
     return MyPyPartitions(
         MyPyPartition(
             FrozenOrderedSet(roots),
             FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
             resolve if len(python_setup.resolves) > 1 else None,
-            interpreter_constraints,
+            interpreter_constraints or mypy.interpreter_constraints,
         )
         for (resolve, interpreter_constraints), (roots, root_cts) in sorted(
             resolve_and_interpreter_constraints_to_coarsened_targets.items()

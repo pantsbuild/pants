@@ -10,13 +10,17 @@ import pytest
 from pkg_resources import Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+)
 from pants.backend.python.util_rules.interpreter_constraints import (
     _PATCH_VERSION_UPPER_BOUND,
     InterpreterConstraints,
 )
 from pants.build_graph.address import Address
-from pants.engine.target import FieldSet
+from pants.engine.target import CoarsenedTarget, FieldSet, Target
 from pants.testutil.option_util import create_subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -421,6 +425,51 @@ def test_contains(candidate, target, matches) -> None:
             InterpreterConstraints(target), ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
         )
         == matches
+    )
+
+
+@pytest.mark.parametrize(
+    "root_ics,ics_by_path_spec",
+    (
+        (["==3.5.*", None], {"root1": "==3.5.*", "inner": ">=3.5"}),
+        (None, {"root1": "==3.5.*", "inner": ">=3.6"}),
+        (["==3.7.*", ">=3.5"], {"root1": "==3.7.*", "inner": ">=3.6", "leaf": ">=3.5"}),
+        (["==3.5.*", ">=3.5"], {"root1": "==3.5.*", "leaf": ">=3.5"}),
+        (None, {"root1": "==3.5.*", "leaf": ">=3.6"}),
+        ([None, "==3.5.*"], {"root2": "==3.5.*", "root3": "==3.5.*"}),
+        (None, {"root2": "==3.5.*", "root3": "==3.6.*"}),
+        (None, {"root2": "==3.5.*", "root3": ">=3.5"}),
+    ),
+)
+def test_validate_targets(
+    root_ics: list[str | None] | None, ics_by_path_spec: dict[str, str]
+) -> None:
+    def t(path_spec: str) -> Target:
+        address = Address(path_spec)
+        ics = ics_by_path_spec.get(path_spec)
+        if ics is None:
+            return PythonSourcesGeneratorTarget({}, address)
+        else:
+            return PythonSourceTarget(
+                {InterpreterConstraintsField.alias: [ics], "source": f"{path_spec}.py"}, address
+            )
+
+    expected = (
+        [(InterpreterConstraints([ics]) if ics else None) for ics in root_ics] if root_ics else None
+    )
+    assert expected == InterpreterConstraints.compute_for_targets(
+        [
+            CoarsenedTarget(
+                [t("root1")],
+                [CoarsenedTarget([t("inner")], [CoarsenedTarget([t("leaf")], [])])],
+            ),
+            CoarsenedTarget([t("root2"), t("root3")], [CoarsenedTarget([t("leaf")], [])]),
+        ],
+        create_subsystem(
+            PythonSetup,
+            interpreter_constraints=[],
+            interpreter_versions_universe=["3.5", "3.6", "3.7"],
+        ),
     )
 
 
