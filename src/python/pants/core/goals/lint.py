@@ -24,7 +24,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsSnapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import FieldSet, Targets
+from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
@@ -250,7 +250,7 @@ def _get_error_code(results: tuple[LintResults, ...]) -> int:
 async def lint(
     console: Console,
     workspace: Workspace,
-    targets: Targets,
+    targets: FilteredTargets,
     specs_snapshot: SpecsSnapshot,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,

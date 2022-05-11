@@ -8,12 +8,12 @@ from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
+    FilteredTargets,
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     RegisteredTargetTypes,
     SourcesField,
-    Targets,
 )
 from pants.engine.unions import UnionMembership
 
@@ -35,7 +35,7 @@ class ExportCodegen(Goal):
 
 @goal_rule
 async def export_codegen(
-    targets: Targets,
+    targets: FilteredTargets,
     union_membership: UnionMembership,
     workspace: Workspace,
     dist_dir: DistDir,
