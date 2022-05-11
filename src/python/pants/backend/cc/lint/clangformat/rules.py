@@ -38,6 +38,8 @@ class ClangFormatRequest(FmtRequest):
 
 @rule(level=LogLevel.DEBUG)
 async def clangformat_fmt(request: ClangFormatRequest, clangformat: ClangFormat) -> FmtResult:
+    if clangformat.skip:
+        return FmtResult.skip(formatter_name=request.name)
 
     clangformat_pex_get = Get(
         Pex,
