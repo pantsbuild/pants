@@ -39,6 +39,7 @@ from pants.engine.fs import (
     SpecsSnapshot,
 )
 from pants.engine.internals import native_engine
+from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizations as _TargetParametrizations,
@@ -59,6 +60,7 @@ from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    FilteredTargets,
     GeneratedSources,
     GeneratedTargets,
     GenerateSourcesRequest,
@@ -344,6 +346,11 @@ async def resolve_targets(
     return Targets(expanded_targets)
 
 
+@rule
+def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
+    return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
+
+
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
     tgts = await Get(Targets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
@@ -614,6 +621,7 @@ class OwnersRequest:
 
     sources: tuple[str, ...]
     owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
+    filter_by_global_options: bool = False
 
 
 class Owners(Collection[Address]):
@@ -636,10 +644,18 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # glob.
     live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
     deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
-    live_candidate_tgts, deleted_candidate_tgts = await MultiGet(
-        Get(Targets, AddressSpecs(live_candidate_specs)),
-        Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs)),
-    )
+    live_get: Get[FilteredTargets | Targets, AddressSpecs]
+    if owners_request.filter_by_global_options:
+        live_get = Get(
+            FilteredTargets, AddressSpecs(live_candidate_specs, filter_by_global_options=True)
+        )
+        deleted_get = Get(
+            UnexpandedTargets, AddressSpecs(deleted_candidate_specs, filter_by_global_options=True)
+        )
+    else:
+        live_get = Get(Targets, AddressSpecs(live_candidate_specs))
+        deleted_get = Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs))
+    live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
     matching_addresses: OrderedSet[Address] = OrderedSet()
     unmatched_sources = set(owners_request.sources)
@@ -664,7 +680,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             # primary ownership, but the target still should match the file. We can't use
             # `tgt.get()` because this is a mixin, and there technically may be >1 field.
             secondary_owner_fields = tuple(
-                field  # type: ignore[misc]
+                field
                 for field in candidate_tgt.field_values.values()
                 if isinstance(field, SecondaryOwnerMixin)
             )
@@ -749,7 +765,8 @@ async def addresses_from_filesystem_specs(
         for spec in filesystem_specs.file_includes
     )
     owners_per_include = await MultiGet(
-        Get(Owners, OwnersRequest(sources=paths.files)) for paths in paths_per_include
+        Get(Owners, OwnersRequest(paths.files, filter_by_global_options=True))
+        for paths in paths_per_include
     )
     addresses: set[Address] = set()
     for spec, owners in zip(filesystem_specs.file_includes, owners_per_include):
@@ -1305,7 +1322,7 @@ async def find_valid_field_sets_for_target_roots(
 ) -> TargetRootsToFieldSets:
     # NB: This must be in an `await Get`, rather than the rule signature, to avoid a rule graph
     # issue.
-    targets = await Get(Targets, Specs, specs)
+    targets = await Get(FilteredTargets, Specs, specs)
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
     )
