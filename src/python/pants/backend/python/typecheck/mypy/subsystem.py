@@ -293,8 +293,6 @@ async def _mypy_interpreter_constraints(
 
         ics = InterpreterConstraints.compute_for_targets(coarsened_targets, python_setup)
         if ics is None:
-            # TODO: This case should be removed after the deprecation in `compute_for_targets`
-            # triggers.
             unique_constraints = {
                 InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
                 for ct in coarsened_targets

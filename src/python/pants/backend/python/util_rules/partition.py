@@ -36,8 +36,6 @@ async def _by_interpreter_constraints_and_resolve(
     coarsened_targets_by_address = coarsened_targets.by_address()
     ics = InterpreterConstraints.compute_for_targets(coarsened_targets, python_setup)
     if ics is None:
-        # TODO: This case should be removed after the deprecation in `compute_for_targets`
-        # triggers.
         interpreter_constraints_by_coarsened_target = {
             ct: InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
             for ct in coarsened_targets

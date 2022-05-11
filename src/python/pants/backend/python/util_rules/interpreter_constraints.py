@@ -13,7 +13,6 @@ from typing_extensions import Protocol
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
-from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import CoarsenedTarget, Target
@@ -21,7 +20,6 @@ from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import bullet_list
 
 
 # This protocol allows us to work with any arbitrary FieldSet. See
@@ -106,6 +104,8 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         If a (Coarsened)Target root does not have ICs of its own, then its entry in the return value
         will be None.
+
+        TODO: See the deprecation in `target_types_rules.validate_python_dependencies`.
         """
 
         interpreter_constraints: dict[CoarsenedTarget, set[RawConstraints]] = {}
@@ -128,20 +128,6 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             }
 
             if len(ics) > 1:
-                # TODO: When the deprecation is removed, this message should convert into an exception,
-                # and the function should become infallible.
-                warn_or_error(
-                    removal_version="2.14.0.dev2",
-                    entity="the `interpreter_constraints` field differing between targets in a cycle",
-                    hint=(
-                        "The following targets are involved in a cycle (which is supported), but "
-                        "have differing `interpreter_constraints` fields (which is deprecated).\n"
-                        "Interpreter constraints:\n"
-                        f"{bullet_list(str(ic) for ic in ics)}\n"
-                        "Targets:\n"
-                        f"{ct.bullet_list()}"
-                    ),
-                )
                 return None
 
             # Collect the distinct interpreter constraints of dependencies.
@@ -156,32 +142,12 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             if ics:
                 single_ics = next(iter(ics))
                 # Validate that the ICs for dependencies are all compatible with our own.
-                non_subset_items = [
-                    f"{d_ics}: {', '.join(str(t) for t in targets)}"
-                    for d_ics, targets in dependency_interpreter_constraints.items()
-                    if not interpreter_constraints_contains(
+                if not all(
+                    interpreter_constraints_contains(
                         d_ics, single_ics, python_setup.interpreter_universe
                     )
-                ]
-                if non_subset_items:
-                    # TODO: When the deprecation is removed, this message should convert into an exception,
-                    # and the function should become infallible.
-                    warn_or_error(
-                        removal_version="2.14.0.dev2",
-                        entity=(
-                            "the `interpreter_constraints` of a target not being a subset "
-                            "of its dependencies' `interpreter_constraints`"
-                        ),
-                        hint=(
-                            f"The target {ct} has the `interpreter_constraints` {single_ics}, which "
-                            "are not a subset of the `interpreter_constraints` of some of its "
-                            "dependencies:\n"
-                            f"{bullet_list(non_subset_items)}\n\n"
-                            f"To fix this, you should likely adjust {ct}'s "
-                            "`interpreter_constraints` to match the narrowest range in the "
-                            "above list."
-                        ),
-                    )
+                    for d_ics, targets in dependency_interpreter_constraints.items()
+                ):
                     return None
             else:
                 # If there are no interpreter constraints in a CT, then it acts like an alias for
@@ -284,6 +250,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     def create_from_targets(
         cls, targets: Iterable[Target], python_setup: PythonSetup
     ) -> InterpreterConstraints:
+        """TODO: See the deprecation in `target_types_rules.validate_python_dependencies`."""
         return cls.create_from_compatibility_fields(
             (
                 tgt[InterpreterConstraintsField]
@@ -297,6 +264,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     def create_from_compatibility_fields(
         cls, fields: Iterable[InterpreterConstraintsField], python_setup: PythonSetup
     ) -> InterpreterConstraints:
+        """TODO: See the deprecation in `target_types_rules.validate_python_dependencies`."""
         constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)

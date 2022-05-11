@@ -476,6 +476,12 @@ async def validate_python_dependencies(
         ):
             non_subset_items.append(f"{dep_ics}: {dep.target.address}")
 
+    # TODO: When this deprecation triggers, it should be converted into an exception, and
+    # all usages of the InterpreterConstraints methods:
+    #   * compute_for_targets
+    #   * create_from_compatibility_fields
+    #   * create_from_targets
+    # ... should be replaced with calls to InterpreterConstraintsField.value_or_global_default.
     deprecated_conditional(
         lambda: bool(non_subset_items),
         removal_version="2.14.0.dev1",
