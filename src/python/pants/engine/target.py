@@ -6,6 +6,7 @@ from __future__ import annotations
 import collections.abc
 import dataclasses
 import enum
+import glob as glob_stdlib
 import itertools
 import logging
 import os.path
@@ -1129,6 +1130,10 @@ def _generate_file_level_targets(
     `overrides` allows changing the fields for particular targets. It expects the full file path
      as the key.
     """
+
+    # Paths will have already been globbed, so they should be escaped. See
+    # https://github.com/pantsbuild/pants/issues/15381.
+    paths = [glob_stdlib.escape(path) for path in paths]
 
     def generate_address(base_address: Address, relativized_fp: str) -> Address:
         return (

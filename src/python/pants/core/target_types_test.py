@@ -332,6 +332,7 @@ def test_generate_file_and_resource_targets() -> None:
             ),
             "assets/f1.ext": "",
             "assets/f2.ext": "",
+            "assets/f[3].ext": "",
             "assets/subdir/f.ext": "",
         }
     )
@@ -360,10 +361,12 @@ def test_generate_file_and_resource_targets() -> None:
     assert set(generated_files.values()) == {
         gen_file_tgt("f1.ext", tags=["overridden"]),
         gen_file_tgt("f2.ext"),
+        gen_file_tgt("f[[]3].ext"),
         gen_file_tgt("subdir/f.ext"),
     }
     assert set(generated_resources.values()) == {
         gen_resource_tgt("f1.ext", tags=["overridden"]),
         gen_resource_tgt("f2.ext"),
+        gen_resource_tgt("f[[]3].ext"),
         gen_resource_tgt("subdir/f.ext"),
     }
