@@ -686,7 +686,6 @@ class SkipPythonTestsField(BoolField):
 
 
 _PYTHON_TEST_MOVED_FIELDS = (
-    *COMMON_TARGET_FIELDS,
     PythonTestsDependenciesField,
     PythonResolveField,
     PythonTestsTimeoutField,
@@ -699,7 +698,12 @@ _PYTHON_TEST_MOVED_FIELDS = (
 
 class PythonTestTarget(Target):
     alias = "python_test"
-    core_fields = (*_PYTHON_TEST_MOVED_FIELDS, PythonTestsDependenciesField, PythonTestSourceField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        *_PYTHON_TEST_MOVED_FIELDS,
+        PythonTestsDependenciesField,
+        PythonTestSourceField,
+    )
     help = (
         "A single Python test file, written in either Pytest style or unittest style.\n\n"
         "All test util code, including `conftest.py`, should go into a dedicated `python_source` "
@@ -744,9 +748,13 @@ class PythonTestsOverrideField(OverridesField):
 
 class PythonTestsGeneratorTarget(TargetFilesGenerator):
     alias = "python_tests"
-    core_fields = (PythonTestsGeneratingSourcesField, PythonTestsOverrideField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PythonTestsGeneratingSourcesField,
+        PythonTestsOverrideField,
+    )
     generated_target_cls = PythonTestTarget
-    copied_fields = ()
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = _PYTHON_TEST_MOVED_FIELDS
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = "Generate a `python_test` target for each file in the `sources` field."
