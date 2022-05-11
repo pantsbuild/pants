@@ -132,11 +132,11 @@ def test_change_transitive_dep(repo: str) -> None:
     append_to_file(repo, "transitive.sh", "# foo")
     assert_list_stdout(repo, ["//transitive.sh:lib"])
     assert_list_stdout(
-        repo, ["//:lib", "//dep.sh:lib", "//transitive.sh:lib"], dependees=DependeesOption.DIRECT
+        repo, ["//dep.sh:lib", "//transitive.sh:lib"], dependees=DependeesOption.DIRECT
     )
     assert_list_stdout(
         repo,
-        ["//:lib", "//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib"],
+        ["//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib"],
         dependees=DependeesOption.TRANSITIVE,
     )
 
@@ -156,6 +156,12 @@ def test_delete_generated_target(repo: str) -> None:
     delete_file(repo, "transitive.sh")
     for dependees in DependeesOption:
         assert_list_stdout(repo, ["//:lib"], dependees=dependees)
+
+    # If we also edit a sibling generated target, we should still (for now at least) include the
+    # target generator.
+    append_to_file(repo, "app.sh", "# foo")
+    for dependees in DependeesOption:
+        assert_list_stdout(repo, ["//:lib", "//app.sh:lib"], dependees=dependees)
 
 
 def test_delete_atom_target(repo: str) -> None:
@@ -198,7 +204,7 @@ def test_tag_filtering(repo: str) -> None:
     append_to_file(repo, "transitive.sh", "# foo")
     assert_list_stdout(
         repo,
-        ["//:lib", "//app.sh:lib", "//transitive.sh:lib"],
+        ["//app.sh:lib", "//transitive.sh:lib"],
         dependees=DependeesOption.TRANSITIVE,
         extra_args=["--tag=-b"],
     )

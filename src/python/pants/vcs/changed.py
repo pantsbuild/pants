@@ -18,6 +18,7 @@ from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 from pants.vcs.git import GitWorktree
 
@@ -43,15 +44,26 @@ async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
     owners = await Get(Owners, OwnersRequest(request.sources, filter_by_global_options=True))
     if request.dependees == DependeesOption.NONE:
         return ChangedAddresses(owners)
-    dependees_with_roots = await Get(
+
+    # See https://github.com/pantsbuild/pants/issues/15313. We filter out target generators because
+    # they are not useful as aliases for their generated targets in the context of
+    # `--changed-since`. Including them makes it look like all sibling targets from the same
+    # target generator have also changed.
+    #
+    # However, we also must be careful to preserve if target generators are direct owners, which
+    # happens when a generated file is deleted.
+    owner_target_generators = FrozenOrderedSet(
+        addr.maybe_convert_to_target_generator() for addr in owners if addr.is_generated_target
+    )
+    dependees = await Get(
         Dependees,
         DependeesRequest(
             owners,
             transitive=request.dependees == DependeesOption.TRANSITIVE,
-            include_roots=True,
+            include_roots=False,
         ),
     )
-    return ChangedAddresses(dependees_with_roots)
+    return ChangedAddresses(FrozenOrderedSet(owners) | (dependees - owner_target_generators))
 
 
 @dataclass(frozen=True)
