@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+import textwrap
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
 
 from pants.backend.scala.bsp.spec import (
     ScalaBuildTarget,
@@ -35,10 +38,20 @@ from pants.bsp.util_rules.targets import (
     BSPResourcesRequest,
     BSPResourcesResult,
 )
+from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary, ReadlinkBinaryRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileEntry, MergeDigests, Workspace
+from pants.engine.fs import (
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    FileContent,
+    FileEntry,
+    MergeDigests,
+    Workspace,
+)
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import _uncacheable_rule, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Target, Targets
 from pants.engine.unions import UnionRule
@@ -46,8 +59,9 @@ from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
 from pants.jvm.bsp.compile import rules as jvm_compile_rules
 from pants.jvm.bsp.resources import _jvm_bsp_resources
 from pants.jvm.bsp.resources import rules as jvm_resources_rules
-from pants.jvm.bsp.spec import MavenDependencyModule, MavenDependencyModuleArtifact
+from pants.jvm.bsp.spec import JvmBuildTarget, MavenDependencyModule, MavenDependencyModuleArtifact
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
@@ -57,7 +71,7 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactFieldSet, JvmResolveField
+from pants.jvm.target_types import JvmArtifactFieldSet, JvmJdkField, JvmResolveField
 
 LANGUAGE_ID = "scala"
 
@@ -72,10 +86,11 @@ class ScalaBSPLanguageSupport(BSPLanguageSupport):
 
 @dataclass(frozen=True)
 class ScalaMetadataFieldSet(FieldSet):
-    required_fields = (ScalaSourceField, JvmResolveField)
+    required_fields = (ScalaSourceField, JvmResolveField, JvmJdkField)
 
     source: ScalaSourceField
     resolve: JvmResolveField
+    jdk: JvmJdkField
 
 
 class ScalaBSPResolveFieldFactoryRequest(BSPResolveFieldFactoryRequest):
@@ -154,27 +169,89 @@ def bsp_resolve_field_factory(
 @rule
 async def bsp_resolve_scala_metadata(
     request: ScalaBSPBuildTargetsMetadataRequest,
+    bash: BashBinary,
     jvm: JvmSubsystem,
     scala: ScalaSubsystem,
     build_root: BuildRoot,
 ) -> BSPBuildTargetsMetadataResult:
     resolves = {fs.resolve.normalized_value(jvm) for fs in request.field_sets}
+    jdk_versions = {fs.jdk for fs in request.field_sets}
     if len(resolves) > 1:
         raise ValueError(
             "Cannot provide Scala metadata for multiple resolves. Please set the "
             "`resolve = jvm:$resolve` field in your `[experimental-bsp].groups_config_files` to "
             "select the relevant resolve to use."
         )
-    resolve = list(resolves)[0]
-    scala_version = scala.version_for_resolve(resolve)
+    (resolve,) = resolves
 
+    scala_version = scala.version_for_resolve(resolve)
     scala_runtime = await Get(
         MaterializeScalaRuntimeJarsResult, MaterializeScalaRuntimeJarsRequest(scala_version)
     )
 
+    #
+    # Extract the JDK paths from an lawful-evil process so we can supply it to the IDE
+    #
+
+    # The maximum JDK version will be compatible with all the specified targets
+    jdk_requests = [JdkRequest.from_field(version) for version in jdk_versions]
+    jdk_request = max(jdk_requests, key=_jdk_request_sort_key(jvm))
+
+    jdk, readlink, = await MultiGet(
+        Get(JdkEnvironment, JdkRequest, jdk_request),
+        Get(ReadlinkBinary, ReadlinkBinaryRequest()),
+    )
+
+    cmd = "leak_paths.sh"
+    leak_jdk_sandbox_paths = textwrap.dedent(
+        f"""\
+        # Script to leak JDK cache paths out of Coursier sandbox so that BSP can use them.
+
+        {readlink.path} {jdk.coursier.cache_dir}
+        {jdk.java_home_command}
+        """
+    )
+    leak_sandbox_path_digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    cmd,
+                    leak_jdk_sandbox_paths.encode("utf-8"),
+                    is_executable=True,
+                ),
+            ]
+        ),
+    )
+
+    leaked_paths = await Get(
+        ProcessResult,
+        Process(
+            [
+                bash.path,
+                cmd,
+            ],
+            input_digest=leak_sandbox_path_digest,
+            immutable_input_digests=jdk.immutable_input_digests,
+            env=jdk.env,
+            use_nailgun=(),
+            description="Leak JDK cache paths for BSP",
+            append_only_caches=jdk.append_only_caches,
+        ),
+    )
+
+    cache_dir, jdk_home = leaked_paths.stdout.decode().strip().split("\n")
+
+    _, _, suffix = jdk_home.partition(jdk.coursier.cache_dir)
+    coursier_java_home = cache_dir + suffix
+
     scala_jar_uris = tuple(
         build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
         for p in scala_runtime.content.files
+    )
+
+    jvm_build_target = JvmBuildTarget(
+        Path(coursier_java_home).as_uri(), f"1.{jdk.jre_major_version}"
     )
 
     return BSPBuildTargetsMetadataResult(
@@ -184,9 +261,25 @@ async def bsp_resolve_scala_metadata(
             scala_binary_version=".".join(scala_version.split(".")[0:2]),
             platform=ScalaPlatform.JVM,
             jars=scala_jar_uris,
+            jvm_build_target=jvm_build_target,
         ),
         digest=scala_runtime.content.digest,
     )
+
+
+def _jdk_request_sort_key(
+    jvm: JvmSubsystem,
+) -> Callable[[JdkRequest,], tuple[int, ...]]:
+    def sort_key_function(request: JdkRequest) -> tuple[int, ...]:
+        if request == JdkRequest.SYSTEM:
+            raise ValueError("Pants BSP does not currently support system JDKs")
+
+        version_str = request.version if isinstance(request.version, str) else jvm.jdk
+        _, version = version_str.split(":")
+
+        return tuple(int(i) for i in version.split("."))
+
+    return sort_key_function
 
 
 # -----------------------------------------------------------------------------------------------
