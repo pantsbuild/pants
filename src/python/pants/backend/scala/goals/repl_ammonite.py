@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import importlib.resources
-import itertools
 
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.repl import ReplImplementation, ReplRequest
@@ -21,32 +20,33 @@ from pants.engine.fs import (
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, CoarsenedTargets
+from pants.engine.target import CoarsenedTargets
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, InternalJdk
+from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
-from pants.jvm.resolve.jvm_tool import JvmToolBase, GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
 
 class AmmoniteSubsystem(JvmToolBase):
     options_scope = "ammonite"
+    name = "Ammonite"
+    help = "Ammonite, A Modernized Scala REPL (https://ammonite.io/)"
 
-    # TODO: Get this from a `ScalaToolBase` intermediate base class.
-    SCALA_VERSION = "2.13.6"
+    SCALA_VERSION = "2.13.8"
 
-    default_version = "2.4.1"
+    default_version = "2.5.3"
     default_artifacts = (
         f"com.lihaoyi:ammonite_{SCALA_VERSION}:{{version}}",
         f"com.lihaoyi:ammonite-repl_{SCALA_VERSION}:{{version}}",
     )
-    default_lockfile_resource = ("pants.backend.scala.goals", "ammonite.default.lockfile.txt")
-    default_lockfile_url = git_url(
-        "src/python/pants/backend/scala/goals/ammonite.default.lockfile.txt"
-    )
+    default_lockfile_resource = ("pants.backend.scala.goals", "ammonite.lock")
+    default_lockfile_path = "src/python/pants/backend/scala/goals/ammonite.lock"
+    default_lockfile_url = git_url(default_lockfile_path)
 
 
 class AmmoniteReplToolLockfileSentinel(GenerateToolLockfileSentinel):
@@ -70,9 +70,7 @@ async def create_scala_repl_request(
 ) -> ReplRequest:
     user_classpath, lockfile_request = await MultiGet(
         Get(Classpath, Addresses, request.addresses),
-        Get(
-            GenerateJvmLockfileFromTool, AmmoniteReplToolLockfileSentinel()
-        )
+        Get(GenerateJvmLockfileFromTool, AmmoniteReplToolLockfileSentinel()),
     )
 
     roots = await Get(CoarsenedTargets, Addresses, request.addresses)
@@ -86,7 +84,7 @@ async def create_scala_repl_request(
         ToolClasspathRequest(
             prefix="__toolcp",
             lockfile=lockfile_request,
-        )
+        ),
     )
 
     user_classpath_prefix = "__cp"
@@ -129,15 +127,15 @@ async def create_scala_repl_request(
 
 
 @rule
-async def generate_ammonite_lockfile_request(
-    _: AmmoniteReplToolLockfileSentinel, ammonite: AmmoniteSubsystem
+def generate_ammonite_lockfile_request(
+    _: AmmoniteReplToolLockfileSentinel, tool: AmmoniteSubsystem
 ) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.from_tool(ammonite)
+    return GenerateJvmLockfileFromTool.create(tool)
 
 
 @rule
 async def setup_ammonite_runner_classfiles(
-    bash: BashBinary, ammonite: AmmoniteSubsystem
+    bash: BashBinary, jdk: InternalJdk
 ) -> AmmoniteRunnerClassfiles:
     dest_dir = "classfiles"
 
@@ -149,15 +147,37 @@ async def setup_ammonite_runner_classfiles(
 
     runner_source = FileContent("AmmoniteRunner.scala", runner_source_content)
 
-    lockfile_request = await Get(
-        GenerateJvmLockfileFromTool, AmmoniteReplToolLockfileSentinel()
-    )
+    lockfile_request = await Get(GenerateJvmLockfileFromTool, AmmoniteReplToolLockfileSentinel())
 
-    tool_classpath, source_digest = await MultiGet(
+    tool_classpath, runner_classpath, source_digest = await MultiGet(
         Get(
             ToolClasspath,
             ToolClasspathRequest(
                 prefix="__toolcp",
+                artifact_requirements=ArtifactRequirements.from_coordinates(
+                    [
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-compiler",
+                            version=AmmoniteSubsystem.SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-library",
+                            version=AmmoniteSubsystem.SCALA_VERSION,
+                        ),
+                        Coordinate(
+                            group="org.scala-lang",
+                            artifact="scala-reflect",
+                            version=AmmoniteSubsystem.SCALA_VERSION,
+                        ),
+                    ]
+                ),
+            ),
+        ),
+        Get(
+            ToolClasspath,
+            ToolClasspathRequest(
                 lockfile=lockfile_request,
             ),
         ),
@@ -171,6 +191,11 @@ async def setup_ammonite_runner_classfiles(
             ),
         ),
     )
+
+    toolcp_relpath = "__toolcp"
+    extra_immutable_input_digests = {
+        toolcp_relpath: tool_classpath.digest,
+    }
 
     merged_digest = await Get(
         Digest,
@@ -208,13 +233,6 @@ async def setup_ammonite_runner_classfiles(
         Digest, RemovePrefix(process_result.output_digest, dest_dir)
     )
     return AmmoniteRunnerClassfiles(digest=stripped_classfiles_digest)
-
-
-@rule
-def generate_ammonite_lockfile_request(
-    _: AmmoniteReplToolLockfileSentinel, tool: AmmoniteSubsystem
-) -> GenerateJvmLockfileFromTool:
-    return GenerateJvmLockfileFromTool.create(tool)
 
 
 def rules():
