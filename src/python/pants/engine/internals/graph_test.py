@@ -105,7 +105,13 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
 
 class MockTarget(Target):
     alias = "target"
-    core_fields = (MockDependencies, MultipleSourcesField, SpecialCasedDeps1, SpecialCasedDeps2)
+    core_fields = (
+        MockDependencies,
+        MultipleSourcesField,
+        SpecialCasedDeps1,
+        SpecialCasedDeps2,
+        Tags,
+    )
     deprecated_alias = "deprecated_target"
     deprecated_alias_removal_version = "9.9.9.dev0"
 
@@ -841,18 +847,22 @@ def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
                 """\
                 generator(name='generator', sources=['*.txt'])
                 target(name='not-generator', sources=['*.txt'])
+                target(name='skip-me', sources=['*.txt'])
+                target(name='bad-tag', sources=['*.txt'], tags=['skip'])
                 """
             ),
         }
     )
-    all_addresses = [
+    specs_rule_runner.set_options(["--tag=-skip", "--exclude-target-regexp=skip-me"])
+    all_unskipped_addresses = [
         Address("demo", target_name="not-generator"),
         Address("demo", target_name="generator", relative_file_path="f1.txt"),
         Address("demo", target_name="generator", relative_file_path="f2.txt"),
     ]
 
     assert (
-        resolve_filesystem_specs(specs_rule_runner, [FileGlobSpec("demo/*.txt")]) == all_addresses
+        resolve_filesystem_specs(specs_rule_runner, [FileGlobSpec("demo/*.txt")])
+        == all_unskipped_addresses
     )
     # We should deduplicate between glob and literal specs.
     assert (
@@ -860,7 +870,7 @@ def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
             specs_rule_runner,
             [FileGlobSpec("demo/*.txt"), FileLiteralSpec("demo/f1.txt")],
         )
-        == all_addresses
+        == all_unskipped_addresses
     )
 
 

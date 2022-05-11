@@ -614,6 +614,7 @@ class OwnersRequest:
 
     sources: tuple[str, ...]
     owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
+    filter_by_global_options: bool = False
 
 
 class Owners(Collection[Address]):
@@ -637,8 +638,21 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
     deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(
-        Get(Targets, AddressSpecs(live_candidate_specs)),
-        Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs)),
+        Get(
+            # TODO(#14977): Using `Targets` means that we do not filter out overridden targets.
+            Targets,
+            AddressSpecs(
+                live_candidate_specs,
+                filter_by_global_options=owners_request.filter_by_global_options,
+            ),
+        ),
+        Get(
+            UnexpandedTargets,
+            AddressSpecs(
+                deleted_candidate_specs,
+                filter_by_global_options=owners_request.filter_by_global_options,
+            ),
+        ),
     )
 
     matching_addresses: OrderedSet[Address] = OrderedSet()
@@ -749,7 +763,8 @@ async def addresses_from_filesystem_specs(
         for spec in filesystem_specs.file_includes
     )
     owners_per_include = await MultiGet(
-        Get(Owners, OwnersRequest(sources=paths.files)) for paths in paths_per_include
+        Get(Owners, OwnersRequest(paths.files, filter_by_global_options=True))
+        for paths in paths_per_include
     )
     addresses: set[Address] = set()
     for spec, owners in zip(filesystem_specs.file_includes, owners_per_include):
