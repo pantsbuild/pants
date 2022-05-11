@@ -19,6 +19,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import CoarsenedTarget, Target
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list
 
@@ -38,8 +39,23 @@ class FieldSetWithInterpreterConstraints(Protocol):
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
+RawConstraints = Tuple[str, ...]
+
+
 # The current maxes are 2.7.18 and 3.6.15.  We go much higher, for safety.
 _PATCH_VERSION_UPPER_BOUND = 30
+
+
+@memoized
+def interpreter_constraints_contains(
+    a: RawConstraints, b: RawConstraints, interpreter_universe: tuple[str, ...]
+) -> bool:
+    """A memoized version of `InterpreterConstraints.contains`.
+
+    This is a function in order to keep the memoization cache on the module rather than on an
+    instance. It can't go on `PythonSetup`, since that would cause a cycle with this module.
+    """
+    return InterpreterConstraints(a).contains(InterpreterConstraints(b), interpreter_universe)
 
 
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
@@ -92,23 +108,6 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         will be None.
         """
 
-        RawConstraints = Tuple[str, ...]
-
-        # A local cache of `ic1.contains(ic2)` checks.
-        # NB: Does not memoize failure, because validation shortcircuits if any check fails.
-        contains_memo: set[tuple[RawConstraints, RawConstraints]] = set()
-
-        def contains(a: RawConstraints, b: RawConstraints) -> bool:
-            key = (a, b)
-            if key in contains_memo:
-                return True
-            if not InterpreterConstraints(a).contains(
-                InterpreterConstraints(b), python_setup.interpreter_universe
-            ):
-                return False
-            contains_memo.add(key)
-            return True
-
         interpreter_constraints: dict[CoarsenedTarget, set[RawConstraints]] = {}
 
         def compute(ct: CoarsenedTarget) -> set[RawConstraints] | None:
@@ -160,7 +159,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 non_subset_items = [
                     f"{d_ics}: {', '.join(str(t) for t in targets)}"
                     for d_ics, targets in dependency_interpreter_constraints.items()
-                    if not contains(d_ics, single_ics)
+                    if not interpreter_constraints_contains(
+                        d_ics, single_ics, python_setup.interpreter_universe
+                    )
                 ]
                 if non_subset_items:
                     # TODO: When the deprecation is removed, this message should convert into an exception,

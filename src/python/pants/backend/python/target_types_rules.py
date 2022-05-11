@@ -11,6 +11,7 @@ import dataclasses
 import logging
 import os.path
 from collections import defaultdict
+from dataclasses import dataclass
 from itertools import chain
 from textwrap import dedent
 from typing import DefaultDict, Dict, Generator, Optional, Tuple, cast
@@ -24,6 +25,7 @@ from pants.backend.python.goals.setup_py import InvalidEntryPoint
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
+    InterpreterConstraintsField,
     PexBinariesGeneratorTarget,
     PexBinary,
     PexBinaryDependenciesField,
@@ -40,6 +42,8 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
 )
+from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
+from pants.base.deprecated import deprecated_conditional
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -47,6 +51,7 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
     GeneratedTargets,
     GenerateTargetsRequest,
     InjectDependenciesRequest,
@@ -55,6 +60,8 @@ from pants.engine.target import (
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
     Targets,
+    ValidatedDependencies,
+    ValidateDependenciesRequest,
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule
@@ -62,6 +69,7 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -433,6 +441,64 @@ async def inject_python_distribution_dependencies(
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# Dependency validation
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DependencyValidationFieldSet(FieldSet):
+    required_fields = (InterpreterConstraintsField,)
+
+    interpreter_constraints: InterpreterConstraintsField
+
+
+class PythonValidateDependenciesRequest(ValidateDependenciesRequest):
+    field_set_type = DependencyValidationFieldSet
+
+
+@rule
+async def validate_python_dependencies(
+    request: PythonValidateDependenciesRequest,
+    python_setup: PythonSetup,
+) -> ValidatedDependencies:
+    dependencies = await MultiGet(Get(WrappedTarget, Address, d) for d in request.dependencies)
+
+    # Validate that the ICs for dependencies are all compatible with our own.
+    target_ics = request.field_set.interpreter_constraints.value_or_global_default(python_setup)
+    non_subset_items = []
+    for dep in dependencies:
+        if not dep.target.has_field(InterpreterConstraintsField):
+            continue
+        dep_ics = dep.target[InterpreterConstraintsField].value_or_global_default(python_setup)
+        if not interpreter_constraints_contains(
+            dep_ics, target_ics, python_setup.interpreter_universe
+        ):
+            non_subset_items.append(f"{dep_ics}: {dep.target.address}")
+
+    deprecated_conditional(
+        lambda: bool(non_subset_items),
+        removal_version="2.14.0.dev1",
+        entity=(
+            "the `interpreter_constraints` of a target not being a subset "
+            "of its dependencies' `interpreter_constraints`"
+        ),
+        hint=softwrap(
+            f"""
+            The target {request.field_set.address} has the `interpreter_constraints` {target_ics},
+            which are not a subset of the `interpreter_constraints` of some of its dependencies:
+
+            {bullet_list(sorted(non_subset_items))}
+
+            To fix this, you should likely adjust {request.field_set.address}'s
+            `interpreter_constraints` to match the narrowest range in the above list.
+            """
+        ),
+    )
+
+    return ValidatedDependencies()
+
+
 def rules():
     return (
         *collect_rules(),
@@ -441,4 +507,5 @@ def rules():
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinaries),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
+        UnionRule(ValidateDependenciesRequest, PythonValidateDependenciesRequest),
     )
