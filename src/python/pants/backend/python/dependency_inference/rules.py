@@ -154,7 +154,7 @@ class PythonInferSubsystem(Subsystem):
             dependencies, e.g. they will not show up in `{bin_name()} dependencies` and their own
             dependencies will not be used.
 
-            By default, Pants only adds a "proper" dependency if there is content in the 
+            By default, Pants only adds a "proper" dependency if there is content in the
             `__init__.py` file. This makes sure that dependencies are added when likely necessary
             to build, while also avoiding adding unnecessary dependencies. While accurate, those
             unnecessary dependencies can complicate setting metadata like the
