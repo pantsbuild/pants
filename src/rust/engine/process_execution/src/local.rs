@@ -606,7 +606,8 @@ pub trait CapturedWorkdir {
 /// Mutates the env for the process `req`, replacing any `{chroot}` placeholders with
 /// `workdir_path`.
 ///
-/// This matches the behavior of interactive processes executed by the `run` goal.
+/// This matches the behavior of interactive processes executed in a temporary directory and those
+/// executed by the `run` goal.
 ///
 /// TODO: align this with the code path for interactive processes. Related issue #14386.
 ///
