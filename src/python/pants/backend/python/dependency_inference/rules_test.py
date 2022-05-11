@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 
 import pytest
@@ -316,10 +318,7 @@ def test_infer_python_assets(caplog) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "behavior",
-    [InitFilesInference.never, InitFilesInference.content_only, InitFilesInference.always],
-)
+@pytest.mark.parametrize("behavior", InitFilesInference)
 def test_infer_python_inits(behavior: InitFilesInference) -> None:
     rule_runner = RuleRunner(
         rules=[

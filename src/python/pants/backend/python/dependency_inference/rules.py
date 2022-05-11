@@ -180,10 +180,12 @@ class PythonInferSubsystem(Subsystem):
             """
         ),
         removal_version="2.14.0.dev1",
-        removal_hint=(
-            "Use the more powerful option `[python-infer].init_files`. For identical"
-            "behavior, set to 'always'. Otherwise, we recommend the default of `content_only` "
-            "(simply delete the option `[python-infer].inits` to trigger the default)."
+        removal_hint=softwrap(
+            """
+            Use the more powerful option `[python-infer].init_files`. For identical
+            behavior, set to 'always'. Otherwise, we recommend the default of `content_only`
+            (simply delete the option `[python-infer].inits` to trigger the default).
+            """
         ),
     )
 
