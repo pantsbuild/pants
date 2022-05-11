@@ -17,7 +17,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Effect, Get, MultiGet
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.target import Targets
+from pants.engine.target import FilteredTargets, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.dirutil import safe_rmtree
 from pants.util.frozendict import FrozenDict
@@ -107,7 +107,7 @@ class Export(Goal):
 @goal_rule
 async def export(
     console: Console,
-    targets: Targets,
+    targets: FilteredTargets,
     workspace: Workspace,
     union_membership: UnionMembership,
     build_root: BuildRoot,

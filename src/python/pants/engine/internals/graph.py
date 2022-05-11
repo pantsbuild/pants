@@ -39,6 +39,7 @@ from pants.engine.fs import (
     SpecsSnapshot,
 )
 from pants.engine.internals import native_engine
+from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizations as _TargetParametrizations,
@@ -59,6 +60,7 @@ from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    FilteredTargets,
     GeneratedSources,
     GeneratedTargets,
     GenerateSourcesRequest,
@@ -342,6 +344,11 @@ async def resolve_targets(
         for tgt in parametrizations.generated_or_generator(generator.address)
     )
     return Targets(expanded_targets)
+
+
+@rule
+def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
+    return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
@@ -639,8 +646,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(
         Get(
-            # TODO(#14977): Using `Targets` means that we do not filter out overridden targets.
-            Targets,
+            FilteredTargets,
             AddressSpecs(
                 live_candidate_specs,
                 filter_by_global_options=owners_request.filter_by_global_options,
@@ -1320,7 +1326,7 @@ async def find_valid_field_sets_for_target_roots(
 ) -> TargetRootsToFieldSets:
     # NB: This must be in an `await Get`, rather than the rule signature, to avoid a rule graph
     # issue.
-    targets = await Get(Targets, Specs, specs)
+    targets = await Get(FilteredTargets, Specs, specs)
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
     )

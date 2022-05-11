@@ -17,7 +17,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, collect_rules, goal_rule
-from pants.engine.target import Targets
+from pants.engine.target import FilteredTargets, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, StrOption
@@ -102,7 +102,7 @@ async def run_repl(
     console: Console,
     workspace: Workspace,
     repl_subsystem: ReplSubsystem,
-    specified_targets: Targets,
+    specified_targets: FilteredTargets,
     build_root: BuildRoot,
     union_membership: UnionMembership,
     global_options: GlobalOptions,

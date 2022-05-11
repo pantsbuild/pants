@@ -651,6 +651,20 @@ class Targets(Collection[Target]):
         return self[0]
 
 
+# This distinct type is necessary because of https://github.com/pantsbuild/pants/issues/14977.
+class FilteredTargets(Collection[Target]):
+    """A heterogenous collection of Target instances that have been filtered with the global options
+    `--tag` and `--exclude-target-regexp`.
+
+    Outside of the extra filtering, this type is identical to `Targets`, including its handling of
+    target generators.
+    """
+
+    def expect_single(self) -> Target:
+        assert_single_address([tgt.address for tgt in self])
+        return self[0]
+
+
 class UnexpandedTargets(Collection[Target]):
     """Like `Targets`, but will not replace target generators with their generated targets (e.g.
     replace `python_sources` "BUILD targets" with generated `python_source` "file targets")."""
