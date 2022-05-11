@@ -644,21 +644,18 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # glob.
     live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
     deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
-    live_get = (
-        Get(FilteredTargets, AddressSpecs(live_candidate_specs, filter_by_global_options=True))
-        if owners_request.filter_by_global_options
-        else Get(Targets, AddressSpecs(live_candidate_specs))
-    )
-    live_candidate_tgts, deleted_candidate_tgts = await MultiGet(
-        live_get,
-        Get(
-            UnexpandedTargets,
-            AddressSpecs(
-                deleted_candidate_specs,
-                filter_by_global_options=owners_request.filter_by_global_options,
-            ),
-        ),
-    )
+    live_get: Get[FilteredTargets | Targets, AddressSpecs]
+    if owners_request.filter_by_global_options:
+        live_get = Get(
+            FilteredTargets, AddressSpecs(live_candidate_specs, filter_by_global_options=True)
+        )
+        deleted_get = Get(
+            UnexpandedTargets, AddressSpecs(deleted_candidate_specs, filter_by_global_options=True)
+        )
+    else:
+        live_get = Get(Targets, AddressSpecs(live_candidate_specs, filter_by_global_options=True))
+        deleted_get = Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs))
+    live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
     matching_addresses: OrderedSet[Address] = OrderedSet()
     unmatched_sources = set(owners_request.sources)
@@ -683,7 +680,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             # primary ownership, but the target still should match the file. We can't use
             # `tgt.get()` because this is a mixin, and there technically may be >1 field.
             secondary_owner_fields = tuple(
-                field  # type: ignore[misc]
+                field
                 for field in candidate_tgt.field_values.values()
                 if isinstance(field, SecondaryOwnerMixin)
             )
