@@ -7,7 +7,7 @@ from typing import Iterable
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.option.option_types import SkipOption
+from pants.option.option_types import ArgsListOption, SkipOption
 from pants.util.strutil import softwrap
 
 
@@ -28,6 +28,7 @@ class ClangFormat(PythonToolBase):
     default_interpreter_constraints = ["CPython>=3.7"]
 
     skip = SkipOption("fmt", "lint")
+    args = ArgsListOption(example="--version")
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         """clang-format will use the closest configuration file to the file currently being

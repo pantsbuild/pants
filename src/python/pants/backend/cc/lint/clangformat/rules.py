@@ -73,14 +73,16 @@ async def clangformat_fmt(request: ClangFormatRequest, clangformat: ClangFormat)
         ),
     )
 
-    # TODO: Review correct argv
     result = await Get(
         ProcessResult,
         PexProcess(
             clangformat_pex,
             argv=(
-                "--Werror",
-                "-i",
+                "--style=file",  # Look for .clang-format files
+                "--fallback-style=webkit",  # Use WebKit if there is no config file
+                "-i",  # In-place edits
+                "--Werror",  # Formatting warnings as errors
+                *clangformat.args,  # User-added arguments
                 *request.snapshot.files,
             ),
             input_digest=input_digest,
