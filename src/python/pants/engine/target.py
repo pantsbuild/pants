@@ -10,6 +10,7 @@ import glob as glob_stdlib
 import itertools
 import logging
 import os.path
+import zlib
 from abc import ABC, ABCMeta, abstractmethod
 from collections import deque
 from dataclasses import dataclass
@@ -1352,6 +1353,33 @@ class NoApplicableTargetsBehavior(Enum):
     error = "error"
 
 
+def parse_shard_spec(shard_spec: str, origin: str = "") -> Tuple[int, int]:
+    def invalid():
+        origin_str = f" from {origin}" if origin else ""
+        return ValueError(
+            f"Invalid shard specification {shard_spec}{origin_str}. Use a string of the form "
+            '"k/N" where k and N are integers, and 0 <= k < N .'
+        )
+
+    if not shard_spec:
+        return 0, -1
+    shard_str, _, num_shards_str = shard_spec.partition("/")
+    try:
+        shard, num_shards = int(shard_str), int(num_shards_str)
+    except ValueError:
+        raise invalid()
+    if shard < 0 or shard >= num_shards:
+        raise invalid()
+    return shard, num_shards
+
+
+def get_shard(key: str, num_shards: int) -> int:
+    # Note: hash() is not guaranteed to be stable across processes, and adler32 is not
+    # well-distributed for small strings, so we use crc32. It's faster to compute than
+    # a cryptographic hash, which would be overkill.
+    return zlib.crc32(key.encode()) % num_shards
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSetsRequest(Generic[_FS]):
@@ -1359,6 +1387,8 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
+    shard: int
+    num_shards: int
 
     def __init__(
         self,
@@ -1367,11 +1397,23 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
         expect_single_field_set: bool = False,
+        shard: int = 0,
+        num_shards: int = -1,
     ) -> None:
+        if expect_single_field_set and num_shards != -1:
+            raise ValueError(
+                "At most one of shard_spec and expect_single_field_set may be set"
+                " on a TargetRootsToFieldSetsRequest instance"
+            )
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
         self.no_applicable_targets_behavior = no_applicable_targets_behavior
         self.expect_single_field_set = expect_single_field_set
+        self.shard = shard
+        self.num_shards = num_shards
+
+    def is_in_shard(self, key: str) -> bool:
+        return get_shard(key, self.num_shards) == self.shard
 
 
 @frozen_after_init
