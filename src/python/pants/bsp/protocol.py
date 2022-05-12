@@ -148,6 +148,10 @@ class BSPConnection:
             request = method_mapping.request_type.from_json_dict(params)
         except Exception:
             return _make_error_future(JsonRpcInvalidRequest())
+
+        # TODO: This should not be necessary: see https://github.com/pantsbuild/pants/issues/15435.
+        self._scheduler_session.new_run_id()
+
         workspace = Workspace(self._scheduler_session)
         params = Params(request, workspace)
         execution_request = self._scheduler_session.execution_request(
