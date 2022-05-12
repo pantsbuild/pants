@@ -14,9 +14,8 @@ from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel

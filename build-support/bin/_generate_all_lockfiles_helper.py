@@ -10,6 +10,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
+from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
@@ -114,6 +115,7 @@ AllTools = (
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
     DefaultTool.python(DockerfileParser, backend="pants.backend.docker"),
     DefaultTool.python(TwineSubsystem),
+    DefaultTool.python(ClangFormat, backend="pants.backend.experimental.cc.lint.clangformat"),
     # JVM
     DefaultTool.jvm(JUnit),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),
