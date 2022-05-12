@@ -157,11 +157,12 @@ def run_lint_rule(
     rule_runner: RuleRunner,
     *,
     lint_request_types: Sequence[Type[LintTargetsRequest]],
-    fmt_request_types: Sequence[Type[FmtRequest]] = [],
+    fmt_request_types: Sequence[Type[FmtRequest]] = (),
     targets: list[Target],
     run_files_linter: bool = False,
     batch_size: int = 128,
     only: list[str] | None = None,
+    skip_formatters: bool = False,
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
@@ -174,6 +175,7 @@ def run_lint_rule(
         LintSubsystem,
         batch_size=batch_size,
         only=only or [],
+        skip_formatters=skip_formatters,
     )
     specs_snapshot = SpecsSnapshot(rule_runner.make_snapshot_of_empty_files(["f.txt"]))
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
@@ -284,6 +286,24 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✓ FilesLinter succeeded.
 
         (One or more formatters failed. Run `./pants fmt` to fix.)
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=lint_request_types,
+        fmt_request_types=fmt_request_types,
+        targets=targets,
+        run_files_linter=True,
+        skip_formatters=True,
+    )
+    assert stderr == dedent(
+        """\
+
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+        ✓ SuccessfulLinter succeeded.
         """
     )
 
