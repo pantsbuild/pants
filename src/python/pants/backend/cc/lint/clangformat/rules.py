@@ -12,8 +12,7 @@ from pants.backend.cc.target_types import CCSourceField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.fs import Digest, MergeDigests
-from pants.engine.internals.native_engine import Snapshot
+from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
 from pants.engine.target import FieldSet
