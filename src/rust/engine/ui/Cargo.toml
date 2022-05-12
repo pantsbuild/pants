@@ -19,5 +19,5 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = 'stuhood/raw-messa
 stdio = { path = "../stdio" }
 terminal_size = "0.1.15"
 task_executor = { path = "../task_executor" }
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1.0", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }
