@@ -20,7 +20,7 @@ grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 futures = "0.3"
 hashing = { path = "../hashing" }
-libc = "0.2.112"
+libc = "0.2.125"
 log = "0.4"
 nails = "0.12"
 nix = "0.23"
