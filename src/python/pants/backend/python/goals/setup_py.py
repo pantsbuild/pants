@@ -19,6 +19,7 @@ from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
+    BuildBackendEnvVarsField,
     GenerateSetupField,
     LongDescriptionPathField,
     PythonDistributionEntryPointsField,
@@ -56,6 +57,7 @@ from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, Package
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -413,6 +415,11 @@ async def package_python_dist(
 
     wheel_config_settings = dist_tgt.get(WheelConfigSettingsField).value or FrozenDict()
     sdist_config_settings = dist_tgt.get(SDistConfigSettingsField).value or FrozenDict()
+    backend_env_vars = dist_tgt.get(BuildBackendEnvVarsField).value
+    if backend_env_vars:
+        extra_build_time_env = await Get(Environment, EnvironmentRequest(sorted(backend_env_vars)))
+    else:
+        extra_build_time_env = Environment()
 
     interpreter_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
@@ -485,6 +492,7 @@ async def package_python_dist(
             wheel_config_settings=wheel_config_settings,
             sdist_config_settings=sdist_config_settings,
             extra_build_time_requirements=extra_build_time_requirements,
+            extra_build_time_env=extra_build_time_env,
         ),
     )
     dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
