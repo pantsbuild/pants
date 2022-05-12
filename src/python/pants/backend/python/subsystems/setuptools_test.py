@@ -62,6 +62,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],
+                interpreter_constraints=["==2.7.*"],
                 provides=python_artifact(name="dist"),
             )
             """
@@ -71,10 +72,9 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_sources(name="lib", interpreter_constraints=["==2.7.*", "==3.5.*"])
             python_distribution(
                 name="dist",
-                dependencies=[":lib"],
+                interpreter_constraints=["==2.7.*", "==3.5.*"],
                 provides=python_artifact(name="dist"),
             )
             """
@@ -90,17 +90,15 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_sources(name="lib1", interpreter_constraints=["==2.7.*"])
             python_distribution(
                 name="dist1",
-                dependencies=[":lib1"],
+                interpreter_constraints=["==2.7.*"],
                 provides=python_artifact(name="dist"),
             )
 
-            python_sources(name="lib2", interpreter_constraints=["==3.5.*"])
             python_distribution(
                 name="dist2",
-                dependencies=[":lib2"],
+                interpreter_constraints=["==3.5.*"],
                 provides=python_artifact(name="dist"),
             )
             """
@@ -110,17 +108,15 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_sources(name="lib1", interpreter_constraints=["==2.7.*", "==3.5.*"])
             python_distribution(
                 name="dist1",
-                dependencies=[":lib1"],
+                interpreter_constraints=["==2.7.*", "==3.5.*"],
                 provides=python_artifact(name="dist"),
             )
 
-            python_sources(name="lib2", interpreter_constraints=[">=3.5"])
             python_distribution(
                 name="dist2",
-                dependencies=[":lib2"],
+                interpreter_constraints=[">=3.5"],
                 provides=python_artifact(name="dist"),
             )
             """
@@ -141,6 +137,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             python_distribution(
                 name="dist2",
                 dependencies=[":lib2"],
+                interpreter_constraints=["==2.7.*"],
                 provides=python_artifact(name="dist"),
             )
 
@@ -148,6 +145,7 @@ def test_setup_lockfile_interpreter_constraints() -> None:
             python_distribution(
                 name="dist3",
                 dependencies=[":lib3"],
+                interpreter_constraints=[">=3.6"],
                 provides=python_artifact(name="dist"),
             )
             """

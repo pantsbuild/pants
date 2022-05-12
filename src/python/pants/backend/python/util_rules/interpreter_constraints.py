@@ -176,9 +176,7 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     @classmethod
     def merge(cls, ics: Iterable[InterpreterConstraints]) -> InterpreterConstraints:
         return InterpreterConstraints(
-            cls.merge_constraint_sets(
-                tuple(str(requirement) for requirement in ic) for ic in ics if ic
-            )
+            cls.merge_constraint_sets(tuple(str(requirement) for requirement in ic) for ic in ics)
         )
 
     @classmethod
@@ -189,10 +187,20 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         For example, given `[["CPython>=2.7", "CPython<=3"], ["CPython==3.6.*"]]`, return
         `["CPython>=2.7,==3.6.*", "CPython<=3,==3.6.*"]`.
         """
+        # A sentinel to indicate a requirement that is impossible to satisfy (i.e., one that
+        # requires two different interpreter types).
+        impossible = Requirement.parse("IMPOSSIBLE")
+
         # Each element (a Set[ParsedConstraint]) will get ANDed. We use sets to deduplicate
         # identical top-level parsed constraint sets.
+
+        # First filter out any empty constraint_sets, as those represent "no constraints", i.e.,
+        # any interpreters are allowed, so omitting them has the logical effect of ANDing them with
+        # the others, without having to deal with the vacuous case below.
+        constraint_sets = [cs for cs in constraint_sets if cs]
         if not constraint_sets:
             return []
+
         parsed_constraint_sets: set[frozenset[Requirement]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
@@ -205,28 +213,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             merged_specs: set[tuple[str, str]] = set()
             expected_interpreter = parsed_constraints[0].project_name
             for parsed_constraint in parsed_constraints:
-                if parsed_constraint.project_name == expected_interpreter:
-                    merged_specs.update(parsed_constraint.specs)
-                    continue
-
-                def key_fn(req: Requirement):
-                    return req.project_name
-
-                # NB: We must pre-sort the data for itertools.groupby() to work properly.
-                sorted_constraints = sorted(parsed_constraints, key=key_fn)
-                attempted_interpreters = {
-                    interp: sorted(
-                        str(parsed_constraint) for parsed_constraint in parsed_constraints
-                    )
-                    for interp, parsed_constraints in itertools.groupby(
-                        sorted_constraints, key=key_fn
-                    )
-                }
-                raise ValueError(
-                    "Tried ANDing Python interpreter constraints with different interpreter "
-                    "types. Please use only one interpreter type. Got "
-                    f"{attempted_interpreters}."
-                )
+                if parsed_constraint.project_name != expected_interpreter:
+                    return impossible
+                merged_specs.update(parsed_constraint.specs)
 
             formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
             return Requirement.parse(f"{expected_interpreter}{formatted_specs}")
@@ -238,13 +227,22 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 return 0
             return -1 if req1.specs < req2.specs else 1
 
-        return sorted(
+        ored_constraints = sorted(
             {
                 and_constraints(constraints_product)
                 for constraints_product in itertools.product(*parsed_constraint_sets)
             },
             key=functools.cmp_to_key(cmp_constraints),
         )
+        ret = [cs for cs in ored_constraints if cs != impossible]
+        if not ret:
+            # There are no possible combinations.
+            attempted_str = " AND ".join(f"({' OR '.join(cs)})" for cs in constraint_sets)
+            raise ValueError(
+                "These interpreter constraints cannot be merged, as they require "
+                f"conflicting interpreter types: {attempted_str}"
+            )
+        return ret
 
     @classmethod
     def create_from_targets(

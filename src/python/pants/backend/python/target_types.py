@@ -1341,6 +1341,7 @@ class PythonDistribution(Target):
     alias = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
         PythonDistributionDependenciesField,
         PythonDistributionEntryPointsField,
         PythonProvidesField,
