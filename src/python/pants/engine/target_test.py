@@ -42,7 +42,7 @@ from pants.engine.target import (
     Target,
     ValidNumbers,
     parse_shard_spec,
-    targets_with_sources_types,
+    targets_with_sources_types, get_shard,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import FilesNotFoundBehavior
@@ -1398,3 +1398,8 @@ def test_parse_shard_spec_good(shard_spec, expected) -> None:
 def test_parse_shard_spec_bad(shard_spec) -> None:
     with pytest.raises(ValueError):
         parse_shard_spec(shard_spec)
+
+
+def test_get_shard() -> None:
+    assert get_shard("foo/bar/1", 2) == 0
+    assert get_shard("foo/bar/4", 2) == 1

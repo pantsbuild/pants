@@ -7,6 +7,7 @@ import functools
 import itertools
 import logging
 import os.path
+import zlib
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, NamedTuple, Sequence
@@ -1377,9 +1378,9 @@ async def find_valid_field_sets_for_target_roots(
 
     if request.num_shards > 0:
         sharded_targets_to_applicable_field_sets = {
-            key: value
-            for key, value in targets_to_applicable_field_sets.items()
-            if hash(key) % request.num_shards == request.shard
+            tgt: value
+            for tgt, value in targets_to_applicable_field_sets.items()
+            if request.is_in_shard(tgt.address.spec)
         }
         result = TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
     else:

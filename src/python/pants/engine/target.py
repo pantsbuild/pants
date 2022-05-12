@@ -10,6 +10,7 @@ import glob as glob_stdlib
 import itertools
 import logging
 import os.path
+import zlib
 from abc import ABC, ABCMeta, abstractmethod
 from collections import deque
 from dataclasses import dataclass
@@ -1371,6 +1372,13 @@ def parse_shard_spec(shard_spec: str) -> Tuple[int, int]:
     return shard, num_shards
 
 
+def get_shard(key: str, num_shards: int) -> int:
+    # Note: hash() is not guaranteed to be stable across processes, and adler32 is not
+    # well-distributed for small strings, so we use crc32. It's faster to compute than
+    # a cryptographic hash, which would be overkill.
+    return zlib.crc32(key.encode()) % num_shards
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSetsRequest(Generic[_FS]):
@@ -1400,6 +1408,9 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         self.no_applicable_targets_behavior = no_applicable_targets_behavior
         self.expect_single_field_set = expect_single_field_set
         self.shard, self.num_shards = parse_shard_spec(shard_spec)
+
+    def is_in_shard(self, key: str) -> bool:
+        return get_shard(key, self.num_shards) == self.shard
 
 
 @frozen_after_init
