@@ -355,6 +355,26 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
+    shard = StrOption(
+        "--shard",
+        default="",
+        help=softwrap(
+            """
+            A shard specification of the form "k/N", where N is a positive integer and k is a
+            non-negative integer less than N.
+
+            If set, the request input targets will be partitioned into N disjoint subsets of
+            roughly equal size, and only the k'th subset will be used, with all others discarded.
+
+            Useful for splitting large numbers of test files across multiple machines in CI.
+            For example, you can run three shards with --shard=0/3, --shard=1/3, --shard=2/3.
+
+            Note that the shards are roughly equal in size as measured by number of files.
+            No attempt is made to consider the size of different files, the time they have
+            taken to run in the past, or other such sophisticated measures.
+            """
+        ),
+    )
 
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
@@ -406,6 +426,7 @@ async def run_tests(
             TestFieldSet,
             goal_description=f"the `{test_subsystem.name}` goal",
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
+            shard_spec=test_subsystem.shard,
         ),
     )
     results = await MultiGet(

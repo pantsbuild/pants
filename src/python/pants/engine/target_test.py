@@ -41,6 +41,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     ValidNumbers,
+    parse_shard_spec,
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
@@ -1370,3 +1371,30 @@ def test_overrides_field_normalization() -> None:
                 (Paths(("dir/foo.ext", "dir/bar.ext"), ()), PathGlobs([]), tgt1_override),
             ],
         )
+
+
+# -----------------------------------------------------------------------------------------------
+# Test utility functions
+# -----------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "shard_spec,expected",
+    (
+        ("0/4", (0, 4)),
+        ("1/4", (1, 4)),
+        ("2/4", (2, 4)),
+        ("3/4", (3, 4)),
+        ("0/2", (0, 2)),
+        ("1/2", (1, 2)),
+        ("0/1", (0, 1)),
+    ),
+)
+def test_parse_shard_spec_good(shard_spec, expected) -> None:
+    assert parse_shard_spec(shard_spec) == expected
+
+
+@pytest.mark.parametrize("shard_spec", ("0/0", "1/1", "4/4", "5/4", "-1/4", "foo/4"))
+def test_parse_shard_spec_bad(shard_spec) -> None:
+    with pytest.raises(ValueError):
+        parse_shard_spec(shard_spec)

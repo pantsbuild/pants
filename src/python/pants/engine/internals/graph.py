@@ -1375,7 +1375,16 @@ async def find_valid_field_sets_for_target_roots(
         ):
             logger.warning(str(no_applicable_exception))
 
-    result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
+    if request.num_shards > 0:
+        sharded_targets_to_applicable_field_sets = {
+            key: value
+            for key, value in targets_to_applicable_field_sets.items()
+            if hash(key) % request.num_shards == request.shard
+        }
+        result = TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
+    else:
+        result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
+
     if not request.expect_single_field_set:
         return result
     if len(result.targets) > 1:
