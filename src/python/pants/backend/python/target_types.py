@@ -1303,6 +1303,19 @@ class SDistConfigSettingsField(ConfigSettingsField):
     help = "PEP-517 config settings to pass to the build backend when building an sdist."
 
 
+class BuildBackendEnvVarsField(StringSequenceField):
+    alias = "env_vars"
+    required = False
+    help = softwrap(
+        """
+        Environment variables to set when running the PEP-517 build backend.
+
+        Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+        or just `ENV_VAR` to copy the value from Pants's own environment.
+        """
+    )
+
+
 class GenerateSetupField(TriBoolField):
     alias = "generate_setup"
     required = False
@@ -1350,6 +1363,7 @@ class PythonDistribution(Target):
         SDistField,
         WheelConfigSettingsField,
         SDistConfigSettingsField,
+        BuildBackendEnvVarsField,
         LongDescriptionPathField,
     )
     help = softwrap(

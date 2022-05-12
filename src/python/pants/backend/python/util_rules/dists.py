@@ -123,6 +123,7 @@ class DistBuildRequest:
     sdist_config_settings: FrozenDict[str, tuple[str, ...]] | None = None
 
     extra_build_time_requirements: tuple[Pex, ...] = tuple()
+    extra_build_time_env: Mapping[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -214,6 +215,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
     merged_digest = await Get(Digest, MergeDigests((request.input, backend_shim_digest)))
 
     extra_env = {
+        **(request.extra_build_time_env or {}),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(request.build_time_source_roots),
     }
     if python_setup.macos_big_sur_compatibility and is_macos_big_sur():
