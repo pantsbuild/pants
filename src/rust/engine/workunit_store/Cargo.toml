@@ -23,5 +23,5 @@ tokio = { version = "1.16", features = ["rt", "sync"] }
 
 [dev-dependencies]
 futures = "0.3"
-internment = "0.6"
+internment = "0.7"
 tokio = { version = "1.16", features = ["macros"] }

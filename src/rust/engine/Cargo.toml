@@ -125,7 +125,7 @@ graph = { path = "graph" }
 grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
 indexmap = "1.8"
-internment = "0.6"
+internment = "0.7"
 itertools = "0.10"
 lazy_static = "1"
 libc = "0.2.125"
