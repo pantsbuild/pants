@@ -51,16 +51,22 @@ async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSet
     # the machine.
     tool_interpreter_constraints = black.interpreter_constraints
     if black.options.is_default("interpreter_constraints"):
-        distinct_constraints = InterpreterConstraints.group_field_sets_by_constraints(
-            request.field_sets, python_setup
-        ).keys()
-        for constraints in distinct_constraints:
-            if constraints.requires_python38_or_newer(python_setup.interpreter_universe):
-                # We've found at least one constraint that requires 3.8, so we know we must run
-                # black on 3.8+, and this constraint is as good as any (in the sense that we
-                # expect a compatible interpreter to exist).
-                tool_interpreter_constraints = constraints
-                break
+        try:
+            # Don't compute this unless we have to, since it might fail.
+            all_interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
+                (field_set.interpreter_constraints for field_set in request.field_sets),
+                python_setup,
+            )
+        except ValueError:
+            raise ValueError(
+                "Could not compute an interpreter to run Black on, due to conflicting requirements "
+                "in the repo.\nPlease set `[black].interpreter_constraints` explicitly in "
+                "pants.toml to a suitable interpreter."
+            )
+        if all_interpreter_constraints.requires_python38_or_newer(
+            python_setup.interpreter_universe
+        ):
+            tool_interpreter_constraints = all_interpreter_constraints
 
     black_pex_get = Get(
         VenvPex,
