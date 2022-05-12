@@ -6,10 +6,17 @@ from __future__ import annotations
 import os
 from typing import Iterable
 
+from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
+from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
+from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
@@ -32,6 +39,11 @@ class ClangFormat(PythonToolBase):
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--version")
 
+    register_lockfile = True
+    default_lockfile_resource = ("pants.backend.cc.lint.clangformat", "clangformat.lock")
+    default_lockfile_path = "src/python/pants/backend/cc/lint/clangformat/clangformat.lock"
+    default_lockfile_url = git_url(default_lockfile_path)
+
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         """clang-format will use the closest configuration file to the file currently being
         formatted, so add all of them."""
@@ -44,3 +56,24 @@ class ClangFormat(PythonToolBase):
             discovery=True,
             check_existence=check_existence,
         )
+
+
+class ClangFormatLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = ClangFormat.options_scope
+
+
+@rule
+def setup_clangformat_lockfile(
+    _: ClangFormatLockfileSentinel, clangformat: ClangFormat, python_setup: PythonSetup
+) -> GeneratePythonLockfile:
+    return GeneratePythonLockfile.from_tool(
+        clangformat, use_pex=python_setup.generate_lockfiles_with_pex
+    )
+
+
+def rules() -> Iterable[Rule | UnionRule]:
+    return (
+        *collect_rules(),
+        *lockfile.rules(),
+        UnionRule(GenerateToolLockfileSentinel, ClangFormatLockfileSentinel),
+    )
