@@ -7,6 +7,7 @@ import os
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -26,7 +27,8 @@ class ClangFormat(PythonToolBase):
     help = softwrap(
         """
         The clang-format utility for formatting C/C++ (and others) code
-        (https://clang.llvm.org/docs/ClangFormat.html).
+        (https://clang.llvm.org/docs/ClangFormat.html). The clang-format binaries
+        are retrieved from PyPi (https://pypi.org/project/clang-format/).
         """
     )
 
@@ -71,9 +73,21 @@ def setup_clangformat_lockfile(
     )
 
 
+class ClangFormatExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+def clangformat_export(_: ClangFormatExportSentinel, clangformat: ClangFormat) -> ExportPythonTool:
+    return ExportPythonTool(
+        resolve_name=clangformat.options_scope, pex_request=clangformat.to_pex_request()
+    )
+
+
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, ClangFormatLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, ClangFormatExportSentinel),
     )

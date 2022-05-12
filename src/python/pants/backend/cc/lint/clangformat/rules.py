@@ -40,17 +40,6 @@ async def clangformat_fmt(request: ClangFormatRequest, clangformat: ClangFormat)
     if clangformat.skip:
         return FmtResult.skip(formatter_name=request.name)
 
-    clangformat_pex_get = Get(
-        Pex,
-        PexRequest(
-            output_filename="clangformat.pex",
-            internal_only=True,
-            requirements=clangformat.pex_requirements(),
-            interpreter_constraints=clangformat.interpreter_constraints,
-            main=clangformat.main,
-        ),
-    )
-
     # Look for any/all of the clang-format configuration files (recurse sub-dirs)
     config_files_get = Get(
         ConfigFiles,
@@ -58,7 +47,9 @@ async def clangformat_fmt(request: ClangFormatRequest, clangformat: ClangFormat)
         clangformat.config_request(request.snapshot.dirs),
     )
 
-    clangformat_pex, config_files = await MultiGet(clangformat_pex_get, config_files_get)
+    clangformat_pex, config_files = await MultiGet(
+        Get(Pex, PexRequest, clangformat.to_pex_request()), config_files_get
+    )
 
     # Merge source files, config files, and clang-format pex process
     input_digest = await Get(
