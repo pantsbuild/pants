@@ -1353,11 +1353,12 @@ class NoApplicableTargetsBehavior(Enum):
     error = "error"
 
 
-def parse_shard_spec(shard_spec: str) -> Tuple[int, int]:
+def parse_shard_spec(shard_spec: str, origin: str = "") -> Tuple[int, int]:
     def invalid():
+        origin_str = f" from {origin}" if origin else ""
         return ValueError(
-            f'Invalid shard specification {shard_spec}. Use a string of the form "k/N" where '
-            "k and N are integers, and 0 <= k < N ."
+            f"Invalid shard specification {shard_spec}{origin_str}. Use a string of the form "
+            '"k/N" where k and N are integers, and 0 <= k < N .'
         )
 
     if not shard_spec:
@@ -1396,9 +1397,10 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
         expect_single_field_set: bool = False,
-        shard_spec: str = "",
+        shard: int = 0,
+        num_shards: int = -1,
     ) -> None:
-        if expect_single_field_set and shard_spec:
+        if expect_single_field_set and num_shards != -1:
             raise ValueError(
                 "At most one of shard_spec and expect_single_field_set may be set"
                 " on a TargetRootsToFieldSetsRequest instance"
@@ -1407,7 +1409,8 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         self.goal_description = goal_description
         self.no_applicable_targets_behavior = no_applicable_targets_behavior
         self.expect_single_field_set = expect_single_field_set
-        self.shard, self.num_shards = parse_shard_spec(shard_spec)
+        self.shard = shard
+        self.num_shards = num_shards
 
     def is_in_shard(self, key: str) -> bool:
         return get_shard(key, self.num_shards) == self.shard

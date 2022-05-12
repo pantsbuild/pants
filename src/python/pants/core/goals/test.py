@@ -39,6 +39,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
+    parse_shard_spec,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption, EnumOption, StrListOption, StrOption
@@ -363,8 +364,9 @@ class TestSubsystem(GoalSubsystem):
             A shard specification of the form "k/N", where N is a positive integer and k is a
             non-negative integer less than N.
 
-            If set, the request input targets will be partitioned into N disjoint subsets of
-            roughly equal size, and only the k'th subset will be used, with all others discarded.
+            If set, the request input targets will be deterministically partitioned into N disjoint
+            subsets of roughly equal size, and only the k'th subset will be used, with all others
+            discarded.
 
             Useful for splitting large numbers of test files across multiple machines in CI.
             For example, you can run three shards with --shard=0/3, --shard=1/3, --shard=2/3.
@@ -420,13 +422,15 @@ async def run_tests(
                 exit_code = debug_result.exit_code
         return Test(exit_code)
 
+    shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
             goal_description=f"the `{test_subsystem.name}` goal",
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
-            shard_spec=test_subsystem.shard,
+            shard=shard,
+            num_shards=num_shards,
         ),
     )
     results = await MultiGet(
