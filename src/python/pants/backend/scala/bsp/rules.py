@@ -61,7 +61,7 @@ from pants.jvm.bsp.resources import _jvm_bsp_resources
 from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import JvmBuildTarget, MavenDependencyModule, MavenDependencyModuleArtifact
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
-from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest
+from pants.jvm.jdk_rules import DefaultJdk, JdkEnvironment, JdkRequest
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import (
     CoursierLockfileEntry,
@@ -72,6 +72,7 @@ from pants.jvm.resolve.coursier_fetch import (
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactFieldSet, JvmJdkField, JvmResolveField
+from pants.util.logging import LogLevel
 
 LANGUAGE_ID = "scala"
 
@@ -190,7 +191,17 @@ async def bsp_resolve_scala_metadata(
     )
 
     #
-    # Extract the JDK paths from an lawful-evil process so we can supply it to the IDE
+    # Extract the JDK paths from an lawful-evil process so we can supply it to the IDE.
+    #
+    # Why lawful-evil?
+    # This script relies on implementation details of the Pants JVM execution environment,
+    # namely that the Coursier Archive Cache (i.e. where JDKs are extracted to after download)
+    # is stored into a predictable location on disk and symlinked into the sandbox on process
+    # startup. The script reads the symlink of the cache directory, and outputs the linked
+    # location of the JDK (according to Coursier), and we use that to calculate the permanent
+    # location of the JDK.
+    #
+    # Please don't do anything like this except as a last resort.
     #
 
     # The maximum JDK version will be compatible with all the specified targets
@@ -201,6 +212,11 @@ async def bsp_resolve_scala_metadata(
         Get(JdkEnvironment, JdkRequest, jdk_request),
         Get(ReadlinkBinary, ReadlinkBinaryRequest()),
     )
+
+    if any(i.version == DefaultJdk.SYSTEM for i in jdk_requests):
+        system_jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.SYSTEM)
+        if system_jdk.jre_major_version > jdk.jre_major_version:
+            jdk = system_jdk
 
     cmd = "leak_paths.sh"
     leak_jdk_sandbox_paths = textwrap.dedent(
@@ -235,15 +251,20 @@ async def bsp_resolve_scala_metadata(
             immutable_input_digests=jdk.immutable_input_digests,
             env=jdk.env,
             use_nailgun=(),
-            description="Leak JDK cache paths for BSP",
+            description="Report JDK cache paths for BSP",
             append_only_caches=jdk.append_only_caches,
+            level=LogLevel.TRACE,
         ),
     )
 
     cache_dir, jdk_home = leaked_paths.stdout.decode().strip().split("\n")
 
-    _, _, suffix = jdk_home.partition(jdk.coursier.cache_dir)
-    coursier_java_home = cache_dir + suffix
+    _, sep, suffix = jdk_home.partition(jdk.coursier.cache_dir)
+    if sep:
+        coursier_java_home = cache_dir + suffix
+    else:
+        # Partition failed. Probably a system JDK instead
+        coursier_java_home = jdk_home
 
     scala_jar_uris = tuple(
         build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
@@ -251,7 +272,8 @@ async def bsp_resolve_scala_metadata(
     )
 
     jvm_build_target = JvmBuildTarget(
-        Path(coursier_java_home).as_uri(), f"1.{jdk.jre_major_version}"
+        java_home=Path(coursier_java_home).as_uri(), 
+        java_version=f"1.{jdk.jre_major_version}",
     )
 
     return BSPBuildTargetsMetadataResult(
@@ -272,7 +294,7 @@ def _jdk_request_sort_key(
 ) -> Callable[[JdkRequest,], tuple[int, ...]]:
     def sort_key_function(request: JdkRequest) -> tuple[int, ...]:
         if request == JdkRequest.SYSTEM:
-            raise ValueError("Pants BSP does not currently support system JDKs")
+            return (-1,)
 
         version_str = request.version if isinstance(request.version, str) else jvm.jdk
         _, version = version_str.split(":")
