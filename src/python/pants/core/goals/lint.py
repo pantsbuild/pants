@@ -26,13 +26,13 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import IntOption, StrListOption
+from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import strip_v2_chroot_path
+from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +193,18 @@ class LintSubsystem(GoalSubsystem):
         "--only",
         help=only_option_help("lint", "linter", "flake8", "shellcheck"),
     )
+    skip_formatters = BoolOption(
+        "--skip-formatters",
+        default=False,
+        help=softwrap(
+            f"""
+            If true, skip running all formatters in check-only mode.
+
+            FYI: when running `{bin_name()} fmt lint ::`, there should be little performance
+            benefit to using this flag. Pants will reuse the results from `fmt` when running `lint`.
+            """
+        ),
+    )
     batch_size = IntOption(
         "--batch-size",
         advanced=True,
@@ -312,27 +324,29 @@ async def lint(
         request_type(batch) for request_type, batch in batch_by_type(lint_target_request_types)
     )
 
-    batched_fmt_request_pairs = batch_by_type(fmt_target_request_types)
-    all_fmt_source_batches = await MultiGet(
-        Get(
-            SourceFiles,
-            SourceFilesRequest(
-                getattr(field_set, "sources", getattr(field_set, "source", None))
-                for field_set in batch
-            ),
+    fmt_requests: Iterable[FmtRequest] = ()
+    if not lint_subsystem.skip_formatters:
+        batched_fmt_request_pairs = batch_by_type(fmt_target_request_types)
+        all_fmt_source_batches = await MultiGet(
+            Get(
+                SourceFiles,
+                SourceFilesRequest(
+                    getattr(field_set, "sources", getattr(field_set, "source", None))
+                    for field_set in batch
+                ),
+            )
+            for _, batch in batched_fmt_request_pairs
         )
-        for _, batch in batched_fmt_request_pairs
-    )
+        fmt_requests = (
+            request_type(
+                batch,
+                snapshot=source_files_snapshot.snapshot,
+            )
+            for (request_type, batch), source_files_snapshot in zip(
+                batched_fmt_request_pairs, all_fmt_source_batches
+            )
+        )
 
-    fmt_requests = (
-        request_type(
-            batch,
-            snapshot=source_files_snapshot.snapshot,
-        )
-        for (request_type, batch), source_files_snapshot in zip(
-            batched_fmt_request_pairs, all_fmt_source_batches
-        )
-    )
     file_requests = (
         tuple(request_type(specs_snapshot.snapshot.files) for request_type in file_request_types)
         if specs_snapshot.snapshot.files
