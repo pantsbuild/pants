@@ -7,7 +7,6 @@ import functools
 import itertools
 import logging
 import os.path
-import zlib
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, NamedTuple, Sequence

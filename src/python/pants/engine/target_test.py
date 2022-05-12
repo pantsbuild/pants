@@ -41,8 +41,9 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     ValidNumbers,
+    get_shard,
     parse_shard_spec,
-    targets_with_sources_types, get_shard,
+    targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import FilesNotFoundBehavior
