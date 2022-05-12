@@ -18,7 +18,7 @@ from pants.bsp.util_rules.targets import BSPBuildTargetInternal, BSPCompileReque
 from pants.engine.fs import Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import _uncacheable_rule, collect_rules
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule
 from pants.engine.target import FieldSet, Targets
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
@@ -46,7 +46,7 @@ class CompileOneBSPTargetRequest:
     arguments: tuple[str, ...] | None = ()
 
 
-@_uncacheable_rule
+@rule
 async def compile_bsp_target(
     request: CompileOneBSPTargetRequest,
     bsp_context: BSPContext,

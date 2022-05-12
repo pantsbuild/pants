@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from pants.bsp.context import BSPContext
 from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode, TaskId
+from pants.bsp.spec.log import LogMessageParams, MessageType
 from pants.bsp.spec.task import TaskProgressParams
 from pants.bsp.util_rules.targets import BSPCompileRequest, BSPCompileResult
 from pants.engine.addresses import Addresses
@@ -20,6 +21,7 @@ from pants.jvm.compile import (
     ClasspathEntry,
     ClasspathEntryRequest,
     ClasspathEntryRequestFactory,
+    CompileResult,
     FallibleClasspathEntry,
 )
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -33,7 +35,11 @@ def jvm_classes_directory(target_id: BuildTargetIdentifier) -> str:
 
 @dataclass(frozen=True)
 class BSPClasspathEntryRequest:
-    """A wrapper around a `ClasspathEntryRequest` which notifies the BSP client on completion."""
+    """A wrapper around a `ClasspathEntryRequest` which notifies the BSP client on completion.
+
+    TODO: Because this struct contains a `task_id`, messages will re-render in every run, even
+    though the underlying computation does not re-run. See #15426 for an alternative.
+    """
 
     request: ClasspathEntryRequest
     task_id: TaskId
@@ -52,6 +58,14 @@ async def notify_for_classpath_entry(
             message=entry.message(),
         )
     )
+    if entry.result == CompileResult.FAILED:
+        context.notify_client(
+            LogMessageParams(
+                type_=MessageType.ERROR,
+                message=entry.message(),
+                task=request.task_id,
+            )
+        )
     return entry
 
 
