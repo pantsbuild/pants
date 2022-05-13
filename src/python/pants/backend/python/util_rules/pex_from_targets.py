@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -44,6 +43,7 @@ from pants.backend.python.util_rules.python_sources import (
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
+from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
@@ -52,7 +52,7 @@ from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequ
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import bullet_list, path_safe
+from pants.util.strutil import path_safe
 
 logger = logging.getLogger(__name__)
 
@@ -205,41 +205,16 @@ class ChosenPythonResolveRequest:
     addresses: Addresses
 
 
-# Note: Inspired by `coursier_fetch.py`.
-class NoCompatibleResolveException(Exception):
-    """No compatible resolve could be found for a set of targets."""
-
-    def __init__(
-        self,
-        python_setup: PythonSetup,
-        msg_prefix: str,
-        relevant_targets: Iterable[Target],
-        msg_suffix: str = "",
-    ) -> None:
-        resolves_to_addresses = defaultdict(list)
-        for tgt in relevant_targets:
-            if tgt.has_field(PythonResolveField):
-                resolve = tgt[PythonResolveField].normalized_value(python_setup)
-                resolves_to_addresses[resolve].append(tgt.address.spec)
-
-        formatted_resolve_lists = "\n\n".join(
-            f"{resolve}:\n{bullet_list(sorted(addresses))}"
-            for resolve, addresses in sorted(resolves_to_addresses.items())
-        )
-        super().__init__(
-            f"{msg_prefix}:\n\n"
-            f"{formatted_resolve_lists}\n\n"
-            "Targets which will be used together must all have the same resolve (from the "
-            f"[resolve]({doc_url('reference-python_test#coderesolvecode')}) "
-            "field) in common." + (f"\n\n{msg_suffix}" if msg_suffix else "")
-        )
-
-
 @rule
 async def choose_python_resolve(
     request: ChosenPythonResolveRequest, python_setup: PythonSetup
 ) -> ChosenPythonResolve:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
+
+    def maybe_get_resolve(t: Target) -> str | None:
+        if not t.has_field(PythonResolveField):
+            return None
+        return t[PythonResolveField].normalized_value(python_setup)
 
     # First, choose the resolve by inspecting the root targets.
     root_resolves = {
@@ -249,10 +224,11 @@ async def choose_python_resolve(
     }
     if root_resolves:
         if len(root_resolves) > 1:
-            raise NoCompatibleResolveException(
-                python_setup,
-                "The input targets did not have a resolve in common",
+            raise NoCompatibleResolveException.bad_input_roots(
                 transitive_targets.roots,
+                maybe_get_resolve=maybe_get_resolve,
+                doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+                workaround=None,
             )
 
         chosen_resolve = next(iter(root_resolves))
@@ -263,14 +239,12 @@ async def choose_python_resolve(
                 tgt.has_field(PythonResolveField)
                 and tgt[PythonResolveField].normalized_value(python_setup) != chosen_resolve
             ):
-                plural = ("s", "their") if len(transitive_targets.roots) > 1 else ("", "its")
-                raise NoCompatibleResolveException(
-                    python_setup,
-                    (
-                        f"The resolve chosen for the root target{plural[0]} was {chosen_resolve}, but "
-                        f"some of {plural[1]} dependencies are not compatible with that resolve"
-                    ),
-                    transitive_targets.closure,
+                raise NoCompatibleResolveException.bad_dependencies(
+                    maybe_get_resolve=maybe_get_resolve,
+                    doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+                    root_resolve=chosen_resolve,
+                    root_targets=transitive_targets.roots,
+                    dependencies=transitive_targets.dependencies,
                 )
 
     else:
