@@ -13,6 +13,13 @@ from pants.backend.go.util_rules.assembly import (
     AssemblyPreCompilationRequest,
     FallibleAssemblyPreCompilation,
 )
+from pants.backend.go.util_rules.coverage import (
+    ApplyCodeCoverageRequest,
+    ApplyCodeCoverageResult,
+    BuiltGoPackageCodeCoverageMetadata,
+    FileCodeCoverageMetadata,
+    GoCoverageConfig,
+)
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
@@ -39,6 +46,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         minimum_go_version: str | None,
         for_tests: bool = False,
         embed_config: EmbedConfig | None = None,
+        coverage_config: GoCoverageConfig | None = None,
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -55,6 +63,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.minimum_go_version = minimum_go_version
         self.for_tests = for_tests
         self.embed_config = embed_config
+        self.coverage_config = coverage_config
         self._hashcode = hash(
             (
                 self.import_path,
@@ -66,6 +75,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.minimum_go_version,
                 self.for_tests,
                 self.embed_config,
+                self.coverage_config,
             )
         )
 
@@ -82,7 +92,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "
-            f"embed_config={self.embed_config}"
+            f"embed_config={self.embed_config}, "
+            f"coverage_config={self.coverage_config}"
             ")"
         )
 
@@ -102,6 +113,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.minimum_go_version == other.minimum_go_version
             and self.for_tests == other.for_tests
             and self.embed_config == other.embed_config
+            and self.coverage_config == other.coverage_config
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -184,6 +196,7 @@ class BuiltGoPackage:
 
     digest: Digest
     import_paths_to_pkg_a_files: FrozenDict[str, str]
+    coverage_metadata: BuiltGoPackageCodeCoverageMetadata | None = None
 
 
 @dataclass(frozen=True)
@@ -236,9 +249,34 @@ async def build_go_package(
         Get(GoCompileActionIdResult, GoCompileActionIdRequest(request)),
     )
 
+    # If coverage is enabled for this package, then replace the Go source files with versions modified to
+    # contain coverage code.
+    # Note: When cgo is implemented, coverage should be applied *after* cgo processing.
+    go_file_names = request.go_file_names
+    go_files_digest = request.digest
+    cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...] | None = None
+    if request.coverage_config:
+        coverage_result = await Get(
+            ApplyCodeCoverageResult,
+            ApplyCodeCoverageRequest(
+                digest=request.digest,
+                dir_path=request.dir_path,
+                go_files=go_file_names,
+                cover_mode=request.coverage_config.cover_mode,
+                import_path=request.import_path,
+            ),
+        )
+        go_files_digest = await Get(Digest, MergeDigests([go_files_digest, coverage_result.digest]))
+        cover_file_metadatas = coverage_result.cover_file_metadatas
+        new_go_file_names = list(go_file_names)
+        for cover_file_metadata in cover_file_metadatas:
+            idx = new_go_file_names.index(cover_file_metadata.go_file)
+            new_go_file_names[idx] = cover_file_metadata.cover_go_file
+        go_file_names = tuple(new_go_file_names)
+
     input_digest = await Get(
         Digest,
-        MergeDigests([merged_deps_digest, import_config.digest, embedcfg.digest, request.digest]),
+        MergeDigests([merged_deps_digest, import_config.digest, embedcfg.digest, go_files_digest]),
     )
 
     assembly_digests = None
@@ -298,7 +336,7 @@ async def build_go_package(
 
     relativized_sources = (
         f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}"
-        for name in request.go_file_names
+        for name in go_file_names
     )
     compile_args.extend(["--", *relativized_sources])
     compile_result = await Get(
@@ -347,7 +385,20 @@ async def build_go_package(
     output_digest = await Get(Digest, AddPrefix(compilation_digest, path_prefix))
     merged_result_digest = await Get(Digest, MergeDigests([*dep_digests, output_digest]))
 
-    output = BuiltGoPackage(merged_result_digest, FrozenDict(import_paths_to_pkg_a_files))
+    coverage_metadata = (
+        BuiltGoPackageCodeCoverageMetadata(
+            import_path=request.import_path,
+            cover_file_metadatas=cover_file_metadatas,
+        )
+        if cover_file_metadatas
+        else None
+    )
+
+    output = BuiltGoPackage(
+        digest=merged_result_digest,
+        import_paths_to_pkg_a_files=FrozenDict(import_paths_to_pkg_a_files),
+        coverage_metadata=coverage_metadata,
+    )
     return FallibleBuiltGoPackage(output, request.import_path)
 
 

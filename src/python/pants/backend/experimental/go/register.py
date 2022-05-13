@@ -25,7 +25,7 @@ from pants.backend.go.util_rules import (
     pkg_analyzer,
     sdk,
     tests_analysis,
-    third_party_pkg,
+    third_party_pkg, coverage, coverage_output,
 )
 
 
@@ -39,6 +39,8 @@ def rules():
         *build_pkg.rules(),
         *build_pkg_target.rules(),
         *check.rules(),
+        *coverage.rules(),
+        *coverage_output.rules(),
         *third_party_pkg.rules(),
         *go_bootstrap.rules(),
         *goroot.rules(),

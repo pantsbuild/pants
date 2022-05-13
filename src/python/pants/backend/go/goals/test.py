@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Sequence
@@ -16,10 +17,17 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
+    BuiltGoPackage,
     FallibleBuildGoPackageRequest,
     FallibleBuiltGoPackage,
 )
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
+from pants.backend.go.util_rules.coverage import (
+    GenerateCoverageSetupCodeRequest,
+    GenerateCoverageSetupCodeResult,
+    GoCoverageConfig,
+    GoCoverageData,
+)
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FallibleFirstPartyPkgDigest,
@@ -41,12 +49,15 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+_logger = logging.getLogger(__name__)
 
 # Known options to Go test binaries. Only these options will be transformed by `transform_test_args`.
 # The bool value represents whether the option is expected to take a value or not.
@@ -189,31 +200,41 @@ async def run_go_tests(
     testmain = await Get(
         GeneratedTestMain,
         GenerateTestMainRequest(
-            pkg_digest.digest,
-            FrozenOrderedSet(
+            digest=pkg_digest.digest,
+            test_paths=FrozenOrderedSet(
                 os.path.join(".", pkg_analysis.dir_path, name)
                 for name in pkg_analysis.test_go_files
             ),
-            FrozenOrderedSet(
+            xtest_paths=FrozenOrderedSet(
                 os.path.join(".", pkg_analysis.dir_path, name)
                 for name in pkg_analysis.xtest_go_files
             ),
-            import_path,
-            field_set.address,
+            import_path=import_path,
+            register_cover=test_subsystem.use_coverage,
+            address=field_set.address,
         ),
     )
 
+    _logger.info(f"testmain = {testmain}")
+
     if testmain.failed_exit_code_and_stderr is not None:
+        _logger.info("FAILURE!")
         _exit_code, _stderr = testmain.failed_exit_code_and_stderr
         return compilation_failure(_exit_code, None, _stderr)
 
     if not testmain.has_tests and not testmain.has_xtests:
         return TestResult.skip(field_set.address, output_setting=test_subsystem.output)
 
+    coverage_config: GoCoverageConfig | None = None
+    if test_subsystem.use_coverage:
+        coverage_config = GoCoverageConfig(cover_mode=go_test_subsystem.coverage_mode)
+
     # Construct the build request for the package under test.
     maybe_test_pkg_build_request = await Get(
         FallibleBuildGoPackageRequest,
-        BuildGoPackageTargetRequest(field_set.address, for_tests=True),
+        BuildGoPackageTargetRequest(
+            field_set.address, for_tests=True, coverage_config=coverage_config
+        ),
     )
     if maybe_test_pkg_build_request.request is None:
         assert maybe_test_pkg_build_request.stderr is not None
@@ -222,7 +243,15 @@ async def run_go_tests(
         )
     test_pkg_build_request = maybe_test_pkg_build_request.request
 
+    # TODO: Eventually support adding coverage to non-test packages. Those other packages will need to be
+    # added to `main_direct_deps` and to the coverage setup in the testmain.
     main_direct_deps = [test_pkg_build_request]
+
+    # Build the `main_direct_deps` when in coverage mode so we can obtain coverage variables.
+    # TODO: Consider a way to generate coverage variables without building.
+    test_pkg_built_package = await Get(
+        BuiltGoPackage, BuildGoPackageRequest, test_pkg_build_request
+    )
 
     if testmain.has_xtests:
         # Build a synthetic package for xtests where the import path is the same as the package under test
@@ -251,17 +280,38 @@ async def run_go_tests(
             direct_dependencies=tuple(direct_dependencies),
             minimum_go_version=pkg_analysis.minimum_go_version,
             embed_config=pkg_digest.xtest_embed_config,
+            coverage_config=coverage_config,
         )
         main_direct_deps.append(xtest_pkg_build_request)
+
+    # Generate coverage setup for the test main if coverage is enabled.
+    coverage_setup_digest = EMPTY_DIGEST
+    coverage_setup_files = []
+    if coverage_config is not None:
+        test_pkg_coverage_metadata = test_pkg_built_package.coverage_metadata
+        assert test_pkg_coverage_metadata is not None
+        coverage_setup_result = await Get(
+            GenerateCoverageSetupCodeResult,
+            GenerateCoverageSetupCodeRequest(
+                packages=FrozenOrderedSet([test_pkg_coverage_metadata]),
+                cover_mode=go_test_subsystem.coverage_mode,
+            ),
+        )
+        coverage_setup_digest = coverage_setup_result.digest
+        coverage_setup_files = [GenerateCoverageSetupCodeResult.PATH]
+
+    testmain_input_digest = await Get(
+        Digest, MergeDigests([testmain.digest, coverage_setup_digest])
+    )
 
     # Generate the synthetic main package which imports the test and/or xtest packages.
     maybe_built_main_pkg = await Get(
         FallibleBuiltGoPackage,
         BuildGoPackageRequest(
             import_path="main",
-            digest=testmain.digest,
+            digest=testmain_input_digest,
             dir_path="",
-            go_file_names=(GeneratedTestMain.TEST_MAIN_FILE,),
+            go_file_names=(GeneratedTestMain.TEST_MAIN_FILE, *coverage_setup_files),
             s_file_names=(),
             direct_dependencies=tuple(main_direct_deps),
             minimum_go_version=pkg_analysis.minimum_go_version,
@@ -326,25 +376,48 @@ async def run_go_tests(
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
 
+    maybe_cover_args = []
+    maybe_cover_output_file = []
+    if test_subsystem.use_coverage:
+        maybe_cover_args = ["-test.coverprofile=cover.out"]
+        maybe_cover_output_file = ["cover.out"]
+
+    test_run_args = [
+        "./test_runner",
+        *transform_test_args(
+            go_test_subsystem.args,
+            field_set.timeout.calculate_from_global_options(test_subsystem),
+        ),
+        *maybe_cover_args,
+    ]
+
     result = await Get(
         FallibleProcessResult,
         Process(
-            [
-                "./test_runner",
-                *transform_test_args(
-                    go_test_subsystem.args,
-                    field_set.timeout.calculate_from_global_options(test_subsystem),
-                ),
-            ],
+            argv=test_run_args,
             env=extra_env,
             input_digest=test_input_digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
             working_directory=working_dir,
+            output_files=(*maybe_cover_output_file,),
             level=LogLevel.DEBUG,
         ),
     )
-    return TestResult.from_fallible_process_result(result, field_set.address, test_subsystem.output)
+
+    coverage_data: GoCoverageData | None = None
+    if test_subsystem.use_coverage:
+        coverage_data = GoCoverageData(
+            coverage_digest=result.output_digest,
+            import_path=import_path,
+        )
+
+    return TestResult.from_fallible_process_result(
+        process_result=result,
+        address=field_set.address,
+        output_setting=test_subsystem.output,
+        coverage_data=coverage_data,
+    )
 
 
 @rule
