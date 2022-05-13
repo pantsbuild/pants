@@ -15,14 +15,10 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.subsystems import setuptools
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
     PexLayout,
-    PythonRequirementsField,
     PythonRequirementTarget,
-    PythonResolveField,
-    PythonSourceField,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
     PythonTestTarget,
@@ -33,7 +29,6 @@ from pants.backend.python.util_rules.pex_from_targets import (
     ChosenPythonResolve,
     ChosenPythonResolveRequest,
     GlobalRequirementConstraints,
-    NoCompatibleResolveException,
     PexFromTargetsRequest,
 )
 from pants.backend.python.util_rules.pex_requirements import (
@@ -44,8 +39,8 @@ from pants.backend.python.util_rules.pex_requirements import (
 )
 from pants.backend.python.util_rules.pex_test_utils import get_all_data
 from pants.build_graph.address import Address
+from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.engine.addresses import Addresses
-from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.contextutil import pushd
 from pants.util.ordered_set import OrderedSet
@@ -70,38 +65,6 @@ def rule_runner() -> RuleRunner:
             PythonSourceTarget,
             PythonTestTarget,
         ],
-    )
-
-
-def test_no_compatible_resolve_error() -> None:
-    python_setup = create_subsystem(PythonSetup, resolves={"a": "", "b": ""}, enable_resolves=True)
-    targets = [
-        PythonRequirementTarget(
-            {PythonRequirementsField.alias: [], PythonResolveField.alias: "a"},
-            Address("", target_name="t1"),
-        ),
-        PythonSourceTarget(
-            {PythonSourceField.alias: "f.py", PythonResolveField.alias: "a"},
-            Address("", target_name="t2"),
-        ),
-        PythonSourceTarget(
-            {PythonSourceField.alias: "f.py", PythonResolveField.alias: "b"},
-            Address("", target_name="t3"),
-        ),
-    ]
-    assert str(NoCompatibleResolveException(python_setup, "Prefix", targets)).startswith(
-        dedent(
-            """\
-            Prefix:
-
-            a:
-              * //:t1
-              * //:t2
-
-            b:
-              * //:t3
-            """
-        )
     )
 
 
