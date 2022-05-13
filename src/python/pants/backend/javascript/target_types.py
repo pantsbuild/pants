@@ -29,7 +29,7 @@ class JSGeneratorSourcesField(MultipleSourcesField):
 
 
 class JSSourceTarget(Target):
-    alias = "js_source"
+    alias = "javascript_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
@@ -43,7 +43,7 @@ class JSSourcesGeneratorSourcesField(JSGeneratorSourcesField):
 
 
 class JSSourcesGeneratorTarget(TargetFilesGenerator):
-    alias = "js_sources"
+    alias = "javascript_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         JSSourcesGeneratorSourcesField,
@@ -51,4 +51,4 @@ class JSSourcesGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = JSSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (Dependencies,)
-    help = "Generate a `js_source` target for each file in the `sources` field."
+    help = "Generate a `javascript_source` target for each file in the `sources` field."

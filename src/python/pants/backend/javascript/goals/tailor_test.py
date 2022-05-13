@@ -3,9 +3,9 @@
 
 import pytest
 
-from pants.backend.js.goals import tailor
-from pants.backend.js.goals.tailor import PutativeJSTargetsRequest
-from pants.backend.js.target_types import JSSourcesGeneratorTarget
+from pants.backend.javascript.goals import tailor
+from pants.backend.javascript.goals.tailor import PutativeJSTargetsRequest
+from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -30,7 +30,7 @@ def rule_runner() -> RuleRunner:
 def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/owned/BUILD": "js_sources()\n",
+            "src/owned/BUILD": "javascript_sources()\n",
             "src/owned/OwnedFile.js": "",
             "src/unowned/UnownedFile1.js": "",
             "src/unowned/UnownedFile2.js": "",

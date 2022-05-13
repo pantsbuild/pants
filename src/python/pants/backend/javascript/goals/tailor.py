@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.js.target_types import JS_FILE_EXTENSIONS, JSSourcesGeneratorTarget
+from pants.backend.javascript.target_types import JS_FILE_EXTENSIONS, JSSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,

@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from pants.backend.js.goals import tailor
-from pants.backend.js.target_types import JSSourcesGeneratorTarget, JSSourceTarget
+from pants.backend.javascript.goals import tailor
+from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.engine.rules import Rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
