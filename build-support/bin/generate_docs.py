@@ -241,6 +241,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.google_cloud_function.python",
         "pants.backend.plugin_development",
         "pants.backend.python",
+        "pants.backend.python.docs.sphinx",
         "pants.backend.python.lint.bandit",
         "pants.backend.python.lint.black",
         "pants.backend.python.lint.docformatter",

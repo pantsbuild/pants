@@ -44,6 +44,7 @@ target(
         "src/python/pants/backend/plugin_development",
         "src/python/pants/backend/project_info",
         "src/python/pants/backend/python",
+        "src/python/pants/backend/python/docs/sphinx",
         "src/python/pants/backend/python/lint/bandit",
         "src/python/pants/backend/python/lint/black",
         "src/python/pants/backend/python/lint/docformatter",
