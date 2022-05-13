@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
+
 import pytest
 
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -197,8 +199,8 @@ def test_no_compatible_resolve_error() -> None:
         )
     )
     assert bad_roots_err.startswith(
-        softwrap(
-            """
+        dedent(
+            """\
             The input targets did not have a resolve in common.
 
             a:
@@ -207,8 +209,7 @@ def test_no_compatible_resolve_error() -> None:
             b:
               * //:t3
 
-            Targets used together must use the same resolve, set by the `resolve` field.
-            """
+            Targets used together must use the same resolve, set by the `resolve` field."""
         )
     )
 
