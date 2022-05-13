@@ -272,7 +272,7 @@ async def bsp_resolve_scala_metadata(
     )
 
     jvm_build_target = JvmBuildTarget(
-        java_home=Path(coursier_java_home).as_uri(), 
+        java_home=Path(coursier_java_home).as_uri(),
         java_version=f"1.{jdk.jre_major_version}",
     )
 
