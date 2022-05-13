@@ -3,8 +3,19 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
+
 import pytest
 
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import (
+    PythonRequirementsField,
+    PythonRequirementTarget,
+    PythonResolveField,
+    PythonSourceField,
+    PythonSourceTarget,
+)
+from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import (
     DEFAULT_TOOL_LOCKFILE,
     NO_TOOL_LOCKFILE,
@@ -12,12 +23,16 @@ from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
+    NoCompatibleResolveException,
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
     WrappedGenerateLockfile,
     determine_resolves_to_generate,
     filter_tool_lockfile_requests,
 )
+from pants.engine.target import Dependencies, Target
+from pants.testutil.option_util import create_subsystem
+from pants.util.strutil import softwrap
 
 
 def test_determine_tool_sentinels_to_generate() -> None:
@@ -147,4 +162,108 @@ def test_filter_tool_lockfile_requests() -> None:
         assert_filtered(default_tool, resolve_specified=True)
     assert f"`[{default_tool.resolve_name}].lockfile` is set to `{DEFAULT_TOOL_LOCKFILE}`" in str(
         exc.value
+    )
+
+
+def test_no_compatible_resolve_error() -> None:
+    python_setup = create_subsystem(PythonSetup, resolves={"a": "", "b": ""}, enable_resolves=True)
+    t1 = PythonRequirementTarget(
+        {
+            PythonRequirementsField.alias: [],
+            PythonResolveField.alias: "a",
+            Dependencies.alias: ["//:t3"],
+        },
+        Address("", target_name="t1"),
+    )
+    t2 = PythonSourceTarget(
+        {
+            PythonSourceField.alias: "f.py",
+            PythonResolveField.alias: "a",
+            Dependencies.alias: ["//:t3"],
+        },
+        Address("", target_name="t2"),
+    )
+    t3 = PythonSourceTarget(
+        {PythonSourceField.alias: "f.py", PythonResolveField.alias: "b"},
+        Address("", target_name="t3"),
+    )
+
+    def maybe_get_resolve(t: Target) -> str | None:
+        if not t.has_field(PythonResolveField):
+            return None
+        return t[PythonResolveField].normalized_value(python_setup)
+
+    bad_roots_err = str(
+        NoCompatibleResolveException.bad_input_roots(
+            [t2, t3], maybe_get_resolve=maybe_get_resolve, doc_url_slug="", workaround=None
+        )
+    )
+    assert bad_roots_err.startswith(
+        dedent(
+            """\
+            The input targets did not have a resolve in common.
+
+            a:
+              * //:t2
+
+            b:
+              * //:t3
+
+            Targets used together must use the same resolve, set by the `resolve` field."""
+        )
+    )
+
+    bad_single_dep_err = str(
+        NoCompatibleResolveException.bad_dependencies(
+            maybe_get_resolve=maybe_get_resolve,
+            doc_url_slug="",
+            root_targets=[t1],
+            root_resolve="a",
+            dependencies=[t3],
+        )
+    )
+    assert bad_single_dep_err.startswith(
+        softwrap(
+            """
+            The target //:t1 uses the `resolve` `a`, but some of its
+            dependencies are not compatible with that resolve:
+
+              * //:t3 (b)
+
+            All dependencies must work with the same `resolve`. To fix this, either change
+            the `resolve=` field on those dependencies to `a`, or change
+            the `resolve=` of the target //:t1.
+            """
+        )
+    )
+
+    bad_multiple_deps_err = str(
+        NoCompatibleResolveException.bad_dependencies(
+            maybe_get_resolve=maybe_get_resolve,
+            doc_url_slug="",
+            root_targets=[t1, t2],
+            root_resolve="a",
+            dependencies=[t3],
+        )
+    )
+    assert bad_multiple_deps_err.startswith(
+        softwrap(
+            """
+            The input targets use the `resolve` `a`, but some of their
+            dependencies are not compatible with that resolve.
+
+            Input targets:
+
+              * //:t1
+              * //:t2
+
+            Bad dependencies:
+
+              * //:t3 (b)
+
+            All dependencies must work with the same `resolve`. To fix this, either change
+            the `resolve=` field on those dependencies to `a`, or change
+            the `resolve=` of the input targets.
+            """
+        )
     )
