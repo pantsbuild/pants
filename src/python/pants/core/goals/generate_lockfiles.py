@@ -8,16 +8,18 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Iterable, Sequence
+from typing import Callable, ClassVar, Iterable, Sequence
 
 from pants.engine.collection import Collection
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import StrListOption, StrOption
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, doc_url
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +373,102 @@ async def generate_lockfiles_goal(
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
 
     return GenerateLockfilesGoal(exit_code=0)
+
+
+# -----------------------------------------------------------------------------------------------
+# Helpers for determining the resolve
+# -----------------------------------------------------------------------------------------------
+
+
+class NoCompatibleResolveException(Exception):
+    """No compatible resolve could be found for a set of targets."""
+
+    @classmethod
+    def bad_input_roots(
+        cls,
+        targets: Iterable[Target],
+        *,
+        maybe_get_resolve: Callable[[Target], str | None],
+        doc_url_slug: str,
+        workaround: str | None,
+    ) -> NoCompatibleResolveException:
+        resolves_to_addresses = defaultdict(list)
+        for tgt in targets:
+            maybe_resolve = maybe_get_resolve(tgt)
+            if maybe_resolve is not None:
+                resolves_to_addresses[maybe_resolve].append(tgt.address.spec)
+
+        formatted_resolve_lists = "\n\n".join(
+            f"{resolve}:\n{bullet_list(sorted(addresses))}"
+            for resolve, addresses in sorted(resolves_to_addresses.items())
+        )
+        return NoCompatibleResolveException(
+            f"The input targets did not have a resolve in common.\n\n"
+            f"{formatted_resolve_lists}\n\n"
+            "Targets used together must use the same resolve, set by the `resolve` field. For more "
+            f"information on 'resolves' (lockfiles), see {doc_url(doc_url_slug)}."
+            + (f"\n\n{workaround}" if workaround else "")
+        )
+
+    @classmethod
+    def bad_dependencies(
+        cls,
+        *,
+        maybe_get_resolve: Callable[[Target], str | None],
+        doc_url_slug: str,
+        root_resolve: str,
+        root_targets: Sequence[Target],
+        dependencies: Iterable[Target],
+    ) -> NoCompatibleResolveException:
+        if len(root_targets) == 1:
+            addr = root_targets[0].address
+            prefix = softwrap(
+                f"""
+                The target {addr} uses the `resolve` `{root_resolve}`, but some of its
+                dependencies are not compatible with that resolve:
+                """
+            )
+            change_input_targets_instructions = f"of the target {addr}"
+        else:
+            assert root_targets
+            prefix = softwrap(
+                f"""
+                The input targets use the `resolve` `{root_resolve}`, but some of their
+                dependencies are not compatible with that resolve.
+
+                Input targets:
+
+                {bullet_list(sorted(t.address.spec for t in root_targets))}
+
+                Bad dependencies:
+                """
+            )
+            change_input_targets_instructions = "of the input targets"
+
+        deps_strings = []
+        for dep in dependencies:
+            maybe_resolve = maybe_get_resolve(dep)
+            if maybe_resolve is None or maybe_resolve == root_resolve:
+                continue
+            deps_strings.append(f"{dep.address} ({maybe_resolve})")
+
+        return NoCompatibleResolveException(
+            softwrap(
+                f"""
+                {prefix}
+
+                {bullet_list(deps_strings)}
+
+                All dependencies must work with the same `resolve`. To fix this, either change
+                the `resolve=` field on those dependencies to `{root_resolve}`, or change
+                the `resolve=` {change_input_targets_instructions}. If those dependencies should
+                work with multiple resolves, use the `parametrize` mechanism with the `resolve=`
+                field or manually create multiple targets for the same entity.
+
+                For more information, see {doc_url(doc_url_slug)}.
+                """
+            )
+        )
 
 
 def rules():
