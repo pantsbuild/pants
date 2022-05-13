@@ -15,8 +15,6 @@ files(name="no_build_file_directory", sources=["no_build_file/**/*"])
 
 files(name="print_env_directory", sources=["print_env/**/*"])
 
-files(name="python_targets_directory", sources=["python_targets/**/*"])
-
 files(name="sources_directory", sources=["sources/**/*"])
 
 experimental_run_shell_command(
