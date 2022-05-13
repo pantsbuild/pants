@@ -258,7 +258,9 @@ impl PyGeneratorResponseBreak {
   }
 }
 
-#[pyclass]
+// TODO: We allow subclassing in order to add validation via a subclass on the Python side.
+// If we were to port that validation to rust, we could remove that indirection.
+#[pyclass(subclass)]
 pub struct PyGeneratorResponseGet {
   product: Py<PyType>,
   declared_subject: Py<PyType>,

@@ -117,9 +117,9 @@ class AwaitableConstraints:
         return repr(self)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
 class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
+    __slots__ = ("output_type", "input_type", "input")
+
     @overload
     def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None:
         ...
@@ -139,22 +139,24 @@ class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None:
-        self.output_type = self._validate_output_type(output_type)
+        self._validate_output_type(output_type)
+        self.output_type = output_type
         if input_arg1 is None:
             self.input_type = type(input_arg0)
-            self.input = self._validate_input(input_arg0, shorthand_form=True)
+            self._validate_input(input_arg0, shorthand_form=True)
+            self.input = input_arg0
         else:
             self.input_type = self._validate_explicit_input_type(input_arg0)
-            self.input = self._validate_input(input_arg1, shorthand_form=False)
+            self._validate_input(input_arg1, shorthand_form=False)
+            self.input = input_arg1
 
     @staticmethod
-    def _validate_output_type(output_type: Any) -> type[_Output]:
+    def _validate_output_type(output_type: Any) -> None:
         if not isinstance(output_type, type):
             raise TypeError(
                 "Invalid Get. The first argument (the output type) must be a type, but given "
                 f"`{output_type}` with type {type(output_type)}."
             )
-        return cast(Type[_Output], output_type)
 
     @staticmethod
     def _validate_explicit_input_type(input_type: Any) -> type[_Input]:
@@ -166,7 +168,7 @@ class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
             )
         return cast(Type[_Input], input_type)
 
-    def _validate_input(self, input_: Any, *, shorthand_form: bool) -> _Input:
+    def _validate_input(self, input_: Any, *, shorthand_form: bool) -> None:
         if isinstance(input_, type):
             if shorthand_form:
                 raise TypeError(
@@ -183,14 +185,13 @@ class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
         # If the input_type is not annotated with `@union`, then we validate that the input is
         # exactly the same type as the input_type. (Why not check unions? We don't have access to
         # `UnionMembership` to know if it's a valid union member. The engine will check that.)
-        if not is_union(self.input_type) and type(input_) != self.input_type:
+        if type(input_) != self.input_type and not is_union(self.input_type):
             # We can assume we're using the longhand form because the shorthand form guarantees
             # that the `input_type` is the same as `input`.
             raise TypeError(
                 f"Invalid Get. The third argument `{input_}` must have the exact same type as the "
                 f"second argument, {self.input_type}, but had the type {type(input_)}."
             )
-        return cast(_Input, input_)
 
     def __await__(
         self,
