@@ -24,6 +24,7 @@ from pants.bsp.spec.base import (
     BuildTargetCapabilities,
     BuildTargetIdentifier,
     StatusCode,
+    TaskId,
     Uri,
 )
 from pants.bsp.spec.targets import (
@@ -663,6 +664,7 @@ class BSPCompileRequest(Generic[_FS]):
 
     bsp_target: BSPBuildTargetInternal
     field_sets: tuple[_FS, ...]
+    task_id: TaskId
 
 
 @dataclass(frozen=True)

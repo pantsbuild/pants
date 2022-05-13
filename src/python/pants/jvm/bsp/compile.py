@@ -1,13 +1,19 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode
+import time
+from dataclasses import dataclass
+
+from pants.bsp.context import BSPContext
+from pants.bsp.spec.base import BuildTargetIdentifier, StatusCode, TaskId
+from pants.bsp.spec.log import LogMessageParams, MessageType
+from pants.bsp.spec.task import TaskProgressParams
 from pants.bsp.util_rules.targets import BSPCompileRequest, BSPCompileResult
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule_helper
+from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.classpath import LooseClassfiles
@@ -15,6 +21,7 @@ from pants.jvm.compile import (
     ClasspathEntry,
     ClasspathEntryRequest,
     ClasspathEntryRequestFactory,
+    CompileResult,
     FallibleClasspathEntry,
 )
 from pants.jvm.resolve.key import CoursierResolveKey
@@ -24,6 +31,42 @@ from pants.util.strutil import path_safe
 
 def jvm_classes_directory(target_id: BuildTargetIdentifier) -> str:
     return f"jvm/classes/{path_safe(target_id.uri)}"
+
+
+@dataclass(frozen=True)
+class BSPClasspathEntryRequest:
+    """A wrapper around a `ClasspathEntryRequest` which notifies the BSP client on completion.
+
+    TODO: Because this struct contains a `task_id`, messages will re-render in every run, even
+    though the underlying computation does not re-run. See #15426 for an alternative.
+    """
+
+    request: ClasspathEntryRequest
+    task_id: TaskId
+
+
+@rule
+async def notify_for_classpath_entry(
+    request: BSPClasspathEntryRequest,
+    context: BSPContext,
+) -> FallibleClasspathEntry:
+    entry = await Get(FallibleClasspathEntry, ClasspathEntryRequest, request.request)
+    context.notify_client(
+        TaskProgressParams(
+            task_id=request.task_id,
+            event_time=int(time.time() * 1000),
+            message=entry.message(),
+        )
+    )
+    if entry.result == CompileResult.FAILED:
+        context.notify_client(
+            LogMessageParams(
+                type_=MessageType.ERROR,
+                message=entry.message(),
+                task=request.task_id,
+            )
+        )
+    return entry
 
 
 @rule_helper
@@ -53,8 +96,10 @@ async def _jvm_bsp_compile(
     results = await MultiGet(
         Get(
             FallibleClasspathEntry,
-            ClasspathEntryRequest,
-            classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
+            BSPClasspathEntryRequest(
+                classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
+                task_id=request.task_id,
+            ),
         )
         for coarsened_target in coarsened_targets.coarsened_closure()
         if not any(JvmArtifactFieldSet.is_applicable(t) for t in coarsened_target.members)

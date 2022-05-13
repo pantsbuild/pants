@@ -18,7 +18,7 @@ from pants.bsp.util_rules.targets import BSPBuildTargetInternal, BSPCompileReque
 from pants.engine.fs import Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import _uncacheable_rule, collect_rules
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule
 from pants.engine.target import FieldSet, Targets
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
@@ -46,7 +46,7 @@ class CompileOneBSPTargetRequest:
     arguments: tuple[str, ...] | None = ()
 
 
-@_uncacheable_rule
+@rule
 async def compile_bsp_target(
     request: CompileOneBSPTargetRequest,
     bsp_context: BSPContext,
@@ -64,12 +64,16 @@ async def compile_bsp_target(
                 field_set = field_set_type.create(target)
                 field_sets_by_request_type[compile_request_type].add(field_set)
 
-    task_id = TaskId(id=uuid.uuid4().hex)
+    task_id = TaskId(
+        id=uuid.uuid4().hex, parents=((request.origin_id,) if request.origin_id else None)
+    )
+    message = f"Compilation of {request.bsp_target.bsp_target_id.uri}"
 
     bsp_context.notify_client(
         TaskStartParams(
             task_id=task_id,
             event_time=int(time.time() * 1000),
+            message=message,
             data=CompileTask(target=request.bsp_target.bsp_target_id),
         )
     )
@@ -78,7 +82,9 @@ async def compile_bsp_target(
         Get(
             BSPCompileResult,
             BSPCompileRequest,
-            compile_request_type(bsp_target=request.bsp_target, field_sets=tuple(field_sets)),
+            compile_request_type(
+                bsp_target=request.bsp_target, field_sets=tuple(field_sets), task_id=task_id
+            ),
         )
         for compile_request_type, field_sets in field_sets_by_request_type.items()
     )
@@ -91,6 +97,7 @@ async def compile_bsp_target(
         TaskFinishParams(
             task_id=task_id,
             event_time=int(time.time() * 1000),
+            message=message,
             status=status,
             data=CompileReport(
                 target=request.bsp_target.bsp_target_id,
