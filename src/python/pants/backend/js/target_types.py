@@ -52,7 +52,3 @@ class JSSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (Dependencies,)
     help = "Generate a `js_source` target for each file in the `sources` field."
-
-
-# def rules():
-#     return collect_rules()
