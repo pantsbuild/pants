@@ -327,6 +327,10 @@ class DiffBinary(BinaryPath):
     pass
 
 
+class ReadlinkBinary(BinaryPath):
+    pass
+
+
 class GitBinaryException(Exception):
     pass
 
@@ -690,6 +694,14 @@ async def find_diff() -> DiffBinary:
     return DiffBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `readlink` binary", level=LogLevel.DEBUG)
+async def find_readlink() -> ReadlinkBinary:
+    request = BinaryPathRequest(binary_name="readlink", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="defererence symlinks")
+    return ReadlinkBinary(first_path.path, first_path.fingerprint)
+
+
 @rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
 async def find_git() -> GitBinary:
     request = BinaryPathRequest(binary_name="git", search_path=SEARCH_PATHS)
@@ -734,6 +746,10 @@ class DiffBinaryRequest:
     pass
 
 
+class ReadlinkBinaryRequest:
+    pass
+
+
 class GitBinaryRequest:
     pass
 
@@ -761,6 +777,13 @@ async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBin
 @rule
 async def find_mkdir_wrapper(_: MkdirBinaryRequest, mkdir_binary: MkdirBinary) -> MkdirBinary:
     return mkdir_binary
+
+
+@rule
+async def find_readlink_wrapper(
+    _: ReadlinkBinaryRequest, readlink_binary: ReadlinkBinary
+) -> ReadlinkBinary:
+    return readlink_binary
 
 
 @rule

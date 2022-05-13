@@ -95,6 +95,7 @@ class JdkEnvironment:
     coursier: Coursier
     jre_major_version: int
     global_jvm_options: tuple[str, ...]
+    java_home_command: str
 
     bin_dir: ClassVar[str] = "__jdk"
     jdk_preparation_script: ClassVar[str] = f"{bin_dir}/jdk.sh"
@@ -138,6 +139,7 @@ class InternalJdk(JdkEnvironment):
             env.coursier,
             env.jre_major_version,
             env.global_jvm_options,
+            env.java_home_command,
         )
 
 
@@ -293,6 +295,7 @@ async def prepare_jdk_environment(
         nailgun_jar=os.path.join(JdkEnvironment.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,
+        java_home_command=java_home_command,
     )
 
 
