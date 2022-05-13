@@ -5,7 +5,8 @@ python_sources(dependencies=[":lockfile"])
 resource(name="lockfile", source="clangformat.lock")
 
 python_tests(
-    name="rules_integration_test",
-    sources=["rules_integration_test.py"],
-    timeout=240,
+    name="tests",
+    overrides={
+        "rules_integration_test.py": {"timeout": 240},
+    },
 )

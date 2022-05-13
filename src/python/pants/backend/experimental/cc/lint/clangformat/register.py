@@ -12,6 +12,7 @@ from typing import Iterable
 
 from pants.backend.cc.lint.clangformat import rules as clangformat_rules
 from pants.backend.cc.lint.clangformat import skip_field, subsystem
+from pants.backend.python.goals import lockfile as python_lockfile
 from pants.engine.rules import Rule
 from pants.engine.unions import UnionRule
 
@@ -21,4 +22,5 @@ def rules() -> Iterable[Rule | UnionRule]:
         *clangformat_rules.rules(),
         *skip_field.rules(),
         *subsystem.rules(),
+        *python_lockfile.rules(),
     )
