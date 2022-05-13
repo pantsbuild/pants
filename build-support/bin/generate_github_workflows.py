@@ -323,25 +323,29 @@ def download_apache_thrift() -> Step:
 def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     def test_python_linux(shard: str) -> dict[str, Any]:
         return {
-        "name": f"Test Python (Linux) Shard {shard}",
-        "runs-on": LINUX_VERSION,
-        "needs": "bootstrap_pants_linux",
-        "strategy": {"matrix": {"python-version": python_versions}},
-        "timeout-minutes": 90,
-        "if": IS_PANTS_OWNER,
-        "steps": [
-            *checkout(),
-            install_jdk(),
-            install_go(),
-            download_apache_thrift(),
-            *setup_primary_python(),
-            expose_all_pythons(),
-            native_binaries_download(),
-            setup_toolchain_auth(),
-            {"name": f"Run Python test shard {shard}", "run": f"./pants test --shard={shard} ::\n"},
-            upload_log_artifacts(name=f"python-test-linux-{shard.replace('/', '_')}"),
-        ],
-    }
+            "name": f"Test Python (Linux) Shard {shard}",
+            "runs-on": LINUX_VERSION,
+            "needs": "bootstrap_pants_linux",
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "timeout-minutes": 90,
+            "if": IS_PANTS_OWNER,
+            "steps": [
+                *checkout(),
+                install_jdk(),
+                install_go(),
+                download_apache_thrift(),
+                *setup_primary_python(),
+                expose_all_pythons(),
+                native_binaries_download(),
+                setup_toolchain_auth(),
+                {
+                    "name": f"Run Python test shard {shard}",
+                    "run": f"./pants test --shard={shard} ::\n",
+                },
+                upload_log_artifacts(name=f"python-test-linux-{shard.replace('/', '_')}"),
+            ],
+        }
+
     jobs = {
         "check_labels": {
             "name": "Ensure PR has a category label",
