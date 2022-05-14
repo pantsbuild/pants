@@ -39,9 +39,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.84"
+    default_version = "v2.1.87"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.84,<3.0"
+    version_constraints = ">=2.1.87,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -50,8 +50,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "e17018c3bc902f0717fd4b2806f6cbb35cfafa5180d8cfa094b9fff11197805b",
-                    "3741845",
+                    "862a7e3949a2ec9479e10a20012be88726e883c390f19eb33ca2cc4017bdbdf8",
+                    "3748064",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64"]
@@ -181,8 +181,8 @@ async def setup_pex_cli_process(
         else []
     )
     args = [
-        *global_args,
         *request.subcommand,
+        *global_args,
         *verbosity_args,
         *resolve_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
