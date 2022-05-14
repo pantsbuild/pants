@@ -17,7 +17,7 @@ from pants.core.util_rules import archive
 from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.dependency_inference import symbol_mapper
-from pants.jvm.goals import lockfile
+from pants.jvm.goals import add_artifact_goal, lockfile
 from pants.jvm.package import deploy_jar
 from pants.jvm.package.war import rules as war_rules
 from pants.jvm.resolve import coursier_fetch, jvm_tool
@@ -61,4 +61,5 @@ def rules():
         *war_rules(),
         *java_bsp_rules.rules(),
         *archive.rules(),
+        *add_artifact_goal.rules(),
     ]
