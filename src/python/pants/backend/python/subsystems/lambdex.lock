@@ -49,13 +49,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7785d2d79633906c692db272d7299530505403415256a9c5c892883a4c057aa4",
-              "url": "https://files.pythonhosted.org/packages/e4/17/68b51b61b24f5d7056a0c8d1758d576c21e0d6a6e43d449d7dc0bfa3b131/pex-2.1.84-py2.py3-none-any.whl"
+              "hash": "3e8deb7acbe884122c560dba64e56b5e6eb3eed6683513443a613e73266c2cdb",
+              "url": "https://files.pythonhosted.org/packages/61/2a/6299e5a1fe18a395802fd2cbfaa6229112e8b95627adead6942f2a0466e5/pex-2.1.87-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b633e32f334e3bf3d453a108b4b632430f8a3de908c1ba13067f7c4fcc07a47c",
-              "url": "https://files.pythonhosted.org/packages/82/e3/a019f70b60596782d22382d5593124d9782a9554271248afb099cfc009ae/pex-2.1.84.tar.gz"
+              "hash": "2cf387a729675b1c0474f4f7a098db9fc3644d8f6d13fa4cc8613c0f2ee7c2b5",
+              "url": "https://files.pythonhosted.org/packages/fc/b0/a2018b64226bab09082d1ee35f71773a429e87625dbd24b83c27e8bdcb10/pex-2.1.87.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -63,7 +63,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.11,>=2.7",
-          "version": "2.1.84"
+          "version": "2.1.87"
         }
       ],
       "platform_tag": [
@@ -74,7 +74,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.84",
+  "pex_version": "2.1.87",
   "prefer_older_binary": false,
   "requirements": [
     "lambdex==0.1.6"
