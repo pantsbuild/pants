@@ -289,9 +289,9 @@ def test_address_validate_build_in_spec_path() -> None:
         Address("a/b/BUILD", target_name="foo")
 
     # It's fine to use BUILD in the relative_file_path, target_name, or generated_name, though.
-    assert Address("a/b", relative_file_path="BUILD").spec == "a/b/BUILD"
+    assert Address("a/b", relative_file_path="BUILD").spec == "a/b/BUILD:b"
     assert Address("a/b", target_name="BUILD").spec == "a/b:BUILD"
-    assert Address("a/b", generated_name="BUILD").spec == "a/b#BUILD"
+    assert Address("a/b", generated_name="BUILD").spec == "a/b:b#BUILD"
 
 
 def test_address_equality() -> None:
@@ -322,20 +322,20 @@ def test_address_spec() -> None:
         assert str(address) == expected
         assert address.path_safe_spec == expected_path_spec
 
-    assert_spec(Address("a/b"), expected="a/b:b", expected_path_spec="a.b")
+    assert_spec(Address("a/b"), expected="a/b:b", expected_path_spec="a.b.b")
 
     assert_spec(Address("a/b", target_name="c"), expected="a/b:c", expected_path_spec="a.b.c")
     assert_spec(Address("", target_name="root"), expected="//:root", expected_path_spec=".root")
 
     assert_spec(
         Address("a/b", generated_name="generated"),
-        expected="a/b#generated",
-        expected_path_spec="a.b@generated",
+        expected="a/b:b#generated",
+        expected_path_spec="a.b.b@generated",
     )
     assert_spec(
         Address("a/b", generated_name="generated/f.ext"),
-        expected="a/b#generated/f.ext",
-        expected_path_spec="a.b@generated.f.ext",
+        expected="a/b:b#generated/f.ext",
+        expected_path_spec="a.b.b@generated.f.ext",
     )
     assert_spec(
         Address("a/b", target_name="generator", generated_name="generated"),
@@ -370,8 +370,8 @@ def test_address_spec() -> None:
     )
     assert_spec(
         Address("a/b", relative_file_path="c.txt"),
-        expected="a/b/c.txt",
-        expected_path_spec="a.b.c.txt",
+        expected="a/b/c.txt:b",
+        expected_path_spec="a.b.c.txt.b",
     )
     assert_spec(
         Address("a/b", relative_file_path="subdir/f.txt"),
@@ -391,18 +391,18 @@ def test_address_spec() -> None:
     )
     assert_spec(
         Address("a/b", parameters={"k1": "v", "k2": "v"}),
-        expected="a/b@k1=v,k2=v",
-        expected_path_spec="a.b@@k1=v,k2=v",
+        expected="a/b:b@k1=v,k2=v",
+        expected_path_spec="a.b.b@@k1=v,k2=v",
     )
     assert_spec(
         Address("a/b", generated_name="gen", parameters={"k": "v"}),
-        expected="a/b#gen@k=v",
-        expected_path_spec="a.b@gen@@k=v",
+        expected="a/b:b#gen@k=v",
+        expected_path_spec="a.b.b@gen@@k=v",
     )
     assert_spec(
         Address("a/b", relative_file_path="f.ext", parameters={"k": "v"}),
-        expected="a/b/f.ext@k=v",
-        expected_path_spec="a.b.f.ext@@k=v",
+        expected="a/b/f.ext:b@k=v",
+        expected_path_spec="a.b.f.ext.b@@k=v",
     )
 
 
@@ -469,7 +469,10 @@ def test_address_create_generated() -> None:
             Address("a/b/c", target_name="tgt", generated_name="dir/gen"),
             AddressInput("a/b/c", "tgt", generated_component="dir/gen"),
         ),
-        (Address("a/b/c", relative_file_path="f.txt"), AddressInput("a/b/c/f.txt")),
+        (
+            Address("a/b/c", relative_file_path="f.txt"),
+            AddressInput("a/b/c/f.txt", target_component="c"),
+        ),
         (
             Address("a/b/c", relative_file_path="f.txt", target_name="tgt"),
             AddressInput("a/b/c/f.txt", "tgt"),

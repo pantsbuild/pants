@@ -395,22 +395,13 @@ class Address(EngineAwareParameter):
         prefix = "//" if not self.spec_path else ""
         if self._relative_file_path is None:
             path = self.spec_path
-            target = (
-                ""
-                if self._target_name is None and (self.generated_name or self.parameters)
-                else self.target_name
-            )
+            target = self.target_name
         else:
             path = self.filename
             parent_prefix = "../" * self._relative_file_path.count(os.path.sep)
-            target = (
-                ""
-                if self._target_name is None and not parent_prefix
-                else f"{parent_prefix}{self.target_name}"
-            )
-        target_sep = ":" if target else ""
+            target = f"{parent_prefix}{self.target_name}"
         generated = "" if self.generated_name is None else f"#{self.generated_name}"
-        return f"{prefix}{path}{target_sep}{target}{generated}{self.parameters_repr}"
+        return f"{prefix}{path}:{target}{generated}{self.parameters_repr}"
 
     @property
     def path_safe_spec(self) -> str:
@@ -428,10 +419,7 @@ class Address(EngineAwareParameter):
         else:
             parent_prefix = "."
             path = ""
-        if parent_prefix == ".":
-            target = f"{parent_prefix}{self._target_name}" if self._target_name else ""
-        else:
-            target = f"{parent_prefix}{self.target_name}"
+        target = f"{parent_prefix}{self.target_name}"
         if self.parameters:
             key_value_strs = ",".join(
                 f"{sanitize(k)}={sanitize(v)}" for k, v in self.parameters.items()
