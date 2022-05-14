@@ -36,7 +36,6 @@ from pants.core.util_rules import archive, source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
-from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.target import (
     GeneratedSources,
@@ -489,7 +488,6 @@ def test_invalid_asset_fields(asset_type):
         rules=[
             *target_type_rules(),
             *peek.rules(),
-            *fs_rules(),
         ],
         target_types=[FileTarget, ResourceTarget],
         objects={"http_source": HTTPSource},
