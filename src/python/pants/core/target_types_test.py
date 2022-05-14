@@ -486,7 +486,6 @@ def test_invalid_http_source(kwargs, exc_match):
 def test_invalid_asset_fields(asset_type):
     rule_runner = RuleRunner(
         rules=[
-            *target_type_rules(),
             *peek.rules(),
         ],
         target_types=[FileTarget, ResourceTarget],
@@ -494,9 +493,9 @@ def test_invalid_asset_fields(asset_type):
     )
     rule_runner.write_files(
         {
-            "missing_both/BUILD": f"{asset_type}(name='antigravity')",
+            "missing_both/BUILD": f"{asset_type}()",
             "gives_both/BUILD": (
-                f"{asset_type}(name='antigravity', source='foo', url=http_source(url='http://foo/bar', len=0, sha256=''))"
+                f"{asset_type}(source='foo', url=http_source(url='http://foo/bar', len=0, sha256=''))"
             ),
         }
     )
@@ -504,4 +503,4 @@ def test_invalid_asset_fields(asset_type):
         peek.Peek,
         args=["missing_both:"],
     )
-    assert "ERROR" in result.stdout
+    assert "missing a value for either the `source` or `url` fields." in result.stdout

@@ -7,7 +7,7 @@ import dataclasses
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from pants.core.goals.package import (
     BuiltPackage,
@@ -45,7 +45,6 @@ from pants.engine.target import (
     MultipleSourcesField,
     OptionalSingleSourceField,
     OverridesField,
-    RequiredFieldMissingException,
     ScalarField,
     SourcesField,
     SpecialCasedDependencies,
@@ -79,7 +78,7 @@ class HTTPSource:
     def __init__(self, url: str, *, len: int, sha256: str, filename: str = ""):
         for field in dataclasses.fields(self):
             value = locals()[field.name]
-            if not isinstance(value, getattr(builtins, field.type)):
+            if not isinstance(value, getattr(builtins, cast(str, field.type))):
                 raise TypeError(f"`{field.name}` must be a `{field.type}`, got `{type(value)!r}`.")
 
         self.url = url
@@ -102,6 +101,7 @@ class URLField(ScalarField[HTTPSource], AsyncFieldMixin):
 
     @property
     def file_path(self) -> str:
+        assert self.value
         return f"{self.address.spec_path}/{self.value.filename}"
 
 
@@ -146,7 +146,7 @@ class _AssetTarget(Target):
                 )
             )
         if not (self[self.source_field_cls].value or self[URLField].value):
-            raise RequiredFieldMissingException(
+            raise InvalidFieldException(
                 softwrap(
                     f"""
                     The `{self.alias}` {self.address} is missing a value for either the `source` or
@@ -186,7 +186,7 @@ class GenerateFileSourceRequest(GenerateSourcesRequest):
 
 @rule
 async def hydrate_file_source(request: GenerateFileSourceRequest) -> GeneratedSources:
-    return await _hydrate_asset_source(request)
+    return cast(GeneratedSources, await _hydrate_asset_source(request))
 
 
 class FilesGeneratingSourcesField(MultipleSourcesField):
@@ -400,7 +400,7 @@ class GenerateResourceSourceRequest(GenerateSourcesRequest):
 
 @rule
 async def hydrate_resource_source(request: GenerateResourceSourceRequest) -> GeneratedSources:
-    return await _hydrate_asset_source(request)
+    return cast(GeneratedSources, await _hydrate_asset_source(request))
 
 
 class ResourcesGeneratingSourcesField(MultipleSourcesField):
