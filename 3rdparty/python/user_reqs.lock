@@ -18,7 +18,7 @@
 //     "ijson==3.1.4",
 //     "mypy-typing-asserts==0.1.1",
 //     "packaging==21.3",
-//     "pex==2.1.84",
+//     "pex==2.1.87",
 //     "psutil==5.9.0",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -548,13 +548,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7785d2d79633906c692db272d7299530505403415256a9c5c892883a4c057aa4",
-              "url": "https://files.pythonhosted.org/packages/e4/17/68b51b61b24f5d7056a0c8d1758d576c21e0d6a6e43d449d7dc0bfa3b131/pex-2.1.84-py2.py3-none-any.whl"
+              "hash": "3e8deb7acbe884122c560dba64e56b5e6eb3eed6683513443a613e73266c2cdb",
+              "url": "https://files.pythonhosted.org/packages/61/2a/6299e5a1fe18a395802fd2cbfaa6229112e8b95627adead6942f2a0466e5/pex-2.1.87-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b633e32f334e3bf3d453a108b4b632430f8a3de908c1ba13067f7c4fcc07a47c",
-              "url": "https://files.pythonhosted.org/packages/82/e3/a019f70b60596782d22382d5593124d9782a9554271248afb099cfc009ae/pex-2.1.84.tar.gz"
+              "hash": "2cf387a729675b1c0474f4f7a098db9fc3644d8f6d13fa4cc8613c0f2ee7c2b5",
+              "url": "https://files.pythonhosted.org/packages/fc/b0/a2018b64226bab09082d1ee35f71773a429e87625dbd24b83c27e8bdcb10/pex-2.1.87.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -562,7 +562,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.11,>=2.7",
-          "version": "2.1.84"
+          "version": "2.1.87"
         },
         {
           "artifacts": [
@@ -718,13 +718,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ef7b523f6356f763771559412c0d7134753f037822dad1b16945b7b846f7ad06",
-              "url": "https://files.pythonhosted.org/packages/d9/41/d9cfb4410589805cd787f8a82cddd13142d9bf7449d12adf2d05a4a7d633/pyparsing-3.0.8-py3-none-any.whl"
+              "hash": "5026bae9a10eeaefb61dab2f09052b9f4307d44aee4eda64b309723d8d206bbc",
+              "url": "https://files.pythonhosted.org/packages/6c/10/a7d0fa5baea8fe7b50f448ab742f26f52b80bfca85ac2be9d35cdd9a3246/pyparsing-3.0.9-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7bf433498c016c4314268d95df76c81b842a4cb2b276fa3312cfb1e1d85f6954",
-              "url": "https://files.pythonhosted.org/packages/31/df/789bd0556e65cf931a5b87b603fcf02f79ff04d5379f3063588faaf9c1e4/pyparsing-3.0.8.tar.gz"
+              "hash": "2b020ecf7d21b687f219b71ecad3631f644a47f01403fa1d1036b0c6416d70fb",
+              "url": "https://files.pythonhosted.org/packages/71/22/207523d16464c40a0310d2d4d8926daffa00ac1f5b1576170a32db749636/pyparsing-3.0.9.tar.gz"
             }
           ],
           "project_name": "pyparsing",
@@ -733,7 +733,7 @@
             "railroad-diagrams; extra == \"diagrams\""
           ],
           "requires_python": ">=3.6.8",
-          "version": "3.0.8"
+          "version": "3.0.9"
         },
         {
           "artifacts": [
@@ -1545,7 +1545,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.84",
+  "pex_version": "2.1.87",
   "prefer_older_binary": false,
   "requirements": [
     "PyYAML<7.0,>=6.0",
@@ -1557,7 +1557,7 @@
     "ijson==3.1.4",
     "mypy-typing-asserts==0.1.1",
     "packaging==21.3",
-    "pex==2.1.84",
+    "pex==2.1.87",
     "psutil==5.9.0",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",

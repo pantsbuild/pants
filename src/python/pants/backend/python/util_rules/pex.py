@@ -392,16 +392,19 @@ async def build_pex(
 
     # Include any additional arguments and input digests required by the requirements.
     requirements_digests = []
+    pex_lock_resolver_args = [*python_repos.pex_args]
+    pip_resolver_args = [*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"]
     if isinstance(request.requirements, EntireLockfile):
         lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile))
         concurrency_available = lockfile.requirement_estimate
         requirements_digests.append(lockfile.lockfile_digest)
         if lockfile.is_pex_native:
             argv.extend(["--lock", lockfile.lockfile_path])
-            is_network_resolve = False
+            argv.extend(pex_lock_resolver_args)
         else:
+            # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
             argv.extend(["--requirement", lockfile.lockfile_path, "--no-transitive"])
-            is_network_resolve = True
+            argv.extend(pip_resolver_args)
         if lockfile.metadata and request.requirements.complete_req_strings:
             validate_metadata(
                 lockfile.metadata,
@@ -421,14 +424,13 @@ async def build_pex(
             repository_pex = request.requirements.from_superset
             argv.extend(["--pex-repository", repository_pex.name])
             requirements_digests.append(repository_pex.digest)
-            is_network_resolve = False
         elif isinstance(request.requirements.from_superset, LoadedLockfile):
             loaded_lockfile = request.requirements.from_superset
             # NB: This is also validated in the constructor.
             assert loaded_lockfile.is_pex_native
             requirements_digests.append(loaded_lockfile.lockfile_digest)
             argv.extend(["--lock", loaded_lockfile.lockfile_path])
-            is_network_resolve = False
+            argv.extend(pex_lock_resolver_args)
 
             if loaded_lockfile.metadata:
                 validate_metadata(
@@ -441,7 +443,8 @@ async def build_pex(
         else:
             assert request.requirements.from_superset is None
 
-            is_network_resolve = True
+            # We use pip to perform a normal resolve.
+            argv.extend(pip_resolver_args)
             if request.requirements.constraints_strings:
                 constraints_file = "__constraints.txt"
                 constraints_content = "\n".join(request.requirements.constraints_strings)
@@ -452,9 +455,6 @@ async def build_pex(
                     )
                 )
                 argv.extend(["--constraints", constraints_file])
-
-    if is_network_resolve:
-        argv.extend([*python_repos.pex_args, "--resolver-version", "pip-2020-resolver"])
 
     merged_digest = await Get(
         Digest,
