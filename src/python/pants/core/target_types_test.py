@@ -5,14 +5,19 @@ from __future__ import annotations
 
 import os
 import tarfile
+import textwrap
 import zipfile
 from io import BytesIO
 from textwrap import dedent
 
+import pytest
+
+from pants.backend.project_info import peek
 from pants.backend.python import target_types_rules as python_target_type_rules
-from pants.backend.python.goals import package_pex_binary
-from pants.backend.python.target_types import PexBinary
+from pants.backend.python.goals import package_pex_binary, run_pex_binary
+from pants.backend.python.target_types import PexBinary, PythonSourceTarget
 from pants.backend.python.util_rules import pex_from_targets
+from pants.core.goals import run
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
     ArchiveFieldSet,
@@ -20,6 +25,7 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     FileSourceField,
     FileTarget,
+    HTTPSource,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
     ResourcesGeneratorTarget,
@@ -30,6 +36,7 @@ from pants.core.util_rules import archive, source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.target import (
     GeneratedSources,
@@ -39,7 +46,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
 
 def test_relocated_files() -> None:
@@ -367,3 +374,136 @@ def test_generate_file_and_resource_targets() -> None:
         gen_resource_tgt("f2.ext"),
         gen_resource_tgt("subdir/f.ext"),
     }
+
+
+@pytest.mark.parametrize("asset_type", ("file", "resource"))
+def test_url_assets(asset_type) -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_type_rules(),
+            *pex_from_targets.rules(),
+            *package_pex_binary.rules(),
+            *run_pex_binary.rules(),
+            *python_target_type_rules.rules(),
+            *run.rules(),
+        ],
+        target_types=[FileTarget, ResourceTarget, PythonSourceTarget, PexBinary],
+        objects={"http_source": HTTPSource},
+    )
+    http_source_info = (
+        'url="https://raw.githubusercontent.com/python/cpython/7e46ae33bd522cf8331052c3c8835f9366599d8d/Lib/antigravity.py",'
+        "len=500,"
+        'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
+    )
+    rule_runner.write_files(
+        {
+            "assets/BUILD": dedent(
+                f"""\
+                {asset_type}(
+                    name='antigravity',
+                    url=http_source(
+                        {http_source_info},
+                    ),
+                )
+                {asset_type}(
+                    name='antigravity_renamed',
+                    url=http_source(
+                        {http_source_info},
+                        filename="antigravity_renamed.py",
+                    ),
+                )
+                """
+            ),
+            "app/app.py": textwrap.dedent(
+                """\
+                import pathlib
+
+                assets_path = pathlib.Path(__file__).parent.parent / "assets"
+                for path in assets_path.iterdir():
+                    print(path.name)
+                    assert "https://xkcd.com/353/" in path.read_text()
+                """
+            ),
+            "app/BUILD": textwrap.dedent(
+                """\
+                python_source(
+                    source="app.py",
+                    dependencies=[
+                        "assets:antigravity",
+                        "assets:antigravity_renamed",
+                    ]
+                )
+                pex_binary(name="app.py", entry_point='app.py')
+                """
+            ),
+        }
+    )
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdout_reader):
+        rule_runner.run_goal_rule(
+            run.Run,
+            args=["app/app.py"],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        )
+        stdout = stdout_reader.get_stdout()
+        assert "antigravity.py" in stdout
+        assert "antigravity_renamed.py" in stdout
+
+
+@pytest.mark.parametrize(
+    "kwargs, exc_match",
+    [
+        (
+            dict(url=None, len=0, sha256=""),
+            pytest.raises(TypeError, match=r"`url` must be a `str`"),
+        ),
+        (
+            dict(url="http://foo/bar", len="", sha256=""),
+            pytest.raises(TypeError, match=r"`len` must be a `int`"),
+        ),
+        (
+            dict(url="http://foo/bar", len=0, sha256=123),
+            pytest.raises(TypeError, match=r"`sha256` must be a `str`"),
+        ),
+        (
+            dict(url="http://foo/bar", len=0, sha256="", filename=10),
+            pytest.raises(TypeError, match=r"`filename` must be a `str`"),
+        ),
+        (
+            dict(url="http://foo/bar/", len=0, sha256=""),
+            pytest.raises(ValueError, match=r"Couldn't deduce filename"),
+        ),
+        (
+            dict(url="http://foo/bar/", len=0, sha256="", filename="../foobar.txt"),
+            pytest.raises(ValueError, match=r"`filename` cannot contain a path separator."),
+        ),
+    ],
+)
+def test_invalid_http_source(kwargs, exc_match):
+    with exc_match:
+        HTTPSource(**kwargs)
+
+
+@pytest.mark.parametrize("asset_type", ("file", "resource"))
+def test_invalid_asset_fields(asset_type):
+    rule_runner = RuleRunner(
+        rules=[
+            *target_type_rules(),
+            *peek.rules(),
+            *fs_rules(),
+        ],
+        target_types=[FileTarget, ResourceTarget],
+        objects={"http_source": HTTPSource},
+    )
+    rule_runner.write_files(
+        {
+            "missing_both/BUILD": f"{asset_type}(name='antigravity')",
+            "gives_both/BUILD": (
+                f"{asset_type}(name='antigravity', source='foo', url=http_source(url='http://foo/bar', len=0, sha256=''))"
+            ),
+        }
+    )
+    result = rule_runner.run_goal_rule(
+        peek.Peek,
+        args=["missing_both:"],
+    )
+    assert "ERROR" in result.stdout

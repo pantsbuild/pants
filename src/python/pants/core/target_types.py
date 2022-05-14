@@ -2,9 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import builtins
+import dataclasses
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import ClassVar
 
 from pants.core.goals.package import (
     BuiltPackage,
@@ -14,11 +17,22 @@ from pants.core.goals.package import (
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
 from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import (
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    DownloadFile,
+    FileEntry,
+    MergeDigests,
+    RemovePrefix,
+    Snapshot,
+)
+from pants.engine.internals.native_engine import FileDigest
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
+    AsyncFieldMixin,
     Dependencies,
     FieldSet,
     FieldSetsPerTarget,
@@ -27,9 +41,12 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
+    InvalidFieldException,
     MultipleSourcesField,
+    OptionalSingleSourceField,
     OverridesField,
-    SingleSourceField,
+    RequiredFieldMissingException,
+    ScalarField,
     SourcesField,
     SpecialCasedDependencies,
     StringField,
@@ -42,20 +59,114 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
+
+# -----------------------------------------------------------------------------------------------
+# Asset target helpers
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(unsafe_hash=True)
+@frozen_after_init
+class HTTPSource:
+    url: str
+    len: int
+    sha256: str
+    # Defaults to last part of the URL path (E.g. `index.html`)
+    filename: str
+
+    def __init__(self, url: str, *, len: int, sha256: str, filename: str = ""):
+        for field in dataclasses.fields(self):
+            value = locals()[field.name]
+            if not isinstance(value, getattr(builtins, field.type)):
+                raise TypeError(f"`{field.name}` must be a `{field.type}`, got `{type(value)!r}`.")
+
+        self.url = url
+        self.len = len
+        self.sha256 = sha256
+        self.filename = filename or self.url.rsplit("/", 1)[1]
+
+        if not self.filename:
+            raise ValueError(
+                "Couldn't deduce filename from `url`. Please specify the `filename` argument."
+            )
+        if "\\" in self.filename or "/" in self.filename:
+            raise ValueError("`filename` cannot contain a path separator.")
+
+
+class URLField(ScalarField[HTTPSource], AsyncFieldMixin):
+    alias = "url"
+    expected_type = HTTPSource
+    expected_type_description = "an `http_source` object"
+
+    @property
+    def file_path(self) -> str:
+        return f"{self.address.spec_path}/{self.value.filename}"
+
+
+@rule_helper
+async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSources:
+    target = request.protocol_target
+    url_field = target[URLField]
+    http_source = url_field.value
+    if not http_source:
+        return GeneratedSources(request.protocol_sources)
+
+    file_digest = FileDigest(http_source.sha256, http_source.len)
+    # NB: This just has to run, we don't actually need the result because we know the Digest's
+    # FileEntry metadata.
+    await Get(Digest, DownloadFile(http_source.url, file_digest))
+    snapshot = await Get(
+        Snapshot,
+        CreateDigest(
+            [
+                FileEntry(
+                    path=url_field.file_path,
+                    file_digest=file_digest,
+                )
+            ]
+        ),
+    )
+
+    return GeneratedSources(snapshot)
+
+
+class _AssetTarget(Target):
+    source_field_cls: ClassVar[type[OptionalSingleSourceField]]
+
+    def validate(self) -> None:
+        if self[self.source_field_cls].value and self[URLField].value:
+            raise InvalidFieldException(
+                softwrap(
+                    f"""
+                    The `{self.alias}` {self.address} specifies both the `source` and `url` fields.
+                    Only one can be specified
+                    """
+                )
+            )
+        if not (self[self.source_field_cls].value or self[URLField].value):
+            raise RequiredFieldMissingException(
+                softwrap(
+                    f"""
+                    The `{self.alias}` {self.address} is missing a value for either the `source` or
+                    `url` fields.
+                    """
+                )
+            )
+
 
 # -----------------------------------------------------------------------------------------------
 # `file` and`files` targets
 # -----------------------------------------------------------------------------------------------
-
-
-class FileSourceField(SingleSourceField):
+class FileSourceField(OptionalSingleSourceField):
     uses_source_roots = False
 
 
-class FileTarget(Target):
+class FileTarget(_AssetTarget):
     alias = "file"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourceField)
+    source_field_cls = FileSourceField
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourceField, URLField)
     help = softwrap(
         """
         A single loose file that lives outside of code packages.
@@ -65,6 +176,17 @@ class FileTarget(Target):
         Python's `open()`, via paths relative to the repository root.
         """
     )
+
+
+class GenerateFileSourceRequest(GenerateSourcesRequest):
+    input = FileSourceField
+    output = FileSourceField
+    exportable = False
+
+
+@rule
+async def hydrate_file_source(request: GenerateFileSourceRequest) -> GeneratedSources:
+    return await _hydrate_asset_source(request)
 
 
 class FilesGeneratingSourcesField(MultipleSourcesField):
@@ -249,13 +371,15 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
 # -----------------------------------------------------------------------------------------------
 
 
-class ResourceSourceField(SingleSourceField):
+class ResourceSourceField(OptionalSingleSourceField):
+    required = False
     uses_source_roots = True
 
 
-class ResourceTarget(Target):
+class ResourceTarget(_AssetTarget):
     alias = "resource"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourceField)
+    source_field_cls = ResourceSourceField
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourceField, URLField)
     help = softwrap(
         """
         A single resource file embedded in a code package and accessed in a
@@ -266,6 +390,17 @@ class ResourceTarget(Target):
         Python's `pkgutil` or JVM's ClassLoader, via paths relative to the target's source root.
         """
     )
+
+
+class GenerateResourceSourceRequest(GenerateSourcesRequest):
+    input = ResourceSourceField
+    output = ResourceSourceField
+    exportable = False
+
+
+@rule
+async def hydrate_resource_source(request: GenerateResourceSourceRequest) -> GeneratedSources:
+    return await _hydrate_asset_source(request)
 
 
 class ResourcesGeneratingSourcesField(MultipleSourcesField):
@@ -370,14 +505,16 @@ class AllAssetTargetsByPath:
 def map_assets_by_path(
     all_asset_targets: AllAssetTargets,
 ) -> AllAssetTargetsByPath:
+    def get_path(tgt: Target, field_cls: type[OptionalSingleSourceField]) -> PurePath:
+        return PurePath(tgt[field_cls].file_path or tgt[URLField].file_path)
+
     resources_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
     for resource_tgt in all_asset_targets.resources:
-        path = PurePath(resource_tgt[ResourceSourceField].file_path)
-        resources_by_path[path].add(resource_tgt)
+        resources_by_path[get_path(resource_tgt, ResourceSourceField)].add(resource_tgt)
 
     files_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
     for file_tgt in all_asset_targets.files:
-        files_by_path[PurePath(file_tgt[FileSourceField].file_path)].add(file_tgt)
+        files_by_path[get_path(file_tgt, FileSourceField)].add(file_tgt)
 
     return AllAssetTargetsByPath(
         FrozenDict((key, frozenset(values)) for key, values in resources_by_path.items()),
@@ -543,6 +680,8 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 def rules():
     return (
         *collect_rules(),
+        UnionRule(GenerateSourcesRequest, GenerateResourceSourceRequest),
+        UnionRule(GenerateSourcesRequest, GenerateFileSourceRequest),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),
         UnionRule(PackageFieldSet, ArchiveFieldSet),
     )
