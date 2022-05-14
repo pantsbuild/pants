@@ -105,7 +105,6 @@ async def resolve_scala_plugins_for_target(
     jvm: JvmSubsystem,
     scalac: Scalac,
 ) -> ScalaPluginTargetsForTarget:
-
     target = request.target
     resolve = request.resolve_name
 
@@ -125,7 +124,7 @@ async def resolve_scala_plugins_for_target(
 
     artifact_addresses = await MultiGet(
         # `is not None` is solely to satiate mypy. artifact field is required.
-        Get(Address, AddressInput, AddressInput.parse(ai))
+        Get(Address, AddressInput, AddressInput.parse(ai, relative_to=target.address.spec_path))
         for ai in artifact_address_inputs
         if ai is not None
     )

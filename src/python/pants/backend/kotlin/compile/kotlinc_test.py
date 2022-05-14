@@ -389,7 +389,6 @@ def test_compile_with_kotlinc_plugin(
                     name = "allopen",
                     plugin_id = "org.jetbrains.kotlin.allopen",
                     plugin_args = ["annotation=lib.MarkOpen"],
-                    # TODO: Support relative addresses.
                     artifact = "3rdparty/jvm:org.jetbrains.kotlin_kotlin-allopen_{_KOTLIN_VERSION}",
                 )
 
