@@ -477,7 +477,9 @@ async def infer_python_init_dependencies(
         ),
     )
     owners = await MultiGet(Get(Owners, OwnersRequest((f,))) for f in init_files.snapshot.files)
-    return InferredDependencies(itertools.chain.from_iterable(owners))
+    owner_tgts = await Get(Targets, Addresses(itertools.chain.from_iterable(owners)))
+    python_owners = [tgt.address for tgt in owner_tgts if tgt.has_field(PythonSourceField)]
+    return InferredDependencies(python_owners)
 
 
 class InferConftestDependencies(InferDependenciesRequest):
