@@ -8,7 +8,7 @@ import os
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Sequence, cast
+from typing import Optional, Sequence, Union, cast
 
 from pants.core.goals.package import (
     BuiltPackage,
@@ -98,8 +98,8 @@ class AssetSourceField(SingleSourceField):
 
     @classmethod
     def compute_value(  # type: ignore[override]
-        cls, raw_value: Optional[str | HTTPSource], address: Address
-    ) -> Optional[str | HTTPSource]:
+        cls, raw_value: Optional[Union[str, HTTPSource]], address: Address
+    ) -> Optional[Union[str, HTTPSource]]:
         if raw_value is None or isinstance(raw_value, str):
             return super().compute_value(raw_value, address)
         elif not isinstance(raw_value, HTTPSource):
