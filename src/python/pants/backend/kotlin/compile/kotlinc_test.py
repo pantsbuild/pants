@@ -524,8 +524,7 @@ def test_compile_with_kotlinc_plugin(rule_runner: RuleRunner) -> None:
                     name = "allopen",
                     plugin_id = "org.jetbrains.kotlin.allopen",
                     plugin_args = ["annotation=lib.MarkOpen"],
-                    # TODO: Support relative addresses.
-                    artifact = "lib:allopen_lib",
+                    artifact = ":allopen_lib",
                 )
 
                 kotlin_sources()
