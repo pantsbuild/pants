@@ -118,7 +118,6 @@ class KotlincPluginArtifactField(StringField):
 
 class KotlincPluginIdField(StringField):
     alias = "plugin_id"
-    required = True
     help = softwrap(
         """
         The ID for `kotlinc` to use when setting options for the plugin.
