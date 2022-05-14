@@ -12,7 +12,6 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.project_info import peek
 from pants.backend.python import target_types_rules as python_target_type_rules
 from pants.backend.python.goals import package_pex_binary, run_pex_binary
 from pants.backend.python.target_types import PexBinary, PythonSourceTarget
@@ -400,13 +399,13 @@ def test_url_assets(asset_type) -> None:
                 f"""\
                 {asset_type}(
                     name='antigravity',
-                    url=http_source(
+                    source=http_source(
                         {http_source_info},
                     ),
                 )
                 {asset_type}(
                     name='antigravity_renamed',
-                    url=http_source(
+                    source=http_source(
                         {http_source_info},
                         filename="antigravity_renamed.py",
                     ),
@@ -480,27 +479,3 @@ def test_url_assets(asset_type) -> None:
 def test_invalid_http_source(kwargs, exc_match):
     with exc_match:
         HTTPSource(**kwargs)
-
-
-@pytest.mark.parametrize("asset_type", ("file", "resource"))
-def test_invalid_asset_fields(asset_type):
-    rule_runner = RuleRunner(
-        rules=[
-            *peek.rules(),
-        ],
-        target_types=[FileTarget, ResourceTarget],
-        objects={"http_source": HTTPSource},
-    )
-    rule_runner.write_files(
-        {
-            "missing_both/BUILD": f"{asset_type}()",
-            "gives_both/BUILD": (
-                f"{asset_type}(source='foo', url=http_source(url='http://foo/bar', len=0, sha256=''))"
-            ),
-        }
-    )
-    result = rule_runner.run_goal_rule(
-        peek.Peek,
-        args=["missing_both:"],
-    )
-    assert "missing a value for either the `source` or `url` fields." in result.stdout

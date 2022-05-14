@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import builtins
 import dataclasses
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, cast
+from typing import Optional, Sequence, cast
 
 from pants.core.goals.package import (
     BuiltPackage,
@@ -16,7 +17,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
-from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -32,7 +33,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
-    AsyncFieldMixin,
     Dependencies,
     FieldSet,
     FieldSetsPerTarget,
@@ -41,11 +41,10 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
-    InvalidFieldException,
+    InvalidFieldTypeException,
     MultipleSourcesField,
-    OptionalSingleSourceField,
     OverridesField,
-    ScalarField,
+    SingleSourceField,
     SourcesField,
     SpecialCasedDependencies,
     StringField,
@@ -94,25 +93,49 @@ class HTTPSource:
             raise ValueError("`filename` cannot contain a path separator.")
 
 
-class URLField(ScalarField[HTTPSource], AsyncFieldMixin):
-    alias = "url"
-    expected_type = HTTPSource
-    expected_type_description = "an `http_source` object"
+class AssetSourceField(SingleSourceField):
+    value: str | HTTPSource  # type: ignore[assignment]
+
+    @classmethod
+    def compute_value(  # type: ignore[override]
+        cls, raw_value: Optional[str | HTTPSource], address: Address
+    ) -> Optional[str | HTTPSource]:
+        if raw_value is None or isinstance(raw_value, str):
+            return super().compute_value(raw_value, address)
+        elif not isinstance(raw_value, HTTPSource):
+            raise InvalidFieldTypeException(
+                address,
+                cls.alias,
+                raw_value,
+                expected_type="a string or an `http_source` object",
+            )
+        return raw_value
+
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        if isinstance(self.value, str):
+            super().validate_resolved_files(files)
+
+    @property
+    def globs(self) -> tuple[str, ...]:
+        if isinstance(self.value, str):
+            return (self.value,)
+        return ()
 
     @property
     def file_path(self) -> str:
         assert self.value
-        return f"{self.address.spec_path}/{self.value.filename}"
+        filename = self.value if isinstance(self.value, str) else self.value.filename
+        return os.path.join(self.address.spec_path, filename)
 
 
 @rule_helper
 async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSources:
     target = request.protocol_target
-    url_field = target[URLField]
-    http_source = url_field.value
-    if not http_source:
+    source_field = target[AssetSourceField]
+    if isinstance(source_field.value, str):
         return GeneratedSources(request.protocol_sources)
 
+    http_source = source_field.value
     file_digest = FileDigest(http_source.sha256, http_source.len)
     # NB: This just has to run, we don't actually need the result because we know the Digest's
     # FileEntry metadata.
@@ -122,7 +145,7 @@ async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSou
         CreateDigest(
             [
                 FileEntry(
-                    path=url_field.file_path,
+                    path=source_field.file_path,
                     file_digest=file_digest,
                 )
             ]
@@ -132,41 +155,17 @@ async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSou
     return GeneratedSources(snapshot)
 
 
-class _AssetTarget(Target):
-    source_field_cls: ClassVar[type[OptionalSingleSourceField]]
-
-    def validate(self) -> None:
-        if self[self.source_field_cls].value and self[URLField].value:
-            raise InvalidFieldException(
-                softwrap(
-                    f"""
-                    The `{self.alias}` {self.address} specifies both the `source` and `url` fields.
-                    Only one can be specified
-                    """
-                )
-            )
-        if not (self[self.source_field_cls].value or self[URLField].value):
-            raise InvalidFieldException(
-                softwrap(
-                    f"""
-                    The `{self.alias}` {self.address} is missing a value for either the `source` or
-                    `url` fields.
-                    """
-                )
-            )
-
-
 # -----------------------------------------------------------------------------------------------
 # `file` and`files` targets
 # -----------------------------------------------------------------------------------------------
-class FileSourceField(OptionalSingleSourceField):
+class FileSourceField(AssetSourceField):
     uses_source_roots = False
 
 
-class FileTarget(_AssetTarget):
+class FileTarget(Target):
     alias = "file"
     source_field_cls = FileSourceField
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourceField, URLField)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourceField)
     help = softwrap(
         """
         A single loose file that lives outside of code packages.
@@ -371,15 +370,14 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
 # -----------------------------------------------------------------------------------------------
 
 
-class ResourceSourceField(OptionalSingleSourceField):
-    required = False
+class ResourceSourceField(AssetSourceField):
     uses_source_roots = True
 
 
-class ResourceTarget(_AssetTarget):
+class ResourceTarget(Target):
     alias = "resource"
     source_field_cls = ResourceSourceField
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourceField, URLField)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourceField)
     help = softwrap(
         """
         A single resource file embedded in a code package and accessed in a
@@ -505,16 +503,14 @@ class AllAssetTargetsByPath:
 def map_assets_by_path(
     all_asset_targets: AllAssetTargets,
 ) -> AllAssetTargetsByPath:
-    def get_path(tgt: Target, field_cls: type[OptionalSingleSourceField]) -> PurePath:
-        return PurePath(tgt[field_cls].file_path or tgt[URLField].file_path)
 
     resources_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
     for resource_tgt in all_asset_targets.resources:
-        resources_by_path[get_path(resource_tgt, ResourceSourceField)].add(resource_tgt)
+        resources_by_path[PurePath(resource_tgt[ResourceSourceField].file_path)].add(resource_tgt)
 
     files_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
     for file_tgt in all_asset_targets.files:
-        files_by_path[get_path(file_tgt, FileSourceField)].add(file_tgt)
+        files_by_path[PurePath(file_tgt[FileSourceField].file_path)].add(file_tgt)
 
     return AllAssetTargetsByPath(
         FrozenDict((key, frozenset(values)) for key, values in resources_by_path.items()),
