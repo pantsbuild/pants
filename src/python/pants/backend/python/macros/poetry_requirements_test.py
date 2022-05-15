@@ -505,7 +505,7 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                 },
                 address=Address("", target_name="reqs", generated_name="Un-Normalized-PROJECT"),
             ),
-            TargetGeneratorSourcesHelperTarget({"sources": ["pyproject.toml"]}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"source": "pyproject.toml"}, file_addr),
         },
     )
 
@@ -528,7 +528,7 @@ def test_source_override(rule_runner: RuleRunner) -> None:
                 {"dependencies": [file_addr.spec], "requirements": ["ansicolors>=1.18.0"]},
                 address=Address("", target_name="reqs", generated_name="ansicolors"),
             ),
-            TargetGeneratorSourcesHelperTarget({"sources": ["subdir/pyproject.toml"]}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"source": "subdir/pyproject.toml"}, file_addr),
         },
     )
 
@@ -557,7 +557,7 @@ def test_no_req_defined_warning(rule_runner: RuleRunner, caplog) -> None:
         """,
         expected_targets={
             TargetGeneratorSourcesHelperTarget(
-                {"sources": ["pyproject.toml"]},
+                {"source": "pyproject.toml"},
                 Address("", target_name="reqs", relative_file_path="pyproject.toml"),
             )
         },

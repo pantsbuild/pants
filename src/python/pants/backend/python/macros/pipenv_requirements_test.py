@@ -79,6 +79,6 @@ def test_pipfile_lock(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="reqs", generated_name="cachetools"),
             ),
-            TargetGeneratorSourcesHelperTarget({"sources": ["Pipfile.lock"]}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"source": "Pipfile.lock"}, file_addr),
         },
     )
