@@ -375,7 +375,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
 
     classpath = rule_runner.request(RenderedClasspath, [request])
     assert classpath.content == {
-        "a.A.java.javac.jar": {
+        "a.A.java.a.javac.jar": {
             "org/pantsbuild/a/A.class",
             "org/pantsbuild/a/C.class",
             "org/pantsbuild/b/B.class",
