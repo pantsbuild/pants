@@ -109,7 +109,7 @@ class AssetSourceField(SingleSourceField):
         """
         The source of this target.
 
-        If a string is provided, represents a path is relative to the BUILD file's directory,
+        If a string is provided, represents a path that is relative to the BUILD file's directory,
         e.g. `source='example.ext'`.
 
         If an http_source is provided, represents the network location to download the source from.
