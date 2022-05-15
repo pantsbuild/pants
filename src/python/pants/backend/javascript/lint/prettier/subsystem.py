@@ -8,18 +8,29 @@ from typing import Iterable
 
 from pants.backend.javascript.subsystems.nodejs import NpxToolBase
 from pants.core.util_rules.config_files import ConfigFilesRequest
+from pants.option.option_types import ArgsListOption, SkipOption
+from pants.util.strutil import softwrap
 
 
-class PrettierJS(NpxToolBase):
+class Prettier(NpxToolBase):
     options_scope = "prettier"
-    help = "The PrettierJS formatting tool."
+    name = "Prettier"
+    help = softwrap(
+        """
+        The Prettier utility for formatting JS/TS (and others) code
+        (https://prettier.io/).
+        """
+    )
 
-    default_version = "prettier@2.6.0"
+    default_version = "prettier@2.6.2"
+
+    skip = SkipOption("fmt", "lint")
+    args = ArgsListOption(example="--version")
 
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
-        """PrettierJS will use the closest configuration file to the file currently being formatted,
-        so add all of them In the event of multiple configuration files, PretterJS has an order of
-        precedence specified here:https://prettier.io/docs/en/configuration.html."""
+        """Prettier will use the closest configuration file to the file currently being formatted,
+        so add all of them In the event of multiple configuration files, Prettier has an order of
+        precedence specified here: https://prettier.io/docs/en/configuration.html."""
 
         config_files = (
             *[f"prettier.config{ext}" for ext in [".js", ".cjs"]],

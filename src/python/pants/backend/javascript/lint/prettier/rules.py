@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.javascript.lint.prettierjs.subsystem import PrettierJS
+from pants.backend.javascript.lint.prettier.subsystem import Prettier
 from pants.backend.javascript.subsystems.nodejs import DownloadedNpxTool, NpxToolRequest
 from pants.backend.javascript.target_types import JSSourceField
 from pants.core.goals.fmt import FmtRequest, FmtResult
@@ -32,17 +32,17 @@ class PrettierFmtFieldSet(FieldSet):
 
 class PrettierFmtRequest(FmtRequest):
     field_set_type = PrettierFmtFieldSet
-    name = PrettierJS.options_scope
+    name = Prettier.options_scope
 
 
 @rule(level=LogLevel.DEBUG)
-async def prettier_fmt(request: PrettierFmtRequest, prettier: PrettierJS) -> FmtResult:
-    # if prettier.skip:
-    # return FmtResult.skip(formatter_name=request.name)
+async def prettier_fmt(request: PrettierFmtRequest, prettier: Prettier) -> FmtResult:
+    if prettier.skip:
+        return FmtResult.skip(formatter_name=request.name)
 
     prettier_tool_get = Get(DownloadedNpxTool, NpxToolRequest, prettier.get_request())
 
-    # Look for any/all of the PrettierJS configuration files
+    # Look for any/all of the Prettier configuration files
     config_files_get = Get(
         ConfigFiles,
         ConfigFilesRequest,
@@ -76,7 +76,7 @@ async def prettier_fmt(request: PrettierFmtRequest, prettier: PrettierJS) -> Fmt
             argv=argv,
             input_digest=input_digest,
             output_files=request.snapshot.files,
-            description=f"Run prettier on {pluralize(len(request.snapshot.files), 'file')}.",
+            description=f"Run Prettier on {pluralize(len(request.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
             env=prettier_tool.env,
         ),
