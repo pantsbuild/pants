@@ -286,7 +286,8 @@ async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFm
             continue
         result = await Get(FmtResult, FmtRequest, request)
         results.append(result)
-        prior_formatter_result = result.output
+        if not result.skipped:
+            prior_formatter_result = result.output
     return _LanguageFmtResults(
         tuple(results),
         input=original_sources.snapshot.digest,
