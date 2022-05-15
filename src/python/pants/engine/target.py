@@ -1539,7 +1539,7 @@ class ScalarField(Generic[T], Field):
 
             @classmethod
             def compute_value(
-                cls, raw_value: Optional[MyPluginObject], *, address: Address
+                cls, raw_value: Optional[MyPluginObject], address: Address
             ) -> Optional[MyPluginObject]:
                 return super().compute_value(raw_value, address=address)
     """
