@@ -113,10 +113,14 @@ class AssetSourceField(SingleSourceField):
         e.g. `source='example.ext'`.
 
         If an http_source is provided, represents the network location to download the source from.
+        The downloaded file will exist in the sandbox in the same directory as the target.
         `http_source` has the following signature:
-            http_source(url: str, *, len: int, sha256: str, filename: Optional[str])
-        The filename defaults to the last part of the URL path (E.g. `example.ext`). You can easily
-        get the len and checksum with the following command:
+            http_source(url: str, *, len: int, sha256: str, filename: str = "")
+        The filename defaults to the last part of the URL path (E.g. `example.ext`), but can also be
+        specified if you wish to have control over the file name. You cannot, however, specify a
+        path separator to download the file into a subdirectory (you must declare a target in desired
+        subdirectory).
+        You can easily get the len and checksum with the following command:
             `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
         """
     )
