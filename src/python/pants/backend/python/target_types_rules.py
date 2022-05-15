@@ -484,7 +484,7 @@ async def validate_python_dependencies(
     # ... should be replaced with calls to InterpreterConstraintsField.value_or_global_default.
     deprecated_conditional(
         lambda: bool(non_subset_items),
-        removal_version="2.13.0.dev2",
+        removal_version="2.13.0.dev3",
         entity=(
             "the `interpreter_constraints` of a target not being a subset "
             "of its dependencies' `interpreter_constraints`"
