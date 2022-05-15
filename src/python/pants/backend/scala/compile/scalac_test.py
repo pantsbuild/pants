@@ -519,8 +519,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
 
                 scalac_plugin(
                     name = "acyclic",
-                    # TODO: Support relative addresses.
-                    artifact = "lib:acyclic_lib",
+                    artifact = ":acyclic_lib",
                 )
 
                 scala_sources(
@@ -617,8 +616,7 @@ def test_compile_with_local_scalac_plugin(rule_runner: RuleRunner) -> None:
 
                 scalac_plugin(
                     name = "acyclic",
-                    # TODO: Support relative addresses.
-                    artifact = "lib:acyclic_lib",
+                    artifact = ":acyclic_lib",
                 )
 
                 scala_sources(
@@ -728,8 +726,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
                 scalac_plugin(
                     name="kind-projector",
                     plugin_name="kind-projector",
-                    # TODO: Support relative addresses.
-                    artifact="lib:kind-projector-lib",
+                    artifact=":kind-projector-lib",
                 )
 
                 jvm_artifact(
@@ -742,8 +739,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
                 scalac_plugin(
                     name="better-monadic-for",
                     plugin_name="bm4",
-                    # TODO: Support relative addresses.
-                    artifact="lib:better-monadic-for-lib",
+                    artifact=":better-monadic-for-lib",
                 )
                 """
             ),
