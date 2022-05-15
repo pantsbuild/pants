@@ -1130,10 +1130,10 @@ def test_parametrize(generated_targets_rule_runner: RuleRunner) -> None:
             ),
         },
         dependencies={
-            "demo@tags=t1": {"demo/f1.ext@tags=t1"},
-            "demo@tags=t2": {"demo/f1.ext@tags=t2"},
-            "demo/f1.ext@tags=t1": set(),
-            "demo/f1.ext@tags=t2": set(),
+            "demo:demo@tags=t1": {"demo/f1.ext:demo@tags=t1"},
+            "demo:demo@tags=t2": {"demo/f1.ext:demo@tags=t2"},
+            "demo/f1.ext:demo@tags=t1": set(),
+            "demo/f1.ext:demo@tags=t2": set(),
         },
     )
 
@@ -1202,13 +1202,13 @@ def test_parametrize_overrides(generated_targets_rule_runner: RuleRunner) -> Non
         },
         dependencies={
             "demo:demo": {
-                "demo/f1.ext@resolve=a",
-                "demo/f1.ext@resolve=b",
-                "demo/f2.ext",
+                "demo/f1.ext:demo@resolve=a",
+                "demo/f1.ext:demo@resolve=b",
+                "demo/f2.ext:demo",
             },
-            "demo/f1.ext@resolve=a": set(),
-            "demo/f1.ext@resolve=b": set(),
-            "demo/f2.ext": set(),
+            "demo/f1.ext:demo@resolve=a": set(),
+            "demo/f1.ext:demo@resolve=b": set(),
+            "demo/f2.ext:demo": set(),
         },
     )
 
@@ -1232,8 +1232,8 @@ def test_parametrize_atom(generated_targets_rule_runner: RuleRunner) -> None:
             ),
         },
         dependencies={
-            "demo@resolve=a": set(),
-            "demo@resolve=b": set(),
+            "demo:demo@resolve=a": set(),
+            "demo:demo@resolve=b": set(),
         },
     )
 

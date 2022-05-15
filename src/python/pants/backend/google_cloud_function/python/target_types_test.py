@@ -251,7 +251,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     assert len(caplog.records) == 1
     assert (
         "['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/"
-        "ambiguous_in_another_root.py']"
+        "ambiguous_in_another_root.py:project']"
     ) in caplog.text
 
     # Test that we can turn off the injection.

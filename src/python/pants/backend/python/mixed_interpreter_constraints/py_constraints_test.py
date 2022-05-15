@@ -87,13 +87,13 @@ def test_render_constraints(rule_runner: RuleRunner) -> None:
         Final merged constraints: CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6
 
         CPython==3.7.*
-          app/f.py
+          app/f.py:app
 
         CPython>=3.6
-          lib2/f.py
+          lib2/f.py:lib2
 
         CPython==2.7.* OR CPython>=3.5
-          lib1/f.py
+          lib1/f.py:lib1
         """
     )
 
@@ -108,8 +108,8 @@ def test_constraints_summary(rule_runner: RuleRunner) -> None:
     assert result.stdout == dedent(
         """\
         Target,Constraints,Transitive Constraints,# Dependencies,# Dependees\r
-        app/f.py,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",2,1\r
-        lib1/f.py,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,3\r
-        lib2/f.py,CPython>=3.6,CPython>=3.6,0,3\r
+        app/f.py:app,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",2,1\r
+        lib1/f.py:lib1,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,3\r
+        lib2/f.py:lib2,CPython>=3.6,CPython>=3.6,0,3\r
         """
     )

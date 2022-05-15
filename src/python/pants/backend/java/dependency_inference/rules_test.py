@@ -218,11 +218,11 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     )
     rule_runner.write_files(
         {
-            "a_one/BUILD": "java_sources()",
+            "a_one/BUILD": "java_sources(name='lib')",
             "a_one/A.java": ambiguous_source,
-            "a_two/BUILD": "java_sources()",
+            "a_two/BUILD": "java_sources(name='lib')",
             "a_two/A.java": ambiguous_source,
-            "b/BUILD": "java_sources()",
+            "b/BUILD": "java_sources(name='lib')",
             "b/B.java": dedent(
                 """\
                 package org.pantsbuild.b;
@@ -233,7 +233,8 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
             "c/BUILD": dedent(
                 """\
                 java_sources(
-                  dependencies=["!a_two/A.java"],
+                  name="lib",
+                  dependencies=["!a_two/A.java:lib"],
                 )
                 """
             ),
@@ -246,8 +247,8 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
             ),
         }
     )
-    target_b = rule_runner.get_target(Address("b", relative_file_path="B.java"))
-    target_c = rule_runner.get_target(Address("c", relative_file_path="C.java"))
+    target_b = rule_runner.get_target(Address("b", target_name="lib", relative_file_path="B.java"))
+    target_c = rule_runner.get_target(Address("c", target_name="lib", relative_file_path="C.java"))
 
     # Because there are two sources of `org.pantsbuild.a.A`, neither should be inferred for B. But C
     # disambiguates with a `!`, and so gets the appropriate version.
@@ -257,12 +258,15 @@ def test_infer_java_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None:
     ) == InferredDependencies(dependencies=[])
     assert len(caplog.records) == 1
     assert (
-        "The target b/B.java imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
+        "The target b/B.java:lib imports `org.pantsbuild.a.A`, but Pants cannot safely"
+        in caplog.text
     )
 
     assert rule_runner.request(
         InferredDependencies, [InferJavaSourceDependencies(target_c[JavaSourceField])]
-    ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.java")])
+    ) == InferredDependencies(
+        dependencies=[Address("a_one", target_name="lib", relative_file_path="A.java")]
+    )
 
 
 @maybe_skip_jdk_test

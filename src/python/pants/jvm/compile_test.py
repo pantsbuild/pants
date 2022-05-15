@@ -330,7 +330,7 @@ def test_compile_mixed(rule_runner: RuleRunner) -> None:
         "org/pantsbuild/example/Main$.class",
         "org/pantsbuild/example/Main.class",
     }
-    assert rendered_classpath.content["lib.C.java.javac.jar"] == {
+    assert rendered_classpath.content["lib.C.java.lib.javac.jar"] == {
         "org/pantsbuild/example/lib/C.class",
     }
     assert any(

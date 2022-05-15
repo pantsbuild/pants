@@ -1076,7 +1076,7 @@ def test_owned_dependencies() -> None:
     assert_owned(
         [
             "src/python/foo/bar/bar2.py:bar2",
-            "src/python/foo/foo.py",
+            "src/python/foo/foo.py:foo",
             "src/python/foo:foo-dist",
             "src/python/foo/bar:bar-resources",
             "src/python/foo/bar/baz:baz2",

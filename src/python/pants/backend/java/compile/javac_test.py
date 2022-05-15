@@ -367,7 +367,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
     coarsened_target = expect_single_expanded_coarsened_target(
         rule_runner, Address(spec_path="a", target_name="a")
     )
-    assert sorted(t.address.spec for t in coarsened_target.members) == ["a/A.java", "b/B.java"]
+    assert sorted(t.address.spec for t in coarsened_target.members) == ["a/A.java:a", "b/B.java:b"]
 
     request = CompileJavaSourceRequest(
         component=coarsened_target, resolve=make_resolve(rule_runner)

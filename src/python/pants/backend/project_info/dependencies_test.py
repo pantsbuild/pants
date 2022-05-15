@@ -94,12 +94,12 @@ def test_no_dependencies(rule_runner: RuleRunner) -> None:
     assert_dependencies(rule_runner, specs=["some/target/a.py"], expected=[])
     assert_dependencies(rule_runner, specs=["some/target/a.py"], expected=[], transitive=True)
     assert_dependencies(
-        rule_runner, specs=["some/target/a.py"], expected=["some/target/a.py"], closed=True
+        rule_runner, specs=["some/target/a.py"], expected=["some/target/a.py:target"], closed=True
     )
     assert_dependencies(
         rule_runner,
         specs=["some/target/a.py"],
-        expected=["some/target/a.py"],
+        expected=["some/target/a.py:target"],
         transitive=True,
         closed=True,
     )
@@ -138,12 +138,12 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
     assert_deps(
         specs=["some/other/target"],
         transitive=False,
-        expected=["some/other/target/a.py"],
+        expected=["some/other/target/a.py:target"],
     )
     assert_deps(
         specs=["some/other/target/a.py"],
         transitive=False,
-        expected=["3rdparty/python:req2", "some/target/a.py"],
+        expected=["3rdparty/python:req2", "some/target/a.py:target"],
     )
     assert_deps(
         specs=["some/other/target"],
@@ -151,9 +151,9 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
         expected=[
             "3rdparty/python:req1",
             "3rdparty/python:req2",
-            "dep/target/a.py",
-            "some/other/target/a.py",
-            "some/target/a.py",
+            "dep/target/a.py:target",
+            "some/other/target/a.py:target",
+            "some/target/a.py:target",
         ],
     )
 
@@ -164,9 +164,9 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
         expected=[
             "3rdparty/python:req1",
             "3rdparty/python:req2",
-            "dep/target/a.py",
-            "some/other/target/a.py",
-            "some/target/a.py",
+            "dep/target/a.py:target",
+            "some/other/target/a.py:target",
+            "some/target/a.py:target",
         ],
     )
     assert_deps(
@@ -175,9 +175,9 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
         expected=[
             "3rdparty/python:req1",
             "3rdparty/python:req2",
-            "dep/target/a.py",
-            "some/other/target/a.py",
-            "some/target/a.py",
+            "dep/target/a.py:target",
+            "some/other/target/a.py:target",
+            "some/target/a.py:target",
         ],
     )
     assert_deps(
@@ -185,11 +185,11 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
         expected=[
             "3rdparty/python:req1",
             "3rdparty/python:req2",
-            "dep/target/a.py",
+            "dep/target/a.py:target",
             "dep/target:target",
-            "some/other/target/a.py",
+            "some/other/target/a.py:target",
             "some/other/target:target",
-            "some/target/a.py",
+            "some/target/a.py:target",
             "some/target:target",
         ],
         closed=True,
@@ -200,11 +200,11 @@ def test_python_dependencies(rule_runner: RuleRunner) -> None:
         expected=[
             "3rdparty/python:req1",
             "3rdparty/python:req2",
-            "dep/target/a.py",
+            "dep/target/a.py:target",
             "dep/target:target",
-            "some/other/target/a.py",
+            "some/other/target/a.py:target",
             "some/other/target:target",
-            "some/target/a.py",
+            "some/target/a.py:target",
             "some/target:target",
         ],
         closed=True,

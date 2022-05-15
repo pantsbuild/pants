@@ -54,20 +54,20 @@ def test_to_parameters_failure(exception_str: str, args: list[Any], kwargs: dict
     "expected,fields",
     [
         ([("a:a", {"f": "b"})], {"f": "b"}),
-        ([("a@f=b", {"f": "b"})], {"f": Parametrize("b")}),
+        ([("a:a@f=b", {"f": "b"})], {"f": Parametrize("b")}),
         (
             [
-                ("a@f=b", {"f": "b"}),
-                ("a@f=c", {"f": "c"}),
+                ("a:a@f=b", {"f": "b"}),
+                ("a:a@f=c", {"f": "c"}),
             ],
             {"f": Parametrize("b", "c")},
         ),
         (
             [
-                ("a@f=b,x=d", {"f": "b", "x": "d"}),
-                ("a@f=b,x=e", {"f": "b", "x": "e"}),
-                ("a@f=c,x=d", {"f": "c", "x": "d"}),
-                ("a@f=c,x=e", {"f": "c", "x": "e"}),
+                ("a:a@f=b,x=d", {"f": "b", "x": "d"}),
+                ("a:a@f=b,x=e", {"f": "b", "x": "e"}),
+                ("a:a@f=c,x=d", {"f": "c", "x": "d"}),
+                ("a:a@f=c,x=e", {"f": "c", "x": "e"}),
             ],
             {"f": Parametrize("b", "c"), "x": Parametrize("d", "e")},
         ),

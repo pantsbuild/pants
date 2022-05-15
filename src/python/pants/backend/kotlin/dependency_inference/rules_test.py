@@ -153,11 +153,11 @@ def test_infer_kotlin_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None
     )
     rule_runner.write_files(
         {
-            "a_one/BUILD": "kotlin_sources()",
+            "a_one/BUILD": "kotlin_sources(name='lib')",
             "a_one/A.kt": ambiguous_source,
-            "a_two/BUILD": "kotlin_sources()",
+            "a_two/BUILD": "kotlin_sources(name='lib')",
             "a_two/A.kt": ambiguous_source,
-            "b/BUILD": "kotlin_sources()",
+            "b/BUILD": "kotlin_sources(name='lib')",
             "b/B.kt": dedent(
                 """\
                 package org.pantsbuild.b
@@ -168,7 +168,8 @@ def test_infer_kotlin_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None
             "c/BUILD": dedent(
                 """\
                 kotlin_sources(
-                  dependencies=["!a_two/A.kt"],
+                  name="lib",
+                  dependencies=["!a_two/A.kt:lib"],
                 )
                 """
             ),
@@ -181,8 +182,8 @@ def test_infer_kotlin_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None
             ),
         }
     )
-    target_b = rule_runner.get_target(Address("b", relative_file_path="B.kt"))
-    target_c = rule_runner.get_target(Address("c", relative_file_path="C.kt"))
+    target_b = rule_runner.get_target(Address("b", target_name="lib", relative_file_path="B.kt"))
+    target_c = rule_runner.get_target(Address("c", target_name="lib", relative_file_path="C.kt"))
 
     # Because there are two sources of `org.pantsbuild.a.A`, neither should be inferred for B. But C
     # disambiguates with a `!`, and so gets the appropriate version.
@@ -191,11 +192,15 @@ def test_infer_kotlin_imports_ambiguous(rule_runner: RuleRunner, caplog) -> None
         InferredDependencies, [InferKotlinSourceDependencies(target_b[KotlinSourceField])]
     ) == InferredDependencies(dependencies=[])
     assert len(caplog.records) == 1
-    assert "The target b/B.kt imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
+    assert (
+        "The target b/B.kt:lib imports `org.pantsbuild.a.A`, but Pants cannot safely" in caplog.text
+    )
 
     assert rule_runner.request(
         InferredDependencies, [InferKotlinSourceDependencies(target_c[KotlinSourceField])]
-    ) == InferredDependencies(dependencies=[Address("a_one", relative_file_path="A.kt")])
+    ) == InferredDependencies(
+        dependencies=[Address("a_one", target_name="lib", relative_file_path="A.kt")]
+    )
 
 
 @maybe_skip_jdk_test
