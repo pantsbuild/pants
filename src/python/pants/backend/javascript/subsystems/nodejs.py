@@ -4,18 +4,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Mapping
+from typing import Iterable
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
     TemplatedExternalTool,
 )
-from pants.engine.fs import Digest
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.platform import Platform
+from pants.engine.process import Process
 from pants.engine.rules import Get, Rule, SubsystemRule, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 
@@ -23,6 +23,7 @@ class NodeJS(TemplatedExternalTool):
     options_scope = "nodejs"
     help = "The NodeJS Javascript runtime (including npm and npx)."
 
+    # TODO: Update to latest LTS
     default_version = "v16.14.1"
     default_known_versions = [
         "v16.14.1|macos_arm64|8f6d45796f3d996484dcf53bb0e53cd019cd0ef7a1a247bd0178ebaa7e63a184|28983951",
@@ -40,49 +41,53 @@ class NodeJS(TemplatedExternalTool):
     }
 
     def generate_exe(self, plat: Platform) -> str:
+        assert self.default_url_platform_mapping is not None
         plat_str = self.default_url_platform_mapping[plat.value]
         return f"./node-{self.version}-{plat_str}/bin/node"
 
 
 @dataclass(frozen=True)
-class NpxToolRequest:
+class NpxProcess:
+    """A request to invoke the npx cli (via NodeJS)"""
+
     npm_package: str
-
-
-@dataclass(frozen=True)
-class DownloadedNpxTool:
-    digest: Digest
-    exe: str
-    env: Mapping[str, str]
-
-
-class NpxToolBase(Subsystem):
-    default_version: ClassVar[str]
-
-    def get_request(self) -> NpxToolRequest:
-        return NpxToolRequest(self.default_version)
+    argv: tuple[str, ...]
+    description: str
+    input_digest: Digest = EMPTY_DIGEST
+    output_files: tuple[str, ...] = ()
 
 
 @rule(level=LogLevel.DEBUG)
-async def download_npx_tool(request: NpxToolRequest, nodejs: NodeJS) -> DownloadedNpxTool:
+async def setup_npx_process(request: NpxProcess, nodejs: NodeJS) -> Process:
     # Ensure nodejs is installed
-    nodejs_tool = await Get(
+    downloaded_nodejs = await Get(
         DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(Platform.current)
     )
 
+    input_digest = await Get(Digest, MergeDigests((request.input_digest, downloaded_nodejs.digest)))
+
     # Get reference to npx
+    assert nodejs.default_url_platform_mapping is not None
     plat_str = nodejs.default_url_platform_mapping[Platform.current.value]
-    npx_args = (
-        nodejs_tool.exe,
-        f"./node-{nodejs.version}-{plat_str}/lib/node_modules/npm/bin/npx-cli.js",
+    nodejs_dir = f"node-{nodejs.version}-{plat_str}"
+    # TODO: This is a bit garbage, because the /bin/npx tries to load from the system node
+    npx_exe = (
+        downloaded_nodejs.exe,
+        f"./{nodejs_dir}/lib/node_modules/npm/bin/npx-cli.js",
         "--yes",
-        request.npm_package,
     )
 
-    return DownloadedNpxTool(
-        nodejs_tool.digest,
-        " ".join(npx_args),
-        {"PATH": f"/bin:./node-{nodejs.version}-{plat_str}/bin"},
+    return Process(
+        argv=(
+            *npx_exe,
+            request.npm_package,
+            *request.argv,
+        ),
+        input_digest=input_digest,
+        output_files=request.output_files,
+        description=request.description,
+        level=LogLevel.DEBUG,
+        env={"PATH": f"/bin:./{nodejs_dir}/bin"},
     )
 
 

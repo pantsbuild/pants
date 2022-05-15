@@ -8,13 +8,13 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
-from pants.backend.javascript.subsystems.nodejs import DownloadedNpxTool, NpxToolRequest
+from pants.backend.javascript.subsystems.nodejs import NpxProcess
 from pants.backend.javascript.target_types import JSSourceField
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests, Snapshot
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
+from pants.engine.process import ProcessResult
+from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -40,16 +40,12 @@ async def prettier_fmt(request: PrettierFmtRequest, prettier: Prettier) -> FmtRe
     if prettier.skip:
         return FmtResult.skip(formatter_name=request.name)
 
-    prettier_tool_get = Get(DownloadedNpxTool, NpxToolRequest, prettier.get_request())
-
     # Look for any/all of the Prettier configuration files
-    config_files_get = Get(
+    config_files = await Get(
         ConfigFiles,
         ConfigFilesRequest,
         prettier.config_request(request.snapshot.dirs),
     )
-
-    prettier_tool, config_files = await MultiGet(prettier_tool_get, config_files_get)
 
     # Merge source files, config files, and prettier_tool process
     input_digest = await Get(
@@ -58,27 +54,21 @@ async def prettier_fmt(request: PrettierFmtRequest, prettier: Prettier) -> FmtRe
             (
                 request.snapshot.digest,
                 config_files.snapshot.digest,
-                prettier_tool.digest,
             )
         ),
     )
 
-    logger.warning(prettier_tool.exe)
-    argv = [
-        *prettier_tool.exe.split(" "),
-        "--write",
-        *request.snapshot.files,
-    ]
-
     result = await Get(
         ProcessResult,
-        Process(
-            argv=argv,
+        NpxProcess(
+            npm_package=prettier.default_version,
+            argv=(
+                "--write",
+                *request.snapshot.files,
+            ),
             input_digest=input_digest,
             output_files=request.snapshot.files,
             description=f"Run Prettier on {pluralize(len(request.snapshot.files), 'file')}.",
-            level=LogLevel.DEBUG,
-            env=prettier_tool.env,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)

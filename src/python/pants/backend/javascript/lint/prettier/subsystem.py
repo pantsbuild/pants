@@ -6,13 +6,13 @@ from __future__ import annotations
 import os
 from typing import Iterable
 
-from pants.backend.javascript.subsystems.nodejs import NpxToolBase
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
 
-class Prettier(NpxToolBase):
+class Prettier(Subsystem):
     options_scope = "prettier"
     name = "Prettier"
     help = softwrap(
