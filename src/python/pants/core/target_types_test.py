@@ -448,6 +448,21 @@ def test_url_assets(asset_type) -> None:
 
 
 @pytest.mark.parametrize(
+    "url, expected",
+    [
+        ("http://foo/bar", "bar"),
+        ("http://foo/bar.baz", "bar.baz"),
+        ("http://foo/bar.baz?query=yes/no", "bar.baz"),
+        ("http://foo/bar/baz/file.ext", "file.ext"),
+        ("www.foo.bar", "www.foo.bar"),
+        ("www.foo.bar?query=yes/no", "www.foo.bar"),
+    ],
+)
+def test_http_source_filename(url, expected):
+    assert HTTPSource(url, len=0, sha256="").filename == expected
+
+
+@pytest.mark.parametrize(
     "kwargs, exc_match",
     [
         (

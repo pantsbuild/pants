@@ -5,6 +5,7 @@ from __future__ import annotations
 import builtins
 import dataclasses
 import os
+import urllib.parse
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -83,7 +84,7 @@ class HTTPSource:
         self.url = url
         self.len = len
         self.sha256 = sha256
-        self.filename = filename or self.url.rsplit("/", 1)[1]
+        self.filename = filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
 
         if not self.filename:
             raise ValueError(
