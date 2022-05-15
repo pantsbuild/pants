@@ -87,14 +87,39 @@ class HTTPSource:
 
         if not self.filename:
             raise ValueError(
-                "Couldn't deduce filename from `url`. Please specify the `filename` argument."
+                softwrap(
+                    f"""
+                    Couldn't deduce filename from `url`: '{self.url}'.
+
+                    Please specify the `filename` argument.
+                    """
+                )
             )
         if "\\" in self.filename or "/" in self.filename:
-            raise ValueError("`filename` cannot contain a path separator.")
+            raise ValueError(
+                f"`filename` cannot contain a path separator, but was set to '{self.filename}'"
+            )
 
 
 class AssetSourceField(SingleSourceField):
     value: str | HTTPSource  # type: ignore[assignment]
+    # @TODO: Don't document http_source, link to it once https://github.com/pantsbuild/pants/issues/14832
+    # is implemented.
+    help = softwrap(
+        """
+        The source of this target.
+
+        If a string is provided, represents a path is relative to the BUILD file's directory,
+        e.g. `source='example.ext'`.
+
+        If an http_source is provided, represents the network location to download the source from.
+        `http_source` has the following signature:
+            http_source(url: str, *, len: int, sha256: str, filename: Optional[str])
+        The filename defaults to the last part of the URL path (E.g. `example.ext`). You can easily
+        get the len and checksum with the following command:
+            `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+        """
+    )
 
     @classmethod
     def compute_value(  # type: ignore[override]
@@ -164,7 +189,6 @@ class FileSourceField(AssetSourceField):
 
 class FileTarget(Target):
     alias = "file"
-    source_field_cls = FileSourceField
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FileSourceField)
     help = softwrap(
         """
@@ -376,7 +400,6 @@ class ResourceSourceField(AssetSourceField):
 
 class ResourceTarget(Target):
     alias = "resource"
-    source_field_cls = ResourceSourceField
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourceSourceField)
     help = softwrap(
         """
