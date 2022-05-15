@@ -25,6 +25,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Brian Wickman
 + Bruno Bieth
 + Caitie McCaffrey
++ Caleb Lloyd
 + Caspar Krieger
 + Chris Aniszczyk
 + Chris Borckholder
