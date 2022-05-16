@@ -103,7 +103,6 @@ class ClasspathEntryRequestFactory:
         """
 
         compatible = []
-        compatible_root_only = []
         partial = []
         consume_only = []
         impls = self.impls
@@ -113,14 +112,13 @@ class ClasspathEntryRequestFactory:
                 continue
             elif classification == _ClasspathEntryRequestClassification.COMPATIBLE:
                 compatible.append(impl)
-                compatible_root_only.append(impl.root_only)
             elif classification == _ClasspathEntryRequestClassification.PARTIAL:
                 partial.append(impl)
             elif classification == _ClasspathEntryRequestClassification.CONSUME_ONLY:
                 consume_only.append(impl)
 
         if len(compatible) == 1:
-            if not root and compatible_root_only[0]:
+            if not root and compatible[0].root_only:
                 raise ClasspathRootOnlyWasInner(
                     "The following targets had dependees, but can only be used as roots in a "
                     f"build graph:\n{component.bullet_list()}"
