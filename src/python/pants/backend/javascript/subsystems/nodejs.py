@@ -16,6 +16,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.global_options import NamedCachesDirOption
 from pants.util.logging import LogLevel
 
 
@@ -64,7 +65,9 @@ class NpxProcess:
 
 
 @rule(level=LogLevel.DEBUG)
-async def setup_npx_process(request: NpxProcess, nodejs: NodeJS) -> Process:
+async def setup_npx_process(
+    request: NpxProcess, nodejs: NodeJS, named_caches_dir: NamedCachesDirOption
+) -> Process:
     # Ensure nodejs is installed
     downloaded_nodejs = await Get(
         DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(Platform.current)
@@ -95,7 +98,10 @@ async def setup_npx_process(request: NpxProcess, nodejs: NodeJS) -> Process:
         output_files=request.output_files,
         description=request.description,
         level=request.level,
-        env={"PATH": f"/bin:./{nodejs_dir}/bin"},
+        env={
+            "PATH": f"/bin:./{nodejs_dir}/bin",
+            "npm_config_cache": str(named_caches_dir.val / "npm"),  # Normally stored at ~/.npm
+        },
     )
 
 
