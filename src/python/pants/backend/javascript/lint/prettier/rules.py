@@ -62,7 +62,7 @@ async def prettier_fmt(request: PrettierFmtRequest, prettier: Prettier) -> FmtRe
         ProcessResult,
         NpxProcess(
             npm_package=prettier.default_version,
-            argv=(
+            args=(
                 "--write",
                 *request.snapshot.files,
             ),
