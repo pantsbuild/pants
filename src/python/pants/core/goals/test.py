@@ -205,7 +205,7 @@ _CD = TypeVar("_CD", bound=CoverageData)
 
 @union
 class CoverageDataCollection(Collection[_CD]):
-    element_type: ClassVar[type[_CD]]
+    element_type: ClassVar[type[_CD]]  # type: ignore[misc]
 
 
 @dataclass(frozen=True)

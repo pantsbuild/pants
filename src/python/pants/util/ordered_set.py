@@ -204,11 +204,11 @@ class FrozenOrderedSet(_AbstractOrderedSet[T_co], Hashable):
 
     def __init__(self, iterable: Iterable[T_co] | None = None) -> None:
         super().__init__(iterable)
-        self._hash: int | None = None
+        self.__hash: int | None = None
 
     def __hash__(self) -> int:
-        if self._hash is None:
-            self._hash = 0
+        if self.__hash is None:
+            self.__hash = 0
             for item in self._items.keys():
-                self._hash ^= hash(item)
-        return self._hash
+                self.__hash ^= hash(item)
+        return self.__hash

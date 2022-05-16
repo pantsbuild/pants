@@ -455,7 +455,7 @@ class Target:
             ),
             None,
         )
-        return cast(Optional[Type[_F]], subclass)
+        return subclass
 
     @final
     def _maybe_get(self, field: Type[_F]) -> Optional[_F]:
@@ -1008,7 +1008,7 @@ _TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 @union
 @dataclass(frozen=True)
 class GenerateTargetsRequest(Generic[_TargetGenerator]):
-    generate_from: ClassVar[type[_TargetGenerator]]
+    generate_from: ClassVar[type[_TargetGenerator]]  # type: ignore[misc]
 
     # The TargetGenerator instance to generate targets for.
     generator: _TargetGenerator
@@ -1310,9 +1310,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     @final
     @classmethod
     def create(cls: Type[_FS], tgt: Target) -> _FS:
-        return cls(  # type: ignore[call-arg]
-            address=tgt.address, **_get_field_set_fields_from_target(cls, tgt)
-        )
+        return cls(address=tgt.address, **_get_field_set_fields_from_target(cls, tgt))
 
     def debug_hint(self) -> str:
         return self.address.spec
@@ -1544,10 +1542,10 @@ class ScalarField(Generic[T], Field):
                 return super().compute_value(raw_value, address=address)
     """
 
-    expected_type: ClassVar[Type[T]]
+    expected_type: ClassVar[Type[T]]  # type: ignore[misc]
     expected_type_description: ClassVar[str]
     value: Optional[T]
-    default: ClassVar[Optional[T]] = None
+    default: ClassVar[Optional[T]] = None  # type: ignore[misc]
 
     @classmethod
     def compute_value(cls, raw_value: Optional[Any], address: Address) -> Optional[T]:
@@ -1687,10 +1685,10 @@ class SequenceField(Generic[T], Field):
                 return super().compute_value(raw_value, address=address)
     """
 
-    expected_element_type: ClassVar[Type[T]]
+    expected_element_type: ClassVar[Type]
     expected_type_description: ClassVar[str]
     value: Optional[Tuple[T, ...]]
-    default: ClassVar[Optional[Tuple[T, ...]]] = None
+    default: ClassVar[Optional[Tuple[T, ...]]] = None  # type: ignore[misc]
 
     @classmethod
     def compute_value(
@@ -2561,7 +2559,7 @@ class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
     """
 
     sources_field: SF
-    infer_from: ClassVar[Type[SF]]
+    infer_from: ClassVar[Type[SourcesField]]
 
     def debug_hint(self) -> str:
         return self.sources_field.address.spec
@@ -2594,7 +2592,7 @@ class ValidateDependenciesRequest(Generic[FS], ABC):
     An implementing rule should raise an exception if dependencies are invalid.
     """
 
-    field_set_type: ClassVar[Type[FS]]
+    field_set_type: ClassVar[Type[FS]]  # type: ignore[misc]
 
     field_set: FS
     dependencies: Addresses

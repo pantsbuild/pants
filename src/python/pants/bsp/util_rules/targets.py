@@ -105,7 +105,7 @@ class BSPBuildTargetsMetadataRequest(Generic[_FS]):
 
     language_id: ClassVar[str]
     can_merge_metadata_from: ClassVar[tuple[str, ...]]
-    field_set_type: ClassVar[Type[_FS]]
+    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
 
     field_sets: tuple[_FS, ...]
 
@@ -562,7 +562,7 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 class BSPDependencyModulesRequest(Generic[_FS]):
     """Hook to allow language backends to provide dependency modules."""
 
-    field_set_type: ClassVar[Type[_FS]]
+    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
 
     field_sets: tuple[_FS, ...]
 
@@ -660,7 +660,7 @@ async def bsp_dependency_modules(
 class BSPCompileRequest(Generic[_FS]):
     """Hook to allow language backends to compile targets."""
 
-    field_set_type: ClassVar[Type[_FS]]
+    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
 
     bsp_target: BSPBuildTargetInternal
     field_sets: tuple[_FS, ...]
@@ -690,7 +690,7 @@ class BSPCompileResult:
 class BSPResourcesRequest(Generic[_FS]):
     """Hook to allow language backends to provide resources for targets."""
 
-    field_set_type: ClassVar[Type[_FS]]
+    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
 
     bsp_target: BSPBuildTargetInternal
     field_sets: tuple[_FS, ...]

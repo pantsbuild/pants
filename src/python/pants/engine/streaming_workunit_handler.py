@@ -263,7 +263,7 @@ class _InnerHandler(threading.Thread):
     def run(self) -> None:
         # First, set the thread's logging destination to the parent thread's, meaning the console.
         native_engine.stdio_thread_set_destination(self.logging_destination)
-        while not self.stop_request.isSet():  # type: ignore[attr-defined]
+        while not self.stop_request.isSet():
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
         else:

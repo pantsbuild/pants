@@ -5,7 +5,7 @@ import string
 from collections import namedtuple
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 import pytest
 
@@ -1345,7 +1345,7 @@ def test_overrides_field_normalization() -> None:
     assert OverridesField.flatten_paths(
         addr,
         [
-            (paths, globs, overrides)
+            (paths, globs, cast(Dict[str, Any], overrides))
             for (paths, overrides), globs in zip(
                 [
                     (Paths(("dir/foo.ext",), ()), tgt1_override),
@@ -1360,7 +1360,7 @@ def test_overrides_field_normalization() -> None:
         "dir/bar2.ext": tgt2_override,
     }
     assert path_field.flatten() == {
-        "foo.ext": {**tgt1_override, **tgt2_override},
+        "foo.ext": {**tgt2_override, **tgt1_override},
         "bar*.ext": tgt2_override,
     }
     with pytest.raises(InvalidFieldException):

@@ -91,7 +91,7 @@ class StyleRequest(Generic[_FS], EngineAwareParameter, metaclass=ABCMeta):
     linting.
     """
 
-    field_set_type: ClassVar[type[_FS]]
+    field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
     name: ClassVar[str]
 
     field_sets: Collection[_FS]
