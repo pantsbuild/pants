@@ -18,9 +18,12 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
     get_type_hints,
 )
+
+from typing_extensions import ParamSpec
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
@@ -310,7 +313,11 @@ def _uncacheable_rule(*args, **kwargs) -> Callable:
     return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
 
 
-def rule_helper(func: Callable) -> Callable:
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def rule_helper(func: Callable[P, R]) -> Callable[P, R]:
     """Decorator which marks a function as a "rule helper".
 
     Functions marked as rule helpers are allowed to be called by rules and other rule helpers

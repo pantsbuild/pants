@@ -214,7 +214,7 @@ class GenerateFileSourceRequest(GenerateSourcesRequest):
 
 @rule
 async def hydrate_file_source(request: GenerateFileSourceRequest) -> GeneratedSources:
-    return cast(GeneratedSources, await _hydrate_asset_source(request))
+    return await _hydrate_asset_source(request)
 
 
 class FilesGeneratingSourcesField(MultipleSourcesField):
@@ -426,7 +426,7 @@ class GenerateResourceSourceRequest(GenerateSourcesRequest):
 
 @rule
 async def hydrate_resource_source(request: GenerateResourceSourceRequest) -> GeneratedSources:
-    return cast(GeneratedSources, await _hydrate_asset_source(request))
+    return await _hydrate_asset_source(request)
 
 
 class ResourcesGeneratingSourcesField(MultipleSourcesField):

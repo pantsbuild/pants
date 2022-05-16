@@ -24,7 +24,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsSnapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import FieldSet, FilteredTargets
+from pants.engine.target import FieldSet, FilteredTargets, SourcesField
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.util.collections import partition_sequentially
@@ -331,7 +331,10 @@ async def lint(
             Get(
                 SourceFiles,
                 SourceFilesRequest(
-                    getattr(field_set, "sources", getattr(field_set, "source", None))
+                    cast(
+                        SourcesField,
+                        getattr(field_set, "sources", getattr(field_set, "source", None)),
+                    )
                     for field_set in batch
                 ),
             )

@@ -1089,8 +1089,7 @@ async def resolve_dependencies(
         relevant_inference_request_types = [
             inference_request_type
             for inference_request_type in inference_request_types
-            # NB: `type: ignore`d due to https://github.com/python/mypy/issues/9815.
-            if isinstance(sources_field, inference_request_type.infer_from)  # type: ignore[misc]
+            if isinstance(sources_field, inference_request_type.infer_from)
         ]
         inferred = await MultiGet(
             Get(

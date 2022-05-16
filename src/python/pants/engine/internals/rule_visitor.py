@@ -29,13 +29,15 @@ def _get_starting_indent(source: str) -> int:
     return 0
 
 
-def _get_lookup_names(attr: ast.expr):
+def _get_lookup_names(attr: ast.expr) -> list[str]:
     names = []
     while isinstance(attr, ast.Attribute):
         names.append(attr.attr)
         attr = attr.value
     # NB: attr could be a constant, like `",".join()`
-    names.append(getattr(attr, "id", None))
+    id = getattr(attr, "id", None)
+    if id is not None:
+        names.append(id)
     return names
 
 
@@ -57,7 +59,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         lineno += self.func.__code__.co_firstlineno - 1
         resolved = (
             getattr(self.owning_module, name, None)
-            or self.owning_module.__builtins__.get(name, None)  # type: ignore[attr-defined]
+            or self.owning_module.__builtins__.get(name, None)
         )  # fmt: skip
         if resolved is None:
             raise ValueError(
