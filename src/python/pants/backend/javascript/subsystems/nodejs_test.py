@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import logging
-
 import pytest
 
 from pants.backend.javascript.subsystems import nodejs
@@ -13,8 +11,6 @@ from pants.backend.python import target_types_rules
 from pants.core.util_rules import config_files, source_files
 from pants.engine.process import ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-
-logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -32,12 +28,6 @@ def rule_runner() -> RuleRunner:
 
 
 def test_npx_process(rule_runner: RuleRunner):
-    rule_runner.set_options(
-        [
-            "--backend-packages=['pants.backend.javascript']",
-        ],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
     result = rule_runner.request(
         ProcessResult,
         [

@@ -69,6 +69,7 @@ async def prettier_fmt(request: PrettierFmtRequest, prettier: Prettier) -> FmtRe
             input_digest=input_digest,
             output_files=request.snapshot.files,
             description=f"Run Prettier on {pluralize(len(request.snapshot.files), 'file')}.",
+            level=LogLevel.DEBUG,
         ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
