@@ -242,17 +242,19 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
     )
 
 
-@pytest.mark.parametrize("ignore", [True, False])
-def test_ignore_empty_init(rule_runner: RuleRunner, ignore: bool) -> None:
+def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            "project/__init__.py": "",
-            "project/d1/__init__.py": "# content",
-            "project/d2/__init__.py": "",
-            "project/d2/f.py": "",
+            f"src/python/foo/{fp}": ""
+            for fp in (
+                "__init__.py",
+                "bar/__init__.py",
+                "bar/bar.py",
+                "baz/__init__.py",
+                "qux/qux.py",
+            )
         }
     )
-    rule_runner.set_options([f"--python-tailor-ignore-empty-init-files={ignore}"])
     pts = rule_runner.request(
         PutativeTargets,
         [
@@ -260,30 +262,22 @@ def test_ignore_empty_init(rule_runner: RuleRunner, ignore: bool) -> None:
             AllOwnedSources([]),
         ],
     )
-    result = {
-        PutativeTarget.for_target_type(
-            PythonSourcesGeneratorTarget,
-            "project/d1",
-            None,
-            ["__init__.py"],
-        ),
-        PutativeTarget.for_target_type(
-            PythonSourcesGeneratorTarget,
-            "project/d2",
-            None,
-            ["__init__.py", "f.py"],
-        ),
-    }
-    if not ignore:
-        result.add(
-            PutativeTarget.for_target_type(
-                PythonSourcesGeneratorTarget,
-                "project",
-                None,
-                ["__init__.py"],
-            )
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    PythonSourcesGeneratorTarget,
+                    "src/python/foo/bar",
+                    "bar",
+                    ["__init__.py", "bar.py"],
+                ),
+                PutativeTarget.for_target_type(
+                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "qux", ["qux.py"]
+                ),
+            ]
         )
-    assert result == set(pts)
+        == pts
+    )
 
 
 def test_is_entry_point_true() -> None:
