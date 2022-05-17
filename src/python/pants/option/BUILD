@@ -15,5 +15,6 @@ python_tests(
         ): {
             "dependencies": ["//BUILD_ROOT:files", "//pants.toml:files"],
         },
+        "options_integration_test.py": {"timeout": 150},
     },
 )
