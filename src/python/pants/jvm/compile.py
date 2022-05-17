@@ -118,7 +118,7 @@ class ClasspathEntryRequestFactory:
                 consume_only.append(impl)
 
         if len(compatible) == 1:
-            if not root and impl.root_only:
+            if not root and compatible[0].root_only:
                 raise ClasspathRootOnlyWasInner(
                     "The following targets had dependees, but can only be used as roots in a "
                     f"build graph:\n{component.bullet_list()}"
