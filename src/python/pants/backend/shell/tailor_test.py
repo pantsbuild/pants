@@ -66,13 +66,13 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     ShellSourcesGeneratorTarget,
                     path="src/sh/foo",
-                    name=None,
+                    name="lib",
                     triggering_sources=["f.sh"],
                 ),
                 PutativeTarget.for_target_type(
                     ShellSourcesGeneratorTarget,
                     path="src/sh/foo/bar",
-                    name=None,
+                    name="lib",
                     triggering_sources=["baz2.sh", "baz3.sh"],
                 ),
                 PutativeTarget.for_target_type(
@@ -121,7 +121,7 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     ShellSourcesGeneratorTarget,
                     path="src/sh/foo/qux",
-                    name=None,
+                    name="lib",
                     triggering_sources=["qux.sh"],
                 ),
             ]

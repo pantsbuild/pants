@@ -48,7 +48,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     KotlinSourcesGeneratorTarget,
                     "src/kotlin/unowned",
-                    "unowned",
+                    "lib",
                     ["UnownedFile.kt"],
                 ),
             ]

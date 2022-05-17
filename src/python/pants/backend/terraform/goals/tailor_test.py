@@ -47,7 +47,7 @@ def test_find_putative_targets() -> None:
                 PutativeTarget.for_target_type(
                     TerraformModuleTarget,
                     "prod/terraform/unowned-module",
-                    "unowned-module",
+                    "tf",
                     ("versions.tf",),
                 ),
             ]

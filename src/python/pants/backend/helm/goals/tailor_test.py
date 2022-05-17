@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 
 import pytest
 
@@ -45,7 +44,7 @@ def test_find_helm_charts(rule_runner: RuleRunner) -> None:
     def expected_target(path: str, triggering_source: str) -> PutativeTarget:
         return PutativeTarget.for_target_type(
             HelmChartTarget,
-            name=os.path.basename(path),
+            name="chart",
             path=path,
             triggering_sources=[triggering_source],
         )

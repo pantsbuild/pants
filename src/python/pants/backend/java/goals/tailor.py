@@ -59,7 +59,7 @@ async def find_putative_targets(
 
         for tgt_type, paths in classified_unowned_java_files.items():
             for dirname, filenames in group_by_dir(paths).items():
-                name = "tests" if tgt_type == JunitTestsGeneratorTarget else None
+                name = "tests" if tgt_type == JunitTestsGeneratorTarget else "lib"
                 putative_targets.append(
                     PutativeTarget.for_target_type(
                         tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)

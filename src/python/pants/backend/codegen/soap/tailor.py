@@ -41,7 +41,7 @@ async def find_putative_targets(
         PutativeTarget.for_target_type(
             WsdlSourcesGeneratorTarget,
             path=dirname,
-            name=None,
+            name="wsdl",
             triggering_sources=sorted(filenames),
         )
         for dirname, filenames in group_by_dir(unowned_wsdl_files).items()

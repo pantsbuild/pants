@@ -102,7 +102,7 @@ async def find_fortran_targets(
     pts = []
     for tgt_type, paths in classified_unowned_shell_files.items():
         for dirname, filenames in group_by_dir(paths).items():
-            name = "tests" if tgt_type == FortranTestsTarget else None
+            name = "tests" if tgt_type == FortranTestsTarget else "lib"
             pts.append(
                 PutativeTarget.for_target_type(
                     tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
@@ -128,7 +128,7 @@ def infer_fortran_module_dependency(_request: MockPutativeFortranModuleRequest) 
     return PutativeTargets(
         [
             PutativeTarget.for_target_type(
-                FortranModule, path="dir", name=None, triggering_sources=[]
+                FortranModule, path="dir", name="lib", triggering_sources=[]
             )
         ]
     )
@@ -215,27 +215,6 @@ def test_rename_conflicting_targets(rule_runner: RuleRunner) -> None:
                     "foo1",
                     "fortran_library",
                     ["bar3.f90"],
-                    FortranLibrarySources.default,
-                )
-            ]
-        )
-        == ptgts
-    )
-
-
-def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"foo.f90": ""})
-    ptgt = PutativeTarget("", "", "fortran_library", ["foo.f90"], FortranLibrarySources.default)
-    unpts = rule_runner.request(UniquelyNamedPutativeTargets, [PutativeTargets([ptgt])])
-    ptgts = unpts.putative_targets
-    assert (
-        PutativeTargets(
-            [
-                PutativeTarget(
-                    "",
-                    "root",
-                    "fortran_library",
-                    ["foo.f90"],
                     FortranLibrarySources.default,
                 )
             ]
@@ -490,7 +469,7 @@ def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
             "baz/qux1.f90": "",
             "conflict/f1.f90": "",
             "conflict/f2.f90": "",
-            "conflict/BUILD": "fortran_library(sources=['f1.f90'])",
+            "conflict/BUILD": "fortran_library(name='lib', sources=['f1.f90'])",
         }
     )
     result = rule_runner.run_goal_rule(
@@ -500,9 +479,9 @@ def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
     assert result.stdout == dedent(
         """\
         Created baz/BUILD:
-          - Add my_fortran_lib target baz
+          - Add my_fortran_lib target lib
         Updated conflict/BUILD:
-          - Add my_fortran_lib target conflict0
+          - Add my_fortran_lib target lib0
         Updated foo/BUILD:
           - Add fortran_tests target tests
         """
@@ -516,15 +495,21 @@ def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
         )
         """
     )
-    assert Path(rule_runner.build_root, "baz/BUILD").read_text() == "my_fortran_lib()\n"
+    assert Path(rule_runner.build_root, "baz/BUILD").read_text() == dedent(
+        """\
+        my_fortran_lib(
+            name="lib",
+        )
+        """
+    )
     assert Path(rule_runner.build_root, "conflict/BUILD").read_text() == dedent(
         """\
-        fortran_library(sources=['f1.f90'])
+        fortran_library(name='lib', sources=['f1.f90'])
 
         # NOTE: Sources restricted from the default for my_fortran_lib due to conflict with
-        #   - conflict:conflict
+        #   - conflict:lib
         my_fortran_lib(
-            name="conflict0",
+            name="lib0",
             sources=[
                 "f2.f90",
             ],
@@ -544,7 +529,7 @@ def test_tailor_rule_check_mode(rule_runner: RuleRunner) -> None:
     assert result.stdout == dedent(
         """\
         Would create baz/BUILD:
-          - Add fortran_library target baz
+          - Add fortran_library target lib
         Would update foo/BUILD:
           - Add fortran_tests target tests
 
@@ -578,13 +563,13 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
         [MockPutativeFortranModuleRequest(PutativeTargetsSearchPaths(tuple("")))],
     )
     assert putative_targets == PutativeTargets(
-        [PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])]
+        [PutativeTarget.for_target_type(FortranModule, "dir", "lib", [])]
     )
 
     with pytest.raises(AssertionError) as excinfo:
-        _ = PutativeTarget.for_target_type(FortranModule, "dir", "dir", ["a.f90"])
+        _ = PutativeTarget.for_target_type(FortranModule, "dir", "lib", ["a.f90"])
     expected_msg = (
-        "A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90, "
+        "A target of type FortranModule was proposed at address dir:lib with explicit sources a.f90, "
         "but this target type does not have a `source` or `sources` field."
     )
     assert str(excinfo.value) == expected_msg

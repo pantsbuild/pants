@@ -115,14 +115,11 @@ class PutativeTarget:
         cls,
         target_type: type[Target],
         path: str,
-        name: str | None,
+        name: str,
         triggering_sources: Iterable[str],
         kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
     ) -> PutativeTarget:
-        if name is None:
-            name = os.path.basename(path)
-
         kwargs = kwargs or {}
         explicit_sources = cast(
             "tuple[str, ...] | None",
@@ -172,6 +169,13 @@ class PutativeTarget:
         self.kwargs = FrozenDict(kwargs or {})
         self.comments = tuple(comments)
 
+        if "name" in self.kwargs:
+            raise ValueError(
+                f"Do not set `name` in the `kwargs` for target type {self.type_alias}. The "
+                "tailor goal will set the `name` for you automatically based on the `name` "
+                "property."
+            )
+
     @property
     def address(self) -> Address:
         return Address(self.path, target_name=self.name)
@@ -215,10 +219,7 @@ class PutativeTarget:
 
         has_name = self.name != os.path.basename(self.path)
         if self.kwargs or has_name:
-            _kwargs = {
-                **({"name": self.name} if has_name else {}),
-                **self.kwargs,  # type: ignore[arg-type]
-            }
+            _kwargs = {"name": self.name, **self.kwargs}
             _kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in _kwargs.items()]
             kwargs_str = ",".join(_kwargs_str_parts) + ",\n"
         else:
@@ -422,9 +423,6 @@ async def rename_conflicting_targets(
     for ptgt in ptgts:
         idx = 0
         possibly_renamed_ptgt = ptgt
-        # Targets in root-level BUILD files must be named explicitly.
-        if possibly_renamed_ptgt.path == "" and possibly_renamed_ptgt.kwargs.get("name") is None:
-            possibly_renamed_ptgt = possibly_renamed_ptgt.rename("root")
         # Eliminate any address collisions.
         while possibly_renamed_ptgt.address.spec in existing_addrs:
             possibly_renamed_ptgt = ptgt.rename(f"{ptgt.name}{idx}")

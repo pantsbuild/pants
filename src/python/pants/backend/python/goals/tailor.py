@@ -100,13 +100,12 @@ async def find_putative_targets(
         classified_unowned_py_files = classify_source_files(unowned_py_files)
         for tgt_type, paths in classified_unowned_py_files.items():
             for dirname, filenames in group_by_dir(paths).items():
-                name: str | None
                 if issubclass(tgt_type, PythonTestsGeneratorTarget):
                     name = "tests"
                 elif issubclass(tgt_type, PythonTestUtilsGeneratorTarget):
                     name = "test_utils"
                 else:
-                    name = None
+                    name = "lib"
                 if (
                     python_setup.tailor_ignore_solitary_init_files
                     and tgt_type == PythonSourcesGeneratorTarget

@@ -50,13 +50,13 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     AvroSourcesGeneratorTarget,
                     path="avro/foo",
-                    name=None,
+                    name="avro",
                     triggering_sources=["f.avsc"],
                 ),
                 PutativeTarget.for_target_type(
                     AvroSourcesGeneratorTarget,
                     path="avro/foo/bar",
-                    name=None,
+                    name="avro",
                     triggering_sources=["baz2.avpr", "baz3.avsc"],
                 ),
             ]
@@ -90,13 +90,13 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     AvroSourcesGeneratorTarget,
                     path="avro/foo/bar",
-                    name=None,
+                    name="avro",
                     triggering_sources=["bar.avsc"],
                 ),
                 PutativeTarget.for_target_type(
                     AvroSourcesGeneratorTarget,
                     path="avro/foo/qux",
-                    name=None,
+                    name="avro",
                     triggering_sources=["qux.avsc"],
                 ),
             ]

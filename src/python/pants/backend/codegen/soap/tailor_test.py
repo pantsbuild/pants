@@ -49,7 +49,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     WsdlSourcesGeneratorTarget,
                     path="src/wsdl/dir1",
-                    name=None,
+                    name="wsdl",
                     triggering_sources=["hello.wsdl", "world.wsdl"],
                 ),
             ]

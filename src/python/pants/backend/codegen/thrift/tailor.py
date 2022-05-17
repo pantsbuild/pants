@@ -41,7 +41,7 @@ async def find_putative_thrift_targets(
         PutativeTarget.for_target_type(
             ThriftSourcesGeneratorTarget,
             path=dirname,
-            name=None,
+            name="thrift",
             triggering_sources=sorted(filenames),
         )
         for dirname, filenames in group_by_dir(unowned_thrift_files).items()

@@ -49,7 +49,7 @@ async def find_putative_targets(
         PutativeTarget.for_target_type(
             AvroSourcesGeneratorTarget,
             path=dirname,
-            name=None,
+            name="avro",
             triggering_sources=sorted(filenames),
         )
         for dirname, filenames in group_by_dir(unowned_avro_files).items()

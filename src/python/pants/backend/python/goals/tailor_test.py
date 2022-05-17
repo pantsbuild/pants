@@ -130,12 +130,12 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     kwargs={"source": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(
-                    PythonSourcesGeneratorTarget, "src/python/foo", None, ["__init__.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo", "lib", ["__init__.py"]
                 ),
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget,
                     "src/python/foo/bar",
-                    None,
+                    "lib",
                     ["baz2.py", "baz3.py"],
                 ),
                 PutativeTarget.for_target_type(
@@ -190,7 +190,7 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
                     ["bar_test.py"],
                 ),
                 PutativeTarget.for_target_type(
-                    PythonSourcesGeneratorTarget, "src/python/foo/qux", None, ["qux.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "lib", ["qux.py"]
                 ),
             ]
         )
@@ -268,11 +268,11 @@ def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget,
                     "src/python/foo/bar",
-                    "bar",
+                    "lib",
                     ["__init__.py", "bar.py"],
                 ),
                 PutativeTarget.for_target_type(
-                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "qux", ["qux.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "lib", ["qux.py"]
                 ),
             ]
         )

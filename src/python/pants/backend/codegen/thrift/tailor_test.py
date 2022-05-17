@@ -50,13 +50,13 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     ThriftSourcesGeneratorTarget,
                     path="thrifts/foo",
-                    name=None,
+                    name="thrift",
                     triggering_sources=["f.thrift"],
                 ),
                 PutativeTarget.for_target_type(
                     ThriftSourcesGeneratorTarget,
                     path="thrifts/foo/bar",
-                    name=None,
+                    name="thrift",
                     triggering_sources=["baz2.thrift", "baz3.thrift"],
                 ),
             ]
@@ -90,13 +90,13 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     ThriftSourcesGeneratorTarget,
                     path="thrifts/foo/bar",
-                    name=None,
+                    name="thrift",
                     triggering_sources=["bar.thrift"],
                 ),
                 PutativeTarget.for_target_type(
                     ThriftSourcesGeneratorTarget,
                     path="thrifts/foo/qux",
-                    name=None,
+                    name="thrift",
                     triggering_sources=["qux.thrift"],
                 ),
             ]

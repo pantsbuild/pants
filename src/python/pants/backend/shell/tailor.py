@@ -58,7 +58,7 @@ async def find_putative_targets(
     pts = []
     for tgt_type, paths in classified_unowned_shell_files.items():
         for dirname, filenames in group_by_dir(paths).items():
-            name = "tests" if tgt_type == Shunit2TestsGeneratorTarget else None
+            name = "tests" if tgt_type == Shunit2TestsGeneratorTarget else "lib"
             pts.append(
                 PutativeTarget.for_target_type(
                     tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)

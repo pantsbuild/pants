@@ -49,7 +49,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     JSSourcesGeneratorTarget,
                     "src/unowned",
-                    "unowned",
+                    "lib",
                     ["UnownedFile1.js", "UnownedFile2.js"],
                 ),
             ]

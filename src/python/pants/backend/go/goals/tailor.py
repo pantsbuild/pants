@@ -60,7 +60,7 @@ async def find_putative_go_targets(
                 PutativeTarget.for_target_type(
                     GoModTarget,
                     path=dirname,
-                    name=None,
+                    name="mod",
                     triggering_sources=sorted(filenames),
                 )
             )
@@ -79,7 +79,7 @@ async def find_putative_go_targets(
                 PutativeTarget.for_target_type(
                     GoPackageTarget,
                     path=dirname,
-                    name=None,
+                    name="pkg",
                     triggering_sources=sorted(filenames),
                 )
             )

@@ -39,7 +39,7 @@ async def find_putative_targets(
         PutativeTarget.for_target_type(
             ProtobufSourcesGeneratorTarget,
             path=dirname,
-            name=None,
+            name="protos",
             triggering_sources=sorted(filenames),
         )
         for dirname, filenames in group_by_dir(unowned_proto_files).items()
