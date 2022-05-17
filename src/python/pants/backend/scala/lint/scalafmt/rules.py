@@ -140,9 +140,7 @@ async def gather_scalafmt_config_files(
 
 @rule
 async def setup_scalafmt_partition(
-    request: SetupScalafmtPartition,
-    jdk: InternalJdk,
-    tool: ScalafmtSubsystem
+    request: SetupScalafmtPartition, jdk: InternalJdk, tool: ScalafmtSubsystem
 ) -> Partition:
     sources_digest = await Get(
         Digest,
