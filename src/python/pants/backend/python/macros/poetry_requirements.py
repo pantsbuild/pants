@@ -443,7 +443,7 @@ async def generate_from_python_requirement(
     }
 
     file_tgt = TargetGeneratorSourcesHelperTarget(
-        {TargetGeneratorSourcesHelperSourcesField.alias: [pyproject_rel_path]},
+        {TargetGeneratorSourcesHelperSourcesField.alias: pyproject_rel_path},
         Address(
             request.template_address.spec_path,
             target_name=request.template_address.target_name,

@@ -551,15 +551,15 @@ def map_assets_by_path(
 # -----------------------------------------------------------------------------------------------
 
 
-class TargetGeneratorSourcesHelperSourcesField(MultipleSourcesField):
+class TargetGeneratorSourcesHelperSourcesField(SingleSourceField):
     uses_source_roots = False
     required = True
 
 
 class TargetGeneratorSourcesHelperTarget(Target):
     """Target generators that work by reading in some source file(s) should also generate this
-    target and add it as a dependency to every generated target so that `--changed-since` works
-    properly.
+    target once per file, and add it as a dependency to every generated target so that `--changed-
+    since` works properly.
 
     See https://github.com/pantsbuild/pants/issues/13118 for discussion of why this is necessary and
     alternatives considered.
@@ -571,8 +571,8 @@ class TargetGeneratorSourcesHelperTarget(Target):
         """
         A private helper target type used by some target generators.
 
-        This tracks their `sources` field so that `--changed-since --changed-dependees` works
-        properly for generated targets.
+        This tracks their `source` / `sources` field so that `--changed-since --changed-dependees`
+        works properly for generated targets.
         """
     )
 
