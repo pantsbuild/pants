@@ -141,11 +141,16 @@ def test_file_deps_success(rule_runner: RuleRunner) -> None:
                   version = '{scalatest_coord.version}',
                 )
 
+                scala_sources(
+                    name='example-sources',
+                    dependencies=[':ducks'],
+                )
+
                 scalatest_tests(
                     name='example-test',
                     dependencies= [
                         ':org.scalatest_scalatest',
-                        ':ducks',
+                        ':example-sources',
                     ],
                 )
 
@@ -154,6 +159,18 @@ def test_file_deps_success(rule_runner: RuleRunner) -> None:
                     source="ducks.txt",
                 )
 
+                """
+            ),
+            "SimpleFileReader.scala": dedent(
+                """
+                package org.pantsbuild.example
+
+                import java.nio.file.Files
+                import java.nio.file.Path
+
+                object SimpleFileReader {
+                    def read(): String = Files.readString(Path.of("ducks.txt"))
+                }
                 """
             ),
             "SimpleSpec.scala": dedent(
@@ -167,7 +184,9 @@ def test_file_deps_success(rule_runner: RuleRunner) -> None:
                 class SimpleSpec extends AnyFunSpec {
                   describe("Ducks") {
                     it("should be ducks") {
-                      assert(Files.readString(Path.of("ducks.txt")) == "lol ducks")
+                      val expectedFileContents = "lol ducks"
+                      assert(SimpleFileReader.read() == expectedFileContents)
+                      assert(Files.readString(Path.of("ducks.txt")) == expectedFileContents)
                     }
                   }
                 }
@@ -178,6 +197,7 @@ def test_file_deps_success(rule_runner: RuleRunner) -> None:
     )
 
     test_result = run_scalatest_test(rule_runner, "example-test", "SimpleSpec.scala")
+    print(test_result.stdout)
 
     assert test_result.exit_code == 0
     assert "Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0" in test_result.stdout
