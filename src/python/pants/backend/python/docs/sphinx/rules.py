@@ -3,51 +3,57 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.backend.python.docs.sphinx.sphinx_subsystem import SphinxSubsystem
 from pants.backend.python.docs.sphinx.target_types import SphinxProjectSourcesField
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.util_rules.distdir import DistDir
-from pants.engine.addresses import Address
-from pants.engine.fs import Workspace
-from pants.engine.goal import Goal, GoalSubsystem
+from pants.core.goals.package import (
+    BuiltPackage,
+    BuiltPackageArtifact,
+    OutputPathField,
+    PackageFieldSet,
+)
+from pants.engine.internals.native_engine import AddPrefix, Digest, RemovePrefix
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, WrappedTarget
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
-class SphinxDocsGoalSubsystem(GoalSubsystem):
-    name = "sphinx-docs"
-    help = "Generate docs with Sphinx"
+@dataclass(frozen=True)
+class SphinxPackageFieldSet(PackageFieldSet):
+    required_fields = (SphinxProjectSourcesField,)
+
+    sources: SphinxProjectSourcesField
+    output_path: OutputPathField
 
 
-class SphinxDocsGoal(Goal):
-    subsystem_cls = SphinxDocsGoalSubsystem
-
-
-@goal_rule
+@rule
 async def generate_sphinx_docs(
-    sphinx: SphinxSubsystem, dist_dir: DistDir, workspace: Workspace
-) -> SphinxDocsGoal:
-    wrapped_tgt = await Get(WrappedTarget, Address("sphinx-demo", target_name="sphinx"))
-    tgt = wrapped_tgt.target
-    sources = await Get(HydratedSources, HydrateSourcesRequest(tgt[SphinxProjectSourcesField]))
-    sphinx_pex = await Get(VenvPex, PexRequest, sphinx.to_pex_request())
-
+    field_set: SphinxPackageFieldSet, sphinx: SphinxSubsystem
+) -> BuiltPackage:
+    sources, sphinx_pex = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(field_set.sources)),
+        Get(VenvPex, PexRequest, sphinx.to_pex_request()),
+    )
     result = await Get(
         ProcessResult,
         VenvPexProcess(
             sphinx_pex,
-            argv=(tgt.address.spec_path or ".", "__build"),
+            argv=(field_set.address.spec_path or ".", "__build"),
             output_directories=("__build",),
             input_digest=sources.snapshot.digest,
-            description=f"Generate docs with Sphinx for {tgt.address}",
-            level=LogLevel.DEBUG,
+            description=f"Generate docs with Sphinx for {field_set.address}",
+            level=LogLevel.INFO,
         ),
     )
-    workspace.write_digest(result.output_digest, path_prefix=str(dist_dir.relpath))
-    return SphinxDocsGoal(exit_code=0)
+    stripped_digest = await Get(Digest, RemovePrefix(result.output_digest, "__build"))
+    dest_dir = field_set.output_path.value_or_default(file_ending=None)
+    result_digest = await Get(Digest, AddPrefix(stripped_digest, dest_dir))
+    return BuiltPackage(result_digest, artifacts=(BuiltPackageArtifact(dest_dir),))
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), UnionRule(PackageFieldSet, SphinxPackageFieldSet))

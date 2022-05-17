@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import PurePath
 from typing import Sequence
 
+from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     InvalidFieldException,
@@ -57,6 +58,7 @@ class SphinxProjectTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         SphinxProjectSourcesField,
+        OutputPathField,
         # TODO: Add `dependencies` when that makes sense. Likely we just want deps on Python targets.
     )
     help = "A website generated via Sphinx."
