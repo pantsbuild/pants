@@ -19,7 +19,7 @@ from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals import build_files, graph, options_parsing
+from pants.engine.internals import build_files, graph, options_parsing, specs_rules
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
@@ -258,6 +258,7 @@ class EngineInitializer:
                 *desktop.rules(),
                 *git_rules(),
                 *graph.rules(),
+                *specs_rules.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
                 *system_binaries.rules(),
