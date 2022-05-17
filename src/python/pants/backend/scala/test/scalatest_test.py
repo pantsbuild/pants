@@ -197,7 +197,6 @@ def test_file_deps_success(rule_runner: RuleRunner) -> None:
     )
 
     test_result = run_scalatest_test(rule_runner, "example-test", "SimpleSpec.scala")
-    print(test_result.stdout)
 
     assert test_result.exit_code == 0
     assert "Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0" in test_result.stdout
