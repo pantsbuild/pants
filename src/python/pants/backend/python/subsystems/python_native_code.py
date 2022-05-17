@@ -19,12 +19,14 @@ class PythonNativeCode(Subsystem):
         "--cpp-flags",
         default=safe_shlex_split(os.environ.get("CPPFLAGS", "")),
         help="Override the `CPPFLAGS` environment variable for any forked subprocesses.",
-    ).advanced()
+        advanced=True,
+    )
     ld_flags = StrListOption(
         "--ld-flags",
         default=safe_shlex_split(os.environ.get("LDFLAGS", "")),
         help="Override the `LDFLAGS` environment variable for any forked subprocesses.",
-    ).advanced()
+        advanced=True,
+    )
 
     @property
     def environment_dict(self) -> Dict[str, str]:

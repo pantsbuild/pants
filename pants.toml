@@ -27,10 +27,11 @@ backend_packages.add = [
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
+  "internal_plugins.test_lockfile_fixtures",
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.17.0",
+  "toolchain.pants.plugin==0.19.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -59,6 +60,13 @@ build_ignore.add = [
   "testprojects/src/go/**",
 ]
 
+ignore_warnings.add = [
+  # TODO: `toolchain.pants.plugin==0.18.0` must still use the old `get_git` implementation.
+  "DEPRECATED: pants.base.build_environment.get_git"
+]
+
+files_not_found_behavior = "error"
+
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
 remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
@@ -84,11 +92,13 @@ root_patterns = [
   "/build-support/flake8",
   "/build-support/migration-support",
   "/pants-plugins",
+  # For `conftest.py`
+  "/",
 ]
 
 [tailor]
 build_file_header = """\
-# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """
 ignore_paths = [
@@ -102,7 +112,7 @@ ignore_adding_targets = [
   "src/python/pants/backend/go/go_sources/embedcfg:bin",
   "src/python/pants/backend/go/go_sources/generate_testmain:bin",
   "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
-  "src/python/pants/backend/python/dependency_inference/scripts:import_parser0",
+  "src/python/pants/backend/python/dependency_inference/scripts:dependency_parser0",
   "src/python/pants/backend/terraform:hcl2_parser0",
 ]
 
@@ -110,10 +120,19 @@ ignore_adding_targets = [
 venv_use_symlinks = true
 
 [python]
+# N.B.: When adjusting this to support new Python versions, you must update the Pants
+# `python_distrobution` targets, currently:
+# + src/python/pants:pants-packaged
+# + src/python/pants/testutil:testutil_wheel
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
-resolves = { python-default = "3rdparty/python/lockfiles/user_reqs.txt" }
+resolves = { python-default = "3rdparty/python/user_reqs.lock" }
 enable_resolves = true
+lockfile_generator = "pex"
+
+[python-infer]
+assets = true
+unowned_dependency_behavior = "error"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
@@ -126,7 +145,7 @@ extra_requirements.add = [
   "flake8-no-implicit-concat",
   "flake8-comprehensions>=3.8.0,<4.0",
 ]
-lockfile = "3rdparty/python/lockfiles/flake8.txt"
+lockfile = "3rdparty/python/flake8.lock"
 source_plugins = ["build-support/flake8"]
 
 [shellcheck]
@@ -144,7 +163,7 @@ extra_requirements.add = [
   "pytest-icdiff",
   "pygments",
 ]
-lockfile = "3rdparty/python/lockfiles/pytest.txt"
+lockfile = "3rdparty/python/pytest.lock"
 timeout_default = 60
 
 [test]
@@ -164,7 +183,7 @@ interpreter_constraints = [">=3.7,<3.10"]
 extra_requirements.add = [
   "mypy-typing-asserts",
 ]
-lockfile = "3rdparty/python/lockfiles/mypy.txt"
+lockfile = "3rdparty/python/mypy.lock"
 
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
@@ -184,12 +203,16 @@ default_resolve = "jvm_testprojects"
 jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 # A resolve for the java_parser, which is shipped with Pants, and invoked with its own isolated
 # classpath. Consequently, we isolate it to its own lockfile.
-java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
+# Note: The jvm_artifact targets in this resolve must be kept in sync with the requirements
+# in `generate_java_parser_lockfile_request`.
+java_parser_dev = "src/python/pants/backend/java/dependency_inference/java_parser.lock"
 # Has the same isolation requirements as `java_parser`.
-scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
+# Note: The jvm_artifact targets in this resolve must be kept in sync with with the requirements
+# in `generate_scala_parser_lockfile_request`.
+scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
 
 [scala]
-version_for_resolve = { "scala_parser" = '2.13.7' }
+version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
 [toolchain-setup]
 repo = "pants"
@@ -243,3 +266,5 @@ master = "src/python/pants/notes/master.rst"
 "2.9.x" = "src/python/pants/notes/2.9.x.md"
 "2.10.x" = "src/python/pants/notes/2.10.x.md"
 "2.11.x" = "src/python/pants/notes/2.11.x.md"
+"2.12.x" = "src/python/pants/notes/2.12.x.md"
+"2.13.x" = "src/python/pants/notes/2.13.x.md"

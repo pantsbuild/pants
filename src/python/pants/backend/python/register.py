@@ -20,24 +20,19 @@ from pants.backend.python.goals import (
     tailor,
 )
 from pants.backend.python.macros import (
-    deprecation_fixers,
     pipenv_requirements,
     poetry_requirements,
     python_requirements,
 )
 from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTargetGenerator
-from pants.backend.python.macros.pipenv_requirements_caof import PipenvRequirementsCAOF
 from pants.backend.python.macros.poetry_requirements import PoetryRequirementsTargetGenerator
-from pants.backend.python.macros.poetry_requirements_caof import PoetryRequirementsCAOF
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
-from pants.backend.python.macros.python_requirements_caof import PythonRequirementsCAOF
 from pants.backend.python.subsystems import ipython, pytest, python_native_code, setuptools
 from pants.backend.python.target_types import (
     PexBinariesGeneratorTarget,
     PexBinary,
     PythonDistribution,
-    PythonRequirementsFileTarget,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
@@ -55,17 +50,11 @@ from pants.backend.python.util_rules import (
     python_sources,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 
 
 def build_file_aliases():
-    return BuildFileAliases(
-        objects={"python_artifact": PythonArtifact, "setup_py": PythonArtifact},
-        context_aware_object_factories={
-            "python_requirements": PythonRequirementsCAOF,
-            "poetry_requirements": PoetryRequirementsCAOF,
-            "pipenv_requirements": PipenvRequirementsCAOF,
-        },
-    )
+    return BuildFileAliases(objects={"python_artifact": PythonArtifact, "setup_py": PythonArtifact})
 
 
 def rules():
@@ -93,7 +82,6 @@ def rules():
         *tailor.rules(),
         *target_types_rules.rules(),
         # Macros.
-        *deprecation_fixers.rules(),
         *pipenv_requirements.rules(),
         *poetry_requirements.rules(),
         *python_requirements.rules(),
@@ -101,11 +89,11 @@ def rules():
 
 
 def target_types():
-    return [
+    return (
         PexBinary,
         PexBinariesGeneratorTarget,
         PythonDistribution,
-        PythonRequirementsFileTarget,
+        TargetGeneratorSourcesHelperTarget,
         PythonRequirementTarget,
         PythonSourcesGeneratorTarget,
         PythonSourceTarget,
@@ -116,4 +104,4 @@ def target_types():
         PipenvRequirementsTargetGenerator,
         PoetryRequirementsTargetGenerator,
         PythonRequirementsTargetGenerator,
-    ]
+    )

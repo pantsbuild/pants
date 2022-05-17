@@ -178,10 +178,12 @@ async def run_go_tests(
         GenerateTestMainRequest(
             pkg_digest.digest,
             FrozenOrderedSet(
-                os.path.join(".", pkg_analysis.dir_path, name) for name in pkg_analysis.test_files
+                os.path.join(".", pkg_analysis.dir_path, name)
+                for name in pkg_analysis.test_go_files
             ),
             FrozenOrderedSet(
-                os.path.join(".", pkg_analysis.dir_path, name) for name in pkg_analysis.xtest_files
+                os.path.join(".", pkg_analysis.dir_path, name)
+                for name in pkg_analysis.xtest_go_files
             ),
             import_path,
             field_set.address,
@@ -231,7 +233,7 @@ async def run_go_tests(
             import_path=f"{import_path}_test",
             digest=pkg_digest.digest,
             dir_path=pkg_analysis.dir_path,
-            go_file_names=pkg_analysis.xtest_files,
+            go_file_names=pkg_analysis.xtest_go_files,
             s_file_names=(),  # TODO: Are there .s files for xtest?
             direct_dependencies=tuple(direct_dependencies),
             minimum_go_version=pkg_analysis.minimum_go_version,

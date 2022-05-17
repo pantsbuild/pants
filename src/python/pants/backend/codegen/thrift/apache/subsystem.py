@@ -8,6 +8,7 @@ from pants.engine.environment import Environment
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import softwrap
 
 
 class ApacheThriftSubsystem(Subsystem):
@@ -17,21 +18,29 @@ class ApacheThriftSubsystem(Subsystem):
     _thrift_search_paths = StrListOption(
         "--thrift-search-paths",
         default=["<PATH>"],
-        help=(
-            "A list of paths to search for Thrift.\n\n"
-            "Specify absolute paths to directories with the `thrift` binary, e.g. `/usr/bin`. "
-            "Earlier entries will be searched first.\n\n"
-            "The special string '<PATH>' will expand to the contents of the PATH env var."
+        help=softwrap(
+            """
+            A list of paths to search for Thrift.
+
+            Specify absolute paths to directories with the `thrift` binary, e.g. `/usr/bin`.
+            Earlier entries will be searched first.
+
+            The special string `"<PATH>"` will expand to the contents of the PATH env var.
+            """
         ),
     )
     expected_version = StrOption(
         "--expected-version",
         default="0.15",
-        help=(
-            "The major/minor version of Apache Thrift that  you are using, such as `0.15`.\n\n"
-            "Pants will only use Thrift binaries from `--thrift-search-paths` that have the "
-            "expected version, and it will error if none are found.\n\n"
-            "Do not include the patch version."
+        help=softwrap(
+            """
+            The major/minor version of Apache Thrift that  you are using, such as `0.15`.
+
+            Pants will only use Thrift binaries from `--thrift-search-paths` that have the
+            expected version, and it will error if none are found.
+
+            Do not include the patch version.
+            """
         ),
     )
 

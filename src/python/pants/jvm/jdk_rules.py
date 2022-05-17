@@ -13,10 +13,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar, Iterable, Mapping
 
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
-from pants.engine.process import BashBinary, FallibleProcessResult, Process, ProcessCacheScope
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTarget
 from pants.jvm.compile import ClasspathEntry
@@ -25,9 +26,12 @@ from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmJdkField
+from pants.option.global_options import GlobalOptions
+from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty, frozen_after_init
+from pants.util.strutil import fmt_memory_size, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +94,8 @@ class JdkEnvironment:
     nailgun_jar: str
     coursier: Coursier
     jre_major_version: int
+    global_jvm_options: tuple[str, ...]
+    java_home_command: str
 
     bin_dir: ClassVar[str] = "__jdk"
     jdk_preparation_script: ClassVar[str] = f"{bin_dir}/jdk.sh"
@@ -124,6 +130,17 @@ class InternalJdk(JdkEnvironment):
     The InternalJdk should only be used in situations where no classfiles are required for a user's
     firstparty or thirdparty code (such as for codegen, or analysis of source files).
     """
+
+    @classmethod
+    def from_jdk_environment(cls, env: JdkEnvironment) -> InternalJdk:
+        return cls(
+            env._digest,
+            env.nailgun_jar,
+            env.coursier,
+            env.jre_major_version,
+            env.global_jvm_options,
+            env.java_home_command,
+        )
 
 
 VERSION_REGEX = re.compile(r"version \"(.+?)\"")
@@ -167,7 +184,7 @@ async def internal_jdk(jvm: JvmSubsystem) -> InternalJdk:
 
     request = JdkRequest(jvm.tool_jdk) if jvm.tool_jdk is not None else JdkRequest.SYSTEM
     env = await Get(JdkEnvironment, JdkRequest, request)
-    return InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
+    return InternalJdk.from_jdk_environment(env)
 
 
 @rule
@@ -263,6 +280,7 @@ async def prepare_jdk_environment(
             ]
         ),
     )
+
     return JdkEnvironment(
         _digest=await Get(
             Digest,
@@ -273,9 +291,11 @@ async def prepare_jdk_environment(
                 ]
             ),
         ),
+        global_jvm_options=jvm.global_options,
         nailgun_jar=os.path.join(JdkEnvironment.bin_dir, nailgun.filenames[0]),
         coursier=coursier,
         jre_major_version=jre_major_version,
+        java_home_command=java_home_command,
     )
 
 
@@ -288,6 +308,7 @@ class JvmProcess:
     input_digest: Digest
     description: str = dataclasses.field(compare=False)
     level: LogLevel
+    extra_jvm_options: tuple[str, ...]
     extra_nailgun_keys: tuple[str, ...]
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
@@ -306,6 +327,7 @@ class JvmProcess:
         input_digest: Digest,
         description: str,
         level: LogLevel = LogLevel.INFO,
+        extra_jvm_options: Iterable[str] | None = None,
         extra_nailgun_keys: Iterable[str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
@@ -322,6 +344,7 @@ class JvmProcess:
         self.input_digest = input_digest
         self.description = description
         self.level = level
+        self.extra_jvm_options = tuple(extra_jvm_options or ())
         self.extra_nailgun_keys = tuple(extra_nailgun_keys or ())
         self.output_files = tuple(output_files or ())
         self.output_directories = tuple(output_directories or ())
@@ -339,8 +362,13 @@ class JvmProcess:
             )
 
 
+_JVM_HEAP_SIZE_UNITS = ["", "k", "m", "g"]
+
+
 @rule
-async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
+async def jvm_process(
+    bash: BashBinary, request: JvmProcess, global_options: GlobalOptions
+) -> Process:
 
     jdk = request.jdk
 
@@ -354,12 +382,37 @@ async def jvm_process(bash: BashBinary, request: JvmProcess) -> Process:
         **request.extra_env,
     }
 
+    def valid_jvm_opt(opt: str) -> str:
+        if opt.startswith("-Xmx"):
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Invalid value for JVM options: {opt}.
+
+                    For setting a maximum heap size for the JVM child processes, use
+                    `[GLOBAL].process_per_child_memory_usage` option instead.
+
+                    Run `{bin_name()} help-advanced global` for more information.
+                    """
+                )
+            )
+        return opt
+
+    max_heap_size = fmt_memory_size(
+        global_options.process_per_child_memory_usage, units=_JVM_HEAP_SIZE_UNITS
+    )
+    jvm_user_options = [*jdk.global_jvm_options, *request.extra_jvm_options]
+    jvm_options = [
+        f"-Xmx{max_heap_size}",
+        *[valid_jvm_opt(opt) for opt in jvm_user_options],
+    ]
+
     use_nailgun = []
     if request.use_nailgun:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
 
     return Process(
-        [*jdk.args(bash, request.classpath_entries), *request.argv],
+        [*jdk.args(bash, request.classpath_entries), *jvm_options, *request.argv],
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         use_nailgun=use_nailgun,

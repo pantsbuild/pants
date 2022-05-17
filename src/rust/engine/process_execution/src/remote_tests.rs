@@ -6,7 +6,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint};
 use maplit::{btreemap, hashset};
 use mock::execution_server::{ExpectedAPICall, MockOperation};
 use prost::Message;
@@ -26,7 +26,7 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
   Platform, Process, ProcessCacheScope, ProcessMetadata,
 };
-use fs::RelativePath;
+use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
 use std::io::Cursor;
 use tonic::{Code, Status};
@@ -78,7 +78,7 @@ async fn make_execute_request() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_digests: InputDigests::with_input_files(input_directory.digest()),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -155,7 +155,7 @@ async fn make_execute_request_with_instance_name() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_digests: InputDigests::with_input_files(input_directory.digest()),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -245,7 +245,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_digests: InputDigests::with_input_files(input_directory.digest()),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -333,7 +333,7 @@ async fn make_execute_request_with_jdk() {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
   req.jdk_home = Some(PathBuf::from("/tmp"));
   req.description = "some description".to_owned();
-  req.input_digests = InputDigests::with_input_files(input_directory.digest());
+  req.input_digests = InputDigests::with_input_files(input_directory.directory_digest());
 
   let want_command = remexec::Command {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
@@ -389,7 +389,7 @@ async fn make_execute_request_with_jdk() {
 async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let input_directory = TestDirectory::containing_roland();
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
-  req.input_digests = InputDigests::with_input_files(input_directory.digest());
+  req.input_digests = InputDigests::with_input_files(input_directory.directory_digest());
   req.description = "some description".to_owned();
   req.jdk_home = Some(PathBuf::from("/tmp"));
 
@@ -482,7 +482,7 @@ async fn make_execute_request_with_timeout() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_digests: InputDigests::with_input_files(input_directory.digest()),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -559,12 +559,16 @@ async fn make_execute_request_using_immutable_inputs() {
 
   let prefix = RelativePath::new("cats").unwrap();
   let input_directory = TestDirectory::containing_roland();
+  store
+    .record_directory(&input_directory.directory(), false)
+    .await
+    .expect("Saving directory bytes to store");
   let input_digests = InputDigests::new(
     &store,
-    EMPTY_DIGEST,
+    EMPTY_DIRECTORY_DIGEST.clone(),
     {
       let mut map = BTreeMap::new();
-      map.insert(prefix.clone(), input_directory.digest());
+      map.insert(prefix.clone(), input_directory.directory_digest());
       map
     },
     vec![],
@@ -572,9 +576,9 @@ async fn make_execute_request_using_immutable_inputs() {
   .await
   .unwrap();
 
-  // The computed input root digest should be prefixed will be prefixed with the mount point.
+  // The computed input root digest will be prefixed with the mount point.
   let expected_digest = store
-    .add_prefix(input_directory.digest(), &prefix)
+    .add_prefix(input_directory.directory_digest(), &prefix)
     .await
     .unwrap();
 
@@ -627,7 +631,7 @@ async fn make_execute_request_using_immutable_inputs() {
       ))
         .into(),
     ),
-    input_root_digest: Some((&expected_digest).into()),
+    input_root_digest: Some((&expected_digest.as_digest()).into()),
     ..Default::default()
   };
 
@@ -695,7 +699,7 @@ async fn successful_with_only_call_to_execute() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -744,7 +748,7 @@ async fn successful_after_reconnect_with_wait_execution() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -803,7 +807,7 @@ async fn successful_after_reconnect_from_retryable_error() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -844,7 +848,7 @@ async fn successful_served_from_action_cache() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -999,7 +1003,7 @@ async fn sends_headers() {
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkunitStore::new(false),
+    workunit_store: WorkunitStore::new(false, log::Level::Debug),
     build_id: String::from("marmosets"),
     run_id: RunId(0),
   };
@@ -1061,12 +1065,13 @@ async fn extract_response_with_digest_stdout() {
   assert_eq!(result.stdout_bytes, testdata.bytes());
   assert_eq!(result.stderr_bytes, testdata_empty.bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
 
 #[tokio::test]
 async fn extract_response_with_digest_stderr() {
+  let _ = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -1088,12 +1093,13 @@ async fn extract_response_with_digest_stderr() {
   assert_eq!(result.stdout_bytes, testdata_empty.bytes());
   assert_eq!(result.stderr_bytes, testdata.bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
 
 #[tokio::test]
 async fn extract_response_with_digest_stdout_osx_remote() {
+  let _ = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -1115,7 +1121,7 @@ async fn extract_response_with_digest_stdout_osx_remote() {
   assert_eq!(result.stdout_bytes, testdata.bytes());
   assert_eq!(result.stderr_bytes, testdata_empty.bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::Macos_x86_64);
 }
 
@@ -1620,10 +1626,7 @@ async fn execute_missing_file_errors_if_unknown() {
   };
 
   let store_dir = TempDir::new().unwrap();
-  let cas = mock::StubCAS::builder()
-    .file(&TestData::roland())
-    .directory(&TestDirectory::containing_roland())
-    .build();
+  let cas = mock::StubCAS::builder().file(&TestData::roland()).build();
   let runtime = task_executor::Executor::new();
   let store = Store::local_only(runtime.clone(), store_dir)
     .unwrap()
@@ -1706,7 +1709,7 @@ async fn extract_execute_response_success() {
   assert_eq!(result.original.exit_code, wanted_exit_code);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::nested().digest()
+    TestDirectory::nested().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
@@ -1843,7 +1846,7 @@ async fn extract_execute_response_other_status() {
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let (mut workunit_store, _) = WorkunitStore::setup_for_tests();
+  let (workunit_store, _) = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -1866,7 +1869,7 @@ async fn remote_workunits_are_stored() {
     .await
     .unwrap();
 
-  let got_workunit_items: HashSet<String> = workunit_store
+  let got_workunit_items: HashSet<&'static str> = workunit_store
     .latest_workunits(log::Level::Trace)
     .1
     .into_iter()
@@ -1874,10 +1877,10 @@ async fn remote_workunits_are_stored() {
     .collect();
 
   let wanted_workunit_items = hashset! {
-    String::from("remote execution action scheduling"),
-    String::from("remote execution worker input fetching"),
-    String::from("remote execution worker command executing"),
-    String::from("remote execution worker output uploading"),
+    "remote execution action scheduling",
+    "remote execution worker input fetching",
+    "remote execution worker command executing",
+    "remote execution worker output uploading",
   };
 
   assert!(got_workunit_items.is_superset(&wanted_workunit_items));
@@ -2021,6 +2024,7 @@ async fn extract_output_files_from_response_two_files_nested() {
 
 #[tokio::test]
 async fn extract_output_files_from_response_just_directory() {
+  let _ = WorkunitStore::setup_for_tests();
   let test_tree: TestTree = TestDirectory::containing_roland().into();
 
   let execute_response = remexec::ExecuteResponse {
@@ -2047,6 +2051,7 @@ async fn extract_output_files_from_response_directories_and_files() {
   // /pets/cats/roland.ext
   // /pets/dogs/robin.ext
 
+  let _ = WorkunitStore::setup_for_tests();
   let execute_response = remexec::ExecuteResponse {
     result: Some(remexec::ActionResult {
       exit_code: 0,
@@ -2084,6 +2089,7 @@ async fn extract_output_files_from_response_directories_and_files() {
 
 #[tokio::test]
 async fn extract_output_files_from_response_no_prefix() {
+  let _ = WorkunitStore::setup_for_tests();
   let execute_response = remexec::ExecuteResponse {
     result: Some(remexec::ActionResult {
       exit_code: 0,
@@ -2433,7 +2439,8 @@ async fn extract_output_files_from_response(
     .result
     .as_ref()
     .ok_or_else(|| "No ActionResult found".to_string())?;
-  crate::remote::extract_output_files(store, action_result, false).await
+  let directory_digest = crate::remote::extract_output_files(store, action_result, false).await?;
+  Ok(directory_digest.as_digest())
 }
 
 pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
@@ -2475,7 +2482,7 @@ pub(crate) fn cat_roland_request() -> Process {
   let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
   process.input_digests =
-    InputDigests::with_input_files(TestDirectory::containing_roland().digest());
+    InputDigests::with_input_files(TestDirectory::containing_roland().directory_digest());
   process.timeout = one_second();
   process.description = "cat a roland".to_string();
   process

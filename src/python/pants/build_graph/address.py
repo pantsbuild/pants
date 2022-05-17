@@ -35,6 +35,18 @@ class InvalidTargetName(InvalidAddress):
     """Indicate an invalid target name for `Address`."""
 
 
+class InvalidParameters(InvalidAddress):
+    """Indicate invalid parameter values for `Address`."""
+
+
+class UnsupportedIgnore(InvalidAddress):
+    """Indicate that a `!` ignore was used."""
+
+
+class UnsupportedWildcard(InvalidAddress):
+    """Indicate that an address wildcard was used."""
+
+
 @dataclass(frozen=True)
 class AddressInput:
     """A string that has been parsed and normalized using the Address syntax.
@@ -55,19 +67,29 @@ class AddressInput:
                     f"Address spec {self.path_component}:{self.target_component} has no name part."
                 )
 
-        # A root is okay.
-        if self.path_component == "":
-            return
-        components = self.path_component.split(os.sep)
-        if any(component in (".", "..", "") for component in components):
-            raise InvalidSpecPath(
-                f"Address spec has un-normalized path part '{self.path_component}'"
-            )
-        if os.path.isabs(self.path_component):
-            raise InvalidSpecPath(
-                f"Address spec has absolute path {self.path_component}; expected a path relative "
-                "to the build root."
-            )
+        if self.path_component != "":
+            components = self.path_component.split(os.sep)
+            if any(component in (".", "..", "") for component in components):
+                raise InvalidSpecPath(
+                    f"Address spec has un-normalized path part '{self.path_component}'"
+                )
+            if os.path.isabs(self.path_component):
+                raise InvalidSpecPath(
+                    f"Address spec has absolute path {self.path_component}; expected a path relative "
+                    "to the build root."
+                )
+
+        for k, v in self.parameters.items():
+            key_banned = BANNED_CHARS_IN_PARAMETERS & set(k)
+            if key_banned:
+                raise InvalidParameters(
+                    f"Address spec has illegal characters in parameter keys: `{key_banned}` in `{k}={v}`."
+                )
+            val_banned = BANNED_CHARS_IN_PARAMETERS & set(v)
+            if val_banned:
+                raise InvalidParameters(
+                    f"Address spec has illegal characters in parameter values: `{val_banned}` in `{k}={v}`."
+                )
 
     @classmethod
     def parse(
@@ -135,11 +157,27 @@ class AddressInput:
             return os.path.normpath(subproject)
 
         (
-            path_component,
-            target_component,
-            parameters,
-            generated_component,
-        ) = native_engine.address_parse(spec)
+            is_ignored,
+            (
+                path_component,
+                target_component,
+                generated_component,
+                parameters,
+            ),
+            wildcard,
+        ) = native_engine.address_spec_parse(spec)
+
+        if is_ignored:
+            # NB: BUILD dependency ignore parsing occurs at a different level, because AddressInput
+            # does not support encoding negation.
+            raise UnsupportedIgnore(
+                f"The address `{spec}` was prefixed with a `!` ignore, which is not supported."
+            )
+
+        if wildcard:
+            raise UnsupportedWildcard(
+                f"The address `{spec}` included a wildcard (`{wildcard}`), which is not supported."
+            )
 
         normalized_relative_to = None
         if relative_to:
@@ -318,6 +356,12 @@ class Address(EngineAwareParameter):
     def is_parametrized(self) -> bool:
         return bool(self.parameters)
 
+    def is_parametrized_subset_of(self, other: Address) -> bool:
+        """True if this Address is == to the given Address, but with a subset of its parameters."""
+        if not self._equal_without_parameters(other):
+            return False
+        return self.parameters.items() <= other.parameters.items()
+
     @property
     def filename(self) -> str:
         if self._relative_file_path is None:
@@ -366,7 +410,7 @@ class Address(EngineAwareParameter):
             )
         target_sep = ":" if target else ""
         generated = "" if self.generated_name is None else f"#{self.generated_name}"
-        return f"{prefix}{path}{target_sep}{target}{self.parameters_repr}{generated}"
+        return f"{prefix}{path}{target_sep}{target}{generated}{self.parameters_repr}"
 
     @property
     def path_safe_spec(self) -> str:
@@ -397,7 +441,7 @@ class Address(EngineAwareParameter):
             params = ""
         generated = f"@{sanitize(self.generated_name)}" if self.generated_name else ""
         prefix = sanitize(self.spec_path)
-        return f"{prefix}{path}{target}{params}{generated}"
+        return f"{prefix}{path}{target}{generated}{params}"
 
     def parametrize(self, parameters: Mapping[str, str]) -> Address:
         """Creates a new Address with the given `parameters` merged over self.parameters."""
@@ -439,16 +483,18 @@ class Address(EngineAwareParameter):
             relative_file_path=relative_file_path,
         )
 
-    def __eq__(self, other):
-        if not isinstance(other, Address):
-            return False
+    def _equal_without_parameters(self, other: Address) -> bool:
         return (
             self.spec_path == other.spec_path
             and self._target_name == other._target_name
-            and self.parameters == other.parameters
             and self.generated_name == other.generated_name
             and self._relative_file_path == other._relative_file_path
         )
+
+    def __eq__(self, other):
+        if not isinstance(other, Address):
+            return False
+        return self._equal_without_parameters(other) and self.parameters == other.parameters
 
     def __hash__(self):
         return self._hash

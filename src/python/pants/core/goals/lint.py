@@ -6,8 +6,9 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, cast
+from typing import Any, ClassVar, Iterable, Iterator, Type, TypeVar, cast
 
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.style_request import (
     StyleRequest,
     determine_specified_tool_names,
@@ -16,21 +17,45 @@ from pants.core.goals.style_request import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsSnapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import FieldSet, Targets
+from pants.engine.target import FieldSet, FilteredTargets, SourcesField
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.util.collections import partition_sequentially
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import strip_v2_chroot_path
+from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
+
+_SR = TypeVar("_SR", bound=StyleRequest)
+
+
+class AmbiguousRequestNamesError(Exception):
+    def __init__(
+        self,
+        ambiguous_name: str,
+        requests: set[Type[StyleRequest] | Type[LintFilesRequest]],
+    ):
+        request_names = {
+            f"{request_target.__module__}.{request_target.__qualname__}"
+            for request_target in requests
+        }
+
+        super().__init__(
+            f"The same name `{ambiguous_name}` is used by multiple requests, "
+            f"which causes ambiguity: {request_names}\n\n"
+            f"To fix, please update these requests so that `{ambiguous_name}` "
+            f"is not used more than once."
+        )
 
 
 @dataclass(frozen=True)
@@ -134,7 +159,7 @@ class LintResults(EngineAwareReturnType):
 
 @union
 class LintTargetsRequest(StyleRequest):
-    """AThe entry point for linters that need targets."""
+    """The entry point for linters that need targets."""
 
 
 @union
@@ -164,114 +189,217 @@ class LintSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return LintTargetsRequest in union_membership or LintFilesRequest in union_membership
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--only",
-            type=list,
-            member_type=str,
-            default=[],
-            help=only_option_help("lint", "linter", "flake8", "shellcheck"),
-        )
-        register(
-            "--batch-size",
-            advanced=True,
-            type=int,
-            default=128,
-            help=style_batch_size_help(uppercase="Linter", lowercase="linter"),
-        )
+    only = StrListOption(
+        "--only",
+        help=only_option_help("lint", "linter", "flake8", "shellcheck"),
+    )
+    skip_formatters = BoolOption(
+        "--skip-formatters",
+        default=False,
+        help=softwrap(
+            f"""
+            If true, skip running all formatters in check-only mode.
 
-    @property
-    def only(self) -> tuple[str, ...]:
-        return tuple(self.options.only)
-
-    @property
-    def batch_size(self) -> int:
-        return cast(int, self.options.batch_size)
+            FYI: when running `{bin_name()} fmt lint ::`, there should be little performance
+            benefit to using this flag. Pants will reuse the results from `fmt` when running `lint`.
+            """
+        ),
+    )
+    batch_size = IntOption(
+        "--batch-size",
+        advanced=True,
+        default=128,
+        help=style_batch_size_help(uppercase="Linter", lowercase="linter"),
+    )
 
 
 class Lint(Goal):
     subsystem_cls = LintSubsystem
 
 
+def _check_ambiguous_request_names(
+    *requests: Type[LintFilesRequest] | Type[StyleRequest],
+) -> None:
+    for name, request_group in itertools.groupby(requests, key=lambda target: target.name):
+        request_group_set = set(request_group)
+
+        if len(request_group_set) > 1:
+            raise AmbiguousRequestNamesError(name, request_group_set)
+
+
+def _print_results(
+    console: Console,
+    results: tuple[LintResults, ...],
+    formatter_failed: bool,
+) -> None:
+    if results:
+        console.print_stderr("")
+
+    for result in results:
+        if result.skipped:
+            continue
+        elif result.exit_code == 0:
+            sigil = console.sigil_succeeded()
+            status = "succeeded"
+        else:
+            sigil = console.sigil_failed()
+            status = "failed"
+        console.print_stderr(f"{sigil} {result.linter_name} {status}.")
+
+    if formatter_failed:
+        console.print_stderr("")
+        console.print_stderr(f"(One or more formatters failed. Run `{bin_name()} fmt` to fix.)")
+
+
+def _get_error_code(results: tuple[LintResults, ...]) -> int:
+    for result in reversed(results):
+        if result.exit_code:
+            return result.exit_code
+    return 0
+
+
 @goal_rule
 async def lint(
     console: Console,
     workspace: Workspace,
-    targets: Targets,
+    targets: FilteredTargets,
     specs_snapshot: SpecsSnapshot,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
     dist_dir: DistDir,
 ) -> Lint:
-    target_request_types = cast(
-        "Iterable[type[LintTargetsRequest]]", union_membership[LintTargetsRequest]
+    lint_target_request_types = cast(
+        "Iterable[type[LintTargetsRequest]]", union_membership.get(LintTargetsRequest)
     )
-    file_request_types = union_membership[LintFilesRequest]
+    fmt_target_request_types = cast("Iterable[type[FmtRequest]]", union_membership.get(FmtRequest))
+    file_request_types = cast(
+        "Iterable[type[LintFilesRequest]]", union_membership[LintFilesRequest]
+    )
+
+    _check_ambiguous_request_names(
+        *lint_target_request_types, *fmt_target_request_types, *file_request_types
+    )
+
     specified_names = determine_specified_tool_names(
         "lint",
         lint_subsystem.only,
-        target_request_types,
+        [
+            *lint_target_request_types,
+            *fmt_target_request_types,
+        ],
         extra_valid_names={request.name for request in file_request_types},
     )
-    target_requests = tuple(
-        request_type(
-            request_type.field_set_type.create(target)
-            for target in targets
-            if (
-                request_type.name in specified_names
-                and request_type.field_set_type.is_applicable(target)
+
+    def is_specified(request_type: type[StyleRequest] | type[LintFilesRequest]):
+        return request_type.name in specified_names
+
+    lint_target_request_types = filter(is_specified, lint_target_request_types)
+    fmt_target_request_types = filter(is_specified, fmt_target_request_types)
+    file_request_types = filter(is_specified, file_request_types)
+
+    def batch(field_sets: Iterable[FieldSet]) -> Iterator[list[FieldSet]]:
+        partitions = partition_sequentially(
+            field_sets,
+            key=lambda fs: fs.address.spec,
+            size_target=lint_subsystem.batch_size,
+            size_max=4 * lint_subsystem.batch_size,
+        )
+        for partition in partitions:
+            yield partition
+
+    def batch_by_type(
+        request_types: Iterable[type[_SR]],
+    ) -> tuple[tuple[type[_SR], list[FieldSet]], ...]:
+        return tuple(
+            (request_type, field_set_batch)
+            for request_type in request_types
+            for field_set_batch in batch(
+                request_type.field_set_type.create(target)
+                for target in targets
+                if request_type.field_set_type.is_applicable(target)
             )
         )
-        for request_type in target_request_types
-    )
-    file_requests = tuple(
-        request_type(specs_snapshot.snapshot.files)
-        for request_type in file_request_types
-        if request_type.name in specified_names
+
+    lint_target_requests = (
+        request_type(batch) for request_type, batch in batch_by_type(lint_target_request_types)
     )
 
-    def address_str(fs: FieldSet) -> str:
-        return fs.address.spec
+    fmt_requests: Iterable[FmtRequest] = ()
+    if not lint_subsystem.skip_formatters:
+        batched_fmt_request_pairs = batch_by_type(fmt_target_request_types)
+        all_fmt_source_batches = await MultiGet(
+            Get(
+                SourceFiles,
+                SourceFilesRequest(
+                    cast(
+                        SourcesField,
+                        getattr(field_set, "sources", getattr(field_set, "source", None)),
+                    )
+                    for field_set in batch
+                ),
+            )
+            for _, batch in batched_fmt_request_pairs
+        )
+        fmt_requests = (
+            request_type(
+                batch,
+                snapshot=source_files_snapshot.snapshot,
+            )
+            for (request_type, batch), source_files_snapshot in zip(
+                batched_fmt_request_pairs, all_fmt_source_batches
+            )
+        )
+
+    file_requests = (
+        tuple(request_type(specs_snapshot.snapshot.files) for request_type in file_request_types)
+        if specs_snapshot.snapshot.files
+        else ()
+    )
 
     all_requests = [
-        *(
-            Get(LintResults, LintTargetsRequest, request.__class__(field_set_batch))
-            for request in target_requests
-            if request.field_sets
-            for field_set_batch in partition_sequentially(
-                request.field_sets,
-                key=address_str,
-                size_target=lint_subsystem.batch_size,
-                size_max=4 * lint_subsystem.batch_size,
-            )
-        ),
+        *(Get(LintResults, LintTargetsRequest, request) for request in lint_target_requests),
+        *(Get(FmtResult, FmtRequest, request) for request in fmt_requests),
         *(Get(LintResults, LintFilesRequest, request) for request in file_requests),
     ]
     all_batch_results = cast(
-        "tuple[LintResults, ...]",
+        "tuple[LintResults | FmtResult, ...]",
         await MultiGet(all_requests),  # type: ignore[arg-type]
     )
 
-    def key_fn(results: LintResults):
+    def key_fn(results: LintResults | FmtResult):
+        if isinstance(results, FmtResult):
+            return results.formatter_name
         return results.linter_name
 
     # NB: We must pre-sort the data for itertools.groupby() to work properly.
     sorted_all_batch_results = sorted(all_batch_results, key=key_fn)
+
+    formatter_failed = False
+
+    def coerce_to_lintresult(batch_results: LintResults | FmtResult) -> tuple[LintResult, ...]:
+        if isinstance(batch_results, FmtResult):
+            nonlocal formatter_failed
+            formatter_failed = formatter_failed or batch_results.did_change
+            return (
+                LintResult(
+                    1 if batch_results.did_change else 0,
+                    batch_results.stdout,
+                    batch_results.stderr,
+                ),
+            )
+        return batch_results.results
+
     # We consolidate all results for each linter into a single `LintResults`.
     all_results = tuple(
         sorted(
             (
                 LintResults(
                     itertools.chain.from_iterable(
-                        batch_results.results for batch_results in all_linter_results
+                        coerce_to_lintresult(batch_results) for batch_results in results
                     ),
                     linter_name=linter_name,
                 )
-                for linter_name, all_linter_results in itertools.groupby(
-                    sorted_all_batch_results, key=key_fn
-                )
+                for linter_name, results in itertools.groupby(sorted_all_batch_results, key=key_fn)
             ),
             key=key_fn,
         )
@@ -288,22 +416,12 @@ async def lint(
         get_name=get_name,
     )
 
-    exit_code = 0
-    if all_results:
-        console.print_stderr("")
-    for results in all_results:
-        if results.skipped:
-            continue
-        elif results.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "succeeded"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
-            exit_code = results.exit_code
-        console.print_stderr(f"{sigil} {results.linter_name} {status}.")
-
-    return Lint(exit_code)
+    _print_results(
+        console,
+        all_results,
+        formatter_failed,
+    )
+    return Lint(_get_error_code(all_results))
 
 
 def rules():

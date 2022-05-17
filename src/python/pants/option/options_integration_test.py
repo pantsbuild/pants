@@ -23,7 +23,7 @@ def test_invalid_options() -> None:
     }
     config_errors = [
         "ERROR] Invalid option 'invalid_global' under [GLOBAL]",
-        "ERROR] Invalid scope [invalid_scope]",
+        "ERROR] Invalid section [invalid_scope]",
         "ERROR] Invalid option 'bad_option' under [pytest]",
     ]
 
@@ -46,20 +46,20 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
     plugin = dedent(
         """\
         from pants.option.subsystem import Subsystem
+        from pants.option.option_types import StrOption
         from pants.engine.rules import SubsystemRule
 
         class Options(Subsystem):
             help = "Options just for a test."
             options_scope = "mock-options"
 
-            @classmethod
-            def register_options(cls, register):
-                super().register_options(register)
-                register(
-                    "--deprecated",
-                    removal_version="999.99.9.dev0",
-                    removal_hint="blah",
-                )
+            deprecated = StrOption(
+                "--deprecated",
+                default=None,
+                help="doens't matter",
+                removal_version="999.99.9.dev0",
+                removal_hint="blah",
+            )
 
         def rules():
             return [SubsystemRule(Options)]
@@ -84,7 +84,7 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
         result.assert_success()
         assert unmatched_glob_warning in result.stderr
         assert (
-            "DEPRECATED: option 'deprecated' in scope 'mock-options' will be removed in version "
+            "DEPRECATED: option 'deprecated' in scope 'mock-options' is scheduled to be removed in version "
             "999.99.9.dev0."
         ) in result.stderr
 

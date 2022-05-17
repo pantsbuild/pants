@@ -12,7 +12,7 @@ from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
-from pants.option.option_types import IntOption
+from pants.option.option_types import BoolOption, IntOption
 from pants.option.options import Options
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
@@ -235,10 +235,7 @@ def test_get_all_help_info():
         options_scope = "foo"
         help = "A foo."
 
-        @classmethod
-        def register_options(cls, register):
-            register("--opt2", type=bool, default=True, help="Option 2")
-            register("--opt3", advanced=True, choices=["a", "b", "c"])
+        opt2 = BoolOption("--opt2", default=True, advanced=True, help="Option 2")
 
     class Bar(GoalSubsystem):
         name = "bar"
@@ -336,7 +333,8 @@ def test_get_all_help_info():
                 "description": "A foo.",
                 "is_goal": False,
                 "deprecated_scope": None,
-                "basic": (
+                "basic": (),
+                "advanced": (
                     {
                         "display_args": ("--[no-]foo-opt2",),
                         "comma_separated_display_args": "--[no-]foo-opt2",
@@ -359,28 +357,6 @@ def test_get_all_help_info():
                         "removal_hint": None,
                         "choices": None,
                         "comma_separated_choices": None,
-                    },
-                ),
-                "advanced": (
-                    {
-                        "display_args": ("--foo-opt3=<str>",),
-                        "comma_separated_display_args": "--foo-opt3=<str>",
-                        "scoped_cmd_line_args": ("--foo-opt3",),
-                        "unscoped_cmd_line_args": ("--opt3",),
-                        "config_key": "opt3",
-                        "env_var": "PANTS_FOO_OPT3",
-                        "value_history": {
-                            "ranked_values": ({"rank": Rank.NONE, "value": None, "details": None},),
-                        },
-                        "typ": str,
-                        "default": None,
-                        "help": "No help available.",
-                        "deprecation_active": False,
-                        "deprecated_message": None,
-                        "removal_version": None,
-                        "removal_hint": None,
-                        "choices": ("a", "b", "c"),
-                        "comma_separated_choices": "a, b, c",
                     },
                 ),
                 "deprecated": tuple(),
@@ -449,9 +425,31 @@ def test_get_all_help_info():
                 ),
             }
         },
+        "name_to_rule_info": {
+            "construct_scope_foo": {
+                "description": None,
+                "documentation": "A foo.",
+                "input_gets": ("Get(ScopedOptions, Scope, ..)",),
+                "input_types": (),
+                "name": "construct_scope_foo",
+                "output_type": "Foo",
+                "provider": "help_info_extracter_test",
+            },
+            "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test": {
+                "description": None,
+                "documentation": "This rule is for testing info extraction only.",
+                "input_gets": (),
+                "input_types": ("Foo",),
+                "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                "output_type": "Target",
+                "provider": "help_info_extracter_test",
+            },
+        },
         "name_to_api_type_info": {
             "pants.help.help_info_extracter_test.Foo": {
-                "consumed_by_rules": ("pants.help.help_info_extracter_test.rule_info_test",),
+                "consumed_by_rules": (
+                    "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                ),
                 "dependees": ("help_info_extracter_test",),
                 "dependencies": ("pants.option.scope",),
                 "documentation": None,
@@ -479,7 +477,9 @@ def test_get_all_help_info():
                 "module": "pants.engine.target",
                 "name": "Target",
                 "provider": "help_info_extracter_test",
-                "returned_by_rules": ("pants.help.help_info_extracter_test.rule_info_test",),
+                "returned_by_rules": (
+                    "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                ),
                 "union_members": (),
                 "union_type": None,
                 "used_in_rules": (),
@@ -499,32 +499,12 @@ def test_get_all_help_info():
                 "used_in_rules": ("construct_scope_foo",),
             },
         },
-        "name_to_rule_info": {
-            "construct_scope_foo": {
-                "description": None,
-                "documentation": "A foo.",
-                "input_gets": ("Get(ScopedOptions, Scope, ..)",),
-                "input_types": (),
-                "name": "construct_scope_foo",
-                "output_type": "Foo",
-                "provider": "help_info_extracter_test",
-            },
-            "pants.help.help_info_extracter_test.rule_info_test": {
-                "description": None,
-                "documentation": "This rule is for testing info extraction only.",
-                "input_gets": (),
-                "input_types": ("Foo",),
-                "name": "pants.help.help_info_extracter_test.rule_info_test",
-                "output_type": "Target",
-                "provider": "help_info_extracter_test",
-            },
-        },
     }
 
     # Break down this colossal structure into pieces so it is easier to spot where the issue is.
-    for (expected, actual) in zip(
-        sorted(expected_all_help_info_dict.items()), sorted(all_help_info_dict.items())
-    ):
+    # Check keys equality first, then contents
+    assert list(expected_all_help_info_dict) == list(all_help_info_dict)
+    for (expected, actual) in zip(expected_all_help_info_dict.items(), all_help_info_dict.items()):
         assert expected == actual
 
 

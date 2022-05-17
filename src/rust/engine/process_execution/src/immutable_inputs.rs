@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_oncecell::OnceCell;
-use fs::{Permissions, RelativePath};
+use fs::{DirectoryDigest, Permissions, RelativePath};
 use futures::TryFutureExt;
 use hashing::Digest;
 use parking_lot::Mutex;
@@ -82,7 +82,8 @@ impl ImmutableInputs {
   }
 
   /// Returns an absolute Path to immutably consume the given Digest from.
-  async fn path(&self, digest: Digest) -> Result<PathBuf, String> {
+  async fn path(&self, directory_digest: DirectoryDigest) -> Result<PathBuf, String> {
+    let digest = directory_digest.as_digest();
     let cell = self.contents.lock().entry(digest).or_default().clone();
     let value = cell
       .get_or_try_init(async {
@@ -95,7 +96,11 @@ impl ImmutableInputs {
         })?;
         self
           .store
-          .materialize_directory(chroot.path().to_path_buf(), digest, Permissions::ReadOnly)
+          .materialize_directory(
+            chroot.path().to_path_buf(),
+            directory_digest,
+            Permissions::ReadOnly,
+          )
           .await?;
         let src = chroot.into_path();
         let dest = self.workdir.path().join(digest.hash.to_hex());
@@ -148,12 +153,12 @@ impl ImmutableInputs {
   ///
   pub(crate) async fn local_paths(
     &self,
-    immutable_inputs: &BTreeMap<RelativePath, Digest>,
+    immutable_inputs: &BTreeMap<RelativePath, DirectoryDigest>,
   ) -> Result<Vec<WorkdirSymlink>, String> {
     let dsts = futures::future::try_join_all(
       immutable_inputs
         .values()
-        .map(|d| self.path(*d))
+        .map(|d| self.path(d.clone()))
         .collect::<Vec<_>>(),
     )
     .await?;

@@ -64,18 +64,14 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
 
 
 def test_docker_binary_push_image(docker_path: str, docker: DockerBinary) -> None:
-    assert docker.push_image(()) == ()
-
     image_ref = "registry/repo/name:tag"
-    push_request = docker.push_image((image_ref,))
-    assert push_request == (
-        Process(
-            argv=(docker_path, "push", image_ref),
-            cache_scope=ProcessCacheScope.PER_SESSION,
-            description="",  # The description field is marked `compare=False`
-        ),
+    push_request = docker.push_image(image_ref)
+    assert push_request == Process(
+        argv=(docker_path, "push", image_ref),
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description="",  # The description field is marked `compare=False`
     )
-    assert push_request[0].description == f"Pushing docker image {image_ref}"
+    assert push_request.description == f"Pushing docker image {image_ref}"
 
 
 def test_docker_binary_run_image(docker_path: str, docker: DockerBinary) -> None:

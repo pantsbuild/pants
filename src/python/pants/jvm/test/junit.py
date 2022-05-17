@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 
@@ -123,7 +125,7 @@ async def setup_junit_for_target(
             *(("--scan-class-path", user_classpath_arg) if user_classpath_arg else ()),
             "--reports-dir",
             reports_dir,
-            *junit.options.args,
+            *junit.args,
         ],
         input_digest=input_digest,
         extra_immutable_input_digests=extra_immutable_input_digests,

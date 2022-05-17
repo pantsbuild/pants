@@ -24,6 +24,7 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -39,22 +40,36 @@ class AnonymousTelemetry(Subsystem):
     enabled = BoolOption(
         "--enabled",
         default=False,
-        help=(
-            f"Whether to send anonymous telemetry to the Pants project.\nTelemetry is sent "
-            f"asynchronously, with silent failure, and does not impact build times or "
-            f"outcomes.\n{_telemetry_docs_referral}."
+        help=softwrap(
+            f"""
+            Whether to send anonymous telemetry to the Pants project.
+
+            Telemetry is sent asynchronously, with silent failure, and does not impact build times
+            or outcomes.
+
+            {_telemetry_docs_referral}.
+            """
         ),
-    ).advanced()
+        advanced=True,
+    )
     repo_id = StrOption(
         "--repo-id",
-        help=(
-            f"An anonymized ID representing this repo.\nFor private repos, you likely want the "
-            f"ID to not be derived from, or algorithmically convertible to, anything "
-            f"identifying the repo.\nFor public repos the ID may be visible in that repo's "
-            f"config file, so anonymity of the repo is not guaranteed (although user anonymity "
-            f"is always guaranteed).\n{_telemetry_docs_referral}."
+        default=None,
+        help=softwrap(
+            f"""
+            An anonymized ID representing this repo.
+
+            For private repos, you likely want the ID to not be derived from, or algorithmically
+            convertible to, anything identifying the repo.
+
+            For public repos the ID may be visible in that repo's config file, so anonymity of the
+            repo is not guaranteed (although user anonymity is always guaranteed).
+
+            {_telemetry_docs_referral}.
+            """
         ),
-    ).advanced()
+        advanced=True,
+    )
 
 
 class AnonymousTelemetryCallback(WorkunitsCallback):

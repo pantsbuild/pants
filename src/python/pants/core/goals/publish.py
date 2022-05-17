@@ -25,7 +25,7 @@ import logging
 from abc import ABCMeta
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from itertools import chain
-from typing import ClassVar, Generic, Type, TypeVar, cast
+from typing import ClassVar, Generic, Type, TypeVar
 
 from typing_extensions import final
 
@@ -44,6 +44,7 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.option.option_types import StrOption
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """
 
     # Subclasses must provide this, to a union member (subclass) of `PublishRequest`.
-    publish_request_type: ClassVar[Type[_T]]
+    publish_request_type: ClassVar[Type[_T]]  # type: ignore[misc]
 
     @final
     def _request(self, packages: tuple[BuiltPackage, ...]) -> _T:
@@ -170,18 +171,11 @@ class PublishSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return PackageFieldSet in union_membership and PublishFieldSet in union_membership
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--output",
-            type=str,
-            help="Filename for JSON structured publish information.",
-        )
-
-    @property
-    def output(self) -> str | None:
-        return cast("str|None", self.options.output)
+    output = StrOption(
+        "--output",
+        default=None,
+        help="Filename for JSON structured publish information.",
+    )
 
 
 class Publish(Goal):
@@ -246,6 +240,7 @@ async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
             outputs.append(pub.get_output_data(published=False, status=status))
             continue
 
+        logger.debug(f"Execute {pub.process}")
         res = await Effect(InteractiveProcessResult, InteractiveProcess, pub.process)
         if res.exit_code == 0:
             sigil = console.sigil_succeeded()

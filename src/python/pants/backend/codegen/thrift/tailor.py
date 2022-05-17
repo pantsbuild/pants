@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.thrift.subsystem import ThriftSubsystem
 from pants.backend.codegen.thrift.target_types import ThriftSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -27,8 +28,13 @@ class PutativeThriftTargetsRequest(PutativeTargetsRequest):
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Thrift targets to create")
 async def find_putative_thrift_targets(
-    req: PutativeThriftTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeThriftTargetsRequest,
+    all_owned_sources: AllOwnedSources,
+    thrift_subsystem: ThriftSubsystem,
 ) -> PutativeTargets:
+    if not thrift_subsystem.tailor:
+        return PutativeTargets()
+
     all_thrift_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.thrift"))
     unowned_thrift_files = set(all_thrift_files.files) - set(all_owned_sources)
     pts = [

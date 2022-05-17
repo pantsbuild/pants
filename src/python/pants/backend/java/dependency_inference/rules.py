@@ -26,8 +26,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
-from pants.jvm.dependency_inference.artifact_mapper import ThirdPartyPackageToArtifactMapping
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
+from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -65,14 +64,9 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     request: JavaInferredDependenciesAndExportsRequest,
     java_infer_subsystem: JavaInferSubsystem,
     jvm: JvmSubsystem,
-    first_party_dep_map: FirstPartySymbolMapping,
-    third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
+    symbol_mapping: SymbolMapping,
 ) -> JavaInferredDependencies:
-    if (
-        not java_infer_subsystem.imports
-        and not java_infer_subsystem.consumed_types
-        and not java_infer_subsystem.third_party_imports
-    ):
+    if not java_infer_subsystem.imports and not java_infer_subsystem.consumed_types:
         return JavaInferredDependencies(FrozenOrderedSet([]), FrozenOrderedSet([]))
 
     address = request.source.address
@@ -126,32 +120,23 @@ async def infer_java_dependencies_and_exports_via_source_analysis(
     dependencies: OrderedSet[Address] = OrderedSet()
     exports: OrderedSet[Address] = OrderedSet()
     for typ in types:
-        first_party_matches = first_party_dep_map.symbols.addresses_for_symbol(typ, resolve=resolve)
-        third_party_matches = (
-            third_party_artifact_mapping.addresses_for_symbol(typ, resolve)
-            if java_infer_subsystem.third_party_imports
-            else FrozenOrderedSet()
-        )
-        matches = first_party_matches.union(third_party_matches)
-        if not matches:
-            continue
+        for matches in symbol_mapping.addresses_for_symbol(typ, resolve).values():
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                matches,
+                address,
+                import_reference="type",
+                context=f"The target {address} imports `{typ}`",
+            )
+            maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
 
-        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-            matches,
-            address,
-            import_reference="type",
-            context=f"The target {address} imports `{typ}`",
-        )
-        maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
-
-        if maybe_disambiguated:
-            dependencies.add(maybe_disambiguated)
-            if typ in export_types:
-                exports.add(maybe_disambiguated)
-        else:
-            # Exports from explicitly provided dependencies:
-            explicitly_provided_exports = set(matches) & set(explicitly_provided_deps.includes)
-            exports.update(explicitly_provided_exports)
+            if maybe_disambiguated:
+                dependencies.add(maybe_disambiguated)
+                if typ in export_types:
+                    exports.add(maybe_disambiguated)
+            else:
+                # Exports from explicitly provided dependencies:
+                explicitly_provided_exports = set(matches) & set(explicitly_provided_deps.includes)
+                exports.update(explicitly_provided_exports)
 
     # Files do not export themselves. Don't be silly.
     if address in exports:

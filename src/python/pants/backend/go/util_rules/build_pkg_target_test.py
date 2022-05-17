@@ -27,12 +27,62 @@ from pants.backend.go.util_rules.build_pkg import (
     FallibleBuildGoPackageRequest,
     FallibleBuiltGoPackage,
 )
-from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
-from pants.engine.addresses import Address
-from pants.engine.fs import Snapshot
-from pants.engine.rules import QueryRule
+from pants.backend.go.util_rules.build_pkg_target import (
+    BuildGoPackageTargetRequest,
+    GoCodegenBuildRequest,
+)
+from pants.core.target_types import FilesGeneratorTarget, FileSourceField
+from pants.engine.addresses import Address, Addresses
+from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
+from pants.engine.rules import Get, QueryRule, rule
+from pants.engine.target import Dependencies, DependenciesRequest
+from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.strutil import path_safe
+
+
+# Set up a semi-complex codegen plugin. Note that we cyclically call into the
+# `BuildGoPackageTargetRequest` rule to set up a dependency on a third-party package, as this
+# is common for codegen plugins to need to do.
+class GoCodegenBuildFilesRequest(GoCodegenBuildRequest):
+    generate_from = FileSourceField
+
+
+@rule
+async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBuildGoPackageRequest:
+    content = dedent(
+        """\
+        package gen
+
+        import "fmt"
+        import "github.com/google/uuid"
+
+        func Quote(s string) string {
+            uuid.SetClockSequence(-1)  // A trivial line to use uuid.
+            return fmt.Sprintf(">> %s <<", s)
+        }
+        """
+    )
+    digest = await Get(Digest, CreateDigest([FileContent("codegen/f.go", content.encode())]))
+
+    deps = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
+    assert len(deps) == 1
+    assert deps[0].generated_name == "github.com/google/uuid"
+    thirdparty_dep = await Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(deps[0]))
+    assert thirdparty_dep.request is not None
+
+    return FallibleBuildGoPackageRequest(
+        request=BuildGoPackageRequest(
+            import_path="codegen.com/gen",
+            digest=digest,
+            dir_path="codegen",
+            go_file_names=("f.go",),
+            s_file_names=(),
+            direct_dependencies=(thirdparty_dep.request,),
+            minimum_go_version=None,
+        ),
+        import_path="codegen.com/gen",
+    )
 
 
 @pytest.fixture
@@ -49,12 +99,14 @@ def rule_runner() -> RuleRunner:
             *first_party_pkg.rules(),
             *third_party_pkg.rules(),
             *target_type_rules.rules(),
+            generate_from_file,
             QueryRule(BuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(FallibleBuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
+            UnionRule(GoCodegenBuildRequest, GoCodegenBuildFilesRequest),
         ],
-        target_types=[GoModTarget, GoPackageTarget],
+        target_types=[GoModTarget, GoPackageTarget, FilesGeneratorTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -353,3 +405,72 @@ def test_build_invalid_target(rule_runner: RuleRunner) -> None:
     assert dep_build_request.request is None
     assert dep_build_request.exit_code == 1
     assert "dep/f.go:1:1: expected 'package', found invalid\n" in (dep_build_request.stderr or "")
+
+
+def test_build_codegen_target(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/greeter
+                go 1.17
+                require github.com/google/uuid v1.3.0
+                """
+            ),
+            "go.sum": dedent(
+                """\
+                github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+                github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+                """
+            ),
+            "generate_from_me.txt": "",
+            "greeter.go": dedent(
+                """\
+                package greeter
+
+                import "fmt"
+                import "codegen.com/gen"
+
+                func Hello() {
+                    fmt.Println(gen.Quote("Hello world!"))
+                }
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                go_mod(name='mod')
+                go_package(name='pkg', dependencies=[":gen"])
+                files(
+                    name='gen',
+                    sources=['generate_from_me.txt'],
+                    dependencies=[':mod#github.com/google/uuid'],
+                )
+                """
+            ),
+        }
+    )
+
+    # Running directly on a codegen target should work.
+    assert_pkg_target_built(
+        rule_runner,
+        Address("", target_name="gen", relative_file_path="generate_from_me.txt"),
+        expected_import_path="codegen.com/gen",
+        expected_dir_path="codegen",
+        expected_go_file_names=["f.go"],
+        expected_direct_dependency_import_paths=["github.com/google/uuid"],
+        expected_transitive_dependency_import_paths=[],
+    )
+
+    # Direct dependencies on codegen targets must be propagated.
+    #
+    # Note that the `go_package` depends on the `files` generator target. This should work, even
+    # though `files` itself cannot generate, because it's an alias for all generated `file` targets.
+    assert_pkg_target_built(
+        rule_runner,
+        Address("", target_name="pkg"),
+        expected_import_path="example.com/greeter",
+        expected_dir_path="",
+        expected_go_file_names=["greeter.go"],
+        expected_direct_dependency_import_paths=["codegen.com/gen"],
+        expected_transitive_dependency_import_paths=["github.com/google/uuid"],
+    )

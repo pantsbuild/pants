@@ -186,7 +186,7 @@ class StreamingWorkunitHandler:
         specs: Specs,
         report_interval_seconds: float,
         allow_async_completion: bool,
-        max_workunit_verbosity: LogLevel = LogLevel.TRACE,
+        max_workunit_verbosity: LogLevel,
     ) -> None:
         scheduler = scheduler.isolated_shallow_clone("streaming_workunit_handler_session")
         self.callbacks = callbacks
@@ -263,7 +263,7 @@ class _InnerHandler(threading.Thread):
     def run(self) -> None:
         # First, set the thread's logging destination to the parent thread's, meaning the console.
         native_engine.stdio_thread_set_destination(self.logging_destination)
-        while not self.stop_request.isSet():  # type: ignore[attr-defined]
+        while not self.stop_request.isSet():
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
         else:

@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -20,11 +20,11 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import AllTargets, AllTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.option.custom_types import file_option, shell_str
-from pants.util.docutil import bin_name, git_url
+from pants.option.option_types import ArgsListOption, FileOption, SkipOption
+from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 
 
@@ -42,6 +42,7 @@ class BanditFieldSet(FieldSet):
 
 class Bandit(PythonToolBase):
     options_scope = "bandit"
+    name = "Bandit"
     help = "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
 
     # When upgrading, check if Bandit has started using PEP 517 (a `pyproject.toml` file). If so,
@@ -57,50 +58,18 @@ class Bandit(PythonToolBase):
     default_main = ConsoleScript("bandit")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.bandit", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/bandit/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.bandit", "bandit.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/bandit/bandit.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=f"Don't use Bandit when running `{bin_name()} lint`",
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help=(
-                f"Arguments to pass directly to Bandit, e.g. "
-                f'`--{cls.options_scope}-args="--skip B101,B308 --confidence"`'
-            ),
-        )
-        register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help=(
-                "Path to a Bandit YAML config file "
-                "(https://bandit.readthedocs.io/en/latest/config.html)."
-            ),
-        )
-
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
-
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="--skip B101,B308 --confidence")
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help="Path to a Bandit YAML config file (https://bandit.readthedocs.io/en/latest/config.html).",
+    )
 
     @property
     def config_request(self) -> ConfigFilesRequest:
@@ -111,24 +80,9 @@ class Bandit(PythonToolBase):
         )
 
 
-class BanditLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = Bandit.options_scope
-
-
-@rule(
-    desc=(
-        "Determine all Python interpreter versions used by Bandit in your project (for lockfile "
-        "usage)"
-    ),
-    level=LogLevel.DEBUG,
-)
-async def setup_bandit_lockfile(
-    _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    if not bandit.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(bandit)
-
-    # While Bandit will run in partitions, we need a single lockfile that works with every
+@rule_helper
+async def _bandit_interpreter_constraints(python_setup: PythonSetup) -> InterpreterConstraints:
+    # While Bandit will run in partitions, we need a set of constraints that works with every
     # partition.
     #
     # This ORs all unique interpreter constraints. The net effect is that every possible Python
@@ -140,8 +94,54 @@ async def setup_bandit_lockfile(
         if BanditFieldSet.is_applicable(tgt)
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+
+
+class BanditLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = Bandit.options_scope
+
+
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Bandit in your project (for lockfile "
+        "generation)"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def setup_bandit_lockfile(
+    _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
+) -> GeneratePythonLockfile:
+    if not bandit.uses_custom_lockfile:
+        return GeneratePythonLockfile.from_tool(
+            bandit, use_pex=python_setup.generate_lockfiles_with_pex
+        )
+
+    constraints = await _bandit_interpreter_constraints(python_setup)
     return GeneratePythonLockfile.from_tool(
-        bandit, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        bandit,
+        constraints,
+        use_pex=python_setup.generate_lockfiles_with_pex,
+    )
+
+
+class BanditExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Bandit in your project (for "
+        "`export` goal)"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def bandit_export(
+    _: BanditExportSentinel, bandit: Bandit, python_setup: PythonSetup
+) -> ExportPythonTool:
+    constraints = await _bandit_interpreter_constraints(python_setup)
+    return ExportPythonTool(
+        resolve_name=bandit.options_scope,
+        pex_request=bandit.to_pex_request(interpreter_constraints=constraints),
     )
 
 
@@ -150,4 +150,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, BanditLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, BanditExportSentinel),
     )

@@ -16,7 +16,7 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResult, CheckResults
-from pants.core.util_rules import archive, config_files, source_files
+from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Addresses
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
@@ -43,7 +43,7 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *archive.rules(),
+            *system_binaries.rules(),
             *config_files.rules(),
             *jvm_tool.rules(),
             *source_files.rules(),

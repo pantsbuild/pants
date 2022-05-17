@@ -507,6 +507,7 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
     assert "FAIL: TestAddExternal" in result.stdout
 
 
+@pytest.mark.no_error_if_skipped
 def test_fuzz_target_supported(rule_runner: RuleRunner) -> None:
     go_version_result = rule_runner.request(
         ProcessResult, [GoSdkProcess(["version"], description="Get `go` version.")]

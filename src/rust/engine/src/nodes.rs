@@ -12,8 +12,10 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use deepsize::DeepSizeOf;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
+use internment::Intern;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
 use pyo3::prelude::{Py, PyAny, Python};
 use pyo3::IntoPy;
@@ -26,9 +28,9 @@ use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeI
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use fs::{
-  self, DigestEntry, Dir, DirectoryListing, File, FileContent, FileEntry, GlobExpansionConjunction,
-  GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching,
-  Vfs,
+  self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
+  GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs,
+  RelativePath, StrictGlobMatching, Vfs,
 };
 use process_execution::{
   self, CacheName, InputDigests, Platform, Process, ProcessCacheScope, ProcessResultSource,
@@ -127,16 +129,20 @@ pub trait WrappedNode: Into<NodeKey> {
 ///
 /// A Node that selects a product for some Params.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Select {
   pub params: Params,
   pub product: TypeId,
-  entry: rule_graph::Entry<Rule>,
+  entry: Intern<rule_graph::Entry<Rule>>,
 }
 
 impl Select {
-  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry<Rule>) -> Select {
-    params.retain(|k| match &entry {
+  pub fn new(
+    mut params: Params,
+    product: TypeId,
+    entry: Intern<rule_graph::Entry<Rule>>,
+  ) -> Select {
+    params.retain(|k| match entry.as_ref() {
       &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
       &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
     });
@@ -156,8 +162,7 @@ impl Select {
     // TODO: Is it worth propagating an error here?
     let entry = edges
       .entry_for(&dependency_key)
-      .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product))
-      .clone();
+      .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product));
     Select::new(params, product, entry)
   }
 
@@ -189,22 +194,20 @@ impl Select {
   }
 
   async fn run(self, context: Context) -> NodeResult<Value> {
-    match &self.entry {
-      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
-        match inner.rule() {
+    match self.entry.as_ref() {
+      &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
+        rule_graph::EntryWithDeps::Inner(ref inner) => match inner.rule() {
           &tasks::Rule::Task(ref task) => {
             context
               .get(Task {
                 params: self.params.clone(),
-                product: self.product,
-                task: task.clone(),
-                entry: Arc::new(self.entry.clone()),
+                task: *task,
+                entry: self.entry,
                 side_effected: Arc::new(AtomicBool::new(false)),
               })
               .await
           }
           &Rule::Intrinsic(ref intrinsic) => {
-            let intrinsic = intrinsic.clone();
             let values = future::try_join_all(
               intrinsic
                 .inputs
@@ -219,8 +222,11 @@ impl Select {
               .run(intrinsic, context.clone(), values)
               .await
           }
+        },
+        &rule_graph::EntryWithDeps::Root(_) => {
+          panic!("Not a runtime-executable entry! {:?}", self.entry)
         }
-      }
+      },
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
           Ok(key.to_value())
@@ -230,9 +236,6 @@ impl Select {
             type_id
           )))
         }
-      }
-      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_)) => {
-        panic!("Not a runtime-executable entry! {:?}", self.entry)
       }
     }
   }
@@ -264,7 +267,7 @@ impl From<Select> for NodeKey {
   }
 }
 
-pub fn lift_directory_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
+pub fn lift_directory_digest(digest: &PyAny) -> Result<DirectoryDigest, String> {
   let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{}", e))?;
   Ok(py_digest.0)
 }
@@ -276,7 +279,7 @@ pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
 
 /// A Node that represents a process to execute.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct ExecuteProcess {
   process: Process,
 }
@@ -311,7 +314,7 @@ impl ExecuteProcess {
 
     input_digests_fut?
       .await
-      .map_err(|e| format!("Failed to merge input digests for process: {:?}", e))
+      .map_err(|e| format!("Failed to merge input digests for process: {}", e))
   }
 
   fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, String> {
@@ -430,24 +433,31 @@ impl WrappedNode for ExecuteProcess {
 
     let definition = serde_json::to_string(&request)
       .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
-    workunit.update_metadata(|initial| WorkunitMetadata {
-      stdout: Some(res.stdout_digest),
-      stderr: Some(res.stderr_digest),
-      user_metadata: vec![
+    workunit.update_metadata(|initial| {
+      initial.map(|(initial, level)| {
         (
-          "definition".to_string(),
-          UserMetadataItem::ImmediateString(definition),
-        ),
-        (
-          "source".to_string(),
-          UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
-        ),
-        (
-          "exit_code".to_string(),
-          UserMetadataItem::ImmediateInt(res.exit_code as i64),
-        ),
-      ],
-      ..initial
+          WorkunitMetadata {
+            stdout: Some(res.stdout_digest),
+            stderr: Some(res.stderr_digest),
+            user_metadata: vec![
+              (
+                "definition".to_string(),
+                UserMetadataItem::ImmediateString(definition),
+              ),
+              (
+                "source".to_string(),
+                UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+              ),
+              (
+                "exit_code".to_string(),
+                UserMetadataItem::ImmediateInt(res.exit_code as i64),
+              ),
+            ],
+            ..initial
+          },
+          level,
+        )
+      })
     });
     if let Some(total_elapsed) = res.metadata.total_elapsed {
       let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
@@ -474,16 +484,16 @@ impl WrappedNode for ExecuteProcess {
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct ProcessResult(pub process_execution::FallibleProcessResultWithPlatform);
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct ReadLink(Link);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct LinkDest(PathBuf);
 
 #[async_trait]
@@ -515,7 +525,7 @@ impl From<ReadLink> for NodeKey {
 ///
 /// A Node that represents reading a file and fingerprinting its contents.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct DigestFile(pub File);
 
 #[async_trait]
@@ -547,7 +557,7 @@ impl From<DigestFile> for NodeKey {
 /// A Node that represents executing a directory listing that returns a Stat per directory
 /// entry (generally in one syscall). No symlinks are expanded.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Scandir(Dir);
 
 #[async_trait]
@@ -595,7 +605,7 @@ fn unmatched_globs_additional_context() -> Option<String> {
 /// This is similar to the Snapshot node, but avoids digesting the files and writing to LMDB store
 /// as a performance optimization.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Paths {
   path_globs: PathGlobs,
 }
@@ -604,6 +614,7 @@ impl Paths {
   pub fn from_path_globs(path_globs: PathGlobs) -> Paths {
     Paths { path_globs }
   }
+
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
     context
       .expand_globs(path_globs, unmatched_globs_additional_context())
@@ -656,7 +667,7 @@ impl From<Paths> for NodeKey {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct SessionValues;
 
 #[async_trait]
@@ -678,7 +689,7 @@ impl From<SessionValues> for NodeKey {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct RunId;
 
 #[async_trait]
@@ -709,7 +720,7 @@ impl From<RunId> for NodeKey {
 ///
 /// A Node that captures an store::Snapshot for a PathGlobs subject.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Snapshot {
   path_globs: PathGlobs,
 }
@@ -717,18 +728,6 @@ pub struct Snapshot {
 impl Snapshot {
   pub fn from_path_globs(path_globs: PathGlobs) -> Snapshot {
     Snapshot { path_globs }
-  }
-
-  async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<store::Snapshot> {
-    // We rely on Context::expand_globs tracking dependencies for scandirs,
-    // and store::Snapshot::from_path_stats tracking dependencies for file digests.
-    let path_stats = context
-      .expand_globs(path_globs, unmatched_globs_additional_context())
-      .map_err(|e| throw(format!("{}", e)))
-      .await?;
-    store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
-      .map_err(|e| throw(format!("Snapshot failed: {}", e)))
-      .await
   }
 
   pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
@@ -753,7 +752,7 @@ impl Snapshot {
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
   }
 
-  pub fn store_directory_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
+  pub fn store_directory_digest(py: Python, item: DirectoryDigest) -> Result<Value, String> {
     let py_digest = Py::new(py, externs::fs::PyDigest(item)).map_err(|e| format!("{}", e))?;
     Ok(Value::new(py_digest.into_py(py)))
   }
@@ -863,16 +862,25 @@ impl Snapshot {
 
 #[async_trait]
 impl WrappedNode for Snapshot {
-  type Item = Digest;
+  type Item = store::Snapshot;
 
   async fn run_wrapped_node(
     self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Digest> {
+  ) -> NodeResult<store::Snapshot> {
     let path_globs = self.path_globs.parse().map_err(throw)?;
-    let snapshot = Self::create(context, path_globs).await?;
-    Ok(snapshot.digest)
+
+    // We rely on Context::expand_globs to track dependencies for scandirs,
+    // and `context.get(DigestFile)` to track dependencies for file digests.
+    let path_stats = context
+      .expand_globs(path_globs, unmatched_globs_additional_context())
+      .map_err(|e| throw(format!("{}", e)))
+      .await?;
+
+    store::Snapshot::from_path_stats(context.clone(), path_stats)
+      .map_err(|e| throw(format!("Snapshot failed: {}", e)))
+      .await
   }
 }
 
@@ -882,7 +890,7 @@ impl From<Snapshot> for NodeKey {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct DownloadedFile(pub Key);
 
 impl DownloadedFile {
@@ -942,13 +950,13 @@ impl DownloadedFile {
 
 #[async_trait]
 impl WrappedNode for DownloadedFile {
-  type Item = Digest;
+  type Item = store::Snapshot;
 
   async fn run_wrapped_node(
     self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Digest> {
+  ) -> NodeResult<store::Snapshot> {
     let (url_str, expected_digest) = Python::with_gil(|py| {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
@@ -960,11 +968,10 @@ impl WrappedNode for DownloadedFile {
     })?;
     let url = Url::parse(&url_str)
       .map_err(|err| throw(format!("Error parsing URL {}: {}", url_str, err)))?;
-    let snapshot = self
+    self
       .load_or_download(context.core, url, expected_digest)
       .await
-      .map_err(throw)?;
-    Ok(snapshot.digest)
+      .map_err(throw)
   }
 }
 
@@ -974,15 +981,14 @@ impl From<DownloadedFile> for NodeKey {
   }
 }
 
-#[derive(Derivative, Clone)]
+#[derive(DeepSizeOf, Derivative, Clone)]
 #[derivative(Eq, PartialEq, Hash)]
 pub struct Task {
-  params: Params,
-  product: TypeId,
-  task: tasks::Task,
+  pub params: Params,
+  task: Intern<tasks::Task>,
   // The Params and the Task struct are sufficient to uniquely identify it.
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
-  entry: Arc<rule_graph::Entry<Rule>>,
+  entry: Intern<rule_graph::Entry<Rule>>,
   // Does not affect the identity of the Task.
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   side_effected: Arc<AtomicBool>,
@@ -993,7 +999,7 @@ impl Task {
     context: &Context,
     workunit: &mut RunningWorkunit,
     params: &Params,
-    entry: &Arc<rule_graph::Entry<Rule>>,
+    entry: Intern<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
   ) -> NodeResult<Vec<Value>> {
     // While waiting for dependencies, mark the workunit for this Task blocked.
@@ -1003,7 +1009,6 @@ impl Task {
       .map(|get| {
         let context = context.clone();
         let mut params = params.clone();
-        let entry = entry.clone();
         async move {
           let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
             output: get.output,
@@ -1021,7 +1026,6 @@ impl Task {
           // See #12934 for further cleanup of this API.
           let select = edges
             .entry_for(&dependency_key)
-            .cloned()
             .map(|entry| {
               // The subject of the get is a new parameter that replaces an existing param of the same
               // type.
@@ -1080,7 +1084,7 @@ impl Task {
     context: &Context,
     workunit: &mut RunningWorkunit,
     params: Params,
-    entry: Arc<rule_graph::Entry<Rule>>,
+    entry: Intern<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
     let mut input = {
@@ -1090,15 +1094,14 @@ impl Task {
     loop {
       let context = context.clone();
       let params = params.clone();
-      let entry = entry.clone();
       let response = Python::with_gil(|py| externs::generator_send(py, &generator, &input))?;
       match response {
         externs::GeneratorResponse::Get(get) => {
-          let values = Self::gen_get(&context, workunit, &params, &entry, vec![get]).await?;
+          let values = Self::gen_get(&context, workunit, &params, entry, vec![get]).await?;
           input = values.into_iter().next().unwrap();
         }
         externs::GeneratorResponse::GetMulti(gets) => {
-          let values = Self::gen_get(&context, workunit, &params, &entry, gets).await?;
+          let values = Self::gen_get(&context, workunit, &params, entry, gets).await?;
           let gil = Python::acquire_gil();
           input = externs::store_tuple(gil.python(), values);
         }
@@ -1115,7 +1118,7 @@ impl fmt::Debug for Task {
     write!(
       f,
       "Task {{ func: {}, params: {}, product: {}, cacheable: {} }}",
-      self.task.func, self.params, self.product, self.task.cacheable,
+      self.task.func, self.params, self.task.product, self.task.cacheable,
     )
   }
 }
@@ -1142,9 +1145,9 @@ impl WrappedNode for Task {
         self
           .task
           .clause
-          .into_iter()
+          .iter()
           .map(|type_id| {
-            Select::new_from_edges(params.clone(), type_id, edges).run(context.clone())
+            Select::new_from_edges(params.clone(), *type_id, edges).run(context.clone())
           })
           .collect::<Vec<_>>(),
       )
@@ -1180,21 +1183,18 @@ impl WrappedNode for Task {
       result_type = new_type;
     }
 
-    if result_type != self.product {
+    if result_type != self.task.product {
       return Err(throw(format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
         self.task.func, result_val
       )));
     }
 
-    let engine_aware_return_type = if self.task.engine_aware_return_type {
+    if self.task.engine_aware_return_type {
       let gil = Python::acquire_gil();
       let py = gil.python();
-      EngineAwareReturnType::from_task_result((*result_val).as_ref(py), &context)
-    } else {
-      EngineAwareReturnType::default()
+      EngineAwareReturnType::update_workunit(workunit, (*result_val).as_ref(py))
     };
-    engine_aware_return_type.update_workunit(workunit);
 
     Ok(result_val)
   }
@@ -1235,7 +1235,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
 ///
 /// There is large variance in the sizes of the members of this enum, so a few of them are boxed.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub enum NodeKey {
   DigestFile(DigestFile),
   DownloadedFile(DownloadedFile),
@@ -1258,7 +1258,7 @@ impl NodeKey {
       &NodeKey::Select(ref s) => format!("{}", s.product),
       &NodeKey::SessionValues(_) => "SessionValues".to_string(),
       &NodeKey::RunId(_) => "RunId".to_string(),
-      &NodeKey::Task(ref s) => format!("{}", s.product),
+      &NodeKey::Task(ref t) => format!("{}", t.task.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::Paths(..) => "Paths".to_string(),
       &NodeKey::DigestFile(..) => "DigestFile".to_string(),
@@ -1307,19 +1307,19 @@ impl NodeKey {
   /// Provides the `name` field in workunits associated with this node. These names
   /// should be friendly to machine-parsing (i.e. "my_node" rather than "My awesome node!").
   ///
-  fn workunit_name(&self) -> String {
+  pub fn workunit_name(&self) -> &'static str {
     match self {
-      NodeKey::Task(ref task) => task.task.display_info.name.clone(),
-      NodeKey::ExecuteProcess(..) => "process".to_string(),
-      NodeKey::Snapshot(..) => "snapshot".to_string(),
-      NodeKey::Paths(..) => "paths".to_string(),
-      NodeKey::DigestFile(..) => "digest_file".to_string(),
-      NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
-      NodeKey::ReadLink(..) => "read_link".to_string(),
-      NodeKey::Scandir(..) => "scandir".to_string(),
-      NodeKey::Select(..) => "select".to_string(),
-      NodeKey::SessionValues(..) => "session_values".to_string(),
-      NodeKey::RunId(..) => "run_id".to_string(),
+      NodeKey::Task(ref task) => &task.task.as_ref().display_info.name,
+      NodeKey::ExecuteProcess(..) => "process",
+      NodeKey::Snapshot(..) => "snapshot",
+      NodeKey::Paths(..) => "paths",
+      NodeKey::DigestFile(..) => "digest_file",
+      NodeKey::DownloadedFile(..) => "downloaded_file",
+      NodeKey::ReadLink(..) => "read_link",
+      NodeKey::Scandir(..) => "scandir",
+      NodeKey::Select(..) => "select",
+      NodeKey::SessionValues(..) => "session_values",
+      NodeKey::RunId(..) => "run_id",
     }
   }
 
@@ -1352,6 +1352,29 @@ impl NodeKey {
       NodeKey::RunId(..) => None,
     }
   }
+
+  ///
+  /// Filters the given Params to those which are subtypes of EngineAwareParameter.
+  ///
+  fn engine_aware_params<'a>(
+    context: Context,
+    py: Python<'a>,
+    params: &'a Params,
+  ) -> impl Iterator<Item = Value> + 'a {
+    let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
+    params.keys().filter_map(move |key| {
+      if key
+        .type_id()
+        .as_py_type(py)
+        .is_subclass(engine_aware_param_ty)
+        .unwrap_or(false)
+      {
+        Some(key.to_value())
+      } else {
+        None
+      }
+    })
+  }
 }
 
 #[async_trait]
@@ -1362,62 +1385,31 @@ impl Node for NodeKey {
   type Error = Failure;
 
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
-    let workunit_store_handle = workunit_store::expect_workunit_store_handle();
-
     let workunit_name = self.workunit_name();
-    let user_facing_name = self.user_facing_name();
-    let engine_aware_params: Vec<_> = match &self {
-      NodeKey::Task(ref task) => {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        let engine_aware_param_ty = context.core.types.engine_aware_parameter.as_py_type(py);
-        task
-          .params
-          .keys()
-          .filter_map(|key| {
-            // TODO: Switch to PyO3's upcoming mechanism for this:
-            // https://github.com/PyO3/pyo3/pull/1985.
-            if engine_aware_param_ty
-              .call_method1("__subclasscheck__", (key.type_id().as_py_type(py),))
-              .map(|res| res.extract::<bool>().unwrap_or(false))
-              .unwrap_or(false)
-            {
-              Some(key.to_value())
-            } else {
-              None
-            }
-          })
-          .collect()
-      }
-      _ => vec![],
+    let params = match &self {
+      NodeKey::Task(ref task) => task.params.clone(),
+      _ => Params::default(),
     };
-    let user_metadata = {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      engine_aware_params
-        .iter()
-        .flat_map(|val| EngineAwareParameter::metadata(&context, (**val).as_ref(py)))
-        .collect()
-    };
-
-    let metadata = WorkunitMetadata {
-      desc: user_facing_name,
-      level: self.workunit_level(),
-      user_metadata,
-      ..WorkunitMetadata::default()
-    };
+    let context2 = context.clone();
 
     in_workunit!(
-      workunit_store_handle.store,
-      self.workunit_name(),
-      metadata,
+      workunit_name,
+      self.workunit_level(),
+      desc = self.user_facing_name(),
+      user_metadata = {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        Self::engine_aware_params(context.clone(), py, &params)
+          .flat_map(|val| EngineAwareParameter::metadata((*val).as_ref(py)))
+          .collect()
+      },
       |workunit| async move {
         // To avoid races, we must ensure that we have installed a watch for the subject before
         // executing the node logic. But in case of failure, we wait to see if the Node itself
         // fails, and prefer that error message if so (because we have little control over the
         // error messages of the watch API).
-        let maybe_watch = if let Some(path) = self.fs_subject() {
-          if let Some(watcher) = &context.core.watcher {
+        let maybe_watch =
+          if let Some((path, watcher)) = self.fs_subject().zip(context.core.watcher.as_ref()) {
             let abs_path = context.core.build_root.join(path);
             watcher
               .watch(abs_path)
@@ -1425,20 +1417,17 @@ impl Node for NodeKey {
               .await
           } else {
             Ok(())
-          }
-        } else {
-          Ok(())
-        };
+          };
 
         let mut result = match self {
           NodeKey::DigestFile(n) => {
             n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Digest)
+              .map_ok(NodeOutput::FileDigest)
               .await
           }
           NodeKey::DownloadedFile(n) => {
             n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Digest)
+              .map_ok(NodeOutput::Snapshot)
               .await
           }
           NodeKey::ExecuteProcess(n) => {
@@ -1463,7 +1452,7 @@ impl Node for NodeKey {
           }
           NodeKey::Snapshot(n) => {
             n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Digest)
+              .map_ok(NodeOutput::Snapshot)
               .await
           }
           NodeKey::Paths(n) => {
@@ -1503,13 +1492,12 @@ impl Node for NodeKey {
           let displayable_param_names: Vec<_> = {
             let gil = Python::acquire_gil();
             let py = gil.python();
-            engine_aware_params
-              .into_iter()
+            Self::engine_aware_params(context2, py, &params)
               .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
               .collect()
           };
           let failure_name = if displayable_param_names.is_empty() {
-            name
+            name.to_owned()
           } else if displayable_param_names.len() == 1 {
             format!(
               "{} ({})",
@@ -1641,9 +1629,10 @@ impl NodeError for Failure {
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum NodeOutput {
-  Digest(hashing::Digest),
+  FileDigest(hashing::Digest),
+  Snapshot(store::Snapshot),
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(Box<ProcessResult>),
@@ -1657,9 +1646,19 @@ pub enum NodeOutput {
 impl NodeOutput {
   pub fn digests(&self) -> Vec<hashing::Digest> {
     match self {
-      NodeOutput::Digest(d) => vec![*d],
+      NodeOutput::FileDigest(d) => vec![*d],
+      NodeOutput::Snapshot(s) => {
+        // TODO: Callers should maybe be adapted for the fact that these nodes will now return
+        // transitive lists of digests (since lease extension might be operating recursively
+        // too). #13112.
+        let dd: DirectoryDigest = s.clone().into();
+        dd.digests()
+      }
       NodeOutput::ProcessResult(p) => {
-        vec![p.0.stdout_digest, p.0.stderr_digest, p.0.output_directory]
+        let mut digests = p.0.output_directory.digests();
+        digests.push(p.0.stdout_digest);
+        digests.push(p.0.stderr_digest);
+        digests
       }
       NodeOutput::DirectoryListing(_)
       | NodeOutput::LinkDest(_)
@@ -1685,7 +1684,18 @@ impl TryFrom<NodeOutput> for hashing::Digest {
 
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeOutput::Digest(v) => Ok(v),
+      NodeOutput::FileDigest(v) => Ok(v),
+      _ => Err(()),
+    }
+  }
+}
+
+impl TryFrom<NodeOutput> for store::Snapshot {
+  type Error = ();
+
+  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
+    match nr {
+      NodeOutput::Snapshot(v) => Ok(v),
       _ => Err(()),
     }
   }

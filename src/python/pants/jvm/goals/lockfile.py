@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Mapping
 
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
@@ -28,6 +29,7 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactResolveField, JvmResolveField
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import OrderedSet
 
 
 @dataclass(frozen=True)
@@ -67,7 +69,9 @@ async def generate_jvm_lockfile(
     resolved_lockfile_contents = resolved_lockfile.to_serialized()
     metadata = JVMLockfileMetadata.new(request.artifacts)
     resolved_lockfile_contents = metadata.add_header_to_lockfile(
-        resolved_lockfile_contents, regenerate_command=f"{bin_name()} generate-lockfiles"
+        resolved_lockfile_contents,
+        regenerate_command=f"{bin_name()} generate-lockfiles",
+        delimeter="#",
     )
 
     lockfile_digest = await Get(
@@ -77,7 +81,7 @@ async def generate_jvm_lockfile(
     return GenerateLockfileResult(lockfile_digest, request.resolve_name, request.lockfile_dest)
 
 
-class RequestedJVMserResolveNames(RequestedUserResolveNames):
+class RequestedJVMUserResolveNames(RequestedUserResolveNames):
     pass
 
 
@@ -92,7 +96,7 @@ def determine_jvm_user_resolves(
     return KnownUserResolveNames(
         names=tuple(jvm_subsystem.resolves.keys()),
         option_name=f"[{jvm_subsystem.options_scope}].resolves",
-        requested_resolve_names_cls=RequestedJVMserResolveNames,
+        requested_resolve_names_cls=RequestedJVMUserResolveNames,
     )
 
 
@@ -126,12 +130,12 @@ async def validate_jvm_artifacts_for_resolve(
 
 @rule
 async def setup_user_lockfile_requests(
-    requested: RequestedJVMserResolveNames,
+    requested: RequestedJVMUserResolveNames,
     all_targets: AllTargets,
     jvm_subsystem: JvmSubsystem,
 ) -> UserGenerateLockfiles:
-    resolve_to_artifacts = defaultdict(set)
-    for tgt in all_targets:
+    resolve_to_artifacts: Mapping[str, OrderedSet[ArtifactRequirement]] = defaultdict(OrderedSet)
+    for tgt in sorted(all_targets, key=lambda t: t.address):
         if not tgt.has_field(JvmArtifactResolveField):
             continue
         artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
@@ -144,7 +148,7 @@ async def setup_user_lockfile_requests(
         Get(
             GenerateJvmLockfile,
             _ValidateJvmArtifactsRequest(
-                artifacts=ArtifactRequirements(sorted(resolve_to_artifacts.get(resolve, ()))),
+                artifacts=ArtifactRequirements(resolve_to_artifacts.get(resolve, ())),
                 resolve_name=resolve,
             ),
         )
@@ -160,5 +164,5 @@ def rules():
         *coursier_fetch.rules(),
         UnionRule(GenerateLockfile, GenerateJvmLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownJVMUserResolveNamesRequest),
-        UnionRule(RequestedUserResolveNames, RequestedJVMserResolveNames),
+        UnionRule(RequestedUserResolveNames, RequestedJVMUserResolveNames),
     )

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from functools import partial
-from textwrap import dedent
+from itertools import chain
 from typing import Iterator
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
@@ -86,9 +87,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         source = DockerInterpolationContext.TextSource(
             address=self.address, target_alias="docker_image", field_alias=self.tags.alias
         )
-        return interpolation_context.format(
-            tag, source=source, error_cls=DockerImageTagValueError
-        ).lower()
+        return interpolation_context.format(tag, source=source, error_cls=DockerImageTagValueError)
 
     def format_repository(
         self, default_repository: str, interpolation_context: DockerInterpolationContext
@@ -115,6 +114,17 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             repository_text, source=source, error_cls=DockerRepositoryNameError
         ).lower()
 
+    def format_names(
+        self,
+        repository: str,
+        tags: tuple[str, ...],
+        interpolation_context: DockerInterpolationContext,
+    ) -> Iterator[str]:
+        for tag in tags:
+            yield ":".join(
+                s for s in [repository, self.format_tag(tag, interpolation_context)] if s
+            )
+
     def image_refs(
         self,
         default_repository: str,
@@ -140,10 +150,8 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         """
         repository = self.format_repository(default_repository, interpolation_context)
         image_names = tuple(
-            ":".join(s for s in [repository, self.format_tag(tag, interpolation_context)] if s)
-            for tag in self.tags.value or ()
+            self.format_names(repository, self.tags.value or (), interpolation_context)
         )
-
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
             # The image name is also valid as image ref without registry.
@@ -151,8 +159,11 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
         return tuple(
             "/".join([registry.address, image_name])
-            for image_name in image_names
             for registry in registries_options
+            for image_name in chain(
+                image_names,
+                self.format_names(repository, registry.extra_image_tags, interpolation_context),
+            )
         )
 
     def get_context_root(self, default_context_root: str) -> str:
@@ -270,7 +281,7 @@ async def build_docker_image(
             address=field_set.address,
             context_root=context_root,
             context=context,
-            colors=global_options.options.colors,
+            colors=global_options.colors,
         )
         if maybe_msg:
             logger.warning(maybe_msg)
@@ -283,23 +294,57 @@ async def build_docker_image(
             process_cleanup=process_cleanup.val,
         )
 
-    logger.debug(
-        dedent(
-            f"""\
-            Docker build output for {tags[0]}:
-            stdout:
-            {result.stdout.decode()}
-
-            stderr:
-            {result.stderr.decode()}
-            """
+    image_id = parse_image_id_from_docker_build_output(result.stdout, result.stderr)
+    docker_build_output_msg = "\n".join(
+        (
+            f"Docker build output for {tags[0]}:",
+            "stdout:",
+            result.stdout.decode(),
+            "stderr:",
+            result.stderr.decode(),
         )
     )
 
+    if options.build_verbose:
+        logger.info(docker_build_output_msg)
+    else:
+        logger.debug(docker_build_output_msg)
+
     return BuiltPackage(
         result.output_digest,
-        (BuiltDockerImage.create(tags),),
+        (BuiltDockerImage.create(image_id, tags),),
     )
+
+
+def parse_image_id_from_docker_build_output(*outputs: bytes) -> str:
+    """Outputs are typically the stdout/stderr pair from the `docker build` process."""
+    image_id_regexp = re.compile(
+        "|".join(
+            (
+                # BuildKit output.
+                r"(writing image (?P<digest>sha256:\S+) done)",
+                # Docker output.
+                r"(Successfully built (?P<short_id>\S+))",
+            ),
+        )
+    )
+    for output in outputs:
+        image_id_match = next(
+            (
+                match
+                for match in (
+                    re.search(image_id_regexp, line)
+                    for line in reversed(output.decode().split("\n"))
+                )
+                if match
+            ),
+            None,
+        )
+        if image_id_match:
+            image_id = image_id_match.group("digest") or image_id_match.group("short_id")
+            return image_id
+
+    return "<unknown>"
 
 
 def format_docker_build_context_help_message(

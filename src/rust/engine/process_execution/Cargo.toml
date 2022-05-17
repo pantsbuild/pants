@@ -8,44 +8,46 @@ publish = false
 [dependencies]
 # Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
 async-trait = "=0.1.42"
-async-lock = "2.4"
+async-lock = "2.5"
 walkdir = "2"
 protos = { path = "../protos" }
 bytes = "1.0"
 cache = { path = "../cache" }
 derivative = "2.2"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["log"] }
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 futures = "0.3"
 hashing = { path = "../hashing" }
-libc = "0.2.112"
+libc = "0.2.125"
 log = "0.4"
 nails = "0.12"
-nix = "0.23"
-sha2 = "0.9"
-shell-quote = "0.1.0"
+nix = "0.24"
+sha2 = "0.10"
+shell-quote = "0.3.0"
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
 tokio = { version = "1.16", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = "0.23"
-tokio-util = { version = "0.6", features = ["codec"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 uname = "0.1.1"
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1.0", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }
 regex = "1"
 lazy_static = "1"
 parking_lot = "0.12"
 itertools = "0.10"
-serde = "1.0.104"
-bincode = "1.2.1"
+serde = "1.0.136"
+bincode = "1.3.3"
 async-oncecell = "0.2"
 rand = "0.8"
 prost = "0.9"
 prost-types = "0.9"
-strum = "0.20"
-strum_macros = "0.23"
+strum = "0.24"
+strum_macros = "0.24"
 tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tryfuture = { path = "../tryfuture" }
 

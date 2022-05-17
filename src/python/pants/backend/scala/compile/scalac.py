@@ -9,7 +9,6 @@ from itertools import chain
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.backend.scala.compile.scalac_plugins import (
-    GlobalScalacPlugins,
     ScalaPlugins,
     ScalaPluginsForTargetRequest,
     ScalaPluginsRequest,
@@ -23,7 +22,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesField
+from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.compile import (
@@ -53,11 +52,15 @@ class ScalaLibraryRequest:
     version: str
 
 
+# TODO: This code is duplicated in the scalac and BSP rules.
+def compute_output_jar_filename(ctgt: CoarsenedTarget) -> str:
+    return f"{ctgt.representative.address.path_safe_spec}.scalac.jar"
+
+
 @rule(desc="Compile with scalac")
 async def compile_scala_source(
     scala: ScalaSubsystem,
     scalac: Scalac,
-    scalac_plugins: GlobalScalacPlugins,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
 
@@ -123,7 +126,6 @@ async def compile_scala_source(
         )
 
     toolcp_relpath = "__toolcp"
-    scalac_plugins_relpath = "__plugincp"
     local_scalac_plugins_relpath = "__localplugincp"
     usercp = "__cp"
 
@@ -160,7 +162,6 @@ async def compile_scala_source(
 
     extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
-        scalac_plugins_relpath: scalac_plugins.classpath.digest,
         local_scalac_plugins_relpath: local_plugins.classpath.digest,
     }
     extra_nailgun_keys = tuple(extra_immutable_input_digests)
@@ -168,7 +169,7 @@ async def compile_scala_source(
 
     classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
 
-    output_file = f"{request.component.representative.address.path_safe_spec}.scalac.jar"
+    output_file = compute_output_jar_filename(request.component)
     process_result = await Get(
         FallibleProcessResult,
         JvmProcess(
@@ -178,10 +179,13 @@ async def compile_scala_source(
                 "scala.tools.nsc.Main",
                 "-bootclasspath",
                 ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
-                *scalac_plugins.args(scalac_plugins_relpath),
                 *local_plugins.args(local_scalac_plugins_relpath),
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 *scalac.args,
+                # NB: We set a non-existent main-class so that using `-d` produces a `jar` manifest
+                # with stable content.
+                "-Xmain-class",
+                "no.main.class",
                 "-d",
                 output_file,
                 *sorted(

@@ -21,11 +21,11 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -45,7 +45,6 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
-            QueryRule(LintResults, (GofmtRequest,)),
             QueryRule(FmtResult, (GofmtRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
@@ -109,10 +108,9 @@ def run_gofmt(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
-) -> tuple[tuple[LintResult, ...], FmtResult]:
+) -> FmtResult:
     rule_runner.set_options(extra_args or (), env_inherit={"PATH"})
     field_sets = [GofmtFieldSet.create(tgt) for tgt in targets]
-    lint_results = rule_runner.request(LintResults, [GofmtRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
@@ -122,15 +120,16 @@ def run_gofmt(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            GofmtRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            GofmtRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
-    return lint_results.results, fmt_result
+    return fmt_result
 
 
-def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
+def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
     files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    return rule_runner.request(Digest, [CreateDigest(files)])
+    digest = rule_runner.request(Digest, [CreateDigest(files)])
+    return rule_runner.request(Snapshot, [digest])
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
@@ -138,12 +137,9 @@ def test_passing(rule_runner: RuleRunner) -> None:
         {"f.go": GOOD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')"}
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
-    lint_results, fmt_result = run_gofmt(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert lint_results[0].stderr == ""
+    fmt_result = run_gofmt(rule_runner, [tgt])
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_digest(rule_runner, {"f.go": GOOD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.go": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -152,12 +148,9 @@ def test_failing(rule_runner: RuleRunner) -> None:
         {"f.go": BAD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')"}
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
-    lint_results, fmt_result = run_gofmt(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "f.go" in lint_results[0].stdout
+    fmt_result = run_gofmt(rule_runner, [tgt])
     assert fmt_result.stderr == ""
-    assert fmt_result.output == get_digest(rule_runner, {"f.go": FIXED_BAD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.go": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -171,12 +164,8 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
-    lint_results, fmt_result = run_gofmt(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "bad.go" in lint_results[0].stdout
-    assert "good.go" not in lint_results[0].stdout
-    assert fmt_result.output == get_digest(
+    fmt_result = run_gofmt(rule_runner, [tgt])
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good.go": GOOD_FILE, "bad.go": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
@@ -194,12 +183,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         }
     )
     tgts = [rule_runner.get_target(Address("good")), rule_runner.get_target(Address("bad"))]
-    lint_results, fmt_result = run_gofmt(rule_runner, tgts)
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "bad/f.go" in lint_results[0].stdout
-    assert "good/f.go" not in lint_results[0].stdout
-    assert fmt_result.output == get_digest(
+    fmt_result = run_gofmt(rule_runner, tgts)
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good/f.go": GOOD_FILE, "bad/f.go": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
@@ -210,7 +195,6 @@ def test_skip(rule_runner: RuleRunner) -> None:
         {"f.go": BAD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')"}
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
-    lint_results, fmt_result = run_gofmt(rule_runner, [tgt], extra_args=["--gofmt-skip"])
-    assert not lint_results
+    fmt_result = run_gofmt(rule_runner, [tgt], extra_args=["--gofmt-skip"])
     assert fmt_result.skipped is True
     assert fmt_result.did_change is False

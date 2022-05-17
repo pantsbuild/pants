@@ -5,9 +5,9 @@ python_sources()
 
 python_tests(
     name="tests",
-    dependencies=[
-        # We shell out to pex in tests; so we have a dependency, but not an explicit import.
-        "3rdparty/python#pex"
-    ],
-    timeout=300,
+    overrides={
+        "local_dists_test.py": {"timeout": 120},
+        "pex_from_targets_test.py": {"timeout": 200},
+        "pex_test.py": {"timeout": 330},
+    },
 )

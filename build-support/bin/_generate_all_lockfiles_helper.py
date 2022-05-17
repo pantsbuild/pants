@@ -10,10 +10,15 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
+from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
+from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
+from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
+from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
+from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.bandit.subsystem import Bandit
@@ -30,13 +35,14 @@ from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
+from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
-from pants.backend.scala.subsystems.scalac import Scalac
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 from pants.jvm.resolve.jvm_tool import JvmToolBase
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +106,7 @@ AllTools = (
     DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
     DefaultTool.python(IPython),
     DefaultTool.python(Setuptools),
+    DefaultTool.python(SetuptoolsSCM),
     DefaultTool.python(MyPy, source_plugins=True),
     DefaultTool.python(PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"),
     DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
@@ -108,49 +115,60 @@ AllTools = (
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
     DefaultTool.python(DockerfileParser, backend="pants.backend.docker"),
     DefaultTool.python(TwineSubsystem),
+    DefaultTool.python(ClangFormat, backend="pants.backend.experimental.cc.lint.clangformat"),
     # JVM
     DefaultTool.jvm(JUnit),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),
     DefaultTool.jvm(ScalafmtSubsystem),
+    DefaultTool.jvm(ScalaPBSubsystem, backend="pants.backend.experimental.codegen.protobuf.scala"),
     DefaultTool.jvm(Scalatest),
-    DefaultTool(
-        "scalac-plugins",
-        (f"--scalac-plugins-global-lockfile={Scalac.default_plugins_lockfile_path}",),
+    DefaultTool.jvm(
+        ScroogeSubsystem, backend="pants.backend.experimental.codegen.thrift.scrooge.scala"
     ),
+    DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
+    DefaultTool.jvm(KtlintSubsystem, backend="pants.backend.experimental.kotlin.lint.ktlint"),
 )
 
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "Generate lockfiles for internal usage + default tool lockfiles that we distribute. "
-            "This script makes sure that tool lockfiles are generated with the correct values."
+        description=softwrap(
+            """
+            Generate lockfiles for internal usage + default tool lockfiles that we distribute.
+            This script makes sure that tool lockfiles are generated with the correct values.
+            """
         ),
         prog="generate_all_lockfiles.sh",
     )
     parser.add_argument(
         "--internal",
         action="store_true",
-        help=(
-            "Regenerate all internal lockfiles. Use this when you change our "
-            "`requirements.txt` and/or internal config of tools, like adding a new Flake8 plugin."
+        help=softwrap(
+            """
+            Regenerate all internal lockfiles. Use this when you change our
+            `requirements.txt` and/or internal config of tools, like adding a new Flake8 plugin.
+            """
         ),
     )
     parser.add_argument(
         "--tool",
         nargs="*",
-        help=(
-            "Regenerate these default tool lockfile(s). Use this when bumping default versions "
-            "of particular tools. Valid options: "
-            f"{sorted(tool.resolve_name for tool in AllTools)}"
+        help=softwrap(
+            f"""
+            Regenerate these default tool lockfile(s). Use this when bumping default versions
+            of particular tools. Valid options:
+            {sorted(tool.resolve_name for tool in AllTools)}
+            """
         ),
     )
     parser.add_argument(
         "--pex",
         action="store_true",
-        help=(
-            "Use when bumping the PEX version. (Will regenerate our internal user lockfile & "
-            "the Lambdex tool's lockfile.)"
+        help=softwrap(
+            """
+            Use when bumping the PEX version. (Will regenerate our internal user lockfile &
+            the Lambdex tool's lockfile.)
+            """
         ),
     )
     parser.add_argument(

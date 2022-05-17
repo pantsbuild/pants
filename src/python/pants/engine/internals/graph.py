@@ -9,7 +9,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence, cast
+from typing import Iterable, NamedTuple, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
@@ -39,6 +39,7 @@ from pants.engine.fs import (
     SpecsSnapshot,
 )
 from pants.engine.internals import native_engine
+from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizations as _TargetParametrizations,
@@ -51,6 +52,7 @@ from pants.engine.target import (
     AllUnexpandedTargets,
     CoarsenedTarget,
     CoarsenedTargets,
+    CoarsenedTargetsRequest,
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -58,6 +60,7 @@ from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
+    FilteredTargets,
     GeneratedSources,
     GeneratedTargets,
     GenerateSourcesRequest,
@@ -90,6 +93,8 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
+    ValidatedDependencies,
+    ValidateDependenciesRequest,
     WrappedTarget,
     _generate_file_level_targets,
 )
@@ -99,6 +104,7 @@ from pants.source.filespec import matches_filespec
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list, pluralize
 
@@ -127,6 +133,7 @@ def target_types_to_generate_targets_requests(
     )
 
 
+@memoized
 def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     assert tgt_type.deprecated_alias_removal_version is not None
     warn_or_error(
@@ -139,6 +146,7 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     )
 
 
+@memoized
 def warn_deprecated_field_type(field_type: type[Field]) -> None:
     assert field_type.deprecated_alias_removal_version is not None
     warn_or_error(
@@ -176,12 +184,13 @@ async def resolve_target_parametrizations(
 
     target = None
     parametrizations: list[_TargetParametrization] = []
-    generate_request = target_types_to_generate_requests.request_for(target_type)
+    generate_request: type[GenerateTargetsRequest] | None = None
+    if issubclass(target_type, TargetGenerator):
+        generate_request = target_types_to_generate_requests.request_for(target_type)
     if generate_request:
         # Split out the `propagated_fields` before construction.
         generator_fields = dict(target_adaptor.kwargs)
         template_fields = {}
-        # TODO: Require for all instances before landing.
         if issubclass(target_type, TargetGenerator):
             copied_fields = (
                 *target_type.copied_fields,
@@ -254,7 +263,7 @@ async def resolve_target_parametrizations(
     else:
         first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
         if rest:
-            # The target was parametrized, and so the original target is not addressable.
+            # The target was parametrized, and so the original Target does not exist.
             generated = FrozenDict(
                 (
                     parameterized_address,
@@ -337,6 +346,11 @@ async def resolve_targets(
         for tgt in parametrizations.generated_or_generator(generator.address)
     )
     return Targets(expanded_targets)
+
+
+@rule
+def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
+    return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
@@ -504,7 +518,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     )
 
 
-@rule(desc="Resolve transitive targets")
+@rule(desc="Resolve transitive targets", level=LogLevel.DEBUG)
 async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTargets:
     """Find all the targets transitively depended upon by the target roots."""
 
@@ -538,16 +552,19 @@ async def transitive_targets(request: TransitiveTargetsRequest) -> TransitiveTar
 
 
 @rule
-async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
+def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
+    return CoarsenedTargetsRequest(addresses)
+
+
+@rule(desc="Resolve coarsened targets", level=LogLevel.DEBUG)
+async def coarsened_targets(request: CoarsenedTargetsRequest) -> CoarsenedTargets:
     dependency_mapping = await Get(
         _DependencyMapping,
         _DependencyMappingRequest(
-            # NB: We set include_special_cased_deps=True because although computing CoarsenedTargets
-            # requires a transitive graph walk (to ensure that all cycles are actually detected),
-            # the resulting CoarsenedTargets instance is not itself transitive: everything not directly
-            # involved in a cycle with one of the input Addresses is discarded in the output.
-            TransitiveTargetsRequest(addresses, include_special_cased_deps=True),
-            expanded_targets=False,
+            TransitiveTargetsRequest(
+                request.roots, include_special_cased_deps=request.include_special_cased_deps
+            ),
+            expanded_targets=request.expanded_targets,
         ),
     )
     addresses_to_targets = {
@@ -564,7 +581,7 @@ async def coarsened_targets(addresses: Addresses) -> CoarsenedTargets:
 
     coarsened_targets: dict[Address, CoarsenedTarget] = {}
     root_coarsened_targets = []
-    root_addresses_set = set(addresses)
+    root_addresses_set = set(request.roots)
     for component in components:
         component = sorted(component)
         component_set = set(component)
@@ -606,6 +623,7 @@ class OwnersRequest:
 
     sources: tuple[str, ...]
     owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
+    filter_by_global_options: bool = False
 
 
 class Owners(Collection[Address]):
@@ -628,10 +646,18 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # glob.
     live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
     deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
-    live_candidate_tgts, deleted_candidate_tgts = await MultiGet(
-        Get(Targets, AddressSpecs(live_candidate_specs)),
-        Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs)),
-    )
+    live_get: Get[FilteredTargets | Targets, AddressSpecs]
+    if owners_request.filter_by_global_options:
+        live_get = Get(
+            FilteredTargets, AddressSpecs(live_candidate_specs, filter_by_global_options=True)
+        )
+        deleted_get = Get(
+            UnexpandedTargets, AddressSpecs(deleted_candidate_specs, filter_by_global_options=True)
+        )
+    else:
+        live_get = Get(Targets, AddressSpecs(live_candidate_specs))
+        deleted_get = Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs))
+    live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
     matching_addresses: OrderedSet[Address] = OrderedSet()
     unmatched_sources = set(owners_request.sources)
@@ -656,7 +682,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             # primary ownership, but the target still should match the file. We can't use
             # `tgt.get()` because this is a mixin, and there technically may be >1 field.
             secondary_owner_fields = tuple(
-                field  # type: ignore[misc]
+                field
                 for field in candidate_tgt.field_values.values()
                 if isinstance(field, SecondaryOwnerMixin)
             )
@@ -688,7 +714,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 @rule
 def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
-    return cast(OwnersNotFoundBehavior, global_options.options.owners_not_found_behavior)
+    return global_options.owners_not_found_behavior
 
 
 def _log_or_raise_unmatched_owners(
@@ -741,7 +767,8 @@ async def addresses_from_filesystem_specs(
         for spec in filesystem_specs.file_includes
     )
     owners_per_include = await MultiGet(
-        Get(Owners, OwnersRequest(sources=paths.files)) for paths in paths_per_include
+        Get(Owners, OwnersRequest(paths.files, filter_by_global_options=True))
+        for paths in paths_per_include
     )
     addresses: set[Address] = set()
     for spec, owners in zip(filesystem_specs.file_includes, owners_per_include):
@@ -819,19 +846,20 @@ async def resolve_specs_snapshot(
 
 @rule
 def extract_files_not_found_behavior(global_options: GlobalOptions) -> FilesNotFoundBehavior:
-    return cast(FilesNotFoundBehavior, global_options.options.files_not_found_behavior)
+    return global_options.files_not_found_behavior
 
 
 class AmbiguousCodegenImplementationsException(Exception):
     """Exception for when there are multiple codegen implementations and it is ambiguous which to
     use."""
 
-    def __init__(
-        self,
+    @classmethod
+    def create(
+        cls,
         generators: Iterable[type[GenerateSourcesRequest]],
         *,
         for_sources_types: Iterable[type[SourcesField]],
-    ) -> None:
+    ) -> AmbiguousCodegenImplementationsException:
         all_same_generator_paths = (
             len({(generator.input, generator.output) for generator in generators}) == 1
         )
@@ -839,29 +867,28 @@ class AmbiguousCodegenImplementationsException(Exception):
         input = example_generator.input.__name__
         if all_same_generator_paths:
             output = example_generator.output.__name__
-            super().__init__(
-                f"Multiple of the registered code generators can generate {output} from {input}. "
+            return cls(
+                f"Multiple registered code generators can generate {output} from {input}. "
                 "It is ambiguous which implementation to use.\n\nPossible implementations:\n\n"
                 f"{bullet_list(sorted(generator.__name__ for generator in generators))}"
             )
-        else:
-            possible_output_types = sorted(
-                generator.output.__name__
-                for generator in generators
-                if issubclass(generator.output, tuple(for_sources_types))
-            )
-            possible_generators_with_output = [
-                f"{generator.__name__} -> {generator.output.__name__}"
-                for generator in sorted(generators, key=lambda generator: generator.output.__name__)
-            ]
-            super().__init__(
-                f"Multiple of the registered code generators can generate one of "
-                f"{possible_output_types} from {input}. It is ambiguous which implementation to "
-                f"use. This can happen when the call site requests too many different output types "
-                f"from the same original protocol sources.\n\nPossible implementations with their "
-                f"output type:\n\n"
-                f"{bullet_list(possible_generators_with_output)}"
-            )
+        possible_output_types = sorted(
+            generator.output.__name__
+            for generator in generators
+            if issubclass(generator.output, tuple(for_sources_types))
+        )
+        possible_generators_with_output = [
+            f"{generator.__name__} -> {generator.output.__name__}"
+            for generator in sorted(generators, key=lambda generator: generator.output.__name__)
+        ]
+        return cls(
+            f"Multiple registered code generators can generate one of "
+            f"{possible_output_types} from {input}. It is ambiguous which implementation to "
+            f"use. This can happen when the call site requests too many different output types "
+            f"from the same original protocol sources.\n\nPossible implementations with their "
+            f"output type:\n\n"
+            f"{bullet_list(possible_generators_with_output)}"
+        )
 
 
 @rule(desc="Hydrate the `sources` field")
@@ -884,7 +911,7 @@ async def hydrate_sources(
         and issubclass(generate_request_type.output, request.for_sources_types)
     ]
     if request.enable_codegen and len(relevant_generate_request_types) > 1:
-        raise AmbiguousCodegenImplementationsException(
+        raise AmbiguousCodegenImplementationsException.create(
             relevant_generate_request_types, for_sources_types=request.for_sources_types
         )
     generate_request_type = next(iter(relevant_generate_request_types), None)
@@ -953,7 +980,7 @@ class SubprojectRoots(Collection[str]):
 
 @rule
 def extract_subproject_roots(global_options: GlobalOptions) -> SubprojectRoots:
-    return SubprojectRoots(global_options.options.subproject_roots)
+    return SubprojectRoots(global_options.subproject_roots)
 
 
 class ParsedDependencies(NamedTuple):
@@ -1062,8 +1089,7 @@ async def resolve_dependencies(
         relevant_inference_request_types = [
             inference_request_type
             for inference_request_type in inference_request_types
-            # NB: `type: ignore`d due to https://github.com/python/mypy/issues/9815.
-            if isinstance(sources_field, inference_request_type.infer_from)  # type: ignore[misc]
+            if isinstance(sources_field, inference_request_type.infer_from)
         ]
         inferred = await MultiGet(
             Get(
@@ -1080,7 +1106,23 @@ async def resolve_dependencies(
         parametrizations = await Get(
             _TargetParametrizations, Address, tgt.address.maybe_convert_to_target_generator()
         )
-        generated_addresses = tuple(parametrizations.parametrization_for(tgt.address).keys())
+        generated_addresses = tuple(parametrizations.generated_for(tgt.address).keys())
+
+    # If the target is parametrized, see whether any explicitly provided dependencies are also
+    # parametrized, but with partial/no parameters. If so, fill them in.
+    explicitly_provided_includes: Iterable[Address] = explicitly_provided.includes
+    if request.field.address.is_parametrized and explicitly_provided_includes:
+        explicit_dependency_parametrizations = await MultiGet(
+            Get(_TargetParametrizations, Address, address.maybe_convert_to_target_generator())
+            for address in explicitly_provided_includes
+        )
+
+        explicitly_provided_includes = [
+            parametrizations.get_subset(address, tgt).address
+            for address, parametrizations in zip(
+                explicitly_provided_includes, explicit_dependency_parametrizations
+            )
+        ]
 
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
@@ -1110,18 +1152,34 @@ async def resolve_dependencies(
             for addr in special_cased_field.to_unparsed_address_inputs().values
         )
 
-    result = {
-        addr
-        for addr in (
-            *generated_addresses,
-            *explicitly_provided.includes,
-            *itertools.chain.from_iterable(injected),
-            *itertools.chain.from_iterable(inferred),
-            *special_cased,
+    result = Addresses(
+        sorted(
+            {
+                addr
+                for addr in (
+                    *generated_addresses,
+                    *explicitly_provided_includes,
+                    *itertools.chain.from_iterable(injected),
+                    *itertools.chain.from_iterable(inferred),
+                    *special_cased,
+                )
+                if addr not in explicitly_provided.ignores
+            }
         )
-        if addr not in explicitly_provided.ignores
-    }
-    return Addresses(sorted(result))
+    )
+
+    # Validate dependencies.
+    _ = await MultiGet(
+        Get(
+            ValidatedDependencies,
+            ValidateDependenciesRequest,
+            vd_request_type(vd_request_type.field_set_type.create(tgt), result),  # type: ignore[misc]
+        )
+        for vd_request_type in union_membership.get(ValidateDependenciesRequest)
+        if vd_request_type.field_set_type.is_applicable(tgt)  # type: ignore[misc]
+    )
+
+    return result
 
 
 @rule(desc="Resolve addresses")
@@ -1281,7 +1339,7 @@ async def find_valid_field_sets_for_target_roots(
 ) -> TargetRootsToFieldSets:
     # NB: This must be in an `await Get`, rather than the rule signature, to avoid a rule graph
     # issue.
-    targets = await Get(Targets, Specs, specs)
+    targets = await Get(FilteredTargets, Specs, specs)
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
     )
@@ -1302,10 +1360,30 @@ async def find_valid_field_sets_for_target_roots(
         )
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
             raise no_applicable_exception
-        if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn:
+        # We squelch the warning if the specs came from change detection or only from address globs,
+        # since in that case we interpret the user's intent as "if there are relevant matching
+        # targets, act on them". But we still want to warn if the specs were literal, or empty.
+        empty_ok = specs.from_change_detection or (
+            specs.address_specs.globs
+            and not specs.address_specs.literals
+            and not specs.filesystem_specs
+        )
+        if (
+            request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn
+            and not empty_ok
+        ):
             logger.warning(str(no_applicable_exception))
 
-    result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
+    if request.num_shards > 0:
+        sharded_targets_to_applicable_field_sets = {
+            tgt: value
+            for tgt, value in targets_to_applicable_field_sets.items()
+            if request.is_in_shard(tgt.address.spec)
+        }
+        result = TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
+    else:
+        result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
+
     if not request.expect_single_field_set:
         return result
     if len(result.targets) > 1:

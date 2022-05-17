@@ -7,9 +7,9 @@ publish = false
 
 [dependencies]
 protos = { path = "../protos" }
-clap = "2"
+clap = "3"
 dirs-next = "2"
-env_logger = "0.5.4"
+env_logger = "0.9.0"
 fs = { path = "../fs" }
 futures = "0.3"
 grpc_util = { path = "../grpc_util" }
@@ -17,7 +17,7 @@ hashing = { path = "../hashing" }
 log = "0.4"
 process_execution = { path = "../process_execution" }
 prost = "0.9"
-shlex = "0.1.1"
+shlex = "1.1.0"
 store = { path = "../fs/store" }
 structopt = "0.3.26"
 task_executor = { path = "../task_executor" }

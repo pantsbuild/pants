@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABCMeta
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
@@ -17,9 +17,17 @@ from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import CoarsenedTarget, FieldSet
+from pants.engine.target import (
+    CoarsenedTarget,
+    Field,
+    FieldSet,
+    GenerateSourcesRequest,
+    SourcesField,
+    TargetFilesGenerator,
+)
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -75,9 +83,14 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
     # True if this request type is only valid at the root of a compile graph.
     root_only: ClassVar[bool] = False
 
-    @staticmethod
+
+@dataclass(frozen=True)
+class ClasspathEntryRequestFactory:
+    impls: tuple[type[ClasspathEntryRequest], ...]
+    generator_sources: FrozenDict[type[ClasspathEntryRequest], frozenset[type[SourcesField]]]
+
     def for_targets(
-        union_membership: UnionMembership,
+        self,
         component: CoarsenedTarget,
         resolve: CoursierResolveKey,
         *,
@@ -92,9 +105,9 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
         compatible = []
         partial = []
         consume_only = []
-        impls = union_membership.get(ClasspathEntryRequest)
+        impls = self.impls
         for impl in impls:
-            classification = ClasspathEntryRequest.classify_impl(impl, component)
+            classification = self.classify_impl(impl, component)
             if classification == _ClasspathEntryRequestClassification.INCOMPATIBLE:
                 continue
             elif classification == _ClasspathEntryRequestClassification.COMPATIBLE:
@@ -105,7 +118,7 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
                 consume_only.append(impl)
 
         if len(compatible) == 1:
-            if not root and impl.root_only:
+            if not root and compatible[0].root_only:
                 raise ClasspathRootOnlyWasInner(
                     "The following targets had dependees, but can only be used as roots in a "
                     f"build graph:\n{component.bullet_list()}"
@@ -134,12 +147,22 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
                 f"combination of inputs:\n{component.bullet_list()}"
             )
 
-    @staticmethod
     def classify_impl(
-        impl: type[ClasspathEntryRequest], component: CoarsenedTarget
+        self, impl: type[ClasspathEntryRequest], component: CoarsenedTarget
     ) -> _ClasspathEntryRequestClassification:
         targets = component.members
-        compatible = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
+        generator_sources = self.generator_sources.get(impl) or frozenset()
+
+        compatible_direct = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
+        compatible_codegen = sum(1 for t in targets for g in generator_sources if t.has_field(g))
+        compatible_codegen_target_generator = sum(
+            1
+            for t in targets
+            if isinstance(t, TargetFilesGenerator)
+            and any(field in t.generated_target_cls.core_fields for field in generator_sources)
+        )
+
+        compatible = compatible_direct + compatible_codegen + compatible_codegen_target_generator
         if compatible == 0:
             return _ClasspathEntryRequestClassification.INCOMPATIBLE
         if compatible == len(targets):
@@ -150,6 +173,31 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
         if compatible + consume_only == len(targets):
             return _ClasspathEntryRequestClassification.CONSUME_ONLY
         return _ClasspathEntryRequestClassification.PARTIAL
+
+
+@rule
+def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathEntryRequestFactory:
+    cpe_impls = union_membership.get(ClasspathEntryRequest)
+
+    impls_by_source: dict[type[Field], type[ClasspathEntryRequest]] = {}
+    for impl in cpe_impls:
+        for field_set in impl.field_sets:
+            for field in field_set.required_fields:
+                # Assume only one impl per field (normally sound)
+                # (note that subsequently, we only check for `SourceFields`, so no need to filter)
+                impls_by_source[field] = impl
+
+    # Classify code generator sources by their CPE impl
+    sources_by_impl_: dict[type[ClasspathEntryRequest], list[type[SourcesField]]] = defaultdict(
+        list
+    )
+
+    for g in union_membership.get(GenerateSourcesRequest):
+        if g.output in impls_by_source:
+            sources_by_impl_[impls_by_source[g.output]].append(g.input)
+    sources_by_impl = FrozenDict((key, frozenset(value)) for key, value in sources_by_impl_.items())
+
+    return ClasspathEntryRequestFactory(tuple(cpe_impls), sources_by_impl)
 
 
 @frozen_after_init
@@ -341,7 +389,7 @@ def required_classfiles(fallible_result: FallibleClasspathEntry) -> ClasspathEnt
 
 @rule
 def classpath_dependency_requests(
-    union_membership: UnionMembership, request: ClasspathDependenciesRequest
+    classpath_entry_request: ClasspathEntryRequestFactory, request: ClasspathDependenciesRequest
 ) -> ClasspathEntryRequests:
     def ignore_because_generated(coarsened_dep: CoarsenedTarget) -> bool:
         if len(coarsened_dep.members) == 1:
@@ -351,8 +399,8 @@ def classpath_dependency_requests(
         return us.spec_path == them.spec_path and us.target_name == them.target_name
 
     return ClasspathEntryRequests(
-        ClasspathEntryRequest.for_targets(
-            union_membership, component=coarsened_dep, resolve=request.request.resolve
+        classpath_entry_request.for_targets(
+            component=coarsened_dep, resolve=request.request.resolve
         )
         for coarsened_dep in request.request.component.dependencies
         if not request.ignore_generated or not ignore_because_generated(coarsened_dep)

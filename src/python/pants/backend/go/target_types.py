@@ -22,8 +22,58 @@ from pants.engine.target import (
     MultipleSourcesField,
     StringField,
     Target,
+    TargetGenerator,
     ValidNumbers,
 )
+from pants.util.strutil import softwrap
+
+# -----------------------------------------------------------------------------------------------
+# `go_third_party_package` target
+# -----------------------------------------------------------------------------------------------
+
+
+class GoImportPathField(StringField):
+    alias = "import_path"
+    help = softwrap(
+        """
+        Import path in Go code to import this package.
+
+        This field should not be overridden; use the value from target generation.
+        """
+    )
+    required = True
+    value: str
+
+
+class GoThirdPartyPackageDependenciesField(Dependencies):
+    pass
+
+
+class GoThirdPartyPackageTarget(Target):
+    alias = "go_third_party_package"
+    core_fields = (*COMMON_TARGET_FIELDS, GoThirdPartyPackageDependenciesField, GoImportPathField)
+    help = softwrap(
+        """
+        A package from a third-party Go module.
+
+        You should not explicitly create this target in BUILD files. Instead, add a `go_mod`
+        target where you have your `go.mod` file, which will generate
+        `go_third_party_package` targets for you.
+
+        Make sure that your `go.mod` and `go.sum` files include this package's module.
+        """
+    )
+
+    def validate(self) -> None:
+        if not self.address.is_generated_target:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target type should not be manually created in BUILD "
+                f"files, but it was created for {self.address}.\n\n"
+                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
+                f"generate `{self.alias}` targets for you based on the `require` directives in "
+                f"your `go.mod`."
+            )
+
 
 # -----------------------------------------------------------------------------------------------
 # `go_mod` target generator
@@ -69,20 +119,27 @@ class GoModDependenciesField(Dependencies):
     alias = "_dependencies"
 
 
-class GoModTarget(Target):
+class GoModTarget(TargetGenerator):
     alias = "go_mod"
+    help = softwrap(
+        """
+        A first-party Go module (corresponding to a `go.mod` file).
+
+        Generates `go_third_party_package` targets based on the `require` directives in your
+        `go.mod`.
+
+        If you have third-party packages, make sure you have an up-to-date `go.sum`. Run
+        `go mod tidy` directly to update your `go.mod` and `go.sum`.
+        """
+    )
+    generated_target_cls = GoThirdPartyPackageTarget
     core_fields = (
         *COMMON_TARGET_FIELDS,
         GoModDependenciesField,
         GoModSourcesField,
     )
-    help = (
-        "A first-party Go module (corresponding to a `go.mod` file).\n\n"
-        "Generates `go_third_party_package` targets based on the `require` directives in your "
-        "`go.mod`.\n\n"
-        "If you have third-party packages, make sure you have an up-to-date `go.sum`. Run "
-        "`go mod tidy` directly to update your `go.mod` and `go.sum`."
-    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = ()
 
 
 # -----------------------------------------------------------------------------------------------
@@ -93,6 +150,7 @@ class GoModTarget(Target):
 class GoPackageSourcesField(MultipleSourcesField):
     default = ("*.go", "*.s")
     expected_file_extensions = (".go", ".s")
+    ban_subdirectories = True
 
     @classmethod
     def compute_value(
@@ -103,18 +161,6 @@ class GoPackageSourcesField(MultipleSourcesField):
             raise InvalidFieldException(
                 f"The {repr(cls.alias)} field in target {address} must be set to files/globs in "
                 f"the target's directory, but it was set to {repr(value_or_default)}."
-            )
-
-        # Ban recursive globs and subdirectories. We assume that a `go_package` corresponds
-        # to exactly one directory.
-        invalid_globs = [
-            glob for glob in (value_or_default or ()) if "**" in glob or os.path.sep in glob
-        ]
-        if invalid_globs:
-            raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} must only have globs for the "
-                f"target's directory, i.e. it cannot include values with `**` and `{os.path.sep}`, "
-                f"but it was set to: {sorted(value_or_default)}"
             )
         return value_or_default
 
@@ -131,9 +177,12 @@ class SkipGoTestsField(BoolField):
 
 class GoTestTimeoutField(IntField):
     alias = "test_timeout"
-    help = (
-        "A timeout (in seconds) when running this package's tests.\n\n"
-        "If this field is not set, the test will never time out."
+    help = softwrap(
+        """
+        A timeout (in seconds) when running this package's tests.
+
+        If this field is not set, the test will never time out.
+        """
     )
     valid_numbers = ValidNumbers.positive_and_zero
 
@@ -147,52 +196,14 @@ class GoPackageTarget(Target):
         GoTestTimeoutField,
         SkipGoTestsField,
     )
-    help = (
-        "A first-party Go package (corresponding to a directory with `.go` files).\n\n"
-        "Expects that there is a `go_mod` target in its directory or in an ancestor "
-        "directory."
+    help = softwrap(
+        """
+        A first-party Go package (corresponding to a directory with `.go` files).
+
+        Expects that there is a `go_mod` target in its directory or in an ancestor
+        directory.
+        """
     )
-
-
-# -----------------------------------------------------------------------------------------------
-# `go_third_party_package` target
-# -----------------------------------------------------------------------------------------------
-
-
-class GoImportPathField(StringField):
-    alias = "import_path"
-    help = (
-        "Import path in Go code to import this package.\n\n"
-        "This field should not be overridden; use the value from target generation."
-    )
-    required = True
-    value: str
-
-
-class GoThirdPartyPackageDependenciesField(Dependencies):
-    pass
-
-
-class GoThirdPartyPackageTarget(Target):
-    alias = "go_third_party_package"
-    core_fields = (*COMMON_TARGET_FIELDS, GoThirdPartyPackageDependenciesField, GoImportPathField)
-    help = (
-        "A package from a third-party Go module.\n\n"
-        "You should not explicitly create this target in BUILD files. Instead, add a `go_mod` "
-        "target where you have your `go.mod` file, which will generate "
-        "`go_third_party_package` targets for you.\n\n"
-        "Make sure that your `go.mod` and `go.sum` files include this package's module."
-    )
-
-    def validate(self) -> None:
-        if not self.address.is_generated_target:
-            raise InvalidTargetException(
-                f"The `{self.alias}` target type should not be manually created in BUILD "
-                f"files, but it was created for {self.address}.\n\n"
-                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
-                f"generate `{self.alias}` targets for you based on the `require` directives in "
-                f"your `go.mod`."
-            )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -202,10 +213,13 @@ class GoThirdPartyPackageTarget(Target):
 
 class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
-    help = (
-        "Address of the `go_package` with the `main` for this binary.\n\n"
-        "If not specified, will default to the `go_package` for the same "
-        "directory as this target's BUILD file. You should usually rely on this default."
+    help = softwrap(
+        """
+        Address of the `go_package` with the `main` for this binary.
+
+        If not specified, will default to the `go_package` for the same
+        directory as this target's BUILD file. You should usually rely on this default.
+        """
     )
     value: str
 

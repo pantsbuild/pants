@@ -30,6 +30,8 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import (
     AllUnexpandedTargets,
+    MultipleSourcesField,
+    OptionalSingleSourceField,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -44,6 +46,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 
 @union
@@ -63,7 +66,9 @@ class PutativeTargetsSearchPaths:
 @memoized
 def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
     for field in tgt_type.core_fields:
-        if issubclass(field, SourcesField):
+        if issubclass(field, OptionalSingleSourceField):
+            return (field.default,) if field.default else tuple()
+        if issubclass(field, MultipleSourcesField):
             return field.default or tuple()
     return tuple()
 
@@ -122,10 +127,16 @@ class PutativeTarget:
         if name is None:
             name = os.path.basename(path)
 
-        explicit_sources = (kwargs or {}).get("sources")
+        kwargs = kwargs or {}
+        explicit_sources = cast(
+            "tuple[str, ...] | None",
+            (kwargs["source"],) if "source" in kwargs else kwargs.get("sources"),
+        )
         if explicit_sources is not None and not isinstance(explicit_sources, tuple):
             raise TypeError(
-                "Explicit sources passed to PutativeTarget.for_target_type must be a Tuple[str]."
+                "`source` or `sources` passed to PutativeTarget.for_target_type(kwargs=)`, but "
+                "it was not the correct type. `source` must be `str` and `sources` must be "
+                f"`tuple[str, ...]`. Was `{explicit_sources}` with type `{type(explicit_sources)}`."
             )
 
         default_sources = default_sources_for_target_type(target_type)
@@ -133,7 +144,7 @@ class PutativeTarget:
             raise AssertionError(
                 f"A target of type {target_type.__name__} was proposed at "
                 f"address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)}, "
-                "but this target type does not have a `sources` field."
+                "but this target type does not have a `source` or `sources` field."
             )
         owned_sources = explicit_sources or default_sources or tuple()
         return cls(
@@ -251,60 +262,81 @@ class TailorSubsystem(GoalSubsystem):
     check = BoolOption(
         "--check",
         default=False,
-        help=(
-            "Do not write changes to disk, only write back what would change. Return code "
-            "0 means there would be no changes, and 1 means that there would be. "
+        help=softwrap(
+            """
+            Do not write changes to disk, only write back what would change. Return code
+            0 means there would be no changes, and 1 means that there would be.
+            """
         ),
     )
     build_file_name = StrOption(
         "--build-file-name",
         default="BUILD",
-        help=(
-            "The name to use for generated BUILD files.\n\n"
-            "This must be compatible with `[GLOBAL].build_patterns`."
+        help=softwrap(
+            """
+            The name to use for generated BUILD files.
+
+            This must be compatible with `[GLOBAL].build_patterns`.
+            """
         ),
-    ).advanced()
+        advanced=True,
+    )
     build_file_header = StrOption(
         "--build-file-header",
+        default=None,
         help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
-    ).advanced()
+        advanced=True,
+    )
     build_file_indent = StrOption(
         "--build-file-indent",
         default="    ",
         help="The indent to use when auto-editing BUILD files.",
-    ).advanced()
+        advanced=True,
+    )
     _alias_mapping = DictOption[str](
         "--alias-mapping",
-        help=(
-            "A mapping from standard target type to custom type to use instead. The custom "
-            "type can be a custom target type or a macro that offers compatible functionality "
-            f"to the one it replaces (see {doc_url('macros')})."
+        help=softwrap(
+            f"""
+            A mapping from standard target type to custom type to use instead. The custom
+            type can be a custom target type or a macro that offers compatible functionality
+            to the one it replaces (see {doc_url('macros')}).
+            """
         ),
-    ).advanced()
+        advanced=True,
+    )
     ignore_paths = StrListOption(
         "--ignore-paths",
-        help=(
-            "Do not edit or create BUILD files at these paths.\n\n"
-            "Can use literal file names and/or globs, e.g. "
-            "`['project/BUILD, 'ignore_me/**']`.\n\n"
-            "This augments the option `[GLOBAL].build_ignore`, which tells Pants to also not "
-            "_read_ BUILD files at certain paths. In contrast, this option only tells Pants to "
-            "not edit/create BUILD files at the specified paths."
+        help=softwrap(
+            """
+            Do not edit or create BUILD files at these paths.
+
+            Can use literal file names and/or globs, e.g. `['project/BUILD, 'ignore_me/**']`.
+
+            This augments the option `[GLOBAL].build_ignore`, which tells Pants to also not
+            _read_ BUILD files at certain paths. In contrast, this option only tells Pants to
+            not edit/create BUILD files at the specified paths.
+            """
         ),
-    ).advanced()
+        advanced=True,
+    )
     _ignore_adding_targets = StrListOption(
         "--ignore-adding-targets",
-        help=(
-            "Do not add these target definitions.\n\n"
-            "Expects a list of target addresses that would normally be added by `tailor`, "
-            "e.g. `['project:tgt']`. To find these names, you can run `tailor --check`, then "
-            "combine the BUILD file path with the target's name. For example, if `tailor` "
-            "would add the target `bin` to `project/BUILD`, then the address would be "
-            "`project:bin`. If the BUILD file is at the root of your repository, use `//` for "
-            "the path, e.g. `//:bin`.\n\n"
-            "Does not work with macros."
+        help=softwrap(
+            """
+            Do not add these target definitions.
+
+            Expects a list of target addresses that would normally be added by `tailor`,
+            e.g. `['project:tgt']`. To find these names, you can run `tailor --check`, then
+            combine the BUILD file path with the target's name. For example, if `tailor`
+            would add the target `bin` to `project/BUILD`, then the address would be
+            `project:bin`. If the BUILD file is at the root of your repository, use `//` for
+            the path, e.g. `//:bin`.
+
+            Does not work with macros.
+            """
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     @property
     def ignore_adding_targets(self) -> set[str]:

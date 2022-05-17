@@ -6,7 +6,7 @@ from __future__ import annotations
 import collections
 import json
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Iterable, cast
+from typing import Any, Iterable
 
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -22,6 +22,7 @@ from pants.engine.target import (
     Targets,
     UnexpandedTargets,
 )
+from pants.option.option_types import BoolOption
 
 
 class PeekSubsystem(Outputting, GoalSubsystem):
@@ -30,31 +31,49 @@ class PeekSubsystem(Outputting, GoalSubsystem):
     name = "peek"
     help = "Display BUILD target info"
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--exclude-defaults",
-            type=bool,
-            default=False,
-            help="Whether to leave off values that match the target-defined default values.",
-        )
-
-    @property
-    def exclude_defaults(self) -> bool:
-        return cast(bool, self.options.exclude_defaults)
+    exclude_defaults = BoolOption(
+        "--exclude-defaults",
+        default=False,
+        help="Whether to leave off values that match the target-defined default values.",
+    )
 
 
 class Peek(Goal):
     subsystem_cls = PeekSubsystem
 
 
+def _normalize_value(val: Any) -> Any:
+    if isinstance(val, collections.abc.Mapping):
+        return {str(k): _normalize_value(v) for k, v in val.items()}
+    return val
+
+
 @dataclass(frozen=True)
 class TargetData:
     target: Target
-    # These fields may not be registered on the target, so we have nothing to expand.
+    # Sources may not be registered on the target, so we'll have nothing to expand.
     expanded_sources: tuple[str, ...] | None
-    expanded_dependencies: tuple[str, ...] | None
+    expanded_dependencies: tuple[str, ...]
+
+    def to_dict(self, exclude_defaults: bool = False) -> dict:
+        nothing = object()
+        fields = {
+            (
+                f"{k.alias}_raw" if issubclass(k, (SourcesField, Dependencies)) else k.alias
+            ): _normalize_value(v.value)
+            for k, v in self.target.field_values.items()
+            if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
+        }
+
+        fields["dependencies"] = self.expanded_dependencies
+        if self.expanded_sources is not None:
+            fields["sources"] = self.expanded_sources
+
+        return {
+            "address": self.target.address.spec,
+            "target_type": self.target.alias,
+            **dict(sorted(fields.items())),
+        }
 
 
 class TargetDatas(Collection[TargetData]):
@@ -62,34 +81,7 @@ class TargetDatas(Collection[TargetData]):
 
 
 def render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> str:
-    nothing = object()
-
-    def normalize_value(val: Any) -> Any:
-        if isinstance(val, collections.abc.Mapping):
-            return {str(k): normalize_value(v) for k, v in val.items()}
-        return val
-
-    def to_json(td: TargetData) -> dict:
-        fields = {
-            (
-                f"{k.alias}_raw" if issubclass(k, (SourcesField, Dependencies)) else k.alias
-            ): normalize_value(v.value)
-            for k, v in td.target.field_values.items()
-            if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
-        }
-
-        if td.expanded_dependencies is not None:
-            fields["dependencies"] = td.expanded_dependencies
-        if td.expanded_sources is not None:
-            fields["sources"] = td.expanded_sources
-
-        return {
-            "address": td.target.address.spec,
-            "target_type": td.target.alias,
-            **dict(sorted(fields.items())),
-        }
-
-    return f"{json.dumps([to_json(td) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
+    return f"{json.dumps([td.to_dict(exclude_defaults) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
@@ -116,12 +108,9 @@ async def get_target_data(
 ) -> TargetDatas:
     sorted_targets = sorted(targets, key=lambda tgt: tgt.address)
 
-    # We "hydrate" these field with the engine, but not every target has them registered.
-    targets_with_dependencies = []
+    # We "hydrate" sources fields with the engine, but not every target has them registered.
     targets_with_sources = []
     for tgt in sorted_targets:
-        if tgt.has_field(Dependencies):
-            targets_with_dependencies.append(tgt)
         if tgt.has_field(SourcesField):
             targets_with_sources.append(tgt)
 
@@ -131,17 +120,17 @@ async def get_target_data(
             Targets,
             DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
         )
-        for tgt in targets_with_dependencies
+        for tgt in sorted_targets
     )
     hydrated_sources_per_target = await MultiGet(
         Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
         for tgt in targets_with_sources
     )
 
-    expanded_dependencies_map = {
-        tgt.address: tuple(dep.address.spec for dep in deps)
-        for tgt, deps in zip(targets_with_dependencies, dependencies_per_target)
-    }
+    expanded_dependencies = [
+        tuple(dep.address.spec for dep in deps)
+        for tgt, deps in zip(sorted_targets, dependencies_per_target)
+    ]
     expanded_sources_map = {
         tgt.address: hs.snapshot.files
         for tgt, hs in zip(targets_with_sources, hydrated_sources_per_target)
@@ -150,10 +139,10 @@ async def get_target_data(
     return TargetDatas(
         TargetData(
             tgt,
-            expanded_dependencies=expanded_dependencies_map.get(tgt.address),
+            expanded_dependencies=expanded_deps,
             expanded_sources=expanded_sources_map.get(tgt.address),
         )
-        for tgt in sorted_targets
+        for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )
 
 

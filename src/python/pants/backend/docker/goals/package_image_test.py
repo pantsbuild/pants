@@ -16,6 +16,7 @@ from pants.backend.docker.goals.package_image import (
     DockerImageTagValueError,
     DockerRepositoryNameError,
     build_docker_image,
+    parse_image_id_from_docker_build_output,
     rules,
 )
 from pants.backend.docker.registries import DockerRegistries
@@ -128,6 +129,7 @@ def assert_build(
         opts.setdefault("default_context_root", "")
         opts.setdefault("build_args", [])
         opts.setdefault("build_target_stage", None)
+        opts.setdefault("build_verbose", False)
         opts.setdefault("env_vars", [])
 
         docker_options = create_subsystem(
@@ -272,6 +274,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 docker_image(name="unreg", image_tags=["1.2.3"], registries=[])
                 docker_image(name="def", image_tags=["1.2.3"])
                 docker_image(name="multi", image_tags=["1.2.3"], registries=["@reg2", "@reg1"])
+                docker_image(name="extra_tags", image_tags=["1.2.3"], registries=["@reg1", "@extra"])
                 """
             ),
             "docker/test/Dockerfile": "FROM python:3.8",
@@ -283,6 +286,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         "registries": {
             "reg1": {"address": "myregistry1domain:port"},
             "reg2": {"address": "myregistry2domain:port", "default": "true"},
+            "extra": {"address": "extra", "extra_image_tags": ["latest"]},
         },
     }
 
@@ -341,6 +345,17 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
             "Built docker images: \n"
             "  * myregistry2domain:port/multi:1.2.3\n"
             "  * myregistry1domain:port/multi:1.2.3"
+        ),
+        options=options,
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="extra_tags"),
+        (
+            "Built docker images: \n"
+            "  * myregistry1domain:port/extra_tags:1.2.3\n"
+            "  * extra/extra_tags:1.2.3\n"
+            "  * extra/extra_tags:latest"
         ),
         options=options,
     )
@@ -929,3 +944,77 @@ def test_get_context_root(
         actual_context_root = fs.get_context_root(docker_options.default_context_root)
         if expected_context_root:
             assert actual_context_root == expected_context_root
+
+
+@pytest.mark.parametrize(
+    "expected, stdout, stderr",
+    [
+        (
+            "<unknown>",
+            "",
+            "",
+        ),
+        (
+            "0e09b442b572",
+            "",
+            dedent(
+                """\
+                Step 22/22 : LABEL job-url="https://jenkins.example.net/job/python_artefactsapi_pipeline/"
+                 ---> Running in ae5c3eac5c0b
+                Removing intermediate container ae5c3eac5c0b
+                 ---> 0e09b442b572
+                Successfully built 0e09b442b572
+                Successfully tagged docker.example.net/artefactsapi/master:3.6.5
+                """
+            ),
+        ),
+        (
+            "sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7",
+            dedent(
+                """\
+                #7 [2/2] COPY testprojects.src.python.hello.main/main.pex /hello
+                #7 sha256:843d0c804a7eb5ba08b0535b635d5f98a3e56bc43a3fbe7d226a8024176f00d1
+                #7 DONE 0.1s
+
+                #8 exporting to image
+                #8 sha256:e8c613e07b0b7ff33893b694f7759a10d42e180f2b4dc349fb57dc6b71dcab00
+                #8 exporting layers 0.0s done
+                #8 writing image sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7 done
+                #8 naming to docker.io/library/test-example-synth:1.2.5 done
+                #8 DONE 0.0s
+
+                Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them
+
+                """
+            ),
+            "",
+        ),
+    ],
+)
+def test_parse_image_id_from_docker_build_output(expected: str, stdout: str, stderr: str) -> None:
+    assert expected == parse_image_id_from_docker_build_output(stdout.encode(), stderr.encode())
+
+
+@pytest.mark.parametrize(
+    "raw_values, expect_raises, image_refs",
+    [
+        (dict(name="lowercase"), no_exception(), ("lowercase:latest",)),
+        (dict(name="CamelCase"), no_exception(), ("camelcase:latest",)),
+        (dict(image_tags=["CamelCase"]), no_exception(), ("image:CamelCase",)),
+        (dict(registries=["REG1.example.net"]), no_exception(), ("REG1.example.net/image:latest",)),
+    ],
+)
+def test_image_ref_formatting(
+    raw_values: dict, expect_raises: ContextManager, image_refs: tuple[str, ...]
+) -> None:
+    address = Address("test", target_name=raw_values.pop("name", "image"))
+    tgt = DockerImageTarget(raw_values, address)
+    field_set = DockerFieldSet.create(tgt)
+    default_repository = "{name}"
+    registries = DockerRegistries.from_dict({})
+    interpolation_context = DockerInterpolationContext.from_dict({})
+    with expect_raises:
+        assert (
+            field_set.image_refs(default_repository, registries, interpolation_context)
+            == image_refs
+        )

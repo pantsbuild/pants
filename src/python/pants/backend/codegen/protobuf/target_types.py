@@ -21,6 +21,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -61,9 +62,12 @@ class ProtobufSourceTarget(Target):
         ProtobufSourceField,
         ProtobufGrpcToggleField,
     )
-    help = (
-        "A single Protobuf file used to generate various languages.\n\n"
-        f"See {doc_url('protobuf')}."
+    help = softwrap(
+        f"""
+        A single Protobuf file used to generate various languages.
+
+        See {doc_url('protobuf')}.
+        """
     )
 
 
@@ -96,8 +100,8 @@ class ProtobufSourcesOverridesField(OverridesField):
         ProtobufSourceTarget.alias,
         (
             "overrides={\n"
-            '  "foo.proto": {"grpc": True]},\n'
-            '  "bar.proto": {"description": "our user model"]},\n'
+            '  "foo.proto": {"grpc": True},\n'
+            '  "bar.proto": {"description": "our user model"},\n'
             '  ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
             "}"
         ),
@@ -108,16 +112,15 @@ class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "protobuf_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ProtobufDependenciesField,
         ProtobufSourcesGeneratingSourcesField,
         ProtobufSourcesOverridesField,
     )
     generated_target_cls = ProtobufSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        ProtobufGrpcToggleField,
         ProtobufDependenciesField,
     )
-    moved_fields = (ProtobufGrpcToggleField,)
     settings_request_cls = GeneratorSettingsRequest
     help = "Generate a `protobuf_source` target for each file in the `sources` field."
 

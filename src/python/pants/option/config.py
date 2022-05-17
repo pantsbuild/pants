@@ -3,24 +3,24 @@
 
 from __future__ import annotations
 
-import configparser
 import getpass
-import itertools
+import logging
 import os
 import re
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
-from hashlib import sha1
-from typing import Any, ClassVar, Dict, Iterable, List, Mapping, Sequence, Union, cast
+from types import SimpleNamespace
+from typing import Any, Dict, Iterable, List, Mapping, Union, cast
 
 import toml
 from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
+from pants.option.errors import ConfigError, ConfigValidationError, InterpolationMissingOptionError
 from pants.option.ranked_value import Value
-from pants.util.eval import parse_expression
-from pants.util.ordered_set import OrderedSet
+
+logger = logging.getLogger(__name__)
+
 
 # A dict with optional override seed values for buildroot, pants_workdir, and pants_distdir.
 SeedValues = Dict[str, Value]
@@ -42,7 +42,11 @@ class ConfigSource(Protocol):
         raise NotImplementedError()
 
 
-class Config(ABC):
+DEFAULT_SECTION = "DEFAULT"
+
+
+@dataclass(frozen=True, eq=False)
+class Config:
     """Encapsulates config file loading and access, including encapsulation of support for multiple
     config files.
 
@@ -50,13 +54,7 @@ class Config(ABC):
     replaced with the value of var_name.
     """
 
-    DEFAULT_SECTION: ClassVar[str] = configparser.DEFAULTSECT
-
-    class ConfigError(Exception):
-        pass
-
-    class ConfigValidationError(ConfigError):
-        pass
+    values: tuple[_ConfigValues, ...]
 
     @classmethod
     def load(
@@ -64,62 +62,73 @@ class Config(ABC):
         file_contents: Iterable[ConfigSource],
         *,
         seed_values: SeedValues | None = None,
+        env: Mapping[str, str] | None = None,
     ) -> Config:
         """Loads config from the given string payloads, with later payloads overriding earlier ones.
 
         A handful of seed values will be set to act as if specified in the loaded config file's
         DEFAULT section, and be available for use in substitutions.  The caller may override some of
         these seed values.
-        """
-        single_file_configs = []
-        for file_content in file_contents:
-            content_digest = sha1(file_content.content).hexdigest()
-            normalized_seed_values = cls._determine_seed_values(seed_values=seed_values)
 
+        If an `env` is supplied, it is exposed as `env` object available for interpolation via dot
+        access of the environment variable names (e.g.: `env.HOME`).
+        """
+        config_values = []
+        for file_content in file_contents:
+            normalized_seed_values = cls._determine_seed_values(seed_values=seed_values, env=env)
             try:
-                config_values = cls._parse_toml(
-                    file_content.content.decode(), normalized_seed_values
-                )
+                config_values.append(cls._parse_toml(file_content, normalized_seed_values))
             except Exception as e:
-                raise cls.ConfigError(
+                raise ConfigError(
                     f"Config file {file_content.path} could not be parsed as TOML:\n  {e}"
                 )
-
-            single_file_configs.append(
-                _SingleFileConfig(
-                    config_path=file_content.path,
-                    content_digest=content_digest,
-                    values=config_values,
-                ),
-            )
-        return _ChainedConfig(tuple(reversed(single_file_configs)))
+        return cls(tuple(config_values))
 
     @classmethod
     def _parse_toml(
-        cls, config_content: str, normalized_seed_values: dict[str, str]
+        cls, config_source: ConfigSource, normalized_seed_values: dict[str, Any]
     ) -> _ConfigValues:
         """Attempt to parse as TOML, raising an exception on failure."""
-        toml_values = cast(Dict[str, Any], toml.loads(config_content))
-        toml_values["DEFAULT"] = {
+        toml_values = cast(Dict[str, Any], toml.loads(config_source.content.decode()))
+        toml_values[DEFAULT_SECTION] = {
             **normalized_seed_values,
-            **toml_values.get("DEFAULT", {}),
+            **toml_values.get(DEFAULT_SECTION, {}),
         }
-        return _ConfigValues(toml_values)
+        return _ConfigValues(config_source.path, toml_values)
+
+    def verify(self, section_to_valid_options: dict[str, set[str]]):
+        error_log = []
+        for config_values in self.values:
+            error_log.extend(config_values.get_verification_errors(section_to_valid_options))
+        if error_log:
+            for error in error_log:
+                logger.error(error)
+            raise ConfigValidationError(
+                "Invalid config entries detected. See log for details on which entries to update "
+                "or remove.\n(Specify --no-verify-config to disable this check.)"
+            )
 
     @staticmethod
-    def _determine_seed_values(*, seed_values: SeedValues | None = None) -> dict[str, str]:
+    def _determine_seed_values(
+        *, seed_values: SeedValues | None = None, env: Mapping[str, str] | None = None
+    ) -> dict[str, Any]:
         """We pre-populate several default values to allow %([key-name])s interpolation.
 
         This sets up those defaults and checks if the user overrode any of the values.
+
+        In addition, we pre-populate any supplied env entries to allow %(env.[env-var-name])s
+        interpolation.
         """
         safe_seed_values = seed_values or {}
         buildroot = cast(str, safe_seed_values.get("buildroot", get_buildroot()))
 
-        all_seed_values: dict[str, str] = {
+        all_seed_values: dict[str, Any] = {
             "buildroot": buildroot,
             "homedir": os.path.expanduser("~"),
             "user": getpass.getuser(),
         }
+        if env:
+            all_seed_values["env"] = SimpleNamespace(**env)
 
         def update_seed_values(key: str, *, default_dir: str) -> None:
             all_seed_values[key] = cast(
@@ -131,59 +140,26 @@ class Config(ABC):
 
         return all_seed_values
 
-    def get(self, section, option, type_=str, default=None):
-        """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as
-        type.
+    def get(self, section, option) -> list[str]:
+        """Retrieves an option value from each config file in which it appears."""
+        available_vals = []
+        for vals in self.values:
+            val = vals.get_value(section, option)
+            if val is not None:
+                available_vals.append(val)
+        return available_vals
 
-        If the specified section does not exist or is missing a definition for the option, the value
-        is looked up in the DEFAULT section.  If there is still no definition found, the default
-        value supplied is returned.
-        """
-        if not self.has_option(section, option):
-            return default
-
-        raw_value = self.get_value(section, option)
-        if issubclass(type_, str):
-            return raw_value
-
-        key = f"{section}.{option}"
-        return parse_expression(
-            name=key, val=raw_value, acceptable_types=type_, raise_type=self.ConfigError
-        )
-
-    @abstractmethod
-    def configs(self) -> Sequence[_SingleFileConfig]:
-        """Returns the underlying single-file configs represented by this object."""
-
-    @abstractmethod
     def sources(self) -> list[str]:
         """Returns the sources of this config as a list of filenames."""
+        return [vals.path for vals in self.values]
 
-    @abstractmethod
-    def sections(self) -> list[str]:
-        """Returns the sections in this config (not including DEFAULT)."""
-
-    @abstractmethod
-    def has_section(self, section: str) -> bool:
-        """Returns whether this config has the section."""
-
-    @abstractmethod
-    def has_option(self, section: str, option: str) -> bool:
-        """Returns whether this config specified a value for the option."""
-
-    @abstractmethod
-    def get_value(self, section: str, option: str) -> str | None:
-        """Returns the value of the option in this config as a string, or None if no value
-        specified."""
-
-    @abstractmethod
-    def get_source_for_option(self, section: str, option: str) -> str | None:
-        """Returns the path to the source file the given option was defined in.
-
-        :param section: the scope of the option.
-        :param option: the name of the option.
-        :returns: the path to the config file, or None if the option was not defined by a config file.
-        """
+    def get_sources_for_option(self, section: str, option: str) -> list[str]:
+        """Returns the path(s) to the source file(s) the given option was defined in."""
+        paths = []
+        for vals in reversed(self.values):
+            if vals.get_value(section, option) is not None:
+                paths.append(os.path.relpath(vals.path))
+        return paths
 
 
 _TomlPrimitive = Union[bool, int, float, str]
@@ -194,7 +170,8 @@ _TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive]]
 class _ConfigValues:
     """The parsed contents of a TOML config file."""
 
-    values: dict[str, Any]
+    path: str
+    section_to_values: dict[str, dict[str, Any]]
 
     @staticmethod
     def _is_an_option(option_value: _TomlValue | dict) -> bool:
@@ -222,7 +199,7 @@ class _ConfigValues:
             # that .format() does not try to improperly interpolate.
             escaped_str = value.replace("{", "{{").replace("}", "}}")
             new_style_format_str = re.sub(
-                pattern=r"%\((?P<interpolated>[a-zA-Z_0-9]*)\)s",
+                pattern=r"%\((?P<interpolated>[a-zA-Z_0-9.]+)\)s",
                 repl=r"{\g<interpolated>}",
                 string=escaped_str,
             )
@@ -231,7 +208,7 @@ class _ConfigValues:
                 return new_style_format_str.format(**possible_interpolations)
             except KeyError as e:
                 bad_reference = e.args[0]
-                raise configparser.InterpolationMissingOptionError(
+                raise InterpolationMissingOptionError(
                     option,
                     section,
                     raw_value,
@@ -239,9 +216,8 @@ class _ConfigValues:
                 )
 
         def recursively_format_str(value: str) -> str:
-            # It's possible to interpolate with a value that itself has an interpolation. We must
-            # fully evaluate all expressions for parity with configparser.
-            match = re.search(r"%\(([a-zA-Z_0-9]*)\)s", value)
+            # It's possible to interpolate with a value that itself has an interpolation.
+            match = re.search(r"%\(([a-zA-Z_0-9.]+)\)s", value)
             if not match:
                 return value
             return recursively_format_str(value=format_str(value))
@@ -258,12 +234,8 @@ class _ConfigValues:
         interpolate: bool = True,
         list_prefix: str | None = None,
     ) -> str:
-        """For parity with configparser, we convert all values back to strings, which allows us to
-        avoid upstream changes to files like parser.py.
-
-        This is clunky. If we drop INI support, we should remove this and use native values
-        (although we must still support interpolation).
-        """
+        # We convert all values to strings, which allows us to treat them uniformly with
+        # env vars and cmd-line flags in parser.py.
         possibly_interpolate = partial(
             self._possibly_interpolate_value,
             option=option,
@@ -295,22 +267,12 @@ class _ConfigValues:
             interpolate=False,
         )
 
-    @property
-    def sections(self) -> list[str]:
-        return [scope for scope in self.values if scope != "DEFAULT"]
-
-    def has_section(self, section: str) -> bool:
-        return section in self.values
-
-    def has_option(self, section: str, option: str) -> bool:
-        if not self.has_section(section):
-            return False
-        return option in self.values[section] or option in self.defaults
-
     def get_value(self, section: str, option: str) -> str | None:
-        section_values = self.values.get(section)
+        section_values = self.section_to_values.get(section)
         if section_values is None:
-            raise configparser.NoSectionError(section)
+            return None
+        if option not in section_values:
+            return None
 
         stringify = partial(
             self._stringify_val,
@@ -318,11 +280,6 @@ class _ConfigValues:
             section=section,
             section_values=section_values,
         )
-
-        if option not in section_values:
-            if option in self.defaults:
-                return stringify(raw_value=self.defaults[option])
-            raise configparser.NoOptionError(option, section)
 
         option_value = section_values[option]
         if not isinstance(option_value, dict):
@@ -336,132 +293,34 @@ class _ConfigValues:
         if not has_add and not has_remove:
             return stringify(option_value)
 
-        add_val = stringify(option_value["add"], list_prefix="+") if has_add else None
-        remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else None
+        add_val = stringify(option_value["add"], list_prefix="+") if has_add else "[]"
+        remove_val = stringify(option_value["remove"], list_prefix="-") if has_remove else "[]"
         if has_add and has_remove:
             return f"{add_val},{remove_val}"
         if has_add:
             return add_val
         return remove_val
 
-    def options(self, section: str) -> list[str]:
-        section_values = self.values.get(section)
-        if section_values is None:
-            raise configparser.NoSectionError(section)
-        return [
-            *section_values.keys(),
-            *(
-                default_option
-                for default_option in self.defaults
-                if default_option not in section_values
-            ),
-        ]
-
     @property
-    def defaults(self) -> dict[str, str]:
-        return {
-            option: self._stringify_val_without_interpolation(option_val)
-            for option, option_val in self.values["DEFAULT"].items()
-        }
+    def defaults(self) -> dict[str, Any]:
+        return self.section_to_values[DEFAULT_SECTION].copy()
 
-
-@dataclass(frozen=True, eq=False)
-class _SingleFileConfig(Config):
-    """Config read from a single file."""
-
-    config_path: str
-    content_digest: str
-    values: _ConfigValues
-
-    def configs(self) -> list[_SingleFileConfig]:
-        return [self]
-
-    def sources(self) -> list[str]:
-        return [self.config_path]
-
-    def sections(self) -> list[str]:
-        return self.values.sections
-
-    def has_section(self, section: str) -> bool:
-        return self.values.has_section(section)
-
-    def has_option(self, section: str, option: str) -> bool:
-        return self.values.has_option(section, option)
-
-    def get_value(self, section: str, option: str) -> str | None:
-        return self.values.get_value(section, option)
-
-    def get_source_for_option(self, section: str, option: str) -> str | None:
-        if self.has_option(section, option):
-            return self.sources()[0]
-        return None
-
-    def __repr__(self) -> str:
-        return f"SingleFileConfig({self.config_path})"
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, _SingleFileConfig):
-            return NotImplemented
-        return self.config_path == other.config_path and self.content_digest == other.content_digest
-
-    def __hash__(self) -> int:
-        return hash(self.content_digest)
-
-
-@dataclass(frozen=True)
-class _ChainedConfig(Config):
-    """Config read from multiple sources."""
-
-    # Config instances to chain. Later instances take precedence over earlier ones.
-    chained_configs: tuple[_SingleFileConfig, ...]
-
-    @property
-    def _configs(self) -> tuple[_SingleFileConfig, ...]:
-        return self.chained_configs
-
-    def configs(self) -> tuple[_SingleFileConfig, ...]:
-        return self.chained_configs
-
-    def sources(self) -> list[str]:
-        # NB: Present the sources in the order we were given them.
-        return list(itertools.chain.from_iterable(cfg.sources() for cfg in reversed(self._configs)))
-
-    def sections(self) -> list[str]:
-        ret: OrderedSet[str] = OrderedSet()
-        for cfg in self._configs:
-            ret.update(cfg.sections())
-        return list(ret)
-
-    def has_section(self, section: str) -> bool:
-        for cfg in self._configs:
-            if cfg.has_section(section):
-                return True
-        return False
-
-    def has_option(self, section: str, option: str) -> bool:
-        for cfg in self._configs:
-            if cfg.has_option(section, option):
-                return True
-        return False
-
-    def get_value(self, section: str, option: str) -> str | None:
-        for cfg in self._configs:
+    def get_verification_errors(self, section_to_valid_options: dict[str, set[str]]) -> list[str]:
+        error_log = []
+        for section, vals in self.section_to_values.items():
+            if section == DEFAULT_SECTION:
+                continue
             try:
-                return cfg.get_value(section, option)
-            except (configparser.NoSectionError, configparser.NoOptionError):
-                pass
-        if not self.has_section(section):
-            raise configparser.NoSectionError(section)
-        raise configparser.NoOptionError(option, section)
-
-    def get_source_for_option(self, section: str, option: str) -> str | None:
-        for cfg in self._configs:
-            if cfg.has_option(section, option):
-                return cfg.get_source_for_option(section, option)
-        return None
-
-    def __repr__(self) -> str:
-        return f"ChainedConfig({self.sources()})"
+                valid_options_in_section = section_to_valid_options[section]
+            except KeyError:
+                error_log.append(f"Invalid section [{section}] in {self.path}")
+            else:
+                for option in sorted(set(vals.keys()) - valid_options_in_section):
+                    if option not in valid_options_in_section:
+                        error_log.append(
+                            f"Invalid option '{option}' under [{section}] in {self.path}"
+                        )
+        return error_log
 
 
 @dataclass(frozen=True)

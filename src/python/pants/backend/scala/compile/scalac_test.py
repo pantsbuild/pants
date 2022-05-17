@@ -9,6 +9,7 @@ from textwrap import dedent
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixture
 from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
@@ -64,6 +65,10 @@ def rule_runner() -> RuleRunner:
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
+
+LOCKFILE_REQUIREMENTS = pytest.mark.jvm_lockfile(
+    path="scala-library.test.lock", requirements=["org.scala-lang:scala-library:2.13.6"]
+)
 
 DEFAULT_LOCKFILE = TestCoursierWrapper(
     CoursierResolvedLockfile(
@@ -142,7 +147,8 @@ SCALA_LIB_MAIN_SOURCE = dedent(
 
 
 @maybe_skip_jdk_test
-def test_compile_no_deps(rule_runner: RuleRunner) -> None:
+@LOCKFILE_REQUIREMENTS
+def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -153,7 +159,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
                 """
             ),
             "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
+            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
             "ExampleLib.scala": SCALA_LIB_SOURCE,
         }
     )
@@ -519,8 +525,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
 
                 scalac_plugin(
                     name = "acyclic",
-                    # TODO: Support relative addresses.
-                    artifact = "lib:acyclic_lib",
+                    artifact = ":acyclic_lib",
                 )
 
                 scala_sources(
@@ -558,34 +563,6 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
                     ArtifactRequirement(scala_library_coord),
                 ]
             ),
-            "3rdparty/jvm/scalac-plugins.lock": TestCoursierWrapper.new(
-                entries=(
-                    CoursierLockfileEntry(
-                        coord=acyclic_coord,
-                        file_name="acyclic_2.13-0.2.1.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "4bc4656140ad5e4802fedcdbe920ec7c92dbebf5e76d1c60d35676a314481944",
-                            62534,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=scala_library_coord,
-                        file_name="org.scala-lang_scala-library_2.13.6.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
-                            5955737,
-                        ),
-                    ),
-                )
-            ).serialize(
-                [
-                    ArtifactRequirement(coordinate=acyclic_coord),
-                ]
-            ),
             "lib/A.scala": dedent(
                 """
                 package lib
@@ -609,8 +586,7 @@ def test_compile_with_scalac_plugin(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(
         args=[
-            "--scalac-plugins-global=['lib:acyclic']",
-            "--scalac-plugins-global-lockfile=3rdparty/jvm/scalac-plugins.lock",
+            "--scalac-plugins-for-resolve={'jvm-default': 'acyclic'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -646,8 +622,7 @@ def test_compile_with_local_scalac_plugin(rule_runner: RuleRunner) -> None:
 
                 scalac_plugin(
                     name = "acyclic",
-                    # TODO: Support relative addresses.
-                    artifact = "lib:acyclic_lib",
+                    artifact = ":acyclic_lib",
                 )
 
                 scala_sources(
@@ -683,34 +658,6 @@ def test_compile_with_local_scalac_plugin(rule_runner: RuleRunner) -> None:
                 [
                     ArtifactRequirement(coordinate=acyclic_coord),
                     ArtifactRequirement(scala_library_coord),
-                ]
-            ),
-            "3rdparty/jvm/scalac-plugins.lock": TestCoursierWrapper.new(
-                entries=(
-                    CoursierLockfileEntry(
-                        coord=acyclic_coord,
-                        file_name="acyclic_2.13-0.2.1.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "4bc4656140ad5e4802fedcdbe920ec7c92dbebf5e76d1c60d35676a314481944",
-                            62534,
-                        ),
-                    ),
-                    CoursierLockfileEntry(
-                        coord=scala_library_coord,
-                        file_name="org.scala-lang_scala-library_2.13.6.jar",
-                        direct_dependencies=Coordinates([]),
-                        dependencies=Coordinates([]),
-                        file_digest=FileDigest(
-                            "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a",
-                            5955737,
-                        ),
-                    ),
-                )
-            ).serialize(
-                [
-                    ArtifactRequirement(coordinate=acyclic_coord),
                 ]
             ),
             "lib/A.scala": dedent(
@@ -785,8 +732,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
                 scalac_plugin(
                     name="kind-projector",
                     plugin_name="kind-projector",
-                    # TODO: Support relative addresses.
-                    artifact="lib:kind-projector-lib",
+                    artifact=":kind-projector-lib",
                 )
 
                 jvm_artifact(
@@ -799,14 +745,12 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
                 scalac_plugin(
                     name="better-monadic-for",
                     plugin_name="bm4",
-                    # TODO: Support relative addresses.
-                    artifact="lib:better-monadic-for-lib",
+                    artifact=":better-monadic-for-lib",
                 )
                 """
             ),
             "3rdparty/jvm/BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-            "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
-            "3rdparty/jvm/scalac-plugins.lock": TestCoursierWrapper.new(
+            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(
                 entries=(
                     CoursierLockfileEntry(
                         coord=better_monadic_coord,
@@ -897,6 +841,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
                 )
             ).serialize(
                 [
+                    ArtifactRequirement(scala_library_coord),
                     ArtifactRequirement(better_monadic_coord),
                     ArtifactRequirement(kind_projector_coord),
                 ]
@@ -937,8 +882,7 @@ def test_compile_with_multiple_scalac_plugins(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(
         args=[
-            "--scalac-plugins-global=['lib:better-monadic-for', 'lib:kind-projector']",
-            "--scalac-plugins-global-lockfile=3rdparty/jvm/scalac-plugins.lock",
+            "--scalac-plugins-for-resolve={'jvm-default': 'bm4,kind-projector'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )

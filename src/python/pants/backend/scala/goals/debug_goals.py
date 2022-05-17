@@ -12,6 +12,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Targets
+from pants.jvm.goals import debug_goals
 
 
 class DumpScalaSourceAnalysisSubsystem(GoalSubsystem):
@@ -36,7 +37,7 @@ async def dump_scala_source_analysis(targets: Targets, console: Console) -> Dump
         {"address": str(fs.address), **analysis.to_debug_json_dict()}
         for (fs, analysis) in zip(scala_source_field_sets, scala_source_analysis)
     ]
-    console.write_stdout(json.dumps(scala_source_analysis_json))
+    console.print_stdout(json.dumps(scala_source_analysis_json))
     return DumpScalaSourceAnalysis(exit_code=0)
 
 
@@ -44,4 +45,5 @@ def rules():
     return [
         *collect_rules(),
         *scala_rules(),
+        *debug_goals.rules(),
     ]

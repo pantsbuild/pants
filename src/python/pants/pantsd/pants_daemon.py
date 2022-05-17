@@ -148,7 +148,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             temp_fd = safe_open(log_path, "w") if writable else open(os.devnull)
             os.dup2(temp_fd.fileno(), fileno)
             setattr(sys, attr, os.fdopen(fileno, mode=("w" if writable else "r")))
-        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[assignment]
 
     def _initialize_metadata(self) -> None:
         """Writes out our pid and other metadata.

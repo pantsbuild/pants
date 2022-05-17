@@ -169,7 +169,10 @@ def _convert(val, acceptable_types):
     """
     if isinstance(val, acceptable_types):
         return val
-    return parse_expression(val, acceptable_types, raise_type=ParseError)
+    try:
+        return parse_expression(val, acceptable_types)
+    except ValueError as e:
+        raise ParseError(str(e)) from e
 
 
 def _convert_list(val, member_type, is_enum):

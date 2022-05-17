@@ -3,7 +3,7 @@
 
 import itertools
 from pathlib import PurePath
-from typing import Iterable, cast
+from typing import Iterable
 
 from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Address, Addresses, BuildFileAddress
@@ -19,54 +19,44 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
     UnexpandedTargets,
 )
+from pants.option.option_types import BoolOption
+from pants.util.strutil import softwrap
 
 
 class FiledepsSubsystem(LineOriented, GoalSubsystem):
     name = "filedeps"
     help = "List all source and BUILD files a target depends on."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--absolute",
-            type=bool,
-            default=False,
-            help=(
-                "If True, output with absolute path. If unspecified, output with path relative to "
-                "the build root."
-            ),
-        )
-        register(
-            "--globs",
-            type=bool,
-            default=False,
-            help=(
-                "Instead of outputting filenames, output the original globs used in the BUILD "
-                "file. This will not include exclude globs (i.e. globs that start with `!`)."
-            ),
-        )
-        register(
-            "--transitive",
-            type=bool,
-            default=False,
-            help=(
-                "If True, list files from all dependencies, including transitive dependencies. If "
-                "unspecified, only list files from the target."
-            ),
-        )
-
-    @property
-    def absolute(self) -> bool:
-        return cast(bool, self.options.absolute)
-
-    @property
-    def globs(self) -> bool:
-        return cast(bool, self.options.globs)
-
-    @property
-    def transitive(self) -> bool:
-        return cast(bool, self.options.transitive)
+    absolute = BoolOption(
+        "--absolute",
+        default=False,
+        help=softwrap(
+            """
+            If True, output with absolute path. If unspecified, output with path relative to
+            the build root.
+            """
+        ),
+    )
+    globs = BoolOption(
+        "--globs",
+        default=False,
+        help=softwrap(
+            """
+            Instead of outputting filenames, output the original globs used in the BUILD
+            file. This will not include exclude globs (i.e. globs that start with `!`).
+            """
+        ),
+    )
+    transitive = BoolOption(
+        "--transitive",
+        default=False,
+        help=softwrap(
+            """
+            If True, list files from all dependencies, including transitive dependencies. If
+            unspecified, only list files from the target.
+            """
+        ),
+    )
 
 
 class Filedeps(Goal):

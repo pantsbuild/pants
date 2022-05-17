@@ -34,7 +34,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time;
 
-use clap::{value_t, App, Arg};
+use clap::{Arg, Command};
 use futures::future::FutureExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
@@ -658,16 +658,17 @@ pub fn mount<P: AsRef<Path>>(
   runtime: task_executor::Executor,
 ) -> std::io::Result<(fuser::BackgroundSession, Receiver<BRFSEvent>)> {
   // TODO: Work out how to disable caching in the filesystem
-  let options = ["-o", "ro", "-o", "fsname=brfs", "-o", "noapplexattr"]
-    .iter()
-    .map(<&str>::as_ref)
-    .collect::<Vec<&OsStr>>();
+  let options = vec![
+    fuser::MountOption::RO,
+    fuser::MountOption::FSName("brfs".to_owned()),
+    fuser::MountOption::CUSTOM("noapplexattr".to_owned()),
+  ];
 
   let (sender, receiver) = channel();
   let brfs = BuildResultFS::new(sender, runtime, store);
 
   debug!("About to spawn_mount with options {:?}", options);
-  let result = fuser::spawn_mount(brfs, &mount_path, &options);
+  let result = fuser::spawn_mount2(brfs, &mount_path, &options);
   // N.B.: The session won't be used by the caller, but we return it since a reference must be
   // maintained to prevent early dropping which unmounts the filesystem.
   result.map(|session| (session, receiver))
@@ -679,49 +680,49 @@ async fn main() {
 
   let default_store_path = Store::default_path();
 
-  let args = App::new("brfs")
+  let args = Command::new("brfs")
     .arg(
-      Arg::with_name("local-store-path")
+      Arg::new("local-store-path")
         .takes_value(true)
         .long("local-store-path")
         .default_value_os(default_store_path.as_ref())
         .required(false),
     ).arg(
-      Arg::with_name("server-address")
+      Arg::new("server-address")
         .takes_value(true)
         .long("server-address")
         .required(false),
     ).arg(
-      Arg::with_name("remote-instance-name")
+      Arg::new("remote-instance-name")
         .takes_value(true)
         .long("remote-instance-name")
         .required(false),
     ).arg(
-      Arg::with_name("root-ca-cert-file")
+      Arg::new("root-ca-cert-file")
         .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
         .takes_value(true)
         .long("root-ca-cert-file")
         .required(false)
     ).arg(
-      Arg::with_name("oauth-bearer-token-file")
+      Arg::new("oauth-bearer-token-file")
         .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
         .takes_value(true)
         .long("oauth-bearer-token-file")
         .required(false)
     ).arg(
-      Arg::with_name("mount-path")
+      Arg::new("mount-path")
         .required(true)
         .takes_value(true),
     )
     .arg(
-      Arg::with_name("rpc-concurrency-limit")
+      Arg::new("rpc-concurrency-limit")
           .help("Maximum concurrenct RPCs to the service.")
           .takes_value(true)
           .long("rpc-concurrency-limit")
           .required(false)
           .default_value("128")
     ).arg(
-    Arg::with_name("batch-api-size-limit")
+    Arg::new("batch-api-size-limit")
         .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
         .takes_value(true)
         .long("batch-api-size-limit")
@@ -769,10 +770,12 @@ async fn main() {
         4 * 1024 * 1024,
         std::time::Duration::from_secs(5 * 60),
         1,
-        value_t!(args.value_of("rpc-concurrency-limit"), usize)
+        args
+          .value_of_t::<usize>("rpc-concurrency-limit")
           .expect("Bad rpc-concurrency-limit flag"),
         None,
-        value_t!(args.value_of("batch-api-size-limit"), usize)
+        args
+          .value_of_t::<usize>("batch-api-size-limit")
           .expect("Bad batch-api-size-limit flag"),
       )
       .expect("Error making remote store"),

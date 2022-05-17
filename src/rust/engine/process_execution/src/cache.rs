@@ -69,13 +69,9 @@ impl crate::CommandRunner for CommandRunner {
     let context2 = context.clone();
     let key2 = key.clone();
     let cache_read_result = in_workunit!(
-      context.workunit_store.clone(),
-      "local_cache_read".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("Local cache lookup: {}", req.description)),
-        ..WorkunitMetadata::default()
-      },
+      "local_cache_read",
+      Level::Trace,
+      desc = Some(format!("Local cache lookup: {}", req.description)),
       |workunit| async move {
         workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
@@ -92,10 +88,16 @@ impl crate::CommandRunner for CommandRunner {
             }
             // When we successfully use the cache, we change the description and increase the level
             // (but not so much that it will be logged by default).
-            workunit.update_metadata(|initial| WorkunitMetadata {
-              desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
-              level: Level::Debug,
-              ..initial
+            workunit.update_metadata(|initial| {
+              initial.map(|(initial, _)| {
+                (
+                  WorkunitMetadata {
+                    desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+                    ..initial
+                  },
+                  Level::Debug,
+                )
+              })
             });
             Ok(result)
           }
@@ -126,23 +128,15 @@ impl crate::CommandRunner for CommandRunner {
     let result = self.underlying.run(context.clone(), workunit, req).await?;
     if result.exit_code == 0 || write_failures_to_cache {
       let result = result.clone();
-      in_workunit!(
-        context.workunit_store.clone(),
-        "local_cache_write".to_owned(),
-        WorkunitMetadata {
-          level: Level::Trace,
-          ..WorkunitMetadata::default()
-        },
-        |workunit| async move {
-          if let Err(err) = self.store(&key, &result).await {
-            warn!(
-              "Error storing process execution result to local cache: {} - ignoring and continuing",
-              err
-            );
-            workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
-          }
+      in_workunit!("local_cache_write", Level::Trace, |workunit| async move {
+        if let Err(err) = self.store(&key, &result).await {
+          warn!(
+            "Error storing process execution result to local cache: {} - ignoring and continuing",
+            err
+          );
+          workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
         }
-      )
+      })
       .await;
     }
     Ok(result)
@@ -201,7 +195,8 @@ impl CommandRunner {
         .boxed(),
       self
         .file_store
-        .ensure_local_has_recursive_directory(result.output_directory),
+        .ensure_local_has_recursive_directory(result.output_directory.clone())
+        .boxed(),
     ])
     .await?;
 
@@ -216,11 +211,17 @@ impl CommandRunner {
     let stdout_digest = result.stdout_digest;
     let stderr_digest = result.stderr_digest;
 
+    // Ensure that the process output is persisted.
+    self
+      .file_store
+      .ensure_directory_digest_persisted(result.output_directory.clone())
+      .await?;
+
     let action_result = remexec::ActionResult {
       exit_code: result.exit_code,
       output_directories: vec![remexec::OutputDirectory {
         path: String::new(),
-        tree_digest: Some((&result.output_directory).into()),
+        tree_digest: Some((&result.output_directory.as_digest()).into()),
       }],
       stdout_digest: Some((&stdout_digest).into()),
       stderr_digest: Some((&stderr_digest).into()),

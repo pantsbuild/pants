@@ -148,7 +148,8 @@ def run_test_rule(
     targets: list[Target],
     debug: bool = False,
     use_coverage: bool = False,
-    xml_dir: str | None = None,
+    report: bool = False,
+    report_dir: str = TestSubsystem.default_report_path,
     output: ShowOutput = ShowOutput.ALL,
     valid_targets: bool = True,
     run_id: RunId = RunId(999),
@@ -157,9 +158,12 @@ def run_test_rule(
         TestSubsystem,
         debug=debug,
         use_coverage=use_coverage,
-        xml_dir=xml_dir,
+        report=report,
+        report_dir=report_dir,
+        xml_dir=None,
         output=output,
         extra_env_vars=[],
+        shard="",
     )
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     union_membership = UnionMembership(
@@ -271,7 +275,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
         """\
 
         ✓ //:good succeeded in 1.00s (memoized).
-        𐄂 //:bad failed in 1.00s (memoized).
+        ✕ //:bad failed in 1.00s (memoized).
         """
     )
 
@@ -336,18 +340,32 @@ def test_debug_target(rule_runner: RuleRunner) -> None:
     assert exit_code == 0
 
 
-def test_xml_dir(rule_runner: RuleRunner) -> None:
-    xml_dir = "dist/test-results"
+def test_report(rule_runner: RuleRunner) -> None:
     addr1 = Address("", target_name="t1")
     addr2 = Address("", target_name="t2")
     exit_code, stderr = run_test_rule(
         rule_runner,
         field_set=SuccessfulFieldSet,
         targets=[make_target(addr1), make_target(addr2)],
-        xml_dir=xml_dir,
+        report=True,
     )
     assert exit_code == 0
-    assert f"Wrote test XML to `{xml_dir}`" in stderr
+    assert "Wrote test reports to dist/test/reports" in stderr
+
+
+def test_report_dir(rule_runner: RuleRunner) -> None:
+    report_dir = "dist/test-results"
+    addr1 = Address("", target_name="t1")
+    addr2 = Address("", target_name="t2")
+    exit_code, stderr = run_test_rule(
+        rule_runner,
+        field_set=SuccessfulFieldSet,
+        targets=[make_target(addr1), make_target(addr2)],
+        report=True,
+        report_dir=report_dir,
+    )
+    assert exit_code == 0
+    assert f"Wrote test reports to {report_dir}" in stderr
 
 
 def test_coverage(rule_runner: RuleRunner) -> None:

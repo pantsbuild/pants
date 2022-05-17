@@ -121,3 +121,25 @@ class UnknownFlagsError(ParseError):
         scope = f"scope {self.arg_scope}" if self.arg_scope else "global scope"
         msg = f"Unknown flags {', '.join(self.flags)} on {scope}"
         super().__init__(msg)
+
+
+# -----------------------------------------------------------------------
+# Config parsing errors
+# -----------------------------------------------------------------------
+
+
+class ConfigError(OptionsError):
+    """An error encountered while parsing a config file."""
+
+
+class ConfigValidationError(ConfigError):
+    """A config file is invalid."""
+
+
+class InterpolationMissingOptionError(ConfigError):
+    def __init__(self, option, section, rawval, reference):
+        super().__init__(
+            self,
+            f"Bad value substitution: option {option} in section {section} contains an "
+            f"interpolation key {reference} which is not a valid option name. Raw value: {rawval}",
+        )

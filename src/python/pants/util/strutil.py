@@ -205,3 +205,79 @@ _non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
 
 def path_safe(s: str) -> str:
     return _non_path_safe_re.sub("_", s)
+
+
+# TODO: This may be a bit too eager. Some strings might want to preserve multiple spaces in them
+# (e.g. a Python code block which has a comment in it would have 2 spaces before the "#", which
+# would be squashed by this eager regex). The challenge is that there's some overlap between prose
+# (which shouldn't need multiple spaces) and code (which might) for non-alphanumeric characters.
+# We can tighten as necessary.
+_super_space_re = re.compile(r"(\S)  +(\S)")
+_more_than_2_newlines = re.compile(r"\n{2}\n+")
+_leading_whitespace_re = re.compile(r"(^[ ]*)(?:[^ \n])", re.MULTILINE)
+
+
+def softwrap(text: str) -> str:
+    """Turns a multiline-ish string into a softwrapped string.
+
+    This is primarily used to turn strings in source code, which often have a single paragraph
+    span multiple source lines, into consistently formatted blocks for hardwrapping later.
+
+    Applies the following rules:
+        - Dedents the text (you also don't need to start your string with a backslash)
+            (The algorithm used for dedention simply looks at the first indented line and
+            unambiguously tries to strip that much indentation from every indented line thereafter.)
+        - Replaces all occurrences of multiple spaces in a sentence with a single space
+        - Replaces all occurrences of multiple newlines with exactly 2 newlines
+        - Replaces singular newlines with a space (to turn a paragraph into one long line)
+            - Unless the following line is indented, in which case the newline and indentation
+              are preserved.
+        - Double-newlines are preserved
+        - Extra indentation is preserved, and also preserves the indented line's ending
+            (If your indented line needs to be continued due to it being longer than the suggested
+            width, use trailing backlashes to line-continue the line. Because we squash multiple
+            spaces, this will "just work".)
+    """
+    # If callers didnt use a leading "\" thats OK.
+    if text[0] == "\n":
+        text = text[1:]
+
+    text = _more_than_2_newlines.sub("\n\n", text)
+    margin = _leading_whitespace_re.search(text)
+    if margin:
+        text = re.sub(r"(?m)^" + margin[1], "", text)
+
+    lines = text.splitlines(keepends=True)
+    # NB: collecting a list of strs and `"".join` is more performant than calling `+=` repeatedly.
+    result_strs = []
+    for i, line in enumerate(lines):
+        line = _super_space_re.sub(r"\1 \2", line)
+        next_line = lines[i + 1] if i + 1 < len(lines) else ""
+        if "\n" in (line, next_line) or line.startswith(" ") or next_line.startswith(" "):
+            result_strs.append(line)
+        else:
+            result_strs.append(line.rstrip())
+            result_strs.append(" ")
+
+    return "".join(result_strs).rstrip()
+
+
+_MEMORY_UNITS = ["B", "KiB", "MiB", "GiB"]
+
+
+def fmt_memory_size(value: int, *, units: Iterable[str] = _MEMORY_UNITS) -> str:
+    """Formats a numeric value as amount of bytes alongside the biggest byte-based unit from the
+    list that represents the same amount without using decimals."""
+
+    if not units:
+        return str(value)
+
+    amount = value
+    unit_idx = 0
+
+    units = tuple(units)
+    while (amount >= 1024 and amount % 1024 == 0) and unit_idx < len(units) - 1:
+        amount = int(amount / 1024)
+        unit_idx += 1
+
+    return f"{int(amount)}{units[unit_idx]}"

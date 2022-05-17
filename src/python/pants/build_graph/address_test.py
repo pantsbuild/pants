@@ -9,8 +9,11 @@ from pants.build_graph.address import (
     Address,
     AddressInput,
     AddressParseException,
+    InvalidParameters,
     InvalidSpecPath,
     InvalidTargetName,
+    UnsupportedIgnore,
+    UnsupportedWildcard,
 )
 from pants.util.frozendict import FrozenDict
 
@@ -69,6 +72,13 @@ def test_address_input_parse_spec() -> None:
     # Parameters
     assert_parsed("a@k=v", path_component="a", parameters={"k": "v"})
     assert_parsed("a@k1=v1,k2=v2", path_component="a", parameters={"k1": "v1", "k2": "v2"})
+    assert_parsed(
+        "a#gen@k1=v1", generated_component="gen", path_component="a", parameters={"k1": "v1"}
+    )
+    assert_parsed("a@t", path_component="a@t")
+    assert_parsed("a@=", path_component="a@=")
+    assert_parsed("a@t,y", path_component="a@t,y")
+    assert_parsed("a@2.png:../t", path_component="a@2.png", target_component="../t")
 
     # Absolute spec
     assert_parsed("//a/b/c", path_component="a/b/c")
@@ -106,11 +116,6 @@ def test_address_input_parse_bad_path_component(spec: str) -> None:
 @pytest.mark.parametrize(
     "spec,expected",
     [
-        ("a:", "non-empty target name"),
-        ("a@t", "one or more key=value pairs"),
-        ("a@=", "one or more key=value pairs"),
-        ("a@t=", "one or more key=value pairs"),
-        ("a@t,y", "one or more key=value pairs"),
         ("a@t=,y", "one or more key=value pairs"),
         ("a#", "non-empty generated target name"),
     ],
@@ -125,7 +130,6 @@ def test_address_input_parse(spec: str, expected: str) -> None:
     "spec",
     [
         "",
-        "a::",
         "//",
         "//:!t",
         "//:?",
@@ -140,9 +144,44 @@ def test_address_bad_target_component(spec: str) -> None:
         AddressInput.parse(spec).dir_to_address()
 
 
-@pytest.mark.parametrize("spec", ["//:t#gen@", "//:t#gen!", "//:t#gen?", "//:t#gen=", "//:t#gen#"])
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "!",
+        "!a",
+        "!a:x",
+        "!a#x",
+    ],
+)
+def test_address_bad_ignore(spec: str) -> None:
+    with pytest.raises(UnsupportedIgnore):
+        AddressInput.parse(spec).dir_to_address()
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "a::",
+        "a:",
+        "a:b:",
+        "a:b::",
+        "a#b:",
+    ],
+)
+def test_address_bad_wildcard(spec: str) -> None:
+    with pytest.raises(UnsupportedWildcard):
+        AddressInput.parse(spec).dir_to_address()
+
+
+@pytest.mark.parametrize("spec", ["//:t#gen!", "//:t#gen?", "//:t#gen=", "//:t#gen#"])
 def test_address_generated_name(spec: str) -> None:
     with pytest.raises(InvalidTargetName):
+        AddressInput.parse(spec).dir_to_address()
+
+
+@pytest.mark.parametrize("spec", ["//:t@k=#gen", "//:t@k#gen=v"])
+def test_address_invalid_params(spec: str) -> None:
+    with pytest.raises(InvalidParameters):
         AddressInput.parse(spec).dir_to_address()
 
 
@@ -357,8 +396,8 @@ def test_address_spec() -> None:
     )
     assert_spec(
         Address("a/b", generated_name="gen", parameters={"k": "v"}),
-        expected="a/b@k=v#gen",
-        expected_path_spec="a.b@@k=v@gen",
+        expected="a/b#gen@k=v",
+        expected_path_spec="a.b@gen@@k=v",
     )
     assert_spec(
         Address("a/b", relative_file_path="f.ext", parameters={"k": "v"}),
@@ -452,6 +491,14 @@ def test_address_create_generated() -> None:
         (
             Address("", target_name="t", parameters={"k": "v"}),
             AddressInput("", "t", parameters=FrozenDict({"k": "v"})),
+        ),
+        (
+            Address("", target_name="t", parameters={"k": "v"}, generated_name="gen"),
+            AddressInput("", "t", parameters=FrozenDict({"k": "v"}), generated_component="gen"),
+        ),
+        (
+            Address("", target_name="t", parameters={"k": ""}),
+            AddressInput("", "t", parameters=FrozenDict({"k": ""})),
         ),
         (
             Address("", target_name="t", parameters={"k1": "v1", "k2": "v2"}),

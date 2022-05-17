@@ -570,3 +570,63 @@ def test_fetch_one_coord_with_mismatched_coord(rule_runner: RuleRunner) -> None:
     )
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         rule_runner.request(ClasspathEntry, [lockfile_entry])
+
+
+@maybe_skip_jdk_test
+def test_user_repo_order_is_respected(rule_runner: RuleRunner) -> None:
+    """Tests that the repo resolution order issue found in #14577 is avoided."""
+
+    jai_core = Coordinate(group="javax.media", artifact="jai_core", version="1.1.3")
+
+    # `repo1.maven.org` has a bogus POM that Coursier hits first
+    # `repo.osgeo.org` has a valid POM and should succeed
+    rule_runner.set_options(
+        args=[
+            """--coursier-repos=['https://repo1.maven.org/maven2', 'https://repo.osgeo.org/repository/release']"""
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    with engine_error(ProcessExecutionFailure):
+        rule_runner.request(
+            CoursierResolvedLockfile,
+            [
+                ArtifactRequirements.from_coordinates([jai_core]),
+            ],
+        )
+
+    rule_runner.set_options(
+        args=[
+            """--coursier-repos=['https://repo.osgeo.org/repository/release', 'https://repo1.maven.org/maven2']"""
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    rule_runner.request(
+        CoursierResolvedLockfile,
+        [
+            ArtifactRequirements.from_coordinates([jai_core]),
+        ],
+    )
+
+
+@maybe_skip_jdk_test
+def test_transitive_excludes(rule_runner: RuleRunner) -> None:
+    resolve = rule_runner.request(
+        CoursierResolvedLockfile,
+        [
+            ArtifactRequirements(
+                [
+                    Coordinate(
+                        group="com.fasterxml.jackson.core",
+                        artifact="jackson-databind",
+                        version="2.12.1",
+                    )
+                    .as_requirement()
+                    .with_extra_excludes("com.fasterxml.jackson.core:jackson-core")
+                ]
+            ),
+        ],
+    )
+
+    entries = resolve.entries
+    assert any(i for i in entries if i.coord.artifact == "jackson-databind")
+    assert not any(i for i in entries if i.coord.artifact == "jackson-core")

@@ -1,25 +1,24 @@
-use std;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
 
-use hashing::EMPTY_DIGEST;
 use maplit::hashset;
 use shell_quote::bash;
 use spectral::{assert_that, string::StrAssertions};
-use store::Store;
-use tempfile;
 use tempfile::TempDir;
-use testutil;
+
+use fs::EMPTY_DIRECTORY_DIGEST;
+use store::Store;
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-  CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  ImmutableInputs, InputDigests, NamedCaches, Platform, Process, RelativePath,
+  local, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
+  RelativePath,
 };
 
 #[derive(PartialEq, Debug)]
@@ -39,7 +38,7 @@ async fn stdout() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
 #[tokio::test]
@@ -56,7 +55,7 @@ async fn stdout_and_stderr_and_exit_code() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "bar".as_bytes());
   assert_eq!(result.original.exit_code, 1);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
 #[tokio::test]
@@ -74,7 +73,7 @@ async fn capture_exit_code_signal() {
   assert_eq!(result.stdout_bytes, "".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, -15);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
@@ -145,7 +144,7 @@ async fn output_files_none() {
   assert_eq!(result.stdout_bytes, "".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
 #[tokio::test]
@@ -166,7 +165,7 @@ async fn output_files_one() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -194,7 +193,7 @@ async fn output_dirs() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::recursive().digest()
+    TestDirectory::recursive().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -221,7 +220,7 @@ async fn output_files_many() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::recursive().digest()
+    TestDirectory::recursive().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -247,7 +246,7 @@ async fn output_files_execution_failure() {
   assert_eq!(result.original.exit_code, 1);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -274,7 +273,7 @@ async fn output_files_partial_output() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -298,7 +297,7 @@ async fn output_overlapping_file_and_dir() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::nested().digest()
+    TestDirectory::nested().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -319,7 +318,7 @@ async fn append_only_cache_created() {
   assert_eq!(result.stdout_bytes, format!("{}\n", name).as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
@@ -343,8 +342,61 @@ async fn jdk_symlink() {
   assert_eq!(result.stdout_bytes, roland);
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn test_update_env() {
+  let mut env: BTreeMap<String, String> = BTreeMap::new();
+  env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
+
+  let work_dir = TempDir::new().unwrap();
+  let mut req = Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone());
+  local::update_env(&work_dir.path(), &mut req);
+
+  let path = format!("/usr/bin:{}/bin", work_dir.path().to_str().unwrap());
+
+  assert_eq!(&path, req.env.get(&"PATH".to_string()).unwrap());
+}
+
+#[tokio::test]
+async fn test_chroot_placeholder() {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  let mut env: BTreeMap<String, String> = BTreeMap::new();
+  env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
+
+  let work_tmpdir = TempDir::new().unwrap();
+  let work_root = work_tmpdir.path().to_owned();
+
+  let result = run_command_locally_in_dir(
+    Process::new(vec!["/usr/bin/env".to_owned()]).env(env.clone()),
+    work_root.clone(),
+    false,
+    &mut workunit,
+    None,
+    None,
+  )
+  .await
+  .unwrap();
+
+  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
+  let got_env: BTreeMap<String, String> = stdout
+    .split("\n")
+    .filter(|line| !line.is_empty())
+    .map(|line| line.splitn(2, "="))
+    .map(|mut parts| {
+      (
+        parts.next().unwrap().to_string(),
+        parts.next().unwrap_or("").to_string(),
+      )
+    })
+    .collect();
+
+  let path = format!("/usr/bin:{}", work_root.to_str().unwrap());
+  assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
+  assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
 }
 
 #[tokio::test]
@@ -379,7 +431,8 @@ async fn test_directory_preservation() {
 
   let mut process =
     Process::new(argv.clone()).output_files(relative_paths(&["roland.ext"]).collect());
-  process.input_digests = InputDigests::with_input_files(TestDirectory::nested().digest());
+  process.input_digests =
+    InputDigests::with_input_files(TestDirectory::nested().directory_digest());
   process.working_directory = Some(RelativePath::new("cats").unwrap());
 
   let result = run_command_locally_in_dir(
@@ -479,7 +532,7 @@ async fn all_containing_directories_for_outputs_are_created() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::nested_dir_and_file().digest()
+    TestDirectory::nested_dir_and_file().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -502,7 +555,7 @@ async fn output_empty_dir() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_falcons_dir().digest()
+    TestDirectory::containing_falcons_dir().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -555,7 +608,8 @@ async fn working_directory() {
   let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
   process.working_directory = Some(RelativePath::new("cats").unwrap());
   process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
-  process.input_digests = InputDigests::with_input_files(TestDirectory::nested().digest());
+  process.input_digests =
+    InputDigests::with_input_files(TestDirectory::nested().directory_digest());
   process.timeout = one_second();
   process.description = "confused-cat".to_string();
 
@@ -575,7 +629,7 @@ async fn working_directory() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
@@ -606,12 +660,12 @@ async fn immutable_inputs() {
   let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
   process.input_digests = InputDigests::new(
     &store,
-    TestDirectory::containing_falcons_dir().digest(),
+    TestDirectory::containing_falcons_dir().directory_digest(),
     {
       let mut map = BTreeMap::new();
       map.insert(
         RelativePath::new("cats").unwrap(),
-        TestDirectory::containing_roland().digest(),
+        TestDirectory::containing_roland().directory_digest(),
       );
       map
     },
@@ -642,6 +696,76 @@ async fn immutable_inputs() {
   assert_eq!(result.original.exit_code, 0);
 }
 
+#[tokio::test]
+async fn prepare_workdir_exclusive_relative() {
+  // Test that we detect that we should should exclusive spawn when a relative path that points
+  // outside of a working directory is used.
+  let _ = WorkunitStore::setup_for_tests();
+
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+  let (_caches_dir, named_caches, immutable_inputs) =
+    named_caches_and_immutable_inputs(store.clone());
+
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .store_file_bytes(TestData::catnip().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::recursive().directory(), true)
+    .await
+    .expect("Error saving directory");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let work_dir = TempDir::new().unwrap();
+
+  // NB: This path is not marked executable, but that isn't (currently) relevant to the heuristic.
+  let mut process = Process::new(vec!["../treats.ext".to_owned()])
+    .working_directory(Some(RelativePath::new("cats").unwrap()));
+  process.input_digests = InputDigests::new(
+    &store,
+    TestDirectory::recursive().directory_digest(),
+    BTreeMap::new(),
+    vec![],
+  )
+  .await
+  .unwrap();
+
+  let exclusive_spawn = local::prepare_workdir(
+    work_dir.path().to_owned(),
+    &process,
+    TestDirectory::recursive().directory_digest(),
+    store,
+    executor,
+    &named_caches,
+    &immutable_inputs,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(exclusive_spawn, true);
+}
+
+fn named_caches_and_immutable_inputs(store: Store) -> (TempDir, NamedCaches, ImmutableInputs) {
+  let root = TempDir::new().unwrap();
+  let root_path = root.path().to_owned();
+  let named_cache_dir = root_path.join("named");
+
+  (
+    root,
+    NamedCaches::new(named_cache_dir),
+    ImmutableInputs::new(store, &root_path).unwrap(),
+  )
+}
+
 async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
@@ -658,16 +782,17 @@ async fn run_command_locally_in_dir(
   executor: Option<task_executor::Executor>,
 ) -> Result<LocalTestResult, String> {
   let store_dir = TempDir::new().unwrap();
-  let named_cache_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
+  let (_caches_dir, named_caches, immutable_inputs) =
+    named_caches_and_immutable_inputs(store.clone());
   let runner = crate::local::CommandRunner::new(
     store.clone(),
     executor.clone(),
     dir.clone(),
-    NamedCaches::new(named_cache_dir.path().to_owned()),
-    ImmutableInputs::new(store.clone(), &dir)?,
+    named_caches,
+    immutable_inputs,
     cleanup,
   );
   let original = runner.run(Context::default(), workunit, req.into()).await?;

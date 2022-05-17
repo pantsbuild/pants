@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 
 import pytest
@@ -10,6 +12,7 @@ from pants.backend.python.dependency_inference.rules import (
     InferConftestDependencies,
     InferInitDependencies,
     InferPythonImportDependencies,
+    InitFilesInference,
     PythonInferSubsystem,
     UnownedDependencyError,
     UnownedDependencyUsage,
@@ -20,19 +23,22 @@ from pants.backend.python.dependency_inference.rules import (
 from pants.backend.python.macros import python_requirements
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.target_types import (
-    PythonRequirementsFileTarget,
     PythonRequirementTarget,
     PythonSourceField,
     PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
     PythonTestsGeneratorTarget,
     PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import ancestor_files
+from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
+from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
-from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.rules import SubsystemRule
 from pants.engine.target import InferredDependencies
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
+from pants.util.strutil import softwrap
 
 
 def test_infer_python_imports(caplog) -> None:
@@ -40,6 +46,7 @@ def test_infer_python_imports(caplog) -> None:
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonRequirementTarget],
@@ -156,11 +163,168 @@ def test_infer_python_imports(caplog) -> None:
     assert "disambiguated_via_ignores.py" not in caplog.text
 
 
-def test_infer_python_inits() -> None:
+def test_infer_python_assets(caplog) -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *import_rules(),
+            *target_types_rules.rules(),
+            *core_target_types_rules(),
+            QueryRule(InferredDependencies, [InferPythonImportDependencies]),
+        ],
+        target_types=[
+            PythonSourcesGeneratorTarget,
+            PythonRequirementTarget,
+            ResourcesGeneratorTarget,
+            FilesGeneratorTarget,
+        ],
+    )
+    rule_runner.write_files(
+        {
+            "src/python/data/BUILD": "resources(name='jsonfiles', sources=['*.json'])",
+            "src/python/data/db.json": "",
+            "src/python/data/db2.json": "",
+            "src/python/data/flavors.txt": "",
+            "configs/prod.txt": "",
+            "src/python/app.py": dedent(
+                """\
+                pkgutil.get_data(__name__, "data/db.json")
+                pkgutil.get_data(__name__, "data/db2.json")
+                open("configs/prod.txt")
+                """
+            ),
+            "src/python/f.py": dedent(
+                """\
+                idk_kinda_looks_resourcey = "data/db.json"
+                CustomResourceType("data/flavors.txt")
+                """
+            ),
+            "src/python/BUILD": dedent(
+                """\
+                python_sources()
+                # Also test assets declared from parent dir
+                resources(
+                    name="txtfiles",
+                    sources=["data/*.txt"],
+                )
+                """
+            ),
+            "configs/BUILD": dedent(
+                """\
+                files(
+                    name="configs",
+                    sources=["prod.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    def run_dep_inference(address: Address) -> InferredDependencies:
+        args = [
+            "--source-root-patterns=src/python",
+            "--python-infer-assets",
+        ]
+        rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+        target = rule_runner.get_target(address)
+        return rule_runner.request(
+            InferredDependencies, [InferPythonImportDependencies(target[PythonSourceField])]
+        )
+
+    assert run_dep_inference(
+        Address("src/python", relative_file_path="app.py")
+    ) == InferredDependencies(
+        [
+            Address("src/python/data", target_name="jsonfiles", relative_file_path="db.json"),
+            Address("src/python/data", target_name="jsonfiles", relative_file_path="db2.json"),
+            Address("configs", target_name="configs", relative_file_path="prod.txt"),
+        ],
+    )
+
+    assert run_dep_inference(
+        Address("src/python", relative_file_path="f.py")
+    ) == InferredDependencies(
+        [
+            Address("src/python/data", target_name="jsonfiles", relative_file_path="db.json"),
+            Address("src/python", target_name="txtfiles", relative_file_path="data/flavors.txt"),
+        ],
+    )
+
+    # Test handling of ambiguous assets. We should warn on the ambiguous dependency, but not warn
+    # on the disambiguated one and should infer a dep.
+    caplog.clear()
+    rule_runner.write_files(
+        {
+            "src/python/data/BUILD": dedent(
+                """\
+                    resources(name='jsonfiles', sources=['*.json'])
+                    resources(name='also_jsonfiles', sources=['*.json'])
+                    resources(name='txtfiles', sources=['*.txt'])
+                """
+            ),
+            "src/python/data/ambiguous.json": "",
+            "src/python/data/disambiguated_with_bang.json": "",
+            "src/python/app.py": dedent(
+                """\
+                pkgutil.get_data(__name__, "data/ambiguous.json")
+                pkgutil.get_data(__name__, "data/disambiguated_with_bang.json")
+                """
+            ),
+            "src/python/BUILD": dedent(
+                """\
+                python_sources(
+                    name="main",
+                    dependencies=['!./data/disambiguated_with_bang.json:also_jsonfiles'],
+                )
+                """
+            ),
+            # Both a resource relative to the module and file with conspicuously similar paths
+            "src/python/data/both_file_and_resource.txt": "",
+            "data/both_file_and_resource.txt": "",
+            "data/BUILD": "files(name='txtfiles', sources=['*.txt'])",
+            "src/python/assets_bag.py": "ImAPathType('data/both_file_and_resource.txt')",
+        }
+    )
+    assert run_dep_inference(
+        Address("src/python", target_name="main", relative_file_path="app.py")
+    ) == InferredDependencies(
+        [
+            Address(
+                "src/python/data",
+                target_name="jsonfiles",
+                relative_file_path="disambiguated_with_bang.json",
+            ),
+        ],
+    )
+    assert len(caplog.records) == 1
+    assert "The target src/python/app.py:main uses `data/ambiguous.json`" in caplog.text
+    assert (
+        "['src/python/data/ambiguous.json:also_jsonfiles', 'src/python/data/ambiguous.json:jsonfiles']"
+        in caplog.text
+    )
+    assert "disambiguated_with_bang.py" not in caplog.text
+
+    caplog.clear()
+    assert run_dep_inference(
+        Address("src/python", target_name="main", relative_file_path="assets_bag.py")
+    ) == InferredDependencies([])
+    assert len(caplog.records) == 1
+    assert (
+        "The target src/python/assets_bag.py:main uses `data/both_file_and_resource.txt`"
+        in caplog.text
+    )
+    assert (
+        "['data/both_file_and_resource.txt:txtfiles', 'src/python/data/both_file_and_resource.txt:txtfiles']"
+        in caplog.text
+    )
+
+
+@pytest.mark.parametrize("behavior", InitFilesInference)
+def test_infer_python_inits(behavior: InitFilesInference) -> None:
     rule_runner = RuleRunner(
         rules=[
             *ancestor_files.rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             infer_python_init_dependencies,
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
@@ -168,44 +332,50 @@ def test_infer_python_inits() -> None:
         target_types=[PythonSourcesGeneratorTarget],
     )
     rule_runner.set_options(
-        ["--python-infer-inits", "--source-root-patterns=src/python"],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        [f"--python-infer-init-files={behavior.value}"], env_inherit=PYTHON_BOOTSTRAP_ENV
     )
-
     rule_runner.write_files(
         {
-            "src/python/root/__init__.py": "",
+            "src/python/root/__init__.py": "content",
             "src/python/root/BUILD": "python_sources()",
             "src/python/root/mid/__init__.py": "",
             "src/python/root/mid/BUILD": "python_sources()",
-            "src/python/root/mid/leaf/__init__.py": "",
+            "src/python/root/mid/leaf/__init__.py": "content",
             "src/python/root/mid/leaf/f.py": "",
             "src/python/root/mid/leaf/BUILD": "python_sources()",
-            "src/python/type_stub/__init__.pyi": "",
+            "src/python/type_stub/__init__.pyi": "content",
             "src/python/type_stub/foo.pyi": "",
             "src/python/type_stub/BUILD": "python_sources()",
         }
     )
 
-    def run_dep_inference(address: Address) -> InferredDependencies:
+    def check(address: Address, expected: list[Address]) -> None:
         target = rule_runner.get_target(address)
-        return rule_runner.request(
+        result = rule_runner.request(
             InferredDependencies,
             [InferInitDependencies(target[PythonSourceField])],
         )
+        if behavior == InitFilesInference.never:
+            assert not result
+        else:
+            assert result == InferredDependencies(expected)
 
-    assert run_dep_inference(
-        Address("src/python/root/mid/leaf", relative_file_path="f.py")
-    ) == InferredDependencies(
+    check(
+        Address("src/python/root/mid/leaf", relative_file_path="f.py"),
         [
             Address("src/python/root", relative_file_path="__init__.py"),
-            Address("src/python/root/mid", relative_file_path="__init__.py"),
+            *(
+                []
+                if behavior is InitFilesInference.content_only
+                else [Address("src/python/root/mid", relative_file_path="__init__.py")]
+            ),
             Address("src/python/root/mid/leaf", relative_file_path="__init__.py"),
         ],
     )
-    assert run_dep_inference(
-        Address("src/python/type_stub", relative_file_path="foo.pyi")
-    ) == InferredDependencies([Address("src/python/type_stub", relative_file_path="__init__.pyi")])
+    check(
+        Address("src/python/type_stub", relative_file_path="foo.pyi"),
+        [Address("src/python/type_stub", relative_file_path="__init__.pyi")],
+    )
 
 
 def test_infer_python_conftests() -> None:
@@ -213,6 +383,7 @@ def test_infer_python_conftests() -> None:
         rules=[
             *ancestor_files.rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             infer_python_conftest_dependencies,
             SubsystemRule(PythonInferSubsystem),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
@@ -256,23 +427,28 @@ def test_infer_python_conftests() -> None:
     )
 
 
-def test_infer_python_strict(caplog) -> None:
-    rule_runner = RuleRunner(
+@pytest.fixture
+def imports_rule_runner() -> RuleRunner:
+    return RuleRunner(
         rules=[
             *import_rules(),
             *target_types_rules.rules(),
+            *core_target_types_rules(),
             *python_requirements.rules(),
             QueryRule(InferredDependencies, [InferPythonImportDependencies]),
         ],
         target_types=[
+            PythonSourceTarget,
             PythonSourcesGeneratorTarget,
             PythonRequirementTarget,
-            PythonRequirementsFileTarget,
             PythonRequirementsTargetGenerator,
         ],
+        objects={"parametrize": Parametrize},
     )
 
-    rule_runner.write_files(
+
+def test_infer_python_strict(imports_rule_runner: RuleRunner, caplog) -> None:
+    imports_rule_runner.write_files(
         {
             "src/python/cheesey.py": dedent(
                 """\
@@ -284,46 +460,38 @@ def test_infer_python_strict(caplog) -> None:
         }
     )
 
-    def run_dep_inference(
-        address: Address,
-        unowned_dependency_behavior: str,
-    ) -> InferredDependencies:
-        rule_runner.set_options(
+    def run_dep_inference(unowned_dependency_behavior: str) -> InferredDependencies:
+        imports_rule_runner.set_options(
             [
                 f"--python-infer-unowned-dependency-behavior={unowned_dependency_behavior}",
                 "--python-infer-string-imports",
-                "--source-root-patterns=src/python",
             ],
-            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+            env_inherit=PYTHON_BOOTSTRAP_ENV,
         )
-        target = rule_runner.get_target(address)
-        return rule_runner.request(
+        target = imports_rule_runner.get_target(
+            Address("src/python", relative_file_path="cheesey.py")
+        )
+        return imports_rule_runner.request(
             InferredDependencies,
             [InferPythonImportDependencies(target[PythonSourceField])],
         )
 
-    # First test with "warning"
-    run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), "warning")
+    run_dep_inference("warning")
     assert len(caplog.records) == 1
-    assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
-    assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
+    assert (
+        "cannot infer owners for the following imports in the target src/python/cheesey.py:"
+        in caplog.text
+    )
+    assert "  * venezuelan_beaver_cheese (line: 1)" in caplog.text
     assert "japanese.sage.derby" not in caplog.text
 
-    # Now test with "error"
-    caplog.clear()
-    with pytest.raises(ExecutionError) as exc_info:
-        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), "error")
-
-    assert isinstance(exc_info.value.wrapped_exceptions[0], UnownedDependencyError)
-    assert len(caplog.records) == 2  # one for the error being raised and one for our message
-    assert "The following imports in src/python/cheesey.py have no owners:" in caplog.text
-    assert "  * venezuelan_beaver_cheese (src/python/cheesey.py:1)" in caplog.text
-    assert "japanese.sage.derby" not in caplog.text
+    with engine_error(UnownedDependencyError, contains="src/python/cheesey.py"):
+        run_dep_inference("error")
 
     caplog.clear()
 
     # All modes should be fine if the module is explicitly declared as a requirement
-    rule_runner.write_files(
+    imports_rule_runner.write_files(
         {
             "src/python/BUILD": dedent(
                 """\
@@ -338,11 +506,11 @@ def test_infer_python_strict(caplog) -> None:
         }
     )
     for mode in UnownedDependencyUsage:
-        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
+        run_dep_inference(mode.value)
         assert not caplog.records
 
     # All modes should be fine if the module is implictly found via requirements.txt
-    rule_runner.write_files(
+    imports_rule_runner.write_files(
         {
             "src/python/requirements.txt": "venezuelan_beaver_cheese==1.0.0",
             "src/python/BUILD": dedent(
@@ -354,16 +522,71 @@ def test_infer_python_strict(caplog) -> None:
         }
     )
     for mode in UnownedDependencyUsage:
-        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
+        run_dep_inference(mode.value)
         assert not caplog.records
 
     # All modes should be fine if the module is owned by a first party
-    rule_runner.write_files(
+    imports_rule_runner.write_files(
         {
             "src/python/venezuelan_beaver_cheese.py": "",
             "src/python/BUILD": "python_sources()",
         }
     )
     for mode in UnownedDependencyUsage:
-        run_dep_inference(Address("src/python", relative_file_path="cheesey.py"), mode.value)
+        run_dep_inference(mode.value)
         assert not caplog.records
+
+
+def test_infer_python_strict_multiple_resolves(imports_rule_runner: RuleRunner) -> None:
+    imports_rule_runner.write_files(
+        {
+            "project/base.py": "",
+            "project/utils.py": "",
+            "project/app.py": "import project.base\nimport project.utils",
+            "project/BUILD": dedent(
+                """\
+                python_source(
+                    name="base",
+                    source="base.py",
+                    resolve="a",
+                )
+
+                python_source(
+                    name="utils",
+                    source="utils.py",
+                    resolve=parametrize("a", "b"),
+                )
+
+                python_source(
+                    name="app",
+                    source="app.py",
+                    resolve="z",
+                )
+                """
+            ),
+        }
+    )
+
+    imports_rule_runner.set_options(
+        [
+            "--python-infer-unowned-dependency-behavior=error",
+            "--python-enable-resolves",
+            "--python-resolves={'a': '', 'b': '', 'z': ''}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    tgt = imports_rule_runner.get_target(Address("project", target_name="app"))
+    expected_error = softwrap(
+        """
+        These imports are not in the resolve used by the target (`z`), but they were present in
+        other resolves:
+
+          * project.base: 'a' from project:base
+          * project.utils: 'a' from project:utils@resolve=a, 'b' from project:utils@resolve=b
+        """
+    )
+    with engine_error(UnownedDependencyError, contains=expected_error):
+        imports_rule_runner.request(
+            InferredDependencies, [InferPythonImportDependencies(tgt[PythonSourceField])]
+        )

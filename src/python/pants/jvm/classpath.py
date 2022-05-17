@@ -7,12 +7,15 @@ import logging
 from dataclasses import dataclass
 from typing import Iterator
 
-from pants.engine.fs import Digest
+from pants.core.util_rules import system_binaries
+from pants.core.util_rules.system_binaries import UnzipBinary
+from pants.engine.fs import Digest, MergeDigests, RemovePrefix
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
-from pants.engine.unions import UnionMembership
-from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +72,7 @@ class Classpath:
 @rule
 async def classpath(
     coarsened_targets: CoarsenedTargets,
-    union_membership: UnionMembership,
+    classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> Classpath:
     # Compute a single shared resolve for all of the roots, which will validate that they
     # are compatible with one another.
@@ -80,9 +83,7 @@ async def classpath(
         Get(
             ClasspathEntry,
             ClasspathEntryRequest,
-            ClasspathEntryRequest.for_targets(
-                union_membership, component=t, resolve=resolve, root=True
-            ),
+            classpath_entry_request.for_targets(component=t, resolve=resolve, root=True),
         )
         for t in coarsened_targets
     )
@@ -90,5 +91,48 @@ async def classpath(
     return Classpath(classpath_entries, resolve)
 
 
+@dataclass(frozen=True)
+class LooseClassfiles:
+    """The contents of a classpath entry as loose classfiles.
+
+    Note that `ClasspathEntry` and `Classpath` both guarantee that they contain JAR files, and so
+    creating loose classfiles from them involves extracting their entry.
+    """
+
+    digest: Digest
+
+
+@rule
+async def loose_classfiles(
+    classpath_entry: ClasspathEntry, unzip_binary: UnzipBinary
+) -> LooseClassfiles:
+    dest_dir = "dest"
+    process_results = await MultiGet(
+        Get(
+            ProcessResult,
+            Process(
+                argv=[
+                    unzip_binary.path,
+                    "-d",
+                    dest_dir,
+                    filename,
+                ],
+                output_directories=(dest_dir,),
+                description=f"Extract {filename}",
+                immutable_input_digests=dict(ClasspathEntry.immutable_inputs([classpath_entry])),
+                level=LogLevel.TRACE,
+            ),
+        )
+        for filename in ClasspathEntry.immutable_inputs_args([classpath_entry])
+    )
+
+    merged_digest = await Get(Digest, MergeDigests(pr.output_digest for pr in process_results))
+
+    return LooseClassfiles(await Get(Digest, RemovePrefix(merged_digest, dest_dir)))
+
+
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        *system_binaries.rules(),
+    ]

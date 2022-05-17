@@ -4,13 +4,16 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Iterable, Optional, Sequence, Tuple, Type
 
 import pytest
 
+from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import (
+    AmbiguousRequestNamesError,
     Lint,
     LintFilesRequest,
     LintResult,
@@ -20,8 +23,10 @@ from pants.core.goals.lint import (
     lint,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import SpecsSnapshot, Workspace
+from pants.engine.internals.native_engine import EMPTY_DIGEST, EMPTY_SNAPSHOT, Digest, Snapshot
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
@@ -34,8 +39,10 @@ class MockTarget(Target):
     core_fields = (MultipleSourcesField,)
 
 
+@dataclass(frozen=True)
 class MockLinterFieldSet(FieldSet):
     required_fields = (MultipleSourcesField,)
+    sources: MultipleSourcesField
 
 
 class MockLintRequest(LintTargetsRequest, metaclass=ABCMeta):
@@ -115,6 +122,28 @@ class MockFilesRequest(LintFilesRequest):
         return LintResults([LintResult(0, "", "")], linter_name=self.name)
 
 
+class MockFmtRequest(FmtRequest):
+    field_set_type = MockLinterFieldSet
+
+
+class SuccessfulFormatter(MockFmtRequest):
+    name = "SuccessfulFormatter"
+
+    @property
+    def fmt_result(self) -> FmtResult:
+        return FmtResult(EMPTY_SNAPSHOT, EMPTY_SNAPSHOT, "", "", formatter_name=self.name)
+
+
+class FailingFormatter(MockFmtRequest):
+    name = "FailingFormatter"
+
+    @property
+    def fmt_result(self) -> FmtResult:
+        before = EMPTY_SNAPSHOT
+        after = Snapshot._unsafe_create(Digest(EMPTY_DIGEST.fingerprint, 2), [], [])
+        return FmtResult(before, after, "", "", formatter_name=self.name)
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner()
@@ -128,21 +157,25 @@ def run_lint_rule(
     rule_runner: RuleRunner,
     *,
     lint_request_types: Sequence[Type[LintTargetsRequest]],
+    fmt_request_types: Sequence[Type[FmtRequest]] = (),
     targets: list[Target],
     run_files_linter: bool = False,
     batch_size: int = 128,
     only: list[str] | None = None,
+    skip_formatters: bool = False,
 ) -> Tuple[int, str]:
     union_membership = UnionMembership(
         {
             LintTargetsRequest: lint_request_types,
             LintFilesRequest: [MockFilesRequest] if run_files_linter else [],
+            FmtRequest: fmt_request_types,
         }
     )
     lint_subsystem = create_goal_subsystem(
         LintSubsystem,
         batch_size=batch_size,
         only=only or [],
+        skip_formatters=skip_formatters,
     )
     specs_snapshot = SpecsSnapshot(rule_runner.make_snapshot_of_empty_files(["f.txt"]))
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
@@ -159,6 +192,11 @@ def run_lint_rule(
             ],
             mock_gets=[
                 MockGet(
+                    output_type=SourceFiles,
+                    input_type=SourceFilesRequest,
+                    mock=lambda _: SourceFiles(EMPTY_SNAPSHOT, ()),
+                ),
+                MockGet(
                     output_type=LintResults,
                     input_type=LintTargetsRequest,
                     mock=lambda mock_request: mock_request.lint_results,
@@ -167,6 +205,11 @@ def run_lint_rule(
                     output_type=LintResults,
                     input_type=LintFilesRequest,
                     mock=lambda mock_request: mock_request.lint_results,
+                ),
+                MockGet(
+                    output_type=FmtResult,
+                    input_type=FmtRequest,
+                    mock=lambda mock_request: mock_request.fmt_result,
                 ),
             ],
             union_membership=union_membership,
@@ -193,17 +236,22 @@ def test_summary(rule_runner: RuleRunner) -> None:
     good_address = Address("", target_name="good")
     bad_address = Address("", target_name="bad")
 
-    request_types = [
+    lint_request_types = [
         ConditionallySucceedsRequest,
         FailingRequest,
         SkippedRequest,
         SuccessfulRequest,
     ]
+    fmt_request_types = [
+        SuccessfulFormatter,
+        FailingFormatter,
+    ]
     targets = [make_target(good_address), make_target(bad_address)]
 
     exit_code, stderr = run_lint_rule(
         rule_runner,
-        lint_request_types=request_types,
+        lint_request_types=lint_request_types,
+        fmt_request_types=fmt_request_types,
         targets=targets,
         run_files_linter=True,
     )
@@ -211,25 +259,51 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        𐄂 ConditionallySucceedsLinter failed.
-        𐄂 FailingLinter failed.
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingFormatter failed.
+        ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
+        ✓ SuccessfulFormatter succeeded.
         ✓ SuccessfulLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
         """
     )
 
     exit_code, stderr = run_lint_rule(
         rule_runner,
-        lint_request_types=request_types,
+        lint_request_types=lint_request_types,
+        fmt_request_types=fmt_request_types,
         targets=targets,
         run_files_linter=True,
-        only=[FailingRequest.name, MockFilesRequest.name],
+        only=[FailingRequest.name, MockFilesRequest.name, FailingFormatter.name],
     )
     assert stderr == dedent(
         """\
 
-        𐄂 FailingLinter failed.
+        ✕ FailingFormatter failed.
+        ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
+
+        (One or more formatters failed. Run `./pants fmt` to fix.)
+        """
+    )
+
+    exit_code, stderr = run_lint_rule(
+        rule_runner,
+        lint_request_types=lint_request_types,
+        fmt_request_types=fmt_request_types,
+        targets=targets,
+        run_files_linter=True,
+        skip_formatters=True,
+    )
+    assert stderr == dedent(
+        """\
+
+        ✕ ConditionallySucceedsLinter failed.
+        ✕ FailingLinter failed.
+        ✓ FilesLinter succeeded.
+        ✓ SuccessfulLinter succeeded.
         """
     )
 
@@ -252,7 +326,7 @@ def test_batched(rule_runner: RuleRunner, batch_size: int) -> None:
         """\
 
         ✓ ConditionallySucceedsLinter succeeded.
-        𐄂 FailingLinter failed.
+        ✕ FailingLinter failed.
         ✓ SuccessfulLinter succeeded.
         """
     )
@@ -310,3 +384,18 @@ def test_streaming_output_partitions() -> None:
 
         """
     )
+
+
+def test_duplicated_names(rule_runner: RuleRunner) -> None:
+    class AmbiguousLintTargetsRequest(LintTargetsRequest):
+        name = "FilesLinter"  # also used by MockFilesRequest
+
+    with pytest.raises(AmbiguousRequestNamesError):
+        run_lint_rule(
+            rule_runner,
+            lint_request_types=[
+                AmbiguousLintTargetsRequest,
+            ],
+            run_files_linter=True,  # needed for MockFilesRequest
+            targets=[],
+        )

@@ -62,7 +62,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context(log_level="debug") as ctx:
-            with setup_tmpdir({"foo/BUILD": "files(sources=[])"}) as tmpdir:
+            with setup_tmpdir({"foo/BUILD": "target()"}) as tmpdir:
                 ctx.runner(["list", f"{tmpdir}/foo::"])
                 ctx.checker.assert_started()
 
@@ -267,6 +267,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 assert line_pair[0] == line_pair[1]
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7622")
+    @pytest.mark.no_error_if_skipped
     def test_pantsd_filesystem_invalidation(self):
         """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
         with self.pantsd_successful_run_context() as ctx:
@@ -415,6 +416,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             os.unlink(pidpath)
 
     @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/8193")
+    @pytest.mark.no_error_if_skipped
     def test_pantsd_memory_usage(self):
         """Validates that after N runs, memory usage has increased by no more than X percent."""
         number_of_runs = 10
@@ -499,15 +501,23 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             rm_rf(test_path)
 
     def _assert_pantsd_keyboardinterrupt_signal(
-        self, signum: int, regexps: list[str] | None = None
+        self,
+        signum: int,
+        regexps: list[str] | None = None,
+        not_regexps: list[str] | None = None,
+        cleanup_wait_time: int = 0,
     ):
         """Send a signal to the thin pailgun client and observe the error messaging.
 
         :param signum: The signal to send.
         :param regexps: Assert that all of these regexps match somewhere in stderr.
+        :param not_regexps: Assert that all of these regexps do not match somewhere in stderr.
+        :param cleanup_wait_time: passed throught to waiter, dictated how long simulated cleanup will take
         """
         with self.pantsd_test_context() as (workdir, config, checker):
-            client_handle, waiter_pid, child_pid, _ = launch_waiter(workdir=workdir, config=config)
+            client_handle, waiter_pid, child_pid, _ = launch_waiter(
+                workdir=workdir, config=config, cleanup_wait_time=cleanup_wait_time
+            )
             client_pid = client_handle.process.pid
             waiter_process = psutil.Process(waiter_pid)
             child_process = psutil.Process(waiter_pid)
@@ -515,6 +525,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             assert waiter_process.is_running()
             assert child_process.is_running()
             checker.assert_started()
+
+            # give time to enter the try/finally block in the child process
+            time.sleep(5)
 
             # This should kill the client, which will cancel the run on the server, which will
             # kill the waiting process and its child.
@@ -525,6 +538,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             for regexp in regexps or []:
                 self.assertRegex(client_run.stderr, regexp)
 
+            for regexp in not_regexps or []:
+                self.assertNotRegex(client_run.stderr, regexp)
+
             # pantsd should still be running, but the waiter process and child should have been
             # killed.
             time.sleep(5)
@@ -532,10 +548,33 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             assert not child_process.is_running()
             checker.assert_running()
 
-    def test_pantsd_sigint(self):
+    def test_pantsd_graceful_shutdown(self):
+        """Test that SIGINT is propgated to child processes and they are given time to shutdown."""
         self._assert_pantsd_keyboardinterrupt_signal(
             signal.SIGINT,
-            regexps=["Interrupted by user."],
+            regexps=[
+                "Interrupted by user.",
+                "keyboard int received",
+                "waiter cleaning up",
+                "waiter cleanup complete",
+            ],
+            cleanup_wait_time=0,
+        )
+
+    def test_pantsd_graceful_shutdown_deadline(self):
+        """Test that a child process that does not respond to SIGINT within 5 seconds, is forcibly
+        cleaned up with a SIGKILL."""
+        self._assert_pantsd_keyboardinterrupt_signal(
+            signal.SIGINT,
+            regexps=[
+                "Interrupted by user.",
+                "keyboard int received",
+                "waiter cleaning up",
+            ],
+            not_regexps=[
+                "waiter cleanup complete",
+            ],
+            cleanup_wait_time=6,
         )
 
     def test_sigint_kills_request_waiting_for_lock(self):

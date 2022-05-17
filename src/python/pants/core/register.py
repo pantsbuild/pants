@@ -26,6 +26,7 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     FileTarget,
     GenericTarget,
+    HTTPSource,
     RelocatedFiles,
     ResourcesGeneratorTarget,
     ResourceTarget,
@@ -39,11 +40,12 @@ from pants.core.util_rules import (
     source_files,
     stripped_source_files,
     subprocess_environment,
+    system_binaries,
 )
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
-from pants.python import binaries as python_binaries
 from pants.source import source_root
+from pants.vcs import git
 
 
 def rules():
@@ -66,14 +68,15 @@ def rules():
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
-        *python_binaries.rules(),
         *distdir.rules(),
         *external_tool.rules(),
+        *git.rules(),
         *source_files.rules(),
         *source_root.rules(),
         *stats_aggregator.rules(),
         *stripped_source_files.rules(),
         *subprocess_environment.rules(),
+        *system_binaries.rules(),
         *target_type_rules(),
     ]
 
@@ -92,5 +95,8 @@ def target_types():
 
 def build_file_aliases():
     return BuildFileAliases(
-        objects={"parametrize": Parametrize},
+        objects={
+            "http_source": HTTPSource,
+            "parametrize": Parametrize,
+        },
     )

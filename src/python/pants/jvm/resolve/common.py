@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from dataclasses import dataclass
 from typing import Iterable
@@ -12,6 +13,7 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.target import Target
 from pants.jvm.target_types import (
     JvmArtifactArtifactField,
+    JvmArtifactExcludeDependenciesField,
     JvmArtifactFieldSet,
     JvmArtifactGroupField,
     JvmArtifactJarSourceField,
@@ -140,7 +142,7 @@ class Coordinates(DeduplicatedCollection[Coordinate]):
     """An ordered list of `Coordinate`s."""
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True)
 class ArtifactRequirement:
     """A single Maven-style coordinate for a JVM dependency, along with information of how to fetch
     the dependency if it is not to be fetched from a Maven repository."""
@@ -149,6 +151,7 @@ class ArtifactRequirement:
 
     url: str | None = None
     jar: JvmArtifactJarSourceField | None = None
+    excludes: frozenset[str] | None = None
 
     @classmethod
     def from_jvm_artifact_target(cls, target: Target) -> ArtifactRequirement:
@@ -157,6 +160,7 @@ class ArtifactRequirement:
                 "`ArtifactRequirement.from_jvm_artifact_target()` only works on targets with "
                 "`JvmArtifactFieldSet` fields present."
             )
+
         return ArtifactRequirement(
             coordinate=Coordinate(
                 group=target[JvmArtifactGroupField].value,
@@ -169,6 +173,17 @@ class ArtifactRequirement:
                 if target[JvmArtifactJarSourceField].value
                 else None
             ),
+            excludes=frozenset(target[JvmArtifactExcludeDependenciesField].value or []) or None,
+        )
+
+    def with_extra_excludes(self, *excludes: str) -> ArtifactRequirement:
+        """Creates a copy of this `ArtifactRequirement` with `excludes` provided.
+
+        Mostly useful for testing (`Coordinate(...).as_requirement().with_extra_excludes(...)`).
+        """
+
+        return dataclasses.replace(
+            self, excludes=self.excludes.union(excludes) if self.excludes else frozenset(excludes)
         )
 
     def to_coord_arg_str(self) -> str:
@@ -177,12 +192,14 @@ class ArtifactRequirement:
         )
 
     def to_metadata_str(self) -> str:
-        return self.coordinate.to_coord_arg_str(
-            {
-                "url": self.url or "not_provided",
-                "jar": self.jar.address.spec if self.jar else "not_provided",
-            }
-        )
+        attrs = {
+            "url": self.url or "not_provided",
+            "jar": self.jar.address.spec if self.jar else "not_provided",
+        }
+        if self.excludes:
+            attrs["excludes"] = ",".join(self.excludes)
+
+        return self.coordinate.to_coord_arg_str(attrs)
 
 
 # TODO: Consider whether to carry classpath scope in some fashion via ArtifactRequirements.
@@ -197,7 +214,7 @@ class ArtifactRequirements(DeduplicatedCollection[ArtifactRequirement]):
 @dataclass(frozen=True)
 class GatherJvmCoordinatesRequest:
     """A request to turn strings of coordinates (`group:artifact:version`) and/or addresses to
-    `jar_artifact` targets into `ArtifactRequirements`."""
+    `jvm_artifact` targets into `ArtifactRequirements`."""
 
     artifact_inputs: FrozenOrderedSet[str]
     option_name: str

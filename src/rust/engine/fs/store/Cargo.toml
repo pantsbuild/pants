@@ -12,10 +12,12 @@ protos = { path = "../../protos" }
 bytes = "1.0"
 concrete_time = { path = "../../concrete_time" }
 async-oncecell = "0.2"
-grpc_util = { path = "../../grpc_util" }
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
 fs = { path = ".." }
 futures = "0.3"
 glob = "0.3.0"
+grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
 http = "0.2"
 http-body = "0.4"
@@ -38,7 +40,7 @@ tokio = { version = "1.16", features = ["fs"] }
 tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower-service = "0.3"
 tryfuture = { path = "../../tryfuture" }
-uuid = { version = "0.8.2", features = ["v4"] }
+uuid = { version = "1.0.0", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
 
 [dev-dependencies]

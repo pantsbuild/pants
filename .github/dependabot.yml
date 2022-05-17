@@ -4,6 +4,8 @@ updates:
     directory: "/src/rust/engine"
     open-pull-requests-limit: 5
     rebase-strategy: auto
+    labels:
+      - "category:internal"
     schedule:
       interval: "weekly" 
       day: "wednesday"

@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, List, TypeVar, cast
+from typing import Any, ClassVar, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.distdir import DistDir
@@ -39,10 +39,13 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
+    parse_shard_spec,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import BoolOption, EnumOption, StrListOption, StrOption
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +62,8 @@ class TestResult(EngineAwareReturnType):
     result_metadata: ProcessResultMetadata | None
 
     coverage_data: CoverageData | None = None
+    # TODO: Rename this to `reports`. There is no guarantee that every language will produce
+    #  XML reports, or only XML reports.
     xml_results: Snapshot | None = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
     extra_output: Snapshot | None = None
@@ -200,7 +205,7 @@ _CD = TypeVar("_CD", bound=CoverageData)
 
 @union
 class CoverageDataCollection(Collection[_CD]):
-    element_type: ClassVar[type[_CD]]
+    element_type: ClassVar[type[_CD]]  # type: ignore[misc]
 
 
 @dataclass(frozen=True)
@@ -296,91 +301,85 @@ class TestSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return TestFieldSet in union_membership
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--debug",
-            type=bool,
-            default=False,
-            help=(
-                "Run tests sequentially in an interactive process. This is necessary, for "
-                "example, when you add breakpoints to your code."
-            ),
-        )
-        register(
-            "--force",
-            type=bool,
-            default=False,
-            help="Force the tests to run, even if they could be satisfied from cache.",
-        )
-        register(
-            "--output",
-            type=ShowOutput,
-            default=ShowOutput.FAILED,
-            help="Show stdout/stderr for these tests.",
-        )
-        register(
-            "--use-coverage",
-            type=bool,
-            default=False,
-            help="Generate a coverage report if the test runner supports it.",
-        )
-        register(
-            "--open-coverage",
-            type=bool,
-            default=False,
-            help=(
-                "If a coverage report file is generated, open it on the local system if the "
-                "system supports this."
-            ),
-        )
-        register(
-            "--xml-dir",
-            type=str,
-            metavar="<DIR>",
-            default=None,
-            advanced=True,
-            help=(
-                "Specifying a directory causes Junit XML result files to be emitted under "
-                "that dir for each test run that supports producing them."
-            ),
-        )
-        register(
-            "--extra-env-vars",
-            type=list,
-            member_type=str,
-            default=[],
-            help=(
-                "Additional environment variables to include in test processes. "
-                "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
-                "`ENV_VAR` to copy the value of a variable in Pants's own environment."
-            ),
-        )
+    debug = BoolOption(
+        "--debug",
+        default=False,
+        help=softwrap(
+            """
+            Run tests sequentially in an interactive process. This is necessary, for
+            example, when you add breakpoints to your code.
+            """
+        ),
+    )
+    force = BoolOption(
+        "--force",
+        default=False,
+        help="Force the tests to run, even if they could be satisfied from cache.",
+    )
+    output = EnumOption(
+        "--output",
+        default=ShowOutput.FAILED,
+        help="Show stdout/stderr for these tests.",
+    )
+    use_coverage = BoolOption(
+        "--use-coverage",
+        default=False,
+        help="Generate a coverage report if the test runner supports it.",
+    )
+    open_coverage = BoolOption(
+        "--open-coverage",
+        default=False,
+        help=softwrap(
+            """
+            If a coverage report file is generated, open it on the local system if the
+            system supports this.
+            """
+        ),
+    )
+    report = BoolOption(
+        "--report", default=False, advanced=True, help="Write test reports to --report-dir."
+    )
+    default_report_path = str(PurePath("{distdir}", "test", "reports"))
+    _report_dir = StrOption(
+        "--report-dir",
+        default=default_report_path,
+        advanced=True,
+        help="Path to write test reports to. Must be relative to the build root.",
+    )
+    extra_env_vars = StrListOption(
+        "--extra-env-vars",
+        help=softwrap(
+            """
+            Additional environment variables to include in test processes.
+            Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+            `ENV_VAR` to copy the value of a variable in Pants's own environment.
+            """
+        ),
+    )
+    shard = StrOption(
+        "--shard",
+        default="",
+        help=softwrap(
+            """
+            A shard specification of the form "k/N", where N is a positive integer and k is a
+            non-negative integer less than N.
 
-    @property
-    def extra_env_vars(self) -> list[str]:
-        return cast(List[str], self.options.extra_env_vars)
+            If set, the request input targets will be deterministically partitioned into N disjoint
+            subsets of roughly equal size, and only the k'th subset will be used, with all others
+            discarded.
 
-    @property
-    def debug(self) -> bool:
-        return cast(bool, self.options.debug)
+            Useful for splitting large numbers of test files across multiple machines in CI.
+            For example, you can run three shards with --shard=0/3, --shard=1/3, --shard=2/3.
 
-    @property
-    def force(self) -> bool:
-        return cast(bool, self.options.force)
+            Note that the shards are roughly equal in size as measured by number of files.
+            No attempt is made to consider the size of different files, the time they have
+            taken to run in the past, or other such sophisticated measures.
+            """
+        ),
+    )
 
-    @property
-    def output(self) -> ShowOutput:
-        return cast(ShowOutput, self.options.output)
-
-    @property
-    def use_coverage(self) -> bool:
-        return cast(bool, self.options.use_coverage)
-
-    @property
-    def open_coverage(self) -> bool:
-        return cast(bool, self.options.open_coverage)
+    def report_dir(self, distdir: DistDir) -> PurePath:
+        return PurePath(self._report_dir.format(distdir=distdir.relpath))
 
 
 class Test(Goal):
@@ -395,7 +394,7 @@ async def run_tests(
     test_subsystem: TestSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
-    dist_dir: DistDir,
+    distdir: DistDir,
     run_id: RunId,
 ) -> Test:
     if test_subsystem.debug:
@@ -423,12 +422,15 @@ async def run_tests(
                 exit_code = debug_result.exit_code
         return Test(exit_code)
 
+    shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
             goal_description=f"the `{test_subsystem.name}` goal",
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
+            shard=shard,
+            num_shards=num_shards,
         ),
     )
     results = await MultiGet(
@@ -451,17 +453,17 @@ async def run_tests(
         if result.extra_output and result.extra_output.files:
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=str(dist_dir.relpath / "test" / result.address.path_safe_spec),
+                path_prefix=str(distdir.relpath / "test" / result.address.path_safe_spec),
             )
 
-    if test_subsystem.options.xml_dir:
-        xml_dir = test_subsystem.options.xml_dir
-        merged_xml_results = await Get(
+    if test_subsystem.report:
+        report_dir = test_subsystem.report_dir(distdir)
+        merged_reports = await Get(
             Digest,
             MergeDigests(result.xml_results.digest for result in results if result.xml_results),
         )
-        workspace.write_digest(merged_xml_results, path_prefix=xml_dir)
-        console.print_stderr(f"\nWrote test XML to `{xml_dir}`")
+        workspace.write_digest(merged_reports, path_prefix=str(report_dir))
+        console.print_stderr(f"\nWrote test reports to {report_dir}")
 
     if test_subsystem.use_coverage:
         # NB: We must pre-sort the data for itertools.groupby() to work properly, using the same
@@ -560,13 +562,18 @@ async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEn
 
 class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
-    help = (
-        f"Addresses to targets that can be built with the `{bin_name()} package` goal and whose "
-        "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
-        f"as if you had run `{bin_name()} package`. It will include the results in your test's chroot, "
-        "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
-        f"`dist/`).\n\nYou can include anything that can be built by `{bin_name()} package`, e.g. a "
-        "`pex_binary`, `python_awslambda`, or an `archive`."
+    help = softwrap(
+        f"""
+        Addresses to targets that can be built with the `{bin_name()} package` goal and whose
+        resulting artifacts should be included in the test run.
+
+        Pants will build the artifacts as if you had run `{bin_name()} package`.
+        It will include the results in your test's chroot, using the same name they would normally
+        have, but without the `--distdir` prefix (e.g. `dist/`).
+
+        You can include anything that can be built by `{bin_name()} package`, e.g. a `pex_binary`,
+        `python_awslambda`, or an `archive`.
+        """
     )
 
 

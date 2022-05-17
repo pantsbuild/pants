@@ -8,23 +8,21 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Mapping
 
-from pants.core.util_rules import subprocess_environment
+from pants.core.subsystems.python_bootstrap import PythonBootstrap
+from pants.core.util_rules import subprocess_environment, system_binaries
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
-from pants.engine import process
+from pants.core.util_rules.system_binaries import BinaryPath, PythonBinary
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import Environment
-from pants.engine.process import BinaryPath
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.subsystem import Subsystem
-from pants.python import binaries as python_binaries
-from pants.python.binaries import PythonBinary, PythonBootstrap
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var
+from pants.util.strutil import create_path_env_var, softwrap
 
 
 class PexRuntimeEnvironment(Subsystem):
@@ -33,35 +31,41 @@ class PexRuntimeEnvironment(Subsystem):
 
     # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
     #  per-process override.
-    _executable_search_paths = (
-        StrListOption(
-            "--executable-search-paths",
-            default=["<PATH>"],
-            help=(
-                "The PATH value that will be used by the PEX subprocess and any subprocesses it "
-                'spawns.\n\nThe special string "<PATH>" will expand to the contents of the PATH '
-                "env var."
-            ),
-        )
-        .advanced()
-        .metavar("<binary-paths>")
+    _executable_search_paths = StrListOption(
+        "--executable-search-paths",
+        default=["<PATH>"],
+        help=softwrap(
+            """
+            The PATH value that will be used by the PEX subprocess and any subprocesses it
+            spawns.
+
+            The special string `"<PATH>"` will expand to the contents of the PATH env var.
+            """
+        ),
+        advanced=True,
+        metavar="<binary-paths>",
     )
     _verbosity = IntOption(
         "--verbosity",
         default=0,
-        help=("Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging)."),
-    ).advanced()
+        help="Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging).",
+        advanced=True,
+    )
     venv_use_symlinks = BoolOption(
         "--venv-use-symlinks",
         default=False,
-        help=(
-            "When possible, use venvs whose site-packages directories are populated with"
-            "symlinks.\n\nEnabling this can save space in the `--named-caches-dir` directory "
-            "and lead to slightly faster execution times for Pants Python goals. Some "
-            "distributions do not work with symlinked venvs though, so you may not be able to "
-            "enable this optimization as a result."
+        help=softwrap(
+            """
+            When possible, use venvs whose site-packages directories are populated with symlinks.
+
+            Enabling this can save space in the `--named-caches-dir` directory
+            and lead to slightly faster execution times for Pants Python goals. Some
+            distributions do not work with symlinked venvs though, so you may not be able to
+            enable this optimization as a result.
+            """
         ),
-    ).advanced()
+        advanced=True,
+    )
 
     @memoized_method
     def path(self, env: Environment) -> tuple[str, ...]:
@@ -226,7 +230,6 @@ class CompletePexEnvironment:
 def rules():
     return [
         *collect_rules(),
-        *process.rules(),
         *subprocess_environment.rules(),
-        *python_binaries.rules(),
+        *system_binaries.rules(),
     ]

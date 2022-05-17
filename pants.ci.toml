@@ -8,13 +8,13 @@ remote_cache_warnings = "backoff"
 
 [stats]
 log = true
+memory_summary = true
 
 [test]
 use_coverage = true
-xml_dir = "dist/test-results/"
 
 [pytest]
-args = ["--no-header", "-vv"]
+args = ["--no-header", "--noskip", "-vv"]
 
 [coverage-py]
 report = ["raw", "xml"]
@@ -29,11 +29,13 @@ ci_env_variables = [
   "GITHUB_WORKFLOW","GITHUB_JOB",  # temporary, for debugging issues w/ restricted tokens.
 ]
 restricted_token_matches =  """{
-  'GITHUB_REPOSITORY': 'pantsbuild/pants', 
+  'GITHUB_REPOSITORY': 'pantsbuild/pants',
 }"""
 
 [buildsense]
 enable = true
+collect_platform_data = true
+log_final_upload_latency = true
 
 [subprocess-environment]
 env_vars.add = [

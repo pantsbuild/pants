@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, PathGlobs, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 
 
@@ -20,6 +20,7 @@ class AncestorFilesRequest:
 
     input_files: tuple[str, ...]
     requested: tuple[str, ...]
+    ignore_empty_files: bool = False
 
 
 @dataclass(frozen=True)
@@ -62,8 +63,16 @@ async def find_ancestor_files(request: AncestorFilesRequest) -> AncestorFiles:
         return AncestorFiles(EMPTY_SNAPSHOT)
 
     # NB: This will intentionally _not_ error on any unmatched globs.
-    discovered_ancestors_snapshot = await Get(Snapshot, PathGlobs(putative))
-    return AncestorFiles(discovered_ancestors_snapshot)
+    globs = PathGlobs(putative)
+    if request.ignore_empty_files:
+        digest_contents = await Get(DigestContents, PathGlobs, globs)
+        snapshot = await Get(
+            Snapshot, PathGlobs([fc.path for fc in digest_contents if fc.content.strip()])
+        )
+    else:
+        snapshot = await Get(Snapshot, PathGlobs, globs)
+
+    return AncestorFiles(snapshot)
 
 
 def rules():

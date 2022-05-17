@@ -13,7 +13,9 @@ from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
+from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.addresses import Address
@@ -36,13 +38,11 @@ class DockerfileParser(PythonToolRequirementsBase):
     default_version = "dockerfile==3.2.0"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile_lockfile.txt")
-    default_lockfile_path = (
-        f"src/python/{_DOCKERFILE_PACKAGE.replace('.', '/')}/dockerfile_lockfile.txt"
-    )
+    default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile.lock")
+    default_lockfile_path = f"src/python/{_DOCKERFILE_PACKAGE.replace('.', '/')}/dockerfile.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
 
@@ -52,9 +52,13 @@ class DockerfileParserLockfileSentinel(GenerateToolLockfileSentinel):
 
 @rule
 def setup_lockfile_request(
-    _: DockerfileParserLockfileSentinel, dockerfile_parser: DockerfileParser
+    _: DockerfileParserLockfileSentinel,
+    dockerfile_parser: DockerfileParser,
+    python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(dockerfile_parser)
+    return GeneratePythonLockfile.from_tool(
+        dockerfile_parser, use_pex=python_setup.generate_lockfiles_with_pex
+    )
 
 
 @dataclass(frozen=True)
@@ -67,7 +71,7 @@ async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
     parser_script_content = pkgutil.get_data(_DOCKERFILE_PACKAGE, _DOCKERFILE_SANDBOX_TOOL)
     if not parser_script_content:
         raise ValueError(
-            "Unable to find source to {_DOCKERFILE_SANDBOX_TOOL!r} in {_DOCKERFILE_PACKAGE}."
+            f"Unable to find source to {_DOCKERFILE_SANDBOX_TOOL!r} in {_DOCKERFILE_PACKAGE}."
         )
 
     parser_content = FileContent(
@@ -75,21 +79,15 @@ async def setup_parser(dockerfile_parser: DockerfileParser) -> ParserSetup:
         content=parser_script_content,
         is_executable=True,
     )
-
     parser_digest = await Get(Digest, CreateDigest([parser_content]))
 
     parser_pex = await Get(
         VenvPex,
-        PexRequest(
-            output_filename="dockerfile_parser.pex",
-            internal_only=True,
-            requirements=dockerfile_parser.pex_requirements(),
-            interpreter_constraints=dockerfile_parser.interpreter_constraints,
-            main=EntryPoint(PurePath(parser_content.path).stem),
-            sources=parser_digest,
+        PexRequest,
+        dockerfile_parser.to_pex_request(
+            main=EntryPoint(PurePath(parser_content.path).stem), sources=parser_digest
         ),
     )
-
     return ParserSetup(parser_pex)
 
 
@@ -125,7 +123,8 @@ class DockerfileInfo:
     address: Address
     digest: Digest
     source: str
-    putative_target_addresses: tuple[str, ...] = ()
+    from_image_addresses: tuple[str, ...] = ()
+    copy_source_paths: tuple[str, ...] = ()
     version_tags: tuple[str, ...] = ()
     build_args: DockerBuildArgs = DockerBuildArgs()
     from_image_build_arg_names: tuple[str, ...] = ()
@@ -165,7 +164,7 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
         DockerfileParseRequest(
             sources.snapshot.digest,
             (
-                "version-tags,putative-targets,build-args,from-image-build-args,copy-sources",
+                "version-tags,from-image-addresses,copy-source-paths,build-args,from-image-build-args,copy-sources",
                 dockerfile,
             ),
         ),
@@ -174,7 +173,8 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
     output = result.stdout.decode("utf-8").strip().split("\n")
     (
         version_tags,
-        putative_targets,
+        from_image_addresses,
+        copy_source_paths,
         build_args,
         from_image_build_arg_names,
         copy_sources,
@@ -185,7 +185,8 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
             address=request.address,
             digest=sources.snapshot.digest,
             source=dockerfile,
-            putative_target_addresses=putative_targets,
+            from_image_addresses=from_image_addresses,
+            copy_source_paths=copy_source_paths,
             version_tags=version_tags,
             build_args=DockerBuildArgs.from_strings(*build_args, duplicates_must_match=True),
             from_image_build_arg_names=from_image_build_arg_names,
@@ -201,5 +202,6 @@ def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
+        *pex.rules(),
         UnionRule(GenerateToolLockfileSentinel, DockerfileParserLockfileSentinel),
     )

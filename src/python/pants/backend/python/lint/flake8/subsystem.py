@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
-from typing import cast
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -30,7 +30,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import AddPrefix, Digest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -40,10 +40,17 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.option.custom_types import file_option, shell_str, target_option
-from pants.util.docutil import bin_name, doc_url, git_url
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    FileOption,
+    SkipOption,
+    TargetListOption,
+)
+from pants.util.docutil import doc_url, git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -60,101 +67,85 @@ class Flake8FieldSet(FieldSet):
 
 class Flake8(PythonToolBase):
     options_scope = "flake8"
+    name = "Flake8"
     help = "The Flake8 Python linter (https://flake8.pycqa.org/)."
 
     default_version = "flake8>=3.9.2,<4.0"
     default_main = ConsoleScript("flake8")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.flake8", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/flake8/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.flake8", "flake8.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/flake8/flake8.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help=f"Don't use Flake8 when running `{bin_name()} lint`",
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help=(
-                "Arguments to pass directly to Flake8, e.g. "
-                f'`--{cls.options_scope}-args="--ignore E123,W456 --enable-extensions H111"`'
-            ),
-        )
-        register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help=(
-                "Path to an INI config file understood by Flake8 "
-                "(https://flake8.pycqa.org/en/latest/user/configuration.html).\n\n"
-                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                f"this option if the config is located in a non-standard location."
-            ),
-        )
-        register(
-            "--config-discovery",
-            type=bool,
-            default=True,
-            advanced=True,
-            help=(
-                "If true, Pants will include any relevant config files during "
-                "runs (`.flake8`, `flake8`, `setup.cfg`, and `tox.ini`)."
-                f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-                f"non-standard location."
-            ),
-        )
-        register(
-            "--source-plugins",
-            type=list,
-            member_type=target_option,
-            advanced=True,
-            help=(
-                "An optional list of `python_sources` target addresses to load first-party "
-                "plugins.\n\nYou must set the plugin's parent directory as a source root. For "
-                "example, if your plugin is at `build-support/flake8/custom_plugin.py`, add "
-                "'build-support/flake8' to `[source].root_patterns` in `pants.toml`. This is "
-                "necessary for Pants to know how to tell Flake8 to discover your plugin. See "
-                f"{doc_url('source-roots')}\n\nYou must also set `[flake8:local-plugins]` in "
-                "your Flake8 config file. "
-                "For example:\n\n"
-                "```\n"
-                "[flake8:local-plugins]\n"
-                "    extension =\n"
-                "        CUSTOMCODE = custom_plugin:MyChecker\n"
-                "```\n\n"
-                "While your plugin's code can depend on other first-party code and third-party "
-                "requirements, all first-party dependencies of the plugin must live in the same "
-                "directory or a subdirectory.\n\n"
-                "To instead load third-party plugins, set the option "
-                "`[flake8].extra_requirements`.\n\n"
-                "Tip: it's often helpful to define a dedicated 'resolve' via "
-                "`[python].resolves` for your Flake8 plugins such as 'flake8-plugins' "
-                "so that the third-party requirements used by your plugin, like `flake8`, do not "
-                "mix with the rest of your project. Read that option's help message for more info "
-                "on resolves."
-            ),
-        )
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="--ignore E123,W456 --enable-extensions H111")
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            Path to an INI config file understood by Flake8
+            (https://flake8.pycqa.org/en/latest/user/configuration.html).
 
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
+        ),
+    )
+    config_discovery = BoolOption(
+        "--config-discovery",
+        default=True,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include any relevant config files during
+            runs (`.flake8`, `flake8`, `setup.cfg`, and `tox.ini`).
 
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
+        ),
+    )
+    _source_plugins = TargetListOption(
+        "--source-plugins",
+        advanced=True,
+        help=softwrap(
+            f"""
+            An optional list of `python_sources` target addresses to load first-party plugins.
 
-    @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+            You must set the plugin's parent directory as a source root. For
+            example, if your plugin is at `build-support/flake8/custom_plugin.py`, add
+            'build-support/flake8' to `[source].root_patterns` in `pants.toml`. This is
+            necessary for Pants to know how to tell Flake8 to discover your plugin. See
+            {doc_url('source-roots')}
+
+            You must also set `[flake8:local-plugins]` in your Flake8 config file.
+
+            For example:
+
+                ```
+                [flake8:local-plugins]
+                    extension =
+                        CUSTOMCODE = custom_plugin:MyChecker
+                ```
+
+            While your plugin's code can depend on other first-party code and third-party
+            requirements, all first-party dependencies of the plugin must live in the same
+            directory or a subdirectory.
+
+            To instead load third-party plugins, set the option
+            `[flake8].extra_requirements`.
+
+            Tip: it's often helpful to define a dedicated 'resolve' via
+            `[python].resolves` for your Flake8 plugins such as 'flake8-plugins'
+            so that the third-party requirements used by your plugin, like `flake8`, do not
+            mix with the rest of your project. Read that option's help message for more info
+            on resolves.
+            """
+        ),
+    )
 
     @property
     def config_request(self) -> ConfigFilesRequest:
@@ -163,14 +154,14 @@ class Flake8(PythonToolBase):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
-            discovery=cast(bool, self.options.config_discovery),
+            discovery=self.config_discovery,
             check_existence=["flake8", ".flake8"],
             check_content={"setup.cfg": b"[flake8]", "tox.ini": b"[flake8]"},
         )
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.options.source_plugins, owning_address=None)
+        return UnparsedAddressInputs(self._source_plugins, owning_address=None)
 
 
 # --------------------------------------------------------------------------------------
@@ -234,31 +225,16 @@ async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
 
 
 # --------------------------------------------------------------------------------------
-# Lockfile
+# Interpreter constraints
 # --------------------------------------------------------------------------------------
 
 
-class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = Flake8.options_scope
-
-
-@rule(
-    desc=(
-        "Determine all Python interpreter versions used by Flake8 in your project (for lockfile "
-        "usage)"
-    ),
-    level=LogLevel.DEBUG,
-)
-async def setup_flake8_lockfile(
-    _: Flake8LockfileSentinel,
+@rule_helper
+async def _flake8_interpreter_constraints(
     first_party_plugins: Flake8FirstPartyPlugins,
-    flake8: Flake8,
     python_setup: PythonSetup,
-) -> GeneratePythonLockfile:
-    if not flake8.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(flake8)
-
-    # While Flake8 will run in partitions, we need a single lockfile that works with every
+) -> InterpreterConstraints:
+    # While Flake8 will run in partitions, we need a set of constraints that works with every
     # partition.
     #
     # This ORs all unique interpreter constraints. The net effect is that every possible Python
@@ -283,10 +259,74 @@ async def setup_flake8_lockfile(
             )
         )
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+
+
+# --------------------------------------------------------------------------------------
+# Lockfile
+# --------------------------------------------------------------------------------------
+
+
+class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = Flake8.options_scope
+
+
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Flake8 in your project (for lockfile "
+        "generation)"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def setup_flake8_lockfile(
+    _: Flake8LockfileSentinel,
+    first_party_plugins: Flake8FirstPartyPlugins,
+    flake8: Flake8,
+    python_setup: PythonSetup,
+) -> GeneratePythonLockfile:
+    if not flake8.uses_custom_lockfile:
+        return GeneratePythonLockfile.from_tool(
+            flake8, use_pex=python_setup.generate_lockfiles_with_pex
+        )
+
+    constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
     return GeneratePythonLockfile.from_tool(
         flake8,
-        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        constraints,
         extra_requirements=first_party_plugins.requirement_strings,
+        use_pex=python_setup.generate_lockfiles_with_pex,
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Export
+# --------------------------------------------------------------------------------------
+
+
+class Flake8ExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Flake8 in your project (for "
+        "`export` goal)"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def flake8_export(
+    _: Flake8ExportSentinel,
+    flake8: Flake8,
+    first_party_plugins: Flake8FirstPartyPlugins,
+    python_setup: PythonSetup,
+) -> ExportPythonTool:
+    constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
+    return ExportPythonTool(
+        resolve_name=flake8.options_scope,
+        pex_request=flake8.to_pex_request(
+            interpreter_constraints=constraints,
+            extra_requirements=first_party_plugins.requirement_strings,
+        ),
     )
 
 
@@ -296,4 +336,5 @@ def rules():
         *lockfile.rules(),
         *python_sources.rules(),
         UnionRule(GenerateToolLockfileSentinel, Flake8LockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, Flake8ExportSentinel),
     )

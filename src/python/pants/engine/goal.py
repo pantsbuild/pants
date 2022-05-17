@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 from typing_extensions import final
 
 from pants.engine.unions import UnionMembership
+from pants.option.option_types import StrOption
 from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
 from pants.util.meta import classproperty
@@ -29,8 +30,8 @@ class GoalSubsystem(Subsystem):
     ```
     @rule
     def list(console: Console, list_subsystem: ListSubsystem) -> List:
-      transitive = list_subsystem.options.transitive
-      documented = list_subsystem.options.documented
+      transitive = list_subsystem.transitive
+      documented = list_subsystem.documented
       ...
     ```
     """
@@ -95,14 +96,12 @@ class Outputting:
     Useful for goals whose purpose is to emit output to the end user (as distinct from incidental logging to stderr).
     """
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--output-file",
-            metavar="<path>",
-            help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
-        )
+    output_file = StrOption(
+        "--output-file",
+        default=None,
+        metavar="<path>",
+        help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
+    )
 
     @final
     @contextmanager
@@ -118,11 +117,11 @@ class Outputting:
     @contextmanager
     def output_sink(self, console: "Console") -> Iterator:
         stdout_file = None
-        if self.options.output_file:  # type: ignore[attr-defined]
-            stdout_file = open(self.options.output_file, "w")  # type: ignore[attr-defined]
+        if self.output_file:
+            stdout_file = open(self.output_file, "w")
             output_sink = stdout_file
         else:
-            output_sink = console.stdout
+            output_sink = console.stdout  # type: ignore[assignment]
         try:
             yield output_sink
         finally:
@@ -132,15 +131,12 @@ class Outputting:
 
 
 class LineOriented(Outputting):
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--sep",
-            default="\\n",
-            metavar="<separator>",
-            help="String to use to separate lines in line-oriented output.",
-        )
+    sep = StrOption(
+        "--sep",
+        default="\\n",
+        metavar="<separator>",
+        help="String to use to separate lines in line-oriented output.",
+    )
 
     @final
     @contextmanager
@@ -149,6 +145,6 @@ class LineOriented(Outputting):
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
         """
-        sep = self.options.sep.encode().decode("unicode_escape")  # type: ignore[attr-defined]
+        sep = self.sep.encode().decode("unicode_escape")
         with self.output_sink(console) as output_sink:
             yield lambda msg: print(msg, file=output_sink, end=sep)

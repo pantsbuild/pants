@@ -39,9 +39,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.67"
+    default_version = "v2.1.88"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.67,<3.0"
+    version_constraints = ">=2.1.88,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -50,8 +50,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "3f376dba013a6f1a810bfb59fd56a7d95a5ad297f04f57011d0b96cb1624676f",
-                    "3726119",
+                    "ea8f696dac3b1ddac2fe7af288251c63ca4ea0dd16808f01e60b26b21c84a260",
+                    "3748292",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64"]
@@ -136,9 +136,9 @@ async def setup_pex_cli_process(
     # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
     # Instead we manually create a FileContent for it.
     cert_args = []
-    if global_options.options.ca_certs_path:
-        ca_certs_content = Path(global_options.options.ca_certs_path).read_bytes()
-        chrooted_ca_certs_path = os.path.basename(global_options.options.ca_certs_path)
+    if global_options.ca_certs_path:
+        ca_certs_content = Path(global_options.ca_certs_path).read_bytes()
+        chrooted_ca_certs_path = os.path.basename(global_options.ca_certs_path)
 
         gets.append(
             Get(
@@ -171,8 +171,9 @@ async def setup_pex_cli_process(
     if request.concurrency_available > 0:
         global_args.extend(["--jobs", "{pants_concurrency}"])
 
-    if pex_runtime_env.verbosity > 0:
-        global_args.append(f"-{'v' * pex_runtime_env.verbosity}")
+    verbosity_args = (
+        [f"-{'v' * pex_runtime_env.verbosity}"] if pex_runtime_env.verbosity > 0 else []
+    )
 
     resolve_args = (
         [*cert_args, "--python-path", create_path_env_var(pex_env.interpreter_search_paths)]
@@ -180,8 +181,9 @@ async def setup_pex_cli_process(
         else []
     )
     args = [
-        *global_args,
         *request.subcommand,
+        *global_args,
+        *verbosity_args,
         *resolve_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
         # the end.

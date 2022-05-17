@@ -21,8 +21,8 @@ use std::time::Duration;
 
 use async_latch::AsyncLatch;
 use fnv::FnvHasher;
-use futures::future;
-use futures::future::FutureExt;
+use fs::DirectoryDigest;
+use futures::future::{self, FutureExt};
 use futures::Future;
 use hashing::Digest;
 use log::{self, debug, error, warn, Log};
@@ -33,10 +33,10 @@ use process_execution::RemoteCacheWarningsBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
-  PyResult as PyO3Result, Python,
+  PyResult as PyO3Result, Python, ToPyObject,
 };
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
-use pyo3::{create_exception, IntoPy, PyAny};
+use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
 use rule_graph::{self, RuleGraph};
 use task_executor::Executor;
@@ -134,9 +134,11 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(single_file_digests_to_bytes, m)?)?;
   m.add_function(wrap_pyfunction!(ensure_remote_has_recursive, m)?)?;
+  m.add_function(wrap_pyfunction!(ensure_directory_digest_persisted, m)?)?;
 
   m.add_function(wrap_pyfunction!(scheduler_execute, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_metrics, m)?)?;
+  m.add_function(wrap_pyfunction!(scheduler_live_items, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_create, m)?)?;
   m.add_function(wrap_pyfunction!(scheduler_shutdown, m)?)?;
 
@@ -244,6 +246,8 @@ impl PyExecutionStrategyOptions {
     local_enable_nailgun: bool,
     remote_cache_read: bool,
     remote_cache_write: bool,
+    child_default_memory: usize,
+    child_max_memory: usize,
   ) -> Self {
     Self(ExecutionStrategyOptions {
       local_parallelism,
@@ -253,6 +257,8 @@ impl PyExecutionStrategyOptions {
       local_enable_nailgun,
       remote_cache_read,
       remote_cache_write,
+      child_default_memory,
+      child_max_memory,
     })
   }
 }
@@ -353,6 +359,7 @@ impl PySession {
     scheduler: &PyScheduler,
     dynamic_ui: bool,
     ui_use_prodash: bool,
+    max_workunit_level: u64,
     build_id: String,
     session_values: PyObject,
     cancellation_latch: &PySessionCancellationLatch,
@@ -360,6 +367,9 @@ impl PySession {
   ) -> PyO3Result<Self> {
     let core = scheduler.0.core.clone();
     let cancellation_latch = cancellation_latch.0.clone();
+    let py_level: PythonLogLevel = max_workunit_level
+      .try_into()
+      .map_err(|e| PyException::new_err(format!("{e}")))?;
     // NB: Session creation interacts with the Graph, which must not be accessed while the GIL is
     // held.
     let session = py
@@ -368,6 +378,7 @@ impl PySession {
           core,
           dynamic_ui,
           ui_use_prodash,
+          py_level.into(),
           build_id,
           session_values,
           cancellation_latch,
@@ -383,6 +394,11 @@ impl PySession {
 
   fn is_cancelled(&self) -> bool {
     self.0.is_cancelled()
+  }
+
+  #[getter]
+  fn session_values(&self) -> PyObject {
+    self.0.session_values()
   }
 }
 
@@ -652,17 +668,26 @@ fn scheduler_create(
 
 async fn workunit_to_py_value(
   workunit_store: &WorkunitStore,
-  workunit: &Workunit,
+  workunit: Workunit,
   core: &Arc<Core>,
-  session: &Session,
 ) -> PyO3Result<Value> {
+  let metadata = workunit.metadata.ok_or_else(|| {
+    PyException::new_err(format!(
+      // TODO: It would be better for this to be typesafe, but it isn't currently worth it to
+      // split the Workunit struct.
+      "Workunit for {} was disabled. Please file an issue at \
+            [https://github.com/pantsbuild/pants/issues/new].",
+      workunit.span_id
+    ))
+  })?;
+  let has_parent_ids = !workunit.parent_ids.is_empty();
   let mut dict_entries = {
     let gil = Python::acquire_gil();
     let py = gil.python();
     let mut dict_entries = vec![
       (
         externs::store_utf8(py, "name"),
-        externs::store_utf8(py, &workunit.name),
+        externs::store_utf8(py, workunit.name),
       ),
       (
         externs::store_utf8(py, "span_id"),
@@ -670,16 +695,24 @@ async fn workunit_to_py_value(
       ),
       (
         externs::store_utf8(py, "level"),
-        externs::store_utf8(py, &workunit.metadata.level.to_string()),
+        externs::store_utf8(py, &workunit.level.to_string()),
       ),
     ];
 
-    if let Some(parent_id) = workunit.parent_id {
-      dict_entries.push((
-        externs::store_utf8(py, "parent_id"),
-        externs::store_utf8(py, &format!("{}", parent_id)),
-      ));
+    let parent_ids = workunit
+      .parent_ids
+      .into_iter()
+      .map(|parent_id| externs::store_utf8(py, &parent_id.to_string()))
+      .collect::<Vec<_>>();
+
+    if has_parent_ids {
+      // TODO: Remove the single-valued `parent_id` field around version 2.16.0.dev0.
+      dict_entries.push((externs::store_utf8(py, "parent_id"), parent_ids[0].clone()));
     }
+    dict_entries.push((
+      externs::store_utf8(py, "parent_ids"),
+      externs::store_tuple(py, parent_ids),
+    ));
 
     match workunit.state {
       WorkunitState::Started { start_time, .. } => {
@@ -719,7 +752,7 @@ async fn workunit_to_py_value(
       }
     };
 
-    if let Some(desc) = &workunit.metadata.desc.as_ref() {
+    if let Some(desc) = &metadata.desc.as_ref() {
       dict_entries.push((
         externs::store_utf8(py, "description"),
         externs::store_utf8(py, desc),
@@ -730,7 +763,7 @@ async fn workunit_to_py_value(
 
   let mut artifact_entries = Vec::new();
 
-  for (artifact_name, digest) in workunit.metadata.artifacts.iter() {
+  for (artifact_name, digest) in metadata.artifacts.iter() {
     let store = core.store();
     let py_val = match digest {
       ArtifactOutput::FileDigest(digest) => {
@@ -738,8 +771,16 @@ async fn workunit_to_py_value(
         crate::nodes::Snapshot::store_file_digest(gil.python(), *digest)
           .map_err(PyException::new_err)?
       }
-      ArtifactOutput::Snapshot(digest) => {
-        let snapshot = store::Snapshot::from_digest(store, *digest)
+      ArtifactOutput::Snapshot(digest_handle) => {
+        let digest = (&**digest_handle)
+          .as_any()
+          .downcast_ref::<DirectoryDigest>()
+          .ok_or_else(|| {
+            PyException::new_err(format!(
+              "Failed to convert {digest_handle:?} to a DirectoryDigest."
+            ))
+          })?;
+        let snapshot = store::Snapshot::from_digest(store, digest.clone())
           .await
           .map_err(PyException::new_err)?;
         let gil = Python::acquire_gil();
@@ -758,23 +799,18 @@ async fn workunit_to_py_value(
   let gil = Python::acquire_gil();
   let py = gil.python();
 
-  let mut user_metadata_entries = Vec::with_capacity(workunit.metadata.user_metadata.len());
-  for (user_metadata_key, user_metadata_item) in workunit.metadata.user_metadata.iter() {
+  let mut user_metadata_entries = Vec::with_capacity(metadata.user_metadata.len());
+  for (user_metadata_key, user_metadata_item) in metadata.user_metadata.iter() {
     let value = match user_metadata_item {
       UserMetadataItem::ImmediateString(v) => v.into_py(py),
       UserMetadataItem::ImmediateInt(n) => n.into_py(py),
-      UserMetadataItem::PyValue(py_val_handle) => {
-        match session.with_metadata_map(|map| map.get(py_val_handle).cloned()) {
-          None => {
-            log::warn!(
-              "Workunit metadata() value not found for key: {}",
-              user_metadata_key
-            );
-            continue;
-          }
-          Some(v) => v,
-        }
-      }
+      UserMetadataItem::PyValue(py_val_handle) => (&**py_val_handle)
+        .as_any()
+        .downcast_ref::<Value>()
+        .ok_or_else(|| {
+          PyException::new_err(format!("Failed to convert {py_val_handle:?} to a Value."))
+        })?
+        .to_object(py),
     };
     user_metadata_entries.push((
       externs::store_utf8(py, user_metadata_key.as_str()),
@@ -787,14 +823,14 @@ async fn workunit_to_py_value(
     externs::store_dict(py, user_metadata_entries)?,
   ));
 
-  if let Some(stdout_digest) = workunit.metadata.stdout {
+  if let Some(stdout_digest) = metadata.stdout {
     artifact_entries.push((
       externs::store_utf8(py, "stdout_digest"),
       crate::nodes::Snapshot::store_file_digest(py, stdout_digest).map_err(PyException::new_err)?,
     ));
   }
 
-  if let Some(stderr_digest) = workunit.metadata.stderr {
+  if let Some(stderr_digest) = metadata.stderr {
     artifact_entries.push((
       externs::store_utf8(py, "stderr_digest"),
       crate::nodes::Snapshot::store_file_digest(py, stderr_digest).map_err(PyException::new_err)?,
@@ -809,7 +845,7 @@ async fn workunit_to_py_value(
   // TODO: Temporarily attaching the global counters to the "root" workunit. Callers should
   // switch to consuming `StreamingWorkunitContext.get_metrics`.
   // Remove this deprecation after 2.14.0.dev0.
-  if workunit.parent_id.is_none() {
+  if !has_parent_ids {
     let mut metrics = workunit_store.get_metrics();
 
     metrics.insert("DEPRECATED_ConsumeGlobalCountersInstead", 0);
@@ -837,11 +873,10 @@ async fn workunits_to_py_tuple_value(
   workunit_store: &WorkunitStore,
   workunits: Vec<Workunit>,
   core: &Arc<Core>,
-  session: &Session,
 ) -> PyO3Result<Value> {
   let mut workunit_values = Vec::new();
   for workunit in workunits {
-    let py_value = workunit_to_py_value(workunit_store, &workunit, core, session).await?;
+    let py_value = workunit_to_py_value(workunit_store, workunit, core).await?;
     workunit_values.push(py_value);
   }
 
@@ -850,35 +885,59 @@ async fn workunits_to_py_tuple_value(
 
 #[pyfunction]
 fn session_poll_workunits(
-  py: Python,
-  py_scheduler: &PyScheduler,
-  py_session: &PySession,
+  py_scheduler: PyObject,
+  py_session: PyObject,
   max_log_verbosity_level: u64,
 ) -> PyO3Result<PyObject> {
-  let py_level: PythonLogLevel = max_log_verbosity_level
-    .try_into()
-    .map_err(|e| PyException::new_err(format!("{}", e)))?;
-  let core = &py_scheduler.0.core;
-  core.executor.enter(|| {
-    let mut workunit_store = py_session.0.workunit_store();
-    let (started, completed) =
-      py.allow_threads(|| workunit_store.latest_workunits(py_level.into()));
+  // TODO: Black magic. PyObject is not marked UnwindSafe, and contains an UnsafeCell. Since PyO3
+  // only allows us to receive `pyfunction` arguments as `PyObject` (or references under a held
+  // GIL), we cannot do what it does to use `catch_unwind` which would be interacting with
+  // `catch_unwind` while the object is still a raw pointer, and unchecked.
+  //
+  // Instead, we wrap the call, and assert that it is safe. It really might not be though. So this
+  // code should only live long enough to shake out the current issue, and an upstream issue with
+  // PyO3 will be the long term solution.
+  //
+  // see https://github.com/PyO3/pyo3/issues/2102 for more info.
+  let py_scheduler = std::panic::AssertUnwindSafe(py_scheduler);
+  let py_session = std::panic::AssertUnwindSafe(py_session);
+  std::panic::catch_unwind(|| {
+    let (core, session, py_level) = {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
 
-    let started_val = core.executor.block_on(workunits_to_py_tuple_value(
-      py,
-      &workunit_store,
-      started,
-      core,
-      &py_session.0,
-    ))?;
-    let completed_val = core.executor.block_on(workunits_to_py_tuple_value(
-      py,
-      &workunit_store,
-      completed,
-      core,
-      &py_session.0,
-    ))?;
-    Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
+      let py_scheduler = py_scheduler.extract::<PyRef<PyScheduler>>(py)?;
+      let py_session = py_session.extract::<PyRef<PySession>>(py)?;
+      let py_level: PythonLogLevel = max_log_verbosity_level
+        .try_into()
+        .map_err(|e| PyException::new_err(format!("{}", e)))?;
+      (py_scheduler.0.core.clone(), py_session.0.clone(), py_level)
+    };
+    core.executor.enter(|| {
+      let workunit_store = session.workunit_store();
+      let (started, completed) = workunit_store.latest_workunits(py_level.into());
+
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+
+      let started_val = core.executor.block_on(workunits_to_py_tuple_value(
+        py,
+        &workunit_store,
+        started,
+        &core,
+      ))?;
+      let completed_val = core.executor.block_on(workunits_to_py_tuple_value(
+        py,
+        &workunit_store,
+        completed,
+        &core,
+      ))?;
+      Ok(externs::store_tuple(py, vec![started_val, completed_val]).into())
+    })
+  })
+  .unwrap_or_else(|e| {
+    log::warn!("Panic in `session_poll_workunits`: {:?}", e);
+    std::panic::resume_unwind(e);
   })
 }
 
@@ -896,7 +955,7 @@ fn session_run_interactive_process(
       true,
       &Arc::new(std::sync::atomic::AtomicBool::new(true)),
       core.intrinsics.run(
-        Intrinsic {
+        &Intrinsic {
           product: core.types.interactive_process_result,
           inputs: vec![core.types.interactive_process],
         },
@@ -920,6 +979,21 @@ fn scheduler_metrics<'py>(
     .core
     .executor
     .enter(|| py.allow_threads(|| py_scheduler.0.metrics(&py_session.0)))
+}
+
+#[pyfunction]
+fn scheduler_live_items<'py>(
+  py: Python<'py>,
+  py_scheduler: &'py PyScheduler,
+  py_session: &'py PySession,
+) -> (Vec<PyObject>, HashMap<&'static str, (usize, usize)>) {
+  let (items, sizes) = py_scheduler
+    .0
+    .core
+    .executor
+    .enter(|| py.allow_threads(|| py_scheduler.0.live_items(&py_session.0)));
+  let py_items = items.into_iter().map(|value| value.to_object(py)).collect();
+  (py_items, sizes)
 }
 
 #[pyfunction]
@@ -1402,6 +1476,7 @@ fn ensure_remote_has_recursive(
       .iter()
       .map(|value| {
         crate::nodes::lift_directory_digest(value)
+          .map(|dd| dd.as_digest())
           .or_else(|_| crate::nodes::lift_file_digest(value))
       })
       .collect::<Result<Vec<Digest>, _>>()
@@ -1411,6 +1486,26 @@ fn ensure_remote_has_recursive(
       core
         .executor
         .block_on(core.store().ensure_remote_has_recursive(digests))
+    })
+    .map_err(PyException::new_err)?;
+    Ok(())
+  })
+}
+
+#[pyfunction]
+fn ensure_directory_digest_persisted(
+  py: Python,
+  py_scheduler: &PyScheduler,
+  py_digest: &PyAny,
+) -> PyO3Result<()> {
+  let core = &py_scheduler.0.core;
+  core.executor.enter(|| {
+    let digest = crate::nodes::lift_directory_digest(py_digest).map_err(PyException::new_err)?;
+
+    py.allow_threads(|| {
+      core
+        .executor
+        .block_on(core.store().ensure_directory_digest_persisted(digest))
     })
     .map_err(PyException::new_err)?;
     Ok(())
@@ -1472,12 +1567,15 @@ fn write_digest(
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
 
-    block_in_place_and_wait(py, || {
-      core.store().materialize_directory(
-        destination.clone(),
-        lifted_digest,
-        fs::Permissions::Writable,
-      )
+    block_in_place_and_wait(py, || async move {
+      core
+        .store()
+        .materialize_directory(
+          destination.clone(),
+          lifted_digest,
+          fs::Permissions::Writable,
+        )
+        .await
     })
     .map_err(PyValueError::new_err)
   })

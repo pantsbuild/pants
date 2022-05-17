@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from textwrap import dedent
+
 import pytest
 
 from pants.backend.codegen.protobuf.python import additional_fields, python_protobuf_module_mapper
@@ -36,7 +38,13 @@ def rule_runner() -> RuleRunner:
 
 
 def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--source-root-patterns=['root1', 'root2', 'root3']"])
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['root1', 'root2', 'root3']",
+            "--python-enable-resolves",
+            "--python-resolves={'python-default': '', 'another-resolve': ''}",
+        ]
+    )
     rule_runner.write_files(
         {
             "root1/protos/f1.proto": "",
@@ -47,10 +55,17 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             "root1/two_owners/BUILD": "protobuf_sources()",
             "root2/two_owners/f.proto": "",
             "root2/two_owners/BUILD": "protobuf_sources()",
-            # A file with grpc. This also uses the `python_source_root` mechanism, which should be
-            # irrelevant to the module mapping because we strip source roots.
             "root1/tests/f.proto": "",
-            "root1/tests/BUILD": "protobuf_sources(grpc=True, python_source_root='root3')",
+            "root1/tests/BUILD": dedent(
+                """\
+                protobuf_sources(
+                    grpc=True,
+                    # This should be irrelevant to the module mapping because we strip source roots.
+                    python_source_root='root3',
+                    python_resolve='another-resolve',
+                )
+                """
+            ),
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -58,30 +73,44 @@ def test_map_first_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
     def providers(addresses: list[Address]) -> tuple[ModuleProvider, ...]:
         return tuple(ModuleProvider(addr, ModuleProviderType.IMPL) for addr in addresses)
 
-    assert result == FirstPartyPythonMappingImpl(
+    assert result == FirstPartyPythonMappingImpl.create(
         {
-            "protos.f1_pb2": providers([Address("root1/protos", relative_file_path="f1.proto")]),
-            "protos.f2_pb2": providers([Address("root1/protos", relative_file_path="f2.proto")]),
-            "tests.f_pb2": providers([Address("root1/tests", relative_file_path="f.proto")]),
-            "tests.f_pb2_grpc": providers([Address("root1/tests", relative_file_path="f.proto")]),
-            "two_owners.f_pb2": providers(
-                [
-                    Address("root1/two_owners", relative_file_path="f.proto"),
-                    Address("root2/two_owners", relative_file_path="f.proto"),
-                ]
-            ),
+            "python-default": {
+                "protos.f1_pb2": providers(
+                    [Address("root1/protos", relative_file_path="f1.proto")]
+                ),
+                "protos.f2_pb2": providers(
+                    [Address("root1/protos", relative_file_path="f2.proto")]
+                ),
+                "two_owners.f_pb2": providers(
+                    [
+                        Address("root1/two_owners", relative_file_path="f.proto"),
+                        Address("root2/two_owners", relative_file_path="f.proto"),
+                    ]
+                ),
+            },
+            "another-resolve": {
+                "tests.f_pb2": providers([Address("root1/tests", relative_file_path="f.proto")]),
+                "tests.f_pb2_grpc": providers(
+                    [Address("root1/tests", relative_file_path="f.proto")]
+                ),
+            },
         }
     )
 
 
 def test_top_level_source_root(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--source-root-patterns=['/']"])
+    rule_runner.set_options(["--source-root-patterns=['/']", "--python-enable-resolves"])
     rule_runner.write_files({"protos/f.proto": "", "protos/BUILD": "protobuf_sources()"})
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
 
     def providers(addresses: list[Address]) -> tuple[ModuleProvider, ...]:
         return tuple(ModuleProvider(addr, ModuleProviderType.IMPL) for addr in addresses)
 
-    assert result == FirstPartyPythonMappingImpl(
-        {"protos.f_pb2": providers([Address("protos", relative_file_path="f.proto")])}
+    assert result == FirstPartyPythonMappingImpl.create(
+        {
+            "python-default": {
+                "protos.f_pb2": providers([Address("protos", relative_file_path="f.proto")])
+            }
+        }
     )

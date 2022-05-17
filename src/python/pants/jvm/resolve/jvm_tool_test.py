@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import textwrap
 
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
@@ -20,6 +20,7 @@ from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class MockJvmTool(JvmToolBase):
@@ -36,11 +37,34 @@ class MockJvmToolLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = MockJvmTool.options_scope
 
 
+class MockInternalToolLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = "mock-internal-tool"
+
+
 @rule
 def generate_test_tool_lockfile_request(
     _: MockJvmToolLockfileSentinel, tool: MockJvmTool
 ) -> GenerateJvmLockfileFromTool:
     return GenerateJvmLockfileFromTool.create(tool)
+
+
+@rule
+def generate_internal_test_tool_lockfile_request(
+    _: MockInternalToolLockfileSentinel,
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool(
+        artifact_inputs=FrozenOrderedSet(
+            {
+                "com.google.code.gson:gson:2.9.0",
+            }
+        ),
+        artifact_option_name="n/a",
+        lockfile_option_name="n/a",
+        resolve_name=MockInternalToolLockfileSentinel.resolve_name,
+        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
+        write_lockfile_dest="mock-write-lockfile.lock",
+        default_lockfile_resource=("pants.backend.jvm.resolve", "mock-internal-tool.lock"),
+    )
 
 
 def test_jvm_tool_base_extracts_correct_coordinates() -> None:
@@ -55,8 +79,10 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
             *jvm_tool.rules(),
             *lockfile_rules(),
             generate_test_tool_lockfile_request,
+            generate_internal_test_tool_lockfile_request,
             SubsystemRule(MockJvmTool),
             QueryRule(GenerateJvmLockfile, (MockJvmToolLockfileSentinel,)),
+            QueryRule(GenerateJvmLockfile, (MockInternalToolLockfileSentinel,)),
             QueryRule(DigestContents, (Digest,)),
         ],
         target_types=[JvmArtifactTarget],
@@ -89,3 +115,9 @@ def test_jvm_tool_base_extracts_correct_coordinates() -> None:
         Coordinate(group="junit", artifact="junit", version="4.13.2"),
         Coordinate(group="org.hamcrest", artifact="hamcrest-core", version="1.3"),
     ]
+
+    # Ensure that an internal-only tool will not have a lockfile generated.
+    default_lockfile_result = rule_runner.request(
+        GenerateJvmLockfile, [MockInternalToolLockfileSentinel()]
+    )
+    assert default_lockfile_result.lockfile_dest == DEFAULT_TOOL_LOCKFILE

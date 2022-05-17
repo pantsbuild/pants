@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -14,13 +13,14 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.option.custom_types import shell_str
+from pants.option.option_types import ArgsListOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
 class SuccinctCodeCounter(TemplatedExternalTool):
     options_scope = "scc"
+    name = "SCC"
     help = "The Succinct Code Counter, aka `scc` (https://github.com/boyter/scc)."
 
     default_version = "3.0.0"
@@ -40,23 +40,11 @@ class SuccinctCodeCounter(TemplatedExternalTool):
         "linux_x86_64": "x86_64-unknown-linux",
     }
 
-    @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            passthrough=True,
-            help=(
-                'Arguments to pass directly to SCC, e.g. `--count-loc-args="--no-cocomo"`. Refer '
-                "to https://github.com/boyter/scc."
-            ),
-        )
-
-    @property
-    def args(self) -> Tuple[str, ...]:
-        return tuple(self.options.args)
+    args = ArgsListOption(
+        example="--no-cocomo",
+        passthrough=True,
+        extra_help="Refer to to https://github.com/boyter/scc.",
+    )
 
     def generate_exe(self, _: Platform) -> str:
         return "./scc"

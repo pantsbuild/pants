@@ -15,6 +15,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Antoine Tollenaere
 + Asher Foa
 + Bardur Arantsson
++ Bastian Wegge
 + Benjy Weinberger
 + Bill Farner
 + Billy "Hyun Joon" Seol
@@ -24,6 +25,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Brian Wickman
 + Bruno Bieth
 + Caitie McCaffrey
++ Caleb Lloyd
 + Caspar Krieger
 + Chris Aniszczyk
 + Chris Borckholder
@@ -46,6 +48,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Moran
 + Daniel Peebles
 + Daniel Wagner-Hall
 + Danny McClanahan
@@ -54,6 +57,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + David Taylor
 + David Turner
 + Derek Young
++ Dimitrios Bariamis
 + Divij Rajkumar
 + Dominic Hamon
 + Dorothy Ordogh
@@ -128,6 +132,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Justin Trobec
 + Karin Lundberg
 + Kaushik Srenevasan
++ Ken Howard
 + Ken Kawamoto
 + Kevin Oliver
 + Kevin Sweeney
@@ -192,6 +197,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Paul Phillips
 + Paul Yau
 + Peiyu Wang
++ Peter A. I. Forsyth
 + Peter Seibel
 + Peter Vlugter
 + Pierre Chevalier
@@ -203,11 +209,13 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Roger Jiang
 + Roman Andriadi
 + Rushal Verma
++ Ryan King
 + Ryan Scott Brown
 + Ryan Williams
 + Sameer Arora
 + Sameer Brenn
 + Sara Solano
++ Scott Lessans
 + Senthil Kumaran
 + SergeKireev
 + Sergey Serebryakov
@@ -250,5 +258,6 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + billybecker
 + eugene yokota
 + hephex
++ twunderlich-grapl
 + wimax-grapl
 + Ólafur Páll Geirsson

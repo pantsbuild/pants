@@ -10,7 +10,7 @@ use nails::execution::{self, child_channel, ChildInput, Command};
 use store::Store;
 use task_executor::Executor;
 use tokio::net::TcpStream;
-use workunit_store::{in_workunit, Metric, RunningWorkunit, WorkunitMetadata};
+use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use crate::{Context, FallibleProcessResultWithPlatform, InputDigests, Platform, Process};
@@ -122,15 +122,11 @@ impl super::CommandRunner for CommandRunner {
     debug!("Running request under nailgun:\n {:?}", req);
 
     in_workunit!(
-      context.workunit_store.clone(),
-      "run_nailgun_process".to_owned(),
-      WorkunitMetadata {
-        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-        // renders at the Process's level.
-        level: req.level,
-        desc: Some(req.description.clone()),
-        ..WorkunitMetadata::default()
-      },
+      "run_nailgun_process",
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      req.level,
+      desc = Some(req.description.clone()),
       |workunit| async move {
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
 
@@ -143,6 +139,7 @@ impl super::CommandRunner for CommandRunner {
           client_main_class,
           ..
         } = ParsedJVMCommandLines::parse_command_lines(&req.argv)?;
+
         let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
         let (client_input_digests, server_input_digests) =
           req.input_digests.nailgun_client_and_server();
@@ -161,7 +158,6 @@ impl super::CommandRunner for CommandRunner {
           .nailgun_pool
           .acquire(
             server_req,
-            context.clone(),
             self.inner.named_caches(),
             self.inner.immutable_inputs(),
           )
@@ -172,8 +168,7 @@ impl super::CommandRunner for CommandRunner {
         let exclusive_spawn = prepare_workdir(
           nailgun_process.workdir_path().to_owned(),
           &client_req,
-          client_req.input_digests.input_files,
-          context.clone(),
+          client_req.input_digests.input_files.clone(),
           self.inner.store.clone(),
           self.executor.clone(),
           self.inner.named_caches(),

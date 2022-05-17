@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
+from typing import ClassVar, Type, cast
 
 from pants.backend.go.target_types import (
     GoImportPathField,
@@ -29,16 +30,27 @@ from pants.backend.go.util_rules.third_party_pkg import (
 )
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.internals.graph import AmbiguousCodegenImplementationsException
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, UnexpandedTargets, WrappedTarget
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    SourcesField,
+    Target,
+    Targets,
+    WrappedTarget,
+)
+from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import bullet_list
 
 
 @dataclass(frozen=True)
 class BuildGoPackageTargetRequest(EngineAwareParameter):
-    """Build a `go_package` or `go_third_party_package` target and its dependencies as `__pkg__.a`
-    files."""
+    """Build a `go_package`, `go_third_party_package`, or Go codegen target and its dependencies as
+    `__pkg__.a` files."""
 
     address: Address
     is_main: bool = False
@@ -48,14 +60,67 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
         return str(self.address)
 
 
+@union
+@dataclass(frozen=True)
+class GoCodegenBuildRequest:
+    """The plugin hook to build/compile Go code.
+
+    Note that you should still use the normal `GenerateSourcesRequest` plugin hook from
+    `pants.engine.target` too, which is necessary for integrations like the `export-codegen` goal.
+    However, that is only helpful to generate the raw `.go` files; you also need to use this
+    plugin hook so that Pants knows how to compile those generated `.go` files.
+
+    Subclass this and set the class property `generate_from`. Define a rule that goes from your
+    subclass to `BuildGoPackageRequest` - the request must result in valid compilation, which you
+    should test for by using `rule_runner.request(BuiltGoPackage, BuildGoPackageRequest)` in your
+    tests. For example, make sure to set up any third-party packages needed by the generated code.
+    Finally, register `UnionRule(GoCodegenBuildRequest, MySubclass)`.
+    """
+
+    target: Target
+
+    generate_from: ClassVar[type[SourcesField]]
+
+
+def maybe_get_codegen_request_type(
+    tgt: Target, union_membership: UnionMembership
+) -> GoCodegenBuildRequest | None:
+    if not tgt.has_field(SourcesField):
+        return None
+    generate_request_types = cast(
+        FrozenOrderedSet[Type[GoCodegenBuildRequest]], union_membership.get(GoCodegenBuildRequest)
+    )
+    sources_field = tgt[SourcesField]
+    relevant_requests = [
+        req for req in generate_request_types if isinstance(sources_field, req.generate_from)
+    ]
+    if len(relevant_requests) > 1:
+        generate_from_sources = relevant_requests[0].generate_from.__name__
+        raise AmbiguousCodegenImplementationsException(
+            f"Multiple registered code generators from {GoCodegenBuildRequest.__name__} can "
+            f"generate from {generate_from_sources}. It is ambiguous which implementation to "
+            f"use.\n\n"
+            f"Possible implementations:\n\n"
+            f"{bullet_list(sorted(generator.__name__ for generator in relevant_requests))}"
+        )
+    return relevant_requests[0](tgt) if relevant_requests else None
+
+
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuildGoPackageRequest` subclassing `EngineAwareReturnType`).
 @rule(desc="Set up Go compilation request", level=LogLevel.DEBUG)
 async def setup_build_go_package_target_request(
-    request: BuildGoPackageTargetRequest,
+    request: BuildGoPackageTargetRequest, union_membership: UnionMembership
 ) -> FallibleBuildGoPackageRequest:
     wrapped_target = await Get(WrappedTarget, Address, request.address)
     target = wrapped_target.target
+
+    codegen_request = maybe_get_codegen_request_type(target, union_membership)
+    if codegen_request:
+        codegen_result = await Get(
+            FallibleBuildGoPackageRequest, GoCodegenBuildRequest, codegen_request
+        )
+        return codegen_result
 
     embed_config: EmbedConfig | None = None
     if target.has_field(GoPackageSourcesField):
@@ -92,7 +157,7 @@ async def setup_build_go_package_target_request(
             #  package archive?
             # TODO: The `go` tool changes the displayed import path for the package when it has
             #  test files. Do we need to do something similar?
-            go_file_names += _first_party_pkg_analysis.test_files
+            go_file_names += _first_party_pkg_analysis.test_go_files
             if _first_party_pkg_digest.test_embed_config:
                 if embed_config:
                     embed_config = embed_config.merge(_first_party_pkg_digest.test_embed_config)
@@ -123,20 +188,19 @@ async def setup_build_go_package_target_request(
 
     else:
         raise AssertionError(
-            f"Unknown how to build `{target.alias}` target at address {request.address} with Go."
+            f"Unknown how to build `{target.alias}` target at address {request.address} with Go. "
             "Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose with this "
             "message!"
         )
 
-    # TODO: If you use `Targets` here, then we replace the direct dep on the `go_mod` with all
-    #  of its generated targets...Figure this out.
-    all_deps = await Get(UnexpandedTargets, DependenciesRequest(target[Dependencies]))
+    all_deps = await Get(Targets, DependenciesRequest(target[Dependencies]))
     maybe_direct_dependencies = await MultiGet(
         Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(tgt.address))
         for tgt in all_deps
         if (
             tgt.has_field(GoPackageSourcesField)
             or tgt.has_field(GoThirdPartyPackageDependenciesField)
+            or bool(maybe_get_codegen_request_type(tgt, union_membership))
         )
     )
     direct_dependencies = []

@@ -16,12 +16,47 @@ from pants.backend.codegen.thrift.target_types import (
 )
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files, stripped_source_files
-from pants.engine import process
 from pants.engine.internals import graph
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.jvm.dependency_inference import artifact_mapper
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
+from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
+from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+from pants.jvm.target_types import JvmArtifactTarget
 from pants.source import source_root
 from pants.testutil.rule_runner import RuleRunner, logging
+
+LIBTHRIFT_RESOLVE = TestCoursierWrapper.new(
+    entries=(
+        CoursierLockfileEntry(
+            coord=Coordinate(
+                group="org.apache.thrift",
+                artifact="libthrift",
+                version="0.15.0",
+            ),
+            file_name="libthrift-0.15.0.jar",
+            direct_dependencies=Coordinates([]),
+            dependencies=Coordinates([]),
+            file_digest=FileDigest(
+                "e9c47420147cbb87a6df08bc36da04e2be1561967b5ef82d2f3ef9ec090d85d0",
+                305670,
+            ),
+        ),
+        # Note: The transitive dependencies of libthrift have been intentionally omitted from this resolve.
+    ),
+).serialize(
+    [
+        ArtifactRequirement(
+            Coordinate(
+                group="org.apache.thrift",
+                artifact="libthrift",
+                version="0.15.0",
+            )
+        )
+    ]
+)
 
 
 @pytest.fixture
@@ -35,11 +70,11 @@ def rule_runner() -> RuleRunner:
             *source_root.rules(),
             *graph.rules(),
             *stripped_source_files.rules(),
-            *process.rules(),
+            *artifact_mapper.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromThriftRequest]),
         ],
-        target_types=[ThriftSourcesGeneratorTarget],
+        target_types=[ThriftSourcesGeneratorTarget, JvmArtifactTarget],
     )
 
 
@@ -113,6 +148,18 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
                 """
             ),
             "tests/thrift/test_thrifts/BUILD": "thrift_sources(dependencies=['src/thrift/dir2'])",
+            "3rdparty/jvm/default.lock": LIBTHRIFT_RESOLVE,
+            "3rdparty/BUILD": dedent(
+                """\
+                jvm_artifact(
+                  name="org.apache.thrift_libthrift",
+                  group="org.apache.thrift",
+                  artifact="libthrift",
+                  version="0.15.0",
+                  resolve="jvm-default",
+                )
+                """
+            ),
         }
     )
 

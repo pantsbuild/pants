@@ -22,7 +22,7 @@ use task_executor::Executor;
 use tempfile::TempDir;
 
 use crate::local::prepare_workdir;
-use crate::{Context, ImmutableInputs, NamedCaches, Process, ProcessMetadata};
+use crate::{ImmutableInputs, NamedCaches, Process, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -86,7 +86,6 @@ impl NailgunPool {
   pub async fn acquire(
     &self,
     server_process: Process,
-    context: Context,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
   ) -> Result<BorrowedNailgunProcess, String> {
@@ -129,7 +128,6 @@ impl NailgunPool {
         name.clone(),
         server_process,
         &self.workdir_base,
-        context,
         &self.store,
         self.executor.clone(),
         named_caches,
@@ -171,7 +169,7 @@ impl NailgunPool {
   ///
   /// Find the least recently used idle (but not necessarily usable) process in the pool.
   ///
-  fn find_lru_idle(pool_entries: &mut Vec<PoolEntry>) -> Result<Option<usize>, String> {
+  fn find_lru_idle(pool_entries: &mut [PoolEntry]) -> Result<Option<usize>, String> {
     // 24 hours of clock skew would be surprising?
     let mut lru_age = Instant::now() + Duration::from_secs(60 * 60 * 24);
     let mut lru = None;
@@ -337,7 +335,6 @@ impl NailgunProcess {
     name: String,
     startup_options: Process,
     workdir_base: &Path,
-    context: Context,
     store: &Store,
     executor: Executor,
     named_caches: &NamedCaches,
@@ -356,8 +353,7 @@ impl NailgunProcess {
     prepare_workdir(
       workdir.path().to_owned(),
       &startup_options,
-      startup_options.input_digests.input_files,
-      context.clone(),
+      startup_options.input_digests.input_files.clone(),
       store.clone(),
       executor.clone(),
       named_caches,

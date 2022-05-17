@@ -1,48 +1,47 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::context::Context;
-use crate::externs;
-use crate::nodes::{lift_directory_digest, lift_file_digest};
+use std::sync::Arc;
 
+use crate::externs;
 use crate::externs::fs::PyFileDigest;
+use crate::nodes::{lift_directory_digest, lift_file_digest};
+use crate::Value;
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use workunit_store::{
-  ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, UserMetadataPyValue,
-};
+
+use workunit_store::{ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, WorkunitMetadata};
 
 // Note: these functions should not panic, but we also don't preserve errors (e.g. to log) because
 // we rely on MyPy to catch TypeErrors with using the APIs incorrectly. So we convert errors to
 // be like the user did not set extra metadata.
 
 #[derive(Default, Clone, Debug)]
-pub(crate) struct EngineAwareReturnType {
-  level: Option<Level>,
-  message: Option<String>,
-  metadata: Vec<(String, UserMetadataItem)>,
-  artifacts: Vec<(String, ArtifactOutput)>,
-}
+pub(crate) struct EngineAwareReturnType;
 
 impl EngineAwareReturnType {
-  pub(crate) fn from_task_result(task_result: &PyAny, context: &Context) -> Self {
-    Self {
-      level: Self::level(task_result),
-      message: Self::message(task_result),
-      artifacts: Self::artifacts(task_result).unwrap_or_else(Vec::new),
-      metadata: metadata(context, task_result).unwrap_or_else(Vec::new),
-    }
-  }
+  pub(crate) fn update_workunit(workunit: &mut RunningWorkunit, task_result: &PyAny) {
+    workunit.update_metadata(|old| {
+      let new_level = Self::level(task_result);
 
-  pub(crate) fn update_workunit(self, workunit: &mut RunningWorkunit) {
-    workunit.update_metadata(|mut metadata| {
-      if let Some(new_level) = self.level {
-        metadata.level = new_level;
-      }
-      metadata.message = self.message;
-      metadata.artifacts.extend(self.artifacts);
-      metadata.user_metadata.extend(self.metadata);
+      // If the metadata already existed, or if its level changed, we need to update it.
+      let (mut metadata, level) = if let Some((metadata, old_level)) = old {
+        (metadata, new_level.unwrap_or(old_level))
+      } else if let Some(level) = new_level {
+        (WorkunitMetadata::default(), level)
+      } else {
+        return None;
+      };
+
+      metadata.message = Self::message(task_result);
       metadata
+        .artifacts
+        .extend(Self::artifacts(task_result).unwrap_or_default());
+      metadata
+        .user_metadata
+        .extend(metadata_for(task_result).unwrap_or_default());
+      Some((metadata, level))
     });
   }
 
@@ -73,11 +72,11 @@ impl EngineAwareReturnType {
 
     for kv_pair in artifacts_dict.items().into_iter() {
       let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
-      let artifact_output = if value.is_instance::<PyFileDigest>().unwrap_or(false) {
+      let artifact_output = if value.is_instance_of::<PyFileDigest>().unwrap_or(false) {
         lift_file_digest(value).map(ArtifactOutput::FileDigest)
       } else {
         let digest_value = value.getattr("digest").ok()?;
-        lift_directory_digest(digest_value).map(ArtifactOutput::Snapshot)
+        lift_directory_digest(digest_value).map(|dd| ArtifactOutput::Snapshot(Arc::new(dd)))
       }
       .ok()?;
       output.push((key, artifact_output));
@@ -101,12 +100,12 @@ impl EngineAwareParameter {
     hint.extract().ok()
   }
 
-  pub fn metadata(context: &Context, obj: &PyAny) -> Vec<(String, UserMetadataItem)> {
-    metadata(context, obj).unwrap_or_else(Vec::new)
+  pub fn metadata(obj: &PyAny) -> Vec<(String, UserMetadataItem)> {
+    metadata_for(obj).unwrap_or_default()
   }
 }
 
-fn metadata(context: &Context, obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
+fn metadata_for(obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
   let metadata_val = obj.call_method0("metadata").ok()?;
   if metadata_val.is_none() {
     return None;
@@ -116,13 +115,9 @@ fn metadata(context: &Context, obj: &PyAny) -> Option<Vec<(String, UserMetadataI
   let metadata_dict = metadata_val.cast_as::<PyDict>().ok()?;
 
   for kv_pair in metadata_dict.items().into_iter() {
-    let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
-    let py_value_handle = UserMetadataPyValue::new();
-    let umi = UserMetadataItem::PyValue(py_value_handle.clone());
-    context.session.with_metadata_map(|map| {
-      map.insert(py_value_handle.clone(), value.into());
-    });
-    output.push((key, umi));
+    let (key, py_any): (String, &PyAny) = kv_pair.extract().ok()?;
+    let value: Value = Value::new(py_any.into());
+    output.push((key, UserMetadataItem::PyValue(Arc::new(value))));
   }
   Some(output)
 }

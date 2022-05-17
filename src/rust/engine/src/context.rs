@@ -1,6 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::cmp::max;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
 use std::future::Future;
@@ -103,6 +104,8 @@ pub struct ExecutionStrategyOptions {
   pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
   pub remote_cache_write: bool,
+  pub child_max_memory: usize,
+  pub child_default_memory: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -181,17 +184,25 @@ impl Core {
 
     let maybe_nailgunnable_local_command_runner: Box<dyn CommandRunner> =
       if exec_strategy_opts.local_enable_nailgun {
+        // We set the nailgun pool size to the number of instances that fit within the memory
+        // parameters configured when a max child process memory has been given.
+        // Otherwise, pool size will be double of the local parallelism so we can always keep
+        // a jvm warmed up.
+        let pool_size: usize = if exec_strategy_opts.child_max_memory > 0 {
+          max(
+            1,
+            exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
+          )
+        } else {
+          exec_strategy_opts.local_parallelism * 2
+        };
+
         Box::new(nailgun::CommandRunner::new(
           local_command_runner,
           local_execution_root_dir.to_path_buf(),
           store.clone(),
           executor.clone(),
-          // We set the nailgun pool size to twice the number that will ever be active in order to
-          // keep warm but idle processes for task fingerprints which are not currently busy (e.g.
-          // while busy running scalac, keeping some javac processes idle).
-          // TODO: The nailgun pool size should be configurable independent of concurrency, along
-          // with per-instance memory usage. See https://github.com/pantsbuild/pants/issues/13067.
-          exec_strategy_opts.local_parallelism * 2,
+          pool_size,
         ))
       } else {
         Box::new(local_command_runner)

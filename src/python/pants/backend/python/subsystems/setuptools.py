@@ -39,8 +39,8 @@ class Setuptools(PythonToolRequirementsBase):
     default_extra_requirements = ["wheel>=0.35.1,<0.38"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/setuptools_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/setuptools.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
 
@@ -49,14 +49,19 @@ class SetuptoolsLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc="Determine all Python interpreter versions used by setuptools in your project",
+    desc=(
+        "Determine all Python interpreter versions used by setuptools in your project "
+        "(for lockfile generation)"
+    ),
     level=LogLevel.DEBUG,
 )
 async def setup_setuptools_lockfile(
     _: SetuptoolsLockfileSentinel, setuptools: Setuptools, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    if not setuptools.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(setuptools)
+    if not setuptools.uses_custom_lockfile:
+        return GeneratePythonLockfile.from_tool(
+            setuptools, use_pex=python_setup.generate_lockfiles_with_pex
+        )
 
     all_tgts = await Get(AllTargets, AllTargetsRequest())
     transitive_targets_per_python_dist = await MultiGet(
@@ -71,7 +76,9 @@ async def setup_setuptools_lockfile(
     }
     constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
     return GeneratePythonLockfile.from_tool(
-        setuptools, constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+        setuptools,
+        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        use_pex=python_setup.generate_lockfiles_with_pex,
     )
 
 

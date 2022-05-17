@@ -30,6 +30,11 @@ namespace_init_path = Path("src/python/pants/__init__.py")
 
 
 def pytest_sessionstart(session) -> None:
+    if namespace_init_path.exists():
+        raise Exception(
+            f"In order for `pants` to be a namespace package, {namespace_init_path} must not "
+            f"exist on disk. See the explanation in {__file__}."
+        )
     namespace_init_path.touch()
 
 

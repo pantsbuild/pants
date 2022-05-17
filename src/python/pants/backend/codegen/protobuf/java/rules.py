@@ -3,7 +3,11 @@
 
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufSourceField,
+    ProtobufSourcesGeneratorTarget,
+    ProtobufSourceTarget,
+)
 from pants.backend.java.target_types import JavaSourceField
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -28,6 +32,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
@@ -121,4 +126,8 @@ def rules():
         *collect_rules(),
         *pex.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
+        ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
+        ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
     ]

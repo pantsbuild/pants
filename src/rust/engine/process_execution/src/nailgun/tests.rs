@@ -7,7 +7,7 @@ use testutil::owned_string_vec;
 use workunit_store::WorkunitStore;
 
 use crate::nailgun::NailgunPool;
-use crate::{Context, ImmutableInputs, NamedCaches, Process};
+use crate::{ImmutableInputs, NamedCaches, Process};
 
 fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs) {
   let _ = WorkunitStore::setup_for_tests();
@@ -34,7 +34,6 @@ async fn run(pool: &(NailgunPool, NamedCaches, ImmutableInputs), port: u16) -> P
         "-c",
         &format!("echo Mock port {}.; sleep 10", port),
       ])),
-      Context::default(),
       &pool.1,
       &pool.2,
     )

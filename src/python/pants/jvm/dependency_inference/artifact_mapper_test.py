@@ -15,13 +15,15 @@ from pants.backend.java.target_types import (
     JunitTestsGeneratorTarget,
 )
 from pants.backend.java.target_types import rules as java_target_rules
-from pants.core.util_rules import config_files, source_files
+from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import Dependencies, DependenciesRequest
 from pants.jvm.dependency_inference.artifact_mapper import (
+    DEFAULT_SYMBOL_NAMESPACE,
     FrozenTrieNode,
-    ThirdPartyPackageToArtifactMapping,
+    MutableTrieNode,
+    ThirdPartySymbolMapping,
 )
 from pants.jvm.dependency_inference.symbol_mapper import JvmFirstPartyPackageMappingException
 from pants.jvm.jdk_rules import rules as java_util_rules
@@ -29,13 +31,9 @@ from pants.jvm.resolve import jvm_tool
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
-from pants.testutil.rule_runner import (
-    PYTHON_BOOTSTRAP_ENV,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    logging,
-)
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
+from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @pytest.fixture
@@ -49,9 +47,10 @@ def rule_runner() -> RuleRunner:
             *java_util_rules(),
             *javac_rules(),
             *source_files.rules(),
+            *system_binaries.rules(),
             *util_rules(),
             QueryRule(Addresses, [DependenciesRequest]),
-            QueryRule(ThirdPartyPackageToArtifactMapping, []),
+            QueryRule(ThirdPartySymbolMapping, []),
         ],
         objects={"parametrize": Parametrize},
         target_types=[
@@ -65,7 +64,30 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@logging
+def test_trie_node_merge_basic() -> None:
+    one = MutableTrieNode()
+    one.insert("a/b/c", [Address("1")], recursive=True, first_party=False)
+    one.insert("a/b/c/d", [Address("2")], recursive=False, first_party=False)
+    two = MutableTrieNode()
+    two.insert("a/b/c/d", [Address("3")], recursive=False, first_party=False)
+
+    merged = FrozenTrieNode.merge([one.frozen(), two.frozen()])
+    assert list(merged) == [
+        (
+            "a/b/c",
+            True,
+            FrozenDict({DEFAULT_SYMBOL_NAMESPACE: FrozenOrderedSet([Address("1")])}),
+            False,
+        ),
+        (
+            "a/b/c/d",
+            False,
+            FrozenDict({DEFAULT_SYMBOL_NAMESPACE: FrozenOrderedSet([Address("2"), Address("3")])}),
+            False,
+        ),
+    ]
+
+
 @maybe_skip_jdk_test
 def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
@@ -111,8 +133,8 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
         }
     )
 
-    mapping = rule_runner.request(ThirdPartyPackageToArtifactMapping, [])
-    root_node = mapping.mapping_roots["jvm-default"]
+    mapping = rule_runner.request(ThirdPartySymbolMapping, [])
+    root_node = mapping["jvm-default"]
 
     # Handy trie traversal function to placate mypy
     def traverse(*children) -> FrozenTrieNode:
@@ -126,22 +148,24 @@ def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
         return node
 
     # Provided by `JVM_ARTFACT_MAPPINGS.`
-    assert set(traverse("org", "junit").addresses) == {
+    assert set(traverse("org", "junit").addresses[DEFAULT_SYMBOL_NAMESPACE]) == {
         Address("", target_name="junit_junit"),
     }
 
     # Provided by options.
-    assert set(traverse("io", "github", "frenchtoast", "savory").addresses) == {
+    assert set(
+        traverse("io", "github", "frenchtoast", "savory").addresses[DEFAULT_SYMBOL_NAMESPACE]
+    ) == {
         Address("", target_name="github-frenchtoast_savory"),
     }
 
     # Provided on the `jvm_artifact`.
-    assert set(traverse("but", "let", "us", "pretend").addresses) == {
+    assert set(traverse("but", "let", "us", "pretend").addresses[DEFAULT_SYMBOL_NAMESPACE]) == {
         Address("", target_name="does.not_exist"),
     }
 
     # Defaulting to the `group`.
-    assert set(traverse("is", "a", "total").addresses) == {
+    assert set(traverse("is", "a", "total").addresses[DEFAULT_SYMBOL_NAMESPACE]) == {
         Address("", target_name="is.a.total_mystery"),
     }
 

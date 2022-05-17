@@ -10,13 +10,17 @@ import pytest
 from pkg_resources import Requirement
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import InterpreterConstraintsField
+from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+)
 from pants.backend.python.util_rules.interpreter_constraints import (
     _PATCH_VERSION_UPPER_BOUND,
     InterpreterConstraints,
 )
 from pants.build_graph.address import Address
-from pants.engine.target import FieldSet
+from pants.engine.target import CoarsenedTarget, FieldSet, Target
 from pants.testutil.option_util import create_subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -125,13 +129,40 @@ def test_merge_interpreter_constraints() -> None:
     # No interpreter is shorthand for CPython, which is how Pex behaves
     assert_merged(inp=[[">=3.5"], ["CPython==3.7.*"]], expected=["CPython>=3.5,==3.7.*"])
 
-    # Different Python interpreters, which are guaranteed to fail when ANDed but are safe when ORed.
-    with pytest.raises(ValueError):
-        InterpreterConstraints.merge_constraint_sets([["CPython==3.7.*"], ["PyPy==43.0"]])
-    assert_merged(inp=[["CPython==3.7.*", "PyPy==43.0"]], expected=["CPython==3.7.*", "PyPy==43.0"])
-
-    # Ensure we can handle empty input.
+    # Handle empty constraints correctly.
+    assert_merged(inp=[[], []], expected=[])
+    assert_merged(inp=[[], ["==3.8.*"]], expected=["CPython==3.8.*"])
+    assert_merged(inp=[[">=3.8.2"], [], ["==3.8.*"]], expected=["CPython>=3.8.2,==3.8.*"])
     assert_merged(inp=[], expected=[])
+
+    # Handle mixed types correctly when there is a solution.
+    assert_merged(inp=[["CPython==3.7.*", "PyPy==43.0"]], expected=["CPython==3.7.*", "PyPy==43.0"])
+    assert_merged(
+        inp=[["CPython==3.7.*", "PyPy>=43.0"], ["PyPy<44.0"]], expected=["PyPy>=43.0,<44.0"]
+    )
+    assert_merged(
+        inp=[
+            ["CPython==3.7.*", "Jython", "PyPy>=43.0"],
+            ["PyPy<44.0", "Jython>=1.2"],
+            ["Jython<1.3", "PyPy<44.0"],
+        ],
+        expected=["PyPy>=43.0,<44.0", "Jython>=1.2,<1.3"],
+    )
+
+    # Ensure we error when there is no solution.
+    def assert_impossible(constraints, expected_msg):
+        with pytest.raises(ValueError) as excinfo:
+            print(InterpreterConstraints.merge_constraint_sets(constraints))
+        assert str(excinfo.value) == (
+            "These interpreter constraints cannot be merged, as they require conflicting "
+            f"interpreter types: {expected_msg}"
+        )
+
+    assert_impossible([["CPython==3.7.*"], ["PyPy==43.0"]], "(CPython==3.7.*) AND (PyPy==43.0)")
+    assert_impossible(
+        [["CPython==3.7.*", "Jython>=1.2"], ["PyPy==43.0", "Stackless<3.7"]],
+        "(CPython==3.7.* OR Jython>=1.2) AND (PyPy==43.0 OR Stackless<3.7)",
+    )
 
 
 @pytest.mark.parametrize(
@@ -421,6 +452,51 @@ def test_contains(candidate, target, matches) -> None:
             InterpreterConstraints(target), ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
         )
         == matches
+    )
+
+
+@pytest.mark.parametrize(
+    "root_ics,ics_by_path_spec",
+    (
+        (["==3.5.*", None], {"root1": "==3.5.*", "inner": ">=3.5"}),
+        (None, {"root1": "==3.5.*", "inner": ">=3.6"}),
+        (["==3.7.*", ">=3.5"], {"root1": "==3.7.*", "inner": ">=3.6", "leaf": ">=3.5"}),
+        (["==3.5.*", ">=3.5"], {"root1": "==3.5.*", "leaf": ">=3.5"}),
+        (None, {"root1": "==3.5.*", "leaf": ">=3.6"}),
+        ([None, "==3.5.*"], {"root2": "==3.5.*", "root3": "==3.5.*"}),
+        (None, {"root2": "==3.5.*", "root3": "==3.6.*"}),
+        (None, {"root2": "==3.5.*", "root3": ">=3.5"}),
+    ),
+)
+def test_validate_targets(
+    root_ics: list[str | None] | None, ics_by_path_spec: dict[str, str]
+) -> None:
+    def t(path_spec: str) -> Target:
+        address = Address(path_spec)
+        ics = ics_by_path_spec.get(path_spec)
+        if ics is None:
+            return PythonSourcesGeneratorTarget({}, address)
+        else:
+            return PythonSourceTarget(
+                {InterpreterConstraintsField.alias: [ics], "source": f"{path_spec}.py"}, address
+            )
+
+    expected = (
+        [(InterpreterConstraints([ics]) if ics else None) for ics in root_ics] if root_ics else None
+    )
+    assert expected == InterpreterConstraints.compute_for_targets(
+        [
+            CoarsenedTarget(
+                [t("root1")],
+                [CoarsenedTarget([t("inner")], [CoarsenedTarget([t("leaf")], [])])],
+            ),
+            CoarsenedTarget([t("root2"), t("root3")], [CoarsenedTarget([t("leaf")], [])]),
+        ],
+        create_subsystem(
+            PythonSetup,
+            interpreter_constraints=[],
+            interpreter_versions_universe=["3.5", "3.6", "3.7"],
+        ),
     )
 
 

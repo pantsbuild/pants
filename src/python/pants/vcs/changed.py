@@ -18,7 +18,9 @@ from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
-from pants.vcs.git import Git
+from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
+from pants.vcs.git import GitWorktree
 
 
 class DependeesOption(Enum):
@@ -39,18 +41,29 @@ class ChangedAddresses(Collection[Address]):
 
 @rule
 async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
-    owners = await Get(Owners, OwnersRequest(request.sources))
+    owners = await Get(Owners, OwnersRequest(request.sources, filter_by_global_options=True))
     if request.dependees == DependeesOption.NONE:
         return ChangedAddresses(owners)
-    dependees_with_roots = await Get(
+
+    # See https://github.com/pantsbuild/pants/issues/15313. We filter out target generators because
+    # they are not useful as aliases for their generated targets in the context of
+    # `--changed-since`. Including them makes it look like all sibling targets from the same
+    # target generator have also changed.
+    #
+    # However, we also must be careful to preserve if target generators are direct owners, which
+    # happens when a generated file is deleted.
+    owner_target_generators = FrozenOrderedSet(
+        addr.maybe_convert_to_target_generator() for addr in owners if addr.is_generated_target
+    )
+    dependees = await Get(
         Dependees,
         DependeesRequest(
             owners,
             transitive=request.dependees == DependeesOption.TRANSITIVE,
-            include_roots=True,
+            include_roots=False,
         ),
     )
-    return ChangedAddresses(dependees_with_roots)
+    return ChangedAddresses(FrozenOrderedSet(owners) | (dependees - owner_target_generators))
 
 
 @dataclass(frozen=True)
@@ -73,15 +86,17 @@ class ChangedOptions:
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
 
-    def changed_files(self, git: Git) -> list[str]:
+    def changed_files(self, git_worktree: GitWorktree) -> list[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:
-            return cast(List[str], git.changes_in(self.diffspec, relative_to=get_buildroot()))
+            return cast(
+                List[str], git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
+            )
 
-        changes_since = self.since or git.current_rev_identifier
+        changes_since = self.since or git_worktree.current_rev_identifier
         return cast(
             List[str],
-            git.changed_files(
+            git_worktree.changed_files(
                 from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
             ),
         )
@@ -89,17 +104,22 @@ class ChangedOptions:
 
 class Changed(Subsystem):
     options_scope = "changed"
-    help = (
-        "Tell Pants to detect what files and targets have changed from Git.\n\n"
-        f"See {doc_url('advanced-target-selection')}."
+    help = softwrap(
+        f"""
+        Tell Pants to detect what files and targets have changed from Git.
+
+        See {doc_url('advanced-target-selection')}.
+        """
     )
 
     since = StrOption(
         "--since",
+        default=None,
         help="Calculate changes since this Git spec (commit range/SHA/ref).",
     )
     diffspec = StrOption(
         "--diffspec",
+        default=None,
         help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
     )
     dependees = EnumOption(

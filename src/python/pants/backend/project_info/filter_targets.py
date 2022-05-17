@@ -18,9 +18,11 @@ from pants.engine.target import (
     UnexpandedTargets,
     UnrecognizedTargetTypeException,
 )
+from pants.option.option_types import EnumOption, StrListOption
 from pants.util.enums import match
 from pants.util.filtering import and_filters, create_filters
 from pants.util.memo import memoized
+from pants.util.strutil import softwrap
 
 
 class TargetGranularity(Enum):
@@ -31,46 +33,45 @@ class TargetGranularity(Enum):
 
 class FilterSubsystem(LineOriented, GoalSubsystem):
     name = "filter"
-    help = (
-        "Filter the input targets based on various criteria.\n\nMost of the filtering options "
-        "below are comma-separated lists of filtering criteria, with an implied logical OR between "
-        "them, so that a target passes the filter if it matches any of the criteria in the list. "
-        "A '-' prefix inverts the sense of the entire comma-separated list, so that a target "
-        "passes the filter only if it matches none of the criteria in the list.\n\nEach of the "
-        "filtering options may be specified multiple times, with an implied logical AND between "
-        "them."
+    help = softwrap(
+        """
+        Filter the input targets based on various criteria.
+
+        Most of the filtering options below are comma-separated lists of filtering criteria, with
+        an implied logical OR between them, so that a target passes the filter if it matches any of
+        the criteria in the list. A '-' prefix inverts the sense of the entire comma-separated list,
+        so that a target passes the filter only if it matches none of the criteria in the list.
+
+        Each of the filtering options may be specified multiple times, with an implied logical AND
+        between them.
+        """
     )
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--target-type",
-            type=list,
-            metavar="[+-]type1,type2,...",
-            help="Filter on these target types, e.g. `resources` or `python_sources`.",
-        )
-        register(
-            "--granularity",
-            type=TargetGranularity,
-            default=TargetGranularity.all_targets,
-            help=(
-                "Filter to rendering only targets declared in BUILD files, only file-level "
-                "targets, or all targets."
-            ),
-        )
-        register(
-            "--address-regex",
-            type=list,
-            metavar="[+-]regex1,regex2,...",
-            help="Filter on target addresses matching these regexes.",
-        )
-        register(
-            "--tag-regex",
-            type=list,
-            metavar="[+-]regex1,regex2,...",
-            help="Filter on targets with tags matching these regexes.",
-        )
+    target_type = StrListOption(
+        "--target-type",
+        metavar="[+-]type1,type2,...",
+        help="Filter on these target types, e.g. `resources` or `python_sources`.",
+    )
+    granularity = EnumOption(
+        "--granularity",
+        default=TargetGranularity.all_targets,
+        help=softwrap(
+            """
+            Filter to rendering only targets declared in BUILD files, only file-level
+            targets, or all targets.
+            """
+        ),
+    )
+    address_regex = StrListOption(
+        "--address-regex",
+        metavar="[+-]regex1,regex2,...",
+        help="Filter on target addresses matching these regexes.",
+    )
+    tag_regex = StrListOption(
+        "--tag-regex",
+        metavar="[+-]regex1,regex2,...",
+        help="Filter on targets with tags matching these regexes.",
+    )
 
 
 class FilterGoal(Goal):
@@ -140,10 +141,10 @@ def filter_targets(
 
     anded_filter: TargetFilter = and_filters(
         [
-            *(create_filters(filter_subsystem.options.target_type, filter_target_type)),
-            *(create_filters(filter_subsystem.options.address_regex, filter_address_regex)),
-            *(create_filters(filter_subsystem.options.tag_regex, filter_tag_regex)),
-            filter_granularity(filter_subsystem.options.granularity),
+            *(create_filters(filter_subsystem.target_type, filter_target_type)),
+            *(create_filters(filter_subsystem.address_regex, filter_address_regex)),
+            *(create_filters(filter_subsystem.tag_regex, filter_tag_regex)),
+            filter_granularity(filter_subsystem.granularity),
         ]
     )
     addresses = sorted(target.address for target in targets if anded_filter(target))

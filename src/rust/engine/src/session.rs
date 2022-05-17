@@ -15,12 +15,12 @@ use async_latch::AsyncLatch;
 use futures::future::{self, AbortHandle, Abortable, FutureExt};
 use graph::LastObserved;
 use log::warn;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use pyo3::prelude::*;
 use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
-use workunit_store::{format_workunit_duration_ms, RunId, UserMetadataPyValue, WorkunitStore};
+use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
@@ -89,7 +89,6 @@ struct SessionState {
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
   run_id: AtomicU32,
-  workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, PyObject>>,
 }
 
 ///
@@ -145,11 +144,20 @@ impl Session {
     core: Arc<Core>,
     dynamic_ui: bool,
     ui_use_prodash: bool,
+    mut max_workunit_level: log::Level,
     build_id: String,
     session_values: PyObject,
     cancelled: AsyncLatch,
   ) -> Result<Session, String> {
-    let workunit_store = WorkunitStore::new(!dynamic_ui);
+    // We record workunits with the maximum level of:
+    // 1. the given `max_workunit_verbosity`, which should be computed from:
+    //     * the log level, to ensure that workunit events are logged
+    //     * the levels required by any consumers who will call `with_latest_workunits`.
+    // 2. the level required by the ConsoleUI (if any): currently, DEBUG.
+    if dynamic_ui {
+      max_workunit_level = std::cmp::max(max_workunit_level, log::Level::Debug);
+    }
+    let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level);
     let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &workunit_store,
       core.local_parallelism,
@@ -175,7 +183,6 @@ impl Session {
         workunit_store,
         session_values: Mutex::new(session_values),
         run_id: AtomicU32::new(run_id.0),
-        workunit_metadata_map: RwLock::new(HashMap::new()),
       }),
     })
   }
@@ -230,13 +237,6 @@ impl Session {
   ///
   pub async fn cancelled(&self) {
     self.handle.cancelled.triggered().await;
-  }
-
-  pub fn with_metadata_map<F, T>(&self, f: F) -> T
-  where
-    F: FnOnce(&mut HashMap<UserMetadataPyValue, PyObject>) -> T,
-  {
-    f(&mut self.state.workunit_metadata_map.write())
   }
 
   pub fn roots_extend(&self, new_roots: Vec<(Root, Option<LastObserved>)>) {
@@ -399,6 +399,7 @@ impl Sessions {
         .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
       let (abort_handle, abort_registration) = AbortHandle::new_pair();
       let sessions = sessions.clone();
+      #[allow(clippy::let_underscore_lock)]
       let _ = executor.spawn(Abortable::new(
         async move {
           loop {

@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
@@ -127,7 +128,7 @@ async def setup_scalatest_for_target(
             "-o",
             "-u",
             reports_dir,
-            *scalatest.options.args,
+            *scalatest.args,
         ],
         input_digest=input_digest,
         extra_immutable_input_digests=extra_immutable_input_digests,

@@ -19,6 +19,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourcesGeneratorTarget,
 )
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
+from pants.backend.python.dependency_inference import module_mapper
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
@@ -58,6 +59,7 @@ def rule_runner() -> RuleRunner:
             *additional_fields.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
+            *module_mapper.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GeneratePythonFromProtobufRequest]),
         ],
@@ -74,7 +76,11 @@ def assert_files_generated(
     mypy: bool = False,
     extra_args: list[str] | None = None,
 ) -> None:
-    args = [f"--source-root-patterns={repr(source_roots)}", *(extra_args or ())]
+    args = [
+        f"--source-root-patterns={repr(source_roots)}",
+        "--no-python-protobuf-infer-runtime-dependency",
+        *(extra_args or ()),
+    ]
     if mypy:
         args.append("--python-protobuf-mypy-plugin")
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})

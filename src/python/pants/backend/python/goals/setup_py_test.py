@@ -28,6 +28,7 @@ from pants.backend.python.goals.setup_py import (
     OwnedDependency,
     SetupKwargs,
     SetupKwargsRequest,
+    SetupPyError,
     SetupPyGeneration,
     declares_pkg_resources_namespace_package,
     determine_explicitly_provided_setup_kwargs,
@@ -43,6 +44,7 @@ from pants.backend.python.goals.setup_py import (
     validate_commands,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
@@ -52,6 +54,7 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import dists, python_sources
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FileTarget, ResourcesGeneratorTarget, ResourceTarget
 from pants.core.target_types import rules as core_target_types_rules
@@ -61,7 +64,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import InvalidFieldException
 from pants.engine.unions import UnionRule
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
@@ -127,9 +130,17 @@ def assert_chroot(
     expected_files: list[str],
     expected_setup_kwargs,
     addr: Address,
+    interpreter_constraints: InterpreterConstraints | None = None,
 ) -> None:
+    if interpreter_constraints is None:
+        interpreter_constraints = InterpreterConstraints(
+            PythonSetup.default_interpreter_constraints
+        )
+
     tgt = rule_runner.get_target(addr)
-    req = DistBuildChrootRequest(ExportedTarget(tgt), py2=False)
+    req = DistBuildChrootRequest(
+        ExportedTarget(tgt), interpreter_constraints=interpreter_constraints
+    )
     chroot = rule_runner.request(DistBuildChroot, [req])
     snapshot = rule_runner.request(Snapshot, [chroot.digest])
     assert sorted(expected_files) == sorted(snapshot.files)
@@ -137,7 +148,8 @@ def assert_chroot(
     if expected_setup_kwargs is not None:
         sources = rule_runner.request(DistBuildSources, [req])
         setup_kwargs = rule_runner.request(
-            FinalizedSetupKwargs, [GenerateSetupPyRequest(ExportedTarget(tgt), sources)]
+            FinalizedSetupKwargs,
+            [GenerateSetupPyRequest(ExportedTarget(tgt), sources, interpreter_constraints)],
         )
         assert expected_setup_kwargs == setup_kwargs.kwargs
 
@@ -147,7 +159,12 @@ def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: type[Ex
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
             DistBuildChroot,
-            [DistBuildChrootRequest(ExportedTarget(tgt), py2=False)],
+            [
+                DistBuildChrootRequest(
+                    ExportedTarget(tgt),
+                    InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+                )
+            ],
         )
     ex = excinfo.value
     assert len(ex.wrapped_exceptions) == 1
@@ -166,7 +183,7 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
             "src/python/foo/resources/js/code.js": "",
             "files/BUILD": 'file(source="README.txt")',
             "files/README.txt": "",
-            "src/python/BUILD": textwrap.dedent(
+            "BUILD": textwrap.dedent(
                 """
                 python_distribution(
                     name='foo-dist',
@@ -182,13 +199,14 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
                 python_sources(name="setup", dependencies=["src/python/foo"])
                 """
             ),
-            "src/python/setup.py": textwrap.dedent(
+            "setup.py": textwrap.dedent(
                 """
                 from setuptools import setup
 
                 setup(
                     name = "foo",
                     version = "1.2.3",
+                    package_dir={"": "src/python"},
                     packages = ["foo"],
                 )
                 """
@@ -213,15 +231,15 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
         [
             "setup.py",
             "files/README.txt",
-            "foo/bar/__init__.py",
-            "foo/bar/bar.py",
-            "foo/bar/bar.pyi",
-            "foo/resources/js/code.js",
-            "foo/__init__.py",
-            "foo/foo.py",
+            "src/python/foo/bar/__init__.py",
+            "src/python/foo/bar/bar.py",
+            "src/python/foo/bar/bar.pyi",
+            "src/python/foo/resources/js/code.js",
+            "src/python/foo/__init__.py",
+            "src/python/foo/foo.py",
         ],
         None,
-        Address("src/python", target_name="foo-dist"),
+        Address("", target_name="foo-dist"),
     )
 
 
@@ -283,6 +301,7 @@ def test_use_generate_setup_script_package_provenance_agnostic(chroot_rule_runne
                 )
             },
             "install_requires": (),
+            "python_requires": "<4,>=3.7",
         },
         Address("src/python", target_name="foo-dist"),
     )
@@ -410,6 +429,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
             "namespace_packages": ("foo",),
             "package_data": {"foo": ("resources/js/code.js",), "foo.qux": ("qux.pyi",)},
             "install_requires": ("baz==1.1.1",),
+            "python_requires": "<4,>=3.7",
             "entry_points": {"console_scripts": ["foo_main = foo.qux.bin:main"]},
         },
         Address("src/python/foo", target_name="foo-dist"),
@@ -481,6 +501,7 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
             "namespace_packages": tuple(),
             "package_data": {},
             "install_requires": tuple(),
+            "python_requires": "<4,>=3.7",
             "entry_points": {
                 "console_scripts": [
                     "foo_main = foo.qux.bin:main",
@@ -533,6 +554,7 @@ def test_generate_long_description_field_from_file(chroot_rule_runner: RuleRunne
             "namespace_packages": tuple(),
             "package_data": {},
             "install_requires": tuple(),
+            "python_requires": "<4,>=3.7",
             "long_description": "Some long description.",
         },
         Address("src/python/foo", target_name="foo-dist"),
@@ -596,11 +618,12 @@ def test_generate_long_description_field_from_non_existing_file(
 def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
     chroot_rule_runner.write_files(
         {
+            "src/python/invalid_binary/lib.py": "",
             "src/python/invalid_binary/app1.py": "",
             "src/python/invalid_binary/app2.py": "",
             "src/python/invalid_binary/BUILD": textwrap.dedent(
                 """\
-                python_sources(name='not_a_binary', sources=[])
+                python_sources(name='not_a_binary', sources=['lib.py'])
                 pex_binary(name='invalid_entrypoint_unowned1', entry_point='app1.py')
                 pex_binary(name='invalid_entrypoint_unowned2', entry_point='invalid_binary.app2')
                 python_distribution(
@@ -691,6 +714,7 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
             "packages": ("project",),
             "namespace_packages": (),
             "install_requires": (),
+            "python_requires": "<4,>=3.7",
             "package_data": {},
             "entry_points": {"console_scripts": ["foo = project.app:func"]},
         },
@@ -750,7 +774,12 @@ def test_get_sources() -> None:
         owner_tgt = rule_runner.get_target(Address("src/python/foo", target_name="dist"))
         srcs = rule_runner.request(
             DistBuildSources,
-            [DistBuildChrootRequest(ExportedTarget(owner_tgt), py2=False)],
+            [
+                DistBuildChrootRequest(
+                    ExportedTarget(owner_tgt),
+                    InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+                )
+            ],
         )
         chroot_snapshot = rule_runner.request(Snapshot, [srcs.digest])
 
@@ -845,8 +874,11 @@ def test_get_requirements() -> None:
                 python_requirement(name='ext3', requirements=['ext3==0.0.1'])
                 """
             ),
-            "src/python/foo/bar/baz/BUILD": "python_sources(dependencies=['3rdparty:ext1'], sources=[])",
-            "src/python/foo/bar/qux/BUILD": "python_sources(dependencies=['3rdparty:ext2', 'src/python/foo/bar/baz'], sources=[])",
+            "src/python/foo/bar/baz/a.py": "",
+            "src/python/foo/bar/baz/BUILD": "python_sources(dependencies=['3rdparty:ext1'])",
+            "src/python/foo/bar/qux/a.py": "",
+            "src/python/foo/bar/qux/BUILD": "python_sources(dependencies=['3rdparty:ext2', 'src/python/foo/bar/baz'])",
+            "src/python/foo/bar/a.py": "",
             "src/python/foo/bar/BUILD": textwrap.dedent(
                 """
                 python_distribution(
@@ -855,12 +887,10 @@ def test_get_requirements() -> None:
                     provides=setup_py(name='bar', version='9.8.7'),
                 )
 
-                python_sources(
-                    sources=[],
-                    dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'],
-                )
+                python_sources(dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'])
               """
             ),
+            "src/python/foo/corge/a.py": "",
             "src/python/foo/corge/BUILD": textwrap.dedent(
                 """
                 python_distribution(
@@ -870,10 +900,7 @@ def test_get_requirements() -> None:
                     provides=setup_py(name='corge', version='2.2.2'),
                 )
 
-                python_sources(
-                    sources=[],
-                    dependencies=['src/python/foo/bar'],
-                )
+                python_sources(dependencies=['src/python/foo/bar'])
                 """
             ),
         }
@@ -925,8 +952,11 @@ def test_get_requirements_with_exclude() -> None:
                 python_requirement(name='ext3', requirements=['ext3==0.0.1'])
                 """
             ),
-            "src/python/foo/bar/baz/BUILD": "python_sources(dependencies=['3rdparty:ext1'], sources=[])",
-            "src/python/foo/bar/qux/BUILD": "python_sources(dependencies=['3rdparty:ext2', 'src/python/foo/bar/baz'], sources=[])",
+            "src/python/foo/bar/baz/a.py": "",
+            "src/python/foo/bar/baz/BUILD": "python_sources(dependencies=['3rdparty:ext1'])",
+            "src/python/foo/bar/qux/a.py": "",
+            "src/python/foo/bar/qux/BUILD": "python_sources(dependencies=['3rdparty:ext2', 'src/python/foo/bar/baz'])",
+            "src/python/foo/bar/a.py": "",
             "src/python/foo/bar/BUILD": textwrap.dedent(
                 """
                 python_distribution(
@@ -935,10 +965,7 @@ def test_get_requirements_with_exclude() -> None:
                     provides=setup_py(name='bar', version='9.8.7'),
                 )
 
-                python_sources(
-                    sources=[],
-                    dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'],
-                )
+                python_sources(dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'])
               """
             ),
         }
@@ -981,11 +1008,13 @@ def test_owned_dependencies() -> None:
         {
             "src/python/foo/bar/baz/BUILD": textwrap.dedent(
                 """
-                python_sources(name='baz1', sources=[])
-                python_sources(name='baz2', sources=[])
+                python_sources(name='baz1')
+                python_sources(name='baz2')
                 """
             ),
             "src/python/foo/bar/resource.txt": "",
+            "src/python/foo/bar/bar1.py": "",
+            "src/python/foo/bar/bar2.py": "",
             "src/python/foo/bar/BUILD": textwrap.dedent(
                 """
                 python_distribution(
@@ -996,18 +1025,19 @@ def test_owned_dependencies() -> None:
 
                 python_sources(
                     name='bar1',
-                    sources=[],
+                    sources=['bar1.py'],
                     dependencies=['src/python/foo/bar/baz:baz1'],
                 )
 
                 python_sources(
                     name='bar2',
-                    sources=[],
+                    sources=['bar2.py'],
                     dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
                 )
                 resource(name='bar-resources', source='resource.txt')
                 """
             ),
+            "src/python/foo/foo.py": "",
             "src/python/foo/BUILD": textwrap.dedent(
                 """
                 python_distribution(
@@ -1017,7 +1047,7 @@ def test_owned_dependencies() -> None:
                 )
 
                 python_sources(
-                    sources=[],
+                    sources=['foo.py'],
                     dependencies=['src/python/foo/bar:bar1', 'src/python/foo/bar:bar2'],
                 )
                 """
@@ -1036,14 +1066,18 @@ def test_owned_dependencies() -> None:
         )
 
     assert_owned(
-        ["src/python/foo/bar:bar1", "src/python/foo/bar:bar1-dist", "src/python/foo/bar/baz:baz1"],
+        [
+            "src/python/foo/bar/bar1.py:bar1",
+            "src/python/foo/bar:bar1-dist",
+            "src/python/foo/bar/baz:baz1",
+        ],
         Address("src/python/foo/bar", target_name="bar1-dist"),
     )
     assert_owned(
         [
-            "src/python/foo:foo",
+            "src/python/foo/bar/bar2.py:bar2",
+            "src/python/foo/foo.py",
             "src/python/foo:foo-dist",
-            "src/python/foo/bar:bar2",
             "src/python/foo/bar:bar-resources",
             "src/python/foo/bar/baz:baz2",
         ],
@@ -1098,11 +1132,12 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
         {
             "src/python/foo/bar/baz/BUILD": textwrap.dedent(
                 """
-                python_sources(name='baz1', sources=[])
-                python_sources(name='baz2', sources=[])
+                python_sources(name='baz1')
+                python_sources(name='baz2')
                 """
             ),
             "src/python/foo/bar/resource.ext": "",
+            "src/python/foo/bar/bar2.py": "",
             "src/python/foo/bar/BUILD": textwrap.dedent(
                 """
                 python_distribution(
@@ -1112,12 +1147,12 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
                 )
                 python_sources(
                     name='bar2',
-                    sources=[],
                     dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
                 )
                 resource(name='bar-resources', source='resource.ext')
                 """
             ),
+            "src/python/foo/foo2.py": "",
             "src/python/foo/BUILD": textwrap.dedent(
                 """
                 python_distribution(
@@ -1125,7 +1160,7 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
                     dependencies=['src/python/foo/bar/baz:baz2'],
                     provides=setup_py(name='foo1', version='0.1.2'),
                 )
-                python_sources(name='foo2', sources=[])
+                python_sources(name='foo2')
                 python_distribution(
                     name='foo3',
                     dependencies=['src/python/foo/bar:bar2'],
@@ -1161,7 +1196,7 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
     assert_is_owner(
         exporting_owner_rule_runner,
         "src/python/foo:foo3",
-        Address("src/python/foo/bar", target_name="bar2"),
+        Address("src/python/foo/bar", target_name="bar2", relative_file_path="bar2.py"),
     )
     assert_is_owner(
         exporting_owner_rule_runner,
@@ -1180,7 +1215,7 @@ def test_get_owner_siblings(exporting_owner_rule_runner: RuleRunner) -> None:
         {
             "src/python/siblings/BUILD": textwrap.dedent(
                 """
-                python_sources(name='sibling1', sources=[])
+                python_sources(name='sibling1')
                 python_distribution(
                     name='sibling2',
                     dependencies=['src/python/siblings:sibling1'],
@@ -1208,7 +1243,7 @@ def test_get_owner_not_an_ancestor(exporting_owner_rule_runner: RuleRunner) -> N
         {
             "src/python/notanancestor/aaa/BUILD": textwrap.dedent(
                 """
-                python_sources(name='aaa', sources=[])
+                python_sources(name='aaa')
                 """
             ),
             "src/python/notanancestor/bbb/BUILD": textwrap.dedent(
@@ -1236,7 +1271,7 @@ def test_get_owner_multiple_ancestor_generations(exporting_owner_rule_runner: Ru
         {
             "src/python/aaa/bbb/ccc/BUILD": textwrap.dedent(
                 """
-                python_sources(name='ccc', sources=[])
+                python_sources(name='ccc')
                 """
             ),
             "src/python/aaa/bbb/BUILD": textwrap.dedent(
@@ -1365,3 +1400,39 @@ def test_no_dist_type_selected() -> None:
         "In order to package src/python/aaa:aaa at least one of 'wheel' or 'sdist' must be `True`."
         == str(wrapped_exception)
     )
+
+
+def test_too_many_interpreter_constraints(chroot_rule_runner: RuleRunner) -> None:
+    chroot_rule_runner.write_files(
+        {
+            "src/python/foo/BUILD": textwrap.dedent(
+                """
+                python_distribution(
+                    name='foo-dist',
+                    provides=setup_py(
+                        name='foo',
+                        version='1.2.3',
+                    )
+                )
+                """
+            ),
+        }
+    )
+
+    addr = Address("src/python/foo", target_name="foo-dist")
+    tgt = chroot_rule_runner.get_target(addr)
+    err = (
+        "Expected a single interpreter constraint for src/python/foo:foo-dist, "
+        "got: CPython<3,>=2.7 OR CPython<3.10,>=3.8."
+    )
+
+    with engine_error(SetupPyError, contains=err):
+        chroot_rule_runner.request(
+            DistBuildChroot,
+            [
+                DistBuildChrootRequest(
+                    ExportedTarget(tgt),
+                    InterpreterConstraints([">=2.7,<3", ">=3.8,<3.10"]),
+                )
+            ],
+        )

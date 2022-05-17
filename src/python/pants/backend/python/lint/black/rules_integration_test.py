@@ -14,11 +14,11 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.black.subsystem import rules as black_subsystem_rules
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
@@ -37,7 +37,6 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(LintResults, (BlackRequest,)),
             QueryRule(FmtResult, (BlackRequest,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
@@ -53,7 +52,7 @@ NEEDS_CONFIG_FILE = "animal = 'Koala'\n"  # Note the single quotes.
 
 def run_black(
     rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
-) -> tuple[tuple[LintResult, ...], FmtResult]:
+) -> FmtResult:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python.lint.black", *(extra_args or ())],
         # We propagate LANG and LC_ALL to satisfy click, which black depends upon. Without this we
@@ -72,7 +71,6 @@ def run_black(
         env_inherit={"PATH", "PYENV_ROOT", "HOME", "LANG", "LC_ALL"},
     )
     field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
-    lint_results = rule_runner.request(LintResults, [BlackRequest(field_sets)])
     input_sources = rule_runner.request(
         SourceFiles,
         [
@@ -82,15 +80,16 @@ def run_black(
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            BlackRequest(field_sets, prior_formatter_result=input_sources.snapshot),
+            BlackRequest(field_sets, snapshot=input_sources.snapshot),
         ],
     )
-    return lint_results.results, fmt_result
+    return fmt_result
 
 
-def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
+def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
     files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    return rule_runner.request(Digest, [CreateDigest(files)])
+    digest = rule_runner.request(Digest, [CreateDigest(files)])
+    return rule_runner.request(Snapshot, [digest])
 
 
 @pytest.mark.platform_specific_behavior
@@ -104,28 +103,22 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     interpreter_constraint = (
         ">=3.6.2,<3.7" if major_minor_interpreter == "3.6" else f"=={major_minor_interpreter}.*"
     )
-    lint_results, fmt_result = run_black(
+    fmt_result = run_black(
         rule_runner,
         [tgt],
         extra_args=[f"--black-interpreter-constraints=['{interpreter_constraint}']"],
     )
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": GOOD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_black(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "1 file would be reformatted" in lint_results[0].stderr
+    fmt_result = run_black(rule_runner, [tgt])
     assert "1 file reformatted" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": FIXED_BAD_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -137,12 +130,9 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
-    lint_results, fmt_result = run_black(rule_runner, tgts)
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 1
-    assert "1 file would be reformatted, 1 file would be left unchanged" in lint_results[0].stderr
+    fmt_result = run_black(rule_runner, tgts)
     assert "1 file reformatted, 1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good.py": GOOD_FILE, "bad.py": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
@@ -161,34 +151,27 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_black(rule_runner, [tgt], extra_args=extra_args)
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
+    fmt_result = run_black(rule_runner, [tgt], extra_args=extra_args)
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is False
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_black(
+    fmt_result = run_black(
         rule_runner, [tgt], extra_args=["--black-args='--skip-string-normalization'"]
     )
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": NEEDS_CONFIG_FILE})
     assert fmt_result.did_change is False
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_black(rule_runner, [tgt], extra_args=["--black-skip"])
-    assert not lint_results
+    fmt_result = run_black(rule_runner, [tgt], extra_args=["--black-skip"])
     assert fmt_result.skipped is True
     assert fmt_result.did_change is False
 
@@ -214,12 +197,9 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
         {"f.py": content, "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.8'])"}
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_black(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
+    fmt_result = run_black(rule_runner, [tgt])
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": content})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": content})
     assert fmt_result.did_change is False
 
 
@@ -238,12 +218,9 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
         {"f.py": content, "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.9'])"}
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    lint_results, fmt_result = run_black(rule_runner, [tgt])
-    assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 0
-    assert "1 file would be left unchanged" in lint_results[0].stderr
+    fmt_result = run_black(rule_runner, [tgt])
     assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == get_digest(rule_runner, {"f.py": content})
+    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": content})
     assert fmt_result.did_change is False
 
 
@@ -262,13 +239,9 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.pyi")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
     ]
-    lint_results, fmt_result = run_black(rule_runner, good_tgts)
-    assert len(lint_results) == 1 and lint_results[0].exit_code == 0
-    assert (
-        "2 files would be left unchanged" in lint_results[0].stderr
-        and "2 files left unchanged" in fmt_result.stderr
-    )
-    assert fmt_result.output == get_digest(
+    fmt_result = run_black(rule_runner, good_tgts)
+    assert "2 files left unchanged" in fmt_result.stderr
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"good.pyi": GOOD_FILE, "good.py": GOOD_FILE}
     )
     assert not fmt_result.did_change
@@ -277,13 +250,9 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.pyi")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
-    lint_results, fmt_result = run_black(rule_runner, bad_tgts)
-    assert len(lint_results) == 1 and lint_results[0].exit_code == 1
-    assert (
-        "2 files would be reformatted" in lint_results[0].stderr
-        and "2 files reformatted" in fmt_result.stderr
-    )
-    assert fmt_result.output == get_digest(
+    fmt_result = run_black(rule_runner, bad_tgts)
+    assert "2 files reformatted" in fmt_result.stderr
+    assert fmt_result.output == get_snapshot(
         rule_runner, {"bad.pyi": FIXED_BAD_FILE, "bad.py": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change

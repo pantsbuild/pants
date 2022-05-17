@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from collections import deque
-from typing import Iterable, cast
+from typing import Iterable
 
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
@@ -20,35 +20,24 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.option.option_types import StrOption
 
 
 class PathsSubsystem(Outputting, GoalSubsystem):
     name = "paths"
     help = "List the paths between two addresses."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--from",
-            type=str,
-            dest="frm",
-            help="The path starting address",
-        )
+    path_from = StrOption(
+        "--from",
+        default=None,
+        help="The path starting address",
+    )
 
-        register(
-            "--to",
-            type=str,
-            help="The path end address",
-        )
-
-    @property
-    def path_from(self) -> str:
-        return cast(str, self.options.frm)
-
-    @property
-    def path_to(self) -> str:
-        return cast(str, self.options.to)
+    path_to = StrOption(
+        "--to",
+        default=None,
+        help="The path end address",
+    )
 
 
 class PathsGoal(Goal):

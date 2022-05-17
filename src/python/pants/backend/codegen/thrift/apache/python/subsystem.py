@@ -1,11 +1,12 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import annotations
 
-from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.rules import collect_rules
-from pants.option.option_types import StrListOption, TargetListOption
+from pants.option.option_types import BoolOption, StrListOption
 from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
 
 
 class ThriftPythonSubsystem(Subsystem):
@@ -14,27 +15,33 @@ class ThriftPythonSubsystem(Subsystem):
 
     gen_options = StrListOption(
         "--options",
-        help=(
-            "Code generation options specific to the Python code generator to pass to the "
-            "Apache `thift` binary via the `-gen py` argument. "
-            "See `thrift -help` for supported values."
+        help=softwrap(
+            """
+            Code generation options specific to the Python code generator to pass to the
+            Apache `thift` binary via the `-gen py` argument.
+            See `thrift -help` for supported values.
+            """
         ),
     )
-    _runtime_dependencies = TargetListOption(
-        "--runtime-dependencies",
-        help=(
-            "A list of addresses to `python_requirement` targets for the runtime "
-            "dependencies needed for generated Python code to work. For example, "
-            "`['3rdparty/python:thrift']`. These dependencies will "
-            "be automatically added to every `thrift_source` target. At the very least, "
-            "this option must be set to a `python_requirement` for the "
-            "`thrift` runtime library."
-        ),
-    )
+    infer_runtime_dependency = BoolOption(
+        "--infer-runtime-dependency",
+        default=True,
+        help=softwrap(
+            """
+            If True, will add a dependency on a `python_requirement` target exposing the `thrift`
+            module (usually from the `thrift` requirement).
 
-    @property
-    def runtime_dependencies(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self._runtime_dependencies, owning_address=None)
+            If `[python].enable_resolves` is set, Pants will only infer dependencies on
+            `python_requirement` targets that use the same resolve as the particular
+            `thrift_source` / `thrift_source` target uses, which is set via its
+            `python_resolve` field.
+
+            Unless this option is disabled, Pants will error if no relevant target is found or
+            more than one is found which causes ambiguity.
+            """
+        ),
+        advanced=True,
+    )
 
 
 def rules():
