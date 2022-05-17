@@ -11,7 +11,7 @@ from typing import Iterable
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -93,6 +93,7 @@ class MyPy(PythonToolBase):
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--python-version 3.7 --disallow-any-expr")
+    export = ExportToolOption()
     config = FileOption(
         "--config",
         default=None,
@@ -355,6 +356,8 @@ async def mypy_export(
     python_setup: PythonSetup,
     first_party_plugins: MyPyFirstPartyPlugins,
 ) -> ExportPythonTool:
+    if not mypy.export:
+        return ExportPythonTool(resolve_name=mypy.options_scope, pex_request=None)
     constraints = await _mypy_interpreter_constraints(mypy, python_setup)
     return ExportPythonTool(
         resolve_name=mypy.options_scope,
