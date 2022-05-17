@@ -128,6 +128,7 @@ async def setup_junit_for_target(
             *junit.args,
         ],
         input_digest=input_digest,
+        extra_jvm_options=junit.jvm_options,
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run JUnit 5 ConsoleLauncher against {request.field_set.address}",

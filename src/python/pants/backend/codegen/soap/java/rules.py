@@ -161,6 +161,7 @@ async def compile_wsdl_source(
         ],
         classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
         input_digest=input_digest,
+        extra_jvm_options=jaxws.jvm_options,
         extra_immutable_input_digests=immutable_input_digests,
         extra_nailgun_keys=immutable_input_digests,
         description="Generating Java sources from WSDL source",
