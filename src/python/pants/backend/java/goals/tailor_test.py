@@ -59,12 +59,12 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets(
             [
                 PutativeTarget.for_target_type(
-                    JavaSourcesGeneratorTarget, "src/java/unowned", "lib", ["UnownedFile.java"]
+                    JavaSourcesGeneratorTarget, "src/java/unowned", "java", ["UnownedFile.java"]
                 ),
                 PutativeTarget.for_target_type(
                     JunitTestsGeneratorTarget,
                     "src/java/unowned",
-                    "tests",
+                    "junit",
                     ["UnownedFileTest.java"],
                 ),
             ]

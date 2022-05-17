@@ -44,7 +44,7 @@ def test_find_helm_charts(rule_runner: RuleRunner) -> None:
     def expected_target(path: str, triggering_source: str) -> PutativeTarget:
         return PutativeTarget.for_target_type(
             HelmChartTarget,
-            name="chart",
+            name="helm",
             path=path,
             triggering_sources=[triggering_source],
         )

@@ -49,7 +49,7 @@ async def find_putative_helm_targets(
         putative_targets.append(
             PutativeTarget.for_target_type(
                 HelmChartTarget,
-                name="chart",
+                name="helm",
                 path=dirname,
                 triggering_sources=[filename],
             )

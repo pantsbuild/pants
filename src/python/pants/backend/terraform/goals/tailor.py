@@ -42,7 +42,7 @@ async def find_putative_terrform_module_targets(
         PutativeTarget.for_target_type(
             TerraformModuleTarget,
             path=dirname,
-            name="tf",
+            name="terraform",
             triggering_sources=sorted(filenames),
         )
         for dirname, filenames in group_by_dir(unowned_terraform_files).items()

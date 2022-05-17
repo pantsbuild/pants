@@ -52,7 +52,7 @@ async def find_putative_targets(
             for dirname, filenames in group_by_dir(paths).items():
                 putative_targets.append(
                     PutativeTarget.for_target_type(
-                        tgt_type, path=dirname, name="lib", triggering_sources=sorted(filenames)
+                        tgt_type, path=dirname, name="kotlin", triggering_sources=sorted(filenames)
                     )
                 )
 

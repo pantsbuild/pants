@@ -66,19 +66,19 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     ShellSourcesGeneratorTarget,
                     path="src/sh/foo",
-                    name="lib",
+                    name="shell",
                     triggering_sources=["f.sh"],
                 ),
                 PutativeTarget.for_target_type(
                     ShellSourcesGeneratorTarget,
                     path="src/sh/foo/bar",
-                    name="lib",
+                    name="shell",
                     triggering_sources=["baz2.sh", "baz3.sh"],
                 ),
                 PutativeTarget.for_target_type(
                     Shunit2TestsGeneratorTarget,
                     path="src/sh/foo/bar",
-                    name="tests",
+                    name="shunit2",
                     triggering_sources=["baz2_test.sh"],
                 ),
             ]
@@ -115,13 +115,13 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     Shunit2TestsGeneratorTarget,
                     path="src/sh/foo/bar",
-                    name="tests",
+                    name="shunit2",
                     triggering_sources=["bar_test.sh"],
                 ),
                 PutativeTarget.for_target_type(
                     ShellSourcesGeneratorTarget,
                     path="src/sh/foo/qux",
-                    name="lib",
+                    name="shell",
                     triggering_sources=["qux.sh"],
                 ),
             ]

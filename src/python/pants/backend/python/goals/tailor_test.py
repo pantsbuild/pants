@@ -113,41 +113,41 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     PipenvRequirementsTargetGenerator,
                     path="3rdparty",
-                    name="Pipfile.lock",
+                    name="pipenv",
                     triggering_sources=["3rdparty/Pipfile.lock"],
                 ),
                 PutativeTarget.for_target_type(
                     PoetryRequirementsTargetGenerator,
                     path="3rdparty",
-                    name="pyproject.toml",
+                    name="poetry",
                     triggering_sources=["3rdparty/pyproject.toml"],
                 ),
                 PutativeTarget.for_target_type(
                     PythonRequirementsTargetGenerator,
                     path="3rdparty",
-                    name="requirements-test.txt",
+                    name="reqs",
                     triggering_sources=["3rdparty/requirements-test.txt"],
                     kwargs={"source": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(
-                    PythonSourcesGeneratorTarget, "src/python/foo", "lib", ["__init__.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo", "py", ["__init__.py"]
                 ),
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget,
                     "src/python/foo/bar",
-                    "lib",
+                    "py",
                     ["baz2.py", "baz3.py"],
                 ),
                 PutativeTarget.for_target_type(
                     PythonTestsGeneratorTarget,
                     "src/python/foo/bar",
-                    "tests",
+                    "py_tests",
                     ["baz1_test.py", "baz2_test.py"],
                 ),
                 PutativeTarget.for_target_type(
                     PythonTestUtilsGeneratorTarget,
                     "src/python/foo/bar",
-                    "test_utils",
+                    "py_test_utils",
                     ["conftest.py"],
                 ),
             ]
@@ -186,11 +186,11 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     PythonTestsGeneratorTarget,
                     "src/python/foo/bar",
-                    "tests",
+                    "py_tests",
                     ["bar_test.py"],
                 ),
                 PutativeTarget.for_target_type(
-                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "lib", ["qux.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "py", ["qux.py"]
                 ),
             ]
         )
@@ -268,11 +268,11 @@ def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     PythonSourcesGeneratorTarget,
                     "src/python/foo/bar",
-                    "lib",
+                    "py",
                     ["__init__.py", "bar.py"],
                 ),
                 PutativeTarget.for_target_type(
-                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "lib", ["qux.py"]
+                    PythonSourcesGeneratorTarget, "src/python/foo/qux", "py", ["qux.py"]
                 ),
             ]
         )

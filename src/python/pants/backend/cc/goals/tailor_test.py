@@ -48,7 +48,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     CCSourcesGeneratorTarget,
                     "src/native/unowned",
-                    "lib",
+                    "cc",
                     ["UnownedFile.c"],
                 ),
             ]

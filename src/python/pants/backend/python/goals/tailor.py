@@ -101,11 +101,11 @@ async def find_putative_targets(
         for tgt_type, paths in classified_unowned_py_files.items():
             for dirname, filenames in group_by_dir(paths).items():
                 if issubclass(tgt_type, PythonTestsGeneratorTarget):
-                    name = "tests"
+                    name = "py_tests"
                 elif issubclass(tgt_type, PythonTestUtilsGeneratorTarget):
-                    name = "test_utils"
+                    name = "py_test_utils"
                 else:
-                    name = "lib"
+                    name = "py"
                 if (
                     python_setup.tailor_ignore_solitary_init_files
                     and tgt_type == PythonSourcesGeneratorTarget
@@ -130,14 +130,14 @@ async def find_putative_targets(
             Get(DigestContents, PathGlobs, req.search_paths.path_globs("pyproject.toml")),
         )
 
-        def add_req_targets(files: Iterable[str], alias: str) -> None:
+        def add_req_targets(files: Iterable[str], alias: str, tgt_name: str) -> None:
             unowned_files = set(files) - set(all_owned_sources)
             for fp in unowned_files:
                 path, name = os.path.split(fp)
                 pts.append(
                     PutativeTarget(
                         path=path,
-                        name=name,
+                        name=tgt_name,
                         type_alias=alias,
                         triggering_sources=[fp],
                         owned_sources=[name],
@@ -149,11 +149,12 @@ async def find_putative_targets(
                     )
                 )
 
-        add_req_targets(all_requirements_files.files, "python_requirements")
-        add_req_targets(all_pipenv_lockfile_files.files, "pipenv_requirements")
+        add_req_targets(all_requirements_files.files, "python_requirements", "reqs"),
+        add_req_targets(all_pipenv_lockfile_files.files, "pipenv_requirements", "pipenv")
         add_req_targets(
             {fc.path for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content},
             "poetry_requirements",
+            "poetry",
         )
 
     if python_setup.tailor_pex_binary_targets:
