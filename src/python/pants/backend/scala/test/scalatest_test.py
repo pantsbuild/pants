@@ -185,6 +185,7 @@ def test_file_deps_success(rule_runner: RuleRunner) -> None:
                   describe("Ducks") {
                     it("should be ducks") {
                       val expectedFileContents = "lol ducks"
+                      
                       assert(SimpleFileReader.read() == expectedFileContents)
                       assert(Files.readString(Path.of("ducks.txt")) == expectedFileContents)
                     }
