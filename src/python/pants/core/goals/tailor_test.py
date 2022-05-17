@@ -244,28 +244,6 @@ def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_root_macros_dont_get_named(rule_runner: RuleRunner) -> None:
-    # rule_runner.write_files({"macro_trigger.txt": ""})
-    ptgt = PutativeTarget("", "", "fortran_macro", [], [], addressable=False)
-    unpts = rule_runner.request(UniquelyNamedPutativeTargets, [PutativeTargets([ptgt])])
-    ptgts = unpts.putative_targets
-    assert (
-        PutativeTargets(
-            [
-                PutativeTarget(
-                    "",
-                    "",
-                    "fortran_macro",
-                    [],
-                    [],
-                    addressable=False,
-                )
-            ]
-        )
-        == ptgts
-    )
-
-
 def test_restrict_conflicting_sources(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -638,7 +616,7 @@ def test_filter_by_ignores() -> None:
         ignore_adding_targets=["project:bad", "//:bad", "unused:t"],
     )
 
-    def make_ptgt(path: str, name: str, *, addressable: bool = True) -> PutativeTarget:
+    def make_ptgt(path: str, name: str) -> PutativeTarget:
         return PutativeTarget(
             path=path,
             name=name,
@@ -650,7 +628,6 @@ def test_filter_by_ignores() -> None:
     valid_ptgts = [
         make_ptgt("", "good"),
         make_ptgt("project", "good"),
-        make_ptgt("project", "caof_macro", addressable=False),
         make_ptgt("path_ignore_not_recursive/subdir", "t"),
         make_ptgt("global_build_ignore_not_recursive/subdir", "t"),
     ]
