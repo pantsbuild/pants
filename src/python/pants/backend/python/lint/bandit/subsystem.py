@@ -10,7 +10,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.bandit.skip_field import SkipBanditField
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -64,6 +64,7 @@ class Bandit(PythonToolBase):
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--skip B101,B308 --confidence")
+    export = ExportToolOption()
     config = FileOption(
         "--config",
         default=None,
@@ -138,6 +139,8 @@ class BanditExportSentinel(ExportPythonToolSentinel):
 async def bandit_export(
     _: BanditExportSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> ExportPythonTool:
+    if not bandit.export:
+        return ExportPythonTool(resolve_name=bandit.options_scope, pex_request=None)
     constraints = await _bandit_interpreter_constraints(python_setup)
     return ExportPythonTool(
         resolve_name=bandit.options_scope,
