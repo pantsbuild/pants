@@ -98,13 +98,9 @@ class PutativeTarget:
     # Otherwise, this field should contain the default globs that the target type will apply.
     # If the putative target does not have a `sources` field, then this value must be the
     # empty tuple.
-    # TODO: If target_type is a regular target (and not a macro) we can derive the default
-    #  source globs for that type from BuildConfiguration.  However that is fiddly and not
-    #  a high priority.
+    # TODO: We can derive the default source globs for that type from BuildConfiguration.
+    #  However that is fiddly and not a high priority.
     owned_sources: tuple[str, ...]
-
-    # Whether the pututative target has an address (or, e.g., is a macro with no address).
-    addressable: bool
 
     # Note that we generate the BUILD file target entry from these kwargs, the
     # `name`, and `type_alias`.
@@ -153,7 +149,6 @@ class PutativeTarget:
             target_type.alias,
             triggering_sources,
             owned_sources,
-            addressable=True,  # "Real" targets are always addressable.
             kwargs=kwargs,
             comments=comments,
         )
@@ -166,7 +161,6 @@ class PutativeTarget:
         triggering_sources: Iterable[str],
         owned_sources: Iterable[str],
         *,
-        addressable: bool = True,
         kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
     ) -> None:
@@ -175,17 +169,11 @@ class PutativeTarget:
         self.type_alias = type_alias
         self.triggering_sources = tuple(triggering_sources)
         self.owned_sources = tuple(owned_sources)
-        self.addressable = addressable
         self.kwargs = FrozenDict(kwargs or {})
         self.comments = tuple(comments)
 
     @property
     def address(self) -> Address:
-        if not self.addressable:
-            raise ValueError(
-                f"Cannot compute address for non-addressable putative target of type "
-                f"{self.type_alias} at path {self.path}"
-            )
         return Address(self.path, target_name=self.name)
 
     def realias(self, new_alias: str | None) -> PutativeTarget:
@@ -225,7 +213,7 @@ class PutativeTarget:
                 return f"[{val_str}\n{indent}]"
             return repr(v)
 
-        has_name = self.addressable and self.name != os.path.basename(self.path)
+        has_name = self.name != os.path.basename(self.path)
         if self.kwargs or has_name:
             _kwargs = {
                 **({"name": self.name} if has_name else {}),
@@ -373,12 +361,11 @@ class TailorSubsystem(GoalSubsystem):
             )
             if is_ignored_file:
                 continue
-            if ptgt.addressable:
-                # Note that `tailor` can only generate explicit targets, so we don't need to
-                # worry about generated address syntax (`#`) or file address syntax.
-                address = f"{ptgt.path or '//'}:{ptgt.name}"
-                if address in self.ignore_adding_targets:
-                    continue
+            # Note that `tailor` can only generate explicit targets, so we don't need to
+            # worry about generated address syntax (`#`) or file address syntax.
+            address = f"{ptgt.path or '//'}:{ptgt.name}"
+            if address in self.ignore_adding_targets:
+                continue
             yield ptgt
 
 
@@ -433,11 +420,6 @@ async def rename_conflicting_targets(
     existing_addrs: set[str] = {tgt.address.spec for tgt in all_existing_tgts}
     uniquely_named_putative_targets: list[PutativeTarget] = []
     for ptgt in ptgts:
-        if not ptgt.addressable:
-            # Non-addressable PutativeTargets never have collision issues.
-            uniquely_named_putative_targets.append(ptgt)
-            continue
-
         idx = 0
         possibly_renamed_ptgt = ptgt
         # Targets in root-level BUILD files must be named explicitly.
@@ -636,11 +618,7 @@ async def tailor(
     )
     for build_file_path, ptgts in ptgts_by_build_file.items():
         formatted_changes = "\n".join(
-            (
-                f"  - Add {console.green(ptgt.type_alias)} target {console.cyan(ptgt.name)}"
-                if ptgt.addressable
-                else f"  - Add macro {console.green(ptgt.type_alias)}"
-            )
+            f"  - Add {console.green(ptgt.type_alias)} target {console.cyan(ptgt.name)}"
             for ptgt in ptgts
         )
         if build_file_path in updated_build_files:
