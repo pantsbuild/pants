@@ -9,7 +9,7 @@ from typing import Iterable
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -38,6 +38,7 @@ class Isort(PythonToolBase):
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--case-sensitive --trailing-comma")
+    export = ExportToolOption()
     config = FileListOption(
         "--config",
         # TODO: Figure out how to deprecate this being a list in favor of a single string.
@@ -112,6 +113,8 @@ class IsortExportSentinel(ExportPythonToolSentinel):
 
 @rule
 def isort_export(_: IsortExportSentinel, isort: Isort) -> ExportPythonTool:
+    if not isort.export:
+        return ExportPythonTool(resolve_name=isort.options_scope, pex_request=None)
     return ExportPythonTool(resolve_name=isort.options_scope, pex_request=isort.to_pex_request())
 
 

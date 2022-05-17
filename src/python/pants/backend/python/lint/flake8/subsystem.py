@@ -10,7 +10,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -80,6 +80,7 @@ class Flake8(PythonToolBase):
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore E123,W456 --enable-extensions H111")
+    export = ExportToolOption()
     config = FileOption(
         "--config",
         default=None,
@@ -320,6 +321,8 @@ async def flake8_export(
     first_party_plugins: Flake8FirstPartyPlugins,
     python_setup: PythonSetup,
 ) -> ExportPythonTool:
+    if not flake8.export:
+        return ExportPythonTool(resolve_name=flake8.options_scope, pex_request=None)
     constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
     return ExportPythonTool(
         resolve_name=flake8.options_scope,

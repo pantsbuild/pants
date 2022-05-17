@@ -12,7 +12,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.pylint.skip_field import SkipPylintField
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -89,6 +89,7 @@ class Pylint(PythonToolBase):
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore=foo.py,bar.py --disable=C0330,W0311")
+    export = ExportToolOption()
     config = FileOption(
         "--config",
         default=None,
@@ -330,6 +331,8 @@ async def pylint_export(
     first_party_plugins: PylintFirstPartyPlugins,
     python_setup: PythonSetup,
 ) -> ExportPythonTool:
+    if not pylint.export:
+        return ExportPythonTool(resolve_name=pylint.options_scope, pex_request=None)
     constraints = await _pylint_interpreter_constraints(first_party_plugins, python_setup)
     return ExportPythonTool(
         resolve_name=pylint.options_scope,

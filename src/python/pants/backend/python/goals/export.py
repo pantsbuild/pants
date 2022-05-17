@@ -65,8 +65,13 @@ class ExportPythonToolSentinel:
 
 @dataclass(frozen=True)
 class ExportPythonTool(EngineAwareParameter):
+    """How to export a particular Python tool.
+
+    If `pex_request=None`, the tool will be skipped.
+    """
+
     resolve_name: str
-    pex_request: PexRequest
+    pex_request: PexRequest | None
 
     def debug_hint(self) -> str | None:
         return self.resolve_name
@@ -147,6 +152,8 @@ async def export_virtualenv(
 
 @rule
 async def export_tool(request: ExportPythonTool, pex_pex: PexPEX) -> ExportResult:
+    assert request.pex_request is not None
+
     # TODO: Unify export_virtualenv() and export_tool(), since their implementations mostly overlap.
     dest = os.path.join("python", "virtualenvs", "tools")
     pex = await Get(Pex, PexRequest, request.pex_request)
@@ -230,7 +237,9 @@ async def export_virtualenvs(
         for tool_export_type in tool_export_types
     )
     all_tool_results = await MultiGet(
-        Get(ExportResult, ExportPythonTool, request) for request in all_export_tool_requests
+        Get(ExportResult, ExportPythonTool, request)
+        for request in all_export_tool_requests
+        if request.pex_request is not None
     )
 
     return ExportResults(venvs + all_tool_results)
