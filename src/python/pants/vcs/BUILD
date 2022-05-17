@@ -6,7 +6,7 @@ python_sources()
 python_tests(
     name="tests",
     overrides={
-        "changed_integration_test.py": {"timeout": 400},
+        "changed_integration_test.py": {"timeout": 500},
         "git_test.py": {"timeout": 120},
     },
 )
