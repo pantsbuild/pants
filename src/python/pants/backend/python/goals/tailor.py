@@ -131,7 +131,7 @@ async def find_putative_targets(
             Get(DigestContents, PathGlobs, req.search_paths.path_globs("pyproject.toml")),
         )
 
-        def add_req_targets(files: Iterable[str], alias: str, target_name) -> None:
+        def add_req_targets(files: Iterable[str], alias: str, target_name: str) -> None:
             unowned_files = set(files) - set(all_owned_sources)
             for fp in unowned_files:
                 path, name = os.path.split(fp)
