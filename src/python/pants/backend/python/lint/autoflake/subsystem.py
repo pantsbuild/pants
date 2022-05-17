@@ -6,7 +6,7 @@ from __future__ import annotations
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -34,6 +34,7 @@ class Autoflake(PythonToolBase):
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--target-version=py37 --quiet")
+    export = ExportToolOption()
 
 
 class AutoflakeLockfileSentinel(GenerateToolLockfileSentinel):
@@ -55,6 +56,8 @@ class AutoflakeExportSentinel(ExportPythonToolSentinel):
 
 @rule
 def autoflake_export(_: AutoflakeExportSentinel, autoflake: Autoflake) -> ExportPythonTool:
+    if not autoflake.export:
+        return ExportPythonTool(resolve_name=autoflake.options_scope, pex_request=None)
     return ExportPythonTool(
         resolve_name=autoflake.options_scope, pex_request=autoflake.to_pex_request()
     )

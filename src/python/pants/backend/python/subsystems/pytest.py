@@ -14,7 +14,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -145,6 +145,8 @@ class PyTest(PythonToolBase):
         ),
     )
 
+    export = ExportToolOption()
+
     @property
     def all_requirements(self) -> tuple[str, ...]:
         return (self.version, *self.extra_requirements)
@@ -251,6 +253,8 @@ class PytestExportSentinel(ExportPythonToolSentinel):
 async def pytest_export(
     _: PytestExportSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> ExportPythonTool:
+    if not pytest.export:
+        return ExportPythonTool(resolve_name=pytest.options_scope, pex_request=None)
     constraints = await _pytest_interpreter_constraints(python_setup)
     return ExportPythonTool(
         resolve_name=pytest.options_scope,
