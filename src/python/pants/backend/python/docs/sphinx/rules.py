@@ -31,6 +31,9 @@ class SphinxPackageFieldSet(PackageFieldSet):
     output_path: OutputPathField
 
 
+_SPHINX_DEST_DIR = "__build"
+
+
 @rule
 async def generate_sphinx_docs(
     field_set: SphinxPackageFieldSet, sphinx: SphinxSubsystem
@@ -43,14 +46,18 @@ async def generate_sphinx_docs(
         ProcessResult,
         VenvPexProcess(
             sphinx_pex,
-            argv=(field_set.address.spec_path or ".", "__build"),
-            output_directories=("__build",),
+            argv=(
+                # If the project is in the build root, set to ".".
+                field_set.address.spec_path or ".",
+                _SPHINX_DEST_DIR,
+            ),
+            output_directories=(_SPHINX_DEST_DIR,),
             input_digest=sources.snapshot.digest,
             description=f"Generate docs with Sphinx for {field_set.address}",
             level=LogLevel.INFO,
         ),
     )
-    stripped_digest = await Get(Digest, RemovePrefix(result.output_digest, "__build"))
+    stripped_digest = await Get(Digest, RemovePrefix(result.output_digest, _SPHINX_DEST_DIR))
     dest_dir = field_set.output_path.value_or_default(file_ending=None)
     result_digest = await Get(Digest, AddPrefix(stripped_digest, dest_dir))
     return BuiltPackage(result_digest, artifacts=(BuiltPackageArtifact(dest_dir),))

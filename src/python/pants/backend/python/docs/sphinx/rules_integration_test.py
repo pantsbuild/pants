@@ -32,10 +32,7 @@ SIMPLE_CONF_PY = dedent(
     project = 'Tests'
     copyright = '2022'
     author = 'pantsy'
-    extensions = []
     templates_path = ['_templates']
-    exclude_patterns = []
-    html_theme = 'alabaster'
     html_static_path = ['_static']
     """
 )
