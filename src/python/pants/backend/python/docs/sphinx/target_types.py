@@ -21,6 +21,7 @@ class SphinxProjectSourcesField(MultipleSourcesField):
     # TODO: support markdown
     default = ("conf.py", "**/*.rst")
     expected_file_extensions = (".py", ".rst")
+    uses_source_roots = False
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
