@@ -21,22 +21,7 @@ from pants.engine.internals.build_files import (
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, rule
-from pants.engine.target import (
-    Dependencies,
-    GeneratedTargets,
-    GenerateTargetsRequest,
-    MultipleSourcesField,
-    SingleSourceField,
-    SourcesPaths,
-    SourcesPathsRequest,
-    StringField,
-    Tags,
-    Target,
-    TargetGenerator,
-    _generate_file_level_targets,
-)
-from pants.engine.unions import UnionMembership
+from pants.engine.target import Dependencies, MultipleSourcesField, StringField, Tags, Target
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
@@ -113,67 +98,6 @@ class ResolveField(StringField):
 class MockTgt(Target):
     alias = "mock_tgt"
     core_fields = (Dependencies, MultipleSourcesField, Tags, ResolveField)
-
-
-class MockGeneratedTarget(Target):
-    alias = "generated"
-    core_fields = (
-        Dependencies,
-        ResolveField,
-        SingleSourceField,
-        Tags,
-    )
-
-
-class MockTargetGenerator(TargetGenerator):
-    alias = "generator"
-    core_fields = (Dependencies, MultipleSourcesField, Tags)
-    copied_fields = (Tags,)
-    moved_fields = (ResolveField,)
-
-
-class MockGenerateTargetsRequest(GenerateTargetsRequest):
-    generate_from = MockTargetGenerator
-
-
-# TODO: This method duplicates the builtin `generate_file_targets`, with the exception that it
-# intentionally generates both using file addresses and generated addresses. When we remove
-# `use_generated_address_syntax=True`, we should remove this implementation and have
-# `MockTargetGenerator` subclass `TargetFilesGenerator` instead.
-@rule
-async def generate_mock_generated_target(
-    request: MockGenerateTargetsRequest,
-    union_membership: UnionMembership,
-) -> GeneratedTargets:
-    paths = await Get(SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField]))
-    # Generate using both "file address" and "generated target" syntax.
-    return GeneratedTargets(
-        request.generator,
-        [
-            *_generate_file_level_targets(
-                MockGeneratedTarget,
-                request.generator,
-                paths.files,
-                request.template_address,
-                request.template,
-                request.overrides,
-                union_membership,
-                add_dependencies_on_all_siblings=True,
-                use_generated_address_syntax=False,
-            ).values(),
-            *_generate_file_level_targets(
-                MockGeneratedTarget,
-                request.generator,
-                paths.files,
-                request.template_address,
-                request.template,
-                request.overrides,
-                union_membership,
-                add_dependencies_on_all_siblings=True,
-                use_generated_address_syntax=True,
-            ).values(),
-        ],
-    )
 
 
 def test_resolve_address() -> None:
