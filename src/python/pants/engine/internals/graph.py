@@ -24,7 +24,6 @@ from pants.engine.addresses import (
 from pants.engine.collection import Collection
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
-from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizations as _TargetParametrizations,
@@ -331,11 +330,6 @@ async def resolve_targets(
         for tgt in parametrizations.generated_or_generator(generator.address)
     )
     return Targets(expanded_targets)
-
-
-@rule
-def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
-    return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)

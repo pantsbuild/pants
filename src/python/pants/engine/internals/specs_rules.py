@@ -27,6 +27,7 @@ from pants.engine.internals.parametrize import _TargetParametrizations
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import (
+    FilteredTargets,
     HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
@@ -41,11 +42,9 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
-@rule
-def setup_specs_filter(global_options: GlobalOptions) -> SpecsFilter:
-    return SpecsFilter(
-        tags=global_options.tag, exclude_target_regexps=global_options.exclude_target_regexp
-    )
+# -----------------------------------------------------------------------------------------------
+# AddressSpecs -> Targets
+# -----------------------------------------------------------------------------------------------
 
 
 @rule_helper
@@ -162,6 +161,11 @@ async def addresses_from_address_specs(
     return Addresses(sorted(matched_addresses))
 
 
+# -----------------------------------------------------------------------------------------------
+# FilesystemSpecs -> Targets
+# -----------------------------------------------------------------------------------------------
+
+
 @rule
 def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
     return global_options.owners_not_found_behavior
@@ -202,6 +206,11 @@ async def addresses_from_filesystem_specs(
     return Addresses(sorted(addresses))
 
 
+# -----------------------------------------------------------------------------------------------
+# Specs -> Targets
+# -----------------------------------------------------------------------------------------------
+
+
 @rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
 async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
     from_address_specs, from_filesystem_specs = await MultiGet(
@@ -211,6 +220,23 @@ async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
     # We use a set to dedupe because it's possible to have the same address from both an address
     # and filesystem spec.
     return Addresses(sorted({*from_address_specs, *from_filesystem_specs}))
+
+
+@rule
+def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
+    return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
+
+
+@rule
+def setup_specs_filter(global_options: GlobalOptions) -> SpecsFilter:
+    return SpecsFilter(
+        tags=global_options.tag, exclude_target_regexps=global_options.exclude_target_regexp
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# SpecsSnapshot
+# -----------------------------------------------------------------------------------------------
 
 
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
