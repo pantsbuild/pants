@@ -15,6 +15,7 @@ from pants.backend.python.subsystems.python_tool_base import ExportToolOption, P
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
+    InterpreterConstraintsField,
     PythonRequirementsField,
     PythonSourceField,
 )
@@ -33,8 +34,6 @@ from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
-    CoarsenedTargets,
-    CoarsenedTargetsRequest,
     FieldSet,
     Target,
     TransitiveTargets,
@@ -62,6 +61,7 @@ class MyPyFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
     sources: PythonSourceField
+    interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -283,25 +283,14 @@ async def _mypy_interpreter_constraints(
     constraints = mypy.interpreter_constraints
     if mypy.options.is_default("interpreter_constraints"):
         all_tgts = await Get(AllTargets, AllTargetsRequest())
-
-        coarsened_targets = await Get(
-            CoarsenedTargets,
-            CoarsenedTargetsRequest(
-                (tgt.address for tgt in all_tgts if MyPyFieldSet.is_applicable(tgt)),
-                expanded_targets=True,
-            ),
+        unique_constraints = {
+            InterpreterConstraints.create_from_targets([tgt], python_setup)
+            for tgt in all_tgts
+            if MyPyFieldSet.is_applicable(tgt)
+        }
+        code_constraints = InterpreterConstraints(
+            itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
         )
-
-        ics = InterpreterConstraints.compute_for_targets(coarsened_targets, python_setup)
-        if ics is None:
-            unique_constraints = {
-                InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
-                for ct in coarsened_targets
-            }
-        else:
-            unique_constraints = {ic for ic in ics if ic}
-
-        code_constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
         if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
             constraints = code_constraints
     return constraints

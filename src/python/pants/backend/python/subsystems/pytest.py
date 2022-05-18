@@ -18,6 +18,7 @@ from pants.backend.python.subsystems.python_tool_base import ExportToolOption, P
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
+    InterpreterConstraintsField,
     PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
     PythonTestsTimeoutField,
@@ -48,6 +49,7 @@ class PythonTestFieldSet(TestFieldSet):
     required_fields = (PythonTestSourceField,)
 
     source: PythonTestSourceField
+    interpreter_constraints: InterpreterConstraintsField
     timeout: PythonTestsTimeoutField
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
@@ -208,7 +210,9 @@ async def _pytest_interpreter_constraints(python_setup: PythonSetup) -> Interpre
         InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
         for transitive_targets in transitive_targets_per_test
     }
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    constraints = InterpreterConstraints(
+        itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
+    )
     return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 

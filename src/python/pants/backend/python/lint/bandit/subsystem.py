@@ -94,7 +94,9 @@ async def _bandit_interpreter_constraints(python_setup: PythonSetup) -> Interpre
         for tgt in all_tgts
         if BanditFieldSet.is_applicable(tgt)
     }
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    constraints = InterpreterConstraints(
+        itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
+    )
     return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
 
 

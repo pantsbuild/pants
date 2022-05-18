@@ -241,17 +241,17 @@ async def _flake8_interpreter_constraints(
     # This ORs all unique interpreter constraints. The net effect is that every possible Python
     # interpreter used will be covered.
     all_tgts = await Get(AllTargets, AllTargetsRequest())
-    relevant_targets = tuple(tgt for tgt in all_tgts if Flake8FieldSet.is_applicable(tgt))
-    unique_constraints = set()
-    for tgt in relevant_targets:
-        if tgt.has_field(InterpreterConstraintsField):
-            constraints_field = tgt[InterpreterConstraintsField]
-            unique_constraints.add(
-                InterpreterConstraints.create_from_compatibility_fields(
-                    (constraints_field, *first_party_plugins.interpreter_constraints_fields),
-                    python_setup,
-                )
-            )
+    unique_constraints = {
+        InterpreterConstraints.create_from_compatibility_fields(
+            (
+                tgt[InterpreterConstraintsField],
+                *first_party_plugins.interpreter_constraints_fields,
+            ),
+            python_setup,
+        )
+        for tgt in all_tgts
+        if Flake8FieldSet.is_applicable(tgt)
+    }
     if not unique_constraints:
         unique_constraints.add(
             InterpreterConstraints.create_from_compatibility_fields(

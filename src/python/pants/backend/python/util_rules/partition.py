@@ -32,18 +32,7 @@ async def _by_interpreter_constraints_and_resolve(
             (field_set.address for field_set in field_sets), expanded_targets=True
         ),
     )
-
     coarsened_targets_by_address = coarsened_targets.by_address()
-    ics = InterpreterConstraints.compute_for_targets(coarsened_targets, python_setup)
-    if ics is None:
-        interpreter_constraints_by_coarsened_target = {
-            ct: InterpreterConstraints.create_from_targets(ct.closure(), python_setup)
-            for ct in coarsened_targets
-        }
-    else:
-        interpreter_constraints_by_coarsened_target = {
-            ct: ic for ct, ic in zip(coarsened_targets, ics) if ic is not None
-        }
 
     resolve_and_interpreter_constraints_to_coarsened_targets: Mapping[
         tuple[str, InterpreterConstraints],
@@ -54,7 +43,9 @@ async def _by_interpreter_constraints_and_resolve(
         # If there is a cycle in the roots, we still only take the first resolve, as the other
         # members will be validated when the partition is actually built.
         resolve = ct.representative[PythonResolveField].normalized_value(python_setup)
-        interpreter_constraints = interpreter_constraints_by_coarsened_target.get(ct)
+        interpreter_constraints = InterpreterConstraints.create_from_targets(
+            ct.members, python_setup
+        )
         # If a CoarsenedTarget did not have IntepreterConstraints, then it's because it didn't
         # contain any targets with the field, and so there is no point checking it.
         if interpreter_constraints is None:

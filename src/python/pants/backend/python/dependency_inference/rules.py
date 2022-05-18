@@ -387,11 +387,17 @@ async def infer_python_dependencies_via_source(
 
     _wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
     tgt = _wrapped_tgt.target
+    interpreter_constraints = InterpreterConstraints.create_from_targets([tgt], python_setup)
+    if interpreter_constraints is None:
+        # TODO: This would represent a target with a PythonSource field, but no
+        # InterpreterConstraints field. #15400 would allow inference to require both
+        # fields.
+        return InferredDependencies([])
     parsed_dependencies = await Get(
         ParsedPythonDependencies,
         ParsePythonDependenciesRequest(
             cast(PythonSourceField, request.sources_field),
-            InterpreterConstraints.create_from_targets([tgt], python_setup),
+            interpreter_constraints,
             string_imports=python_infer_subsystem.string_imports,
             string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
             assets=python_infer_subsystem.assets,
