@@ -13,14 +13,7 @@ from typing import Iterable, NamedTuple, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
-from pants.base.specs import (
-    AddressSpecs,
-    AscendantAddresses,
-    FileLiteralSpec,
-    FilesystemSpecs,
-    MaybeEmptyDescendantAddresses,
-    Specs,
-)
+from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptyDescendantAddresses, Specs
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -29,17 +22,8 @@ from pants.engine.addresses import (
     UnparsedAddressInputs,
 )
 from pants.engine.collection import Collection
-from pants.engine.fs import (
-    EMPTY_SNAPSHOT,
-    Digest,
-    MergeDigests,
-    PathGlobs,
-    Paths,
-    Snapshot,
-    SpecsSnapshot,
-)
+from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
-from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizations as _TargetParametrizations,
@@ -348,11 +332,6 @@ async def resolve_targets(
     return Targets(expanded_targets)
 
 
-@rule
-def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
-    return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
-
-
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
     tgts = await Get(Targets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
@@ -613,8 +592,38 @@ async def coarsened_targets(request: CoarsenedTargetsRequest) -> CoarsenedTarget
 # -----------------------------------------------------------------------------------------------
 
 
-class InvalidOwnersOfArgs(Exception):
-    pass
+def _log_or_raise_unmatched_owners(
+    file_paths: Sequence[PurePath],
+    owners_not_found_behavior: OwnersNotFoundBehavior,
+    ignore_option: str | None = None,
+) -> None:
+    option_msg = (
+        f"\n\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
+        if ignore_option
+        else ""
+    )
+    if len(file_paths) == 1:
+        prefix = (
+            f"No owning targets could be found for the file `{file_paths[0]}`.\n\n"
+            f"Please check that there is a BUILD file in the parent directory "
+            f"{file_paths[0].parent} with a target whose `sources` field includes the file."
+        )
+    else:
+        prefix = (
+            f"No owning targets could be found for the files {sorted(map(str, file_paths))}`.\n\n"
+            f"Please check that there are BUILD files in each file's parent directory with a "
+            f"target whose `sources` field includes the file."
+        )
+    msg = (
+        f"{prefix} See {doc_url('targets')} for more information on target definitions."
+        f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
+        f"{doc_url('create-initial-build-files')}.{option_msg}"
+    )
+
+    if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+        logger.warning(msg)
+    else:
+        raise ResolveError(msg)
 
 
 @dataclass(frozen=True)
@@ -705,138 +714,6 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         )
 
     return Owners(matching_addresses)
-
-
-# -----------------------------------------------------------------------------------------------
-# Specs -> Addresses
-# -----------------------------------------------------------------------------------------------
-
-
-@rule
-def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
-    return global_options.owners_not_found_behavior
-
-
-def _log_or_raise_unmatched_owners(
-    file_paths: Sequence[PurePath],
-    owners_not_found_behavior: OwnersNotFoundBehavior,
-    ignore_option: str | None = None,
-) -> None:
-    option_msg = (
-        f"\n\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
-        if ignore_option
-        else ""
-    )
-    if len(file_paths) == 1:
-        prefix = (
-            f"No owning targets could be found for the file `{file_paths[0]}`.\n\n"
-            f"Please check that there is a BUILD file in the parent directory "
-            f"{file_paths[0].parent} with a target whose `sources` field includes the file."
-        )
-    else:
-        prefix = (
-            f"No owning targets could be found for the files {sorted(map(str, file_paths))}`.\n\n"
-            f"Please check that there are BUILD files in each file's parent directory with a "
-            f"target whose `sources` field includes the file."
-        )
-    msg = (
-        f"{prefix} See {doc_url('targets')} for more information on target definitions."
-        f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
-        f"{doc_url('create-initial-build-files')}.{option_msg}"
-    )
-
-    if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
-        logger.warning(msg)
-    else:
-        raise ResolveError(msg)
-
-
-@rule
-async def addresses_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs, owners_not_found_behavior: OwnersNotFoundBehavior
-) -> Addresses:
-    """Find the owner(s) for each FilesystemSpec."""
-    paths_per_include = await MultiGet(
-        Get(
-            Paths,
-            PathGlobs,
-            filesystem_specs.path_globs_for_spec(
-                spec, owners_not_found_behavior.to_glob_match_error_behavior()
-            ),
-        )
-        for spec in filesystem_specs.file_includes
-    )
-    owners_per_include = await MultiGet(
-        Get(Owners, OwnersRequest(paths.files, filter_by_global_options=True))
-        for paths in paths_per_include
-    )
-    addresses: set[Address] = set()
-    for spec, owners in zip(filesystem_specs.file_includes, owners_per_include):
-        if (
-            owners_not_found_behavior != OwnersNotFoundBehavior.ignore
-            and isinstance(spec, FileLiteralSpec)
-            and not owners
-        ):
-            _log_or_raise_unmatched_owners(
-                [PurePath(str(spec))],
-                owners_not_found_behavior,
-                ignore_option="--owners-not-found-behavior=ignore",
-            )
-        addresses.update(owners)
-    return Addresses(sorted(addresses))
-
-
-@rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
-async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
-    from_address_specs, from_filesystem_specs = await MultiGet(
-        Get(Addresses, AddressSpecs, specs.address_specs),
-        Get(Addresses, FilesystemSpecs, specs.filesystem_specs),
-    )
-    # We use a set to dedupe because it's possible to have the same address from both an address
-    # and filesystem spec.
-    return Addresses(sorted({*from_address_specs, *from_filesystem_specs}))
-
-
-# -----------------------------------------------------------------------------------------------
-# SourcesSnapshot
-# -----------------------------------------------------------------------------------------------
-
-
-@rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
-async def resolve_specs_snapshot(
-    specs: Specs, owners_not_found_behavior: OwnersNotFoundBehavior
-) -> SpecsSnapshot:
-    """Resolve all files matching the given specs.
-
-    Address specs will use their `SourcesField` field, and Filesystem specs will use whatever args
-    were given. Filesystem specs may safely refer to files with no owning target.
-    """
-    targets = await Get(Targets, AddressSpecs, specs.address_specs)
-    all_hydrated_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
-        for tgt in targets
-        if tgt.has_field(SourcesField)
-    )
-
-    filesystem_specs_digest = (
-        await Get(
-            Digest,
-            PathGlobs,
-            specs.filesystem_specs.to_path_globs(
-                owners_not_found_behavior.to_glob_match_error_behavior()
-            ),
-        )
-        if specs.filesystem_specs
-        else None
-    )
-
-    # NB: We merge into a single snapshot to avoid the same files being duplicated if they were
-    # covered both by address specs and filesystem specs.
-    digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
-    if filesystem_specs_digest:
-        digests.append(filesystem_specs_digest)
-    result = await Get(Snapshot, MergeDigests(digests))
-    return SpecsSnapshot(result)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1446,7 +1323,6 @@ async def generate_file_targets(
 
 
 def rules():
-
     return [
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateFileTargets),
