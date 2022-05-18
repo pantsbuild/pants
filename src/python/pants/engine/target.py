@@ -1139,7 +1139,7 @@ def _generate_file_level_targets(
             # At least one override applies. Generate a target per set of fields.
             all_generated_items.extend(
                 (
-                    template_address.create_file(relativized_fp),
+                    overridden_address.create_file(relativized_fp),
                     fp,
                     {**template, **override_fields},
                 )
