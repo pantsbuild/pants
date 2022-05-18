@@ -5,8 +5,8 @@ print_stacktrace = true
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.python",
+  "pants.backend.experimental.python.docs.sphinx",
   "pants.backend.experimental.python.lint.autoflake",
-  "pants.backend.python.docs.sphinx",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",

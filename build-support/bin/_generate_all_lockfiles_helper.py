@@ -108,7 +108,7 @@ AllTools = (
     DefaultTool.python(IPython),
     DefaultTool.python(Setuptools),
     DefaultTool.python(SetuptoolsSCM),
-    DefaultTool.python(SphinxSubsystem, backend="pants.backend.python.docs.sphinx"),
+    DefaultTool.python(SphinxSubsystem),
     DefaultTool.python(MyPy, source_plugins=True),
     DefaultTool.python(PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"),
     DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
