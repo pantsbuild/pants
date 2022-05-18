@@ -129,7 +129,7 @@ async def find_putative_targets(
             pts.append(
                 PutativeTarget(
                     path=path,
-                    name=name,
+                    name="reqs",
                     type_alias="python_requirements",
                     triggering_sources=[req_file],
                     owned_sources=[name],
