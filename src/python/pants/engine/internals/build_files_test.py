@@ -14,12 +14,12 @@ from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
+    BuildFileOptions,
     evaluate_preludes,
     parse_address_family,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.specs_rules import BuildFileOptions
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, rule
 from pants.engine.target import (
