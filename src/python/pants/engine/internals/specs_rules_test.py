@@ -587,12 +587,13 @@ def test_filesystem_specs_glob(rule_runner: RuleRunner) -> None:
 
 
 def test_filesystem_specs_nonexistent_file(rule_runner: RuleRunner) -> None:
-    spec = FileLiteralSpec("demo/fake.txt")
-    with engine_error(contains='Unmatched glob from file/directory arguments: "demo/fake.txt"'):
-        resolve_filesystem_specs(rule_runner, [spec])
+    rule_runner.write_files({"valid.txt": ""})
+    valid_spec = FileLiteralSpec("valid.txt")
 
-    rule_runner.set_options(["--owners-not-found-behavior=ignore"])
-    assert not resolve_filesystem_specs(rule_runner, [spec])
+    with engine_error(contains='Unmatched glob from file/directory arguments: "demo/fake.txt"'):
+        resolve_filesystem_specs(rule_runner, [FileLiteralSpec("demo/fake.txt"), valid_spec])
+    with engine_error(contains='Unmatched glob from file/directory arguments: "demo/*.txt"'):
+        resolve_filesystem_specs(rule_runner, [FileGlobSpec("demo/*.txt"), valid_spec])
 
 
 def test_filesystem_specs_no_owner(rule_runner: RuleRunner) -> None:

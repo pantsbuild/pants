@@ -295,35 +295,26 @@ class FilesystemSpecs:
         self.ignores = tuple(ignores)
 
     @staticmethod
-    def _generate_path_globs(
-        specs: Iterable[FilesystemSpec], glob_match_error_behavior: GlobMatchErrorBehavior
-    ) -> PathGlobs:
+    def _generate_path_globs(specs: Iterable[FilesystemSpec]) -> PathGlobs:
         return PathGlobs(
             globs=(s.to_glob() for s in specs),
-            glob_match_error_behavior=glob_match_error_behavior,
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
             # We validate that _every_ glob is valid.
             conjunction=GlobExpansionConjunction.all_match,
-            description_of_origin=(
-                None
-                if glob_match_error_behavior == GlobMatchErrorBehavior.ignore
-                else "file/directory arguments"
-            ),
+            description_of_origin="file/directory arguments",
         )
 
     def path_globs_for_spec(
         self,
         spec: FileLiteralSpec | FileGlobSpec | DirLiteralSpec,
-        glob_match_error_behavior: GlobMatchErrorBehavior,
     ) -> PathGlobs:
         """Generate PathGlobs for the specific spec, automatically including the instance's
         FileIgnoreSpecs."""
-        return self._generate_path_globs((spec, *self.ignores), glob_match_error_behavior)
+        return self._generate_path_globs((spec, *self.ignores))
 
-    def to_path_globs(self, glob_match_error_behavior: GlobMatchErrorBehavior) -> PathGlobs:
+    def to_path_globs(self) -> PathGlobs:
         """Generate a single PathGlobs for the instance."""
-        return self._generate_path_globs(
-            (*self.file_includes, *self.dir_includes, *self.ignores), glob_match_error_behavior
-        )
+        return self._generate_path_globs((*self.file_includes, *self.dir_includes, *self.ignores))
 
     def __bool__(self) -> bool:
         return bool(self.file_includes) or bool(self.dir_includes) or bool(self.ignores)

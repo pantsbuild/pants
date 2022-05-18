@@ -177,13 +177,7 @@ async def addresses_from_filesystem_specs(
 ) -> Addresses:
     """Find the owner(s) for each FilesystemSpec."""
     paths_per_include = await MultiGet(
-        Get(
-            Paths,
-            PathGlobs,
-            filesystem_specs.path_globs_for_spec(
-                spec, owners_not_found_behavior.to_glob_match_error_behavior()
-            ),
-        )
+        Get(Paths, PathGlobs, filesystem_specs.path_globs_for_spec(spec))
         for spec in filesystem_specs.file_includes
     )
     owners_per_include = await MultiGet(
@@ -240,9 +234,7 @@ def setup_specs_filter(global_options: GlobalOptions) -> SpecsFilter:
 
 
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
-async def resolve_specs_snapshot(
-    specs: Specs, owners_not_found_behavior: OwnersNotFoundBehavior
-) -> SpecsSnapshot:
+async def resolve_specs_snapshot(specs: Specs) -> SpecsSnapshot:
     """Resolve all files matching the given specs.
 
     Address specs will use their `SourcesField` field, and Filesystem specs will use whatever args
@@ -256,13 +248,7 @@ async def resolve_specs_snapshot(
     )
 
     filesystem_specs_digest = (
-        await Get(
-            Digest,
-            PathGlobs,
-            specs.filesystem_specs.to_path_globs(
-                owners_not_found_behavior.to_glob_match_error_behavior()
-            ),
-        )
+        await Get(Digest, PathGlobs, specs.filesystem_specs.to_path_globs())
         if specs.filesystem_specs
         else None
     )
