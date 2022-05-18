@@ -106,7 +106,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     PythonRequirementsTargetGenerator,
                     path="3rdparty",
-                    name="requirements-test.txt",
+                    name="reqs",
                     triggering_sources=["3rdparty/requirements-test.txt"],
                     kwargs={"source": "requirements-test.txt"},
                 ),
