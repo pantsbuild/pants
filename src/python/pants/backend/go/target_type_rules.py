@@ -36,10 +36,16 @@ from pants.backend.go.util_rules.third_party_pkg import (
 )
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, SiblingAddresses
+from pants.core.target_types import (
+    TargetGeneratorSourcesHelperSourcesField,
+    TargetGeneratorSourcesHelperTarget,
+)
 from pants.engine.addresses import Address, AddressInput
+from pants.engine.fs import Digest, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
+    Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
     InferDependenciesRequest,
@@ -207,25 +213,41 @@ async def generate_targets_from_go_mod(
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
-    go_mod_info = await Get(GoModInfo, GoModInfoRequest(request.generator[GoModSourcesField]))
+    go_mod_sources = request.generator[GoModSourcesField]
+    go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_sources))
+    go_mod_snapshot = await Get(Snapshot, Digest, go_mod_info.digest)
     all_packages = await Get(
         AllThirdPartyPackages,
         AllThirdPartyPackagesRequest(go_mod_info.digest, go_mod_info.mod_path),
     )
 
+    def gen_file_tgt(fp: str) -> TargetGeneratorSourcesHelperTarget:
+        return TargetGeneratorSourcesHelperTarget(
+            {TargetGeneratorSourcesHelperSourcesField.alias: fp},
+            generator_addr.create_file(fp),
+        )
+
+    file_tgts = [gen_file_tgt("go.mod")]
+    if go_mod_sources.go_sum_path in go_mod_snapshot.files:
+        file_tgts.append(gen_file_tgt("go.sum"))
+
     def create_tgt(pkg_info: ThirdPartyPkgAnalysis) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
-            {**request.template, GoImportPathField.alias: pkg_info.import_path},
+            {
+                **request.template,
+                GoImportPathField.alias: pkg_info.import_path,
+                Dependencies.alias: [t.address.spec for t in file_tgts],
+            },
             # E.g. `src/go:mod#github.com/google/uuid`.
             generator_addr.create_generated(pkg_info.import_path),
             union_membership,
             residence_dir=generator_addr.spec_path,
         )
 
-    return GeneratedTargets(
-        request.generator,
-        (create_tgt(pkg_info) for pkg_info in all_packages.import_paths_to_pkg_info.values()),
-    )
+    result = tuple(
+        create_tgt(pkg_info) for pkg_info in all_packages.import_paths_to_pkg_info.values()
+    ) + tuple(file_tgts)
+    return GeneratedTargets(request.generator, result)
 
 
 # -----------------------------------------------------------------------------------------------

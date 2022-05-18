@@ -15,23 +15,13 @@ import pytest
 from pants.base.specs import (
     AddressLiteralSpec,
     AddressSpecs,
-    DescendantAddresses,
-    FileGlobSpec,
     FileLiteralSpec,
-    FilesystemSpec,
     FilesystemSpecs,
     Specs,
 )
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    Snapshot,
-    SpecsSnapshot,
-)
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
@@ -58,7 +48,6 @@ from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     FieldSet,
-    FilteredTargets,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -144,7 +133,6 @@ def transitive_targets_rule_runner() -> RuleRunner:
             QueryRule(CoarsenedTargets, [Addresses]),
             QueryRule(Targets, [DependenciesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
-            QueryRule(FilteredTargets, [Specs]),
         ],
         target_types=[MockTarget, MockTargetGenerator, MockGeneratedTarget],
     )
@@ -627,86 +615,6 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     assert {t.address for t in all_unexpanded} == {*expected, Address("", target_name="generator")}
 
 
-def test_filtered_targets(transitive_targets_rule_runner: RuleRunner) -> None:
-    transitive_targets_rule_runner.write_files(
-        {
-            "addr_specs/f1.txt": "",
-            "addr_specs/f2.txt": "",
-            "addr_specs/BUILD": dedent(
-                """\
-                generator(
-                    sources=["*.txt"],
-                    tags=["a"],
-                    overrides={"f2.txt": {"tags": ["b"]}},
-                )
-
-                target(name='t', tags=["a"])
-                """
-            ),
-            "fs_specs/f1.txt": "",
-            "fs_specs/f2.txt": "",
-            "fs_specs/BUILD": dedent(
-                """\
-                generator(
-                    sources=["*.txt"],
-                    tags=["a"],
-                    overrides={"f2.txt": {"tags": ["b"]}},
-                )
-
-                target(name='t', sources=["f1.txt"], tags=["a"])
-                """
-            ),
-        }
-    )
-    specs = Specs(
-        AddressSpecs([DescendantAddresses("addr_specs")], filter_by_global_options=True),
-        FilesystemSpecs([FileGlobSpec("fs_specs/*.txt")]),
-    )
-
-    def check(tags_option: str | None, expected: set[Address]) -> None:
-        if tags_option:
-            transitive_targets_rule_runner.set_options([f"--tag={tags_option}"])
-        result = transitive_targets_rule_runner.request(FilteredTargets, [specs])
-        assert {t.address for t in result} == expected
-
-    addr_f1 = Address("addr_specs", relative_file_path="f1.txt")
-    addr_f2 = Address("addr_specs", relative_file_path="f2.txt")
-    addr_direct = Address("addr_specs", target_name="t")
-
-    fs_f1 = Address("fs_specs", relative_file_path="f1.txt")
-    fs_f2 = Address("fs_specs", relative_file_path="f2.txt")
-    fs_direct = Address("fs_specs", target_name="t")
-
-    all_a_tags = {addr_f1, addr_direct, fs_f1, fs_direct}
-    all_b_tags = {addr_f2, fs_f2}
-
-    check(None, {*all_a_tags, *all_b_tags})
-    check("a", all_a_tags)
-    check("b", all_b_tags)
-    check("-a", all_b_tags)
-    check("-b", all_a_tags)
-
-
-def test_resolve_specs_snapshot() -> None:
-    """This tests that convert filesystem specs and/or address specs into a single snapshot.
-
-    Some important edge cases:
-    - When a filesystem spec refers to a file without any owning target, it should be included
-      in the snapshot.
-    - If a file is covered both by an address spec and by a filesystem spec, we should merge it
-      so that the file only shows up once.
-    """
-    rule_runner = RuleRunner(rules=[QueryRule(SpecsSnapshot, (Specs,))], target_types=[MockTarget])
-    rule_runner.write_files(
-        {"demo/f1.txt": "", "demo/f2.txt": "", "demo/BUILD": "target(sources=['*.txt'])"}
-    )
-    specs = SpecsParser(rule_runner.build_root).parse_specs(
-        ["demo:demo", "demo/f1.txt", "demo/BUILD"]
-    )
-    result = rule_runner.request(SpecsSnapshot, [specs])
-    assert result.snapshot.files == ("demo/BUILD", "demo/f1.txt", "demo/f2.txt")
-
-
 class MockSecondaryOwnerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "secondary_owner_field"
     required = True
@@ -861,129 +769,6 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
             Address("demo", target_name="generated", relative_file_path="f2.txt"),
         },
     )
-
-
-@pytest.fixture
-def specs_rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[
-            QueryRule(Addresses, [FilesystemSpecs]),
-            QueryRule(Addresses, [Specs]),
-        ],
-        target_types=[MockTarget, MockTargetGenerator, MockGeneratedTarget],
-    )
-
-
-def resolve_filesystem_specs(
-    rule_runner: RuleRunner,
-    specs: Iterable[FilesystemSpec],
-) -> List[Address]:
-    result = rule_runner.request(Addresses, [FilesystemSpecs(specs)])
-    return sorted(result)
-
-
-def test_filesystem_specs_literal_file(specs_rule_runner: RuleRunner) -> None:
-    specs_rule_runner.write_files(
-        {
-            "demo/f1.txt": "",
-            "demo/f2.txt": "",
-            "demo/BUILD": dedent(
-                """\
-                generator(name='generator', sources=['*.txt'])
-                target(name='not-generator', sources=['*.txt'])
-                """
-            ),
-        }
-    )
-    assert resolve_filesystem_specs(specs_rule_runner, [FileLiteralSpec("demo/f1.txt")]) == [
-        Address("demo", target_name="not-generator"),
-        Address("demo", target_name="generator", relative_file_path="f1.txt"),
-    ]
-
-
-def test_filesystem_specs_glob(specs_rule_runner: RuleRunner) -> None:
-    specs_rule_runner.write_files(
-        {
-            "demo/f1.txt": "",
-            "demo/f2.txt": "",
-            "demo/BUILD": dedent(
-                """\
-                generator(name='generator', sources=['*.txt'])
-                target(name='not-generator', sources=['*.txt'])
-                target(name='skip-me', sources=['*.txt'])
-                target(name='bad-tag', sources=['*.txt'], tags=['skip'])
-                """
-            ),
-        }
-    )
-    specs_rule_runner.set_options(["--tag=-skip", "--exclude-target-regexp=skip-me"])
-    all_unskipped_addresses = [
-        Address("demo", target_name="not-generator"),
-        Address("demo", target_name="generator", relative_file_path="f1.txt"),
-        Address("demo", target_name="generator", relative_file_path="f2.txt"),
-    ]
-
-    assert (
-        resolve_filesystem_specs(specs_rule_runner, [FileGlobSpec("demo/*.txt")])
-        == all_unskipped_addresses
-    )
-    # We should deduplicate between glob and literal specs.
-    assert (
-        resolve_filesystem_specs(
-            specs_rule_runner,
-            [FileGlobSpec("demo/*.txt"), FileLiteralSpec("demo/f1.txt")],
-        )
-        == all_unskipped_addresses
-    )
-
-
-def test_filesystem_specs_nonexistent_file(specs_rule_runner: RuleRunner) -> None:
-    spec = FileLiteralSpec("demo/fake.txt")
-    with engine_error(contains='Unmatched glob from file/directory arguments: "demo/fake.txt"'):
-        resolve_filesystem_specs(specs_rule_runner, [spec])
-
-    specs_rule_runner.set_options(["--owners-not-found-behavior=ignore"])
-    assert not resolve_filesystem_specs(specs_rule_runner, [spec])
-
-
-def test_filesystem_specs_no_owner(specs_rule_runner: RuleRunner) -> None:
-    specs_rule_runner.write_files({"no_owners/f.txt": ""})
-    # Error for literal specs.
-    with pytest.raises(ExecutionError) as exc:
-        resolve_filesystem_specs(specs_rule_runner, [FileLiteralSpec("no_owners/f.txt")])
-    assert "No owning targets could be found for the file `no_owners/f.txt`" in str(exc.value)
-
-    # Do not error for glob specs.
-    assert not resolve_filesystem_specs(specs_rule_runner, [FileGlobSpec("no_owners/*.txt")])
-
-
-def test_resolve_addresses_from_specs(specs_rule_runner: RuleRunner) -> None:
-    """This tests that we correctly handle resolving from both address and filesystem specs."""
-    specs_rule_runner.write_files(
-        {
-            "fs_spec/f.txt": "",
-            "fs_spec/BUILD": "generator(sources=['f.txt'])",
-            "address_spec/f.txt": "",
-            "address_spec/BUILD": "generator(sources=['f.txt'])",
-            "multiple_files/f1.txt": "",
-            "multiple_files/f2.txt": "",
-            "multiple_files/BUILD": "generator(sources=['*.txt'])",
-        }
-    )
-
-    no_interaction_specs = ["fs_spec/f.txt", "address_spec:address_spec"]
-    multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
-    specs = SpecsParser(specs_rule_runner.build_root).parse_specs(
-        [*no_interaction_specs, *multiple_files_specs]
-    )
-
-    result = specs_rule_runner.request(Addresses, [specs])
-    assert set(result) == {
-        Address("fs_spec", relative_file_path="f.txt"),
-        Address("address_spec"),
-        Address("multiple_files"),
-        Address("multiple_files", relative_file_path="f2.txt"),
-    }
 
 
 # -----------------------------------------------------------------------------------------------
