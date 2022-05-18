@@ -113,19 +113,19 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                 PutativeTarget.for_target_type(
                     PipenvRequirementsTargetGenerator,
                     path="3rdparty",
-                    name="Pipfile.lock",
+                    name="pipenv",
                     triggering_sources=["3rdparty/Pipfile.lock"],
                 ),
                 PutativeTarget.for_target_type(
                     PoetryRequirementsTargetGenerator,
                     path="3rdparty",
-                    name="pyproject.toml",
+                    name="poetry",
                     triggering_sources=["3rdparty/pyproject.toml"],
                 ),
                 PutativeTarget.for_target_type(
                     PythonRequirementsTargetGenerator,
                     path="3rdparty",
-                    name="requirements-test.txt",
+                    name="reqs",
                     triggering_sources=["3rdparty/requirements-test.txt"],
                     kwargs={"source": "requirements-test.txt"},
                 ),
