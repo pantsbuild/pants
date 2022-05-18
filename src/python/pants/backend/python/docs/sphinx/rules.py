@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.python.docs.sphinx.sphinx_subsystem import SphinxSubsystem
 from pants.backend.python.docs.sphinx.target_types import SphinxProjectSourcesField
+from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.package import (
     BuiltPackage,
@@ -56,4 +57,8 @@ async def generate_sphinx_docs(
 
 
 def rules():
-    return (*collect_rules(), UnionRule(PackageFieldSet, SphinxPackageFieldSet))
+    return (
+        *collect_rules(),
+        *pex.rules(),
+        UnionRule(PackageFieldSet, SphinxPackageFieldSet),
+    )
