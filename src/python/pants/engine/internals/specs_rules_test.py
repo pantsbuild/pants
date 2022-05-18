@@ -27,18 +27,26 @@ from pants.base.specs_parser import SpecsParser
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.engine.fs import SpecsSnapshot
-from pants.engine.internals.build_files_test import MockGeneratedTarget as MockGeneratedTargetAS
-from pants.engine.internals.build_files_test import MockGenerateTargetsRequest
-from pants.engine.internals.build_files_test import MockTargetGenerator as MockTargetGeneratorAS
 from pants.engine.internals.build_files_test import MockTgt as MockTgtAS
-from pants.engine.internals.build_files_test import generate_mock_generated_target
 from pants.engine.internals.graph_test import MockGeneratedTarget as MockGeneratedTargetFS
 from pants.engine.internals.graph_test import MockTarget as MockTargetFS
 from pants.engine.internals.graph_test import MockTargetGenerator as MockTargetGeneratorFS
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import QueryRule
-from pants.engine.target import FilteredTargets, GenerateTargetsRequest
+from pants.engine.rules import QueryRule, rule
+from pants.engine.target import (
+    Dependencies,
+    FilteredTargets,
+    GeneratedTargets,
+    GenerateTargetsRequest,
+    MultipleSourcesField,
+    SingleSourceField,
+    StringField,
+    Tags,
+    Target,
+    TargetFilesGenerator,
+    TargetGenerator,
+)
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.frozendict import FrozenDict
@@ -46,6 +54,51 @@ from pants.util.frozendict import FrozenDict
 # -----------------------------------------------------------------------------------------------
 # AddressSpecs -> Targets
 # -----------------------------------------------------------------------------------------------
+
+
+class ResolveField(StringField):
+    alias = "resolve"
+
+
+class MockGeneratedFileTarget(Target):
+    alias = "file_generated"
+    core_fields = (Dependencies, SingleSourceField, Tags, ResolveField)
+
+
+class MockFileTargetGenerator(TargetFilesGenerator):
+    alias = "file_generator"
+    generated_target_cls = MockGeneratedFileTarget
+    core_fields = (MultipleSourcesField, Tags)
+    copied_fields = (Tags,)
+    moved_fields = (Dependencies, ResolveField)
+
+
+class MockGeneratedNonfileTarget(Target):
+    alias = "nonfile_generated"
+    core_fields = (Dependencies, Tags, ResolveField)
+
+
+class MockNonfileTargetGenerator(TargetGenerator):
+    alias = "nonfile_generator"
+    core_fields = (Tags,)
+    copied_fields = (Tags,)
+    moved_fields = (Dependencies, ResolveField)
+
+
+class MockGenerateTargetsRequest(GenerateTargetsRequest):
+    generate_from = MockNonfileTargetGenerator
+
+
+@rule
+async def generate_mock_generated_target(request: MockGenerateTargetsRequest) -> GeneratedTargets:
+    return GeneratedTargets(
+        request.generator,
+        [
+            MockGeneratedNonfileTarget(
+                request.template, request.generator.address.create_generated("gen")
+            )
+        ],
+    )
 
 
 @pytest.fixture
@@ -57,16 +110,16 @@ def address_specs_rule_runner() -> RuleRunner:
             QueryRule(Addresses, [AddressSpecs]),
         ],
         objects={"parametrize": Parametrize},
-        target_types=[MockTgtAS, MockGeneratedTargetAS, MockTargetGeneratorAS],
+        target_types=[MockTgtAS, MockFileTargetGenerator, MockNonfileTargetGenerator],
     )
 
 
 def resolve_address_specs(
     rule_runner: RuleRunner,
     specs: Iterable[AddressSpec],
-) -> set[Address]:
+) -> list[Address]:
     result = rule_runner.request(Addresses, [AddressSpecs(specs, filter_by_global_options=True)])
-    return set(result)
+    return sorted(result)
 
 
 def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) -> None:
@@ -74,7 +127,8 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
         {
             "demo/BUILD": dedent(
                 """\
-                generator(sources=['**/*.txt'])
+                file_generator(sources=['**/*.txt'])
+                nonfile_generator(name="nonfile")
                 """
             ),
             "demo/f1.txt": "",
@@ -89,7 +143,7 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
 
     def assert_resolved(spec: AddressSpec, expected: set[Address]) -> None:
         result = resolve_address_specs(address_specs_rule_runner, [spec])
-        assert result == expected
+        assert set(result) == expected
 
     # Literals should be "one-in, one-out".
     assert_resolved(AddressLiteralSpec("demo"), {Address("demo")})
@@ -97,10 +151,11 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
         AddressLiteralSpec("demo/f1.txt"), {Address("demo", relative_file_path="f1.txt")}
     )
     assert_resolved(
-        AddressLiteralSpec("demo", None, "f1.txt"), {Address("demo", generated_name="f1.txt")}
+        AddressLiteralSpec("demo", target_component="nonfile", generated_component="gen"),
+        {Address("demo", target_name="nonfile", generated_name="gen")},
     )
     assert_resolved(
-        AddressLiteralSpec("demo/subdir", "another_ext"),
+        AddressLiteralSpec("demo/subdir", target_component="another_ext"),
         {Address("demo/subdir", target_name="another_ext")},
     )
 
@@ -111,12 +166,11 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
         SiblingAddresses("demo"),
         {
             Address("demo"),
+            Address("demo", target_name="nonfile"),
             Address("demo", relative_file_path="f1.txt"),
-            Address("demo", generated_name="f1.txt"),
             Address("demo", relative_file_path="f2.txt"),
-            Address("demo", generated_name="f2.txt"),
             Address("demo", relative_file_path="f[[]3].txt"),
-            Address("demo", generated_name="f[[]3].txt"),
+            Address("demo", target_name="nonfile", generated_name="gen"),
         },
     )
     assert_resolved(
@@ -125,21 +179,18 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
         SiblingAddresses("demo/subdir"),
         {
             Address("demo", relative_file_path="subdir/f.txt"),
-            Address("demo", generated_name="subdir/f.txt"),
             Address("demo/subdir", target_name="another_ext"),
         },
     )
 
     all_tgts_in_demo = {
         Address("demo"),
+        Address("demo", target_name="nonfile"),
+        Address("demo", target_name="nonfile", generated_name="gen"),
         Address("demo", relative_file_path="f1.txt"),
-        Address("demo", generated_name="f1.txt"),
         Address("demo", relative_file_path="f2.txt"),
-        Address("demo", generated_name="f2.txt"),
         Address("demo", relative_file_path="f[[]3].txt"),
-        Address("demo", generated_name="f[[]3].txt"),
         Address("demo", relative_file_path="subdir/f.txt"),
-        Address("demo", generated_name="subdir/f.txt"),
         Address("demo/subdir", target_name="another_ext"),
     }
     assert_resolved(DescendantAddresses("demo"), all_tgts_in_demo)
@@ -148,12 +199,11 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
         AscendantAddresses("demo"),
         {
             Address("demo"),
+            Address("demo", target_name="nonfile"),
+            Address("demo", target_name="nonfile", generated_name="gen"),
             Address("demo", relative_file_path="f1.txt"),
-            Address("demo", generated_name="f1.txt"),
             Address("demo", relative_file_path="f2.txt"),
-            Address("demo", generated_name="f2.txt"),
             Address("demo", relative_file_path="f[[]3].txt"),
-            Address("demo", generated_name="f[[]3].txt"),
         },
     )
 
@@ -161,65 +211,80 @@ def test_address_specs_literals_vs_globs(address_specs_rule_runner: RuleRunner) 
 def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> None:
     """When multiple specs cover the same address, we should deduplicate to one single Address."""
     address_specs_rule_runner.write_files(
-        {"demo/f.txt": "", "demo/BUILD": "generator(sources=['f.txt'])"}
+        {
+            "demo/f.txt": "",
+            "demo/BUILD": dedent(
+                """\
+                file_generator(sources=['f.txt'])
+                nonfile_generator(name="nonfile")
+                """
+            ),
+        }
     )
     specs = [
         AddressLiteralSpec("demo"),
         SiblingAddresses("demo"),
         DescendantAddresses("demo"),
         AscendantAddresses("demo"),
-        # We also include targets generated from `demo` to ensure that the final result has both
-        # the generator and its generated targets.
-        AddressLiteralSpec("demo", None, "f.txt"),
+        AddressLiteralSpec("demo", target_component="nonfile", generated_component="gen"),
         AddressLiteralSpec("demo/f.txt"),
     ]
-    assert resolve_address_specs(address_specs_rule_runner, specs) == {
+    assert resolve_address_specs(address_specs_rule_runner, specs) == [
         Address("demo"),
-        Address("demo", generated_name="f.txt"),
+        Address("demo", target_name="nonfile"),
+        Address("demo", target_name="nonfile", generated_name="gen"),
         Address("demo", relative_file_path="f.txt"),
-    }
+    ]
 
 
 def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> None:
     address_specs_rule_runner.set_options(["--tag=+integration"])
+    all_integration_tgts = [
+        Address("demo", target_name="b_f"),
+        Address("demo", target_name="b_nf"),
+        Address("demo", target_name="b_nf", generated_name="gen"),
+        Address("demo", target_name="b_f", relative_file_path="f.txt"),
+    ]
     address_specs_rule_runner.write_files(
         {
             "demo/f.txt": "",
             "demo/BUILD": dedent(
                 """\
-                generator(name="a", sources=["f.txt"])
-                generator(name="b", sources=["f.txt"], tags=["integration"])
-                generator(name="c", sources=["f.txt"], tags=["ignore"])
+                file_generator(name="a_f", sources=["f.txt"])
+                file_generator(name="b_f", sources=["f.txt"], tags=["integration"])
+                file_generator(name="c_f", sources=["f.txt"], tags=["ignore"])
+
+                nonfile_generator(name="a_nf")
+                nonfile_generator(name="b_nf", tags=["integration"])
+                nonfile_generator(name="c_nf", tags=["ignore"])
                 """
             ),
         }
     )
-    assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
-        Address("demo", target_name="b"),
-        Address("demo", target_name="b", relative_file_path="f.txt"),
-        Address("demo", target_name="b", generated_name="f.txt"),
-    }
+    assert (
+        resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")])
+        == all_integration_tgts
+    )
 
     # The same filtering should work when given literal addresses, including generated targets and
     # file addresses.
     literals_result = resolve_address_specs(
         address_specs_rule_runner,
         [
-            AddressLiteralSpec("demo", "a"),
-            AddressLiteralSpec("demo", "b"),
-            AddressLiteralSpec("demo", "c"),
-            AddressLiteralSpec("demo/f.txt", "a"),
-            AddressLiteralSpec("demo/f.txt", "b"),
-            AddressLiteralSpec("demo", "a", "f.txt"),
-            AddressLiteralSpec("demo", "b", "f.txt"),
-            AddressLiteralSpec("demo", "c", "f.txt"),
+            AddressLiteralSpec("demo", "a_f"),
+            AddressLiteralSpec("demo", "b_f"),
+            AddressLiteralSpec("demo", "c_f"),
+            AddressLiteralSpec("demo", "a_nf"),
+            AddressLiteralSpec("demo", "b_nf"),
+            AddressLiteralSpec("demo", "c_nf"),
+            AddressLiteralSpec("demo/f.txt", "a_f"),
+            AddressLiteralSpec("demo/f.txt", "b_f"),
+            AddressLiteralSpec("demo", "a_nf", "gen"),
+            AddressLiteralSpec("demo", "b_nf", "gen"),
+            AddressLiteralSpec("demo", "c_nf", "gen"),
         ],
     )
-    assert literals_result == {
-        Address("demo", target_name="b"),
-        Address("demo", target_name="b", generated_name="f.txt"),
-        Address("demo", target_name="b", relative_file_path="f.txt"),
-    }
+    assert literals_result == all_integration_tgts
 
 
 def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: RuleRunner) -> None:
@@ -229,38 +294,42 @@ def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: Rule
             "demo/f.txt": "",
             "demo/BUILD": dedent(
                 """\
-                generator(name="exclude_me", sources=["f.txt"])
-                generator(name="not_me", sources=["f.txt"])
+                file_generator(name="exclude_me_f", sources=["f.txt"])
+                file_generator(name="not_me_f", sources=["f.txt"])
+
+                nonfile_generator(name="exclude_me_nf")
+                nonfile_generator(name="not_me_nf")
                 """
             ),
         }
     )
+    not_me_tgts = [
+        Address("demo", target_name="not_me_f"),
+        Address("demo", target_name="not_me_nf"),
+        Address("demo", target_name="not_me_nf", generated_name="gen"),
+        Address("demo", target_name="not_me_f", relative_file_path="f.txt"),
+    ]
 
-    assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
-        Address("demo", target_name="not_me"),
-        Address("demo", target_name="not_me", relative_file_path="f.txt"),
-        Address("demo", target_name="not_me", generated_name="f.txt"),
-    }
+    assert (
+        resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == not_me_tgts
+    )
 
     # The same filtering should work when given literal addresses, including generated targets and
     # file addresses.
     literals_result = resolve_address_specs(
         address_specs_rule_runner,
         [
-            AddressLiteralSpec("demo", "exclude_me"),
-            AddressLiteralSpec("demo", "not_me"),
-            AddressLiteralSpec("demo", "exclude_me", "f.txt"),
-            AddressLiteralSpec("demo", "not_me", "f.txt"),
-            AddressLiteralSpec("demo/f.txt", "exclude_me"),
-            AddressLiteralSpec("demo/f.txt", "not_me"),
+            AddressLiteralSpec("demo", "exclude_me_f"),
+            AddressLiteralSpec("demo", "exclude_me_nf"),
+            AddressLiteralSpec("demo", "not_me_f"),
+            AddressLiteralSpec("demo", "not_me_nf"),
+            AddressLiteralSpec("demo", "exclude_me_nf", "gen"),
+            AddressLiteralSpec("demo", "not_me_nf", "gen"),
+            AddressLiteralSpec("demo/f.txt", "exclude_me_f"),
+            AddressLiteralSpec("demo/f.txt", "not_me_f"),
         ],
     )
-
-    assert literals_result == {
-        Address("demo", target_name="not_me"),
-        Address("demo", target_name="not_me", relative_file_path="f.txt"),
-        Address("demo", target_name="not_me", generated_name="f.txt"),
-    }
+    assert literals_result == not_me_tgts
 
 
 def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> None:
@@ -322,10 +391,11 @@ def test_address_specs_generated_target_does_not_belong_to_generator(
     address_specs_rule_runner.write_files(
         {
             "demo/f.txt": "",
+            "demo/other.txt": "",
             "demo/BUILD": dedent(
                 """\
-                generator(name='owner', sources=['f.txt'])
-                generator(name='not_owner')
+                file_generator(name='owner', sources=['f.txt'])
+                file_generator(name='not_owner', sources=['other.txt'])
                 """
             ),
         }
@@ -348,7 +418,8 @@ def test_address_specs_parametrize(
             "demo/f.txt": "",
             "demo/BUILD": dedent(
                 """\
-                generator(sources=['f.txt'], resolve=parametrize("a", "b"))
+                file_generator(sources=['f.txt'], resolve=parametrize("a", "b"))
+                nonfile_generator(name="nonfile", resolve=parametrize("a", "b"))
                 mock_tgt(sources=['f.txt'], name="not_gen", resolve=parametrize("a", "b"))
                 """
             ),
@@ -356,26 +427,37 @@ def test_address_specs_parametrize(
     )
 
     def assert_resolved(spec: AddressSpec, expected: set[Address]) -> None:
-        assert resolve_address_specs(address_specs_rule_runner, [spec]) == expected
+        assert set(resolve_address_specs(address_specs_rule_runner, [spec])) == expected
 
     not_gen_resolve_a = Address("demo", target_name="not_gen", parameters={"resolve": "a"})
     not_gen_resolve_b = Address("demo", target_name="not_gen", parameters={"resolve": "b"})
-    generator_resolve_a = {
-        Address("demo", generated_name="f.txt", parameters={"resolve": "a"}),
+    file_generator_resolve_a = {
         Address("demo", relative_file_path="f.txt", parameters={"resolve": "a"}),
         Address("demo", parameters={"resolve": "a"}),
-        Address("demo", target_name="not_gen", parameters={"resolve": "a"}),
     }
-    generator_resolve_b = {
-        Address("demo", generated_name="f.txt", parameters={"resolve": "b"}),
+    file_generator_resolve_b = {
         Address("demo", relative_file_path="f.txt", parameters={"resolve": "b"}),
         Address("demo", parameters={"resolve": "b"}),
-        Address("demo", target_name="not_gen", parameters={"resolve": "b"}),
+    }
+    nonfile_generator_resolve_a = {
+        Address("demo", target_name="nonfile", generated_name="gen", parameters={"resolve": "a"}),
+        Address("demo", target_name="nonfile", parameters={"resolve": "a"}),
+    }
+    nonfile_generator_resolve_b = {
+        Address("demo", target_name="nonfile", generated_name="gen", parameters={"resolve": "b"}),
+        Address("demo", target_name="nonfile", parameters={"resolve": "b"}),
     }
 
     assert_resolved(
         DescendantAddresses(""),
-        {*generator_resolve_a, *generator_resolve_b, not_gen_resolve_a, not_gen_resolve_b},
+        {
+            *file_generator_resolve_a,
+            *file_generator_resolve_b,
+            *nonfile_generator_resolve_a,
+            *nonfile_generator_resolve_b,
+            not_gen_resolve_a,
+            not_gen_resolve_b,
+        },
     )
 
     # A literal address for a parameterized target works as expected.
@@ -386,14 +468,14 @@ def test_address_specs_parametrize(
         {not_gen_resolve_a},
     )
     assert_resolved(
-        AddressLiteralSpec("demo", parameters=FrozenDict({"resolve": "a"})),
-        {Address("demo", parameters={"resolve": "a"})},
+        AddressLiteralSpec("demo/f.txt", parameters=FrozenDict({"resolve": "a"})),
+        {Address("demo", relative_file_path="f.txt", parameters={"resolve": "a"})},
     )
     assert_resolved(
         AddressLiteralSpec(
-            "demo", generated_component="f.txt", parameters=FrozenDict({"resolve": "a"})
+            "demo", "nonfile", generated_component="gen", parameters=FrozenDict({"resolve": "a"})
         ),
-        {Address("demo", generated_name="f.txt", parameters={"resolve": "a"})},
+        {Address("demo", target_name="nonfile", generated_name="gen", parameters={"resolve": "a"})},
     )
     assert_resolved(
         # A direct reference to the parametrized target generator.
@@ -415,8 +497,11 @@ def test_address_specs_parametrize(
         {Address("demo", parameters={"resolve": r}) for r in ("a", "b")},
     )
     assert_resolved(
-        AddressLiteralSpec("demo", generated_component="f.txt"),
-        {Address("demo", generated_name="f.txt", parameters={"resolve": r}) for r in ("a", "b")},
+        AddressLiteralSpec("demo", "nonfile", "gen"),
+        {
+            Address("demo", target_name="nonfile", generated_name="gen", parameters={"resolve": r})
+            for r in ("a", "b")
+        },
     )
     assert_resolved(
         AddressLiteralSpec("demo/f.txt"),

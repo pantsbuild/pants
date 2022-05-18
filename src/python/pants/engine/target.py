@@ -1100,7 +1100,6 @@ def _generate_file_level_targets(
     union_membership: UnionMembership | None,
     *,
     add_dependencies_on_all_siblings: bool,
-    use_generated_address_syntax: bool = False,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.
@@ -1124,13 +1123,6 @@ def _generate_file_level_targets(
     # https://github.com/pantsbuild/pants/issues/15381.
     paths = [glob_stdlib.escape(path) for path in paths]
 
-    def generate_address(base_address: Address, relativized_fp: str) -> Address:
-        return (
-            base_address.create_generated(relativized_fp)
-            if use_generated_address_syntax
-            else base_address.create_file(relativized_fp)
-        )
-
     normalized_overrides = dict(overrides or {})
 
     all_generated_items: list[tuple[Address, str, dict[str, Any]]] = []
@@ -1141,13 +1133,13 @@ def _generate_file_level_targets(
         if generated_overrides is None:
             # No overrides apply.
             all_generated_items.append(
-                (generate_address(template_address, relativized_fp), fp, dict(template))
+                (template_address.create_file(relativized_fp), fp, dict(template))
             )
         else:
             # At least one override applies. Generate a target per set of fields.
             all_generated_items.extend(
                 (
-                    generate_address(overridden_address, relativized_fp),
+                    template_address.create_file(relativized_fp),
                     fp,
                     {**template, **override_fields},
                 )
