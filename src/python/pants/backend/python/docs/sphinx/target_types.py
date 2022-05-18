@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import PurePath
 from typing import Sequence
 
@@ -42,12 +43,18 @@ class SphinxProjectSourcesField(MultipleSourcesField):
                     """
                 )
             )
-        # TODO: check if it's conf.py in the root of the dir
-        if py_files[0] == "TODO":
+        expected_conf_py = os.path.join(self.address.spec_path, "conf.py")
+        if py_files[0] != expected_conf_py:
+            # TODO: mention how docs from first-party code work once implemented (dependencies).
             raise InvalidFieldException(
                 softwrap(
-                    """
-                    
+                    f"""
+                    The {repr(self.alias)} field in target {self.address} must have exactly one
+                    `.py` file named `conf.py`, with the full path {expected_conf_py}, but it had
+                    the Python file `{py_files[0]}` instead.
+
+                    Make sure you're declaring the target in the same directory as the `conf.py`
+                    file.
                     """
                 )
             )
