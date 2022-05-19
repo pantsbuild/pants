@@ -77,12 +77,6 @@ def calculate_specs(
         )
     return Specs(
         address_literals=tuple(address_literal_specs),
-        file_literals=(),
-        file_globs=(),
-        dir_literals=(),
-        dir_globs=(),
-        recursive_globs=(),
-        ancestor_globs=(),
         filter_by_global_options=True,
         from_change_detection=True,
     )
