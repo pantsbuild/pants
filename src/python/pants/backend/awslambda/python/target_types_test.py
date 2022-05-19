@@ -229,8 +229,8 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     assert (
         softwrap(
             """
-            ['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/
-            ambiguous_in_another_root.py']
+            ['project/ambiguous_in_another_root.py:ambiguous_in_another_root',
+            'src/py/project/ambiguous_in_another_root.py']
             """
         )
         in caplog.text
