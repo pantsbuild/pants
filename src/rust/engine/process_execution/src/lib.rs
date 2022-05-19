@@ -87,6 +87,8 @@ pub enum Platform {
   Macos_x86_64,
   Macos_arm64,
   Linux_x86_64,
+  Linux_arm64,
+  Linux_aarch64,
 }
 
 impl Platform {
@@ -100,6 +102,15 @@ impl Platform {
         ..
       } if sysname.to_lowercase() == "linux" && machine.to_lowercase() == "x86_64" => {
         Ok(Platform::Linux_x86_64)
+      }
+      uname::Info {
+        ref sysname,
+        ref machine,
+        ..
+      } if sysname.to_lowercase() == "linux"
+        && (machine.to_lowercase() == "arm64" || machine.to_lowercase() == "aarch64") =>
+      {
+        Ok(Platform::Linux_arm64)
       }
       uname::Info {
         ref sysname,
@@ -131,6 +142,8 @@ impl From<Platform> for String {
   fn from(platform: Platform) -> String {
     match platform {
       Platform::Linux_x86_64 => "linux_x86_64".to_string(),
+      Platform::Linux_arm64 => "linux_arm64".to_string(),
+      Platform::Linux_aarch64 => "linux_aarch64".to_string(),
       Platform::Macos_arm64 => "macos_arm64".to_string(),
       Platform::Macos_x86_64 => "macos_x86_64".to_string(),
     }
@@ -144,6 +157,8 @@ impl TryFrom<String> for Platform {
       "macos_arm64" => Ok(Platform::Macos_arm64),
       "macos_x86_64" => Ok(Platform::Macos_x86_64),
       "linux_x86_64" => Ok(Platform::Linux_x86_64),
+      "linux_aarch64" => Ok(Platform::Linux_aarch64),
+      "linux_arm64" => Ok(Platform::Linux_arm64),
       other => Err(format!(
         "Unknown platform {:?} encountered in parsing",
         other

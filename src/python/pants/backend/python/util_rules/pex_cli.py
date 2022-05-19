@@ -54,7 +54,7 @@ class PexCli(TemplatedExternalTool):
                     "3748292",
                 )
             )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64"]
+            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
         ]
 
 
