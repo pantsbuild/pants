@@ -287,6 +287,7 @@ class SpecsWithoutFileOwners:
     This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
     `Get(Addresses, Specs)`, which will result in this rule being used.
     """
+
     address_literals: tuple[AddressLiteralSpec, ...] = ()
     dir_globs: tuple[DirGlobSpec, ...] = ()
     recursive_globs: tuple[RecursiveGlobSpec, ...] = ()
@@ -337,6 +338,7 @@ class SpecsWithOnlyFileOwners:
     This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
     `Get(Addresses, Specs)`, which will result in this rule being used.
     """
+
     file_literals: tuple[FileLiteralSpec, ...] = ()
     file_globs: tuple[FileGlobSpec, ...] = ()
 

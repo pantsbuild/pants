@@ -327,9 +327,7 @@ def test_resolve_with_a_jar(rule_runner: RuleRunner) -> None:
         }
     )
 
-    targets = rule_runner.request(
-        Targets, [Specs(recursive_globs=(RecursiveGlobSpec(""),))]
-    )
+    targets = rule_runner.request(Targets, [Specs(recursive_globs=(RecursiveGlobSpec(""),))])
     jeremy_target = targets[0]
 
     jar_field = jeremy_target[JvmArtifactJarSourceField]
