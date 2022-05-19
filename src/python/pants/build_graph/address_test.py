@@ -147,20 +147,6 @@ def test_address_bad_target_component(spec: str) -> None:
 @pytest.mark.parametrize(
     "spec",
     [
-        "!",
-        "!a",
-        "!a:x",
-        "!a#x",
-    ],
-)
-def test_address_bad_ignore(spec: str) -> None:
-    with pytest.raises(UnsupportedIgnore):
-        AddressInput.parse(spec).dir_to_address()
-
-
-@pytest.mark.parametrize(
-    "spec",
-    [
         "a::",
         "a:",
         "a:b:",

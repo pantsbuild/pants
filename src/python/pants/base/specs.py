@@ -262,7 +262,6 @@ class FilesystemSpecs:
     def __init__(self, specs: Iterable[FilesystemSpec]) -> None:
         file_includes = []
         dir_includes = []
-        ignores = []
         for spec in specs:
             if isinstance(spec, (FileLiteralSpec, FileGlobSpec)):
                 file_includes.append(spec)
@@ -272,7 +271,6 @@ class FilesystemSpecs:
                 raise AssertionError(f"Unexpected type of FilesystemSpec: {repr(self)}")
         self.file_includes = tuple(file_includes)
         self.dir_includes = tuple(dir_includes)
-        self.ignores = tuple(ignores)
 
     @staticmethod
     def _generate_path_globs(
