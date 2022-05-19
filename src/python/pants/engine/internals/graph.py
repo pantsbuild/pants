@@ -13,7 +13,7 @@ from typing import Iterable, NamedTuple, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptyDescendantAddresses, Specs
+from pants.base.specs import AddressSpecs, AscendantAddresses, MaybeEmptyDescendantAddresses
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -41,7 +41,6 @@ from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     Field,
-    FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     FilteredTargets,
@@ -56,7 +55,6 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     MultipleSourcesField,
-    NoApplicableTargetsBehavior,
     OverridesField,
     RegisteredTargetTypes,
     SecondaryOwnerMixin,
@@ -69,8 +67,6 @@ from pants.engine.target import (
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
     TargetGenerator,
-    TargetRootsToFieldSets,
-    TargetRootsToFieldSetsRequest,
     Targets,
     TargetTypesToGenerateTargetsRequests,
     TransitiveTargets,
@@ -1081,197 +1077,6 @@ async def resolve_unparsed_address_inputs(
 # -----------------------------------------------------------------------------------------------
 
 
-class NoApplicableTargetsException(Exception):
-    def __init__(
-        self,
-        targets: Iterable[Target],
-        specs: Specs,
-        union_membership: UnionMembership,
-        *,
-        applicable_target_types: Iterable[type[Target]],
-        goal_description: str,
-    ) -> None:
-        applicable_target_aliases = sorted(
-            {target_type.alias for target_type in applicable_target_types}
-        )
-        inapplicable_target_aliases = sorted({tgt.alias for tgt in targets})
-        msg = (
-            "No applicable files or targets matched."
-            if inapplicable_target_aliases
-            else "No files or targets specified."
-        )
-        msg += (
-            f" {goal_description.capitalize()} works "
-            f"with these target types:\n\n"
-            f"{bullet_list(applicable_target_aliases)}\n\n"
-        )
-
-        # Explain what was specified, if relevant.
-        if inapplicable_target_aliases:
-            if bool(specs.filesystem_specs) and bool(specs.address_specs):
-                specs_description = " files and targets with "
-            elif bool(specs.filesystem_specs):
-                specs_description = " files with "
-            elif bool(specs.address_specs):
-                specs_description = " targets with "
-            else:
-                specs_description = " "
-            msg += (
-                f"However, you only specified{specs_description}these target types:\n\n"
-                f"{bullet_list(inapplicable_target_aliases)}\n\n"
-            )
-
-        # Add a remedy.
-        #
-        # We sometimes suggest using `./pants filedeps` to find applicable files. However, this
-        # command only works if at least one of the targets has a SourcesField field.
-        #
-        # NB: Even with the "secondary owners" mechanism - used by target types like `pex_binary`
-        # and `python_awslambda` to still work with file args - those targets will not show the
-        # associated files when using filedeps.
-        filedeps_goal_works = any(
-            tgt.class_has_field(SourcesField, union_membership) for tgt in applicable_target_types
-        )
-        pants_filter_command = (
-            f"{bin_name()} filter --target-type={','.join(applicable_target_aliases)} ::"
-        )
-        remedy = (
-            f"Please specify relevant files and/or targets. Run `{pants_filter_command}` to "
-            "find all applicable targets in your project"
-        )
-        if filedeps_goal_works:
-            remedy += (
-                f", or run `{pants_filter_command} | xargs {bin_name()} filedeps` to find all "
-                "applicable files."
-            )
-        else:
-            remedy += "."
-        msg += remedy
-        super().__init__(msg)
-
-    @classmethod
-    def create_from_field_sets(
-        cls,
-        targets: Iterable[Target],
-        specs: Specs,
-        union_membership: UnionMembership,
-        registered_target_types: RegisteredTargetTypes,
-        *,
-        field_set_types: Iterable[type[FieldSet]],
-        goal_description: str,
-    ) -> NoApplicableTargetsException:
-        applicable_target_types = {
-            target_type
-            for field_set_type in field_set_types
-            for target_type in field_set_type.applicable_target_types(
-                registered_target_types.types, union_membership
-            )
-        }
-        return cls(
-            targets,
-            specs,
-            union_membership,
-            applicable_target_types=applicable_target_types,
-            goal_description=goal_description,
-        )
-
-
-class TooManyTargetsException(Exception):
-    def __init__(self, targets: Iterable[Target], *, goal_description: str) -> None:
-        addresses = sorted(tgt.address.spec for tgt in targets)
-        super().__init__(
-            f"{goal_description.capitalize()} only works with one valid target, but was given "
-            f"multiple valid targets:\n\n{bullet_list(addresses)}\n\n"
-            "Please select one of these targets to run."
-        )
-
-
-class AmbiguousImplementationsException(Exception):
-    """A target has multiple valid FieldSets, but a goal expects there to be one FieldSet."""
-
-    def __init__(
-        self,
-        target: Target,
-        field_sets: Iterable[FieldSet],
-        *,
-        goal_description: str,
-    ) -> None:
-        # TODO: improve this error message. A better error message would explain to users how they
-        #  can resolve the issue.
-        possible_field_sets_types = sorted(field_set.__class__.__name__ for field_set in field_sets)
-        super().__init__(
-            f"Multiple of the registered implementations for {goal_description} work for "
-            f"{target.address} (target type {repr(target.alias)}). It is ambiguous which "
-            "implementation to use.\n\nPossible implementations:\n\n"
-            f"{bullet_list(possible_field_sets_types)}"
-        )
-
-
-@rule
-async def find_valid_field_sets_for_target_roots(
-    request: TargetRootsToFieldSetsRequest,
-    specs: Specs,
-    union_membership: UnionMembership,
-    registered_target_types: RegisteredTargetTypes,
-) -> TargetRootsToFieldSets:
-    # NB: This must be in an `await Get`, rather than the rule signature, to avoid a rule graph
-    # issue.
-    targets = await Get(FilteredTargets, Specs, specs)
-    field_sets_per_target = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
-    )
-    targets_to_applicable_field_sets = {}
-    for tgt, field_sets in zip(targets, field_sets_per_target.collection):
-        if field_sets:
-            targets_to_applicable_field_sets[tgt] = field_sets
-
-    # Possibly warn or error if no targets were applicable.
-    if not targets_to_applicable_field_sets:
-        no_applicable_exception = NoApplicableTargetsException.create_from_field_sets(
-            targets,
-            specs,
-            union_membership,
-            registered_target_types,
-            field_set_types=union_membership[request.field_set_superclass],
-            goal_description=request.goal_description,
-        )
-        if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
-            raise no_applicable_exception
-        # We squelch the warning if the specs came from change detection or only from address globs,
-        # since in that case we interpret the user's intent as "if there are relevant matching
-        # targets, act on them". But we still want to warn if the specs were literal, or empty.
-        empty_ok = specs.from_change_detection or (
-            specs.address_specs.globs
-            and not specs.address_specs.literals
-            and not specs.filesystem_specs
-        )
-        if (
-            request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn
-            and not empty_ok
-        ):
-            logger.warning(str(no_applicable_exception))
-
-    if request.num_shards > 0:
-        sharded_targets_to_applicable_field_sets = {
-            tgt: value
-            for tgt, value in targets_to_applicable_field_sets.items()
-            if request.is_in_shard(tgt.address.spec)
-        }
-        result = TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
-    else:
-        result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
-
-    if not request.expect_single_field_set:
-        return result
-    if len(result.targets) > 1:
-        raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
-    if len(result.field_sets) > 1:
-        raise AmbiguousImplementationsException(
-            result.targets[0], result.field_sets, goal_description=request.goal_description
-        )
-    return result
-
-
 @rule
 def find_valid_field_sets(
     request: FieldSetsPerTargetRequest, union_membership: UnionMembership
@@ -1294,7 +1099,6 @@ class GenerateFileTargets(GenerateTargetsRequest):
 @rule
 async def generate_file_targets(
     request: GenerateFileTargets,
-    files_not_found_behavior: FilesNotFoundBehavior,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     sources_paths = await Get(
