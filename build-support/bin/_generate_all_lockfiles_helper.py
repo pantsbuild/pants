@@ -19,6 +19,7 @@ from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
+from pants.backend.python.docs.sphinx.sphinx_subsystem import SphinxSubsystem
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
 from pants.backend.python.lint.bandit.subsystem import Bandit
@@ -107,6 +108,7 @@ AllTools = (
     DefaultTool.python(IPython),
     DefaultTool.python(Setuptools),
     DefaultTool.python(SetuptoolsSCM),
+    DefaultTool.python(SphinxSubsystem),
     DefaultTool.python(MyPy, source_plugins=True),
     DefaultTool.python(PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"),
     DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
