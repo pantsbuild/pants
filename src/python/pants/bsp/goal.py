@@ -12,7 +12,7 @@ from typing import Mapping
 
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.base.specs import Specs
+from pants.base.specs_v2 import Specs
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.util_rules.lifecycle import BSP_VERSION, BSPLanguageSupport

@@ -14,8 +14,8 @@ from typing_extensions import Protocol
 
 from pants.base.build_root import BuildRoot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.base.specs import AddressSpecs, Specs
 from pants.base.specs_parser import SpecsParser
+from pants.base.specs_v2 import Specs, SpecsWithoutFileOwners
 from pants.bsp.goal import BSPGoal
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import (
@@ -258,7 +258,9 @@ async def resolve_bsp_build_target_addresses(
     bsp_target: BSPBuildTargetInternal,
     union_membership: UnionMembership,
 ) -> Targets:
-    targets = await Get(Targets, AddressSpecs, bsp_target.specs.address_specs)
+    targets = await Get(
+        Targets, SpecsWithoutFileOwners, SpecsWithoutFileOwners.from_specs(bsp_target.specs)
+    )
     if bsp_target.definition.resolve_filter is None:
         return targets
 

@@ -11,12 +11,12 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs import (
+from pants.base.specs_v2 import (
     AddressLiteralSpec,
-    AddressSpecs,
     FileLiteralSpec,
-    FilesystemSpecs,
     Specs,
+    SpecsWithOnlyFileOwners,
+    SpecsWithoutFileOwners,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import PathGlobs, Paths, SpecsSnapshot
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------------------------
-# AddressSpecs -> Targets
+# SpecsWithoutFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -98,28 +98,28 @@ async def _determine_literal_addresses_from_specs(
 
 
 @rule
-async def addresses_from_address_specs(
-    address_specs: AddressSpecs,
+async def addresses_from_specs_without_file_owners(
+    specs: SpecsWithoutFileOwners,
     build_file_options: BuildFileOptions,
     specs_filter: SpecsFilter,
 ) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
-    filtering_disabled = address_specs.filter_by_global_options is False
+    filtering_disabled = specs.filter_by_global_options is False
 
-    literal_wrapped_targets = await _determine_literal_addresses_from_specs(address_specs.literals)
+    literal_wrapped_targets = await _determine_literal_addresses_from_specs(specs.address_literals)
     matched_addresses.update(
         wrapped_tgt.target.address
         for wrapped_tgt in literal_wrapped_targets
         if filtering_disabled or specs_filter.matches(wrapped_tgt.target)
     )
-    if not address_specs.globs:
+    if not (specs.dir_globs or specs.recursive_globs or specs.ancestor_globs):
         return Addresses(matched_addresses)
 
-    # Resolve all `AddressGlobSpecs`.
+    # Resolve all globs.
     build_file_paths = await Get(
         Paths,
         PathGlobs,
-        address_specs.to_build_file_path_globs(
+        specs.to_build_file_path_globs(
             build_patterns=build_file_options.patterns,
             build_ignore_patterns=build_file_options.ignores,
         ),
@@ -141,9 +141,9 @@ async def addresses_from_address_specs(
             residence_dir_to_targets[tgt.residence_dir].append(tgt)
 
     matched_globs = set()
-    for glob_spec in address_specs.globs:
+    for glob_spec in specs.glob_specs():
         for residence_dir in residence_dir_to_targets:
-            if not glob_spec.matches(residence_dir):
+            if not glob_spec.matches_target(residence_dir):
                 continue
             matched_globs.add(glob_spec)
             matched_addresses.update(
@@ -154,14 +154,14 @@ async def addresses_from_address_specs(
 
     unmatched_globs = [
         glob
-        for glob in address_specs.globs
-        if glob not in matched_globs and glob.error_if_no_matches
+        for glob in specs.glob_specs()
+        if glob not in matched_globs and glob.error_if_no_target_matches
     ]
     if unmatched_globs:
         glob_description = (
-            f"the address glob `{unmatched_globs[0]}`"
+            f"the glob `{unmatched_globs[0]}`"
             if len(unmatched_globs) == 1
-            else f"these address globs: {sorted(str(glob) for glob in unmatched_globs)}"
+            else f"these globs: {sorted(str(glob) for glob in unmatched_globs)}"
         )
         raise ResolveError(
             f"No targets found for {glob_description}\n\n"
@@ -173,7 +173,7 @@ async def addresses_from_address_specs(
 
 
 # -----------------------------------------------------------------------------------------------
-# FilesystemSpecs -> Targets
+# SpecsWithOnlyFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -183,26 +183,26 @@ def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNo
 
 
 @rule
-async def addresses_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs, owners_not_found_behavior: OwnersNotFoundBehavior
+async def addresses_from_specs_with_only_file_owners(
+    specs: SpecsWithOnlyFileOwners, owners_not_found_behavior: OwnersNotFoundBehavior
 ) -> Addresses:
-    """Find the owner(s) for each FilesystemSpec."""
+    """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
         Get(
             Paths,
             PathGlobs,
-            filesystem_specs.path_globs_for_spec(
+            specs.path_globs_for_spec(
                 spec, owners_not_found_behavior.to_glob_match_error_behavior()
             ),
         )
-        for spec in filesystem_specs.file_includes
+        for spec in specs.all_specs()
     )
     owners_per_include = await MultiGet(
         Get(Owners, OwnersRequest(paths.files, filter_by_global_options=True))
         for paths in paths_per_include
     )
     addresses: set[Address] = set()
-    for spec, owners in zip(filesystem_specs.file_includes, owners_per_include):
+    for spec, owners in zip(specs.all_specs(), owners_per_include):
         if (
             owners_not_found_behavior != OwnersNotFoundBehavior.ignore
             and isinstance(spec, FileLiteralSpec)
@@ -224,13 +224,12 @@ async def addresses_from_filesystem_specs(
 
 @rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
 async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
-    from_address_specs, from_filesystem_specs = await MultiGet(
-        Get(Addresses, AddressSpecs, specs.address_specs),
-        Get(Addresses, FilesystemSpecs, specs.filesystem_specs),
+    without_file_owners, with_file_owners = await MultiGet(
+        Get(Addresses, SpecsWithoutFileOwners, SpecsWithoutFileOwners.from_specs(specs)),
+        Get(Addresses, SpecsWithOnlyFileOwners, SpecsWithOnlyFileOwners.from_specs(specs)),
     )
-    # We use a set to dedupe because it's possible to have the same address from both an address
-    # and filesystem spec.
-    return Addresses(sorted({*from_address_specs, *from_filesystem_specs}))
+    # Use a set to dedupe.
+    return Addresses(sorted({*without_file_owners, *with_file_owners}))
 
 
 @rule
@@ -259,22 +258,23 @@ async def resolve_specs_snapshot(
     Address specs will use their `SourcesField` field, and Filesystem specs will use whatever args
     were given. Filesystem specs may safely refer to files with no owning target.
     """
-    targets = await Get(Targets, AddressSpecs, specs.address_specs)
+    targets = await Get(Targets, SpecsWithoutFileOwners, SpecsWithoutFileOwners.from_specs(specs))
     all_hydrated_sources = await MultiGet(
         Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
         for tgt in targets
         if tgt.has_field(SourcesField)
     )
 
+    with_files_owners = SpecsWithOnlyFileOwners.from_specs(specs)
     filesystem_specs_digest = (
         await Get(
             Digest,
             PathGlobs,
-            specs.filesystem_specs.to_path_globs(
+            with_files_owners.to_path_globs(
                 owners_not_found_behavior.to_glob_match_error_behavior()
             ),
         )
-        if specs.filesystem_specs
+        if with_files_owners
         else None
     )
 
@@ -319,16 +319,11 @@ class NoApplicableTargetsException(Exception):
 
         # Explain what was specified, if relevant.
         if inapplicable_target_aliases:
-            if bool(specs.filesystem_specs) and bool(specs.address_specs):
-                specs_description = " files and targets with "
-            elif bool(specs.filesystem_specs):
-                specs_description = " files with "
-            elif bool(specs.address_specs):
-                specs_description = " targets with "
-            else:
-                specs_description = " "
+            specs_description = specs.arguments_provided_description() or ""
+            if specs_description:
+                specs_description = f" {specs_description}"
             msg += (
-                f"However, you only specified{specs_description}these target types:\n\n"
+                f"However, you only specified{specs_description} these target types:\n\n"
                 f"{bullet_list(inapplicable_target_aliases)}\n\n"
             )
 
@@ -448,13 +443,11 @@ async def find_valid_field_sets_for_target_roots(
         )
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
             raise no_applicable_exception
-        # We squelch the warning if the specs came from change detection or only from address globs,
+        # We squelch the warning if the specs came from change detection or only from globs,
         # since in that case we interpret the user's intent as "if there are relevant matching
         # targets, act on them". But we still want to warn if the specs were literal, or empty.
         empty_ok = specs.from_change_detection or (
-            specs.address_specs.globs
-            and not specs.address_specs.literals
-            and not specs.filesystem_specs
+            specs and not specs.address_literals and not specs.file_literals
         )
         if (
             request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn

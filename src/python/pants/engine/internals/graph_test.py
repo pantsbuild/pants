@@ -11,8 +11,8 @@ from typing import Iterable, List, Set, Tuple, Type, cast
 
 import pytest
 
-from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
+from pants.base.specs_v2 import Specs
 from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
 from pants.engine.internals.graph import (

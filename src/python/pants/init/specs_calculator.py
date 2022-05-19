@@ -4,8 +4,8 @@
 import logging
 from typing import cast
 
-from pants.base.specs_v2 import AddressLiteralSpec, Specs
 from pants.base.specs_parser import SpecsParser
+from pants.base.specs_v2 import AddressLiteralSpec, Specs
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
 from pants.engine.internals.scheduler import SchedulerSession
@@ -35,30 +35,12 @@ def calculate_specs(
     logger.debug("specs are: %s", specs)
     logger.debug("changed_options are: %s", changed_options)
 
-    if specs.provided and changed_options.provided:
+    if specs and changed_options.provided:
         changed_name = "--changed-since" if changed_options.since else "--changed-diffspec"
-
-        specs_descriptions = []
-        if specs.address_literals:
-            specs_descriptions.append("target")
-        if specs.file_literals or specs.file_globs:
-            specs_descriptions.append("file")
-        if specs.dir_literals:
-            specs_descriptions.append("directory")
-        if specs.dir_globs or specs.recursive_globs or specs.ancestor_globs:
-            specs_descriptions.append("glob")
-
-        assert specs_descriptions
-        if len(specs_descriptions) == 1:
-            specs_descr = f"{specs_descriptions[0]} arguments"
-        elif len(specs_descriptions) == 2:
-            specs_descr = " and ".join(specs_descriptions) + " arguments"
-        else:
-            specs_descr = (
-                ", ".join(specs_descriptions[:-1]) + f", and {specs_descriptions[-1]} arguments"
-            )
+        specs_description = specs.arguments_provided_description()
+        assert specs_description is not None
         raise InvalidSpecConstraint(
-            f"You used `{changed_name}` at the same time as using {specs_descr}. You can "
+            f"You used `{changed_name}` at the same time as using {specs_description}. You can "
             f"only use `{changed_name}` or use normal arguments."
         )
 
