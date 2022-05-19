@@ -108,6 +108,10 @@ class DirLiteralSpec(Spec):
     def __str__(self) -> str:
         return self.directory
 
+    def to_address_literal(self) -> AddressLiteralSpec:
+        """For now, `dir` can also be shorthand for `dir:dir`."""
+        return AddressLiteralSpec(path_component=self.directory)
+
 
 @dataclass(frozen=True)
 class DirGlobSpec(Spec):
@@ -196,6 +200,7 @@ class Specs:
         cls,
         specs: Iterable[Spec],
         *,
+        convert_dir_literal_to_address_literal: bool,
         filter_by_global_options: bool = False,
         from_change_detection: bool = False,
     ) -> Specs:
@@ -219,7 +224,10 @@ class Specs:
             elif isinstance(spec, FileGlobSpec):
                 file_globs.append(spec)
             elif isinstance(spec, DirLiteralSpec):
-                dir_literals.append(spec)
+                if convert_dir_literal_to_address_literal:
+                    address_literals.append(spec.to_address_literal())
+                else:
+                    dir_literals.append(spec)
             elif isinstance(spec, DirGlobSpec):
                 dir_globs.append(spec)
             elif isinstance(spec, RecursiveGlobSpec):

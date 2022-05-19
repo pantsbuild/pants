@@ -7,8 +7,8 @@ import json
 from collections import deque
 from typing import Iterable
 
-from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
+from pants.base.specs_v2 import Specs
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
