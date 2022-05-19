@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.util.frozendict import FrozenDict
 
@@ -167,6 +168,60 @@ class Specs:
     recursive_globs: tuple[RecursiveGlobSpec, ...]
     ancestor_globs: tuple[AncestorGlobSpec, ...]
 
+    filter_by_global_options: bool = False
+    from_change_detection: bool = False
+
+    @classmethod
+    def create(
+        cls,
+        specs: Iterable[Spec],
+        *,
+        filter_by_global_options: bool = False,
+        from_change_detection: bool = False,
+    ) -> Specs:
+        address_literals = []
+        file_literals = []
+        file_globs = []
+        dir_literals = []
+        dir_globs = []
+        recursive_globs = []
+        ancestor_globs = []
+        for spec in specs:
+            if isinstance(spec, AddressLiteralSpec):
+                address_literals.append(spec)
+            elif isinstance(spec, FileLiteralSpec):
+                file_literals.append(spec)
+            elif isinstance(spec, FileGlobSpec):
+                file_globs.append(spec)
+            elif isinstance(spec, DirLiteralSpec):
+                dir_literals.append(spec)
+            elif isinstance(spec, DirGlobSpec):
+                dir_globs.append(spec)
+            elif isinstance(spec, RecursiveGlobSpec):
+                recursive_globs.append(spec)
+            elif isinstance(spec, AncestorGlobSpec):
+                ancestor_globs.append(spec)
+            else:
+                raise AssertionError(f"Unexpected type of Spec: {repr(spec)}")
+        return Specs(
+            tuple(address_literals),
+            tuple(file_literals),
+            tuple(file_globs),
+            tuple(dir_literals),
+            tuple(dir_globs),
+            tuple(recursive_globs),
+            tuple(ancestor_globs),
+            filter_by_global_options=filter_by_global_options,
+            from_change_detection=from_change_detection,
+        )
+
+    @property
+    def provided(self) -> bool:
+        """Were any specs given?"""
+        return (
+            self.address_literals or self.file_literals or self.file_globs or self.dir_literals or self.dir_globs or self.recursive_globs or self.ancestor_globs
+        )
+
 
 @dataclass(frozen=True)
 class SpecsWithoutFileOwners:
@@ -181,6 +236,3 @@ class SpecsWithoutFileOwners:
 class SpecsWithOnlyFileOwners:
     file_literals: tuple[FileLiteralSpec, ...]
     file_globs: tuple[FileGlobSpec, ...]
-
-
-# TODO: how will we model ignore specs?

@@ -8,26 +8,22 @@ from pathlib import Path, PurePath
 from typing import Iterable
 
 from pants.base.build_environment import get_buildroot
-from pants.base.specs import (
+from pants.base.specs_v2 import (
+    Spec,
     AddressLiteralSpec,
-    AddressSpec,
-    AddressSpecs,
-    DescendantAddresses,
     DirLiteralSpec,
     FileGlobSpec,
     FileLiteralSpec,
-    FilesystemSpec,
-    FilesystemSpecs,
-    SiblingAddresses,
     Specs,
+    RecursiveGlobSpec,
+    DirGlobSpec,
 )
 from pants.engine.internals import native_engine
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import OrderedSet
 
 
 class SpecsParser:
-    """Parses address and filesystem specs as passed from the command line.
+    """Parses specs as passed from the command line.
 
     See the `specs` module for more information on the types of objects returned.
     This class supports some flexibility in the path portion of the spec to allow for more natural
@@ -67,7 +63,7 @@ class SpecsParser:
             normalized = ""
         return normalized
 
-    def parse_spec(self, spec: str) -> AddressSpec | FilesystemSpec:
+    def parse_spec(self, spec: str) -> Spec:
         """Parse the given spec into an `AddressSpec` or `FilesystemSpec` object.
 
         :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
@@ -83,9 +79,9 @@ class SpecsParser:
         ) = native_engine.address_spec_parse(spec)
 
         if wildcard == "::":
-            return DescendantAddresses(directory=self._normalize_spec_path(path_component))
+            return RecursiveGlobSpec(directory=self._normalize_spec_path(path_component))
         if wildcard == ":":
-            return SiblingAddresses(directory=self._normalize_spec_path(path_component))
+            return DirGlobSpec(directory=self._normalize_spec_path(path_component))
         if target_component or generated_component or parameters:
             return AddressLiteralSpec(
                 path_component=self._normalize_spec_path(path_component),
@@ -106,18 +102,6 @@ class SpecsParser:
         return DirLiteralSpec(spec_path)
 
     def parse_specs(self, specs: Iterable[str]) -> Specs:
-        address_specs: OrderedSet[AddressSpec] = OrderedSet()
-        filesystem_specs: OrderedSet[FilesystemSpec] = OrderedSet()
-        for spec_str in specs:
-            parsed_spec = self.parse_spec(spec_str)
-            if isinstance(parsed_spec, AddressSpec):
-                address_specs.add(parsed_spec)
-            elif isinstance(parsed_spec, DirLiteralSpec):
-                address_specs.add(parsed_spec.to_address_literal())
-            else:
-                filesystem_specs.add(parsed_spec)
-
-        return Specs(
-            AddressSpecs(address_specs, filter_by_global_options=True),
-            FilesystemSpecs(filesystem_specs),
+        return Specs.create(
+            (self.parse_spec(spec) for spec in specs), filter_by_global_options=True
         )

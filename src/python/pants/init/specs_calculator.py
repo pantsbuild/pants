@@ -4,7 +4,7 @@
 import logging
 from typing import cast
 
-from pants.base.specs import AddressLiteralSpec, AddressSpecs, FilesystemSpecs, Specs
+from pants.base.specs_v2 import AddressLiteralSpec, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
@@ -37,15 +37,29 @@ def calculate_specs(
 
     if specs.provided and changed_options.provided:
         changed_name = "--changed-since" if changed_options.since else "--changed-diffspec"
-        if specs.filesystem_specs and specs.address_specs:
-            specs_description = "target and file/directory arguments"
-        elif specs.filesystem_specs:
-            specs_description = "file/directory arguments"
+
+        specs_descriptions = []
+        if specs.address_literals:
+            specs_descriptions.append("target")
+        if specs.file_literals or specs.file_globs:
+            specs_descriptions.append("file")
+        if specs.dir_literals:
+            specs_descriptions.append("directory")
+        if specs.dir_globs or specs.recursive_globs or specs.ancestor_globs:
+            specs_descriptions.append("glob")
+
+        assert specs_descriptions
+        if len(specs_descriptions) == 1:
+            specs_descr = f"{specs_descriptions[0]} arguments"
+        elif len(specs_descriptions) == 2:
+            specs_descr = " and ".join(specs_descriptions) + " arguments"
         else:
-            specs_description = "target arguments"
+            specs_descr = (
+                ", ".join(specs_descriptions[:-1]) + f", and {specs_descriptions[-1]} arguments"
+            )
         raise InvalidSpecConstraint(
-            f"You used `{changed_name}` at the same time as using {specs_description}. Please "
-            "use only one."
+            f"You used `{changed_name}` at the same time as using {specs_descr}. You can "
+            f"only use `{changed_name}` or use normal arguments."
         )
 
     if not changed_options.provided:
@@ -68,10 +82,10 @@ def calculate_specs(
     )
     logger.debug("changed addresses: %s", changed_addresses)
 
-    address_specs = []
+    address_literal_specs = []
     for address in cast(ChangedAddresses, changed_addresses):
         address_input = AddressInput.parse(address.spec)
-        address_specs.append(
+        address_literal_specs.append(
             AddressLiteralSpec(
                 path_component=address_input.path_component,
                 target_component=address_input.target_component,
@@ -80,8 +94,14 @@ def calculate_specs(
             )
         )
     return Specs(
-        AddressSpecs(address_specs, filter_by_global_options=True),
-        FilesystemSpecs([]),
+        address_literals=tuple(address_literal_specs),
+        file_literals=(),
+        file_globs=(),
+        dir_literals=(),
+        dir_globs=(),
+        recursive_globs=(),
+        ancestor_globs=(),
+        filter_by_global_options=True,
         from_change_detection=True,
     )
 
