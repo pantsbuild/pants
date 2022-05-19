@@ -15,7 +15,6 @@ from pants.base.specs import (
     DescendantAddresses,
     DirLiteralSpec,
     FileGlobSpec,
-    FileIgnoreSpec,
     FileLiteralSpec,
     FilesystemSpec,
     FilesystemSpecs,
@@ -74,7 +73,6 @@ class SpecsParser:
         :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
         """
         (
-            is_ignored,
             (
                 path_component,
                 target_component,
@@ -84,28 +82,17 @@ class SpecsParser:
             wildcard,
         ) = native_engine.address_spec_parse(spec)
 
-        def assert_not_ignored(spec_descriptor: str) -> None:
-            if is_ignored:
-                raise self.BadSpecError(
-                    f"The {spec_descriptor} spec `{spec}` does not support ignore (`!`) syntax."
-                )
-
         if wildcard == "::":
-            assert_not_ignored("address wildcard")
             return DescendantAddresses(directory=self._normalize_spec_path(path_component))
         if wildcard == ":":
-            assert_not_ignored("address wildcard")
             return SiblingAddresses(directory=self._normalize_spec_path(path_component))
         if target_component or generated_component or parameters:
-            assert_not_ignored("address")
             return AddressLiteralSpec(
                 path_component=self._normalize_spec_path(path_component),
                 target_component=target_component,
                 generated_component=generated_component,
                 parameters=FrozenDict(sorted(parameters)),
             )
-        if is_ignored:
-            return FileIgnoreSpec(path_component)
         if "*" in path_component:
             return FileGlobSpec(spec)
         if PurePath(spec).suffix:

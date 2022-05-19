@@ -14,7 +14,6 @@ from pants.base.specs import (
     DescendantAddresses,
     DirLiteralSpec,
     FileGlobSpec,
-    FileIgnoreSpec,
     FileLiteralSpec,
     FilesystemSpec,
     SiblingAddresses,
@@ -53,10 +52,6 @@ def file_literal(file: str) -> FileLiteralSpec:
 
 def file_glob(val: str) -> FileGlobSpec:
     return FileGlobSpec(val)
-
-
-def ignore(val: str) -> FileIgnoreSpec:
-    return FileIgnoreSpec(val)
 
 
 def assert_spec_parsed(build_root: Path, spec_str: str, expected_spec: Spec) -> None:
@@ -136,11 +131,6 @@ def test_files(tmp_path: Path) -> None:
 @pytest.mark.parametrize("spec", ["*", "**/*", "a/b/*", "a/b/test_*.py", "a/b/**/test_*"])
 def test_file_globs(tmp_path: Path, spec: str) -> None:
     assert_spec_parsed(tmp_path, spec, file_glob(spec))
-
-
-@pytest.mark.parametrize("spec", ["!", "!a/b/", "!/a/b/*"])
-def test_excludes(tmp_path: Path, spec: str) -> None:
-    assert_spec_parsed(tmp_path, spec, ignore(spec[1:]))
 
 
 def test_dir_literals(tmp_path: Path) -> None:

@@ -553,7 +553,6 @@ def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
     dir_specs = [dir_spec.v for dir_spec in specs.filesystem_specs.dir_includes]
     other_specs: list[Spec] = [
         *specs.filesystem_specs.file_includes,
-        *specs.filesystem_specs.ignores,
         *specs.address_specs.globs,
     ]
     for spec in specs.address_specs.literals:
