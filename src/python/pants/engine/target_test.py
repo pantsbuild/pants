@@ -1408,7 +1408,7 @@ def test_get_shard() -> None:
 
 
 def test_generate_file_based_overrides_field_help_message() -> None:
-    # Just test the Exmaple: part looks right
+    # Just test the Example: part looks right
     message = generate_file_based_overrides_field_help_message(
         "alias",
         """
@@ -1418,5 +1418,6 @@ def test_generate_file_based_overrides_field_help_message() -> None:
         }
         """,
     )
-    assert "\n    overrides={\n" in message
+    assert "example:\n    overrides={\n" in message
     assert '\n        "bar.proto"' in message
+    assert "\n    }\n\nFile" in message
