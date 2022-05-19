@@ -7,7 +7,7 @@ import textwrap
 
 import pytest
 
-from pants.base.specs import RecursiveGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import RecursiveGlobSpec, Specs
 from pants.core.util_rules import config_files, source_files
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
@@ -43,7 +43,7 @@ def rule_runner() -> RuleRunner:
             *coursier_fetch_rules(),
             *source_files.rules(),
             *util_rules(),
-            QueryRule(Targets, [SpecsWithoutFileOwners]),
+            QueryRule(Targets, [Specs]),
             QueryRule(CoursierResolvedLockfile, (ArtifactRequirements,)),
             QueryRule(ClasspathEntry, (CoursierLockfileEntry,)),
             QueryRule(FileDigest, (ExtractFileDigest,)),
@@ -328,7 +328,7 @@ def test_resolve_with_a_jar(rule_runner: RuleRunner) -> None:
     )
 
     targets = rule_runner.request(
-        Targets, [SpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),))]
+        Targets, [Specs(recursive_globs=(RecursiveGlobSpec(""),))]
     )
     jeremy_target = targets[0]
 

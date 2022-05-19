@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.specs import AncestorGlobSpec, Spec, Specs, SpecsWithoutFileOwners
+from pants.base.specs import AncestorGlobSpec, Spec, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -454,7 +454,7 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
     source_dirs = {os.path.dirname(path) for path in source_path_set}
     possible_owners = await Get(
         UnexpandedTargets,
-        SpecsWithoutFileOwners(ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs)),
+        Specs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs)),
     )
     possible_owners_sources = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(t.get(SourcesField))) for t in possible_owners

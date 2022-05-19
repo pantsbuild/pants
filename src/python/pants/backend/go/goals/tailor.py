@@ -17,7 +17,7 @@ from pants.backend.go.target_types import (
     GoModTarget,
     GoPackageTarget,
 )
-from pants.base.specs import AncestorGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import AncestorGlobSpec, Specs
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -95,9 +95,9 @@ async def find_putative_go_targets(
         ]
         existing_targets = await Get(
             UnexpandedTargets,
-            SpecsWithoutFileOwners(
+            Specs(
                 ancestor_globs=tuple(AncestorGlobSpec(d) for d in main_package_dirs)
-            ),
+            )
         )
         owned_main_packages = await MultiGet(
             Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(t[GoBinaryMainPackageField]))

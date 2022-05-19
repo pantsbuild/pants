@@ -258,6 +258,7 @@ async def resolve_bsp_build_target_addresses(
     bsp_target: BSPBuildTargetInternal,
     union_membership: UnionMembership,
 ) -> Targets:
+    # NB: Using `Specs` directly rather than `SpecsWithoutFileOwners` results in a rule graph cycle.
     targets = await Get(
         Targets, SpecsWithoutFileOwners, SpecsWithoutFileOwners.from_specs(bsp_target.specs)
     )

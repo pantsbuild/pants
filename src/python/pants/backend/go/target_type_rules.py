@@ -35,7 +35,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysisRequest,
 )
 from pants.base.exceptions import ResolveError
-from pants.base.specs import DirGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import DirGlobSpec, Specs
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
@@ -278,9 +278,9 @@ async def determine_main_pkg_for_go_binary(
 
     candidate_targets = await Get(
         Targets,
-        SpecsWithoutFileOwners(
+        Specs(
             dir_globs=(DirGlobSpec(addr.spec_path, error_if_no_target_matches=False),)
-        ),
+        )
     )
     relevant_pkg_targets = [
         tgt
