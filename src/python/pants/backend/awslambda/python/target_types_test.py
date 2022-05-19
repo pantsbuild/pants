@@ -197,7 +197,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
             """
             project:ambiguous has the field `handler='ambiguous.py:func'`, which maps to the Python
             module `project.ambiguous`
-        """
+            """
         )
         in caplog.text
     )
