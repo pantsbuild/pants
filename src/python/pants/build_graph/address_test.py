@@ -12,7 +12,6 @@ from pants.build_graph.address import (
     InvalidParameters,
     InvalidSpecPath,
     InvalidTargetName,
-    UnsupportedIgnore,
     UnsupportedWildcard,
 )
 from pants.util.frozendict import FrozenDict

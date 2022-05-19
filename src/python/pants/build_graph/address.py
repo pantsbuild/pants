@@ -39,10 +39,6 @@ class InvalidParameters(InvalidAddress):
     """Indicate invalid parameter values for `Address`."""
 
 
-class UnsupportedIgnore(InvalidAddress):
-    """Indicate that a `!` ignore was used."""
-
-
 class UnsupportedWildcard(InvalidAddress):
     """Indicate that an address wildcard was used."""
 
