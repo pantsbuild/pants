@@ -5,31 +5,21 @@ from __future__ import annotations
 
 import itertools
 import os.path
-from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
 from typing import Iterable, List, Set, Tuple, Type, cast
 
 import pytest
 
-from pants.base.specs import (
-    AddressLiteralSpec,
-    AddressSpecs,
-    FileLiteralSpec,
-    FilesystemSpecs,
-    Specs,
-)
+from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
-    AmbiguousImplementationsException,
     CycleException,
-    NoApplicableTargetsException,
     Owners,
     OwnersRequest,
-    TooManyTargetsException,
     TransitiveExcludesNotSupportedError,
     _DependencyMapping,
     _DependencyMappingRequest,
@@ -47,7 +37,6 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
-    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -57,7 +46,6 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     MultipleSourcesField,
-    NoApplicableTargetsBehavior,
     OverridesField,
     SecondaryOwnerMixin,
     SingleSourceField,
@@ -68,13 +56,11 @@ from pants.engine.target import (
     Tags,
     Target,
     TargetFilesGenerator,
-    TargetRootsToFieldSets,
-    TargetRootsToFieldSetsRequest,
     Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
@@ -1141,216 +1127,6 @@ def test_parametrize_partial_generator(generated_targets_rule_runner: RuleRunner
             },
         },
     )
-
-
-# -----------------------------------------------------------------------------------------------
-# Test FieldSets. Also see `engine/target_test.py`.
-# -----------------------------------------------------------------------------------------------
-
-# Must be defined here because `from __future__ import annotations` causes the FieldSet to not be
-# able to find the type..
-class FortranSources(MultipleSourcesField):
-    pass
-
-
-def test_find_valid_field_sets(caplog) -> None:
-    class FortranTarget(Target):
-        alias = "fortran_target"
-        core_fields = (FortranSources, Tags)
-
-    class InvalidTarget(Target):
-        alias = "invalid_target"
-        core_fields = ()
-
-    @union
-    class FieldSetSuperclass(FieldSet):
-        pass
-
-    @dataclass(frozen=True)
-    class FieldSetSubclass1(FieldSetSuperclass):
-        required_fields = (FortranSources,)
-
-        sources: FortranSources
-
-    @dataclass(frozen=True)
-    class FieldSetSubclass2(FieldSetSuperclass):
-        required_fields = (FortranSources,)
-
-        sources: FortranSources
-
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(TargetRootsToFieldSets, [TargetRootsToFieldSetsRequest, Specs]),
-            UnionRule(FieldSetSuperclass, FieldSetSubclass1),
-            UnionRule(FieldSetSuperclass, FieldSetSubclass2),
-        ],
-        target_types=[FortranTarget, InvalidTarget],
-    )
-
-    rule_runner.write_files(
-        {
-            "BUILD": dedent(
-                """\
-                fortran_target(name="valid")
-                fortran_target(name="valid2")
-                invalid_target(name="invalid")
-                """
-            )
-        }
-    )
-    valid_tgt = FortranTarget({}, Address("", target_name="valid"))
-    valid_spec = AddressLiteralSpec("", "valid")
-    invalid_spec = AddressLiteralSpec("", "invalid")
-
-    def find_valid_field_sets(
-        superclass: Type,
-        address_specs: Iterable[AddressLiteralSpec],
-        *,
-        no_applicable_behavior: NoApplicableTargetsBehavior = NoApplicableTargetsBehavior.ignore,
-        expect_single_config: bool = False,
-    ) -> TargetRootsToFieldSets:
-        request = TargetRootsToFieldSetsRequest(
-            superclass,
-            goal_description="fake",
-            no_applicable_targets_behavior=no_applicable_behavior,
-            expect_single_field_set=expect_single_config,
-        )
-        return rule_runner.request(
-            TargetRootsToFieldSets,
-            [request, Specs(AddressSpecs(address_specs), FilesystemSpecs([]))],
-        )
-
-    valid = find_valid_field_sets(FieldSetSuperclass, [valid_spec, invalid_spec])
-    assert valid.targets == (valid_tgt,)
-    assert valid.field_sets == (
-        FieldSetSubclass1.create(valid_tgt),
-        FieldSetSubclass2.create(valid_tgt),
-    )
-
-    with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(FieldSetSuperclass, [valid_spec], expect_single_config=True)
-    assert AmbiguousImplementationsException.__name__ in str(exc.value)
-
-    with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(
-            FieldSetSuperclass,
-            [valid_spec, AddressLiteralSpec("", "valid2")],
-            expect_single_config=True,
-        )
-    assert TooManyTargetsException.__name__ in str(exc.value)
-
-    no_valid_targets = find_valid_field_sets(FieldSetSuperclass, [invalid_spec])
-    assert no_valid_targets.targets == ()
-    assert no_valid_targets.field_sets == ()
-
-    with pytest.raises(ExecutionError) as exc:
-        find_valid_field_sets(
-            FieldSetSuperclass,
-            [invalid_spec],
-            no_applicable_behavior=NoApplicableTargetsBehavior.error,
-        )
-    assert NoApplicableTargetsException.__name__ in str(exc.value)
-
-    caplog.clear()
-    find_valid_field_sets(
-        FieldSetSuperclass,
-        [invalid_spec],
-        no_applicable_behavior=NoApplicableTargetsBehavior.warn,
-    )
-    assert len(caplog.records) == 1
-    assert "No applicable files or targets matched." in caplog.text
-
-
-def test_no_applicable_targets_exception() -> None:
-    # Check that we correctly render the error message.
-    class Tgt1(Target):
-        alias = "tgt1"
-        core_fields = ()
-
-    class Tgt2(Target):
-        alias = "tgt2"
-        core_fields = (MultipleSourcesField,)
-
-    class Tgt3(Target):
-        alias = "tgt3"
-        core_fields = ()
-
-    # No targets/files specified. Because none of the relevant targets have a sources field, we do
-    # not give the filedeps command.
-    exc = NoApplicableTargetsException(
-        [],
-        Specs(AddressSpecs([]), FilesystemSpecs([])),
-        UnionMembership({}),
-        applicable_target_types=[Tgt1],
-        goal_description="the `foo` goal",
-    )
-    remedy = (
-        "Please specify relevant files and/or targets. Run `./pants filter --target-type=tgt1 ::` "
-        "to find all applicable targets in your project."
-    )
-    assert (
-        dedent(
-            f"""\
-            No files or targets specified. The `foo` goal works with these target types:
-
-              * tgt1
-
-            {remedy}"""
-        )
-        in str(exc)
-    )
-
-    invalid_tgt = Tgt3({}, Address("blah"))
-    exc = NoApplicableTargetsException(
-        [invalid_tgt],
-        Specs(AddressSpecs([]), FilesystemSpecs([FileLiteralSpec("foo.ext")])),
-        UnionMembership({}),
-        applicable_target_types=[Tgt1, Tgt2],
-        goal_description="the `foo` goal",
-    )
-    remedy = (
-        "Please specify relevant files and/or targets. Run `./pants filter "
-        "--target-type=tgt1,tgt2 ::` to find all applicable targets in your project, or run "
-        "`./pants filter --target-type=tgt1,tgt2 :: | xargs ./pants filedeps` to find all "
-        "applicable files."
-    )
-    assert (
-        dedent(
-            f"""\
-            No applicable files or targets matched. The `foo` goal works with these target types:
-
-              * tgt1
-              * tgt2
-
-            However, you only specified files with these target types:
-
-              * tgt3
-
-            {remedy}"""
-        )
-        in str(exc)
-    )
-
-    # Test handling of `Specs`.
-    exc = NoApplicableTargetsException(
-        [invalid_tgt],
-        Specs(AddressSpecs([AddressLiteralSpec("foo", "bar")]), FilesystemSpecs([])),
-        UnionMembership({}),
-        applicable_target_types=[Tgt1],
-        goal_description="the `foo` goal",
-    )
-    assert "However, you only specified targets with these target types:" in str(exc)
-    exc = NoApplicableTargetsException(
-        [invalid_tgt],
-        Specs(
-            AddressSpecs([AddressLiteralSpec("foo", "bar")]),
-            FilesystemSpecs([FileLiteralSpec("foo.ext")]),
-        ),
-        UnionMembership({}),
-        applicable_target_types=[Tgt1],
-        goal_description="the `foo` goal",
-    )
-    assert "However, you only specified files and targets with these target types:" in str(exc)
 
 
 # -----------------------------------------------------------------------------------------------
