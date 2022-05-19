@@ -321,7 +321,7 @@ class NoApplicableTargetsException(Exception):
         if inapplicable_target_aliases:
             specs_description = specs.arguments_provided_description() or ""
             if specs_description:
-                specs_description = f" {specs_description}"
+                specs_description = f" {specs_description} with"
             msg += (
                 f"However, you only specified{specs_description} these target types:\n\n"
                 f"{bullet_list(inapplicable_target_aliases)}\n\n"
@@ -342,7 +342,7 @@ class NoApplicableTargetsException(Exception):
             f"{bin_name()} filter --target-type={','.join(applicable_target_aliases)} ::"
         )
         remedy = (
-            f"Please specify relevant files and/or targets. Run `{pants_filter_command}` to "
+            f"Please specify relevant file and/or target arguments. Run `{pants_filter_command}` to "
             "find all applicable targets in your project"
         )
         if filedeps_goal_works:
