@@ -90,12 +90,12 @@ class ThriftSourcesGeneratingSourcesField(MultipleSourcesField):
 class ThriftSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ThriftSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "bar.thrift": {"description": "our user model"]},\n'
-            '  ("foo.thrift", "bar.thrift"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "bar.thrift": {"description": "our user model"]},
+            ("foo.thrift", "bar.thrift"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 

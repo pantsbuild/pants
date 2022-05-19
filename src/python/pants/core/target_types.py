@@ -225,13 +225,13 @@ class FilesGeneratingSourcesField(MultipleSourcesField):
 class FilesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         FileTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo.json": {"description": "our customer model"]},\n'
-            '  "bar.json": {"description": "our product model"]},\n'
-            '  ("foo.json", "bar.json"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo.json": {"description": "our customer model"]},
+            "bar.json": {"description": "our product model"]},
+            ("foo.json", "bar.json"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 
@@ -436,13 +436,13 @@ class ResourcesGeneratingSourcesField(MultipleSourcesField):
 class ResourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ResourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo.json": {"description": "our customer model"]},\n'
-            '  "bar.json": {"description": "our product model"]},\n'
-            '  ("foo.json", "bar.json"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo.json": {"description": "our customer model"]},
+            "bar.json": {"description": "our product model"]},
+            ("foo.json", "bar.json"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 

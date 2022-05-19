@@ -41,6 +41,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     ValidNumbers,
+    generate_file_based_overrides_field_help_message,
     get_shard,
     parse_shard_spec,
     targets_with_sources_types,
@@ -1404,3 +1405,18 @@ def test_parse_shard_spec_bad(shard_spec) -> None:
 def test_get_shard() -> None:
     assert get_shard("foo/bar/1", 2) == 0
     assert get_shard("foo/bar/4", 2) == 1
+
+
+def test_generate_file_based_overrides_field_help_message() -> None:
+    # Just test the Exmaple: part looks right
+    message = generate_file_based_overrides_field_help_message(
+        "alias",
+        """
+        overrides={
+            "bar.proto": {"description": "our user model"]},
+            ("foo.proto", "bar.proto"): {"tags": ["overridden"]},
+        }
+        """,
+    )
+    assert "\n    overrides={\n" in message
+    assert '\n        "bar.proto"' in message

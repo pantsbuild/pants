@@ -41,6 +41,7 @@ from pants.jvm.target_types import JvmResolveField, PrefixedJvmJdkField, Prefixe
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class GenerateJavaFromThriftRequest(GenerateSourcesRequest):
@@ -138,18 +139,24 @@ async def inject_apache_thrift_java_dependencies(
 class MissingApacheThriftJavaRuntimeInResolveError(ValueError):
     def __init__(self, resolve_name: str) -> None:
         super().__init__(
-            f"The JVM resolve `{resolve_name}` does not contain a requirement for the Apache Thrift runtime. "
-            "Since at least one JVM target type in this repository consumes a `protobuf_sources` target "
-            "in this resolve, the resolve must contain a `jvm_artifact` target for the Apache Thrift runtime.\n\n"
-            "Please add the following `jvm_artifact` target somewhere in the repository and re-run "
-            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
-            "jvm_artifact(\n"
-            f'  name="{_LIBTHRIFT_GROUP}_{_LIBTHRIFT_ARTIFACT}",\n'
-            f'  group="{_LIBTHRIFT_GROUP}",\n',
-            f'  artifact="{_LIBTHRIFT_ARTIFACT}",\n',
-            '  version="<your chosen version>",\n',
-            f'  resolve="{resolve_name}",\n',
-            ")",
+            softwrap(
+                f"""
+                The JVM resolve `{resolve_name}` does not contain a requirement for the Apache Thrift
+                runtime. Since at least one JVM target type in this repository consumes a
+                `protobuf_sources` target in this resolve, the resolve must contain a `jvm_artifact`
+                target for the Apache Thrift runtime.
+
+                Please add the following `jvm_artifact` target somewhere in the repository and re-run
+                `{bin_name()} generate-lockfiles --resolve={resolve_name}`:
+                    jvm_artifact(
+                        name="{_LIBTHRIFT_GROUP}_{_LIBTHRIFT_ARTIFACT}",
+                        group="{_LIBTHRIFT_GROUP}",
+                        artifact="{_LIBTHRIFT_ARTIFACT}",
+                        version="<your chosen version>",
+                        resolve="{resolve_name}",
+                    )
+                """
+            )
         )
 
 

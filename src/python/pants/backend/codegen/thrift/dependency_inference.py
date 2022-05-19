@@ -26,6 +26,7 @@ from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -94,9 +95,11 @@ async def infer_thrift_dependencies(
                 ambiguous,
                 address,
                 import_reference="file",
-                context=(
-                    f"The target {address} imports `{import_path}` in the file "
-                    f"{wrapped_tgt.target[ThriftSourceField].file_path}"
+                context=softwrap(
+                    f"""
+                    The target {address} imports `{import_path}` in the file
+                    {wrapped_tgt.target[ThriftSourceField].file_path}
+                    """
                 ),
             )
             maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)

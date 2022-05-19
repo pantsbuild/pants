@@ -33,6 +33,7 @@ from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import softwrap
 
 INCLUDE_REGEX = re.compile(r"^\s*#\s*include\s+((\".*\")|(<.*>))")
 
@@ -158,9 +159,11 @@ async def infer_cc_source_dependencies(
                     ambiguous,
                     address,
                     import_reference="file",
-                    context=(
-                        f"The target {address} includes `{include.path}` in the file "
-                        f"{file_content.path}"
+                    context=softwrap(
+                        f"""
+                        The target {address} includes `{include.path}` in the file
+                        {file_content.path}
+                        """
                     ),
                 )
                 maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous)

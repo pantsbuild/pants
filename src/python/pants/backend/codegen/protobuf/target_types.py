@@ -98,13 +98,13 @@ class ProtobufSourcesGeneratingSourcesField(MultipleSourcesField):
 class ProtobufSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ProtobufSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo.proto": {"grpc": True},\n'
-            '  "bar.proto": {"description": "our user model"},\n'
-            '  ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo.proto": {"grpc": True},
+            "bar.proto": {"description": "our user model"},
+            ("foo.proto", "bar.proto"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 
