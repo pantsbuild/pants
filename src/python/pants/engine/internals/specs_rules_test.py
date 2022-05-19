@@ -10,8 +10,7 @@ from typing import Iterable, Type
 import pytest
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs_parser import SpecsParser
-from pants.base.specs_v2 import (
+from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
     DirGlobSpec,
@@ -23,6 +22,7 @@ from pants.base.specs_v2 import (
     SpecsWithOnlyFileOwners,
     SpecsWithoutFileOwners,
 )
+from pants.base.specs_parser import SpecsParser
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.engine.fs import SpecsSnapshot

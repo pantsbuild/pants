@@ -11,7 +11,7 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs_v2 import (
+from pants.base.specs import (
     AddressLiteralSpec,
     FileLiteralSpec,
     Specs,

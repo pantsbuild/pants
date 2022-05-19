@@ -52,7 +52,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.base.specs_v2 import AncestorGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import AncestorGlobSpec, SpecsWithoutFileOwners
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pants.base.specs_v2 import (
+from pants.base.specs import (
     AncestorGlobSpec,
     DirGlobSpec,
     RecursiveGlobSpec,

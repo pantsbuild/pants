@@ -7,7 +7,7 @@ import textwrap
 
 import pytest
 
-from pants.base.specs_v2 import RecursiveGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import RecursiveGlobSpec, SpecsWithoutFileOwners
 from pants.core.util_rules import config_files, source_files
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError

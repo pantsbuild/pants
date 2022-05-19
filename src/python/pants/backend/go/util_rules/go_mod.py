@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from pants.backend.go.target_types import GoModSourcesField
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.base.specs_v2 import AncestorGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import AncestorGlobSpec, SpecsWithoutFileOwners
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest

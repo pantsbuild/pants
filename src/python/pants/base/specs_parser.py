@@ -8,7 +8,7 @@ from pathlib import Path, PurePath
 from typing import Iterable
 
 from pants.base.build_environment import get_buildroot
-from pants.base.specs_v2 import (
+from pants.base.specs import (
     AddressLiteralSpec,
     DirGlobSpec,
     DirLiteralSpec,

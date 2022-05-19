@@ -8,13 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from pants.base.specs_v2 import (
+from pants.base.specs import (
     AddressLiteralSpec,
-    RecursiveGlobSpec,
+    DirGlobSpec,
     DirLiteralSpec,
     FileGlobSpec,
     FileLiteralSpec,
-    DirGlobSpec,
+    RecursiveGlobSpec,
     Spec,
 )
 from pants.base.specs_parser import SpecsParser

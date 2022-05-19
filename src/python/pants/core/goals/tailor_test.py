@@ -10,7 +10,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.specs_v2 import AddressLiteralSpec, DirLiteralSpec, FileLiteralSpec, Specs
+from pants.base.specs import AddressLiteralSpec, DirLiteralSpec, FileLiteralSpec, Specs
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,

@@ -22,7 +22,7 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.base.specs_v2 import AncestorGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import AncestorGlobSpec, SpecsWithoutFileOwners
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,

@@ -11,7 +11,7 @@ from typing import Any, ClassVar, Iterable, cast
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.specs_v2 import Specs
+from pants.base.specs import Specs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules import system_binaries

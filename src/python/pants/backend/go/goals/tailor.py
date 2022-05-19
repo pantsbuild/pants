@@ -17,7 +17,7 @@ from pants.backend.go.target_types import (
     GoModTarget,
     GoPackageTarget,
 )
-from pants.base.specs_v2 import AncestorGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import AncestorGlobSpec, SpecsWithoutFileOwners
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,

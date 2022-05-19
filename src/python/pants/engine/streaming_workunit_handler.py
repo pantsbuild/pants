@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence, Tuple
 
-from pants.base.specs_v2 import Specs
+from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
 from pants.engine.internals import native_engine

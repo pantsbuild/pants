@@ -13,7 +13,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
-from pants.base.specs_v2 import DirGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import DirGlobSpec, SpecsWithoutFileOwners
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.tailor import group_by_dir
 from pants.engine.fs import CreateDigest, Digest, FileContent

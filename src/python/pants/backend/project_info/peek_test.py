@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.project_info import peek
 from pants.backend.project_info.peek import Peek, TargetData, TargetDatas
-from pants.base.specs_v2 import RecursiveGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import RecursiveGlobSpec, SpecsWithoutFileOwners
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule

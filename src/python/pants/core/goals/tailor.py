@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.specs_v2 import AncestorGlobSpec, Spec, Specs, SpecsWithoutFileOwners
+from pants.base.specs import AncestorGlobSpec, Spec, Specs, SpecsWithoutFileOwners
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console

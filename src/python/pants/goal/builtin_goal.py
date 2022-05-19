@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 from pants.base.exiter import ExitCode
-from pants.base.specs_v2 import Specs
+from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
 from pants.engine.unions import UnionMembership

@@ -11,8 +11,8 @@ from typing import List, Optional, Tuple
 import pytest
 
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
+from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
-from pants.base.specs_v2 import Specs
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_FILE_DIGEST,

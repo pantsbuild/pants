@@ -14,8 +14,8 @@ from typing_extensions import Protocol
 
 from pants.base.build_root import BuildRoot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.base.specs import Specs, SpecsWithoutFileOwners
 from pants.base.specs_parser import SpecsParser
-from pants.base.specs_v2 import Specs, SpecsWithoutFileOwners
 from pants.bsp.goal import BSPGoal
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import (

@@ -4,8 +4,8 @@
 import logging
 from typing import cast
 
+from pants.base.specs import AddressLiteralSpec, Specs
 from pants.base.specs_parser import SpecsParser
-from pants.base.specs_v2 import AddressLiteralSpec, Specs
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
 from pants.engine.internals.scheduler import SchedulerSession

@@ -13,7 +13,7 @@ from typing import Iterable, NamedTuple, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import ResolveError
-from pants.base.specs_v2 import AncestorGlobSpec, RecursiveGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import AncestorGlobSpec, RecursiveGlobSpec, SpecsWithoutFileOwners
 from pants.engine.addresses import (
     Address,
     Addresses,

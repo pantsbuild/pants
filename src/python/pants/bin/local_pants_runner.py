@@ -8,8 +8,8 @@ import sys
 from dataclasses import dataclass
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
+from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
-from pants.base.specs_v2 import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals import native_engine

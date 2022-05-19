@@ -11,7 +11,7 @@ from pants.backend.python.goals import export
 from pants.backend.python.goals.export import ExportVenvsRequest
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex_from_targets
-from pants.base.specs_v2 import RecursiveGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import RecursiveGlobSpec, SpecsWithoutFileOwners
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
 from pants.engine.rules import QueryRule
