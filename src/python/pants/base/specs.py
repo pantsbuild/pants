@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, cast
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
@@ -307,17 +307,20 @@ class SpecsWithoutFileOwners:
     def to_build_file_path_globs(
         self, *, build_patterns: Iterable[str], build_ignore_patterns: Iterable[str]
     ) -> PathGlobs:
-        includes = set()
+        includes: set[str] = set()
         for spec in (*self.dir_globs, *self.ancestor_globs):
+            spec = cast("DirGlobSpec | AncestorGlobSpec", spec)
             includes.update(
                 os.path.join(f, pattern)
                 for pattern in build_patterns
                 for f in recursive_dirname(spec.directory)
             )
-        for spec in self.recursive_globs:
+        for recursive_spec in self.recursive_globs:
             for pattern in build_patterns:
-                includes.update(os.path.join(f, pattern) for f in recursive_dirname(spec.directory))
-                includes.add(os.path.join(spec.directory, "**", pattern))
+                includes.update(
+                    os.path.join(f, pattern) for f in recursive_dirname(recursive_spec.directory)
+                )
+                includes.add(os.path.join(recursive_spec.directory, "**", pattern))
         ignores = (f"!{p}" for p in build_ignore_patterns)
         return PathGlobs((*includes, *ignores))
 
