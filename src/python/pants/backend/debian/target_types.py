@@ -35,24 +35,36 @@ class DebianSources(MultipleSourcesField):
         super().validate_resolved_files(files)
         if not files:
             raise InvalidFieldException(
-                f"The `{self.alias}` field in target `{self.address}` must "
-                f"resolve to at least one file."
+                softwrap(
+                    f"""
+                    The `{self.alias}` field in target `{self.address}` must
+                    resolve to at least one file.
+                    """
+                )
             )
 
         files_outside_dirs = [f for f in files if len(PurePath(f).parts) == 1]
         if files_outside_dirs:
             raise InvalidFieldException(
-                f"The `{self.alias}` field in target `{self.address}` must be paths to "
-                f"files in a single sources directory. Individual files "
-                f"were found: {files_outside_dirs}"
+                softwrap(
+                    f"""
+                    The `{self.alias}` field in target `{self.address}` must be paths to
+                    files in a single sources directory. Individual files
+                    were found: {files_outside_dirs}
+                    """
+                )
             )
 
         directory_prefixes = {PurePath(f).parts[0] for f in files}
         if len(directory_prefixes) > 1:
             raise InvalidFieldException(
-                f"The `{self.alias}` field in target `{self.address}` must be paths to "
-                f"files in a single sources directory. Multiple directories "
-                f"were found: {directory_prefixes}"
+                softwrap(
+                    f"""
+                    The `{self.alias}` field in target `{self.address}` must be paths to
+                    files in a single sources directory. Multiple directories
+                    were found: {directory_prefixes}
+                    """
+                )
             )
 
 

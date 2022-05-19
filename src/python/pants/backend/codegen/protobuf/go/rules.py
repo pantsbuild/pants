@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import textwrap
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -84,6 +85,7 @@ from pants.source.source_root import (
 )
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 _logger = logging.getLogger(__name__)
 
@@ -266,11 +268,13 @@ async def setup_full_package_build_request(
             request=None,
             import_path=request.import_path,
             exit_code=1,
-            stderr=(
-                "Expected Go files generated from Protobuf sources to be output to a single directory.\n"
-                f"- import path: {request.import_path}\n"
-                f"- protobuf files: {', '.join(pkg_files)}"
-            ),
+            stderr=textwrap.dedent(
+                f"""
+                Expected Go files generated from Protobuf sources to be output to a single directory.
+                - import path: {request.import_path}
+                - protobuf files: {', '.join(pkg_files)}
+                """
+            ).strip(),
         )
     gen_dir = list(files_by_dir.keys())[0]
 
@@ -317,10 +321,13 @@ async def setup_full_package_build_request(
                     request=None,
                     import_path=request.import_path,
                     exit_code=result.exit_code,
-                    stderr=(
-                        f"Multiple addresses match import of `{dep_import_path}`.\n"
-                        f"addresses: {', '.join(str(a) for a in candidate_addresses)}"
-                    ),
+                    stderr=textwrap.dedent(
+                        f"""
+                        Multiple addresses match import of `{dep_import_path}`.
+
+                        addresses: {', '.join(str(a) for a in candidate_addresses)}
+                        """
+                    ).strip(),
                 )
             dep_build_request_addrs.extend(candidate_addresses)
 
@@ -374,9 +381,11 @@ async def setup_build_go_package_request_for_protobuf(
             request=None,
             import_path=import_path,
             exit_code=1,
-            stderr=(
-                f"No Protobuf files exists for import path `{import_path}`. "
-                "Consider whether the import path was set correctly via the `option go_package` directive."
+            stderr=softwrap(
+                f"""
+                No Protobuf files exists for import path `{import_path}`.
+                Consider whether the import path was set correctly via the `option go_package` directive.
+                """
             ),
         )
 
@@ -596,8 +605,13 @@ async def infer_go_dependencies(
     )
     if maybe_pkg_analysis.analysis is None:
         _logger.error(
-            f"Failed to analyze {maybe_pkg_analysis.import_path} for dependency inference:\n"
-            f"{maybe_pkg_analysis.stderr}"
+            softwrap(
+                f"""
+                Failed to analyze {maybe_pkg_analysis.import_path} for dependency inference:
+
+                {maybe_pkg_analysis.stderr}
+                """
+            )
         )
         return InferredDependencies([])
     pkg_analysis = maybe_pkg_analysis.analysis

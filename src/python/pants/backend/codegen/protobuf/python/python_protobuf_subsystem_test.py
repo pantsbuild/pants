@@ -1,5 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from textwrap import dedent
+
 from pants.backend.codegen.protobuf import target_types
 from pants.backend.codegen.protobuf.python import python_protobuf_subsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
@@ -55,9 +57,11 @@ def test_find_protobuf_python_requirement() -> None:
     # Multiple is fine if from other resolve.
     rule_runner.write_files(
         {
-            "another_resolve/BUILD": (
-                "python_requirement(name='r1', requirements=['protobuf'], resolve='another')\n"
-                "python_requirement(name='r2', requirements=['grpc'], resolve='another')\n"
+            "another_resolve/BUILD": dedent(
+                """\
+                python_requirement(name='r1', requirements=['protobuf'], resolve='another')
+                python_requirement(name='r2', requirements=['grpc'], resolve='another')
+                """
             )
         }
     )

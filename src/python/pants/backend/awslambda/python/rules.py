@@ -68,12 +68,17 @@ async def package_python_awslambda(
 ) -> BuiltPackage:
     if platform.is_macos:
         logger.warning(
-            "AWS Lambdas built on macOS may fail to build. If your lambda uses any third-party"
-            " dependencies without binary wheels (bdist) for Linux available, it will fail to"
-            " build. If this happens, you will either need to update your dependencies to only use"
-            f" dependencies with pre-built wheels, or find a Linux environment to run {bin_name()}"
-            " package. (See https://realpython.com/python-wheels/ for more about wheels.)\n\n(If"
-            " the build does not raise an exception, it's safe to use macOS.)"
+            softwrap(
+                f"""
+                AWS Lambdas built on macOS may fail to build. If your lambda uses any third-party
+                dependencies without binary wheels (bdist) for Linux available, it will fail to
+                build. If this happens, you will either need to update your dependencies to only use
+                dependencies with pre-built wheels, or find a Linux environment to run {bin_name()}
+                package. (See https://realpython.com/python-wheels/ for more about wheels.)
+
+                (If the build does not raise an exception, it's safe to use macOS.)
+                """
+            )
         )
 
     output_filename = field_set.output_path.value_or_default(
