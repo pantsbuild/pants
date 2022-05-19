@@ -104,7 +104,7 @@ class PythonInferSubsystem(Subsystem):
             dependencies, such as Django settings files expressing dependencies as strings.
 
             To ignore a false positive, you can either put `# pants: no-infer-dep` on the line of
-            the stromg or put `!{bad_address}` in the `dependencies` field of your target.
+            the string or put `!{bad_address}` in the `dependencies` field of your target.
             """
         ),
     )
