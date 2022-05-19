@@ -27,10 +27,9 @@ type ParsedAddress<'a> = (
   Vec<(&'a str, &'a str)>,
 );
 
-/// 1. an is_ignored boolean
-/// 2. an address
-/// 3. an optional wildcard component (`:` or `::`)
-type ParsedSpec<'a> = (bool, ParsedAddress<'a>, Option<&'a str>);
+/// 1. an address
+/// 2. an optional wildcard component (`:` or `::`)
+type ParsedSpec<'a> = (ParsedAddress<'a>, Option<&'a str>);
 
 /// Parses an "address spec", which may come from the CLI or from a BUILD file.
 ///
@@ -45,7 +44,6 @@ type ParsedSpec<'a> = (bool, ParsedAddress<'a>, Option<&'a str>);
 fn address_spec_parse(spec_str: &str) -> PyResult<ParsedSpec> {
   let spec = address::parse_address_spec(spec_str).map_err(AddressParseException::new_err)?;
   Ok((
-    spec.is_ignored,
     (
       spec.address.path,
       spec.address.target,

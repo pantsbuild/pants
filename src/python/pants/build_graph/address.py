@@ -157,7 +157,6 @@ class AddressInput:
             return os.path.normpath(subproject)
 
         (
-            is_ignored,
             (
                 path_component,
                 target_component,
@@ -166,13 +165,6 @@ class AddressInput:
             ),
             wildcard,
         ) = native_engine.address_spec_parse(spec)
-
-        if is_ignored:
-            # NB: BUILD dependency ignore parsing occurs at a different level, because AddressInput
-            # does not support encoding negation.
-            raise UnsupportedIgnore(
-                f"The address `{spec}` was prefixed with a `!` ignore, which is not supported."
-            )
 
         if wildcard:
             raise UnsupportedWildcard(

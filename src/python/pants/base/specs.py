@@ -232,23 +232,6 @@ class FileGlobSpec(FilesystemSpec):
 
 
 @dataclass(frozen=True)
-class FileIgnoreSpec(FilesystemSpec):
-    """A spec to ignore certain files or globs."""
-
-    glob: str
-
-    def __post_init__(self) -> None:
-        if self.glob.startswith("!"):
-            raise ValueError(f"The `glob` for {self} should not start with `!`.")
-
-    def __str__(self) -> str:
-        return f"!{self.glob}"
-
-    def to_glob(self) -> str:
-        return f"!{self.glob}"
-
-
-@dataclass(frozen=True)
 class DirLiteralSpec(FilesystemSpec):
     """A literal dir path, e.g. `some/dir`.
 
@@ -275,7 +258,6 @@ class DirLiteralSpec(FilesystemSpec):
 class FilesystemSpecs:
     file_includes: tuple[FileLiteralSpec | FileGlobSpec, ...]
     dir_includes: tuple[DirLiteralSpec, ...]
-    ignores: tuple[FileIgnoreSpec, ...]
 
     def __init__(self, specs: Iterable[FilesystemSpec]) -> None:
         file_includes = []
@@ -286,8 +268,6 @@ class FilesystemSpecs:
                 file_includes.append(spec)
             elif isinstance(spec, DirLiteralSpec):
                 dir_includes.append(spec)
-            elif isinstance(spec, FileIgnoreSpec):
-                ignores.append(spec)
             else:
                 raise AssertionError(f"Unexpected type of FilesystemSpec: {repr(self)}")
         self.file_includes = tuple(file_includes)
@@ -315,18 +295,17 @@ class FilesystemSpecs:
         spec: FileLiteralSpec | FileGlobSpec | DirLiteralSpec,
         glob_match_error_behavior: GlobMatchErrorBehavior,
     ) -> PathGlobs:
-        """Generate PathGlobs for the specific spec, automatically including the instance's
-        FileIgnoreSpecs."""
-        return self._generate_path_globs((spec, *self.ignores), glob_match_error_behavior)
+        """Generate PathGlobs for the specific spec."""
+        return self._generate_path_globs([spec], glob_match_error_behavior)
 
     def to_path_globs(self, glob_match_error_behavior: GlobMatchErrorBehavior) -> PathGlobs:
         """Generate a single PathGlobs for the instance."""
         return self._generate_path_globs(
-            (*self.file_includes, *self.dir_includes, *self.ignores), glob_match_error_behavior
+            (*self.file_includes, *self.dir_includes), glob_match_error_behavior
         )
 
     def __bool__(self) -> bool:
-        return bool(self.file_includes) or bool(self.dir_includes) or bool(self.ignores)
+        return bool(self.file_includes) or bool(self.dir_includes)
 
 
 @dataclass(frozen=True)
