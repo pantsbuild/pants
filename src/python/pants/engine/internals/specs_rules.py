@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import logging
 import os
@@ -19,7 +20,7 @@ from pants.base.specs import (
     SpecsWithoutFileOwners,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput
-from pants.engine.fs import PathGlobs, Paths, SpecsSnapshot
+from pants.engine.fs import CreateDigest, DigestEntries, PathGlobs, Paths, SpecsSnapshot
 from pants.engine.internals.build_files import AddressFamilyDir, BuildFileOptions
 from pants.engine.internals.graph import Owners, OwnersRequest, _log_or_raise_unmatched_owners
 from pants.engine.internals.mapper import AddressFamily, SpecsFilter
@@ -37,6 +38,8 @@ from pants.engine.target import (
     NoApplicableTargetsBehavior,
     RegisteredTargetTypes,
     SourcesField,
+    SourcesPaths,
+    SourcesPathsRequest,
     Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
@@ -47,7 +50,7 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list
 
 logger = logging.getLogger(__name__)
@@ -198,7 +201,10 @@ async def addresses_from_specs_with_only_file_owners(
         for spec in specs.all_specs()
     )
     owners_per_include = await MultiGet(
-        Get(Owners, OwnersRequest(paths.files, filter_by_global_options=True))
+        Get(
+            Owners,
+            OwnersRequest(paths.files, filter_by_global_options=specs.filter_by_global_options),
+        )
         for paths in paths_per_include
     )
     addresses: set[Address] = set()
@@ -255,35 +261,63 @@ async def resolve_specs_snapshot(
 ) -> SpecsSnapshot:
     """Resolve all files matching the given specs.
 
-    Address specs will use their `SourcesField` field, and Filesystem specs will use whatever args
-    were given. Filesystem specs may safely refer to files with no owning target.
+    All matched targets will use their `sources` field. Certain specs like FileLiteralSpec will
+    also match against all their files, regardless of if a target owns them.
+
+    If a file is owned by a target that gets filtered out (e.g. via `--tag`), then we make sure
+    the file is not added back via filesystem specs, per
+    https://github.com/pantsbuild/pants/issues/15478.
     """
-    targets = await Get(Targets, SpecsWithoutFileOwners, SpecsWithoutFileOwners.from_specs(specs))
+
+    unfiltered_targets = await Get(
+        Targets, Specs, dataclasses.replace(specs, filter_by_global_options=False)
+    )
+    filtered_targets = await Get(FilteredTargets, Targets, unfiltered_targets)
     all_hydrated_sources = await MultiGet(
         Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
-        for tgt in targets
+        for tgt in filtered_targets
         if tgt.has_field(SourcesField)
     )
 
+    digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
+
     with_files_owners = SpecsWithOnlyFileOwners.from_specs(specs)
-    filesystem_specs_digest = (
-        await Get(
+    filtered_out_sources_paths: set[str] = set()
+    if with_files_owners:
+        filtered_out_targets = FrozenOrderedSet(unfiltered_targets).difference(
+            FrozenOrderedSet(filtered_targets)
+        )
+        all_sources_paths = await MultiGet(
+            Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
+            for tgt in filtered_out_targets
+            if tgt.has_field(SourcesField)
+        )
+        filtered_out_sources_paths.update(
+            itertools.chain.from_iterable(paths.files for paths in all_sources_paths)
+        )
+
+    if with_files_owners:
+        target_less_digest = await Get(
             Digest,
             PathGlobs,
             with_files_owners.to_path_globs(
                 owners_not_found_behavior.to_glob_match_error_behavior()
             ),
         )
-        if with_files_owners
-        else None
-    )
+        digests.append(target_less_digest)
 
-    # NB: We merge into a single snapshot to avoid the same files being duplicated if they were
-    # covered both by address specs and filesystem specs.
-    digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
-    if filesystem_specs_digest:
-        digests.append(filesystem_specs_digest)
-    result = await Get(Snapshot, MergeDigests(digests))
+    if filtered_out_sources_paths:
+        digest_entries = await Get(DigestEntries, MergeDigests(digests))
+        result = await Get(
+            Snapshot,
+            CreateDigest(
+                file_entry
+                for file_entry in digest_entries
+                if file_entry.path not in filtered_out_sources_paths
+            ),
+        )
+    else:
+        result = await Get(Snapshot, MergeDigests(digests))
     return SpecsSnapshot(result)
 
 
