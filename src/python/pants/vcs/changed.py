@@ -10,14 +10,17 @@ from typing import List, cast
 from pants.backend.project_info import dependees
 from pants.backend.project_info.dependees import Dependees, DependeesRequest
 from pants.base.build_environment import get_buildroot
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import UnexpandedTargets
 from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 from pants.vcs.git import GitWorktree
 
@@ -39,10 +42,23 @@ class ChangedAddresses(Collection[Address]):
 
 
 @rule
-async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
-    owners = await Get(Owners, OwnersRequest(request.sources, filter_by_global_options=True))
-    if request.dependees == DependeesOption.NONE:
+async def find_changed_owners(
+    request: ChangedRequest, specs_filter: SpecsFilter
+) -> ChangedAddresses:
+    no_dependees = request.dependees == DependeesOption.NONE
+    owners = await Get(
+        Owners,
+        OwnersRequest(
+            request.sources,
+            # If `--changed-dependees` is used, we cannot eagerly filter out root targets. We
+            # need to first find their dependees, and only then should we filter. See
+            # https://github.com/pantsbuild/pants/issues/15544
+            filter_by_global_options=no_dependees,
+        ),
+    )
+    if no_dependees:
         return ChangedAddresses(owners)
+
     dependees_with_roots = await Get(
         Dependees,
         DependeesRequest(
@@ -51,7 +67,19 @@ async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
             include_roots=True,
         ),
     )
-    return ChangedAddresses(dependees_with_roots)
+    result = FrozenOrderedSet(dependees_with_roots)
+    if specs_filter:
+        # Finally, we must now filter out the result to only include what matches our tags, as the
+        # last step of https://github.com/pantsbuild/pants/issues/15544.
+        #
+        # Note that we use `UnexpandedTargets` rather than `Targets` or `FilteredTargets` so that
+        # we preserve target generators.
+        result_as_tgts = await Get(UnexpandedTargets, Addresses(result))
+        result = FrozenOrderedSet(
+            tgt.address for tgt in result_as_tgts if specs_filter.matches(tgt)
+        )
+
+    return ChangedAddresses(result)
 
 
 @dataclass(frozen=True)

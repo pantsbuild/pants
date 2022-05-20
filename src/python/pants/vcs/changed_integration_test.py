@@ -157,6 +157,17 @@ def test_delete_generated_target(repo: str) -> None:
     for dependees in DependeesOption:
         assert_list_stdout(repo, ["//:lib"], dependees=dependees)
 
+    # Make sure that our fix for https://github.com/pantsbuild/pants/issues/15544 does not break
+    # this test when using `--tag`.
+    for dependees in (DependeesOption.NONE, DependeesOption.TRANSITIVE):
+        assert_list_stdout(repo, ["//:lib"], dependees=dependees, extra_args=["--tag=a"])
+
+    # If we also edit a sibling generated target, we should still (for now at least) include the
+    # target generator.
+    append_to_file(repo, "app.sh", "# foo")
+    for dependees in DependeesOption:
+        assert_list_stdout(repo, ["//:lib", "//app.sh:lib"], dependees=dependees)
+
 
 def test_delete_atom_target(repo: str) -> None:
     delete_file(repo, "standalone.sh")
@@ -201,4 +212,19 @@ def test_tag_filtering(repo: str) -> None:
         ["//:lib", "//app.sh:lib", "//transitive.sh:lib"],
         dependees=DependeesOption.TRANSITIVE,
         extra_args=["--tag=-b"],
+    )
+
+    # Regression test for https://github.com/pantsbuild/pants/issues/15544. Don't filter
+    # `--changed-since` roots until the very end if using `--changed-dependees`.
+    #
+    # We change `dep.sh`, which has the tag `b`. When we filter for only tag `a`, we should still
+    # find the dependees of `dep.sh`, like `app.sh`, and only then apply the filter.
+    reset_edits()
+    append_to_file(repo, "dep.sh", "# foo")
+    assert_list_stdout(repo, [], dependees=DependeesOption.NONE, extra_args=["--tag=a"])
+    assert_list_stdout(
+        repo,
+        ["//:lib", "//app.sh:lib"],
+        dependees=DependeesOption.TRANSITIVE,
+        extra_args=["--tag=a"],
     )

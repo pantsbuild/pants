@@ -190,3 +190,6 @@ class SpecsFilter:
         """Check that the target matches the provided `--tag` and `--exclude-target-regexp`
         options."""
         return self._tag_filter(target) and not self._is_excluded_by_pattern(target.address)
+
+    def __bool__(self) -> bool:
+        return bool(self.tags or self.exclude_target_regexps)
