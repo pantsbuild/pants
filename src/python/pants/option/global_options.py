@@ -750,7 +750,7 @@ class BootstrapOptions:
     pants_ignore = StrListOption(
         "--pants-ignore",
         advanced=True,
-        default=[".*/", _default_rel_distdir],
+        default=[".*/", _default_rel_distdir, "__pycache__"],
         help=softwrap(
             """
             Paths to ignore for all filesystem operations performed by pants
