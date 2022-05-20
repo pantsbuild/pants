@@ -1,6 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import logging
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -68,6 +68,9 @@ async def count_loc(
     if not specs_snapshot.snapshot.files:
         return CountLinesOfCode(exit_code=0)
 
+    logging.error("HERE")
+    logging.error(specs_snapshot.snapshot.files)
+    logging.error("DONE")
     scc_program = await Get(
         DownloadedExternalTool,
         ExternalToolRequest,
