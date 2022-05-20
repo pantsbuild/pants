@@ -26,6 +26,7 @@ def assert_build_file_globs(
 
 def test_dir_glob() -> None:
     spec = DirGlobSpec("dir/subdir")
+    assert spec.to_glob() == "dir/subdir/*"
     assert spec.matches_target("") is False
     assert spec.matches_target("dir") is False
     assert spec.matches_target("dir/subdir") is True
@@ -38,6 +39,7 @@ def test_dir_glob() -> None:
     )
 
     spec = DirGlobSpec("")
+    assert spec.to_glob() == "*"
     assert spec.matches_target("") is True
     assert spec.matches_target("dir") is False
     assert_build_file_globs(
@@ -49,6 +51,7 @@ def test_dir_glob() -> None:
 
 def test_recursive_glob() -> None:
     spec = RecursiveGlobSpec("dir/subdir")
+    assert spec.to_glob() == "dir/subdir/**"
     assert spec.matches_target("") is False
     assert spec.matches_target("dir") is False
     assert spec.matches_target("dir/subdir") is True
@@ -62,6 +65,7 @@ def test_recursive_glob() -> None:
     )
 
     spec = RecursiveGlobSpec("")
+    assert spec.to_glob() == "**"
     assert spec.matches_target("") is True
     assert spec.matches_target("dir") is True
     assert spec.matches_target("another_dir") is True

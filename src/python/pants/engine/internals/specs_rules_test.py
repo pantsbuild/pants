@@ -747,14 +747,12 @@ def test_filtered_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_resolve_specs_snapshot(rule_runner: RuleRunner) -> None:
-    """This tests that convert filesystem specs and/or address specs into a single snapshot.
+    """Test that we convert specs into a single snapshot for target-less goals.
 
     Some important edge cases:
-    - When a filesystem spec refers to a file without any owning target, it should be included
-      in the snapshot.
-    - If a file is covered both by an address spec and by a filesystem spec, we should merge it
-      so that the file only shows up once. If the address spec is filtered out though,
-      e.g. via `--tags`, the file must not show up.
+    - Files without owning targets still show up.
+    - If a file is owned by a target, and that target is filtered out e.g. via `--tags`, the file
+      must not show up.
     """
     rule_runner.write_files(
         {
@@ -772,14 +770,40 @@ def test_resolve_specs_snapshot(rule_runner: RuleRunner) -> None:
                 nonfile_generator(name='nonfile')
                 """
             ),
+            "f.txt": "",
+            "unowned/f.txt": "",
+            "unowned/subdir/f.txt": "",
         }
     )
-    rule_runner.set_options(["--tag=-ignore", "--owners-not-found-behavior=ignore"])
-    specs = SpecsParser(rule_runner.build_root).parse_specs(
-        ["demo:f1", "demo/*.txt", "demo/unowned.foo"]
+    rule_runner.set_options(["--tag=-ignore"])
+
+    def assert_snapshot(specs: Iterable[Spec], expected: set[str]) -> None:
+        specs_obj = Specs.create(
+            specs, convert_dir_literal_to_address_literal=True, filter_by_global_options=True
+        )
+        result = rule_runner.request(SpecsSnapshot, [specs_obj])
+        assert set(result.snapshot.files) == expected
+
+    all_expected_demo_files = {"demo/f1.txt", "demo/f2.txt", "demo/unowned.foo"}
+    assert_snapshot(
+        [
+            AddressLiteralSpec("demo", "f1"),
+            FileGlobSpec("demo/*.txt"),
+            FileLiteralSpec("demo/unowned.foo"),
+        ],
+        all_expected_demo_files,
     )
-    result = rule_runner.request(SpecsSnapshot, [specs])
-    assert result.snapshot.files == ("demo/f1.txt", "demo/f2.txt", "demo/unowned.foo")
+
+    assert_snapshot([DirGlobSpec("")], {"f.txt"})
+    assert_snapshot([DirGlobSpec("unowned")], {"unowned/f.txt"})
+    assert_snapshot([DirGlobSpec("demo")], {*all_expected_demo_files, "demo/BUILD"})
+
+    assert_snapshot(
+        [RecursiveGlobSpec("")],
+        {*all_expected_demo_files, "demo/BUILD", "f.txt", "unowned/f.txt", "unowned/subdir/f.txt"},
+    )
+    assert_snapshot([RecursiveGlobSpec("unowned")], {"unowned/f.txt", "unowned/subdir/f.txt"})
+    assert_snapshot([RecursiveGlobSpec("demo")], {*all_expected_demo_files, "demo/BUILD"})
 
 
 # -----------------------------------------------------------------------------------------------

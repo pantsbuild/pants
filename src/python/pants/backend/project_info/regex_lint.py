@@ -80,9 +80,7 @@ class RegexLintSubsystem(Subsystem):
 
         To activate this with the `lint` goal, you must set `[regex-lint].config`.
 
-        Unlike other linters, this can run on files not owned by targets, such as BUILD files. To
-        run on those, use `lint '**'` rather than `lint ::`, for example. We are exploring how to
-        improve this gotchas.
+        Unlike other linters, this can run on files not owned by targets, such as BUILD files.
         """
     )
 
