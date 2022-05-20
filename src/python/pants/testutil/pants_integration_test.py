@@ -9,6 +9,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator, List, Mapping, Union
 
 import pytest
@@ -19,7 +20,7 @@ from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import fast_relpath, safe_file_dump, safe_mkdir, safe_open
+from pants.util.dirutil import fast_relpath, safe_file_dump, safe_mkdir
 from pants.util.osutil import Pid
 from pants.util.strutil import ensure_binary
 
@@ -105,7 +106,7 @@ def run_pants_without_waiting(
 
     if config:
         toml_file_name = "pants.test_config.toml"
-        with safe_open(toml_file_name, mode="w") as fp:
+        with Path(toml_file_name).open("w") as fp:
             fp.write(TomlSerializer(config).serialize())
         args.append(f"--pants-config-files={toml_file_name}")
 
