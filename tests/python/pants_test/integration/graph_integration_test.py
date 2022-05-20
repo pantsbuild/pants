@@ -118,12 +118,6 @@ def test_existing_sources():
     assert "[WARN] Unmatched glob" not in pants_run.stderr
 
 
-def test_existing_directory_with_no_build_files_fails():
-    pants_run = run_pants(["list", f"{_NO_BUILD_FILE_TARGET_BASE}::"])
-    pants_run.assert_failure()
-    assert f"No targets found for the glob `{_NO_BUILD_FILE_TARGET_BASE}::`" in pants_run.stderr
-
-
 @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6787")
 @pytest.mark.no_error_if_skipped
 def test_error_message():
