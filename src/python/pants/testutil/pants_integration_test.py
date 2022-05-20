@@ -9,7 +9,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Iterator, List, Mapping, Union
+from typing import Iterator, List, Mapping, Union
 
 import pytest
 
@@ -99,7 +99,7 @@ def run_pants_with_workdir_without_waiting(
     config: Mapping | None = None,
     extra_env: Mapping[str, str] | None = None,
     print_stacktrace: bool = True,
-    **kwargs: Any,
+    shell: bool = False,
 ) -> PantsJoinHandle:
     args = [
         "--no-pantsrc",
@@ -128,7 +128,7 @@ def run_pants_with_workdir_without_waiting(
 
     # Permit usage of shell=True and string-based commands to allow e.g. `./pants | head`.
     pants_command: Command
-    if kwargs.get("shell") is True:
+    if shell:
         assert not isinstance(command, list), "must pass command as a string when using shell=True"
         pants_command = " ".join([*pants_script, " ".join(args), command])
     else:
@@ -147,7 +147,6 @@ def run_pants_with_workdir_without_waiting(
             "HOME",
             "PATH",  # Needed to find Python interpreters and other binaries.
             "PANTS_PROFILE",
-            "RUN_PANTS_FROM_PEX",
         ):
             value = os.getenv(h)
             if value is not None:
@@ -176,7 +175,6 @@ def run_pants_with_workdir_without_waiting(
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            **kwargs,
         ),
         workdir=workdir,
     )
@@ -189,14 +187,21 @@ def run_pants_with_workdir(
     hermetic: bool = True,
     use_pantsd: bool = True,
     config: Mapping | None = None,
+    extra_env: Mapping[str, str] | None = None,
     stdin_data: bytes | str | None = None,
     tee_output: bool = False,
-    **kwargs: Any,
+    shell: bool = False,
+    print_stacktrace: bool = True,
 ) -> PantsResult:
-    if config:
-        kwargs["config"] = config
     handle = run_pants_with_workdir_without_waiting(
-        command, workdir=workdir, hermetic=hermetic, use_pantsd=use_pantsd, **kwargs
+        command,
+        workdir=workdir,
+        hermetic=hermetic,
+        use_pantsd=use_pantsd,
+        shell=shell,
+        config=config,
+        extra_env=extra_env,
+        print_stacktrace=print_stacktrace,
     )
     return handle.join(stdin_data=stdin_data, tee_output=tee_output)
 
@@ -209,7 +214,6 @@ def run_pants(
     config: Mapping | None = None,
     extra_env: Mapping[str, str] | None = None,
     stdin_data: bytes | str | None = None,
-    **kwargs: Any,
 ) -> PantsResult:
     """Runs Pants in a subprocess.
 
@@ -220,7 +224,6 @@ def run_pants(
         map of key -> value.
     :param extra_env: Set these env vars in the Pants process's environment.
     :param stdin_data: Make this data available to be read from the process's stdin.
-    :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     """
     with temporary_workdir() as workdir:
         return run_pants_with_workdir(
@@ -231,7 +234,6 @@ def run_pants(
             config=config,
             stdin_data=stdin_data,
             extra_env=extra_env,
-            **kwargs,
         )
 
 

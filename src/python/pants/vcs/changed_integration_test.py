@@ -111,7 +111,8 @@ def assert_list_stdout(
             "list",
         ],
         workdir=workdir,
-        # For some reason, we must set `hermetic=False` for Git to be detected.
+        # We must set `hermetic=False` for the environment variables we set before like `GIT_DIR`
+        # to be used.
         hermetic=False,
     )
     result.assert_success()
@@ -144,6 +145,7 @@ def test_change_transitive_dep(repo: str) -> None:
 def test_unowned_file(repo: str) -> None:
     create_file(repo, "dir/some_file.ext", "")
     assert_list_stdout(repo, [])
+    assert False
 
 
 def test_delete_generated_target(repo: str) -> None:
