@@ -136,6 +136,7 @@ async def setup_scalatest_for_target(
             *scalatest.args,
         ],
         input_digest=input_digest,
+        extra_jvm_options=scalatest.jvm_options,
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run Scalatest runner for {request.field_set.address}",

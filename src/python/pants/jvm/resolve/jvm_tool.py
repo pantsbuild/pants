@@ -84,6 +84,18 @@ class JvmToolBase(Subsystem):
             """
         ),
     )
+    jvm_options = StrListOption(
+        "--jvm-options",
+        help=lambda cls: softwrap(
+            f"""
+            List of JVM options to pass to `{cls.options_scope}` JVM processes.
+
+            Options set here will be added to those set in `[jvm].global_options`. Please
+            check the documentation for the `jvm` subsystem to see what values are accepted here.
+            """
+        ),
+        advanced=True,
+    )
 
     @property
     def artifact_inputs(self) -> tuple[str, ...]:
