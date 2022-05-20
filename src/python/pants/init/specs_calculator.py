@@ -57,13 +57,8 @@ def calculate_specs(
         )
 
     changed_files = tuple(changed_options.changed_files(maybe_git_worktree.git_worktree))
-
-    # We input all changed files as file arguments, which makes sure that target-less goals like
-    # `count-loc` recognize all files that have changed, not just ones owned by targets.
     file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
 
-    # We must no matter what also find the target owners to handle deleted targets, along with
-    # `--changed-dependees`.
     changed_request = ChangedRequest(changed_files, changed_options.dependees)
     (changed_addresses,) = session.product_request(
         ChangedAddresses, [Params(changed_request, options_bootstrapper)]
@@ -83,6 +78,8 @@ def calculate_specs(
         )
 
     return Specs(
+        # We need both address_literals and file_literals to cover all our edge cases, including
+        # target-aware vs. target-less goals, e.g. `list` vs `count-loc`.
         address_literals=tuple(address_literal_specs),
         file_literals=file_literal_specs,
         filter_by_global_options=True,
