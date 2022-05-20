@@ -34,10 +34,10 @@ def repo() -> Iterator[str]:
         project = {
             ".gitignore": dedent(
                 f"""\
-                {worktree}
+                {Path(worktree).relative_to(get_buildroot())}
                 .pids
                 __pycache__
-                .coverage*  # For some reason, our CI adds this file.
+                .coverage.*  # For some reason, CI adds these files
                 """
             ),
             "pants.toml": dedent(
@@ -122,16 +122,13 @@ def assert_list_stdout(
 def assert_count_loc(
     workdir: str, *, expected_num_files: int, extra_args: list[str] | None = None
 ) -> None:
-    # FIXME: Our CI is adding files like `.coverage.fv-az167-838.29971.396383`, which for some
-    #  reason Pants is including in the `SpecsSnapshot` when running `count-loc`, even when
-    #  adding `.coverage*` to `.gitignore. It causes tests to fail because `count-loc` thinks
-    #  there are files to run on. This has only happened in CI.
-    coverage_files = list(Path().glob(".coverage.*"))
-    for f in coverage_files:
-        f.unlink()
-
     result = run_pants_with_workdir(
-        [*(extra_args or ()), "--changed-since=HEAD", "count-loc"],
+        [
+            *(extra_args or ()),
+            "--changed-since=HEAD",
+            "count-loc",
+            "--pants-ignore=+['.coverage.*']",
+        ],
         workdir=workdir,
         # We must set `hermetic=False` for some reason.
         hermetic=False,
