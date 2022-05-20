@@ -77,18 +77,18 @@ def repo() -> Iterator[str]:
 
 
 def create_file(fp: str, content: str) -> None:
-    full_fp = Path(get_buildroot(), fp)
+    full_fp = Path(fp)
     full_fp.parent.mkdir(parents=True, exist_ok=True)
     full_fp.write_text(content)
 
 
 def append_to_file(fp: str, content: str) -> None:
-    with Path(get_buildroot(), fp).open("a") as f:
+    with Path(fp).open("a") as f:
         f.write(content)
 
 
 def delete_file(fp: str) -> None:
-    Path(get_buildroot(), fp).unlink()
+    Path(fp).unlink()
 
 
 def reset_edits() -> None:
