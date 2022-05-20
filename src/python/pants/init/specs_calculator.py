@@ -29,7 +29,10 @@ def calculate_specs(
     session: SchedulerSession,
 ) -> Specs:
     """Determine the specs for a given Pants run."""
-    specs = SpecsParser().parse_specs(options.specs)
+    unmatched_cli_globs = (
+        options.for_global_scope().unmatched_cli_globs.to_glob_match_error_behavior()
+    )
+    specs = SpecsParser().parse_specs(options.specs, unmatched_glob_behavior=unmatched_cli_globs)
     changed_options = ChangedOptions.from_options(options.for_scope("changed"))
 
     logger.debug("specs are: %s", specs)
@@ -77,6 +80,7 @@ def calculate_specs(
         )
     return Specs(
         address_literals=tuple(address_literal_specs),
+        unmatched_glob_behavior=unmatched_cli_globs,
         filter_by_global_options=True,
         from_change_detection=True,
     )

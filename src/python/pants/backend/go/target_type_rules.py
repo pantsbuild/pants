@@ -276,9 +276,7 @@ async def determine_main_pkg_for_go_binary(
             )
         return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
 
-    candidate_targets = await Get(
-        Targets, Specs(dir_globs=(DirGlobSpec(addr.spec_path, error_if_no_target_matches=False),))
-    )
+    candidate_targets = await Get(Targets, Specs(dir_globs=(DirGlobSpec(addr.spec_path),)))
     relevant_pkg_targets = [
         tgt
         for tgt in candidate_targets

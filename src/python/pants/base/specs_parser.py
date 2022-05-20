@@ -8,6 +8,7 @@ from pathlib import Path, PurePath
 from typing import Iterable
 
 from pants.base.build_environment import get_buildroot
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import (
     AddressLiteralSpec,
     DirGlobSpec,
@@ -101,9 +102,15 @@ class SpecsParser:
             return FileLiteralSpec(spec_path)
         return DirLiteralSpec(spec_path)
 
-    def parse_specs(self, specs: Iterable[str]) -> Specs:
+    def parse_specs(
+        self,
+        specs: Iterable[str],
+        *,
+        unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
+    ) -> Specs:
         return Specs.create(
             (self.parse_spec(spec) for spec in specs),
             convert_dir_literal_to_address_literal=True,
+            unmatched_glob_behavior=unmatched_glob_behavior,
             filter_by_global_options=True,
         )
