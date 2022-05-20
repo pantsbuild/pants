@@ -188,7 +188,12 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     def create_from_compatibility_fields(
         cls, fields: Iterable[InterpreterConstraintsField], python_setup: PythonSetup
     ) -> InterpreterConstraints:
-        """TODO: See the deprecation in `target_types_rules.validate_python_dependencies`."""
+        """Returns merged InterpreterConstraints for the given `InterpreterConstraintsField`s.
+
+        NB: Because Python targets validate that they have ICs which are a subset of their
+        dependencies, merging constraints like this is only necessary when you are _mixing_ code
+        which might not have any inter-dependencies, such as when you're merging un-related roots.
+        """
         constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
