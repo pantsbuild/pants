@@ -621,7 +621,7 @@ def test_specs_with_only_file_owners_nonexistent_file(rule_runner: RuleRunner) -
     with engine_error(contains='Unmatched glob from file/directory arguments: "demo/fake.txt"'):
         resolve_specs_with_only_file_owners(rule_runner, [spec])
 
-    rule_runner.set_options(["--owners-not-found-behavior=ignore"])
+    rule_runner.set_options(["--unmatched-cli-globs=ignore", "--owners-not-found-behavior=ignore"])
     assert not resolve_specs_with_only_file_owners(rule_runner, [spec])
 
 

@@ -44,7 +44,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
+from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior, UnmatchedCliGlobs
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -178,22 +178,27 @@ async def addresses_from_specs_without_file_owners(
 
 
 @rule
+def extract_unmatched_cli_globs(global_options: GlobalOptions) -> UnmatchedCliGlobs:
+    return global_options.unmatched_cli_globs
+
+
+@rule
 def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
     return global_options.owners_not_found_behavior
 
 
 @rule
 async def addresses_from_specs_with_only_file_owners(
-    specs: SpecsWithOnlyFileOwners, owners_not_found_behavior: OwnersNotFoundBehavior
+    specs: SpecsWithOnlyFileOwners,
+    unmatched_cli_globs: UnmatchedCliGlobs,
+    owners_not_found_behavior: OwnersNotFoundBehavior,
 ) -> Addresses:
     """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
         Get(
             Paths,
             PathGlobs,
-            specs.path_globs_for_spec(
-                spec, owners_not_found_behavior.to_glob_match_error_behavior()
-            ),
+            specs.path_globs_for_spec(spec, unmatched_cli_globs.to_glob_match_error_behavior()),
         )
         for spec in specs.all_specs()
     )
@@ -251,7 +256,7 @@ def setup_specs_filter(global_options: GlobalOptions) -> SpecsFilter:
 
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
 async def resolve_specs_snapshot(
-    specs: Specs, owners_not_found_behavior: OwnersNotFoundBehavior
+    specs: Specs, unmatched_cli_globs: UnmatchedCliGlobs
 ) -> SpecsSnapshot:
     """Resolve all files matching the given specs.
 
@@ -270,9 +275,7 @@ async def resolve_specs_snapshot(
         await Get(
             Digest,
             PathGlobs,
-            with_files_owners.to_path_globs(
-                owners_not_found_behavior.to_glob_match_error_behavior()
-            ),
+            with_files_owners.to_path_globs(unmatched_cli_globs.to_glob_match_error_behavior()),
         )
         if with_files_owners
         else None
