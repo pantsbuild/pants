@@ -72,7 +72,7 @@ class DynamicUIRenderer(Enum):
     experimental_prodash = "experimental-prodash"
 
 
-class FilesNotFoundBehavior(Enum):
+class UnmatchedBuildFileGlobs(Enum):
     """What to do when globs do not match in BUILD files."""
 
     warn = "warn"
@@ -1463,12 +1463,34 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     files_not_found_behavior = EnumOption(
         "--files-not-found-behavior",
-        default=FilesNotFoundBehavior.warn,
+        default=UnmatchedBuildFileGlobs.warn,
         help=softwrap(
             """
             What to do when files and globs specified in BUILD files, such as in the
             `sources` field, cannot be found. This happens when the files do not exist on
             your machine or when they are ignored by the `--pants-ignore` option.
+            """
+        ),
+        advanced=True,
+        removal_version="2.14.0.dev0",
+        removal_hint=softwrap(
+            """
+            Use `[GLOBAL].unmatched_build_file_globs` instead, which behaves the same. This
+            option was renamed for clarity with the new `[GLOBAL].unmatched_cli_globs` option.
+            """
+        ),
+    )
+    unmatched_build_file_globs = EnumOption(
+        "--unmatched-build-file-globs",
+        default=UnmatchedBuildFileGlobs.warn,
+        help=softwrap(
+            """
+            What to do when files and globs specified in BUILD files, such as in the
+            `sources` field, cannot be found.
+
+            This usually happens when the files do not exist on your machine. It can also happen
+            if they are ignored by the `[GLOBAL].pants_ignore` option, which causes the files to be
+            invisible to Pants.
             """
         ),
         advanced=True,

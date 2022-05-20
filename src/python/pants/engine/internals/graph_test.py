@@ -1227,7 +1227,7 @@ def test_sources_output_type(sources_rule_runner: RuleRunner) -> None:
 
 
 def test_sources_unmatched_globs(sources_rule_runner: RuleRunner) -> None:
-    sources_rule_runner.set_options(["--files-not-found-behavior=error"])
+    sources_rule_runner.set_options(["--unmatched-build-file-globs=error"])
     sources_rule_runner.write_files({f: "" for f in ["f1.f95"]})
     sources = MultipleSourcesField(["non_existent.f95"], Address("", target_name="lib"))
     with engine_error(contains="non_existent.f95"):
