@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import glob
 import os
+import shutil
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -90,8 +91,17 @@ def run_pants_without_waiting(
     shell: bool = False,
 ) -> PantsJoinHandle:
     args = ["--no-pantsrc"]
+
+    # Avoid sharing Pantsd across individual tests.
+    pids_dir = Path(".pids")
+    if pids_dir.exists():
+        shutil.rmtree(".pids")
+
     if workdir:
         args.append(f"--pants-workdir={workdir}")
+    effective_workdir = Path(workdir or ".pants.d")
+    if effective_workdir.exists():
+        shutil.rmtree(effective_workdir)
 
     pantsd_in_command = "--no-pantsd" in command or "--pantsd" in command
     pantsd_in_config = config and "GLOBAL" in config and "pantsd" in config["GLOBAL"]
@@ -105,10 +115,9 @@ def run_pants_without_waiting(
         args.append("--pants-ignore=/conftest.py")
 
     if config:
-        toml_file_name = "pants.test_config.toml"
-        with Path(toml_file_name).open("w") as fp:
-            fp.write(TomlSerializer(config).serialize())
-        args.append(f"--pants-config-files={toml_file_name}")
+        pants_toml = Path("pants.test_config.toml")
+        pants_toml.write_text(TomlSerializer(config).serialize())
+        args.append(f"--pants-config-files={pants_toml}")
 
     pants_script = [sys.executable, "-m", "pants"]
 
