@@ -90,7 +90,12 @@ def run_pants_with_workdir_without_waiting(
     extra_env: Mapping[str, str] | None = None,
     shell: bool = False,
 ) -> PantsJoinHandle:
-    args = ["--no-pantsrc", f"--pants-workdir={workdir}"]
+    args = [
+        "--no-pantsrc",
+        f"--pants-workdir={workdir}",
+        # For some reason, Pants's CI adds this file and it is not ignored by default.
+        "--pants-ignore=+['.coverage.*']",
+    ]
 
     pantsd_in_command = "--no-pantsd" in command or "--pantsd" in command
     pantsd_in_config = config and "GLOBAL" in config and "pantsd" in config["GLOBAL"]
@@ -101,7 +106,7 @@ def run_pants_with_workdir_without_waiting(
         args.append("--pants-config-files=[]")
         # Certain tests may be invoking `./pants test` for a pytest test with conftest discovery
         # enabled. We should ignore the root conftest.py for these cases.
-        args.append("--pants-ignore=/conftest.py")
+        args.append("--pants-ignore=+['/conftest.py']")
 
     if config:
         toml_file_name = os.path.join(workdir, "pants.toml")

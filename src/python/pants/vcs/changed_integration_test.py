@@ -126,8 +126,7 @@ def assert_count_loc(
         [
             *(extra_args or ()),
             "--changed-since=HEAD",
-            "count-loc",
-            "--pants-ignore=+['.coverage.*']",
+            "count-loc"
         ],
         workdir=workdir,
         # We must set `hermetic=False` for some reason.
