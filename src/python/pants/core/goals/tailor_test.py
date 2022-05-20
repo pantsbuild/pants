@@ -10,14 +10,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.specs import (
-    AddressLiteralSpec,
-    AddressSpecs,
-    DirLiteralSpec,
-    FileLiteralSpec,
-    FilesystemSpecs,
-    Specs,
-)
+from pants.base.specs import AddressLiteralSpec, DirLiteralSpec, FileLiteralSpec, Specs
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -441,43 +434,36 @@ def test_group_by_dir() -> None:
 
 
 def test_specs_to_dirs() -> None:
-    assert specs_to_dirs(Specs(AddressSpecs([]), FilesystemSpecs([]))) == ("",)
-    assert specs_to_dirs(
-        Specs(AddressSpecs([AddressLiteralSpec("src/python/foo")]), FilesystemSpecs([]))
-    ) == ("src/python/foo",)
-    assert specs_to_dirs(
-        Specs(AddressSpecs([]), FilesystemSpecs([DirLiteralSpec("src/python/foo")]))
-    ) == ("src/python/foo",)
+    assert specs_to_dirs(Specs()) == ("",)
+    assert specs_to_dirs(Specs(address_literals=(AddressLiteralSpec("src/python/foo"),))) == (
+        "src/python/foo",
+    )
+    assert specs_to_dirs(Specs(dir_literals=(DirLiteralSpec("src/python/foo"),))) == (
+        "src/python/foo",
+    )
     assert specs_to_dirs(
         Specs(
-            AddressSpecs(
-                [AddressLiteralSpec("src/python/foo"), AddressLiteralSpec("src/python/bar")]
-            ),
-            FilesystemSpecs([]),
+            address_literals=(
+                AddressLiteralSpec("src/python/foo"),
+                AddressLiteralSpec("src/python/bar"),
+            )
         )
     ) == ("src/python/foo", "src/python/bar")
 
     with pytest.raises(ValueError):
-        specs_to_dirs(
-            Specs(AddressSpecs([]), FilesystemSpecs([FileLiteralSpec("src/python/foo.py")]))
-        )
+        specs_to_dirs(Specs(file_literals=(FileLiteralSpec("src/python/foo.py"),)))
 
     with pytest.raises(ValueError):
-        specs_to_dirs(
-            Specs(AddressSpecs([AddressLiteralSpec("src/python/bar", "tgt")]), FilesystemSpecs([]))
-        )
+        specs_to_dirs(Specs(address_literals=(AddressLiteralSpec("src/python/bar", "tgt"),)))
 
     with pytest.raises(ValueError):
         specs_to_dirs(
             Specs(
-                AddressSpecs(
-                    [
-                        AddressLiteralSpec(
-                            "src/python/bar", target_component=None, generated_component="gen"
-                        )
-                    ]
-                ),
-                FilesystemSpecs([]),
+                address_literals=(
+                    AddressLiteralSpec(
+                        "src/python/bar", target_component=None, generated_component="gen"
+                    ),
+                )
             )
         )
 

@@ -22,7 +22,7 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.base.specs import AddressSpecs, AscendantAddresses
+from pants.base.specs import AncestorGlobSpec, Specs
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -184,7 +184,8 @@ async def find_putative_targets(
         # Get existing binary targets for these entry points.
         entry_point_dirs = {os.path.dirname(entry_point) for entry_point in entry_points}
         possible_existing_binary_targets = await Get(
-            UnexpandedTargets, AddressSpecs(AscendantAddresses(d) for d in entry_point_dirs)
+            UnexpandedTargets,
+            Specs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs)),
         )
         possible_existing_binary_entry_points = await MultiGet(
             Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(t[PexEntryPointField]))

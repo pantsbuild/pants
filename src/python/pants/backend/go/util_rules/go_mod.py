@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from pants.backend.go.target_types import GoModSourcesField
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.base.specs import AddressSpecs, AscendantAddresses
+from pants.base.specs import AncestorGlobSpec, Specs
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest
@@ -44,7 +44,7 @@ class OwningGoMod:
 async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
     # We don't expect `go_mod` targets to be generated, so we can use UnexpandedTargets.
     candidate_targets = await Get(
-        UnexpandedTargets, AddressSpecs([AscendantAddresses(request.address.spec_path)])
+        UnexpandedTargets, Specs(ancestor_globs=(AncestorGlobSpec(request.address.spec_path),))
     )
 
     # Sort by address.spec_path in descending order so the nearest go_mod target is sorted first.

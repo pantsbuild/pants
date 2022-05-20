@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.specs import AddressSpecs, AscendantAddresses, Spec, Specs
+from pants.base.specs import AncestorGlobSpec, Spec, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -453,7 +453,8 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
     source_path_set = set(source_paths.files)
     source_dirs = {os.path.dirname(path) for path in source_path_set}
     possible_owners = await Get(
-        UnexpandedTargets, AddressSpecs(AscendantAddresses(d) for d in source_dirs)
+        UnexpandedTargets,
+        Specs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs)),
     )
     possible_owners_sources = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(t.get(SourcesField))) for t in possible_owners
@@ -550,12 +551,15 @@ def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
     This is a hack that allows us to emulate "directory specs" while we deprecate the shorthand of
     `dir` being `dir:dir`.
     """
-    dir_specs = [dir_spec.v for dir_spec in specs.filesystem_specs.dir_includes]
+    dir_specs = [dir_spec.directory for dir_spec in specs.dir_literals]
     other_specs: list[Spec] = [
-        *specs.filesystem_specs.file_includes,
-        *specs.address_specs.globs,
+        *specs.file_literals,
+        *specs.file_globs,
+        *specs.dir_globs,
+        *specs.recursive_globs,
+        *specs.ancestor_globs,
     ]
-    for spec in specs.address_specs.literals:
+    for spec in specs.address_literals:
         if spec.is_directory_shorthand:
             dir_specs.append(spec.path_component)
         else:

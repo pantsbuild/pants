@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.project_info import peek
 from pants.backend.project_info.peek import Peek, TargetData, TargetDatas
-from pants.base.specs import AddressSpecs, DescendantAddresses
+from pants.base.specs import RecursiveGlobSpec, Specs
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
@@ -169,7 +169,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *peek.rules(),
-            QueryRule(TargetDatas, [AddressSpecs]),
+            QueryRule(TargetDatas, [Specs]),
         ],
         target_types=[FilesGeneratorTarget, GenericTarget],
     )
@@ -195,7 +195,7 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             "foo/b.txt": "",
         }
     )
-    tds = rule_runner.request(TargetDatas, [AddressSpecs([DescendantAddresses("foo")])])
+    tds = rule_runner.request(TargetDatas, [Specs(recursive_globs=(RecursiveGlobSpec("foo"),))])
     assert list(tds) == [
         TargetData(
             GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
