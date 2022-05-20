@@ -7,7 +7,7 @@ from textwrap import dedent
 
 from pants.testutil.pants_integration_test import (
     ensure_daemon,
-    run_pants_with_workdir_without_waiting,
+    run_pants_without_waiting,
     temporary_workdir,
 )
 
@@ -38,7 +38,7 @@ def test_run_then_edit(use_pantsd: bool) -> None:
         Path(name).write_text(content)
 
     with temporary_workdir() as workdir:
-        client_handle = run_pants_with_workdir_without_waiting(
+        client_handle = run_pants_without_waiting(
             [
                 "--backend-packages=['pants.backend.python']",
                 "run",

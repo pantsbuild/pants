@@ -9,7 +9,6 @@ from pants.fs.fs import safe_filename_from_path
 from pants.testutil.pants_integration_test import (
     ensure_daemon,
     run_pants,
-    run_pants_with_workdir,
     setup_tmpdir,
 )
 
@@ -104,7 +103,7 @@ def test_pants_symlink_workdirs(tmp_path: Path) -> None:
     physical_workdir_base = tmp_path / "workdirs"
     physical_workdir = physical_workdir_base / safe_filename_from_path(symlink_workdir.as_posix())
 
-    pants_run = run_pants_with_workdir(
+    pants_run = run_pants(
         [f"--pants-physical-workdir-base={physical_workdir_base.as_posix()}", "help"],
         workdir=symlink_workdir.as_posix(),
     )

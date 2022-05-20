@@ -12,7 +12,7 @@ import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
-from pants.testutil.pants_integration_test import run_pants_with_workdir
+from pants.testutil.pants_integration_test import run_pants
 from pants.util.dirutil import read_file
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
@@ -76,7 +76,7 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
 
 
 def test_logs_unhandled_exception(tmp_path: Path) -> None:
-    pants_run = run_pants_with_workdir(
+    pants_run = run_pants(
         # The backtrace should be omitted when --print-stacktrace=False.
         [*lifecycle_stub_cmdline(), "--no-print-stacktrace"],
         workdir=tmp_path.as_posix(),

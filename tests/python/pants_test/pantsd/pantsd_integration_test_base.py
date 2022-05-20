@@ -20,8 +20,7 @@ from pants.testutil.pants_integration_test import (
     kill_daemon,
     read_pants_log,
     run_pants,
-    run_pants_with_workdir,
-    run_pants_with_workdir_without_waiting,
+    run_pants_without_waiting,
 )
 from pants.util.collections import recursively_update
 from pants.util.contextutil import temporary_dir
@@ -76,7 +75,7 @@ def launch_waiter(
         child_pid_file,
         str(cleanup_wait_time),
     ]
-    client_handle = run_pants_with_workdir_without_waiting(argv, workdir=workdir, config=config)
+    client_handle = run_pants_without_waiting(argv, workdir=workdir, config=config)
     waiter_pid = -1
     for _ in attempts("The waiter process should have written its pid."):
         waiter_pid_str = maybe_read_file(waiter_pid_file)
@@ -152,17 +151,17 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
     @staticmethod
     def run_pants(*args, **kwargs) -> PantsResult:
         # We set our own ad-hoc pantsd configuration in most of these tests.
-        return run_pants(*args, **{**kwargs, **{"use_pantsd": False}})
+        return run_pants(*args, **{**kwargs, "use_pantsd": False})
 
     @staticmethod
     def run_pants_with_workdir(*args, **kwargs) -> PantsResult:
         # We set our own ad-hoc pantsd configuration in most of these tests.
-        return run_pants_with_workdir(*args, **{**kwargs, **{"use_pantsd": False}})
+        return run_pants(*args, **{**kwargs, "use_pantsd": False})
 
     @staticmethod
     def run_pants_with_workdir_without_waiting(*args, **kwargs) -> PantsJoinHandle:
         # We set our own ad-hoc pantsd configuration in most of these tests.
-        return run_pants_with_workdir_without_waiting(*args, **{**kwargs, **{"use_pantsd": False}})
+        return run_pants_without_waiting(*args, **{**kwargs, "use_pantsd": False})
 
     @contextmanager
     def pantsd_test_context(

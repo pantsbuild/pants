@@ -11,7 +11,7 @@ from typing import Iterator
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_integration_test import run_pants_with_workdir
+from pants.testutil.pants_integration_test import run_pants
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.vcs.changed import DependeesOption
 
@@ -102,7 +102,7 @@ def assert_list_stdout(
     *,
     extra_args: list[str] | None = None,
 ) -> None:
-    result = run_pants_with_workdir(
+    result = run_pants(
         [
             *(extra_args or ()),
             "--changed-since=HEAD",

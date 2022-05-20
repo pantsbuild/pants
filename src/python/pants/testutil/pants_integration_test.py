@@ -58,7 +58,7 @@ class PantsResult:
 class PantsJoinHandle:
     command: Command
     process: subprocess.Popen
-    workdir: str
+    workdir: str | None
 
     def join(self, stdin_data: bytes | str | None = None) -> PantsResult:
         """Wait for the pants process to complete, and return a PantsResult for it."""
@@ -67,7 +67,7 @@ class PantsJoinHandle:
         (stdout, stderr) = self.process.communicate(stdin_data)
 
         if self.process.returncode != PANTS_SUCCEEDED_EXIT_CODE:
-            render_logs(self.workdir)
+            render_logs(self.workdir or ".pants.d")
 
         return PantsResult(
             command=self.command,
@@ -78,17 +78,19 @@ class PantsJoinHandle:
         )
 
 
-def run_pants_with_workdir_without_waiting(
+def run_pants_without_waiting(
     command: Command,
     *,
-    workdir: str,
+    workdir: str | None,
     hermetic: bool = True,
     use_pantsd: bool = True,
     config: Mapping | None = None,
     extra_env: Mapping[str, str] | None = None,
     shell: bool = False,
 ) -> PantsJoinHandle:
-    args = ["--no-pantsrc", f"--pants-workdir={workdir}"]
+    args = ["--no-pantsrc"]
+    if workdir:
+        args.append(f"--pants-workdir={workdir}")
 
     pantsd_in_command = "--no-pantsd" in command or "--pantsd" in command
     pantsd_in_config = config and "GLOBAL" in config and "pantsd" in config["GLOBAL"]
@@ -102,7 +104,7 @@ def run_pants_with_workdir_without_waiting(
         args.append("--pants-ignore=/conftest.py")
 
     if config:
-        toml_file_name = os.path.join(workdir, "pants.toml")
+        toml_file_name = "pants.test_config.toml"
         with safe_open(toml_file_name, mode="w") as fp:
             fp.write(TomlSerializer(config).serialize())
         args.append(f"--pants-config-files={toml_file_name}")
@@ -164,10 +166,10 @@ def run_pants_with_workdir_without_waiting(
     )
 
 
-def run_pants_with_workdir(
+def run_pants(
     command: Command,
     *,
-    workdir: str,
+    workdir: str | None = None,
     hermetic: bool = True,
     use_pantsd: bool = True,
     config: Mapping | None = None,
@@ -175,7 +177,19 @@ def run_pants_with_workdir(
     stdin_data: bytes | str | None = None,
     shell: bool = False,
 ) -> PantsResult:
-    handle = run_pants_with_workdir_without_waiting(
+    """Runs Pants in a subprocess.
+
+    :param command: A list of command line arguments coming after `./pants`.
+    :param workdir: Where to write Pantsd logs, with default to `.pants.d`.
+    :param hermetic: If hermetic, your actual `pants.toml` will not be used.
+    :param use_pantsd: If True, the Pants process will use pantsd.
+    :param config: Optional data for a generated TOML file. A map of <section-name> ->
+        map of key -> value.
+    :param extra_env: Set these env vars in the Pants process's environment.
+    :param stdin_data: Make this data available to be read from the process's stdin.
+    :param shell: if true, run with `subprocess.Popen(shell=True)`.
+    """
+    handle = run_pants_without_waiting(
         command,
         workdir=workdir,
         hermetic=hermetic,
@@ -185,37 +199,6 @@ def run_pants_with_workdir(
         extra_env=extra_env,
     )
     return handle.join(stdin_data=stdin_data)
-
-
-def run_pants(
-    command: Command,
-    *,
-    hermetic: bool = True,
-    use_pantsd: bool = True,
-    config: Mapping | None = None,
-    extra_env: Mapping[str, str] | None = None,
-    stdin_data: bytes | str | None = None,
-) -> PantsResult:
-    """Runs Pants in a subprocess.
-
-    :param command: A list of command line arguments coming after `./pants`.
-    :param hermetic: If hermetic, your actual `pants.toml` will not be used.
-    :param use_pantsd: If True, the Pants process will use pantsd.
-    :param config: Optional data for a generated TOML file. A map of <section-name> ->
-        map of key -> value.
-    :param extra_env: Set these env vars in the Pants process's environment.
-    :param stdin_data: Make this data available to be read from the process's stdin.
-    """
-    with temporary_workdir() as workdir:
-        return run_pants_with_workdir(
-            command,
-            workdir=workdir,
-            hermetic=hermetic,
-            use_pantsd=use_pantsd,
-            config=config,
-            stdin_data=stdin_data,
-            extra_env=extra_env,
-        )
 
 
 # -----------------------------------------------------------------------------------------------
