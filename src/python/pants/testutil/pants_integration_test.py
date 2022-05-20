@@ -33,7 +33,6 @@ class PantsResult:
     exit_code: int
     stdout: str
     stderr: str
-    workdir: str
     pid: Pid
 
     def _format_unexpected_error_code_msg(self, msg: str | None) -> str:
@@ -75,7 +74,6 @@ class PantsJoinHandle:
             exit_code=self.process.returncode,
             stdout=stdout.decode(),
             stderr=stderr.decode(),
-            workdir=self.workdir,
             pid=self.process.pid,
         )
 
