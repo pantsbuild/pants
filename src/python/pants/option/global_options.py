@@ -82,6 +82,17 @@ class UnmatchedBuildFileGlobs(Enum):
         return GlobMatchErrorBehavior(self.value)
 
 
+class UnmatchedCliGlobs(Enum):
+    """What to do when globs do not match in CLI args."""
+
+    ignore = "ignore"
+    warn = "warn"
+    error = "error"
+
+    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+        return GlobMatchErrorBehavior(self.value)
+
+
 class OwnersNotFoundBehavior(Enum):
     """What to do when a file argument cannot be mapped to an owning target."""
 
@@ -1487,6 +1498,21 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
             What to do when files and globs specified in BUILD files, such as in the
             `sources` field, cannot be found.
+
+            This usually happens when the files do not exist on your machine. It can also happen
+            if they are ignored by the `[GLOBAL].pants_ignore` option, which causes the files to be
+            invisible to Pants.
+            """
+        ),
+        advanced=True,
+    )
+    unmatched_cli_globs = EnumOption(
+        "--unmatched-cli-globs",
+        default=UnmatchedCliGlobs.error,
+        help=softwrap(
+            """
+            What to do when command line arguments, e.g. files and globs like `dir::`, cannot be
+            found.
 
             This usually happens when the files do not exist on your machine. It can also happen
             if they are ignored by the `[GLOBAL].pants_ignore` option, which causes the files to be
