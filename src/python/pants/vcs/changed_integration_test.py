@@ -117,6 +117,22 @@ def assert_list_stdout(
     assert sorted(result.stdout.strip().splitlines()) == sorted(expected)
 
 
+def assert_count_loc(
+    workdir: str, *, expected_num_files: int, extra_args: list[str] | None = None
+) -> None:
+    result = run_pants_with_workdir(
+        [*(extra_args or ()), "--changed-since=HEAD", "count-loc"],
+        workdir=workdir,
+        # We must set `hermetic=False` for some reason.
+        hermetic=False,
+    )
+    result.assert_success()
+    if expected_num_files:
+        assert f"Total                        {expected_num_files}" in result.stdout
+    else:
+        assert not result.stdout
+
+
 def test_no_changes(repo: str) -> None:
     assert_list_stdout(repo, [])
 
@@ -145,23 +161,12 @@ def test_unowned_file(repo: str) -> None:
 
     If a file was removed, the target-less goals should simply ignore it.
     """
-
-    def run_count_loc() -> str:
-        result = run_pants_with_workdir(
-            ["--changed-since=HEAD", "count-loc"],
-            workdir=repo,
-            # For some reason, we must set `hermetic=False` for Git to be detected.
-            hermetic=False,
-        )
-        result.assert_success()
-        return result.stdout
-
     create_file("dir/some_file.sh", "# blah")
-    assert "Shell" in run_count_loc()
+    assert_count_loc(repo, expected_num_files=1)
     assert_list_stdout(repo, [])
 
     delete_file("dir/some_file.sh")
-    assert "Shell" not in run_count_loc()
+    assert_count_loc(repo, expected_num_files=0)
 
 
 def test_delete_generated_target(repo: str) -> None:
@@ -220,6 +225,11 @@ def test_tag_filtering(repo: str) -> None:
     assert_list_stdout(
         repo, ["//dep.sh:lib"], dependees=DependeesOption.TRANSITIVE, extra_args=["--tag=+b"]
     )
+
+    # Target-less goals should still respect the tag, per
+    # https://github.com/pantsbuild/pants/pull/15479.
+    assert_count_loc(repo, expected_num_files=2)
+    assert_count_loc(repo, expected_num_files=1, extra_args=["--tag=-b"])
 
     # Regression test for https://github.com/pantsbuild/pants/issues/14977: make sure a generated
     # target w/ different tags via `overrides` is excluded no matter what.
