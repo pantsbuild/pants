@@ -23,6 +23,7 @@ from pants.engine.target import (
     FieldSet,
     GenerateSourcesRequest,
     SourcesField,
+    Target,
     TargetFilesGenerator,
 )
 from pants.engine.unions import UnionMembership, union
@@ -153,20 +154,30 @@ class ClasspathEntryRequestFactory:
         targets = component.members
         generator_sources = self.generator_sources.get(impl) or frozenset()
 
-        compatible_direct = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
-        compatible_codegen = sum(1 for t in targets for g in generator_sources if t.has_field(g))
-        compatible_codegen_target_generator = sum(
-            1
-            for t in targets
-            if isinstance(t, TargetFilesGenerator)
-            and any(field in t.generated_target_cls.core_fields for field in generator_sources)
-        )
+        def is_compatible(target: Target) -> bool:
+            return (
+                # Is directly applicable.
+                any(fs.is_applicable(target) for fs in impl.field_sets)
+                or
+                # Is applicable via generated sources.
+                any(target.has_field(g) for g in generator_sources)
+                or
+                # Is applicable via a generator.
+                (
+                    isinstance(target, TargetFilesGenerator)
+                    and any(
+                        field in target.generated_target_cls.core_fields
+                        for field in generator_sources
+                    )
+                )
+            )
 
-        compatible = compatible_direct + compatible_codegen + compatible_codegen_target_generator
+        compatible = sum(1 for t in targets if is_compatible(t))
         if compatible == 0:
             return _ClasspathEntryRequestClassification.INCOMPATIBLE
         if compatible == len(targets):
             return _ClasspathEntryRequestClassification.COMPATIBLE
+
         consume_only = sum(
             1 for t in targets for fs in impl.field_sets_consume_only if fs.is_applicable(t)
         )
