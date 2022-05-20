@@ -296,7 +296,6 @@ async def resolve_specs_snapshot(
             itertools.chain.from_iterable(paths.files for paths in all_sources_paths)
         )
 
-    if with_files_owners:
         target_less_digest = await Get(
             Digest,
             PathGlobs,
