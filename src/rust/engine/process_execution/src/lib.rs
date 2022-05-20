@@ -38,6 +38,7 @@ use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use futures::future::try_join_all;
 use futures::try_join;
 use hashing::Digest;
+use itertools::Itertools;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
@@ -272,6 +273,51 @@ impl InputDigests {
       input_files,
       immutable_inputs,
       use_nailgun,
+    })
+  }
+
+  pub async fn new_from_merged(store: &Store, from: Vec<InputDigests>) -> Result<Self, String> {
+    Ok(Self {
+      complete: store
+        .merge(
+          from
+            .iter()
+            .map(|input_digests| input_digests.complete.clone())
+            .collect(),
+        )
+        .await?,
+      nailgun: store
+        .merge(
+          from
+            .iter()
+            .map(|input_digests| input_digests.nailgun.clone())
+            .collect(),
+        )
+        .await?,
+      input_files: store
+        .merge(
+          from
+            .iter()
+            .map(|input_digests| input_digests.input_files.clone())
+            .collect(),
+        )
+        .await?,
+      immutable_inputs: Itertools::concat(
+        from
+          .iter()
+          .map(|input_digests| input_digests.immutable_inputs.clone()),
+      )
+      .into_iter()
+      .unique()
+      .collect(),
+      use_nailgun: Itertools::concat(
+        from
+          .iter()
+          .map(|input_digests| input_digests.use_nailgun.clone()),
+      )
+      .into_iter()
+      .unique()
+      .collect(),
     })
   }
 
