@@ -76,6 +76,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
 
             import scala.collection.mutable.{ArrayBuffer, HashMap => RenamedHashMap}
             import java.io._
+            import anotherPackage.calc
 
             class OuterClass {
                 import foo.bar.SomeItem
@@ -133,6 +134,10 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                  this(bar)
                }
             }
+
+            object ApplyQualifier {
+                def func4(a: Integer) = calc.calcFunc(a).toInt
+            }
             """
         ),
     )
@@ -140,6 +145,8 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     assert sorted(analysis.provided_symbols) == [
         "org.pantsbuild.example.ASubClass",
         "org.pantsbuild.example.ASubTrait",
+        "org.pantsbuild.example.ApplyQualifier",
+        "org.pantsbuild.example.ApplyQualifier.func4",
         "org.pantsbuild.example.Functions",
         "org.pantsbuild.example.Functions.func1",
         "org.pantsbuild.example.Functions.func2",
@@ -172,6 +179,10 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     assert sorted(analysis.provided_symbols_encoded) == [
         "org.pantsbuild.example.ASubClass",
         "org.pantsbuild.example.ASubTrait",
+        "org.pantsbuild.example.ApplyQualifier",
+        "org.pantsbuild.example.ApplyQualifier$",
+        "org.pantsbuild.example.ApplyQualifier$.MODULE$",
+        "org.pantsbuild.example.ApplyQualifier.func4",
         "org.pantsbuild.example.Functions",
         "org.pantsbuild.example.Functions$",
         "org.pantsbuild.example.Functions$.MODULE$",
@@ -226,6 +237,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                     is_wildcard=False,
                 ),
                 ScalaImport(name="java.io", alias=None, is_wildcard=True),
+                ScalaImport(name="anotherPackage.calc", alias=None, is_wildcard=False),
             ),
         }
     )
@@ -252,6 +264,9 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.HasPrimaryConstructor": FrozenOrderedSet(
                 ["bar", "SomeTypeInSecondaryConstructor"]
             ),
+            "org.pantsbuild.example.ApplyQualifier": FrozenOrderedSet(
+                ["Integer", "a", ".toInt", "calc.calcFunc"]
+            ),
             "org.pantsbuild.example": FrozenOrderedSet(
                 ["ABaseClass", "ATrait1", "ATrait2.Nested", "BaseWithConstructor"]
             ),
@@ -259,11 +274,16 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     )
 
     assert set(analysis.fully_qualified_consumed_symbols()) == {
+        # Select with Apply as Qualifier only yield the name after the Apply
+        ".toInt",
         # Because they contain dots, and thus might be fully qualified. See #13545.
         "ATrait2.Nested",
         "OuterObject.NestedVal",
+        "anotherPackage.calc.calcFunc",
+        "calc.calcFunc",
         # Because of the wildcard import.
         "java.io.+",
+        "java.io..toInt",
         "java.io.ABaseClass",
         "java.io.AParameterType",
         "java.io.ATrait1",
@@ -272,17 +292,20 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.OuterObject.NestedVal",
         "java.io.String",
         "java.io.Unit",
+        "java.io.a",
         "java.io.Integer",
         "java.io.LambdaReturnType",
         "java.io.LambdaTypeArg1",
         "java.io.LambdaTypeArg2",
         "java.io.SomeTypeInSecondaryConstructor",
         "java.io.bar",
+        "java.io.calc.calcFunc",
         "java.io.foo",
         "java.io.TupleTypeArg1",
         "java.io.TupleTypeArg2",
         # Because it's the top-most scope in the file.
         "org.pantsbuild.example.+",
+        "org.pantsbuild.example..toInt",
         "org.pantsbuild.example.ABaseClass",
         "org.pantsbuild.example.AParameterType",
         "org.pantsbuild.example.BaseWithConstructor",
@@ -293,7 +316,9 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.OuterObject.NestedVal",
         "org.pantsbuild.example.String",
         "org.pantsbuild.example.Unit",
+        "org.pantsbuild.example.a",
         "org.pantsbuild.example.bar",
+        "org.pantsbuild.example.calc.calcFunc",
         "org.pantsbuild.example.foo",
         "org.pantsbuild.example.LambdaReturnType",
         "org.pantsbuild.example.LambdaTypeArg1",
@@ -301,6 +326,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.TupleTypeArg1",
         "org.pantsbuild.example.TupleTypeArg2",
         "org.pantsbuild.+",
+        "org.pantsbuild..toInt",
         "org.pantsbuild.ABaseClass",
         "org.pantsbuild.AParameterType",
         "org.pantsbuild.ATrait1",
@@ -316,7 +342,9 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.TupleTypeArg1",
         "org.pantsbuild.TupleTypeArg2",
         "org.pantsbuild.Unit",
+        "org.pantsbuild.a",
         "org.pantsbuild.bar",
+        "org.pantsbuild.calc.calcFunc",
         "org.pantsbuild.foo",
     }
 
