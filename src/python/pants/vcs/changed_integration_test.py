@@ -141,8 +141,27 @@ def test_change_transitive_dep(repo: str) -> None:
 
 
 def test_unowned_file(repo: str) -> None:
-    create_file("dir/some_file.ext", "")
+    """Unowned files should still work with target-less goals like `count-loc`.
+
+    If a file was removed, the target-less goals should simply ignore it.
+    """
+
+    def run_count_loc() -> str:
+        result = run_pants_with_workdir(
+            ["--changed-since=HEAD", "count-loc"],
+            workdir=repo,
+            # For some reason, we must set `hermetic=False` for Git to be detected.
+            hermetic=False,
+        )
+        result.assert_success()
+        return result.stdout
+
+    create_file("dir/some_file.sh", "# blah")
+    assert "Shell" in run_count_loc()
     assert_list_stdout(repo, [])
+
+    delete_file("dir/some_file.sh")
+    assert "Shell" not in run_count_loc()
 
 
 def test_delete_generated_target(repo: str) -> None:

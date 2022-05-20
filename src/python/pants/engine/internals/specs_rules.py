@@ -215,7 +215,8 @@ async def addresses_from_specs_with_only_file_owners(
     addresses: set[Address] = set()
     for spec, owners in zip(specs.all_specs(), owners_per_include):
         if (
-            owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+            not specs.from_change_detection
+            and owners_not_found_behavior != OwnersNotFoundBehavior.ignore
             and isinstance(spec, FileLiteralSpec)
             and not owners
         ):

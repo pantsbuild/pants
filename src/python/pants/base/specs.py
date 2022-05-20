@@ -343,6 +343,7 @@ class SpecsWithOnlyFileOwners:
     file_globs: tuple[FileGlobSpec, ...] = ()
 
     filter_by_global_options: bool = False
+    from_change_detection: bool = False
 
     @classmethod
     def from_specs(cls, specs: Specs) -> SpecsWithOnlyFileOwners:
@@ -350,13 +351,16 @@ class SpecsWithOnlyFileOwners:
             specs.file_literals,
             specs.file_globs,
             filter_by_global_options=specs.filter_by_global_options,
+            from_change_detection=specs.from_change_detection,
         )
 
-    @staticmethod
     def _generate_path_globs(
+        self,
         specs: Iterable[FileLiteralSpec | FileGlobSpec],
         glob_match_error_behavior: GlobMatchErrorBehavior,
     ) -> PathGlobs:
+        if self.from_change_detection:
+            glob_match_error_behavior = GlobMatchErrorBehavior.ignore
         return PathGlobs(
             globs=(s.to_glob() for s in specs),
             glob_match_error_behavior=glob_match_error_behavior,
