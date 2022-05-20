@@ -18,7 +18,6 @@ from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
-from pants.testutil._process_handler import SubprocessProcessHandler
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_file_dump, safe_mkdir, safe_open
 from pants.util.osutil import Pid
@@ -62,20 +61,11 @@ class PantsJoinHandle:
     process: subprocess.Popen
     workdir: str
 
-    def join(self, stdin_data: bytes | str | None = None, tee_output: bool = False) -> PantsResult:
+    def join(self, stdin_data: bytes | str | None = None) -> PantsResult:
         """Wait for the pants process to complete, and return a PantsResult for it."""
-
-        communicate_fn = self.process.communicate
-        if tee_output:
-            # TODO: MyPy complains that SubprocessProcessHandler.communicate_teeing_stdout_and_stderr does
-            # not have the same type signature as subprocess.Popen.communicate_teeing_stdout_and_stderr.
-            # It's possibly not worth trying to fix this because the type stubs for subprocess.Popen are
-            # very complex and also not very precise, given how many different configurations Popen can
-            # take.
-            communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr  # type: ignore[assignment]
         if stdin_data is not None:
             stdin_data = ensure_binary(stdin_data)
-        (stdout, stderr) = communicate_fn(stdin_data)
+        (stdout, stderr) = self.process.communicate(stdin_data)
 
         if self.process.returncode != PANTS_SUCCEEDED_EXIT_CODE:
             render_logs(self.workdir)
@@ -98,14 +88,9 @@ def run_pants_with_workdir_without_waiting(
     use_pantsd: bool = True,
     config: Mapping | None = None,
     extra_env: Mapping[str, str] | None = None,
-    print_stacktrace: bool = True,
     shell: bool = False,
 ) -> PantsJoinHandle:
-    args = [
-        "--no-pantsrc",
-        f"--pants-workdir={workdir}",
-        f"--print-stacktrace={print_stacktrace}",
-    ]
+    args = ["--no-pantsrc", f"--pants-workdir={workdir}"]
 
     pantsd_in_command = "--no-pantsd" in command or "--pantsd" in command
     pantsd_in_config = config and "GLOBAL" in config and "pantsd" in config["GLOBAL"]
@@ -175,6 +160,7 @@ def run_pants_with_workdir_without_waiting(
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            shell=shell,
         ),
         workdir=workdir,
     )
@@ -189,9 +175,7 @@ def run_pants_with_workdir(
     config: Mapping | None = None,
     extra_env: Mapping[str, str] | None = None,
     stdin_data: bytes | str | None = None,
-    tee_output: bool = False,
     shell: bool = False,
-    print_stacktrace: bool = True,
 ) -> PantsResult:
     handle = run_pants_with_workdir_without_waiting(
         command,
@@ -201,9 +185,8 @@ def run_pants_with_workdir(
         shell=shell,
         config=config,
         extra_env=extra_env,
-        print_stacktrace=print_stacktrace,
     )
-    return handle.join(stdin_data=stdin_data, tee_output=tee_output)
+    return handle.join(stdin_data=stdin_data)
 
 
 def run_pants(
