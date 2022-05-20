@@ -470,7 +470,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         test_path = "daemon_correctness_test_0001"
         test_build_file = os.path.join(test_path, "BUILD")
         test_src_file = os.path.join(test_path, "some_file.py")
-        filedeps_cmd = ["--files-not-found-behavior=warn", "filedeps", test_path]
+        filedeps_cmd = ["--unmatched-build-file-globs=warn", "filedeps", test_path]
 
         try:
             with self.pantsd_successful_run_context() as ctx:

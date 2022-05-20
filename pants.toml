@@ -66,7 +66,7 @@ ignore_warnings.add = [
   "DEPRECATED: pants.base.build_environment.get_git"
 ]
 
-files_not_found_behavior = "error"
+unmatched_build_file_globs = "error"
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
 remote_store_address = "grpcs://cache.toolchain.com:443"
