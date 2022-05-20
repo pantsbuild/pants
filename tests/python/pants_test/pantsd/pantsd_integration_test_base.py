@@ -151,17 +151,17 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
     @staticmethod
     def run_pants(*args, **kwargs) -> PantsResult:
         # We set our own ad-hoc pantsd configuration in most of these tests.
-        return run_pants(*args, **{**kwargs, "use_pantsd": False})
+        return run_pants(*args, **{**kwargs, "use_pantsd": False})  # type: ignore
 
     @staticmethod
     def run_pants_with_workdir(*args, **kwargs) -> PantsResult:
         # We set our own ad-hoc pantsd configuration in most of these tests.
-        return run_pants(*args, **{**kwargs, "use_pantsd": False})
+        return run_pants(*args, **{**kwargs, "use_pantsd": False})  # type: ignore
 
     @staticmethod
     def run_pants_with_workdir_without_waiting(*args, **kwargs) -> PantsJoinHandle:
         # We set our own ad-hoc pantsd configuration in most of these tests.
-        return run_pants_without_waiting(*args, **{**kwargs, "use_pantsd": False})
+        return run_pants_without_waiting(*args, **{**kwargs, "use_pantsd": False})  # type: ignore
 
     @contextmanager
     def pantsd_test_context(
