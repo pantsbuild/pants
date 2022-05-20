@@ -27,6 +27,14 @@ def repo() -> Iterator[str]:
     with temporary_dir(root_dir=get_buildroot()) as worktree, environment_as(
         GIT_CONFIG_GLOBAL="/dev/null"
     ):
+        # FIXME: Our CI is adding files like `.coverage.fv-az167-838.29971.396383`, which for some
+        #  reason Pants is including in the `SpecsSnapshot` when running `count-loc`, even when
+        #  adding `.coverage*` to `.gitignore. It causes tests to fail because `count-loc` thinks
+        #  there are files to run on. This has only happened in CI.
+        coverage_files = list(Path().glob("coverage.*"))
+        for f in coverage_files:
+            f.unlink()
+
         _run_git(["init"])
         _run_git(["config", "user.email", "you@example.com"])
         _run_git(["config", "user.name", "Your Name"])
