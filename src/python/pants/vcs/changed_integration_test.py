@@ -36,6 +36,7 @@ def repo() -> Iterator[str]:
                 f"""\
                 {worktree}
                 .pids
+                __pycache__
                 """
             ),
             "pants.toml": dedent(
