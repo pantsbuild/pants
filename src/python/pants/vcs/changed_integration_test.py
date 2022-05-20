@@ -37,6 +37,7 @@ def repo() -> Iterator[str]:
                 {worktree}
                 .pids
                 __pycache__
+                .coverage*  # For some reason, our CI adds this file.
                 """
             ),
             "pants.toml": dedent(
@@ -128,8 +129,6 @@ def assert_count_loc(
         hermetic=False,
     )
     result.assert_success()
-    print(result.stdout)
-    print(result.stderr)
     if expected_num_files:
         assert f"Total                        {expected_num_files}" in result.stdout
     else:
