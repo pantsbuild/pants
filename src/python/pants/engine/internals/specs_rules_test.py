@@ -756,16 +756,33 @@ def test_resolve_specs_snapshot(rule_runner: RuleRunner) -> None:
     - When a filesystem spec refers to a file without any owning target, it should be included
       in the snapshot.
     - If a file is covered both by an address spec and by a filesystem spec, we should merge it
-      so that the file only shows up once.
+      so that the file only shows up once. If the address spec is filtered out though,
+      e.g. via `--tags`, the file must not show up.
     """
     rule_runner.write_files(
-        {"demo/f1.txt": "", "demo/f2.txt": "", "demo/BUILD": "target(sources=['*.txt'])"}
+        {
+            "demo/unowned.foo": "",
+            "demo/f1.txt": "",
+            "demo/f2.txt": "",
+            "demo/f3.txt": "",
+            "demo/BUILD": dedent(
+                """\
+                target(name='f1', sources=['f1.txt'])
+                target(name='f2', sources=['f2.txt'])
+                target(name='f3', sources=['f3.txt'], tags=['ignore'])
+
+                # Non-file targets are ignored.
+                nonfile_generator(name='nonfile')
+                """
+            ),
+        }
     )
+    rule_runner.set_options(["--tag=-ignore", "--owners-not-found-behavior=ignore"])
     specs = SpecsParser(rule_runner.build_root).parse_specs(
-        ["demo:demo", "demo/f1.txt", "demo/BUILD"]
+        ["demo:f1", "demo/*.txt", "demo/unowned.foo"]
     )
     result = rule_runner.request(SpecsSnapshot, [specs])
-    assert result.snapshot.files == ("demo/BUILD", "demo/f1.txt", "demo/f2.txt")
+    assert result.snapshot.files == ("demo/f1.txt", "demo/f2.txt", "demo/unowned.foo")
 
 
 # -----------------------------------------------------------------------------------------------

@@ -342,9 +342,15 @@ class SpecsWithOnlyFileOwners:
     file_literals: tuple[FileLiteralSpec, ...] = ()
     file_globs: tuple[FileGlobSpec, ...] = ()
 
+    filter_by_global_options: bool = False
+
     @classmethod
     def from_specs(cls, specs: Specs) -> SpecsWithOnlyFileOwners:
-        return SpecsWithOnlyFileOwners(specs.file_literals, specs.file_globs)
+        return SpecsWithOnlyFileOwners(
+            specs.file_literals,
+            specs.file_globs,
+            filter_by_global_options=specs.filter_by_global_options,
+        )
 
     @staticmethod
     def _generate_path_globs(
