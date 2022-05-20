@@ -77,10 +77,9 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
 
 def test_logs_unhandled_exception(tmp_path: Path) -> None:
     pants_run = run_pants_with_workdir(
-        lifecycle_stub_cmdline(),
-        workdir=tmp_path.as_posix(),
         # The backtrace should be omitted when --print-stacktrace=False.
-        print_stacktrace=False,
+        [*lifecycle_stub_cmdline(), "--no-print-stacktrace"],
+        workdir=tmp_path.as_posix(),
         extra_env={"_RAISE_EXCEPTION_ON_IMPORT": "True"},
     )
 

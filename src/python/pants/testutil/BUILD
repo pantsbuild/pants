@@ -28,6 +28,4 @@ python_sources(
     },
 )
 
-python_tests(name="tests", sources=["*_test.py", "!pants_integration_test.py"])
-
 resource(name="py_typed", source="py.typed")

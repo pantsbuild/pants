@@ -11,14 +11,6 @@ set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-# Set RUN_PANTS_FROM_PEX to non-empty to cause this wrapper script to delegate directly
-# to ./pants.pex. We use this in CI to avoid bootstrapping in every shard.
-if [[ -n "${RUN_PANTS_FROM_PEX}" ]]; then
-  exec "${HERE}/pants.pex" "$@"
-fi
-
-# Otherwise, run directly from sources, bootstrapping if needed.
-
 # Exposes:
 # + determine_python: Determine which interpreter version to use.
 # shellcheck source=build-support/common.sh
