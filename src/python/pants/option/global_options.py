@@ -1524,7 +1524,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     owners_not_found_behavior = EnumOption(
         "--owners-not-found-behavior",
-        default=OwnersNotFoundBehavior.error,
+        default=OwnersNotFoundBehavior.ignore,
         help=softwrap(
             """
             What to do when file arguments do not have any owning target. This happens when
@@ -1532,6 +1532,17 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
         advanced=True,
+        removal_version="2.14.0.dev0",
+        removal_hint=softwrap(
+            """
+            This option is no longer useful with Pants because we have goals that work without any
+            targets, e.g. the `count-loc` goal or the `regex-lint` linter from the `lint` goal. This
+            option caused us to error on valid use cases.
+
+            For goals that require targets, like `list`, the unowned file will simply be ignored. If
+            no owners are found at all, most goals will warn and some like `run` will error.
+            """
+        ),
     )
 
     build_patterns = StrListOption(
