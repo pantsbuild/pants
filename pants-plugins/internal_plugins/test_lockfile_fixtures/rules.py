@@ -63,7 +63,7 @@ for item in collection_plugin.collected:
             "kwargs": mark.kwargs,
             "test_file_path": str(path),
         })
-        
+
 with open("tests.json", "w") as f:
     f.write(json.dumps(output))
 """
