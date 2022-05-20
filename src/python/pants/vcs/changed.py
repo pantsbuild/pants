@@ -39,7 +39,7 @@ class ChangedAddresses(Collection[Address]):
 
 @rule
 async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
-    owners = await Get(Owners, OwnersRequest(request.sources, filter_by_global_options=True))
+    owners = await Get(Owners, OwnersRequest(request.sources))
     if request.dependees == DependeesOption.NONE:
         return ChangedAddresses(owners)
     dependees_with_roots = await Get(

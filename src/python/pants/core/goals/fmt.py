@@ -21,7 +21,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Snapshot, Worksp
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import FilteredTargets, SourcesField, Targets
+from pants.engine.target import SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
@@ -155,7 +155,7 @@ class Fmt(Goal):
 @goal_rule
 async def fmt(
     console: Console,
-    targets: FilteredTargets,
+    targets: Targets,
     fmt_subsystem: FmtSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,

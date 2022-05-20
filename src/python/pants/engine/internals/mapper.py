@@ -154,7 +154,7 @@ class AddressFamily:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class SpecsFilter:
+class AddressSpecsFilter:
     """Filters addresses with the `--tags` and `--exclude-target-regexp` options."""
 
     tags: tuple[str, ...]
