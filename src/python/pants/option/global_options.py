@@ -72,7 +72,7 @@ class DynamicUIRenderer(Enum):
     experimental_prodash = "experimental-prodash"
 
 
-class NonexistentBuildFileGlobs(Enum):
+class UnknownBuildFileGlobs(Enum):
     """What to do when globs do not match in BUILD files."""
 
     warn = "warn"
@@ -1463,7 +1463,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     files_not_found_behavior = EnumOption(
         "--files-not-found-behavior",
-        default=NonexistentBuildFileGlobs.warn,
+        default=UnknownBuildFileGlobs.warn,
         help=softwrap(
             """
             What to do when files and globs specified in BUILD files, such as in the
@@ -1481,9 +1481,9 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
     )
-    nonexistent_build_file_globs = EnumOption(
-        "--nonexistent-build-file-globs",
-        default=NonexistentBuildFileGlobs.warn,
+    unknown_build_file_globs = EnumOption(
+        "--unknown-build-file-globs",
+        default=UnknownBuildFileGlobs.warn,
         help=softwrap(
             """
             What to do when files and globs specified in BUILD files, such as in the

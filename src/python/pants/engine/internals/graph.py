@@ -79,11 +79,7 @@ from pants.engine.target import (
     _generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import (
-    GlobalOptions,
-    NonexistentBuildFileGlobs,
-    OwnersNotFoundBehavior,
-)
+from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior, UnknownBuildFileGlobs
 from pants.source.filespec import matches_filespec
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
@@ -149,7 +145,7 @@ async def resolve_target_parametrizations(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
-    nonexistent_build_file_globs: NonexistentBuildFileGlobs,
+    unknown_build_file_globs: UnknownBuildFileGlobs,
 ) -> _TargetParametrizations:
     assert not address.is_generated_target and not address.is_parametrized
 
@@ -208,7 +204,7 @@ async def resolve_target_parametrizations(
             overrides_flattened = overrides_field.flatten()
             if issubclass(target_type, TargetFilesGenerator):
                 override_globs = OverridesField.to_path_globs(
-                    address, overrides_flattened, nonexistent_build_file_globs
+                    address, overrides_flattened, unknown_build_file_globs
                 )
                 override_paths = await MultiGet(
                     Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
@@ -740,14 +736,14 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 
 @rule
-def extract_nonexistent_build_file_globs(
+def extract_unknown_build_file_globs(
     global_options: GlobalOptions,
-) -> NonexistentBuildFileGlobs:
+) -> UnknownBuildFileGlobs:
     return cast(
-        NonexistentBuildFileGlobs,
+        UnknownBuildFileGlobs,
         resolve_conflicting_options(
             old_option="files_not_found_behavior",
-            new_option="nonexistent_build_file_globs",
+            new_option="unknown_build_file_globs",
             old_scope=global_options.options_scope,
             new_scope=global_options.options_scope,
             old_container=global_options.options,
@@ -801,7 +797,7 @@ class AmbiguousCodegenImplementationsException(Exception):
 @rule(desc="Hydrate the `sources` field")
 async def hydrate_sources(
     request: HydrateSourcesRequest,
-    nonexistent_build_file_globs: NonexistentBuildFileGlobs,
+    unknown_build_file_globs: UnknownBuildFileGlobs,
     union_membership: UnionMembership,
 ) -> HydratedSources:
     sources_field = request.field
@@ -847,7 +843,7 @@ async def hydrate_sources(
 
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
-    path_globs = sources_field.path_globs(nonexistent_build_file_globs)
+    path_globs = sources_field.path_globs(unknown_build_file_globs)
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
     sources_field.validate_resolved_files(snapshot.files)
 
@@ -867,10 +863,10 @@ async def hydrate_sources(
 
 @rule(desc="Resolve `sources` field file names")
 async def resolve_source_paths(
-    request: SourcesPathsRequest, nonexistent_build_file_globs: NonexistentBuildFileGlobs
+    request: SourcesPathsRequest, unknown_build_file_globs: UnknownBuildFileGlobs
 ) -> SourcesPaths:
     sources_field = request.field
-    path_globs = sources_field.path_globs(nonexistent_build_file_globs)
+    path_globs = sources_field.path_globs(unknown_build_file_globs)
     paths = await Get(Paths, PathGlobs, path_globs)
     sources_field.validate_resolved_files(paths.files)
     return SourcesPaths(files=paths.files, dirs=paths.dirs)

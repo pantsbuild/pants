@@ -50,7 +50,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.global_options import NonexistentBuildFileGlobs
+from pants.option.global_options import UnknownBuildFileGlobs
 from pants.source.filespec import Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
@@ -1927,7 +1927,7 @@ class SourcesField(AsyncFieldMixin, Field):
         )
 
     @final
-    def path_globs(self, nonexistent_build_file_globs: NonexistentBuildFileGlobs) -> PathGlobs:
+    def path_globs(self, unknown_build_file_globs: UnknownBuildFileGlobs) -> PathGlobs:
         if not self.globs:
             return PathGlobs([])
 
@@ -1945,7 +1945,7 @@ class SourcesField(AsyncFieldMixin, Field):
         # Use fields default error behavior if defined, if we use default globs else the provided
         # error behavior.
         error_behavior = (
-            nonexistent_build_file_globs.to_glob_match_error_behavior()
+            unknown_build_file_globs.to_glob_match_error_behavior()
             if conjunction == GlobExpansionConjunction.all_match
             or self.default_glob_match_error_behavior is None
             else self.default_glob_match_error_behavior
@@ -2704,7 +2704,7 @@ class OverridesField(AsyncFieldMixin, Field):
         cls,
         address: Address,
         overrides_keys: Iterable[str],
-        nonexistent_build_file_globs: NonexistentBuildFileGlobs,
+        unknown_build_file_globs: UnknownBuildFileGlobs,
     ) -> tuple[PathGlobs, ...]:
         """Create a `PathGlobs` for each key.
 
@@ -2721,7 +2721,7 @@ class OverridesField(AsyncFieldMixin, Field):
         return tuple(
             PathGlobs(
                 [relativize_glob(glob)],
-                glob_match_error_behavior=nonexistent_build_file_globs.to_glob_match_error_behavior(),
+                glob_match_error_behavior=unknown_build_file_globs.to_glob_match_error_behavior(),
                 description_of_origin=f"the `overrides` field for {address}",
             )
             for glob in overrides_keys
