@@ -621,11 +621,12 @@ def test_specs_with_only_file_owners_nonexistent_file(rule_runner: RuleRunner) -
     with engine_error(contains='Unmatched glob from file/directory arguments: "demo/fake.txt"'):
         resolve_specs_with_only_file_owners(rule_runner, [spec])
 
-    rule_runner.set_options(["--unmatched-cli-globs=ignore", "--owners-not-found-behavior=ignore"])
+    rule_runner.set_options(["--unmatched-cli-globs=ignore"])
     assert not resolve_specs_with_only_file_owners(rule_runner, [spec])
 
 
 def test_specs_with_only_file_owners_no_owner(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--owners-not-found-behavior=error"])
     rule_runner.write_files({"no_owners/f.txt": ""})
     # Error for literal specs.
     with pytest.raises(ExecutionError) as exc:
