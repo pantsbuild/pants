@@ -87,7 +87,7 @@ def test_missing_sources_warnings():
             target_full = f"{_SOURCES_TARGET_BASE}:{target}"
             pants_run = run_pants(
                 ["filedeps", target_full],
-                config={GLOBAL_SCOPE_CONFIG_SECTION: {"unknown_build_file_globs": "warn"}},
+                config={GLOBAL_SCOPE_CONFIG_SECTION: {"unmatched_build_file_globs": "warn"}},
             )
             pants_run.assert_success()
             unmatched_globs = target_to_unmatched_globs[target]
@@ -112,7 +112,7 @@ def test_existing_sources():
     target_full = f"{_SOURCES_TARGET_BASE}:text"
     pants_run = run_pants(
         ["filedeps", target_full],
-        config={GLOBAL_SCOPE_CONFIG_SECTION: {"unknown_build_file_globs": "warn"}},
+        config={GLOBAL_SCOPE_CONFIG_SECTION: {"unmatched_build_file_globs": "warn"}},
     )
     pants_run.assert_success()
     assert "[WARN] Unmatched glob" not in pants_run.stderr
@@ -132,7 +132,7 @@ def test_error_message():
             expected_excerpts = _ERR_TARGETS[target]
             pants_run = run_pants(
                 ["filedeps", target],
-                config={GLOBAL_SCOPE_CONFIG_SECTION: {"unknown_build_file_globs": "error"}},
+                config={GLOBAL_SCOPE_CONFIG_SECTION: {"unmatched_build_file_globs": "error"}},
             )
             pants_run.assert_failure()
             for excerpt in expected_excerpts:
