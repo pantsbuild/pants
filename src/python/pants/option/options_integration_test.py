@@ -6,11 +6,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from pants.fs.fs import safe_filename_from_path
-from pants.testutil.pants_integration_test import (
-    ensure_daemon,
-    run_pants,
-    setup_tmpdir,
-)
+from pants.testutil.pants_integration_test import ensure_daemon, run_pants, setup_tmpdir
 
 
 def test_invalid_options() -> None:
