@@ -47,7 +47,7 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import FilesNotFoundBehavior
+from pants.option.global_options import NonexistentBuildFileGlobs
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import FrozenInstanceError
@@ -975,7 +975,7 @@ def test_multiple_sources_path_globs(
         default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
     sources = TestMultipleSourcesField(field_value, Address("test"))
-    actual = sources.path_globs(FilesNotFoundBehavior.warn)
+    actual = sources.path_globs(NonexistentBuildFileGlobs.warn)
     for attr, expect in zip(expected._fields, expected):
         if expect is not SKIP:
             assert getattr(actual, attr) == expect
@@ -1035,7 +1035,7 @@ def test_single_source_path_globs(
 
     sources = TestSingleSourceField(field_value, Address("test"))
 
-    actual = sources.path_globs(FilesNotFoundBehavior.warn)
+    actual = sources.path_globs(NonexistentBuildFileGlobs.warn)
     for attr, expect in zip(expected._fields, expected):
         if expect is not SKIP:
             assert getattr(actual, attr) == expect
@@ -1337,7 +1337,7 @@ def test_overrides_field_normalization() -> None:
         {"foo.ext": tgt1_override, ("foo.ext", "bar*.ext"): tgt2_override}, Address("dir")
     )
     globs = OverridesField.to_path_globs(
-        Address("dir"), path_field.flatten(), FilesNotFoundBehavior.error
+        Address("dir"), path_field.flatten(), NonexistentBuildFileGlobs.error
     )
     assert [path_globs.globs for path_globs in globs] == [
         ("dir/foo.ext",),
