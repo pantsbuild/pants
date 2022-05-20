@@ -36,7 +36,7 @@ class JvmResourcesRequest(ClasspathEntryRequest):
     )
 
 
-@rule(desc="Fetch with coursier")
+@rule(desc="Assemble resources")
 async def assemble_resources_jar(
     zip: ZipBinary,
     request: JvmResourcesRequest,

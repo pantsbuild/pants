@@ -59,9 +59,11 @@ def test_resources(rule_runner: RuleRunner) -> None:
     rendered_classpath = rule_runner.request(
         RenderedClasspath, [Addresses([Address(spec_path="", target_name="root")])]
     )
-    assert rendered_classpath.content[".root.resources.jar"] == {
-        "one.txt",
-        "two.txt",
+    assert rendered_classpath.content == {
+        ".root.resources.jar": {
+            "one.txt",
+            "two.txt",
+        }
     }
 
     # But requesting a single file should individually package it.
@@ -69,6 +71,8 @@ def test_resources(rule_runner: RuleRunner) -> None:
         RenderedClasspath,
         [Addresses([Address(spec_path="", target_name="root", relative_file_path="one.txt")])],
     )
-    assert rendered_classpath.content[".one.txt.root.resources.jar"] == {
-        "one.txt",
+    assert rendered_classpath.content == {
+        ".one.txt.root.resources.jar": {
+            "one.txt",
+        }
     }

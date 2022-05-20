@@ -403,7 +403,10 @@ def classpath_dependency_requests(
     classpath_entry_request: ClasspathEntryRequestFactory, request: ClasspathDependenciesRequest
 ) -> ClasspathEntryRequests:
     def ignore_because_generated(coarsened_dep: CoarsenedTarget) -> bool:
-        if len(coarsened_dep.members) == 1:
+        if not request.ignore_generated:
+            return False
+        if len(coarsened_dep.members) != 1:
+            # Do not ignore a dependency which is involved in a cycle.
             return False
         us = request.request.component.representative.address
         them = coarsened_dep.representative.address
@@ -414,7 +417,7 @@ def classpath_dependency_requests(
             component=coarsened_dep, resolve=request.request.resolve
         )
         for coarsened_dep in request.request.component.dependencies
-        if not request.ignore_generated or not ignore_because_generated(coarsened_dep)
+        if not ignore_because_generated(coarsened_dep)
     )
 
 
