@@ -1475,9 +1475,8 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         removal_version="2.14.0.dev0",
         removal_hint=softwrap(
             """
-            Use `[GLOBAL].nonexistent_build_file_globs` instead, which behaves the same. This
-            option was renamed for clarity with the new `[GLOBAL].nonexistent_cli_arguments`
-            option.
+            Use `[GLOBAL].unmatched_build_file_globs` instead, which behaves the same. This
+            option was renamed for clarity with the new `[GLOBAL].unmatched_cli_globs` option.
             """
         ),
     )
