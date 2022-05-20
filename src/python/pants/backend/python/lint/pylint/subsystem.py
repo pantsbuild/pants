@@ -30,15 +30,13 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
     Dependencies,
-    DependenciesRequest,
     FieldSet,
     Target,
-    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -62,6 +60,7 @@ class PylintFieldSet(FieldSet):
 
     source: PythonSourceField
     dependencies: Dependencies
+    interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -239,29 +238,22 @@ async def _pylint_interpreter_constraints(
     # While Pylint will run in partitions, we need a set of constraints that works with every
     # partition. We must also consider any 3rd-party requirements used by 1st-party plugins.
     #
-    # This first computes the constraints for each individual target, including its direct
-    # dependencies (which will AND across each target in the closure). Then, it ORs all unique
+    # This first computes the constraints for each individual target. Then, it ORs all unique
     # resulting interpreter constraints. The net effect is that every possible Python interpreter
     # used will be covered.
     all_tgts = await Get(AllTargets, AllTargetsRequest())
-    relevant_targets = tuple(tgt for tgt in all_tgts if PylintFieldSet.is_applicable(tgt))
-    direct_deps_per_target = await MultiGet(
-        Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in relevant_targets
-    )
 
-    unique_constraints = set()
-    for tgt, direct_deps in zip(relevant_targets, direct_deps_per_target):
-        constraints_fields = (
-            t[InterpreterConstraintsField]
-            for t in (tgt, *direct_deps)
-            if t.has_field(InterpreterConstraintsField)
+    unique_constraints = {
+        InterpreterConstraints.create_from_compatibility_fields(
+            (
+                tgt[InterpreterConstraintsField],
+                *first_party_plugins.interpreter_constraints_fields,
+            ),
+            python_setup,
         )
-        unique_constraints.add(
-            InterpreterConstraints.create_from_compatibility_fields(
-                (*constraints_fields, *first_party_plugins.interpreter_constraints_fields),
-                python_setup,
-            )
-        )
+        for tgt in all_tgts
+        if PylintFieldSet.is_applicable(tgt)
+    }
     if not unique_constraints:
         unique_constraints.add(
             InterpreterConstraints.create_from_compatibility_fields(

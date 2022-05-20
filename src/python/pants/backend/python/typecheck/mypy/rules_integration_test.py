@@ -447,7 +447,15 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/uses_py2.py": "from project.py2 import add\nassert add(2, 2) == 4\n",
             f"{PACKAGE}/uses_py3.py": "from project.py3 import add\nassert add(2, 2) == 4\n",
-            f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['==2.7.*', '>=3.6'])",
+            f"{PACKAGE}/BUILD": dedent(
+                """python_sources(
+                overrides={
+                  'uses_py2.py': {'interpreter_constraints': ['==2.7.*']},
+                  'uses_py3.py': {'interpreter_constraints': ['>=3.6']},
+                }
+              )
+            """
+            ),
         }
     )
     py2_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
@@ -458,11 +466,11 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     py2_result, py3_result = sorted(result, key=lambda res: res.partition_description or "")
 
     assert py2_result.exit_code == 0
-    assert py2_result.partition_description == "['CPython==2.7.*', 'CPython==2.7.*,>=3.6']"
+    assert py2_result.partition_description == "['CPython==2.7.*']"
     assert "Success: no issues found" in py2_result.stdout
 
     assert py3_result.exit_code == 0
-    assert py3_result.partition_description == "['CPython==2.7.*,>=3.6', 'CPython>=3.6']"
+    assert py3_result.partition_description == "['CPython>=3.6']"
     assert "Success: no issues found" in py3_result.stdout
 
 
