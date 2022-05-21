@@ -1635,6 +1635,23 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
+    use_deprecated_directory_cli_args_semantics = BoolOption(
+        "--use-deprecated-directory-cli-args-semantics",
+        default=True,
+        help=softwrap(
+            f"""
+            If true, directory arguments like `{bin_name()} test dir` are shorthand for the target
+            `dir:dir`, i.e. the target that leaves off `name=`.
+
+            Otherwise, directory arguments will match all targets in the directory, e.g.
+            `{bin_name()} test dir` will run all tests in `dir`.
+
+            The new semantics will become the default in Pants 2.14, and the old semantics will be
+            removed in 2.15.
+            """
+        ),
+    )
+
     @classmethod
     def validate_instance(cls, opts):
         """Validates an instance of global options for cases that are not prohibited via

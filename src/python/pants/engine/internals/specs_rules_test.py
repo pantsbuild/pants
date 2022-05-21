@@ -15,6 +15,7 @@ from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
     DirGlobSpec,
+    DirLiteralSpec,
     FileGlobSpec,
     FileLiteralSpec,
     RecursiveGlobSpec,
@@ -138,7 +139,7 @@ def resolve_specs_without_file_owners(
     specs_obj = Specs.create(
         specs,
         filter_by_global_options=True,
-        convert_dir_literal_to_address_literal=True,
+        convert_dir_literal_to_address_literal=False,
         unmatched_glob_behavior=(
             GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
         ),
@@ -184,41 +185,45 @@ def test_specs_without_file_owners_literals_vs_globs(rule_runner: RuleRunner) ->
         {Address("demo/subdir", target_name="another_ext")},
     )
 
+    demo_dir_generated_targets = {
+        Address("demo", relative_file_path="f1.txt"),
+        Address("demo", relative_file_path="f2.txt"),
+        Address("demo", relative_file_path="f[[]3].txt"),
+        Address("demo", target_name="nonfile", generated_name="gen"),
+    }
+    demo_subdir_generated_targets = {
+        Address("demo", relative_file_path="subdir/f.txt"),
+        Address("demo/subdir", target_name="another_ext"),
+    }
+
+    # `DirGlobSpec` matches all targets that "reside" in the directory, either because explicitly
+    # declared there or generated into that dir.
     assert_resolved(
-        # Match all targets that reside in `demo/`, either because explicitly declared there or
-        # generated into that dir. Note that this does not include `demo/subdir/f2.ext:../demo`,
-        # even though its target generator matches.
+        # Note that this does not include `demo/subdir/f2.ext:../demo`, even though its target
+        # generator matches.
         DirGlobSpec("demo"),
-        {
-            Address("demo"),
-            Address("demo", target_name="nonfile"),
-            Address("demo", relative_file_path="f1.txt"),
-            Address("demo", relative_file_path="f2.txt"),
-            Address("demo", relative_file_path="f[[]3].txt"),
-            Address("demo", target_name="nonfile", generated_name="gen"),
-        },
+        {Address("demo"), Address("demo", target_name="nonfile"), *demo_dir_generated_targets},
     )
     assert_resolved(
         # Should include all generated targets that reside in `demo/subdir`, even though their
         # target generator is in an ancestor.
         DirGlobSpec("demo/subdir"),
-        {
-            Address("demo", relative_file_path="subdir/f.txt"),
-            Address("demo/subdir", target_name="another_ext"),
-        },
+        demo_subdir_generated_targets,
     )
+
+    # `DirLiteralSpec` matches all targets that "reside" in the directory, but it filters out
+    # target generators.
+    assert_resolved(DirLiteralSpec("demo"), demo_dir_generated_targets)
+    assert_resolved(DirLiteralSpec("demo/subdir"), demo_subdir_generated_targets)
 
     all_tgts_in_demo = {
         Address("demo"),
         Address("demo", target_name="nonfile"),
-        Address("demo", target_name="nonfile", generated_name="gen"),
-        Address("demo", relative_file_path="f1.txt"),
-        Address("demo", relative_file_path="f2.txt"),
-        Address("demo", relative_file_path="f[[]3].txt"),
-        Address("demo", relative_file_path="subdir/f.txt"),
-        Address("demo/subdir", target_name="another_ext"),
+        *demo_dir_generated_targets,
+        *demo_subdir_generated_targets,
     }
     assert_resolved(RecursiveGlobSpec("demo"), all_tgts_in_demo)
+
     assert_resolved(AncestorGlobSpec("demo/subdir"), all_tgts_in_demo)
     assert_resolved(
         AncestorGlobSpec("demo"),
@@ -248,6 +253,7 @@ def test_specs_without_file_owners_deduplication(rule_runner: RuleRunner) -> Non
     )
     specs = [
         AddressLiteralSpec("demo"),
+        DirLiteralSpec("demo"),
         DirGlobSpec("demo"),
         RecursiveGlobSpec("demo"),
         AncestorGlobSpec("demo"),
@@ -369,7 +375,7 @@ def test_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> None
             rule_runner, [spec], ignore_nonexistent=ignore_nonexistent
         )
 
-    # Literal addresses require for the target to beresolved.
+    # Literal addresses require for the target to be resolved.
     assert_resolve_error(
         AddressLiteralSpec("fake", "tgt"), expected="'fake' does not exist on disk"
     )
@@ -388,6 +394,12 @@ def test_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> None
     )
     assert_does_not_error(DirGlobSpec("empty"))
     assert_does_not_error(DirGlobSpec("fake"), ignore_nonexistent=True)
+
+    assert_resolve_error(
+        DirLiteralSpec("fake"), expected='Unmatched glob from CLI arguments: "fake/*"'
+    )
+    assert_does_not_error(DirLiteralSpec("empty"))
+    assert_does_not_error(DirLiteralSpec("fake"), ignore_nonexistent=True)
 
     assert_resolve_error(
         RecursiveGlobSpec("fake"), expected='Unmatched glob from CLI arguments: "fake/**"'
@@ -665,7 +677,7 @@ def test_resolve_addresses_from_specs(rule_runner: RuleRunner) -> None:
     ]
     multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
     specs = SpecsParser(rule_runner.build_root).parse_specs(
-        [*no_interaction_specs, *multiple_files_specs]
+        [*no_interaction_specs, *multiple_files_specs], convert_dir_literal_to_address_literal=False
     )
 
     result = rule_runner.request(Addresses, [specs])
@@ -779,7 +791,7 @@ def test_resolve_specs_snapshot(rule_runner: RuleRunner) -> None:
 
     def assert_snapshot(specs: Iterable[Spec], expected: set[str]) -> None:
         specs_obj = Specs.create(
-            specs, convert_dir_literal_to_address_literal=True, filter_by_global_options=True
+            specs, convert_dir_literal_to_address_literal=False, filter_by_global_options=True
         )
         result = rule_runner.request(SpecsSnapshot, [specs_obj])
         assert set(result.snapshot.files) == expected
@@ -794,9 +806,10 @@ def test_resolve_specs_snapshot(rule_runner: RuleRunner) -> None:
         all_expected_demo_files,
     )
 
-    assert_snapshot([DirGlobSpec("")], {"f.txt"})
-    assert_snapshot([DirGlobSpec("unowned")], {"unowned/f.txt"})
-    assert_snapshot([DirGlobSpec("demo")], {*all_expected_demo_files, "demo/BUILD"})
+    for dir_spec in (DirLiteralSpec, DirGlobSpec):
+        assert_snapshot([dir_spec("")], {"f.txt"})
+        assert_snapshot([dir_spec("unowned")], {"unowned/f.txt"})
+        assert_snapshot([dir_spec("demo")], {*all_expected_demo_files, "demo/BUILD"})
 
     assert_snapshot(
         [RecursiveGlobSpec("")],

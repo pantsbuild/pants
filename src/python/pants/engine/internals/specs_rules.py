@@ -13,7 +13,11 @@ from typing import Iterable
 
 from pants.base.specs import (
     AddressLiteralSpec,
+    AncestorGlobSpec,
+    DirGlobSpec,
+    DirLiteralSpec,
     FileLiteralSpec,
+    RecursiveGlobSpec,
     Specs,
     SpecsWithOnlyFileOwners,
     SpecsWithoutFileOwners,
@@ -40,6 +44,7 @@ from pants.engine.target import (
     SourcesPaths,
     SourcesPathsRequest,
     Target,
+    TargetGenerator,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
@@ -114,7 +119,7 @@ async def addresses_from_specs_without_file_owners(
         for wrapped_tgt in literal_wrapped_targets
         if filtering_disabled or specs_filter.matches(wrapped_tgt.target)
     )
-    if not (specs.dir_globs or specs.recursive_globs or specs.ancestor_globs):
+    if not (specs.dir_literals or specs.dir_globs or specs.recursive_globs or specs.ancestor_globs):
         return Addresses(matched_addresses)
 
     # Resolve all globs.
@@ -143,16 +148,21 @@ async def addresses_from_specs_without_file_owners(
         for tgt in target_parametrizations.all:
             residence_dir_to_targets[tgt.residence_dir].append(tgt)
 
-    matched_globs = set()
+    def valid_tgt(
+        tgt: Target, spec: DirLiteralSpec | DirGlobSpec | RecursiveGlobSpec | AncestorGlobSpec
+    ) -> bool:
+        if not spec.matches_target_generators and isinstance(tgt, TargetGenerator):
+            return False
+        return filtering_disabled or specs_filter.matches(tgt)
+
     for glob_spec in specs.glob_specs():
         for residence_dir in residence_dir_to_targets:
-            if not glob_spec.matches_target(residence_dir):
+            if not glob_spec.matches_target_residence_dir(residence_dir):
                 continue
-            matched_globs.add(glob_spec)
             matched_addresses.update(
                 tgt.address
                 for tgt in residence_dir_to_targets[residence_dir]
-                if filtering_disabled or specs_filter.matches(tgt)
+                if valid_tgt(tgt, glob_spec)
             )
 
     return Addresses(sorted(matched_addresses))
