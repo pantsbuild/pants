@@ -382,7 +382,7 @@ def test_package_object(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    assert sorted(analysis.provided_symbols) == ["foo.bar.Hello"]
+    assert sorted(analysis.provided_symbols) == ["foo.bar", "foo.bar.Hello"]
 
 
 def test_extract_annotations(rule_runner: RuleRunner) -> None:
