@@ -72,7 +72,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_broken_pipe(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             run = self.run_pants_with_workdir(
-                "help | head -1", workdir=workdir, config=pantsd_config, shell=True
+                "help | head -1",
+                workdir=workdir,
+                config=pantsd_config,
+                shell=True,
+                # FIXME: Why is this necessary to set?
+                set_pants_ignore=False,
             )
             self.assertNotIn("broken pipe", run.stderr.lower())
             checker.assert_started()

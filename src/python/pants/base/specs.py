@@ -370,6 +370,7 @@ class SpecsWithOnlyFileOwners:
 
     unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error
     filter_by_global_options: bool = False
+    from_change_detection: bool = False
 
     @classmethod
     def from_specs(cls, specs: Specs) -> SpecsWithOnlyFileOwners:
@@ -378,22 +379,24 @@ class SpecsWithOnlyFileOwners:
             specs.file_globs,
             unmatched_glob_behavior=specs.unmatched_glob_behavior,
             filter_by_global_options=specs.filter_by_global_options,
+            from_change_detection=specs.from_change_detection,
         )
 
     def _generate_path_globs(
         self,
         specs: Iterable[FileLiteralSpec | FileGlobSpec],
     ) -> PathGlobs:
+        unmatched_glob_behavior = (
+            GlobMatchErrorBehavior.ignore
+            if self.from_change_detection
+            else self.unmatched_glob_behavior
+        )
         return PathGlobs(
             globs=(s.to_glob() for s in specs),
-            glob_match_error_behavior=self.unmatched_glob_behavior,
+            glob_match_error_behavior=unmatched_glob_behavior,
             # We validate that _every_ glob is valid.
             conjunction=GlobExpansionConjunction.all_match,
-            description_of_origin=(
-                None
-                if self.unmatched_glob_behavior == GlobMatchErrorBehavior.ignore
-                else "CLI arguments"
-            ),
+            description_of_origin=(None if unmatched_glob_behavior else "CLI arguments"),
         )
 
     def path_globs_for_spec(self, spec: FileLiteralSpec | FileGlobSpec) -> PathGlobs:
