@@ -8,16 +8,11 @@ from enum import Enum
 from typing import Pattern
 
 from pants.base.deprecated import warn_or_error
+from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.target import (
-    RegisteredTargetTypes,
-    Tags,
-    Target,
-    UnexpandedTargets,
-    UnrecognizedTargetTypeException,
-)
+from pants.engine.target import RegisteredTargetTypes, Tags, Target, UnrecognizedTargetTypeException
 from pants.option.option_types import EnumOption, StrListOption
 from pants.util.enums import match
 from pants.util.filtering import TargetFilter, and_filters, create_filters
@@ -127,6 +122,10 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
             ]
         )
 
+    def is_specified(self) -> bool:
+        """Return true if any of the options are set."""
+        return bool(self.target_type or self.address_regex or self.tag_regex or self.granularity)
+
 
 class FilterGoal(Goal):
     subsystem_cls = FilterSubsystem
@@ -152,16 +151,12 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
 
 @goal_rule
 def filter_targets(
-    # NB: We must preserve target generators, not replace with their generated targets.
-    targets: UnexpandedTargets,
-    filter_subsystem: FilterSubsystem,
-    console: Console,
-    registered_target_types: RegisteredTargetTypes,
+    addresses: Addresses, filter_subsystem: FilterSubsystem, console: Console
 ) -> FilterGoal:
-    all_filters = filter_subsystem.all_filters(registered_target_types)
-    addresses = sorted(target.address for target in targets if all_filters(target))
+    # `SpecsFilter` will have already filtered for us. There isn't much reason for this goal to
+    # exist anymore.
     with filter_subsystem.line_oriented(console) as print_stdout:
-        for address in addresses:
+        for address in sorted(addresses):
             print_stdout(address.spec)
     return FilterGoal(exit_code=0)
 

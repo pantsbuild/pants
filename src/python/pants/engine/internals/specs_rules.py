@@ -11,6 +11,7 @@ from collections import defaultdict
 from pathlib import PurePath
 from typing import Iterable
 
+from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
@@ -229,9 +230,16 @@ def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTarge
 
 
 @rule
-def setup_specs_filter(global_options: GlobalOptions) -> SpecsFilter:
+def setup_specs_filter(
+    global_options: GlobalOptions,
+    filter_subsystem: FilterSubsystem,
+    registered_target_types: RegisteredTargetTypes,
+) -> SpecsFilter:
     return SpecsFilter.create(
-        tags=global_options.tag, exclude_target_regexps=global_options.exclude_target_regexp
+        filter_subsystem,
+        registered_target_types,
+        tags=global_options.tag,
+        exclude_target_regexps=global_options.exclude_target_regexp,
     )
 
 

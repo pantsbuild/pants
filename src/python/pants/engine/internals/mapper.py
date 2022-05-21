@@ -7,11 +7,12 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
+from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.target import Tags, Target
+from pants.engine.target import RegisteredTargetTypes, Tags, Target
 from pants.util.filtering import TargetFilter, and_filters, create_filters
 from pants.util.memo import memoized_property
 
@@ -153,14 +154,23 @@ class AddressFamily:
 
 @dataclass(frozen=True)
 class SpecsFilter:
-    """Filters addresses with the `--tags` and `--exclude-target-regexp` options."""
+    """Filters targets with the `--tags`, `--exclude-target-regexp`, and `[filter]` subsystem
+    options."""
 
     is_specified: bool
+    filter_subsystem_filter: TargetFilter
     tags_filter: TargetFilter
     exclude_target_regexps_filter: TargetFilter
 
     @classmethod
-    def create(cls, *, tags: Iterable[str], exclude_target_regexps: Iterable[str]) -> SpecsFilter:
+    def create(
+        cls,
+        filter_subsystem: FilterSubsystem,
+        registered_target_types: RegisteredTargetTypes,
+        *,
+        tags: Iterable[str],
+        exclude_target_regexps: Iterable[str],
+    ) -> SpecsFilter:
         exclude_patterns = tuple(re.compile(pattern) for pattern in exclude_target_regexps)
 
         def exclude_target_regexps_filter(tgt: Target) -> bool:
@@ -175,7 +185,8 @@ class SpecsFilter:
         tags_filter = and_filters(create_filters(tags, tags_outer_filter))
 
         return SpecsFilter(
-            is_specified=bool(tags or exclude_target_regexps),
+            is_specified=bool(filter_subsystem.is_specified() or tags or exclude_target_regexps),
+            filter_subsystem_filter=filter_subsystem.all_filters(registered_target_types),
             tags_filter=tags_filter,
             exclude_target_regexps_filter=exclude_target_regexps_filter,
         )
@@ -183,4 +194,8 @@ class SpecsFilter:
     def matches(self, target: Target) -> bool:
         """Check that the target matches the provided `--tag` and `--exclude-target-regexp`
         options."""
-        return self.tags_filter(target) and self.exclude_target_regexps_filter(target)
+        return (
+            self.tags_filter(target)
+            and self.filter_subsystem_filter(target)
+            and self.exclude_target_regexps_filter(target)
+        )
