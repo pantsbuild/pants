@@ -46,7 +46,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior, UnmatchedCliGlobs
+from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -161,11 +161,6 @@ async def addresses_from_specs_without_file_owners(
 # -----------------------------------------------------------------------------------------------
 # SpecsWithOnlyFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
-
-
-@rule
-def extract_unmatched_cli_globs(global_options: GlobalOptions) -> UnmatchedCliGlobs:
-    return global_options.unmatched_cli_globs
 
 
 @rule
