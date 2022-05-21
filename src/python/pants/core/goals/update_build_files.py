@@ -19,6 +19,7 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.base.deprecated import warn_or_error
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
@@ -26,9 +27,11 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestSubset,
     FileContent,
     MergeDigests,
     PathGlobs,
+    SpecsSnapshot,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -174,16 +177,37 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
+    specs_snapshot: SpecsSnapshot,
 ) -> UpdateBuildFilesGoal:
-    all_build_files = await Get(
-        DigestContents,
-        PathGlobs(
-            globs=(
-                *(os.path.join("**", p) for p in build_file_options.patterns),
-                *(f"!{p}" for p in build_file_options.ignores),
-            )
-        ),
+    build_file_path_globs = PathGlobs(
+        globs=(
+            *(os.path.join("**", p) for p in build_file_options.patterns),
+            *(f"!{p}" for p in build_file_options.ignores),
+        )
     )
+    if specs_snapshot.snapshot.files:
+        all_build_files = await Get(
+            DigestContents, DigestSubset(specs_snapshot.snapshot.digest, build_file_path_globs)
+        )
+    else:
+        warn_or_error(
+            "2.14.0.dev0",
+            f"running `{bin_name()} update-build-files` without arguments",
+            softwrap(
+                f"""
+                Currently, `{bin_name()} update-build-files` without arguments will run against
+                every BUILD file in the project.
+
+                In Pants 2.14, you must use CLI arguments. Use:
+
+                  * `::` to run on everything
+                  * `dir::` to run on `dir` and subdirs
+                  * `dir` to run on `dir`
+                  * `dir/BUILD` to run on that single BUILD file
+                """
+            ),
+        )
+        all_build_files = await Get(DigestContents, PathGlobs, build_file_path_globs)
 
     rewrite_request_classes = []
     for request in union_membership[RewrittenBuildFileRequest]:
