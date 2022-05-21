@@ -89,13 +89,12 @@ def run_pants_with_workdir_without_waiting(
     config: Mapping | None = None,
     extra_env: Mapping[str, str] | None = None,
     shell: bool = False,
+    set_pants_ignore: bool = True,
 ) -> PantsJoinHandle:
-    args = [
-        "--no-pantsrc",
-        f"--pants-workdir={workdir}",
-        # For some reason, Pants's CI adds this file and it is not ignored by default.
-        "--pants-ignore=+['.coverage.*']",
-    ]
+    args = ["--no-pantsrc", f"--pants-workdir={workdir}"]
+    if set_pants_ignore:
+        # FIXME: For some reason, Pants's CI adds this file and it is not ignored by default. Why?
+        args.append("--pants-ignore=+['.coverage.*']")
 
     pantsd_in_command = "--no-pantsd" in command or "--pantsd" in command
     pantsd_in_config = config and "GLOBAL" in config and "pantsd" in config["GLOBAL"]
@@ -104,9 +103,10 @@ def run_pants_with_workdir_without_waiting(
 
     if hermetic:
         args.append("--pants-config-files=[]")
-        # Certain tests may be invoking `./pants test` for a pytest test with conftest discovery
-        # enabled. We should ignore the root conftest.py for these cases.
-        args.append("--pants-ignore=+['/conftest.py']")
+        if set_pants_ignore:
+            # Certain tests may be invoking `./pants test` for a pytest test with conftest discovery
+            # enabled. We should ignore the root conftest.py for these cases.
+            args.append("--pants-ignore=+['/conftest.py']")
 
     if config:
         toml_file_name = os.path.join(workdir, "pants.toml")
@@ -181,6 +181,7 @@ def run_pants_with_workdir(
     extra_env: Mapping[str, str] | None = None,
     stdin_data: bytes | str | None = None,
     shell: bool = False,
+    set_pants_ignore: bool = True,
 ) -> PantsResult:
     handle = run_pants_with_workdir_without_waiting(
         command,
@@ -190,6 +191,7 @@ def run_pants_with_workdir(
         shell=shell,
         config=config,
         extra_env=extra_env,
+        set_pants_ignore=set_pants_ignore,
     )
     return handle.join(stdin_data=stdin_data)
 
