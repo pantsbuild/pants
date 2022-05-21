@@ -73,6 +73,60 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
         help="Filter on targets with tags matching these regexes.",
     )
 
+    def target_type_filters(
+        self, registered_target_types: RegisteredTargetTypes
+    ) -> list[TargetFilter]:
+        def outer_filter(target_alias: str) -> TargetFilter:
+            if target_alias not in registered_target_types.aliases:
+                raise UnrecognizedTargetTypeException(target_alias, registered_target_types)
+
+            target_type = registered_target_types.aliases_to_types[target_alias]
+            if target_type.deprecated_alias and target_alias == target_type.deprecated_alias:
+                warn_deprecated_target_type(target_type)
+
+            def inner_filter(tgt: Target) -> bool:
+                return tgt.alias == target_alias or bool(
+                    tgt.deprecated_alias and tgt.deprecated_alias == target_alias
+                )
+
+            return inner_filter
+
+        return create_filters(self.target_type, outer_filter)
+
+    def address_regex_filters(self) -> list[TargetFilter]:
+        def outer_filter(address_regex: str) -> TargetFilter:
+            regex = compile_regex(address_regex)
+            return lambda tgt: bool(regex.search(tgt.address.spec))
+
+        return create_filters(self.address_regex, outer_filter)
+
+    def tag_regex_filters(self) -> list[TargetFilter]:
+        def outer_filter(tag_regex: str) -> TargetFilter:
+            regex = compile_regex(tag_regex)
+            return lambda tgt: any(bool(regex.search(tag)) for tag in tgt.get(Tags).value or ())
+
+        return create_filters(self.tag_regex, outer_filter)
+
+    def granularity_filter(self) -> TargetFilter:
+        return match(
+            self.granularity,
+            {
+                TargetGranularity.all_targets: lambda _: True,
+                TargetGranularity.file_targets: lambda tgt: tgt.address.is_file_target,
+                TargetGranularity.build_targets: lambda tgt: not tgt.address.is_file_target,
+            },
+        )
+
+    def all_filters(self, registered_target_types: RegisteredTargetTypes) -> TargetFilter:
+        return and_filters(
+            [
+                *self.target_type_filters(registered_target_types),
+                *self.address_regex_filters(),
+                *self.tag_regex_filters(),
+                self.granularity_filter(),
+            ]
+        )
+
 
 class FilterGoal(Goal):
     subsystem_cls = FilterSubsystem
@@ -104,49 +158,8 @@ def filter_targets(
     console: Console,
     registered_target_types: RegisteredTargetTypes,
 ) -> FilterGoal:
-    def filter_target_type(target_alias: str) -> TargetFilter:
-        if target_alias not in registered_target_types.aliases:
-            raise UnrecognizedTargetTypeException(target_alias, registered_target_types)
-
-        target_type = registered_target_types.aliases_to_types[target_alias]
-        if target_type.deprecated_alias and target_alias == target_type.deprecated_alias:
-            warn_deprecated_target_type(target_type)
-
-        def inner_filter(tgt: Target) -> bool:
-            return tgt.alias == target_alias or bool(
-                tgt.deprecated_alias and tgt.deprecated_alias == target_alias
-            )
-
-        return inner_filter
-
-    def filter_address_regex(address_regex: str) -> TargetFilter:
-        regex = compile_regex(address_regex)
-        return lambda tgt: bool(regex.search(tgt.address.spec))
-
-    def filter_tag_regex(tag_regex: str) -> TargetFilter:
-        regex = compile_regex(tag_regex)
-        return lambda tgt: any(bool(regex.search(tag)) for tag in tgt.get(Tags).value or ())
-
-    def filter_granularity(granularity: TargetGranularity) -> TargetFilter:
-        return match(
-            granularity,
-            {
-                TargetGranularity.all_targets: lambda _: True,
-                TargetGranularity.file_targets: lambda tgt: tgt.address.is_file_target,
-                TargetGranularity.build_targets: lambda tgt: not tgt.address.is_file_target,
-            },
-        )
-
-    anded_filter: TargetFilter = and_filters(
-        [
-            *(create_filters(filter_subsystem.target_type, filter_target_type)),
-            *(create_filters(filter_subsystem.address_regex, filter_address_regex)),
-            *(create_filters(filter_subsystem.tag_regex, filter_tag_regex)),
-            filter_granularity(filter_subsystem.granularity),
-        ]
-    )
-    addresses = sorted(target.address for target in targets if anded_filter(target))
-
+    all_filters = filter_subsystem.all_filters(registered_target_types)
+    addresses = sorted(target.address for target in targets if all_filters(target))
     with filter_subsystem.line_oriented(console) as print_stdout:
         for address in addresses:
             print_stdout(address.spec)
