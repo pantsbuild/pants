@@ -640,11 +640,11 @@ async def select_coursier_resolve_for_targets(
         elif resolve != compatible_resolve:
             all_compatible = False
 
-    if not compatible_resolve or not all_compatible:
+    if not all_compatible:
         raise NoCompatibleResolve(
             jvm, "The selected targets did not have a resolve in common", targets
         )
-    resolve = compatible_resolve
+    resolve = compatible_resolve or jvm.default_resolve
 
     # Load the resolve.
     resolve_path = jvm.resolves[resolve]
