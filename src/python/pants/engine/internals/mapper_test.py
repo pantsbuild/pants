@@ -131,7 +131,7 @@ def test_address_family_duplicate_names() -> None:
 
 
 def test_specs_filter() -> None:
-    specs_filter = SpecsFilter(tags=["-a", "+b"], exclude_target_regexps=["skip-me"])
+    specs_filter = SpecsFilter.create(tags=["-a", "+b"], exclude_target_regexps=["skip-me"])
 
     class MockTgt(Target):
         alias = "tgt"

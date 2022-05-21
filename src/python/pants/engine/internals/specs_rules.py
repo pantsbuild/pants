@@ -232,7 +232,7 @@ def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTarge
 
 @rule
 def setup_specs_filter(global_options: GlobalOptions) -> SpecsFilter:
-    return SpecsFilter(
+    return SpecsFilter.create(
         tags=global_options.tag, exclude_target_regexps=global_options.exclude_target_regexp
     )
 
