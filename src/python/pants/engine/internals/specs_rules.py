@@ -256,9 +256,9 @@ async def resolve_specs_snapshot(specs: Specs) -> SpecsSnapshot:
 
     digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
 
-    with_files_owners = SpecsWithOnlyFileOwners.from_specs(specs)
+    specs_snapshot_path_globs = specs.to_specs_snapshot_path_globs()
     filtered_out_sources_paths: set[str] = set()
-    if with_files_owners:
+    if specs_snapshot_path_globs.globs:
         filtered_out_targets = FrozenOrderedSet(unfiltered_targets).difference(
             FrozenOrderedSet(filtered_targets)
         )
@@ -271,11 +271,7 @@ async def resolve_specs_snapshot(specs: Specs) -> SpecsSnapshot:
             itertools.chain.from_iterable(paths.files for paths in all_sources_paths)
         )
 
-        target_less_digest = await Get(
-            Digest,
-            PathGlobs,
-            with_files_owners.to_path_globs(),
-        )
+        target_less_digest = await Get(Digest, PathGlobs, specs_snapshot_path_globs)
         digests.append(target_less_digest)
 
     if filtered_out_sources_paths:

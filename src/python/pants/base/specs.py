@@ -134,6 +134,9 @@ class DirGlobSpec(Spec):
     def matches_target(self, tgt_residence_dir: str) -> bool:
         return tgt_residence_dir == self.directory
 
+    def to_glob(self) -> str:
+        return os.path.join(self.directory, "*")
+
 
 @dataclass(frozen=True)
 class RecursiveGlobSpec(Spec):
@@ -156,6 +159,9 @@ class RecursiveGlobSpec(Spec):
     def matches_target(self, tgt_residence_dir: str) -> bool:
         return fast_relpath_optional(tgt_residence_dir, self.directory) is not None
 
+    def to_glob(self) -> str:
+        return os.path.join(self.directory, "**")
+
 
 @dataclass(frozen=True)
 class AncestorGlobSpec(Spec):
@@ -177,6 +183,20 @@ class AncestorGlobSpec(Spec):
 
     def matches_target(self, tgt_residence_dir: str) -> bool:
         return fast_relpath_optional(self.directory, tgt_residence_dir) is not None
+
+
+def _create_path_globs(
+    globs: Iterable[str], unmatched_glob_behavior: GlobMatchErrorBehavior
+) -> PathGlobs:
+    return PathGlobs(
+        globs=globs,
+        glob_match_error_behavior=unmatched_glob_behavior,
+        # We validate that _every_ glob is valid.
+        conjunction=GlobExpansionConjunction.all_match,
+        description_of_origin=(
+            None if unmatched_glob_behavior == GlobMatchErrorBehavior.ignore else "CLI arguments"
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -279,6 +299,20 @@ class Specs:
             return " and ".join(specs_descriptions) + " arguments"
         return ", ".join(specs_descriptions[:-1]) + f", and {specs_descriptions[-1]} arguments"
 
+    def to_specs_snapshot_path_globs(self) -> PathGlobs:
+        """`PathGlobs` to find all files from the specs, independent of targets."""
+        relevant_specs: Iterable[
+            FileLiteralSpec | FileGlobSpec | DirGlobSpec | RecursiveGlobSpec
+        ] = (
+            *self.file_literals,
+            *self.file_globs,
+            *self.dir_globs,
+            *self.recursive_globs,
+        )
+        return _create_path_globs(
+            (spec.to_glob() for spec in relevant_specs), self.unmatched_glob_behavior
+        )
+
 
 @dataclass(frozen=True)
 class SpecsWithoutFileOwners:
@@ -326,7 +360,11 @@ class SpecsWithoutFileOwners:
         validation_includes: set[str] = set()
         for spec in (*self.dir_globs, *self.ancestor_globs):
             spec = cast("DirGlobSpec | AncestorGlobSpec", spec)
-            validation_includes.add(os.path.join(spec.directory, "*"))
+            validation_includes.add(
+                spec.to_glob()
+                if isinstance(spec, DirGlobSpec)
+                else os.path.join(spec.directory, "*")
+            )
             build_includes.update(
                 os.path.join(f, pattern)
                 for pattern in build_patterns
@@ -334,7 +372,7 @@ class SpecsWithoutFileOwners:
             )
 
         for recursive_spec in self.recursive_globs:
-            validation_includes.add(os.path.join(recursive_spec.directory, "**"))
+            validation_includes.add(recursive_spec.to_glob())
             for pattern in build_patterns:
                 build_includes.update(
                     os.path.join(f, pattern) for f in recursive_dirname(recursive_spec.directory)
@@ -346,13 +384,7 @@ class SpecsWithoutFileOwners:
         validation_path_globs = (
             PathGlobs(())
             if self.unmatched_glob_behavior == GlobMatchErrorBehavior.ignore
-            else PathGlobs(
-                (*validation_includes, *ignores),
-                glob_match_error_behavior=self.unmatched_glob_behavior,
-                # We validate that _every_ glob is valid.
-                conjunction=GlobExpansionConjunction.all_match,
-                description_of_origin="CLI arguments",
-            )
+            else _create_path_globs((*validation_includes, *ignores), self.unmatched_glob_behavior)
         )
         return build_path_globs, validation_path_globs
 
@@ -382,34 +414,14 @@ class SpecsWithOnlyFileOwners:
             from_change_detection=specs.from_change_detection,
         )
 
-    def _generate_path_globs(
-        self,
-        specs: Iterable[FileLiteralSpec | FileGlobSpec],
-    ) -> PathGlobs:
+    def path_globs_for_spec(self, spec: FileLiteralSpec | FileGlobSpec) -> PathGlobs:
+        """Generate PathGlobs for the specific spec."""
         unmatched_glob_behavior = (
             GlobMatchErrorBehavior.ignore
             if self.from_change_detection
             else self.unmatched_glob_behavior
         )
-        return PathGlobs(
-            globs=(s.to_glob() for s in specs),
-            glob_match_error_behavior=unmatched_glob_behavior,
-            # We validate that _every_ glob is valid.
-            conjunction=GlobExpansionConjunction.all_match,
-            description_of_origin=(
-                None
-                if unmatched_glob_behavior == GlobMatchErrorBehavior.ignore
-                else "CLI arguments"
-            ),
-        )
-
-    def path_globs_for_spec(self, spec: FileLiteralSpec | FileGlobSpec) -> PathGlobs:
-        """Generate PathGlobs for the specific spec."""
-        return self._generate_path_globs([spec])
-
-    def to_path_globs(self) -> PathGlobs:
-        """Generate a single PathGlobs for the instance."""
-        return self._generate_path_globs(self.all_specs())
+        return _create_path_globs((spec.to_glob(),), unmatched_glob_behavior)
 
     def all_specs(self) -> Iterator[FileLiteralSpec | FileGlobSpec]:
         yield from self.file_literals
