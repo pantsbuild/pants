@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, Iterator, Type, TypeVar, cast
 
+from pants.base.specs import Specs
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -262,8 +263,7 @@ def _get_error_code(results: tuple[LintResults, ...]) -> int:
 async def lint(
     console: Console,
     workspace: Workspace,
-    targets: FilteredTargets,
-    specs_snapshot: SpecsSnapshot,
+    specs: Specs,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
     dist_dir: DistDir,
@@ -283,10 +283,7 @@ async def lint(
     specified_names = determine_specified_tool_names(
         "lint",
         lint_subsystem.only,
-        [
-            *lint_target_request_types,
-            *fmt_target_request_types,
-        ],
+        [*lint_target_request_types, *fmt_target_request_types],
         extra_valid_names={request.name for request in file_request_types},
     )
 
@@ -296,6 +293,14 @@ async def lint(
     lint_target_request_types = filter(is_specified, lint_target_request_types)
     fmt_target_request_types = filter(is_specified, fmt_target_request_types)
     file_request_types = filter(is_specified, file_request_types)
+
+    _get_targets = Get(
+        FilteredTargets,
+        Specs,
+        specs if lint_target_request_types or fmt_target_request_types else Specs(),
+    )
+    _get_specs_snapshot = Get(SpecsSnapshot, Specs, specs if file_request_types else Specs())
+    targets, specs_snapshot = await MultiGet(_get_targets, _get_specs_snapshot)
 
     def batch(field_sets: Iterable[FieldSet]) -> Iterator[list[FieldSet]]:
         partitions = partition_sequentially(
