@@ -7,7 +7,7 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Iterable
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, LintResults
@@ -187,7 +187,7 @@ class ContentMatcher(Matcher):
 
 
 class MultiMatcher:
-    def __init__(self, config: ValidationConfig):
+    def __init__(self, config: ValidationConfig) -> None:
         """Class to check multiple regex matching on files.
 
         :param dict config: Regex matching config (see above).
@@ -226,19 +226,21 @@ class MultiMatcher:
         self._content_matchers = {cp.name: ContentMatcher(cp) for cp in config.content_patterns}
         self._required_matches = config.required_matches
 
-    def check_source_file(self, path, content):
+    def check_source_file(self, path: str, content: bytes) -> RegexMatchResult:
         content_pattern_names, encoding = self.get_applicable_content_pattern_names(path)
         matching, nonmatching = self.check_content(content_pattern_names, content, encoding)
         return RegexMatchResult(path, matching, nonmatching)
 
-    def check_content(self, content_pattern_names, content, encoding):
+    def check_content(
+        self, content_pattern_names: Iterable[str], content: bytes, encoding: str | None
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
         """Check which of the named patterns matches the given content.
 
         Returns a pair (matching, nonmatching), in which each element is a tuple of pattern names.
 
-        :param iterable content_pattern_names: names of content patterns to check.
-        :param bytes content: the content to check.
-        :param str encoding: the expected encoding of content.
+        :param content_pattern_names: names of content patterns to check.
+        :param content: the content to check.
+        :param encoding: the expected encoding of content.
         """
         if not content_pattern_names or not encoding:
             return (), ()
@@ -252,7 +254,7 @@ class MultiMatcher:
                 nonmatching.append(content_pattern_name)
         return tuple(matching), tuple(nonmatching)
 
-    def get_applicable_content_pattern_names(self, path):
+    def get_applicable_content_pattern_names(self, path: str) -> tuple[set[str], str | None]:
         """Return the content patterns applicable to a given path.
 
         Returns a tuple (applicable_content_pattern_names, content_encoding).
@@ -261,7 +263,7 @@ class MultiMatcher:
         applicable_content_pattern_names will be empty).
         """
         encodings = set()
-        applicable_content_pattern_names = set()
+        applicable_content_pattern_names: set[str] = set()
         for path_pattern_name, content_pattern_names in self._required_matches.items():
             m = self._path_matchers[path_pattern_name]
             if m.matches(path):
