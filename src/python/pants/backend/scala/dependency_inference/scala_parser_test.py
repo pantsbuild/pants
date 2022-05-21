@@ -265,7 +265,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 ["bar", "SomeTypeInSecondaryConstructor"]
             ),
             "org.pantsbuild.example.ApplyQualifier": FrozenOrderedSet(
-                ["Integer", "a", ".toInt", "calc.calcFunc"]
+                ["Integer", "a", "toInt", "calc.calcFunc"]
             ),
             "org.pantsbuild.example": FrozenOrderedSet(
                 ["ABaseClass", "ATrait1", "ATrait2.Nested", "BaseWithConstructor"]
@@ -274,8 +274,6 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     )
 
     assert set(analysis.fully_qualified_consumed_symbols()) == {
-        # Select with Apply as Qualifier only yield the name after the Apply
-        ".toInt",
         # Because they contain dots, and thus might be fully qualified. See #13545.
         "ATrait2.Nested",
         "OuterObject.NestedVal",
@@ -283,7 +281,6 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "calc.calcFunc",
         # Because of the wildcard import.
         "java.io.+",
-        "java.io..toInt",
         "java.io.ABaseClass",
         "java.io.AParameterType",
         "java.io.ATrait1",
@@ -301,11 +298,11 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.bar",
         "java.io.calc.calcFunc",
         "java.io.foo",
+        "java.io.toInt",
         "java.io.TupleTypeArg1",
         "java.io.TupleTypeArg2",
         # Because it's the top-most scope in the file.
         "org.pantsbuild.example.+",
-        "org.pantsbuild.example..toInt",
         "org.pantsbuild.example.ABaseClass",
         "org.pantsbuild.example.AParameterType",
         "org.pantsbuild.example.BaseWithConstructor",
@@ -320,13 +317,13 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.bar",
         "org.pantsbuild.example.calc.calcFunc",
         "org.pantsbuild.example.foo",
+        "org.pantsbuild.example.toInt",
         "org.pantsbuild.example.LambdaReturnType",
         "org.pantsbuild.example.LambdaTypeArg1",
         "org.pantsbuild.example.LambdaTypeArg2",
         "org.pantsbuild.example.TupleTypeArg1",
         "org.pantsbuild.example.TupleTypeArg2",
         "org.pantsbuild.+",
-        "org.pantsbuild..toInt",
         "org.pantsbuild.ABaseClass",
         "org.pantsbuild.AParameterType",
         "org.pantsbuild.ATrait1",
@@ -346,6 +343,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.bar",
         "org.pantsbuild.calc.calcFunc",
         "org.pantsbuild.foo",
+        "org.pantsbuild.toInt",
     }
 
 

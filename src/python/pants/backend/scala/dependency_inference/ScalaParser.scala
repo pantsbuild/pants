@@ -45,15 +45,26 @@ class SourceAnalysisTraverser extends Traverser {
 
   // Extract a qualified name from a tree.
   def extractName(tree: Tree): String = {
-    tree match {
-      case Term.Select(qual, name)  => s"${extractName(qual)}.${extractName(name)}"
-      case Type.Select(qual, name)  => s"${extractName(qual)}.${extractName(name)}"
-      case Term.Name(name)          => name
-      case Type.Name(name)          => name
-      case Pat.Var(node)            => extractName(node)
-      case Name.Indeterminate(name) => name
-      case _                        => ""
-    }
+    def extractNameSelect(qual: Tree, name: Tree): Option[String] =
+      (maybeExtractName(qual), maybeExtractName(name)) match {
+        case (Some(qual), Some(name)) => Some(s"$qual.$name")
+        case (Some(qual), None)       => Some(qual)
+        case (None, Some(name))       => Some(name)
+        case (None, None)             => None
+      }
+
+    def maybeExtractName(tree: Tree): Option[String] = 
+      tree match {
+        case Term.Select(qual, name)  => extractNameSelect(qual, name)
+        case Type.Select(qual, name)  => extractNameSelect(qual, name)
+        case Term.Name(name)          => Some(name)
+        case Type.Name(name)          => Some(name)
+        case Pat.Var(node)            => maybeExtractName(node)
+        case Name.Indeterminate(name) => Some(name)
+        case _                        => None
+      }
+
+    maybeExtractName(tree).getOrElse("")
   }
 
   def extractNamesFromTypeTree(tree: Tree): Vector[String] = {
