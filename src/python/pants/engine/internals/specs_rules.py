@@ -11,7 +11,6 @@ from collections import defaultdict
 from pathlib import PurePath
 from typing import Iterable
 
-from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressLiteralSpec,
     FileLiteralSpec,
@@ -47,8 +46,8 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior, UnmatchedCliGlobs
-from pants.util.docutil import bin_name, doc_url
+from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import bullet_list
@@ -119,14 +118,15 @@ async def addresses_from_specs_without_file_owners(
         return Addresses(matched_addresses)
 
     # Resolve all globs.
-    build_file_paths = await Get(
-        Paths,
-        PathGlobs,
-        specs.to_build_file_path_globs(
-            build_patterns=build_file_options.patterns,
-            build_ignore_patterns=build_file_options.ignores,
-        ),
+    build_file_globs, validation_globs = specs.to_build_file_path_globs_tuple(
+        build_patterns=build_file_options.patterns,
+        build_ignore_patterns=build_file_options.ignores,
     )
+    build_file_paths, _ = await MultiGet(
+        Get(Paths, PathGlobs, build_file_globs),
+        Get(Paths, PathGlobs, validation_globs),
+    )
+
     dirnames = {os.path.dirname(f) for f in build_file_paths.files}
     address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
     base_addresses = Addresses(
@@ -155,23 +155,6 @@ async def addresses_from_specs_without_file_owners(
                 if filtering_disabled or specs_filter.matches(tgt)
             )
 
-    unmatched_globs = [
-        glob
-        for glob in specs.glob_specs()
-        if glob not in matched_globs and glob.error_if_no_target_matches
-    ]
-    if unmatched_globs:
-        glob_description = (
-            f"the glob `{unmatched_globs[0]}`"
-            if len(unmatched_globs) == 1
-            else f"these globs: {sorted(str(glob) for glob in unmatched_globs)}"
-        )
-        raise ResolveError(
-            f"No targets found for {glob_description}\n\n"
-            f"Do targets exist in those directories? Maybe run `{bin_name()} tailor` to generate "
-            f"BUILD files? See {doc_url('targets')} about targets and BUILD files."
-        )
-
     return Addresses(sorted(matched_addresses))
 
 
@@ -181,29 +164,17 @@ async def addresses_from_specs_without_file_owners(
 
 
 @rule
-def extract_unmatched_cli_globs(global_options: GlobalOptions) -> UnmatchedCliGlobs:
-    return global_options.unmatched_cli_globs
-
-
-@rule
 def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
     return global_options.owners_not_found_behavior
 
 
 @rule
 async def addresses_from_specs_with_only_file_owners(
-    specs: SpecsWithOnlyFileOwners,
-    unmatched_cli_globs: UnmatchedCliGlobs,
-    owners_not_found_behavior: OwnersNotFoundBehavior,
+    specs: SpecsWithOnlyFileOwners, owners_not_found_behavior: OwnersNotFoundBehavior
 ) -> Addresses:
     """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
-        Get(
-            Paths,
-            PathGlobs,
-            specs.path_globs_for_spec(spec, unmatched_cli_globs.to_glob_match_error_behavior()),
-        )
-        for spec in specs.all_specs()
+        Get(Paths, PathGlobs, specs.path_globs_for_spec(spec)) for spec in specs.all_specs()
     )
     owners_per_include = await MultiGet(
         Get(
@@ -262,9 +233,7 @@ def setup_specs_filter(global_options: GlobalOptions) -> SpecsFilter:
 
 
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
-async def resolve_specs_snapshot(
-    specs: Specs, unmatched_cli_globs: UnmatchedCliGlobs
-) -> SpecsSnapshot:
+async def resolve_specs_snapshot(specs: Specs) -> SpecsSnapshot:
     """Resolve all files matching the given specs.
 
     All matched targets will use their `sources` field. Certain specs like FileLiteralSpec will
@@ -305,7 +274,7 @@ async def resolve_specs_snapshot(
         target_less_digest = await Get(
             Digest,
             PathGlobs,
-            with_files_owners.to_path_globs(unmatched_cli_globs.to_glob_match_error_behavior()),
+            with_files_owners.to_path_globs(),
         )
         digests.append(target_less_digest)
 

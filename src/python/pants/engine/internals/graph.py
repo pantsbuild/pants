@@ -334,22 +334,14 @@ async def resolve_targets(
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
-    tgts = await Get(
-        Targets,
-        SpecsWithoutFileOwners(
-            recursive_globs=(RecursiveGlobSpec("", error_if_no_target_matches=False),)
-        ),
-    )
+    tgts = await Get(Targets, SpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),)))
     return AllTargets(tgts)
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTargets:
     tgts = await Get(
-        UnexpandedTargets,
-        SpecsWithoutFileOwners(
-            recursive_globs=(RecursiveGlobSpec("", error_if_no_target_matches=False),)
-        ),
+        UnexpandedTargets, SpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),))
     )
     return AllUnexpandedTargets(tgts)
 

@@ -10,6 +10,7 @@ from typing import Iterable, Type
 import pytest
 
 from pants.base.exceptions import ResolveError
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
@@ -132,9 +133,15 @@ def rule_runner() -> RuleRunner:
 def resolve_specs_without_file_owners(
     rule_runner: RuleRunner,
     specs: Iterable[Spec],
+    ignore_nonexistent: bool = False,
 ) -> list[Address]:
     specs_obj = Specs.create(
-        specs, filter_by_global_options=True, convert_dir_literal_to_address_literal=True
+        specs,
+        filter_by_global_options=True,
+        convert_dir_literal_to_address_literal=True,
+        unmatched_glob_behavior=(
+            GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
+        ),
     )
     result = rule_runner.request(Addresses, [SpecsWithoutFileOwners.from_specs(specs_obj)])
     return sorted(result)
@@ -353,59 +360,46 @@ def test_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> None
         {"real/f.txt": "", "real/BUILD": "target(sources=['f.txt'])", "empty/BUILD": "# empty"}
     )
 
-    def assert_resolve_error(specs: Iterable[Spec], *, expected: str) -> None:
+    def assert_resolve_error(spec: Spec, *, expected: str) -> None:
         with engine_error(contains=expected):
-            resolve_specs_without_file_owners(rule_runner, specs)
+            resolve_specs_without_file_owners(rule_runner, [spec])
 
-    # Literal addresses require for the relevant BUILD file to exist and for the target to be
-    # resolved.
+    def assert_does_not_error(spec: Spec, *, ignore_nonexistent: bool = False) -> None:
+        assert not resolve_specs_without_file_owners(
+            rule_runner, [spec], ignore_nonexistent=ignore_nonexistent
+        )
+
+    # Literal addresses require for the target to beresolved.
     assert_resolve_error(
-        [AddressLiteralSpec("fake", "tgt")], expected="'fake' does not exist on disk"
+        AddressLiteralSpec("fake", "tgt"), expected="'fake' does not exist on disk"
     )
     assert_resolve_error(
-        [AddressLiteralSpec("fake/f.txt", "tgt")],
+        AddressLiteralSpec("fake/f.txt", "tgt"),
         expected="'fake/f.txt' does not exist on disk",
     )
     did_you_mean = ResolveError.did_you_mean(
         bad_name="fake_tgt", known_names=["real"], namespace="real"
     )
-    assert_resolve_error([AddressLiteralSpec("real", "fake_tgt")], expected=str(did_you_mean))
-    assert_resolve_error([AddressLiteralSpec("real/f.txt", "fake_tgt")], expected=str(did_you_mean))
+    assert_resolve_error(AddressLiteralSpec("real", "fake_tgt"), expected=str(did_you_mean))
+    assert_resolve_error(AddressLiteralSpec("real/f.txt", "fake_tgt"), expected=str(did_you_mean))
 
     assert_resolve_error(
-        [DirGlobSpec("fake")],
-        expected="No targets found for the glob `fake:`",
+        DirGlobSpec("fake"), expected='Unmatched glob from CLI arguments: "fake/*"'
     )
-    assert_resolve_error([DirGlobSpec("empty")], expected="No targets found for the glob `empty:`")
-    assert not resolve_specs_without_file_owners(
-        rule_runner, [DirGlobSpec("fake", error_if_no_target_matches=False)]
-    )
-    assert not resolve_specs_without_file_owners(
-        rule_runner, [DirGlobSpec("empty", error_if_no_target_matches=False)]
-    )
+    assert_does_not_error(DirGlobSpec("empty"))
+    assert_does_not_error(DirGlobSpec("fake"), ignore_nonexistent=True)
 
     assert_resolve_error(
-        [RecursiveGlobSpec("fake"), RecursiveGlobSpec("empty")],
-        expected="No targets found for these globs: ['empty::', 'fake::']",
+        RecursiveGlobSpec("fake"), expected='Unmatched glob from CLI arguments: "fake/**"'
     )
-    assert not resolve_specs_without_file_owners(
-        rule_runner,
-        [
-            RecursiveGlobSpec("fake", error_if_no_target_matches=False),
-            RecursiveGlobSpec("empty", error_if_no_target_matches=False),
-        ],
-    )
+    assert_does_not_error(RecursiveGlobSpec("empty"))
+    assert_does_not_error(RecursiveGlobSpec("fake"), ignore_nonexistent=True)
 
-    assert not resolve_specs_without_file_owners(
-        rule_runner, [AncestorGlobSpec("fake"), AncestorGlobSpec("empty")]
-    )
     assert_resolve_error(
-        [
-            AncestorGlobSpec("fake", error_if_no_target_matches=True),
-            AncestorGlobSpec("empty", error_if_no_target_matches=True),
-        ],
-        expected="No targets found for these globs: ['empty^', 'fake^']",
+        AncestorGlobSpec("fake"), expected='Unmatched glob from CLI arguments: "fake/*"'
     )
+    assert_does_not_error(AncestorGlobSpec("empty"))
+    assert_does_not_error(AncestorGlobSpec("fake"), ignore_nonexistent=True)
 
 
 def test_specs_without_file_owners_generated_target_does_not_belong_to_generator(
@@ -549,11 +543,15 @@ def test_specs_without_file_owners_parametrize(
 
 
 def resolve_specs_with_only_file_owners(
-    rule_runner: RuleRunner,
-    specs: Iterable[Spec],
+    rule_runner: RuleRunner, specs: Iterable[Spec], ignore_nonexistent: bool = False
 ) -> list[Address]:
     specs_obj = Specs.create(
-        specs, filter_by_global_options=True, convert_dir_literal_to_address_literal=True
+        specs,
+        filter_by_global_options=True,
+        convert_dir_literal_to_address_literal=True,
+        unmatched_glob_behavior=(
+            GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
+        ),
     )
     result = rule_runner.request(Addresses, [SpecsWithOnlyFileOwners.from_specs(specs_obj)])
     return sorted(result)
@@ -618,11 +616,10 @@ def test_specs_with_only_file_owners_glob(rule_runner: RuleRunner) -> None:
 
 def test_specs_with_only_file_owners_nonexistent_file(rule_runner: RuleRunner) -> None:
     spec = FileLiteralSpec("demo/fake.txt")
-    with engine_error(contains='Unmatched glob from file/directory arguments: "demo/fake.txt"'):
+    with engine_error(contains='Unmatched glob from CLI arguments: "demo/fake.txt"'):
         resolve_specs_with_only_file_owners(rule_runner, [spec])
 
-    rule_runner.set_options(["--unmatched-cli-globs=ignore"])
-    assert not resolve_specs_with_only_file_owners(rule_runner, [spec])
+    assert not resolve_specs_with_only_file_owners(rule_runner, [spec], ignore_nonexistent=True)
 
 
 def test_specs_with_only_file_owners_no_owner(rule_runner: RuleRunner) -> None:
