@@ -11,7 +11,6 @@ from typing import Any, Iterable
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, LintResults
-from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -148,10 +147,6 @@ class RegexMatchResult:
     nonmatching: tuple
 
 
-class RegexMatchResults(Collection[RegexMatchResult]):
-    pass
-
-
 class Matcher:
     """Class to match a single (possibly inverted) regex.
 
@@ -226,25 +221,9 @@ class MultiMatcher:
         self._content_matchers = {cp.name: ContentMatcher(cp) for cp in config.content_patterns}
         self._required_matches = config.required_matches
 
-    def check_source_file(self, path: str, content: bytes) -> RegexMatchResult:
-        content_pattern_names, encoding = self.get_applicable_content_pattern_names(path)
-        matching, nonmatching = self.check_content(content_pattern_names, content, encoding)
-        return RegexMatchResult(path, matching, nonmatching)
-
     def check_content(
-        self, content_pattern_names: Iterable[str], content: bytes, encoding: str | None
-    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
-        """Check which of the named patterns matches the given content.
-
-        Returns a pair (matching, nonmatching), in which each element is a tuple of pattern names.
-
-        :param content_pattern_names: names of content patterns to check.
-        :param content: the content to check.
-        :param encoding: the expected encoding of content.
-        """
-        if not content_pattern_names or not encoding:
-            return (), ()
-
+        self, path: str, content: bytes, content_pattern_names: Iterable[str], encoding: str
+    ) -> RegexMatchResult:
         matching = []
         nonmatching = []
         for content_pattern_name in content_pattern_names:
@@ -252,7 +231,7 @@ class MultiMatcher:
                 matching.append(content_pattern_name)
             else:
                 nonmatching.append(content_pattern_name)
-        return tuple(matching), tuple(nonmatching)
+        return RegexMatchResult(path, tuple(matching), tuple(nonmatching))
 
     def get_applicable_content_pattern_names(self, path: str) -> tuple[set[str], str | None]:
         """Return the content patterns applicable to a given path.
@@ -291,17 +270,30 @@ async def lint_with_regex_patterns(
     if multi_matcher is None:
         return LintResults((), linter_name=request.name)
 
-    digest_contents = await Get(DigestContents, PathGlobs(request.file_paths))
-    regex_match_results = RegexMatchResults(
-        multi_matcher.check_source_file(file_content.path, file_content.content)
-        for file_content in sorted(digest_contents, key=lambda fc: fc.path)
+    file_to_content_pattern_names_and_encoding = {}
+    for fp in request.file_paths:
+        content_pattern_names, encoding = multi_matcher.get_applicable_content_pattern_names(fp)
+        if content_pattern_names and encoding:
+            file_to_content_pattern_names_and_encoding[fp] = (content_pattern_names, encoding)
+
+    digest_contents = await Get(
+        DigestContents, PathGlobs(globs=file_to_content_pattern_names_and_encoding.keys())
     )
+
+    result = []
+    for file_content in digest_contents:
+        content_patterns, encoding = file_to_content_pattern_names_and_encoding[file_content.path]
+        result.append(
+            multi_matcher.check_content(
+                file_content.path, file_content.content, content_patterns, encoding
+            )
+        )
 
     stdout = ""
     detail_level = regex_lint_subsystem.detail_level
     num_matched_all = 0
     num_nonmatched_some = 0
-    for rmr in regex_match_results:
+    for rmr in sorted(result, key=lambda rmr: rmr.path):
         if not rmr.matching and not rmr.nonmatching:
             continue
         if detail_level == DetailLevel.names:
