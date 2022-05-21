@@ -396,7 +396,11 @@ class SpecsWithOnlyFileOwners:
             glob_match_error_behavior=unmatched_glob_behavior,
             # We validate that _every_ glob is valid.
             conjunction=GlobExpansionConjunction.all_match,
-            description_of_origin=(None if unmatched_glob_behavior else "CLI arguments"),
+            description_of_origin=(
+                None
+                if unmatched_glob_behavior == GlobMatchErrorBehavior.ignore
+                else "CLI arguments"
+            ),
         )
 
     def path_globs_for_spec(self, spec: FileLiteralSpec | FileGlobSpec) -> PathGlobs:
