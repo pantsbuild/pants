@@ -12,7 +12,7 @@ import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_integration_test import run_pants_with_workdir
-from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.contextutil import temporary_dir
 from pants.vcs.changed import DependeesOption
 
 
@@ -22,11 +22,12 @@ def _run_git(command: list[str]) -> None:
     )
 
 
+_PANTS_TOML = {"GLOBAL": {"backend_packages": ["pants.backend.shell"]}}
+
+
 @pytest.fixture
 def repo() -> Iterator[str]:
-    with temporary_dir(root_dir=get_buildroot()) as worktree, environment_as(
-        GIT_CONFIG_GLOBAL="/dev/null"
-    ):
+    with temporary_dir(root_dir=get_buildroot()) as worktree:
         _run_git(["init"])
         _run_git(["config", "user.email", "you@example.com"])
         _run_git(["config", "user.name", "Your Name"])
@@ -38,12 +39,6 @@ def repo() -> Iterator[str]:
                 .pids
                 __pycache__
                 .coverage.*  # For some reason, CI adds these files
-                """
-            ),
-            "pants.toml": dedent(
-                """\
-                [GLOBAL]
-                backend_packages = ['pants.backend.shell']
                 """
             ),
             "app.sh": "source dep.sh",
@@ -111,9 +106,8 @@ def assert_list_stdout(
             f"--changed-dependees={dependees.value}",
             "list",
         ],
+        config=_PANTS_TOML,
         workdir=workdir,
-        # We must set `hermetic=False` for some reason.
-        hermetic=False,
     )
     result.assert_success()
     assert sorted(result.stdout.strip().splitlines()) == sorted(expected)
@@ -125,8 +119,7 @@ def assert_count_loc(
     result = run_pants_with_workdir(
         [*(extra_args or ()), "--changed-since=HEAD", "count-loc"],
         workdir=workdir,
-        # We must set `hermetic=False` for some reason.
-        hermetic=False,
+        config=_PANTS_TOML,
     )
     result.assert_success()
     if expected_num_files:
