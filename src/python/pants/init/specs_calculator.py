@@ -4,7 +4,7 @@
 import logging
 from typing import cast
 
-from pants.base.specs import AddressLiteralSpec, Specs
+from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
@@ -55,10 +55,11 @@ def calculate_specs(
         raise InvalidSpecConstraint(
             "The `--changed-*` options are only available if Git is used for the repository."
         )
-    changed_request = ChangedRequest(
-        sources=tuple(changed_options.changed_files(maybe_git_worktree.git_worktree)),
-        dependees=changed_options.dependees,
-    )
+
+    changed_files = tuple(changed_options.changed_files(maybe_git_worktree.git_worktree))
+    file_literal_specs = tuple(FileLiteralSpec(f) for f in changed_files)
+
+    changed_request = ChangedRequest(changed_files, changed_options.dependees)
     (changed_addresses,) = session.product_request(
         ChangedAddresses, [Params(changed_request, options_bootstrapper)]
     )
@@ -75,8 +76,12 @@ def calculate_specs(
                 parameters=address_input.parameters,
             )
         )
+
     return Specs(
+        # We need both address_literals and file_literals to cover all our edge cases, including
+        # target-aware vs. target-less goals, e.g. `list` vs `count-loc`.
         address_literals=tuple(address_literal_specs),
+        file_literals=file_literal_specs,
         filter_by_global_options=True,
         from_change_detection=True,
     )
