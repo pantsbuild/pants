@@ -293,8 +293,7 @@ class HelpPrinter(MaybeColor):
             print(formatted_desc)
         print(f"\n\nActivated by {self.maybe_magenta(tinfo.provider)}")
         print("Valid fields:")
-        for field in sorted(tinfo.fields, key=lambda x: x.alias):
-            print()
+        for field in sorted(tinfo.fields, key=lambda x: (-x.required, x.alias)):
             print(self.maybe_magenta(field.alias))
             indent = "    "
             required_or_default = "required" if field.required else f"default: {field.default}"
