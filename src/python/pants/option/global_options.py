@@ -611,6 +611,7 @@ class BootstrapOptions:
         "--pants-version",
         advanced=True,
         default=pants_version(),
+        default_help_repr="<pants_version>",
         daemon=True,
         help=softwrap(
             f"""
@@ -1035,6 +1036,7 @@ class BootstrapOptions:
             """
         ),
         default=tempfile.gettempdir(),
+        default_help_repr="<tmp_dir>",
     )
     local_cache = BoolOption(
         "--local-cache",
@@ -1287,6 +1289,9 @@ class BootstrapOptions:
             See `--remote-execution-headers` as well.
             """
         ),
+        default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_store_headers).replace(
+            VERSION, "<pants_version>"
+        ),
     )
     remote_store_chunk_bytes = IntOption(
         "--remote-store-chunk-bytes",
@@ -1394,6 +1399,9 @@ class BootstrapOptions:
 
             See `--remote-store-headers` as well.
             """
+        ),
+        default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_execution_headers).replace(
+            VERSION, "<pants_version>"
         ),
     )
     remote_execution_overall_deadline_secs = IntOption(
