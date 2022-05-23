@@ -1658,7 +1658,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             The new semantics will become the default in Pants 2.14, and the old semantics will be
             removed in 2.15.
 
-            This also impacts the behavior of the `tailor` goal. If this option is true, 
+            This also impacts the behavior of the `tailor` goal. If this option is true,
             `{bin_name()} tailor` without additional arguments will run over the whole project, and
             `{bin_name()} tailor dir` will run over `dir` and all recursive sub-directories. If
             false, you must specify arguments, like `{bin_name()} tailor ::` to run over the
