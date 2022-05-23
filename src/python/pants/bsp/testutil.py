@@ -17,36 +17,36 @@ from pants.testutil.rule_runner import RuleRunner
 
 @dataclass(frozen=True)
 class PipesForTest:
-    inbound_reader: BinaryIO
-    inbound_writer: BinaryIO
-    outbound_reader: BinaryIO
-    outbound_writer: BinaryIO
+    server_reader: BinaryIO
+    server_writer: BinaryIO
+    client_writer: BinaryIO
+    client_reader: BinaryIO
 
 
 @contextmanager
 def setup_pipes():
-    inbound_reader_fd, inbound_writer_fd = os.pipe()
-    inbound_reader = os.fdopen(inbound_reader_fd, "rb", buffering=0)
-    inbound_writer = os.fdopen(inbound_writer_fd, "wb", buffering=0)
+    server_reader_fd, client_writer_fd = os.pipe()
+    server_reader = os.fdopen(server_reader_fd, "rb", buffering=0)
+    client_writer = os.fdopen(client_writer_fd, "wb", buffering=0)
 
-    outbound_reader_fd, outbound_writer_fd = os.pipe()
-    outbound_reader = os.fdopen(outbound_reader_fd, "rb", buffering=0)
-    outbound_writer = os.fdopen(outbound_writer_fd, "wb", buffering=0)
+    client_reader_fd, server_writer_fd = os.pipe()
+    client_reader = os.fdopen(client_reader_fd, "rb", buffering=0)
+    server_writer = os.fdopen(server_writer_fd, "wb", buffering=0)
 
     wrapper = PipesForTest(
-        inbound_reader=inbound_reader,
-        inbound_writer=inbound_writer,
-        outbound_reader=outbound_reader,
-        outbound_writer=outbound_writer,
+        server_reader=server_reader,
+        server_writer=server_writer,
+        client_writer=client_writer,
+        client_reader=client_reader,
     )
 
     try:
         yield wrapper
     finally:
-        inbound_reader.close()
-        inbound_writer.close()
-        outbound_reader.close()
-        outbound_writer.close()
+        server_reader.close()
+        server_writer.close()
+        client_writer.close()
+        client_reader.close()
 
 
 @contextmanager
@@ -58,8 +58,8 @@ def setup_bsp_server():
             rule_runner.scheduler,
             rule_runner.union_membership,
             context,
-            pipes.inbound_reader,
-            pipes.outbound_writer,
+            pipes.server_reader,
+            pipes.server_writer,
         )
 
         def run_bsp_server():
@@ -69,8 +69,8 @@ def setup_bsp_server():
         bsp_thread.daemon = True
         bsp_thread.start()
 
-        client_reader = JsonRpcStreamReader(pipes.outbound_reader)
-        client_writer = JsonRpcStreamWriter(pipes.inbound_writer)
+        client_reader = JsonRpcStreamReader(pipes.client_reader)
+        client_writer = JsonRpcStreamWriter(pipes.client_writer)
         endpoint = Endpoint({}, lambda msg: client_writer.write(msg))
 
         def run_client():
