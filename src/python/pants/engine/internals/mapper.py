@@ -5,16 +5,15 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Callable, Iterable, Mapping, Pattern
+from typing import Iterable, Mapping
 
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import Tags, Target
-from pants.util.filtering import and_filters, create_filters
+from pants.util.filtering import TargetFilter, and_filters, create_filters
 from pants.util.memo import memoized_property
-from pants.util.meta import frozen_after_init
 
 
 class DuplicateNameError(MappingError):
@@ -152,44 +151,36 @@ class AddressFamily:
         )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class SpecsFilter:
     """Filters addresses with the `--tags` and `--exclude-target-regexp` options."""
 
-    tags: tuple[str, ...]
-    exclude_target_regexps: tuple[str, ...]
+    is_specified: bool
+    tags_filter: TargetFilter
+    exclude_target_regexps_filter: TargetFilter
 
-    def __init__(
-        self,
-        *,
-        tags: Iterable[str] | None = None,
-        exclude_target_regexps: Iterable[str] | None = None,
-    ) -> None:
-        self.tags = tuple(tags or [])
-        self.exclude_target_regexps = tuple(exclude_target_regexps or [])
+    @classmethod
+    def create(cls, *, tags: Iterable[str], exclude_target_regexps: Iterable[str]) -> SpecsFilter:
+        exclude_patterns = tuple(re.compile(pattern) for pattern in exclude_target_regexps)
 
-    @memoized_property
-    def _exclude_regexps(self) -> tuple[Pattern, ...]:
-        return tuple(re.compile(pattern) for pattern in self.exclude_target_regexps)
+        def exclude_target_regexps_filter(tgt: Target) -> bool:
+            return all(p.search(tgt.address.spec) is None for p in exclude_patterns)
 
-    def _is_excluded_by_pattern(self, address: Address) -> bool:
-        return any(p.search(address.spec) is not None for p in self._exclude_regexps)
-
-    @memoized_property
-    def _tag_filter(self):
-        def filter_for_tag(tag: str) -> Callable[[Target], bool]:
-            def filter_target(tgt: Target) -> bool:
+        def tags_outer_filter(tag: str) -> TargetFilter:
+            def tags_inner_filter(tgt: Target) -> bool:
                 return tag in (tgt.get(Tags).value or [])
 
-            return filter_target
+            return tags_inner_filter
 
-        return and_filters(create_filters(self.tags, filter_for_tag))
+        tags_filter = and_filters(create_filters(tags, tags_outer_filter))
+
+        return SpecsFilter(
+            is_specified=bool(tags or exclude_target_regexps),
+            tags_filter=tags_filter,
+            exclude_target_regexps_filter=exclude_target_regexps_filter,
+        )
 
     def matches(self, target: Target) -> bool:
         """Check that the target matches the provided `--tag` and `--exclude-target-regexp`
         options."""
-        return self._tag_filter(target) and not self._is_excluded_by_pattern(target.address)
-
-    def __bool__(self) -> bool:
-        return bool(self.tags or self.exclude_target_regexps)
+        return self.tags_filter(target) and self.exclude_target_regexps_filter(target)

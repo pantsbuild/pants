@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Callable, Pattern
+from typing import Pattern
 
 from pants.base.deprecated import warn_or_error
 from pants.engine.console import Console
@@ -20,7 +20,7 @@ from pants.engine.target import (
 )
 from pants.option.option_types import EnumOption, StrListOption
 from pants.util.enums import match
-from pants.util.filtering import and_filters, create_filters
+from pants.util.filtering import TargetFilter, and_filters, create_filters
 from pants.util.memo import memoized
 from pants.util.strutil import softwrap
 
@@ -83,9 +83,6 @@ def compile_regex(regex: str) -> Pattern:
         return re.compile(regex)
     except re.error as e:
         raise re.error(f"Invalid regular expression {repr(regex)}: {e}")
-
-
-TargetFilter = Callable[[Target], bool]
 
 
 # Memoized so the deprecation doesn't happen repeatedly.

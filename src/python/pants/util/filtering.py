@@ -1,11 +1,17 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import operator
-from typing import Callable, Iterable, Sequence, Tuple, TypeVar
+from typing import TYPE_CHECKING, Callable, Iterable, Tuple, TypeVar
+
+if TYPE_CHECKING:
+    from pants.engine.target import Target
 
 _T = TypeVar("_T")
 Filter = Callable[[_T], bool]
+TargetFilter = Callable[["Target"], bool]
 
 
 def _extract_modifier(modified_param: str) -> Tuple[Callable[[bool], bool], str]:
@@ -42,7 +48,7 @@ def create_filter(predicate_param: str, predicate_factory: Callable[[str], Filte
 
 def create_filters(
     predicate_params: Iterable[str], predicate_factory: Callable[[str], Filter]
-) -> Sequence[Filter]:
+) -> list[Filter]:
     """Create filter functions from a list of string parameters.
 
     :param predicate_params: A list of predicate_param arguments as in `create_filter`.
