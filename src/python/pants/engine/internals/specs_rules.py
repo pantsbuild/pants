@@ -356,9 +356,7 @@ class NoApplicableTargetsException(Exception):
             f"list ::` to find all applicable targets in your project"
         )
         if filedeps_goal_works:
-            remedy += (
-                f", or run `{pants_filter_command} filedeps ::` to find all applicable files."
-            )
+            remedy += f", or run `{pants_filter_command} filedeps ::` to find all applicable files."
         else:
             remedy += "."
         msg += remedy

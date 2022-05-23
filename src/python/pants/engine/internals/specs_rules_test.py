@@ -969,8 +969,8 @@ def test_no_applicable_targets_exception() -> None:
         goal_description="the `foo` goal",
     )
     remedy = (
-        "Please specify relevant file and/or target arguments. Run `./pants filter "
-        "--target-type=tgt1 ::` to find all applicable targets in your project."
+        "Please specify relevant file and/or target arguments. Run `./pants "
+        "--filter-target-type=tgt1 list ::` to find all applicable targets in your project."
     )
     assert (
         dedent(
