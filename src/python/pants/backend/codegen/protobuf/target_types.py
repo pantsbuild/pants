@@ -66,7 +66,9 @@ class ProtobufSourceTarget(Target):
         f"""
         A single Protobuf file used to generate various languages.
 
-        See {doc_url('protobuf')}.
+        See language-specific docs:
+            Python: {doc_url('protobuf-python')}
+            Go: {doc_url('protobuf-go')}
         """
     )
 
