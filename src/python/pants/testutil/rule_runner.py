@@ -320,7 +320,9 @@ class RuleRunner:
         raw_specs = self.options_bootstrapper.full_options_for_scopes(
             [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()]
         ).specs
-        specs = SpecsParser(self.build_root).parse_specs(raw_specs)
+        specs = SpecsParser(self.build_root).parse_specs(
+            raw_specs, convert_dir_literal_to_address_literal=True
+        )
 
         stdout, stderr = StringIO(), StringIO()
         console = Console(stdout=stdout, stderr=stderr, use_colors=False, session=self.scheduler)

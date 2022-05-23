@@ -106,11 +106,12 @@ class SpecsParser:
         self,
         specs: Iterable[str],
         *,
+        convert_dir_literal_to_address_literal: bool,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
     ) -> Specs:
         return Specs.create(
             (self.parse_spec(spec) for spec in specs),
-            convert_dir_literal_to_address_literal=True,
+            convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
             unmatched_glob_behavior=unmatched_glob_behavior,
             filter_by_global_options=True,
         )
