@@ -53,7 +53,9 @@ def test_get_title_from_page_content():
       <body>Welcome to Pants, the ergonomic build system!</body>
     """
     )
-    assert TitleFinder().feed(page_content).title == ["Welcome to Pants!"]
+    title_finder = TitleFinder()
+    title_finder.feed(page_content)
+    assert title_finder.title == "Welcome to Pants!"
 
 
 def test_doc_url_rewriter():
