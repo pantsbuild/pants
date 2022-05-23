@@ -217,13 +217,16 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                 "pex_binary(name='main1', entry_point='main1.py')\n"
                 "pex_binary(name='main2', entry_point='foo.main2')\n"
             ),
+            "src/python/foo/__main__.py": "",
         }
     )
     pts = rule_runner.request(
         PutativeTargets,
         [
             PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
-            AllOwnedSources([f"src/python/foo/{name}" for name in mains]),
+            AllOwnedSources(
+                [f"src/python/foo/{name}" for name in mains] + ["src/python/foo/__main__.py"]
+            ),
         ],
     )
     assert (
@@ -235,6 +238,13 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                     "main3",
                     [],
                     kwargs={"entry_point": "main3.py"},
+                ),
+                PutativeTarget.for_target_type(
+                    PexBinary,
+                    "src/python/foo",
+                    "__main__",
+                    [],
+                    kwargs={"entry_point": "__main__.py"},
                 ),
             ]
         )
