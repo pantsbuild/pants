@@ -92,19 +92,33 @@ class HelpFormatter(MaybeColor):
             val_lines = [self.maybe_cyan(f"{left_padding}{line}") for line in val_lines]
             return val_lines
 
+        def wrap(s: str) -> List[str]:
+            return hard_wrap(s, indent=len(indent), width=self._width)
+
         indent = "      "
+
         arg_lines = [f"  {self.maybe_magenta(args)}" for args in ohi.display_args]
         arg_lines.append(self.maybe_magenta(f"  {ohi.env_var}"))
         arg_lines.append(self.maybe_magenta(f"  {ohi.config_key}"))
+
         choices = "" if ohi.choices is None else f"one of: [{', '.join(ohi.choices)}]"
         choices_lines = [
             f"{indent}{'  ' if i != 0 else ''}{self.maybe_cyan(s)}"
             for i, s in enumerate(textwrap.wrap(f"{choices}", self._width))
         ]
+
+        deprecated_lines = []
+        if ohi.deprecated_message:
+            maybe_colorize = self.maybe_red if ohi.deprecation_active else self.maybe_yellow
+            deprecated_lines.extend(wrap(maybe_colorize(ohi.deprecated_message)))
+            if ohi.removal_hint:
+                deprecated_lines.extend(wrap(maybe_colorize(ohi.removal_hint)))
+
         default_lines = format_value(RankedValue(Rank.HARDCODED, ohi.default), "default: ", indent)
         if not ohi.value_history:
             # Should never happen, but this keeps mypy happy.
             raise ValueError("No value history - options not parsed.")
+
         final_val = ohi.value_history.final_value
         curr_value_lines = format_value(final_val, "current value: ", indent)
 
@@ -118,18 +132,14 @@ class HelpFormatter(MaybeColor):
             for rv in interesting_ranked_values
             for line in format_value(rv, "overrode: ", f"{indent}    ")
         ]
-        description_lines = hard_wrap(ohi.help, indent=len(indent), width=self._width)
+        description_lines = wrap(ohi.help)
         lines = [
             *arg_lines,
             *choices_lines,
             *default_lines,
             *curr_value_lines,
             *value_derivation_lines,
+            *deprecated_lines,
             *description_lines,
         ]
-        if ohi.deprecated_message:
-            maybe_colorize = self.maybe_red if ohi.deprecation_active else self.maybe_yellow
-            lines.append(maybe_colorize(f"{indent}{ohi.deprecated_message}"))
-            if ohi.removal_hint:
-                lines.append(maybe_colorize(f"{indent}{ohi.removal_hint}"))
         return lines
