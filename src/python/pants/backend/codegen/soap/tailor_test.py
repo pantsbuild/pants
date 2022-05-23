@@ -39,7 +39,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeWsdlTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeWsdlTargetsRequest(PutativeTargetsSearchPaths(("src/wsdl", "src/wsdl/dir1"))),
             AllOwnedSources(["src/wsdl/simple.wsdl"]),
         ],
     )

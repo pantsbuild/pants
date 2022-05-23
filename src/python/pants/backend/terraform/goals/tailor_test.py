@@ -37,7 +37,11 @@ def test_find_putative_targets() -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeTerraformTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeTerraformTargetsRequest(
+                PutativeTargetsSearchPaths(
+                    ("prod/terraform/owned-module", "prod/terraform/unowned-module")
+                )
+            ),
             AllOwnedSources(["prod/terraform/owned-module/versions.tf"]),
         ],
     )

@@ -32,7 +32,9 @@ def test_find_putative_targets() -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeDockerTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
+            PutativeDockerTargetsRequest(
+                PutativeTargetsSearchPaths(("src/docker_ok", "src/docker_orphan"))
+            ),
             AllOwnedSources(["src/docker_ok/Dockerfile"]),
         ],
     )

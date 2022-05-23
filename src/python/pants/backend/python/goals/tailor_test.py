@@ -95,7 +95,17 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(
+                PutativeTargetsSearchPaths(
+                    (
+                        "3rdparty",
+                        "already_owned",
+                        "no_match",
+                        "src/python/foo",
+                        "src/python/foo/bar",
+                    )
+                )
+            ),
             AllOwnedSources(
                 [
                     "already_owned/requirements.txt",
@@ -223,7 +233,7 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("src/python/foo",))),
             AllOwnedSources(
                 [f"src/python/foo/{name}" for name in mains] + ["src/python/foo/__main__.py"]
             ),
@@ -268,7 +278,16 @@ def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(
+                PutativeTargetsSearchPaths(
+                    (
+                        "src/python/foo",
+                        "src/python/foo/bar",
+                        "src/python/foo/baz",
+                        "src/python/foo/qux",
+                    )
+                )
+            ),
             AllOwnedSources([]),
         ],
     )

@@ -38,7 +38,9 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeCCTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeCCTargetsRequest(
+                PutativeTargetsSearchPaths(("src/native/owned", "src/native/unowned"))
+            ),
             AllOwnedSources(["src/native/owned/OwnedFile.cc"]),
         ],
     )
