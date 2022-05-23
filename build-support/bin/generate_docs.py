@@ -36,6 +36,7 @@ from readme_api import DocRef, ReadmeAPI
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.help.help_info_extracter import to_help_str
+from pants.util.strutil import softwrap
 from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
