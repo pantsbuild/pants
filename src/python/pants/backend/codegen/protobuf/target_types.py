@@ -63,7 +63,9 @@ class ProtobufSourceTarget(Target):
     )
     help = (
         "A single Protobuf file used to generate various languages.\n\n"
-        f"See {doc_url('protobuf')}."
+        f"See language-specific docs:\n"
+        f"    Python: {doc_url('protobuf-python')}\n"
+        f"    Go: {doc_url('protobuf-go')}"
     )
 
 

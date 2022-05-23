@@ -247,7 +247,7 @@ class PythonGoogleCloudFunction(Target):
     )
     help = (
         "A self-contained Python function suitable for uploading to Google Cloud Function.\n\n"
-        f"See {doc_url('python-google-cloud-function')}."
+        f"See {doc_url('google-cloud-function-python')}."
     )
 
     def validate(self) -> None:
