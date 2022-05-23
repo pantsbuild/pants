@@ -159,7 +159,7 @@ def filter_targets(
         "using `filter` as a goal",
         softwrap(
             f"""
-            You can now specify `filter` arguments with any goal, e.g. `{bin_name()} 
+            You can now specify `filter` arguments with any goal, e.g. `{bin_name()}
             --filter-target-type=python_test test ::`.
 
             This means that the `filter` goal is now identical to `list`. For example, rather than

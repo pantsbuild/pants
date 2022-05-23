@@ -357,7 +357,7 @@ class NoApplicableTargetsException(Exception):
         )
         if filedeps_goal_works:
             remedy += (
-                f", or run `{pants_filter_command} filedeps ::` to find all " "applicable files."
+                f", or run `{pants_filter_command} filedeps ::` to find all applicable files."
             )
         else:
             remedy += "."
