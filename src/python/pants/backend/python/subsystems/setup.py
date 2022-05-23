@@ -97,7 +97,7 @@ class PythonSetup(Subsystem):
             requirements, regardless of using Pex vs. Poetry for the lockfile generator.
             Support is coming in a future Pants release. In the meantime, the workaround is to host
             the files in a custom repository with `[python-repos]`
-            ({doc_url('3rdparty-dependencies#custom-repositories')}).
+            ({doc_url('python-third-party-dependencies#custom-repositories')}).
 
             You may also run into issues generating lockfiles when using Poetry as the generator,
             rather than Pex. See the option `[python].lockfile_generator` for more
