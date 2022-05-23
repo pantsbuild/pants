@@ -38,6 +38,7 @@ use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use futures::future::try_join_all;
 use futures::try_join;
 use hashing::Digest;
+use itertools::Itertools;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
@@ -284,6 +285,53 @@ impl InputDigests {
       input_files,
       immutable_inputs,
       use_nailgun,
+    })
+  }
+
+  pub async fn new_from_merged(store: &Store, from: Vec<InputDigests>) -> Result<Self, String> {
+    let mut merged_immutable_inputs = BTreeMap::new();
+    for input_digests in from.iter() {
+      let size_before = merged_immutable_inputs.len();
+      let immutable_inputs = &input_digests.immutable_inputs;
+      merged_immutable_inputs.append(&mut immutable_inputs.clone());
+      if size_before + immutable_inputs.len() != merged_immutable_inputs.len() {
+        return Err(format!(
+          "Tried to merge two-or-more immutable inputs at the same path with different values! \
+            The collision involved one of the entries in: {immutable_inputs:?}"
+        ));
+      }
+    }
+
+    let complete_digests = from
+      .iter()
+      .map(|input_digests| input_digests.complete.clone())
+      .collect();
+    let nailgun_digests = from
+      .iter()
+      .map(|input_digests| input_digests.nailgun.clone())
+      .collect();
+    let input_files_digests = from
+      .iter()
+      .map(|input_digests| input_digests.input_files.clone())
+      .collect();
+    let (complete, nailgun, input_files) = try_join!(
+      store.merge(complete_digests),
+      store.merge(nailgun_digests),
+      store.merge(input_files_digests),
+    )?;
+    Ok(Self {
+      complete: complete,
+      nailgun: nailgun,
+      input_files: input_files,
+      immutable_inputs: merged_immutable_inputs,
+      use_nailgun: Itertools::concat(
+        from
+          .iter()
+          .map(|input_digests| input_digests.use_nailgun.clone()),
+      )
+      .into_iter()
+      .unique()
+      .collect(),
     })
   }
 
