@@ -43,7 +43,7 @@ def calculate_specs(
             "`use_deprecated_directory_cli_args_semantics` defaulting to True",
             softwrap(
                 f"""
-                Currently, a directory argument like `{bin_name} test dir` is shorthand for the
+                Currently, a directory argument like `{bin_name()} test dir` is shorthand for the
                 target `dir:dir`, i.e. the target that leaves off `name=`.
 
                 In Pants 2.14, by default, a directory argument will instead match all
