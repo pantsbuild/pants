@@ -1,10 +1,14 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
+import functools
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import Thread
-from typing import BinaryIO
+from typing import Any, BinaryIO, Dict, Iterable, Tuple
 
 from pylsp_jsonrpc.endpoint import Endpoint  # type: ignore[import]
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
@@ -12,6 +16,7 @@ from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # ty
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.rules import rules as bsp_rules
+from pants.engine.internals import native_engine
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -49,8 +54,44 @@ def setup_pipes():
         client_reader.close()
 
 
+# A notification method name, and a subset of its fields.
+NotificationSubset = Tuple[str, Dict[str, Any]]
+
+
+@dataclass
+class Notifications:
+    _notifications: list[tuple[str, dict[str, Any]]]
+
+    def _record(self, method_name: str, notification: dict[str, Any]) -> None:
+        self._notifications.append((method_name, notification))
+
+    def assert_received_unordered(self, expected: Iterable[NotificationSubset]) -> None:
+        """Asserts that the buffer contains matching notifications, then clears the buffer."""
+        expected = list(expected)
+        for notification_method_name, notification in self._notifications:
+            for i in range(len(expected)):
+                candidate_method_name, candidate_subset = expected[i]
+                if candidate_method_name != notification_method_name:
+                    continue
+                # If the candidate was a subset of the notification, then we've matched.
+                if candidate_subset.items() <= notification.items():
+                    expected.pop(i)
+                    break
+            else:
+                raise AssertionError(
+                    f"Received unexpected `{notification_method_name}` notification: {notification}"
+                )
+
+        if expected:
+            raise AssertionError(f"Did not receive all expected notifications: {expected}")
+        self._notifications.clear()
+
+
 @contextmanager
-def setup_bsp_server():
+def setup_bsp_server(*, notification_names: set[str] | None = None):
+    notification_names = notification_names or set()
+    stdio_destination = native_engine.stdio_thread_get_destination()
+
     with setup_pipes() as pipes:
         context = BSPContext()
         rule_runner = RuleRunner(rules=bsp_rules(), extra_session_values={BSPContext: context})
@@ -63,6 +104,7 @@ def setup_bsp_server():
         )
 
         def run_bsp_server():
+            native_engine.stdio_thread_set_destination(stdio_destination)
             conn.run()
 
         bsp_thread = Thread(target=run_bsp_server)
@@ -71,7 +113,11 @@ def setup_bsp_server():
 
         client_reader = JsonRpcStreamReader(pipes.client_reader)
         client_writer = JsonRpcStreamWriter(pipes.client_writer)
-        endpoint = Endpoint({}, lambda msg: client_writer.write(msg))
+        notifications = Notifications([])
+        endpoint = Endpoint(
+            {name: functools.partial(notifications._record, name) for name in notification_names},
+            lambda msg: client_writer.write(msg),
+        )
 
         def run_client():
             client_reader.listen(lambda msg: endpoint.consume(msg))
@@ -81,7 +127,7 @@ def setup_bsp_server():
         client_thread.start()
 
         try:
-            yield endpoint
+            yield endpoint, notifications
         finally:
             client_reader.close()
             client_writer.close()

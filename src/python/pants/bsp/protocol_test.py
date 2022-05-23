@@ -14,7 +14,7 @@ from pants.bsp.testutil import setup_bsp_server
 
 
 def test_basic_bsp_protocol() -> None:
-    with setup_bsp_server() as endpoint:
+    with setup_bsp_server() as (endpoint, _):
         with pytest.raises(JsonRpcException) as exc_info:
             response_fut = endpoint.request("foo")
             response_fut.result(timeout=15)
