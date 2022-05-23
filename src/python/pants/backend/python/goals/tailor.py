@@ -161,13 +161,14 @@ async def find_putative_targets(
     if python_setup.tailor_pex_binary_targets:
         # Find binary targets.
 
-        # Get all files whose content indicates that they are entry points.
+        # Get all files whose content indicates that they are entry points or are __main__.py files.
         digest_contents = await Get(DigestContents, PathGlobs, all_py_files_globs)
+        all_main_py = await Get(Paths, PathGlobs, req.search_paths.path_globs("__main__.py"))
         entry_points = [
             file_content.path
             for file_content in digest_contents
             if is_entry_point(file_content.content)
-        ]
+        ] + list(all_main_py.files)
 
         # Get the modules for these entry points.
         src_roots = await Get(
