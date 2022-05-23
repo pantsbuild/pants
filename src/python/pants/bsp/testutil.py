@@ -88,13 +88,16 @@ class Notifications:
 
 
 @contextmanager
-def setup_bsp_server(*, notification_names: set[str] | None = None):
+def setup_bsp_server(
+    rule_runner: RuleRunner | None = None, *, notification_names: set[str] | None = None
+):
+    rule_runner = rule_runner or RuleRunner(rules=bsp_rules())
     notification_names = notification_names or set()
     stdio_destination = native_engine.stdio_thread_get_destination()
 
     with setup_pipes() as pipes:
         context = BSPContext()
-        rule_runner = RuleRunner(rules=bsp_rules(), extra_session_values={BSPContext: context})
+        rule_runner.set_session_values({BSPContext: context})
         conn = BSPConnection(
             rule_runner.scheduler,
             rule_runner.union_membership,
