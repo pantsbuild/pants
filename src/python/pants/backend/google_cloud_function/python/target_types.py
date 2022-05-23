@@ -260,7 +260,7 @@ class PythonGoogleCloudFunction(Target):
         f"""
         A self-contained Python function suitable for uploading to Google Cloud Function.
 
-        See {doc_url('python-google-cloud-function')}.
+        See {doc_url('google-cloud-function-python')}.
         """
     )
 

@@ -4,12 +4,7 @@
 import textwrap
 
 import pytest
-from generate_docs import (
-    DocUrlMatcher,
-    DocUrlRewriter,
-    get_title_from_page_content,
-    value_strs_iter,
-)
+from generate_docs import DocUrlRewriter, TitleFinder, find_doc_urls, get_doc_slug, value_strs_iter
 
 from pants.util.docutil import doc_url
 
@@ -27,23 +22,22 @@ def test_gather_value_strs():
 
 @pytest.mark.parametrize("slug", ["foo-bar", "baz3", "qux"])
 def test_slug_for_url(slug: str) -> None:
-    assert DocUrlMatcher().slug_for_url(doc_url(slug)) == slug
+    assert get_doc_slug(doc_url(slug)) == slug
 
 
 def test_slug_for_url_error() -> None:
     with pytest.raises(ValueError) as excinfo:
-        DocUrlMatcher().slug_for_url("https://notthedocsite.com/v2.6/foobar")
+        get_doc_slug("https://notthedocsite.com/v2.6/foobar")
     assert "Not a docsite URL" in str(excinfo.value)
 
 
 def test_find_doc_urls() -> None:
-    matcher = DocUrlMatcher()
     strs = [
         f"See {doc_url('foo-bar')} for details.",
         f"See {doc_url('qux')}.",  # Don't capture trailing dot.
         f"See {doc_url('foo-bar')} and {doc_url('baz3')}",  # Multiple urls in string.
     ]
-    assert matcher.find_doc_urls(strs) == {doc_url(slug) for slug in ["foo-bar", "baz3", "qux"]}
+    assert find_doc_urls(strs) == {doc_url(slug) for slug in ["foo-bar", "baz3", "qux"]}
 
 
 def test_get_title_from_page_content():
@@ -59,7 +53,7 @@ def test_get_title_from_page_content():
       <body>Welcome to Pants, the ergonomic build system!</body>
     """
     )
-    assert get_title_from_page_content(page_content) == "Welcome to Pants!"
+    assert TitleFinder().feed(page_content).title == ["Welcome to Pants!"]
 
 
 def test_doc_url_rewriter():

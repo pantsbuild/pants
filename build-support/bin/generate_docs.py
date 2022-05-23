@@ -42,6 +42,8 @@ from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
 
+DOC_URL_RE = re.compile(r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)")
+
 
 def main() -> None:
     logging.basicConfig(format="[%(levelname)s]: %(message)s", level=logging.INFO)
@@ -52,17 +54,21 @@ def main() -> None:
 
     version = determine_pants_version(args.no_prompt)
     help_info = run_pants_help_all()
-    doc_urls = DocUrlMatcher().find_doc_urls(value_strs_iter(help_info))
+    doc_urls = find_doc_urls(value_strs_iter(help_info))
     logger.info("Found the following docsite URLs:")
     for url in sorted(doc_urls):
         logger.info(f"  {url}")
-    logger.info("Fetching titles...")
-    slug_to_title = get_titles(doc_urls)
-    logger.info("Found the following titles:")
-    for slug, title in sorted(slug_to_title.items()):
-        logger.info(f"  {slug}: {title}")
-    rewritten_help_info = rewrite_value_strs(help_info, slug_to_title)
-    generator = ReferenceGenerator(args, version, rewritten_help_info)
+
+    if not args.skip_check_urls:
+        logger.info("Fetching titles...")
+        slug_to_title = get_titles(doc_urls)
+        logger.info("Found the following titles:")
+        for slug, title in sorted(slug_to_title.items()):
+            logger.info(f"  {slug}: {title}")
+
+        help_info = rewrite_value_strs(help_info, slug_to_title)
+
+    generator = ReferenceGenerator(args, version, help_info)
     if args.sync:
         generator.sync()
     else:
@@ -92,29 +98,21 @@ def determine_pants_version(no_prompt: bool) -> str:
 
 # Code to replace doc urls with appropriate markdown, for rendering on the docsite.
 
-_doc_url_pattern = r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)"
+
+def get_doc_slug(url: str) -> str:
+    mo = DOC_URL_RE.match(url)
+    if not mo:
+        raise ValueError(f"Not a docsite URL: {url}")
+    return cast(str, mo.group("slug"))
 
 
-class DocUrlMatcher:
-    """Utilities for regex matching docsite URLs."""
-
-    def __init__(self):
-        self._doc_url_re = re.compile(_doc_url_pattern)
-
-    def slug_for_url(self, url: str) -> str:
-        mo = self._doc_url_re.match(url)
-        if not mo:
-            raise ValueError(f"Not a docsite URL: {url}")
-        return cast(str, mo.group("slug"))
-
-    def find_doc_urls(self, strs: Iterable[str]) -> set[str]:
-        """Find all the docsite urls in the given strings."""
-        return {mo.group(0) for s in strs for mo in self._doc_url_re.finditer(s)}
+def find_doc_urls(strs: Iterable[str]) -> set[str]:
+    """Find all the docsite urls in the given strings."""
+    return {mo.group(0) for s in strs for mo in DOC_URL_RE.finditer(s)}
 
 
 class DocUrlRewriter:
     def __init__(self, slug_to_title: dict[str, str]):
-        self._doc_url_re = re.compile(_doc_url_pattern)
         self._slug_to_title = slug_to_title
 
     def _rewrite_url(self, mo: re.Match) -> str:
@@ -127,7 +125,7 @@ class DocUrlRewriter:
         return f"[{title}](doc:{slug})"
 
     def rewrite(self, s: str) -> str:
-        return self._doc_url_re.sub(self._rewrite_url, s)
+        return DOC_URL_RE.sub(self._rewrite_url, s)
 
 
 class TitleFinder(HTMLParser):
@@ -151,29 +149,38 @@ class TitleFinder(HTMLParser):
             self._title = data.strip()
 
     @property
-    def title(self) -> str | None:
-        return self._title
+    def title(self) -> str:
+        return self._title or ""
 
 
-def get_title_from_page_content(page_content: str) -> str:
-    title_finder = TitleFinder()
-    title_finder.feed(page_content)
-    return title_finder.title or ""
+def get_url(url: str):
+    response = requests.get(url)
+    if response.status_code != 200:
+        die(
+            softwrap(
+                f"""
+                Error getting URL: {url}
 
+                If the URL is pantsbuild.org, a `doc_url` link might be using the wrong slug or the
+                docs for this version might be unpublished. Otherwise, the link might be dead.
 
-def get_title(url: str) -> str:
-    return get_title_from_page_content(requests.get(url).text)
+                You can use `--skip-check-urls` to skip.
+                """
+            )
+        )
+    return response
 
 
 def get_titles(urls: set[str]) -> dict[str, str]:
     """Return map from slug->title for each given docsite URL."""
 
-    matcher = DocUrlMatcher()
     # TODO: Parallelize the http requests.
     #  E.g., by turning generate_docs.py into a plugin goal and using the engine.
     ret = {}
     for url in urls:
-        ret[matcher.slug_for_url(url)] = get_title(url)
+        title_finder = TitleFinder()
+        title_finder.feed(get_url(url).text)
+        ret[get_doc_slug(url)] = title_finder.title
     return ret
 
 
@@ -210,6 +217,12 @@ def create_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--api-key", help="The readme.io API key to use. Required for --sync.")
+    parser.add_argument(
+        "--skip-check-urls",
+        action="store_true",
+        default=False,
+        help="Skip checking URLs (including pantsbuild.org ones).",
+    )
     return parser
 
 
