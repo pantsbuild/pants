@@ -450,8 +450,8 @@ class PythonSetup(Subsystem):
         default=True,
         help=softwrap(
             """
-            If true, add `pex_binary` targets for Python files with a `__main__` clause with the
-            `tailor` goal.
+            If true, add `pex_binary` targets for Python files named `__main__.py` or with a
+            `__main__` clause with the `tailor` goal.
             """
         ),
         advanced=True,

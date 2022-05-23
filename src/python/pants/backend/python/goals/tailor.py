@@ -164,7 +164,6 @@ async def find_putative_targets(
         # Get all files whose content indicates that they are entry points or are __main__.py files.
         digest_contents = await Get(DigestContents, PathGlobs, all_py_files_globs)
         all_main_py = await Get(Paths, PathGlobs, req.search_paths.path_globs("__main__.py"))
-        print(all_main_py)
         entry_points = [
             file_content.path
             for file_content in digest_contents
