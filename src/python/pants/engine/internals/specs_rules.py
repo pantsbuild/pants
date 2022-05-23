@@ -23,11 +23,10 @@ from pants.base.specs import (
     SpecsWithoutFileOwners,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput
-from pants.engine.fs import CreateDigest, DigestEntries, PathGlobs, Paths, SpecsSnapshot
+from pants.engine.fs import PathGlobs, Paths, SpecsPaths
 from pants.engine.internals.build_files import AddressFamilyDir, BuildFileOptions
 from pants.engine.internals.graph import Owners, OwnersRequest, _log_or_raise_unmatched_owners
 from pants.engine.internals.mapper import AddressFamily, SpecsFilter
-from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.internals.parametrize import _TargetParametrizations
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule, rule_helper
@@ -36,8 +35,6 @@ from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     FilteredTargets,
-    HydratedSources,
-    HydrateSourcesRequest,
     NoApplicableTargetsBehavior,
     RegisteredTargetTypes,
     SourcesField,
@@ -52,6 +49,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
+from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -238,12 +236,12 @@ def setup_specs_filter(global_options: GlobalOptions) -> SpecsFilter:
 
 
 # -----------------------------------------------------------------------------------------------
-# SpecsSnapshot
+# SpecsPaths
 # -----------------------------------------------------------------------------------------------
 
 
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
-async def resolve_specs_snapshot(specs: Specs) -> SpecsSnapshot:
+async def resolve_specs_paths(specs: Specs) -> SpecsPaths:
     """Resolve all files matching the given specs.
 
     All matched targets will use their `sources` field. Certain specs like FileLiteralSpec will
@@ -258,45 +256,37 @@ async def resolve_specs_snapshot(specs: Specs) -> SpecsSnapshot:
         Targets, Specs, dataclasses.replace(specs, filter_by_global_options=False)
     )
     filtered_targets = await Get(FilteredTargets, Targets, unfiltered_targets)
-    all_hydrated_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
+    all_sources_paths = await MultiGet(
+        Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
         for tgt in filtered_targets
         if tgt.has_field(SourcesField)
     )
 
-    digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
+    result_paths = OrderedSet(
+        itertools.chain.from_iterable(paths.files for paths in all_sources_paths)
+    )
 
     specs_snapshot_path_globs = specs.to_specs_snapshot_path_globs()
-    filtered_out_sources_paths: set[str] = set()
     if specs_snapshot_path_globs.globs:
+        target_less_paths = await Get(Paths, PathGlobs, specs_snapshot_path_globs)
+        result_paths.update(target_less_paths.files)
+
         filtered_out_targets = FrozenOrderedSet(unfiltered_targets).difference(
             FrozenOrderedSet(filtered_targets)
         )
-        all_sources_paths = await MultiGet(
+        filtered_sources_paths = await MultiGet(
             Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
             for tgt in filtered_out_targets
             if tgt.has_field(SourcesField)
         )
-        filtered_out_sources_paths.update(
-            itertools.chain.from_iterable(paths.files for paths in all_sources_paths)
+        result_paths.difference_update(
+            itertools.chain.from_iterable(paths.files for paths in filtered_sources_paths)
         )
 
-        target_less_digest = await Get(Digest, PathGlobs, specs_snapshot_path_globs)
-        digests.append(target_less_digest)
-
-    if filtered_out_sources_paths:
-        digest_entries = await Get(DigestEntries, MergeDigests(digests))
-        result = await Get(
-            Snapshot,
-            CreateDigest(
-                file_entry
-                for file_entry in digest_entries
-                if file_entry.path not in filtered_out_sources_paths
-            ),
-        )
-    else:
-        result = await Get(Snapshot, MergeDigests(digests))
-    return SpecsSnapshot(result)
+    dirs = OrderedSet(
+        itertools.chain.from_iterable(recursive_dirname(os.path.dirname(f)) for f in result_paths)
+    ) - {""}
+    return SpecsPaths(tuple(sorted(result_paths)), tuple(sorted(dirs)))
 
 
 # -----------------------------------------------------------------------------------------------

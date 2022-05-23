@@ -26,7 +26,7 @@ from pants.core.goals.lint import (
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import SpecsSnapshot, Workspace
+from pants.engine.fs import SpecsPaths, Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, EMPTY_SNAPSHOT, Digest, Snapshot
 from pants.engine.target import FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership
@@ -216,11 +216,9 @@ def run_lint_rule(
                     mock=lambda _: FilteredTargets(targets),
                 ),
                 MockGet(
-                    output_type=SpecsSnapshot,
+                    output_type=SpecsPaths,
                     input_type=Specs,
-                    mock=lambda _: SpecsSnapshot(
-                        rule_runner.make_snapshot_of_empty_files(["f.txt"])
-                    ),
+                    mock=lambda _: SpecsPaths(("f.txt",), ()),
                 ),
             ],
             union_membership=union_membership,

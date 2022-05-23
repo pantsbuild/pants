@@ -27,7 +27,7 @@ from pants.base.specs import (
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
-from pants.engine.fs import SpecsSnapshot
+from pants.engine.fs import SpecsPaths
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.specs_rules import (
@@ -119,7 +119,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(Addresses, [SpecsWithoutFileOwners]),
             QueryRule(Addresses, [SpecsWithOnlyFileOwners]),
             QueryRule(FilteredTargets, [Specs]),
-            QueryRule(SpecsSnapshot, [Specs]),
+            QueryRule(SpecsPaths, [Specs]),
         ],
         objects={"parametrize": Parametrize},
         target_types=[MockTarget, MockFileTargetGenerator, MockNonfileTargetGenerator],
@@ -754,11 +754,11 @@ def test_filtered_targets(rule_runner: RuleRunner) -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# SpecsSnapshot
+# SpecsPaths
 # -----------------------------------------------------------------------------------------------
 
 
-def test_resolve_specs_snapshot(rule_runner: RuleRunner) -> None:
+def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
     """Test that we convert specs into a single snapshot for target-less goals.
 
     Some important edge cases:
@@ -789,34 +789,43 @@ def test_resolve_specs_snapshot(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(["--tag=-ignore"])
 
-    def assert_snapshot(specs: Iterable[Spec], expected: set[str]) -> None:
+    def assert_paths(
+        specs: Iterable[Spec], expected_files: set[str], expected_dirs: set[str]
+    ) -> None:
         specs_obj = Specs.create(
             specs, convert_dir_literal_to_address_literal=False, filter_by_global_options=True
         )
-        result = rule_runner.request(SpecsSnapshot, [specs_obj])
-        assert set(result.snapshot.files) == expected
+        result = rule_runner.request(SpecsPaths, [specs_obj])
+        assert set(result.files) == expected_files
+        assert set(result.dirs) == expected_dirs
 
     all_expected_demo_files = {"demo/f1.txt", "demo/f2.txt", "demo/unowned.foo"}
-    assert_snapshot(
+    assert_paths(
         [
             AddressLiteralSpec("demo", "f1"),
             FileGlobSpec("demo/*.txt"),
             FileLiteralSpec("demo/unowned.foo"),
         ],
         all_expected_demo_files,
+        {"demo"},
     )
 
     for dir_spec in (DirLiteralSpec, DirGlobSpec):
-        assert_snapshot([dir_spec("")], {"f.txt"})
-        assert_snapshot([dir_spec("unowned")], {"unowned/f.txt"})
-        assert_snapshot([dir_spec("demo")], {*all_expected_demo_files, "demo/BUILD"})
+        assert_paths([dir_spec("")], {"f.txt"}, set())
+        assert_paths([dir_spec("unowned")], {"unowned/f.txt"}, {"unowned"})
+        assert_paths([dir_spec("demo")], {*all_expected_demo_files, "demo/BUILD"}, {"demo"})
 
-    assert_snapshot(
+    assert_paths(
         [RecursiveGlobSpec("")],
         {*all_expected_demo_files, "demo/BUILD", "f.txt", "unowned/f.txt", "unowned/subdir/f.txt"},
+        {"demo", "unowned", "unowned/subdir"},
     )
-    assert_snapshot([RecursiveGlobSpec("unowned")], {"unowned/f.txt", "unowned/subdir/f.txt"})
-    assert_snapshot([RecursiveGlobSpec("demo")], {*all_expected_demo_files, "demo/BUILD"})
+    assert_paths(
+        [RecursiveGlobSpec("unowned")],
+        {"unowned/f.txt", "unowned/subdir/f.txt"},
+        {"unowned", "unowned/subdir"},
+    )
+    assert_paths([RecursiveGlobSpec("demo")], {*all_expected_demo_files, "demo/BUILD"}, {"demo"})
 
 
 # -----------------------------------------------------------------------------------------------
