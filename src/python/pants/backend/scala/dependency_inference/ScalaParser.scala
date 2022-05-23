@@ -202,6 +202,7 @@ class SourceAnalysisTraverser extends Traverser {
       visitMods(mods)
       val name = extractName(nameNode)
       recordScope(name)
+      recordProvidedName(name, sawObject = true)
       visitTemplate(templ, name)
     }
 
