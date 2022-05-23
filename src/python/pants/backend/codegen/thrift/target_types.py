@@ -72,7 +72,8 @@ class ThriftSourceTarget(Target):
         f"""
         A single Thrift file used to generate various languages.
 
-        See {doc_url('thrift')}.
+        See language-specific docs:
+            Python: {doc_url('thrift-python')}
         """
     )
 

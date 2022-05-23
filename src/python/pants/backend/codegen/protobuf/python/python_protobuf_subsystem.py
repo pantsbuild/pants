@@ -30,7 +30,7 @@ class PythonProtobufSubsystem(Subsystem):
         f"""
         Options related to the Protobuf Python backend.
 
-        See {doc_url('protobuf')}.
+        See {doc_url('protobuf-python')}.
         """
     )
 
