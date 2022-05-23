@@ -60,6 +60,7 @@ from pants.engine.target import (
     TriBoolField,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
@@ -86,6 +87,13 @@ class PythonSourceField(SingleSourceField):
 
 class PythonGeneratingSourcesBase(MultipleSourcesField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
+    help = generate_multiple_sources_field_help_message(
+        softwrap(
+            """
+            Example: `sources=['example.py', 'test_*.py', '!test_ignore.py']`.
+            """
+        )
+    )
 
 
 class InterpreterConstraintsField(StringSequenceField):

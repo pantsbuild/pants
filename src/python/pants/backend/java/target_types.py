@@ -14,6 +14,7 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
     TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
 )
 from pants.jvm.target_types import (
     JunitTestSourceField,
@@ -21,6 +22,7 @@ from pants.jvm.target_types import (
     JvmProvidesTypesField,
     JvmResolveField,
 )
+from pants.util.strutil import softwrap
 
 
 class JavaSourceField(SingleSourceField):
@@ -29,6 +31,13 @@ class JavaSourceField(SingleSourceField):
 
 class JavaGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = (".java",)
+    help = generate_multiple_sources_field_help_message(
+        softwrap(
+            """
+            Example: `sources=['Example.java', '*Test.java', '!TestIgnore.java']`.
+            """
+        )
+    )
 
 
 @dataclass(frozen=True)

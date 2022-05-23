@@ -24,6 +24,7 @@ from pants.engine.target import (
     Target,
     TargetGenerator,
     ValidNumbers,
+    generate_multiple_sources_field_help_message,
 )
 from pants.util.strutil import softwrap
 
@@ -151,6 +152,13 @@ class GoPackageSourcesField(MultipleSourcesField):
     default = ("*.go", "*.s")
     expected_file_extensions = (".go", ".s")
     ban_subdirectories = True
+    help = generate_multiple_sources_field_help_message(
+        softwrap(
+            """
+            Example: `sources=['example.go', '*_test.go', '!test_ignore.go']`.
+            """
+        )
+    )
 
     @classmethod
     def compute_value(
