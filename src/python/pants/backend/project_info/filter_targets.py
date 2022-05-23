@@ -8,16 +8,11 @@ from enum import Enum
 from typing import Pattern
 
 from pants.base.deprecated import warn_or_error
+from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.target import (
-    RegisteredTargetTypes,
-    Tags,
-    Target,
-    UnexpandedTargets,
-    UnrecognizedTargetTypeException,
-)
+from pants.engine.target import RegisteredTargetTypes, Tags, Target, UnrecognizedTargetTypeException
 from pants.option.option_types import EnumOption, StrListOption
 from pants.util.enums import match
 from pants.util.filtering import TargetFilter, and_filters, create_filters
@@ -73,6 +68,64 @@ class FilterSubsystem(LineOriented, GoalSubsystem):
         help="Filter on targets with tags matching these regexes.",
     )
 
+    def target_type_filters(
+        self, registered_target_types: RegisteredTargetTypes
+    ) -> list[TargetFilter]:
+        def outer_filter(target_alias: str) -> TargetFilter:
+            if target_alias not in registered_target_types.aliases:
+                raise UnrecognizedTargetTypeException(target_alias, registered_target_types)
+
+            target_type = registered_target_types.aliases_to_types[target_alias]
+            if target_type.deprecated_alias and target_alias == target_type.deprecated_alias:
+                warn_deprecated_target_type(target_type)
+
+            def inner_filter(tgt: Target) -> bool:
+                return tgt.alias == target_alias or bool(
+                    tgt.deprecated_alias and tgt.deprecated_alias == target_alias
+                )
+
+            return inner_filter
+
+        return create_filters(self.target_type, outer_filter)
+
+    def address_regex_filters(self) -> list[TargetFilter]:
+        def outer_filter(address_regex: str) -> TargetFilter:
+            regex = compile_regex(address_regex)
+            return lambda tgt: bool(regex.search(tgt.address.spec))
+
+        return create_filters(self.address_regex, outer_filter)
+
+    def tag_regex_filters(self) -> list[TargetFilter]:
+        def outer_filter(tag_regex: str) -> TargetFilter:
+            regex = compile_regex(tag_regex)
+            return lambda tgt: any(bool(regex.search(tag)) for tag in tgt.get(Tags).value or ())
+
+        return create_filters(self.tag_regex, outer_filter)
+
+    def granularity_filter(self) -> TargetFilter:
+        return match(
+            self.granularity,
+            {
+                TargetGranularity.all_targets: lambda _: True,
+                TargetGranularity.file_targets: lambda tgt: tgt.address.is_file_target,
+                TargetGranularity.build_targets: lambda tgt: not tgt.address.is_file_target,
+            },
+        )
+
+    def all_filters(self, registered_target_types: RegisteredTargetTypes) -> TargetFilter:
+        return and_filters(
+            [
+                *self.target_type_filters(registered_target_types),
+                *self.address_regex_filters(),
+                *self.tag_regex_filters(),
+                self.granularity_filter(),
+            ]
+        )
+
+    def is_specified(self) -> bool:
+        """Return true if any of the options are set."""
+        return bool(self.target_type or self.address_regex or self.tag_regex or self.granularity)
+
 
 class FilterGoal(Goal):
     subsystem_cls = FilterSubsystem
@@ -98,57 +151,12 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
 
 @goal_rule
 def filter_targets(
-    # NB: We must preserve target generators, not replace with their generated targets.
-    targets: UnexpandedTargets,
-    filter_subsystem: FilterSubsystem,
-    console: Console,
-    registered_target_types: RegisteredTargetTypes,
+    addresses: Addresses, filter_subsystem: FilterSubsystem, console: Console
 ) -> FilterGoal:
-    def filter_target_type(target_alias: str) -> TargetFilter:
-        if target_alias not in registered_target_types.aliases:
-            raise UnrecognizedTargetTypeException(target_alias, registered_target_types)
-
-        target_type = registered_target_types.aliases_to_types[target_alias]
-        if target_type.deprecated_alias and target_alias == target_type.deprecated_alias:
-            warn_deprecated_target_type(target_type)
-
-        def inner_filter(tgt: Target) -> bool:
-            return tgt.alias == target_alias or bool(
-                tgt.deprecated_alias and tgt.deprecated_alias == target_alias
-            )
-
-        return inner_filter
-
-    def filter_address_regex(address_regex: str) -> TargetFilter:
-        regex = compile_regex(address_regex)
-        return lambda tgt: bool(regex.search(tgt.address.spec))
-
-    def filter_tag_regex(tag_regex: str) -> TargetFilter:
-        regex = compile_regex(tag_regex)
-        return lambda tgt: any(bool(regex.search(tag)) for tag in tgt.get(Tags).value or ())
-
-    def filter_granularity(granularity: TargetGranularity) -> TargetFilter:
-        return match(
-            granularity,
-            {
-                TargetGranularity.all_targets: lambda _: True,
-                TargetGranularity.file_targets: lambda tgt: tgt.address.is_file_target,
-                TargetGranularity.build_targets: lambda tgt: not tgt.address.is_file_target,
-            },
-        )
-
-    anded_filter: TargetFilter = and_filters(
-        [
-            *(create_filters(filter_subsystem.target_type, filter_target_type)),
-            *(create_filters(filter_subsystem.address_regex, filter_address_regex)),
-            *(create_filters(filter_subsystem.tag_regex, filter_tag_regex)),
-            filter_granularity(filter_subsystem.granularity),
-        ]
-    )
-    addresses = sorted(target.address for target in targets if anded_filter(target))
-
+    # `SpecsFilter` will have already filtered for us. There isn't much reason for this goal to
+    # exist anymore.
     with filter_subsystem.line_oriented(console) as print_stdout:
-        for address in addresses:
+        for address in sorted(addresses):
             print_stdout(address.spec)
     return FilterGoal(exit_code=0)
 
