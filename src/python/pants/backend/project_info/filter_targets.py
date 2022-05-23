@@ -94,8 +94,8 @@ def warn_deprecated_target_type(tgt_type: type[Target]) -> None:
     assert tgt_type.deprecated_alias_removal_version is not None
     warn_or_error(
         removal_version=tgt_type.deprecated_alias_removal_version,
-        entity=f"using `filter --target-type={tgt_type.deprecated_alias}`",
-        hint=f"Use `filter --target-type={tgt_type.alias}` instead.",
+        entity=f"using `--filter-target-type={tgt_type.deprecated_alias}`",
+        hint=f"Use `--filter-target-type={tgt_type.alias}` instead.",
     )
 
 
@@ -107,19 +107,20 @@ def filter_targets(
     console: Console,
     registered_target_types: RegisteredTargetTypes,
 ) -> FilterGoal:
-    def filter_target_type(target_type: str) -> TargetFilter:
-        if target_type not in registered_target_types.aliases:
-            raise UnrecognizedTargetTypeException(target_type, registered_target_types)
+    def filter_target_type(target_alias: str) -> TargetFilter:
+        if target_alias not in registered_target_types.aliases:
+            raise UnrecognizedTargetTypeException(target_alias, registered_target_types)
 
-        def filt(tgt: Target) -> bool:
-            if tgt.alias == target_type:
-                return True
-            if tgt.deprecated_alias == target_type:
-                warn_deprecated_target_type(type(tgt))
-                return True
-            return False
+        target_type = registered_target_types.aliases_to_types[target_alias]
+        if target_type.deprecated_alias and target_alias == target_type.deprecated_alias:
+            warn_deprecated_target_type(target_type)
 
-        return filt
+        def inner_filter(tgt: Target) -> bool:
+            return tgt.alias == target_alias or (
+                tgt.deprecated_alias and tgt.deprecated_alias == target_alias
+            )
+
+        return inner_filter
 
     def filter_address_regex(address_regex: str) -> TargetFilter:
         regex = compile_regex(address_regex)
