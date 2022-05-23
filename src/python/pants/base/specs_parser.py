@@ -10,6 +10,7 @@ from typing import Iterable
 from pants.base.build_environment import get_buildroot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import (
+    SPEC_IGNORE_PREFIX,
     AddressLiteralSpec,
     DirGlobSpec,
     DirLiteralSpec,
@@ -64,11 +65,16 @@ class SpecsParser:
             normalized = ""
         return normalized
 
-    def parse_spec(self, spec: str) -> Spec:
-        """Parse the given spec into an `AddressSpec` or `FilesystemSpec` object.
+    def parse_spec(self, spec: str) -> tuple[Spec, bool]:
+        """Parse the given spec string and also return `true` if it's an ignore.
 
         :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
         """
+        is_ignore = False
+        if spec.startswith(SPEC_IGNORE_PREFIX):
+            is_ignore = True
+            spec = spec[1:]
+
         (
             (
                 path_component,
@@ -80,27 +86,30 @@ class SpecsParser:
         ) = native_engine.address_spec_parse(spec)
 
         if wildcard == "::":
-            return RecursiveGlobSpec(directory=self._normalize_spec_path(path_component))
+            return RecursiveGlobSpec(directory=self._normalize_spec_path(path_component)), is_ignore
         if wildcard == ":":
-            return DirGlobSpec(directory=self._normalize_spec_path(path_component))
+            return DirGlobSpec(directory=self._normalize_spec_path(path_component)), is_ignore
         if target_component or generated_component or parameters:
-            return AddressLiteralSpec(
-                path_component=self._normalize_spec_path(path_component),
-                target_component=target_component,
-                generated_component=generated_component,
-                parameters=FrozenDict(sorted(parameters)),
+            return (
+                AddressLiteralSpec(
+                    path_component=self._normalize_spec_path(path_component),
+                    target_component=target_component,
+                    generated_component=generated_component,
+                    parameters=FrozenDict(sorted(parameters)),
+                ),
+                is_ignore,
             )
         if "*" in path_component:
-            return FileGlobSpec(spec)
+            return FileGlobSpec(spec), is_ignore
         if PurePath(spec).suffix:
-            return FileLiteralSpec(self._normalize_spec_path(spec))
+            return FileLiteralSpec(self._normalize_spec_path(spec)), is_ignore
         spec_path = self._normalize_spec_path(spec)
         if spec_path == ".":
-            return DirLiteralSpec("")
+            return DirLiteralSpec(""), is_ignore
         # Some paths that look like dirs can actually be files without extensions.
         if Path(self._root_dir, spec_path).is_file():
-            return FileLiteralSpec(spec_path)
-        return DirLiteralSpec(spec_path)
+            return FileLiteralSpec(spec_path), is_ignore
+        return DirLiteralSpec(spec_path), is_ignore
 
     def parse_specs(
         self,
@@ -109,8 +118,17 @@ class SpecsParser:
         convert_dir_literal_to_address_literal: bool,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
     ) -> Specs:
+        include_specs = []
+        ignore_specs = []
+        for spec_str in specs:
+            spec, is_ignore = self.parse_spec(spec_str)
+            if is_ignore:
+                ignore_specs.append(spec)
+            else:
+                include_specs.append(spec)
+
         return Specs.create(
-            (self.parse_spec(spec) for spec in specs),
+            include_specs,
             convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
             unmatched_glob_behavior=unmatched_glob_behavior,
             filter_by_global_options=True,

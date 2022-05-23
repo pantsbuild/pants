@@ -82,11 +82,8 @@ def test_is_spec(tmp_path: Path, splitter: ArgSplitter, known_scope_infos: list[
         "a/b/test*",
         "a/**/*",
         "!",
-        "!a/b",
-        "!a/b.txt",
         "a/b.txt:tgt",
         "a/b.txt:../tgt",
-        "!a/b.txt:tgt",
         "dir#gen",
         "//:tgt#gen",
         "cache.java",
@@ -98,11 +95,12 @@ def test_is_spec(tmp_path: Path, splitter: ArgSplitter, known_scope_infos: list[
     # With no directories on disk to tiebreak.
     for spec in directories_vs_goals:
         assert splitter.likely_a_spec(spec) is False
+        assert splitter.likely_a_spec(f"!{spec}") is True
     for s in unambiguous_specs:
         assert splitter.likely_a_spec(s) is True
+        assert splitter.likely_a_spec(f"!{s}") is True
 
     # With directories on disk to tiebreak.
-
     splitter = ArgSplitter(known_scope_infos, tmp_path.as_posix())
     for d in directories_vs_goals:
         (tmp_path / d).mkdir()
