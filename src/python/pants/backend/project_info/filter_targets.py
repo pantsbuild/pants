@@ -116,7 +116,7 @@ def filter_targets(
             warn_deprecated_target_type(target_type)
 
         def inner_filter(tgt: Target) -> bool:
-            return tgt.alias == target_alias or (
+            return tgt.alias == target_alias or bool(
                 tgt.deprecated_alias and tgt.deprecated_alias == target_alias
             )
 
