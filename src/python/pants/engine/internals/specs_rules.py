@@ -349,17 +349,14 @@ class NoApplicableTargetsException(Exception):
             tgt.class_has_field(SourcesField, union_membership) for tgt in applicable_target_types
         )
         pants_filter_command = (
-            f"{bin_name()} filter --target-type={','.join(applicable_target_aliases)} ::"
+            f"{bin_name()} --filter-target-type={','.join(applicable_target_aliases)}"
         )
         remedy = (
-            f"Please specify relevant file and/or target arguments. Run `{pants_filter_command}` to "
-            "find all applicable targets in your project"
+            f"Please specify relevant file and/or target arguments. Run `{pants_filter_command} "
+            f"list ::` to find all applicable targets in your project"
         )
         if filedeps_goal_works:
-            remedy += (
-                f", or run `{pants_filter_command} | xargs {bin_name()} filedeps` to find all "
-                "applicable files."
-            )
+            remedy += f", or run `{pants_filter_command} filedeps ::` to find all applicable files."
         else:
             remedy += "."
         msg += remedy
