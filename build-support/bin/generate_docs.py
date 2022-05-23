@@ -98,7 +98,7 @@ def get_doc_slug(url: str) -> str:
     mo = DOC_URL_RE.match(url)
     if not mo:
         raise ValueError(f"Not a docsite URL: {url}")
-    return cast(str, mo.group("slug"))
+    return mo.group("slug")
 
 
 def find_doc_urls(strs: Iterable[str]) -> set[str]:
