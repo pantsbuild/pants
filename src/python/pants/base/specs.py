@@ -41,7 +41,11 @@ class AddressLiteralSpec(Spec):
     def __str__(self) -> str:
         tgt = f":{self.target_component}" if self.target_component else ""
         generated = f"#{self.generated_component}" if self.generated_component else ""
-        return f"{self.path_component}{tgt}{generated}"
+        params = ""
+        if self.parameters:
+            rhs = ",".join(f"{k}={v}" for k, v in self.parameters.items())
+            params = f"@{rhs}"
+        return f"{self.path_component}{tgt}{generated}{params}"
 
     @property
     def is_directory_shorthand(self) -> bool:
