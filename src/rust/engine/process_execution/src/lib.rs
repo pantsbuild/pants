@@ -284,8 +284,7 @@ impl InputDigests {
       merged_immutable_inputs.append(&mut immutable_inputs.clone());
       if size_before + immutable_inputs.len() != merged_immutable_inputs.len() {
         return Err(
-          "Tried to merge two-or-more immutable inputs at the same path with different values!"
-            .to_string(),
+          format!("Tried to merge two-or-more immutable inputs at the same path with different values! The collision involved one of the entries in: {immutable_inputs:?}"),
         );
       }
     }
