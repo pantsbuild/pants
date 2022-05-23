@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.base.specs import SPEC_IGNORE_PREFIX, Specs
+from pants.base.specs import SPEC_IGNORE_PREFIX, RawSpecs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.environment import CompleteEnvironment
@@ -53,7 +53,7 @@ class LocalPantsRunner:
     options_bootstrapper: OptionsBootstrapper
     build_config: BuildConfiguration
     run_tracker: RunTracker
-    specs: Specs
+    specs: RawSpecs
     graph_session: GraphSession
     union_membership: UnionMembership
     profile_path: str | None

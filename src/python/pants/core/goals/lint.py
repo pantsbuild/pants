@@ -8,7 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, Iterator, Type, TypeVar, cast
 
-from pants.base.specs import Specs
+from pants.base.specs import RawSpecs
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -263,7 +263,7 @@ def _get_error_code(results: tuple[LintResults, ...]) -> int:
 async def lint(
     console: Console,
     workspace: Workspace,
-    specs: Specs,
+    specs: RawSpecs,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
     dist_dir: DistDir,
@@ -296,10 +296,10 @@ async def lint(
 
     _get_targets = Get(
         FilteredTargets,
-        Specs,
-        specs if lint_target_request_types or fmt_target_request_types else Specs(),
+        RawSpecs,
+        specs if lint_target_request_types or fmt_target_request_types else RawSpecs(),
     )
-    _get_specs_paths = Get(SpecsPaths, Specs, specs if file_request_types else Specs())
+    _get_specs_paths = Get(SpecsPaths, RawSpecs, specs if file_request_types else RawSpecs())
     targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
 
     def batch(field_sets: Iterable[FieldSet]) -> Iterator[list[FieldSet]]:

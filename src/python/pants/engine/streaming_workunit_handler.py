@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence, Tuple
 
-from pants.base.specs import Specs
+from pants.base.specs import RawSpecs
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
 from pants.engine.internals import native_engine
@@ -44,7 +44,7 @@ class ExpandedSpecs:
 class StreamingWorkunitContext:
     _scheduler: SchedulerSession
     _run_tracker: RunTracker
-    _specs: Specs
+    _specs: RawSpecs
     _options_bootstrapper: OptionsBootstrapper
 
     @property
@@ -183,7 +183,7 @@ class StreamingWorkunitHandler:
         run_tracker: RunTracker,
         callbacks: Iterable[WorkunitsCallback],
         options_bootstrapper: OptionsBootstrapper,
-        specs: Specs,
+        specs: RawSpecs,
         report_interval_seconds: float,
         allow_async_completion: bool,
         max_workunit_verbosity: LogLevel,
@@ -288,6 +288,6 @@ def rules():
     return [
         QueryRule(WorkunitsCallbackFactories, (UnionMembership,)),
         QueryRule(Targets, (Addresses,)),
-        QueryRule(Addresses, (Specs, OptionsBootstrapper)),
+        QueryRule(Addresses, (RawSpecs, OptionsBootstrapper)),
         *collect_rules(),
     ]

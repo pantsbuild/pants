@@ -220,7 +220,16 @@ def _create_path_globs(
 
 
 @dataclass(frozen=True)
-class Specs:
+class RawSpecs:
+    """Convert the specs into matching targets and files.
+
+    Unlike `Specs`, this does not consider include vs. ignore specs. It simply matches all relevant
+    targets/files.
+
+    When you want to operate on what the user specified, use `Specs`. Otherwise, you can use
+    either `Specs` or `RawSpecs` in rules, e.g. to find what targets exist in a directory.
+    """
+
     address_literals: tuple[AddressLiteralSpec, ...] = ()
     file_literals: tuple[FileLiteralSpec, ...] = ()
     file_globs: tuple[FileGlobSpec, ...] = ()
@@ -242,7 +251,7 @@ class Specs:
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
         filter_by_global_options: bool = False,
         from_change_detection: bool = False,
-    ) -> Specs:
+    ) -> RawSpecs:
         """Create from a heterogeneous iterable of Spec objects.
 
         If the `Spec` objects are already separated by type, prefer using the class's constructor
@@ -275,7 +284,7 @@ class Specs:
                 ancestor_globs.append(spec)
             else:
                 raise AssertionError(f"Unexpected type of Spec: {repr(spec)}")
-        return Specs(
+        return RawSpecs(
             tuple(address_literals),
             tuple(file_literals),
             tuple(file_globs),
@@ -336,11 +345,11 @@ class Specs:
 
 
 @dataclass(frozen=True)
-class SpecsWithoutFileOwners:
-    """The subset of `Specs` that do not use the `Owners` rule to match targets.
+class RawSpecsWithoutFileOwners:
+    """The subset of `RawSpecs` that do not use the `Owners` rule to match targets.
 
     This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
-    `Get(Addresses, Specs)`, which will result in this rule being used.
+    `Get(Addresses, RawSpecs)`, which will result in this rule being used.
     """
 
     address_literals: tuple[AddressLiteralSpec, ...] = ()
@@ -353,8 +362,8 @@ class SpecsWithoutFileOwners:
     filter_by_global_options: bool = False
 
     @classmethod
-    def from_specs(cls, specs: Specs) -> SpecsWithoutFileOwners:
-        return SpecsWithoutFileOwners(
+    def from_raw_specs(cls, specs: RawSpecs) -> RawSpecsWithoutFileOwners:
+        return RawSpecsWithoutFileOwners(
             specs.address_literals,
             specs.dir_literals,
             specs.dir_globs,
@@ -416,11 +425,11 @@ class SpecsWithoutFileOwners:
 
 
 @dataclass(frozen=True)
-class SpecsWithOnlyFileOwners:
-    """The subset of `Specs` that require using the `Owners` rule to match targets.
+class RawSpecsWithOnlyFileOwners:
+    """The subset of `RawSpecs` that require using the `Owners` rule to match targets.
 
     This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
-    `Get(Addresses, Specs)`, which will result in this rule being used.
+    `Get(Addresses, RawSpecs)`, which will result in this rule being used.
     """
 
     file_literals: tuple[FileLiteralSpec, ...] = ()
@@ -431,8 +440,8 @@ class SpecsWithOnlyFileOwners:
     from_change_detection: bool = False
 
     @classmethod
-    def from_specs(cls, specs: Specs) -> SpecsWithOnlyFileOwners:
-        return SpecsWithOnlyFileOwners(
+    def from_raw_specs(cls, specs: RawSpecs) -> RawSpecsWithOnlyFileOwners:
+        return RawSpecsWithOnlyFileOwners(
             specs.file_literals,
             specs.file_globs,
             unmatched_glob_behavior=specs.unmatched_glob_behavior,

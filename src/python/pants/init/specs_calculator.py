@@ -5,7 +5,7 @@ import logging
 from typing import cast
 
 from pants.base.deprecated import warn_or_error
-from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, Specs
+from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
@@ -30,7 +30,7 @@ def calculate_specs(
     options_bootstrapper: OptionsBootstrapper,
     options: Options,
     session: SchedulerSession,
-) -> Specs:
+) -> RawSpecs:
     """Determine the specs for a given Pants run."""
     global_options = options.for_global_scope()
     unmatched_cli_globs = global_options.unmatched_cli_globs.to_glob_match_error_behavior()
@@ -107,7 +107,7 @@ def calculate_specs(
             )
         )
 
-    return Specs(
+    return RawSpecs(
         # We need both address_literals and file_literals to cover all our edge cases, including
         # target-aware vs. target-less goals, e.g. `list` vs `count-loc`.
         address_literals=tuple(address_literal_specs),

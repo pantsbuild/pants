@@ -12,7 +12,7 @@ from typing import Mapping
 
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.base.specs import Specs
+from pants.base.specs import RawSpecs
 from pants.bsp.context import BSPContext
 from pants.bsp.protocol import BSPConnection
 from pants.bsp.util_rules.lifecycle import BSP_VERSION, BSPLanguageSupport
@@ -109,7 +109,7 @@ class BSPGoal(BuiltinGoal):
         build_config: BuildConfiguration,
         graph_session: GraphSession,
         options: Options,
-        specs: Specs,
+        specs: RawSpecs,
         union_membership: UnionMembership,
     ) -> ExitCode:
         goal_options = options.for_scope(self.name)

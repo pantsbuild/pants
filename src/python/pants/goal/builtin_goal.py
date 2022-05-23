@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 from pants.base.exiter import ExitCode
-from pants.base.specs import Specs
+from pants.base.specs import RawSpecs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
 from pants.engine.unions import UnionMembership
@@ -36,7 +36,7 @@ class BuiltinGoal(ABC, GoalSubsystem):
         build_config: BuildConfiguration,
         graph_session: GraphSession,
         options: Options,
-        specs: Specs,
+        specs: RawSpecs,
         union_membership: UnionMembership,
     ) -> ExitCode:
         pass

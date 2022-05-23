@@ -16,9 +16,9 @@ from pants.base.specs import (
     DirLiteralSpec,
     FileGlobSpec,
     FileLiteralSpec,
+    RawSpecs,
     RecursiveGlobSpec,
     Spec,
-    Specs,
 )
 from pants.engine.internals import native_engine
 from pants.util.frozendict import FrozenDict
@@ -117,7 +117,7 @@ class SpecsParser:
         *,
         convert_dir_literal_to_address_literal: bool,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
-    ) -> Specs:
+    ) -> RawSpecs:
         include_specs = []
         ignore_specs = []
         for spec_str in specs:
@@ -127,7 +127,7 @@ class SpecsParser:
             else:
                 include_specs.append(spec)
 
-        return Specs.create(
+        return RawSpecs.create(
             include_specs,
             convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
             unmatched_glob_behavior=unmatched_glob_behavior,

@@ -7,7 +7,7 @@ from abc import abstractmethod
 from typing import ClassVar
 
 from pants.base.exiter import ExitCode
-from pants.base.specs import Specs
+from pants.base.specs import RawSpecs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -34,7 +34,7 @@ class HelpBuiltinGoalBase(BuiltinGoal):
         build_config: BuildConfiguration,
         graph_session: GraphSession,
         options: Options,
-        specs: Specs,
+        specs: RawSpecs,
         union_membership: UnionMembership,
     ) -> ExitCode:
         all_help_info = HelpInfoExtracter.get_all_help_info(

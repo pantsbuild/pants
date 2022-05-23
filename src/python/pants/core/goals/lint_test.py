@@ -11,7 +11,7 @@ from typing import Iterable, Optional, Sequence, Tuple, Type
 
 import pytest
 
-from pants.base.specs import Specs
+from pants.base.specs import RawSpecs
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import (
     AmbiguousRequestNamesError,
@@ -184,7 +184,7 @@ def run_lint_rule(
             rule_args=[
                 console,
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
-                Specs(),
+                RawSpecs(),
                 lint_subsystem,
                 union_membership,
                 DistDir(relpath=Path("dist")),
@@ -212,12 +212,12 @@ def run_lint_rule(
                 ),
                 MockGet(
                     output_type=FilteredTargets,
-                    input_type=Specs,
+                    input_type=RawSpecs,
                     mock=lambda _: FilteredTargets(targets),
                 ),
                 MockGet(
                     output_type=SpecsPaths,
-                    input_type=Specs,
+                    input_type=RawSpecs,
                     mock=lambda _: SpecsPaths(("f.txt",), ()),
                 ),
             ],

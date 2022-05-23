@@ -18,10 +18,10 @@ from pants.base.specs import (
     DirGlobSpec,
     DirLiteralSpec,
     FileLiteralSpec,
+    RawSpecs,
+    RawSpecsWithOnlyFileOwners,
+    RawSpecsWithoutFileOwners,
     RecursiveGlobSpec,
-    Specs,
-    SpecsWithOnlyFileOwners,
-    SpecsWithoutFileOwners,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import PathGlobs, Paths, SpecsPaths
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------------------------
-# SpecsWithoutFileOwners -> Targets
+# RawSpecsWithoutFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -105,7 +105,7 @@ async def _determine_literal_addresses_from_specs(
 
 @rule
 async def addresses_from_specs_without_file_owners(
-    specs: SpecsWithoutFileOwners,
+    specs: RawSpecsWithoutFileOwners,
     build_file_options: BuildFileOptions,
     specs_filter: SpecsFilter,
 ) -> Addresses:
@@ -168,7 +168,7 @@ async def addresses_from_specs_without_file_owners(
 
 
 # -----------------------------------------------------------------------------------------------
-# SpecsWithOnlyFileOwners -> Targets
+# RawSpecsWithOnlyFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -179,7 +179,7 @@ def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNo
 
 @rule
 async def addresses_from_specs_with_only_file_owners(
-    specs: SpecsWithOnlyFileOwners, owners_not_found_behavior: OwnersNotFoundBehavior
+    specs: RawSpecsWithOnlyFileOwners, owners_not_found_behavior: OwnersNotFoundBehavior
 ) -> Addresses:
     """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
@@ -210,15 +210,17 @@ async def addresses_from_specs_with_only_file_owners(
 
 
 # -----------------------------------------------------------------------------------------------
-# Specs -> Targets
+# RawSpecs -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
 @rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
-async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
+async def resolve_addresses_from_specs(specs: RawSpecs) -> Addresses:
     without_file_owners, with_file_owners = await MultiGet(
-        Get(Addresses, SpecsWithoutFileOwners, SpecsWithoutFileOwners.from_specs(specs)),
-        Get(Addresses, SpecsWithOnlyFileOwners, SpecsWithOnlyFileOwners.from_specs(specs)),
+        Get(Addresses, RawSpecsWithoutFileOwners, RawSpecsWithoutFileOwners.from_raw_specs(specs)),
+        Get(
+            Addresses, RawSpecsWithOnlyFileOwners, RawSpecsWithOnlyFileOwners.from_raw_specs(specs)
+        ),
     )
     # Use a set to dedupe.
     return Addresses(sorted({*without_file_owners, *with_file_owners}))
@@ -249,7 +251,7 @@ def setup_specs_filter(
 
 
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
-async def resolve_specs_paths(specs: Specs) -> SpecsPaths:
+async def resolve_specs_paths(specs: RawSpecs) -> SpecsPaths:
     """Resolve all files matching the given specs.
 
     All matched targets will use their `sources` field. Certain specs like FileLiteralSpec will
@@ -261,7 +263,7 @@ async def resolve_specs_paths(specs: Specs) -> SpecsPaths:
     """
 
     unfiltered_targets = await Get(
-        Targets, Specs, dataclasses.replace(specs, filter_by_global_options=False)
+        Targets, RawSpecs, dataclasses.replace(specs, filter_by_global_options=False)
     )
     filtered_targets = await Get(FilteredTargets, Targets, unfiltered_targets)
     all_sources_paths = await MultiGet(
@@ -298,7 +300,7 @@ async def resolve_specs_paths(specs: Specs) -> SpecsPaths:
 
 
 # -----------------------------------------------------------------------------------------------
-# Specs -> FieldSets
+# RawSpecs -> FieldSets
 # -----------------------------------------------------------------------------------------------
 
 
@@ -306,7 +308,7 @@ class NoApplicableTargetsException(Exception):
     def __init__(
         self,
         targets: Iterable[Target],
-        specs: Specs,
+        specs: RawSpecs,
         union_membership: UnionMembership,
         *,
         applicable_target_types: Iterable[type[Target]],
@@ -366,7 +368,7 @@ class NoApplicableTargetsException(Exception):
     def create_from_field_sets(
         cls,
         targets: Iterable[Target],
-        specs: Specs,
+        specs: RawSpecs,
         union_membership: UnionMembership,
         registered_target_types: RegisteredTargetTypes,
         *,
@@ -423,13 +425,13 @@ class AmbiguousImplementationsException(Exception):
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
-    specs: Specs,
+    specs: RawSpecs,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> TargetRootsToFieldSets:
     # NB: This must be in an `await Get`, rather than the rule signature, to avoid a rule graph
     # issue.
-    targets = await Get(FilteredTargets, Specs, specs)
+    targets = await Get(FilteredTargets, RawSpecs, specs)
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
     )
