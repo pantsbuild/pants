@@ -11,6 +11,7 @@ from typing import Iterable, Optional, Sequence, Tuple, Type
 
 import pytest
 
+from pants.base.specs import Specs
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.goals.lint import (
     AmbiguousRequestNamesError,
@@ -27,7 +28,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import SpecsSnapshot, Workspace
 from pants.engine.internals.native_engine import EMPTY_DIGEST, EMPTY_SNAPSHOT, Digest, Snapshot
-from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
+from pants.engine.target import FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
@@ -175,15 +176,13 @@ def run_lint_rule(
         batch_size=batch_size,
         only=only or [],
     )
-    specs_snapshot = SpecsSnapshot(rule_runner.make_snapshot_of_empty_files(["f.txt"]))
     with mock_console(rule_runner.options_bootstrapper) as (console, stdio_reader):
         result: Lint = run_rule_with_mocks(
             lint,
             rule_args=[
                 console,
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
-                Targets(targets),
-                specs_snapshot,
+                Specs.empty(),
                 lint_subsystem,
                 union_membership,
                 DistDir(relpath=Path("dist")),
@@ -208,6 +207,18 @@ def run_lint_rule(
                     output_type=FmtResult,
                     input_type=FmtRequest,
                     mock=lambda mock_request: mock_request.fmt_result,
+                ),
+                MockGet(
+                    output_type=FilteredTargets,
+                    input_type=Specs,
+                    mock=lambda _: FilteredTargets(targets),
+                ),
+                MockGet(
+                    output_type=SpecsSnapshot,
+                    input_type=Specs,
+                    mock=lambda _: SpecsSnapshot(
+                        rule_runner.make_snapshot_of_empty_files(["f.txt"])
+                    ),
                 ),
             ],
             union_membership=union_membership,
