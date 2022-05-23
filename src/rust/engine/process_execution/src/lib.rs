@@ -283,9 +283,10 @@ impl InputDigests {
       let immutable_inputs = &input_digests.immutable_inputs;
       merged_immutable_inputs.append(&mut immutable_inputs.clone());
       if size_before + immutable_inputs.len() != merged_immutable_inputs.len() {
-        return Err(
-          format!("Tried to merge two-or-more immutable inputs at the same path with different values! The collision involved one of the entries in: {immutable_inputs:?}"),
-        );
+        return Err(format!(
+          "Tried to merge two-or-more immutable inputs at the same path with different values! \
+            The collision involved one of the entries in: {immutable_inputs:?}"
+        ));
       }
     }
 
