@@ -182,7 +182,7 @@ def run_lint_rule(
             rule_args=[
                 console,
                 Workspace(rule_runner.scheduler, _enforce_effects=False),
-                Specs(),
+                Specs.empty(),
                 lint_subsystem,
                 union_membership,
                 DistDir(relpath=Path("dist")),
