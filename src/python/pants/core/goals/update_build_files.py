@@ -27,11 +27,11 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
-    DigestSubset,
     FileContent,
     MergeDigests,
     PathGlobs,
-    SpecsSnapshot,
+    Paths,
+    SpecsPaths,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -177,7 +177,7 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
-    specs_snapshot: SpecsSnapshot,
+    specs_paths: SpecsPaths,
 ) -> UpdateBuildFilesGoal:
     build_file_path_globs = PathGlobs(
         globs=(
@@ -185,9 +185,12 @@ async def update_build_files(
             *(f"!{p}" for p in build_file_options.ignores),
         )
     )
-    if specs_snapshot.snapshot.files:
-        all_build_files = await Get(
-            DigestContents, DigestSubset(specs_snapshot.snapshot.digest, build_file_path_globs)
+    if specs_paths.files:
+        all_build_file_paths = await Get(Paths, PathGlobs, build_file_path_globs)
+        specified_paths = set(specs_paths.files)
+        specified_build_files = await Get(
+            DigestContents,
+            PathGlobs(fp for fp in all_build_file_paths.files if fp in specified_paths),
         )
     else:
         warn_or_error(
@@ -207,7 +210,7 @@ async def update_build_files(
                 """
             ),
         )
-        all_build_files = await Get(DigestContents, PathGlobs, build_file_path_globs)
+        specified_build_files = await Get(DigestContents, PathGlobs, build_file_path_globs)
 
     rewrite_request_classes = []
     for request in union_membership[RewrittenBuildFileRequest]:
@@ -227,7 +230,7 @@ async def update_build_files(
 
     build_file_to_lines = {
         build_file.path: tuple(build_file.content.decode("utf-8").splitlines())
-        for build_file in all_build_files
+        for build_file in specified_build_files
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:

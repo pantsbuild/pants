@@ -21,7 +21,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsSnapshot, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, SpecsPaths, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
@@ -299,8 +299,8 @@ async def lint(
         Specs,
         specs if lint_target_request_types or fmt_target_request_types else Specs(),
     )
-    _get_specs_snapshot = Get(SpecsSnapshot, Specs, specs if file_request_types else Specs())
-    targets, specs_snapshot = await MultiGet(_get_targets, _get_specs_snapshot)
+    _get_specs_paths = Get(SpecsPaths, Specs, specs if file_request_types else Specs())
+    targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
 
     def batch(field_sets: Iterable[FieldSet]) -> Iterator[list[FieldSet]]:
         partitions = partition_sequentially(
@@ -356,8 +356,8 @@ async def lint(
         )
 
     file_requests = (
-        tuple(request_type(specs_snapshot.snapshot.files) for request_type in file_request_types)
-        if specs_snapshot.snapshot.files
+        tuple(request_type(specs_paths.files) for request_type in file_request_types)
+        if specs_paths.files
         else ()
     )
 
