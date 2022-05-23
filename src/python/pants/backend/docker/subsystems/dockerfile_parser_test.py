@@ -16,6 +16,7 @@ from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
+from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -192,3 +193,15 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
         # Stage 2 is not pinned with a tag.
         "stage3 v0.54.0",
     )
+
+
+def test_generate_lockfile_without_python_backend() -> None:
+    """Regression test for https://github.com/pantsbuild/pants/issues/14876."""
+    run_pants(
+        [
+            "--backend-packages=pants.backend.docker",
+            "--dockerfile-parser-lockfile=dp.lock",
+            "generate-lockfiles",
+            "--resolve=dockerfile-parser",
+        ]
+    ).assert_success()

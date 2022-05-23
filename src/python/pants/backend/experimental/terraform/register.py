@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.backend.python.goals import lockfile as python_lockfile
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform import dependency_inference, style, tool
 from pants.backend.terraform.goals import check, tailor
@@ -25,4 +26,5 @@ def rules():
         *style.rules(),
         *pex_rules(),
         *tffmt_rules(),
+        *python_lockfile.rules(),
     ]

@@ -22,6 +22,7 @@ from pants.engine.target import (
     InferredDependencies,
     SourcesField,
 )
+from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
@@ -137,3 +138,15 @@ def test_hcl_parser_wrapper_runs(rule_runner: RuleRunner, major_minor_interprete
 
     lines = {line for line in result.stdout.decode("utf-8").splitlines() if line}
     assert lines == {"grok", "foo/hello/world"}
+
+
+def test_generate_lockfile_without_python_backend() -> None:
+    """Regression test for https://github.com/pantsbuild/pants/issues/14876."""
+    run_pants(
+        [
+            "--backend-packages=pants.backend.experimental.terraform",
+            "--terraform-hcl2-parser-lockfile=tf.lock",
+            "generate-lockfiles",
+            "--resolve=terraform-hcl2-parser",
+        ]
+    ).assert_success()
