@@ -993,9 +993,9 @@ def test_no_applicable_targets_exception() -> None:
         goal_description="the `foo` goal",
     )
     remedy = (
-        "Please specify relevant file and/or target arguments. Run `./pants filter "
-        "--target-type=tgt1,tgt2 ::` to find all applicable targets in your project, or run "
-        "`./pants filter --target-type=tgt1,tgt2 :: | xargs ./pants filedeps` to find all "
+        "Please specify relevant file and/or target arguments. Run `./pants "
+        "--filter-target-type=tgt1,tgt2 list ::` to find all applicable targets in your project, "
+        "or run `./pants --filter-target-type=tgt1,tgt2 filedeps ::` to find all "
         "applicable files."
     )
     assert (
