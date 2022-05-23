@@ -25,7 +25,7 @@ from pants.util.docutil import doc_url, git_url
 
 class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"
-    help = f"Options related to the Protobuf Python backend.\n\nSee {doc_url('protobuf')}."
+    help = f"Options related to the Protobuf Python backend.\n\nSee {doc_url('protobuf-python')}."
 
     mypy_plugin = BoolOption(
         "--mypy-plugin",
