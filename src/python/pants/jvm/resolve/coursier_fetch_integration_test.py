@@ -7,7 +7,7 @@ import textwrap
 
 import pytest
 
-from pants.base.specs import RecursiveGlobSpec, Specs
+from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.util_rules import config_files, source_files
 from pants.engine.fs import FileDigest
 from pants.engine.internals.scheduler import ExecutionError
@@ -43,7 +43,7 @@ def rule_runner() -> RuleRunner:
             *coursier_fetch_rules(),
             *source_files.rules(),
             *util_rules(),
-            QueryRule(Targets, [Specs]),
+            QueryRule(Targets, [RawSpecs]),
             QueryRule(CoursierResolvedLockfile, (ArtifactRequirements,)),
             QueryRule(ClasspathEntry, (CoursierLockfileEntry,)),
             QueryRule(FileDigest, (ExtractFileDigest,)),
@@ -327,7 +327,7 @@ def test_resolve_with_a_jar(rule_runner: RuleRunner) -> None:
         }
     )
 
-    targets = rule_runner.request(Targets, [Specs(recursive_globs=(RecursiveGlobSpec(""),))])
+    targets = rule_runner.request(Targets, [RawSpecs(recursive_globs=(RecursiveGlobSpec(""),))])
     jeremy_target = targets[0]
 
     jar_field = jeremy_target[JvmArtifactJarSourceField]

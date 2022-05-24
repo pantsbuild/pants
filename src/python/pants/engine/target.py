@@ -657,7 +657,7 @@ class Targets(Collection[Target]):
 # This distinct type is necessary because of https://github.com/pantsbuild/pants/issues/14977.
 #
 # NB: We still proactively apply filtering inside `AddressSpecs` and `FilesystemSpecs`, which is
-# earlier in the rule pipeline of `Specs -> Addresses -> UnexpandedTargets -> Targets ->
+# earlier in the rule pipeline of `RawSpecs -> Addresses -> UnexpandedTargets -> Targets ->
 # FilteredTargets`. That is necessary so that project-introspection goals like `list` which don't
 # use `FilteredTargets` still have filtering applied.
 class FilteredTargets(Collection[Target]):

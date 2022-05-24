@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.specs import AncestorGlobSpec, Spec, Specs
+from pants.base.specs import AncestorGlobSpec, RawSpecs, Spec, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -471,7 +471,7 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
     source_dirs = {os.path.dirname(path) for path in source_path_set}
     possible_owners = await Get(
         UnexpandedTargets,
-        Specs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs)),
+        RawSpecs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs)),
     )
     possible_owners_sources = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(t.get(SourcesField))) for t in possible_owners
@@ -560,7 +560,7 @@ async def edit_build_files(
     return EditedBuildFiles(new_digest, tuple(sorted(created)), tuple(sorted(updated)))
 
 
-def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
+def specs_to_dirs(specs: RawSpecs) -> tuple[str, ...]:
     """Extract cmd-line specs that look like directories.
 
     Error on all other specs.
@@ -605,7 +605,7 @@ async def tailor(
 
     if global_options.use_deprecated_directory_cli_args_semantics:
         dir_search_paths: tuple[str, ...] = ()
-        recursive_search_paths = specs_to_dirs(specs)
+        recursive_search_paths = specs_to_dirs(specs.includes)
     else:
         specs_paths = await Get(SpecsPaths, Specs, specs)
         dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))

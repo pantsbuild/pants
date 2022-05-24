@@ -79,12 +79,8 @@ class OptionAlreadyRegistered(RegistrationError):
     """An option with this name was already registered on this scope."""
 
 
-class OptionNameDash(RegistrationError):
-    """Option name must begin with a dash."""
-
-
 class OptionNameDoubleDash(RegistrationError):
-    """Long option name must begin with a double-dash."""
+    """Option name must begin with a double-dash."""
 
 
 class PassthroughType(RegistrationError):
