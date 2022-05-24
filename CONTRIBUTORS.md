@@ -60,6 +60,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Dimitrios Bariamis
 + Divij Rajkumar
 + Dominic Hamon
++ Doron Somech
 + Dorothy Ordogh
 + Drew Rothstein
 + Dumitru Daniliuc
