@@ -549,11 +549,12 @@ class BootstrapOptions:
         help="Re-resolve plugins, even if previously resolved.",
     )
     level = EnumOption(
-        "-l",
         "--level",
         default=LogLevel.INFO,
         daemon=True,
         help="Set the logging level.",
+        # This is the only option where we allow a short flag name.
+        _unsafe_short_flag_name="-l",
     )
     show_log_target = BoolOption(
         "--show-log-target",
