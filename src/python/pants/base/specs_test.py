@@ -3,13 +3,37 @@
 
 from __future__ import annotations
 
+import pytest
+
 from pants.base.specs import (
+    AddressLiteralSpec,
     AncestorGlobSpec,
     DirGlobSpec,
     DirLiteralSpec,
     RecursiveGlobSpec,
     SpecsWithoutFileOwners,
 )
+from pants.util.frozendict import FrozenDict
+
+
+@pytest.mark.parametrize(
+    "spec,expected",
+    [
+        (AddressLiteralSpec("dir"), "dir"),
+        (AddressLiteralSpec("dir/f.txt"), "dir/f.txt"),
+        (AddressLiteralSpec("dir", "tgt"), "dir:tgt"),
+        (AddressLiteralSpec("dir", None, "gen"), "dir#gen"),
+        (AddressLiteralSpec("dir", "tgt", "gen"), "dir:tgt#gen"),
+        (
+            AddressLiteralSpec("dir", None, None, FrozenDict({"k1": "v1", "k2": "v2"})),
+            "dir@k1=v1,k2=v1",
+        ),
+        (AddressLiteralSpec("dir", "tgt", None, FrozenDict({"k": "v"})), "dir:tgt@k=v"),
+        (AddressLiteralSpec("dir", "tgt", "gen", FrozenDict({"k": "v"})), "dir:tgt#gen@k=v"),
+    ],
+)
+def address_literal_str(spec: AddressLiteralSpec, expected: str) -> None:
+    assert str(spec) == expected
 
 
 def assert_build_file_globs(
