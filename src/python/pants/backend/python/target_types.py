@@ -87,13 +87,6 @@ class PythonSourceField(SingleSourceField):
 
 class PythonGeneratingSourcesBase(MultipleSourcesField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = ("", ".py", ".pyi")
-    help = generate_multiple_sources_field_help_message(
-        softwrap(
-            """
-            Example: `sources=['example.py', 'test_*.py', '!test_ignore.py']`.
-            """
-        )
-    )
 
 
 class InterpreterConstraintsField(StringSequenceField):
@@ -819,6 +812,9 @@ class PythonTestTarget(Target):
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
     expected_file_extensions = (".py", "")  # Note that this does not include `.pyi`.
     default = ("test_*.py", "*_test.py", "tests.py")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['test_*.py', '*_test.py', 'tests.py']`"
+    )
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
@@ -895,6 +891,9 @@ class PythonSourcesOverridesField(OverridesField):
 
 class PythonTestUtilsGeneratingSourcesField(PythonGeneratingSourcesBase):
     default = ("conftest.py", "test_*.pyi", "*_test.pyi", "tests.pyi")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['conftest.py', 'test_*.pyi', '*_test.pyi', 'tests.pyi']`"
+    )
 
 
 class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
@@ -902,6 +901,9 @@ class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
         ("*.py", "*.pyi")
         + tuple(f"!{pat}" for pat in PythonTestsGeneratingSourcesField.default)
         + tuple(f"!{pat}" for pat in PythonTestUtilsGeneratingSourcesField.default)
+    )
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.py', 'new_*.py', '!old_ignore.py']`"
     )
 
 

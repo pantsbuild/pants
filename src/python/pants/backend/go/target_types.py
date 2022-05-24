@@ -153,11 +153,7 @@ class GoPackageSourcesField(MultipleSourcesField):
     expected_file_extensions = (".go", ".s")
     ban_subdirectories = True
     help = generate_multiple_sources_field_help_message(
-        softwrap(
-            """
-            Example: `sources=['example.go', '*_test.go', '!test_ignore.go']`.
-            """
-        )
+        "Example: `sources=['example.go', '*_test.go', '!test_ignore.go']`"
     )
 
     @classmethod

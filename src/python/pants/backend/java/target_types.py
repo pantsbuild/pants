@@ -22,7 +22,6 @@ from pants.jvm.target_types import (
     JvmProvidesTypesField,
     JvmResolveField,
 )
-from pants.util.strutil import softwrap
 
 
 class JavaSourceField(SingleSourceField):
@@ -31,13 +30,6 @@ class JavaSourceField(SingleSourceField):
 
 class JavaGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = (".java",)
-    help = generate_multiple_sources_field_help_message(
-        softwrap(
-            """
-            Example: `sources=['Example.java', '*Test.java', '!TestIgnore.java']`.
-            """
-        )
-    )
 
 
 @dataclass(frozen=True)
@@ -78,6 +70,9 @@ class JunitTestTarget(Target):
 
 class JavaTestsGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*Test.java",)
+    help = generate_multiple_sources_field_help_message(
+        """Example: `sources=['*Test.java', '!TestIgnore.java']`."""
+    )
 
 
 class JunitTestsGeneratorTarget(TargetFilesGenerator):
@@ -117,6 +112,9 @@ class JavaSourceTarget(Target):
 
 class JavaSourcesGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*.java",) + tuple(f"!{pat}" for pat in JavaTestsGeneratorSourcesField.default)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Example.java', 'New*.java', '!OldExample.java']`"
+    )
 
 
 class JavaSourcesGeneratorTarget(TargetFilesGenerator):
