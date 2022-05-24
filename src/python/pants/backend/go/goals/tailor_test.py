@@ -56,7 +56,7 @@ def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeGoTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeGoTargetsRequest(PutativeTargetsSearchPaths(("unowned", "owned"))),
             AllOwnedSources(["owned/go.mod"]),
         ],
     )
@@ -87,7 +87,11 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeGoTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeGoTargetsRequest(
+                PutativeTargetsSearchPaths(
+                    ("unowned", "owned", "unowned/testdata", "unowned/vendor", "unowned/cmd/vendor")
+                )
+            ),
             AllOwnedSources(["owned/f.go"]),
         ],
     )
@@ -125,7 +129,16 @@ def test_find_go_binary_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeGoTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeGoTargetsRequest(
+                PutativeTargetsSearchPaths(
+                    (
+                        "missing_binary_tgt",
+                        "tgt_already_exists",
+                        "missing_pkg_and_binary_tgt",
+                        "main_set_to_different_dir",
+                    )
+                )
+            ),
             AllOwnedSources(
                 [
                     "missing_binary_tgt/app.go",

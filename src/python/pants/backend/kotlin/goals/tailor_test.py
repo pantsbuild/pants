@@ -38,7 +38,9 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeKotlinTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeKotlinTargetsRequest(
+                PutativeTargetsSearchPaths(("src/kotlin/owned", "src/kotlin/unowned"))
+            ),
             AllOwnedSources(["src/kotlin/owned/OwnedFile.kt"]),
         ],
     )

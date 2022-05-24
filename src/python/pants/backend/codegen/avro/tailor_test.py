@@ -40,7 +40,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeAvroTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeAvroTargetsRequest(PutativeTargetsSearchPaths(("avro/foo", "avro/foo/bar"))),
             AllOwnedSources(["avro/foo/bar/baz1.avdl"]),
         ],
     )

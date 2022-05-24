@@ -51,7 +51,9 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeJavaTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeJavaTargetsRequest(
+                PutativeTargetsSearchPaths(("src/java", "src/java/unowned"))
+            ),
             AllOwnedSources(["src/java/owned/OwnedFile.java"]),
         ],
     )

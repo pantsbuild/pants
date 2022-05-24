@@ -561,7 +561,7 @@ def test_all_owned_sources(rule_runner: RuleRunner) -> None:
 def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
-        [MockPutativeFortranModuleRequest(PutativeTargetsSearchPaths(tuple("")))],
+        [MockPutativeFortranModuleRequest(PutativeTargetsSearchPaths(("dir",)))],
     )
     assert putative_targets == PutativeTargets(
         [PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])]

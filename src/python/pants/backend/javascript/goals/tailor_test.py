@@ -39,7 +39,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeJSTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeJSTargetsRequest(PutativeTargetsSearchPaths(("src/owned", "src/unowned"))),
             AllOwnedSources(["src/owned/OwnedFile.js"]),
         ],
     )

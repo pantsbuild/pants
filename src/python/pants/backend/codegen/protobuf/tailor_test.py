@@ -40,7 +40,9 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeProtobufTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeProtobufTargetsRequest(
+                PutativeTargetsSearchPaths(("protos/foo", "protos/foo/bar"))
+            ),
             AllOwnedSources(["protos/foo/bar/baz1.proto"]),
         ],
     )

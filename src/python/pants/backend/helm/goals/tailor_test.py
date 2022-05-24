@@ -37,7 +37,9 @@ def test_find_helm_charts(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeHelmChartTargetsRequest(PutativeTargetsSearchPaths(("src/",))),
+            PutativeHelmChartTargetsRequest(
+                PutativeTargetsSearchPaths(("src/owned", "src/foo", "src/bar"))
+            ),
             AllOwnedSources(["src/owned/Chart.yaml"]),
         ],
     )

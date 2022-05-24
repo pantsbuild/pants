@@ -22,6 +22,7 @@ from pants.engine.fs import (
     FileContent,
     PathGlobs,
     Paths,
+    SpecsPaths,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -39,6 +40,7 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, DictOption, StrListOption, StrOption
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.docutil import bin_name, doc_url
@@ -58,9 +60,15 @@ class PutativeTargetsRequest(metaclass=ABCMeta):
 @dataclass(frozen=True)
 class PutativeTargetsSearchPaths:
     dirs: tuple[str, ...]
+    deprecated_recursive_dirs: tuple[str, ...] = ()
 
     def path_globs(self, filename_glob: str) -> PathGlobs:
-        return PathGlobs([os.path.join(d, "**", filename_glob) for d in self.dirs])
+        return PathGlobs(
+            globs=(
+                *(os.path.join(d, filename_glob) for d in self.dirs),
+                *(os.path.join(d, "**", filename_glob) for d in self.deprecated_recursive_dirs),
+            )
+        )
 
 
 @memoized
@@ -582,10 +590,20 @@ async def tailor(
     union_membership: UnionMembership,
     specs: Specs,
     build_file_options: BuildFileOptions,
+    global_options: GlobalOptions,
 ) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
 
-    search_paths = PutativeTargetsSearchPaths(specs_to_dirs(specs))
+    if global_options.use_deprecated_directory_cli_args_semantics:
+        search_paths = PutativeTargetsSearchPaths(
+            dirs=(), deprecated_recursive_dirs=specs_to_dirs(specs)
+        )
+    else:
+        specs_paths = await Get(SpecsPaths, Specs, specs)
+        search_paths = PutativeTargetsSearchPaths(
+            tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
+        )
+
     putative_targets_results = await MultiGet(
         Get(PutativeTargets, PutativeTargetsRequest, req_type(search_paths))
         for req_type in union_membership[PutativeTargetsRequest]
