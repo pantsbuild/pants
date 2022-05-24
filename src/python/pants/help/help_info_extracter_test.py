@@ -12,7 +12,7 @@ from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
-from pants.option.option_types import BoolOption, IntOption
+from pants.option.option_types import BoolOption, IntOption, StrOption
 from pants.option.options import Options
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
@@ -229,7 +229,9 @@ def test_get_all_help_info():
         options_scope = GLOBAL_SCOPE
         help = "Global options."
 
-        opt1 = IntOption("-o", "--opt1", default=42, help="Option 1")
+        opt1 = IntOption("--opt1", default=42, help="Option 1")
+        # We special-case `-l` to allow a short arg. Make sure that works.
+        level = StrOption("-l", "--level", default="info", help="Log level")
 
     class Foo(Subsystem):
         options_scope = "foo"
@@ -301,10 +303,10 @@ def test_get_all_help_info():
                 "deprecated_scope": None,
                 "basic": (
                     {
-                        "display_args": ("-o=<int>", "--opt1=<int>"),
-                        "comma_separated_display_args": "-o=<int>, --opt1=<int>",
-                        "scoped_cmd_line_args": ("-o", "--opt1"),
-                        "unscoped_cmd_line_args": ("-o", "--opt1"),
+                        "display_args": ("--opt1=<int>",),
+                        "comma_separated_display_args": "--opt1=<int>",
+                        "scoped_cmd_line_args": ("--opt1",),
+                        "unscoped_cmd_line_args": ("--opt1",),
                         "config_key": "opt1",
                         "env_var": "PANTS_OPT1",
                         "value_history": {
@@ -316,6 +318,29 @@ def test_get_all_help_info():
                         "typ": int,
                         "default": 42,
                         "help": "Option 1",
+                        "deprecation_active": False,
+                        "deprecated_message": None,
+                        "removal_version": None,
+                        "removal_hint": None,
+                        "choices": None,
+                        "comma_separated_choices": None,
+                    },
+                    {
+                        "display_args": ("-l=<str>", "--level=<str>"),
+                        "comma_separated_display_args": "-l=<str>, --level=<str>",
+                        "scoped_cmd_line_args": ("-l", "--level"),
+                        "unscoped_cmd_line_args": ("-l", "--level"),
+                        "config_key": "level",
+                        "env_var": "PANTS_LEVEL",
+                        "value_history": {
+                            "ranked_values": (
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": "info", "details": None},
+                            ),
+                        },
+                        "typ": str,
+                        "default": "info",
+                        "help": "Log level",
                         "deprecation_active": False,
                         "deprecated_message": None,
                         "removal_version": None,

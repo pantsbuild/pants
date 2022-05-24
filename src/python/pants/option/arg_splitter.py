@@ -289,6 +289,9 @@ class ArgSplitter:
     def is_level_short_arg(self, arg: str) -> bool:
         """We special case the `--level` global option to also be recognized with `-l`.
 
-        It's important that that this be classified as a global option.
+        It's important that this be classified as a global option.
+
+        Note that we also need to recognize `-h` and `-v` as builtin goals. That is handled already
+        via `likely_a_spec()`.
         """
         return arg in {"-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror"}
