@@ -71,7 +71,7 @@ class JunitTestTarget(Target):
 class JavaTestsGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*Test.java",)
     help = generate_multiple_sources_field_help_message(
-        """Example: `sources=['*Test.java', '!TestIgnore.java']`."""
+        "Example: `sources=['*Test.java', '!TestIgnore.java']`"
     )
 
 
