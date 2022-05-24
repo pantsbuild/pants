@@ -95,7 +95,15 @@ class HelmChartMetaSourceField(SingleSourceField):
 
 
 class HelmChartSourcesField(MultipleSourcesField):
-    default = ("values.yaml", "templates/*.yaml", "templates/*.tpl")
+    default = (
+        "values.yaml",
+        "values.yml",
+        "templates/*.yaml",
+        "templates/*.yml",
+        "templates/*.tpl",
+        "crds/*.yaml",
+        "crds/*.yml",
+    )
     expected_file_extensions = (".yaml", ".yml", ".tpl")
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['values.yaml', 'templates/*.yaml', '!values_ignore.yaml']`"
