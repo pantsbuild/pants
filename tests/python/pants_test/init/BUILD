@@ -4,10 +4,15 @@
 python_tests(
     name="tests",
     timeout=360,
-    dependencies=[
-        # Used by `test_options_initializer`.
-        "//BUILD_ROOT:files"
-    ],
+    overrides={
+        ("test_options_initializer.py", "test_plugin_resolver.py"): {
+            "dependencies": [
+                "//BUILD_ROOT:files",
+                # This tests load `pants.toml`, which references many of these plugins.
+                "src/python/pants/bin:plugins",
+            ],
+        }
+    },
 )
 
 python_sources()
