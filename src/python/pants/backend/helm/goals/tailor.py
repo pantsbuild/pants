@@ -38,7 +38,7 @@ async def find_putative_helm_targets(
     all_chart_files = await Get(
         Paths, PathGlobs, request.path_globs(*HELM_CHART_METADATA_FILENAMES)
     )
-    unowned_chart_files = set(all_chart_files) - set(all_owned_sources)
+    unowned_chart_files = set(all_chart_files.files) - set(all_owned_sources)
 
     putative_targets = []
     for chart_file in sorted(unowned_chart_files):
