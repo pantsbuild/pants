@@ -80,7 +80,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     def __new__(
         cls,
         flag_name: str,
-        *additional_flag_names: str,
+        *,
         default: _MaybeDynamicT[_DefaultT],
         help: _HelpT,
         # Additional bells/whistles
@@ -98,9 +98,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     ):
         """Construct a new Option descriptor.
 
-        :param flag_name: Either the long "--" or short "-" flag name (E.g. "--skip")
-        :param additional_flag_names: Additional flag names (if `flag_name` is set to the short
-            name).
+        :param flag_name: The argument name, starting with "--", e.g. "--skip".
         :param default: The default value the property will return if unspecified by the user. Note
             that for "scalar" option types (like StrOption and IntOption) this can either be an
             instance of the scalar type or `None`, but __must__ be provided.
@@ -131,7 +129,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             user when running `help`.
         """
         self = super().__new__(cls)
-        self._flag_names = (flag_name, *additional_flag_names)
+        self._flag_names = (flag_name,)
         self._default = default
         self._help = help
         self._register_if = register_if or (lambda cls: True)  # type: ignore[assignment]
@@ -210,7 +208,7 @@ class _ListOptionBase(
     def __new__(
         cls,
         flag_name: str,
-        *additional_flag_names: str,
+        *,
         default: _MaybeDynamicT[list[_ListMemberT]] = [],
         help: _HelpT,
         # Additional bells/whistles
@@ -230,7 +228,6 @@ class _ListOptionBase(
         instance = super().__new__(
             cls,  # type: ignore[arg-type]
             flag_name,
-            *additional_flag_names,
             default=default,  # type: ignore[arg-type]
             help=help,
             register_if=register_if,
@@ -426,7 +423,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
     def __new__(
         cls,
         flag_name: str,
-        *additional_flag_names: str,
+        *,
         default: _EnumT,
         help: _HelpT,
         # Additional bells/whistles
@@ -449,7 +446,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
     def __new__(
         cls,
         flag_name: str,
-        *additional_flag_names: str,
+        *,
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
@@ -473,7 +470,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
     def __new__(
         cls,
         flag_name: str,
-        *additional_flag_names: str,
+        *,
         enum_type: type[_EnumT],
         default: None,
         help: _HelpT,
@@ -495,7 +492,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
     def __new__(
         cls,
         flag_name,
-        *additional_flag_names,
+        *,
         enum_type=None,
         default,
         help,
@@ -515,7 +512,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         instance = super().__new__(
             cls,
             flag_name,
-            *additional_flag_names,
             default=default,
             help=help,
             register_if=register_if,
@@ -565,7 +561,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
     def __new__(
         cls,
         flag_name: str,
-        *additional_flag_names: str,
+        *,
         default: list[_EnumT],
         help: _HelpT,
         # Additional bells/whistles
@@ -588,7 +584,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
     def __new__(
         cls,
         flag_name: str,
-        *additional_flag_names: str,
+        *,
         enum_type: type[_EnumT],
         default: _DynamicDefaultT,
         help: _HelpT,
@@ -612,7 +608,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
     def __new__(
         cls,
         flag_name: str,
-        *additional_flag_names: str,
+        *,
         enum_type: type[_EnumT],
         help: _HelpT,
         # Additional bells/whistles
@@ -633,7 +629,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
     def __new__(
         cls,
         flag_name,
-        *additional_flag_names,
+        *,
         enum_type=None,
         default=[],
         help,
@@ -653,7 +649,6 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         instance = super().__new__(
             cls,
             flag_name,
-            *additional_flag_names,
             default=default,
             help=help,
             register_if=register_if,
@@ -716,7 +711,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
     def __new__(
         cls,
         flag_name: str,
-        *additional_flag_names: str,
+        *,
         default: _MaybeDynamicT[dict[str, _ValueT]] = {},
         help,
         # Additional bells/whistles
@@ -735,7 +730,6 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         return super().__new__(
             cls,  # type: ignore[arg-type]
             flag_name,
-            *additional_flag_names,
             default=default,  # type: ignore[arg-type]
             help=help,
             register_if=register_if,
