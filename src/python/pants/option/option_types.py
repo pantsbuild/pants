@@ -98,9 +98,8 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     ):
         """Construct a new Option descriptor.
 
-        :param flag_name: Either the long "--" or short "-" flag name (E.g. "--skip")
-        :param additional_flag_names: Additional flag names (if `flag_name` is set to the short
-            name).
+        :param flag_name: The argument name, starting with "--", e.g. "--skip".
+        :param additional_flag_names: Additional flag names. Usually this should be left off.
         :param default: The default value the property will return if unspecified by the user. Note
             that for "scalar" option types (like StrOption and IntOption) this can either be an
             instance of the scalar type or `None`, but __must__ be provided.
