@@ -505,6 +505,25 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
 
 
+class LogLevelOption(EnumOption):
+    """The `--level` option.
+
+    This is a dedicated class because it's the only option where we allow both the short flag `-l`
+    and the long flag `--level`.
+    """
+
+    def __new__(cls):
+        self = super().__new__(
+            cls,
+            "--level",
+            default=LogLevel.INFO,
+            daemon=True,
+            help="Set the logging level.",
+        )
+        self._flag_names = ("--level", "-l")
+        return self
+
+
 class BootstrapOptions:
     """The set of options necessary to create a Scheduler.
 
@@ -548,14 +567,7 @@ class BootstrapOptions:
         default=False,
         help="Re-resolve plugins, even if previously resolved.",
     )
-    level = EnumOption(
-        "--level",
-        default=LogLevel.INFO,
-        daemon=True,
-        help="Set the logging level.",
-        # This is the only option where we allow a short flag name.
-        _unsafe_short_flag_name="-l",
-    )
+    level = LogLevelOption()
     show_log_target = BoolOption(
         "--show-log-target",
         default=False,

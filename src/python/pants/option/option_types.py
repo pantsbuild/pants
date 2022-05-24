@@ -95,7 +95,6 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-        _unsafe_short_flag_name: str | None = None,
     ):
         """Construct a new Option descriptor.
 
@@ -130,9 +129,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             user when running `help`.
         """
         self = super().__new__(cls)
-        self._flag_names = (
-            (_unsafe_short_flag_name, flag_name) if _unsafe_short_flag_name else (flag_name,)
-        )
+        self._flag_names = (flag_name,)
         self._default = default
         self._help = help
         self._register_if = register_if or (lambda cls: True)  # type: ignore[assignment]
@@ -441,7 +438,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-        _unsafe_short_flag_name: str | None = None,
     ) -> EnumOption[_EnumT, _EnumT]:
         ...
 
@@ -466,7 +462,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-        _unsafe_short_flag_name: str | None = None,
     ) -> EnumOption[_EnumT, _EnumT]:
         ...
 
@@ -491,7 +486,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
-        _unsafe_short_flag_name: str | None = None,
     ) -> EnumOption[_EnumT, None]:
         ...
 
@@ -514,7 +508,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         # Internal bells/whistles
         daemon=None,
         fingerprint=None,
-        _unsafe_short_flag_name: str | None = None,
     ):
         instance = super().__new__(
             cls,
@@ -531,7 +524,6 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
             removal_hint=removal_hint,
             daemon=daemon,
             fingerprint=fingerprint,
-            _unsafe_short_flag_name=_unsafe_short_flag_name,
         )
         instance._enum_type = enum_type
         return instance
