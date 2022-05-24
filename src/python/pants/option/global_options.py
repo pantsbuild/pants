@@ -520,7 +520,7 @@ class LogLevelOption(EnumOption[LogLevel, LogLevel]):
             daemon=True,
             help="Set the logging level.",
         )
-        self._flag_names = ("--level", "-l")
+        self._flag_names = ("-l", "--level")
         return self  # type: ignore[return-value]
 
 
