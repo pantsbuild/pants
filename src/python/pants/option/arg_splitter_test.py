@@ -81,7 +81,7 @@ def test_is_spec(tmp_path: Path, splitter: ArgSplitter, known_scope_infos: list[
         "a/b/*.txt",
         "a/b/test*",
         "a/**/*",
-        "!",
+        "-",
         "a/b.txt:tgt",
         "a/b.txt:../tgt",
         "dir#gen",
@@ -95,10 +95,10 @@ def test_is_spec(tmp_path: Path, splitter: ArgSplitter, known_scope_infos: list[
     # With no directories on disk to tiebreak.
     for spec in directories_vs_goals:
         assert splitter.likely_a_spec(spec) is False
-        assert splitter.likely_a_spec(f"!{spec}") is True
+        assert splitter.likely_a_spec(f"-{spec}") is True
     for s in unambiguous_specs:
         assert splitter.likely_a_spec(s) is True
-        assert splitter.likely_a_spec(f"!{s}") is True
+        assert splitter.likely_a_spec(f"-{s}") is True
 
     # With directories on disk to tiebreak.
     splitter = ArgSplitter(known_scope_infos, tmp_path.as_posix())
@@ -123,26 +123,27 @@ def goal_split_test(command_line: str, **expected):
     [
         # Basic arg splitting, various flag combos.
         (
-            "./pants --check-long-flag -g check -c test -i "
+            "./pants --check-long-flag --gg -ltrace check --cc test --ii "
             "src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
             dict(
                 expected_goals=["check", "test"],
                 expected_scope_to_flags={
-                    "": ["-g"],
-                    "check": ["--long-flag", "-c"],
-                    "test": ["-i"],
+                    "": ["--gg", "-ltrace"],
+                    "check": ["--long-flag", "--cc"],
+                    "test": ["--ii"],
                 },
                 expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
             ),
         ),
         (
-            "./pants -farg --fff=arg check --gg-gg=arg-arg -g test --iii "
-            "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
+            "./pants --fff=arg check --gg-gg=arg-arg test --iii "
+            "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -ltrace "
+            "--another-global",
             dict(
                 expected_goals=["check", "test"],
                 expected_scope_to_flags={
-                    "": ["-farg", "--fff=arg"],
-                    "check": ["--gg-gg=arg-arg", "-g", "--long-flag"],
+                    "": ["--fff=arg", "-ltrace", "--another-global"],
+                    "check": ["--gg-gg=arg-arg", "--long-flag"],
                     "test": ["--iii"],
                 },
                 expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
@@ -184,8 +185,8 @@ def goal_split_test(command_line: str, **expected):
         goal_split_test("./pants test *", expected_specs=["*"]),
         goal_split_test("./pants test test/*.txt", expected_specs=["test/*.txt"]),
         goal_split_test("./pants test test/**/*", expected_specs=["test/**/*"]),
-        goal_split_test("./pants test !", expected_specs=["!"]),
-        goal_split_test("./pants test !a/b", expected_specs=["!a/b"]),
+        goal_split_test("./pants test -", expected_specs=["-"]),
+        goal_split_test("./pants test -a/b", expected_specs=["-a/b"]),
         (
             "./pants test check.java",
             dict(
@@ -235,17 +236,17 @@ def test_passthru_args(splitter: ArgSplitter) -> None:
     )
     assert_valid_split(
         splitter,
-        "./pants -farg --fff=arg check --gg-gg=arg-arg -g test --iii "
+        "./pants -lerror --fff=arg check --gg-gg=arg-arg test --iii "
         "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -- "
-        "passthru1 passthru2",
+        "passthru1 passthru2 -linfo",
         expected_goals=["check", "test"],
         expected_scope_to_flags={
-            "": ["-farg", "--fff=arg"],
-            "check": ["--gg-gg=arg-arg", "-g", "--long-flag"],
+            "": ["-lerror", "--fff=arg"],
+            "check": ["--gg-gg=arg-arg", "--long-flag"],
             "test": ["--iii"],
         },
         expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
-        expected_passthru=["passthru1", "passthru2"],
+        expected_passthru=["passthru1", "passthru2", "-linfo"],
     )
 
 
@@ -327,19 +328,31 @@ def help_no_arguments_test(command_line: str, *scopes: str, **expected):
         help_test(
             "./pants -f",
             expected_goals=[],
-            expected_scope_to_flags={"": ["-f"]},
-            expected_specs=[],
+            expected_scope_to_flags={"": []},
+            expected_specs=["-f"],
         ),
         help_test(
             "./pants help check -x",
             expected_goals=["check"],
-            expected_scope_to_flags={"": [], "help": ["-x"], "check": []},
-            expected_specs=[],
+            expected_scope_to_flags={"": [], "help": [], "check": []},
+            expected_specs=["-x"],
         ),
         help_test(
             "./pants check -h",
             expected_goals=["check"],
             expected_scope_to_flags={"": [], "check": [], "help": []},
+            expected_specs=[],
+        ),
+        help_test(
+            "./pants -linfo check -h",
+            expected_goals=["check"],
+            expected_scope_to_flags={"": ["-linfo"], "check": [], "help": []},
+            expected_specs=[],
+        ),
+        help_test(
+            "./pants check -h -linfo",
+            expected_goals=["check"],
+            expected_scope_to_flags={"": ["-linfo"], "check": [], "help": []},
             expected_specs=[],
         ),
         help_test(
@@ -409,7 +422,7 @@ def test_unknown_goal_detection(
     assert_unknown_goal(splitter, command_line, unknown_goals)
 
 
-@pytest.mark.parametrize("extra_args", ("", "foo/bar:baz", "f.ext"))
+@pytest.mark.parametrize("extra_args", ("", "foo/bar:baz", "f.ext", "-linfo", "--arg"))
 def test_no_goal_detection(extra_args: str, splitter: ArgSplitter) -> None:
     split_args = splitter.split_args(shlex.split(f"./pants {extra_args}"))
     assert NO_GOAL_NAME == split_args.builtin_goal

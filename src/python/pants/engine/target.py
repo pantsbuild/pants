@@ -2779,6 +2779,19 @@ class OverridesField(AsyncFieldMixin, Field):
         return result
 
 
+def generate_multiple_sources_field_help_message(files_example: str) -> str:
+    return softwrap(
+        """
+        A list of files and globs that belong to this target.
+
+        Paths are relative to the BUILD file's directory. You can ignore files/globs by
+        prefixing them with `!`.
+
+        """
+        + files_example
+    )
+
+
 def generate_file_based_overrides_field_help_message(
     generated_target_name: str, example: str
 ) -> str:

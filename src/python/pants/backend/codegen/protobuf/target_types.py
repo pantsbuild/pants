@@ -17,6 +17,7 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
     Targets,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
@@ -95,6 +96,9 @@ def generator_settings(
 class ProtobufSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.proto",)
     expected_file_extensions = (".proto",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.proto', 'new_*.proto', '!old_ignore*.proto']`"
+    )
 
 
 class ProtobufSourcesOverridesField(OverridesField):

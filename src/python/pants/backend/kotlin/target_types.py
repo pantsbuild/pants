@@ -16,6 +16,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
 )
 from pants.jvm.target_types import (
     JunitTestSourceField,
@@ -90,6 +91,9 @@ class KotlinSourceTarget(Target):
 
 class KotlinSourcesGeneratorSourcesField(KotlinGeneratorSourcesField):
     default = ("*.kt",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Example.kt', 'New*.kt', '!OldIgnore.kt']`"
+    )
 
 
 class KotlinSourcesGeneratorTarget(TargetFilesGenerator):
@@ -139,6 +143,9 @@ class KotlinJunitTestTarget(Target):
 
 class KotlinJunitTestsGeneratorSourcesField(KotlinGeneratorSourcesField):
     default = ("*Test.kt",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Test.kt', '!TestIgnore.kt']`"
+    )
 
 
 class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
