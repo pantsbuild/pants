@@ -26,6 +26,7 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.util.enums import match
@@ -169,6 +170,9 @@ class Shunit2TestTarget(Target):
 
 class Shunit2TestsGeneratorSourcesField(ShellGeneratingSourcesBase):
     default = ("*_test.sh", "test_*.sh", "tests.sh")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['test.sh', 'test_*.sh', '!test_ignore.sh']`"
+    )
 
 
 class Shunit2TestsOverrideField(OverridesField):
@@ -216,6 +220,9 @@ class ShellSourceTarget(Target):
 
 class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBase):
     default = ("*.sh",) + tuple(f"!{pat}" for pat in Shunit2TestsGeneratorSourcesField.default)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.sh', 'new_*.sh', '!old_ignore.sh']`"
+    )
 
 
 class ShellSourcesOverridesField(OverridesField):

@@ -18,6 +18,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.target_types import (
@@ -107,6 +108,9 @@ class ScalatestTestTarget(Target):
 
 class ScalatestTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Spec.scala", "*Suite.scala")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Spec.scala', '!SuiteIgnore.scala']`"
+    )
 
 
 class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
@@ -158,6 +162,9 @@ class ScalaJunitTestTarget(Target):
 
 class ScalaJunitTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Test.scala",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Test.scala', '!TestIgnore.scala']`"
+    )
 
 
 class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
@@ -208,6 +215,9 @@ class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSourcesField):
         "*.scala",
         *(f"!{pat}" for pat in (ScalaJunitTestsGeneratorSourcesField.default)),
         *(f"!{pat}" for pat in (ScalatestTestsGeneratorSourcesField.default)),
+    )
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Example.scala', 'New*.scala', '!OldIgnore.scala']`"
     )
 
 
