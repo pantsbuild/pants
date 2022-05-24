@@ -273,12 +273,12 @@ class ArgSplitter:
         return default_scope, flag
 
     def _at_flag(self) -> bool:
-        return (
-            bool(self._unconsumed_args)
-            and self._unconsumed_args[-1].startswith("-")
-            and not self._at_standalone_double_dash()
-            and not self._at_scope()
-        )
+        if not self._unconsumed_args:
+            return False
+        arg = self._unconsumed_args[-1]
+        if not arg.startswith("-"):
+            return False
+        return not self._at_standalone_double_dash() and not self._at_scope()
 
     def _at_scope(self) -> bool:
         return bool(self._unconsumed_args) and self._unconsumed_args[-1] in self._known_scopes
