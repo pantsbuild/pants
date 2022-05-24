@@ -73,8 +73,7 @@ class ArgSplitter:
 
     Recognizes, e.g.:
 
-    ./pants check --foo lint -y target1: dir f.ext
-    ./pants check --foo lint -y target1: dir f.ext
+    ./pants check --foo lint target1: dir f.ext
     ./pants --global-opt check target1: dir f.ext --check-flag
     ./pants --check-flag check target1: dir f.ext
     ./pants goal -- passthru foo
@@ -276,7 +275,7 @@ class ArgSplitter:
         if not self._unconsumed_args:
             return False
         arg = self._unconsumed_args[-1]
-        if not arg.startswith("-"):
+        if not arg.startswith("--"):
             return False
         return not self._at_standalone_double_dash() and not self._at_scope()
 

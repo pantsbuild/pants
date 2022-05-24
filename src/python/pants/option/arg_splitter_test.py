@@ -125,26 +125,26 @@ def goal_split_test(command_line: str, **expected):
     [
         # Basic arg splitting, various flag combos.
         (
-            "./pants --check-long-flag -g check -c test -i "
+            "./pants --check-long-flag --gg check --cc test --ii "
             "src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
             dict(
                 expected_goals=["check", "test"],
                 expected_scope_to_flags={
-                    "": ["-g"],
-                    "check": ["--long-flag", "-c"],
-                    "test": ["-i"],
+                    "": ["--gg"],
+                    "check": ["--long-flag", "--cc"],
+                    "test": ["--ii"],
                 },
                 expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
             ),
         ),
         (
-            "./pants -farg --fff=arg check --gg-gg=arg-arg -g test --iii "
+            "./pants --fff=arg check --gg-gg=arg-arg test --iii "
             "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz",
             dict(
                 expected_goals=["check", "test"],
                 expected_scope_to_flags={
-                    "": ["-farg", "--fff=arg"],
-                    "check": ["--gg-gg=arg-arg", "-g", "--long-flag"],
+                    "": ["--fff=arg"],
+                    "check": ["--gg-gg=arg-arg", "--long-flag"],
                     "test": ["--iii"],
                 },
                 expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
@@ -237,13 +237,13 @@ def test_passthru_args(splitter: ArgSplitter) -> None:
     )
     assert_valid_split(
         splitter,
-        "./pants -farg --fff=arg check --gg-gg=arg-arg -g test --iii "
+        "./pants --fff=arg check --gg-gg=arg-arg test --iii "
         "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz -- "
         "passthru1 passthru2",
         expected_goals=["check", "test"],
         expected_scope_to_flags={
-            "": ["-farg", "--fff=arg"],
-            "check": ["--gg-gg=arg-arg", "-g", "--long-flag"],
+            "": ["--fff=arg"],
+            "check": ["--gg-gg=arg-arg", "--long-flag"],
             "test": ["--iii"],
         },
         expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
@@ -329,13 +329,13 @@ def help_no_arguments_test(command_line: str, *scopes: str, **expected):
         help_test(
             "./pants -f",
             expected_goals=[],
-            expected_scope_to_flags={"": ["-f"]},
+            expected_scope_to_flags={"": [], "-f": []},
             expected_specs=[],
         ),
         help_test(
             "./pants help check -x",
             expected_goals=["check"],
-            expected_scope_to_flags={"": [], "help": ["-x"], "check": []},
+            expected_scope_to_flags={"": [], "-x": [], "help": [], "check": []},
             expected_specs=[],
         ),
         help_test(
