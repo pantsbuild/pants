@@ -18,11 +18,12 @@ from pants.base.specs import (
     DirLiteralSpec,
     FileGlobSpec,
     FileLiteralSpec,
+    RawSpecs,
+    RawSpecsWithOnlyFileOwners,
+    RawSpecsWithoutFileOwners,
     RecursiveGlobSpec,
     Spec,
     Specs,
-    SpecsWithOnlyFileOwners,
-    SpecsWithoutFileOwners,
 )
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.address import Address
@@ -115,10 +116,11 @@ def rule_runner() -> RuleRunner:
         rules=[
             generate_mock_generated_target,
             UnionRule(GenerateTargetsRequest, MockGenerateTargetsRequest),
+            QueryRule(Addresses, [RawSpecs]),
+            QueryRule(Addresses, [RawSpecsWithoutFileOwners]),
+            QueryRule(Addresses, [RawSpecsWithOnlyFileOwners]),
+            QueryRule(FilteredTargets, [Addresses]),
             QueryRule(Addresses, [Specs]),
-            QueryRule(Addresses, [SpecsWithoutFileOwners]),
-            QueryRule(Addresses, [SpecsWithOnlyFileOwners]),
-            QueryRule(FilteredTargets, [Specs]),
             QueryRule(SpecsPaths, [Specs]),
         ],
         objects={"parametrize": Parametrize},
@@ -127,16 +129,16 @@ def rule_runner() -> RuleRunner:
 
 
 # -----------------------------------------------------------------------------------------------
-# SpecsWithoutFileOwners -> Targets
+# RawSpecsWithoutFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
-def resolve_specs_without_file_owners(
+def resolve_raw_specs_without_file_owners(
     rule_runner: RuleRunner,
     specs: Iterable[Spec],
     ignore_nonexistent: bool = False,
 ) -> list[Address]:
-    specs_obj = Specs.create(
+    specs_obj = RawSpecs.create(
         specs,
         filter_by_global_options=True,
         convert_dir_literal_to_address_literal=False,
@@ -144,11 +146,11 @@ def resolve_specs_without_file_owners(
             GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
         ),
     )
-    result = rule_runner.request(Addresses, [SpecsWithoutFileOwners.from_specs(specs_obj)])
+    result = rule_runner.request(Addresses, [RawSpecsWithoutFileOwners.from_raw_specs(specs_obj)])
     return sorted(result)
 
 
-def test_specs_without_file_owners_literals_vs_globs(rule_runner: RuleRunner) -> None:
+def test_raw_specs_without_file_owners_literals_vs_globs(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "demo/BUILD": dedent(
@@ -168,7 +170,7 @@ def test_specs_without_file_owners_literals_vs_globs(rule_runner: RuleRunner) ->
     )
 
     def assert_resolved(spec: Spec, expected: set[Address]) -> None:
-        result = resolve_specs_without_file_owners(rule_runner, [spec])
+        result = resolve_raw_specs_without_file_owners(rule_runner, [spec])
         assert set(result) == expected
 
     # Literals should be "one-in, one-out".
@@ -238,7 +240,7 @@ def test_specs_without_file_owners_literals_vs_globs(rule_runner: RuleRunner) ->
     )
 
 
-def test_specs_without_file_owners_deduplication(rule_runner: RuleRunner) -> None:
+def test_raw_specs_without_file_owners_deduplication(rule_runner: RuleRunner) -> None:
     """When multiple specs cover the same address, we should deduplicate to one single Address."""
     rule_runner.write_files(
         {
@@ -260,7 +262,7 @@ def test_specs_without_file_owners_deduplication(rule_runner: RuleRunner) -> Non
         AddressLiteralSpec("demo", target_component="nonfile", generated_component="gen"),
         AddressLiteralSpec("demo/f.txt"),
     ]
-    assert resolve_specs_without_file_owners(rule_runner, specs) == [
+    assert resolve_raw_specs_without_file_owners(rule_runner, specs) == [
         Address("demo"),
         Address("demo", target_name="nonfile"),
         Address("demo", target_name="nonfile", generated_name="gen"),
@@ -268,7 +270,7 @@ def test_specs_without_file_owners_deduplication(rule_runner: RuleRunner) -> Non
     ]
 
 
-def test_specs_without_file_owners_filter_by_tag(rule_runner: RuleRunner) -> None:
+def test_raw_specs_without_file_owners_filter_by_tag(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--tag=+integration"])
     all_integration_tgts = [
         Address("demo", target_name="b_f"),
@@ -293,13 +295,13 @@ def test_specs_without_file_owners_filter_by_tag(rule_runner: RuleRunner) -> Non
         }
     )
     assert (
-        resolve_specs_without_file_owners(rule_runner, [DirGlobSpec("demo")])
+        resolve_raw_specs_without_file_owners(rule_runner, [DirGlobSpec("demo")])
         == all_integration_tgts
     )
 
     # The same filtering should work when given literal addresses, including generated targets and
     # file addresses.
-    literals_result = resolve_specs_without_file_owners(
+    literals_result = resolve_raw_specs_without_file_owners(
         rule_runner,
         [
             AddressLiteralSpec("demo", "a_f"),
@@ -318,7 +320,7 @@ def test_specs_without_file_owners_filter_by_tag(rule_runner: RuleRunner) -> Non
     assert literals_result == all_integration_tgts
 
 
-def test_specs_without_file_owners_filter_by_exclude_pattern(rule_runner: RuleRunner) -> None:
+def test_raw_specs_without_file_owners_filter_by_exclude_pattern(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--exclude-target-regexp=exclude_me.*"])
     rule_runner.write_files(
         {
@@ -341,11 +343,11 @@ def test_specs_without_file_owners_filter_by_exclude_pattern(rule_runner: RuleRu
         Address("demo", target_name="not_me_f", relative_file_path="f.txt"),
     ]
 
-    assert resolve_specs_without_file_owners(rule_runner, [DirGlobSpec("demo")]) == not_me_tgts
+    assert resolve_raw_specs_without_file_owners(rule_runner, [DirGlobSpec("demo")]) == not_me_tgts
 
     # The same filtering should work when given literal addresses, including generated targets and
     # file addresses.
-    literals_result = resolve_specs_without_file_owners(
+    literals_result = resolve_raw_specs_without_file_owners(
         rule_runner,
         [
             AddressLiteralSpec("demo", "exclude_me_f"),
@@ -361,17 +363,17 @@ def test_specs_without_file_owners_filter_by_exclude_pattern(rule_runner: RuleRu
     assert literals_result == not_me_tgts
 
 
-def test_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> None:
+def test_raw_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {"real/f.txt": "", "real/BUILD": "target(sources=['f.txt'])", "empty/BUILD": "# empty"}
     )
 
     def assert_resolve_error(spec: Spec, *, expected: str) -> None:
         with engine_error(contains=expected):
-            resolve_specs_without_file_owners(rule_runner, [spec])
+            resolve_raw_specs_without_file_owners(rule_runner, [spec])
 
     def assert_does_not_error(spec: Spec, *, ignore_nonexistent: bool = False) -> None:
-        assert not resolve_specs_without_file_owners(
+        assert not resolve_raw_specs_without_file_owners(
             rule_runner, [spec], ignore_nonexistent=ignore_nonexistent
         )
 
@@ -414,7 +416,7 @@ def test_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> None
     assert_does_not_error(AncestorGlobSpec("fake"), ignore_nonexistent=True)
 
 
-def test_specs_without_file_owners_generated_target_does_not_belong_to_generator(
+def test_raw_specs_without_file_owners_generated_target_does_not_belong_to_generator(
     rule_runner: RuleRunner,
 ) -> None:
     rule_runner.write_files(
@@ -431,7 +433,7 @@ def test_specs_without_file_owners_generated_target_does_not_belong_to_generator
     )
 
     with pytest.raises(ExecutionError) as exc:
-        resolve_specs_without_file_owners(
+        resolve_raw_specs_without_file_owners(
             rule_runner, [AddressLiteralSpec("demo/f.txt", "not_owner")]
         )
     assert (
@@ -439,7 +441,7 @@ def test_specs_without_file_owners_generated_target_does_not_belong_to_generator
     ) in str(exc.value)
 
 
-def test_specs_without_file_owners_parametrize(
+def test_raw_specs_without_file_owners_parametrize(
     rule_runner: RuleRunner,
 ) -> None:
     rule_runner.write_files(
@@ -456,7 +458,7 @@ def test_specs_without_file_owners_parametrize(
     )
 
     def assert_resolved(spec: Spec, expected: set[Address]) -> None:
-        assert set(resolve_specs_without_file_owners(rule_runner, [spec])) == expected
+        assert set(resolve_raw_specs_without_file_owners(rule_runner, [spec])) == expected
 
     not_gen_resolve_a = Address("demo", target_name="not_gen", parameters={"resolve": "a"})
     not_gen_resolve_b = Address("demo", target_name="not_gen", parameters={"resolve": "b"})
@@ -543,21 +545,21 @@ def test_specs_without_file_owners_parametrize(
     # Error on invalid targets.
     def assert_errors(spec: AddressLiteralSpec) -> None:
         with engine_error(ValueError):
-            resolve_specs_without_file_owners(rule_runner, [spec])
+            resolve_raw_specs_without_file_owners(rule_runner, [spec])
 
     assert_errors(AddressLiteralSpec("demo", parameters=FrozenDict({"fake": "v"})))
     assert_errors(AddressLiteralSpec("demo", parameters=FrozenDict({"resolve": "fake"})))
 
 
 # -----------------------------------------------------------------------------------------------
-# SpecsWithOnlyFileOwners -> Targets
+# RawSpecsWithOnlyFileOwners -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
-def resolve_specs_with_only_file_owners(
+def resolve_raw_specs_with_only_file_owners(
     rule_runner: RuleRunner, specs: Iterable[Spec], ignore_nonexistent: bool = False
 ) -> list[Address]:
-    specs_obj = Specs.create(
+    specs_obj = RawSpecs.create(
         specs,
         filter_by_global_options=True,
         convert_dir_literal_to_address_literal=True,
@@ -565,11 +567,11 @@ def resolve_specs_with_only_file_owners(
             GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
         ),
     )
-    result = rule_runner.request(Addresses, [SpecsWithOnlyFileOwners.from_specs(specs_obj)])
+    result = rule_runner.request(Addresses, [RawSpecsWithOnlyFileOwners.from_raw_specs(specs_obj)])
     return sorted(result)
 
 
-def test_specs_with_only_file_owners_literal_file(rule_runner: RuleRunner) -> None:
+def test_raw_specs_with_only_file_owners_literal_file(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "demo/f1.txt": "",
@@ -583,13 +585,15 @@ def test_specs_with_only_file_owners_literal_file(rule_runner: RuleRunner) -> No
             ),
         }
     )
-    assert resolve_specs_with_only_file_owners(rule_runner, [FileLiteralSpec("demo/f1.txt")]) == [
+    assert resolve_raw_specs_with_only_file_owners(
+        rule_runner, [FileLiteralSpec("demo/f1.txt")]
+    ) == [
         Address("demo", target_name="not-generator"),
         Address("demo", target_name="generator", relative_file_path="f1.txt"),
     ]
 
 
-def test_specs_with_only_file_owners_glob(rule_runner: RuleRunner) -> None:
+def test_raw_specs_with_only_file_owners_glob(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "demo/f1.txt": "",
@@ -613,12 +617,12 @@ def test_specs_with_only_file_owners_glob(rule_runner: RuleRunner) -> None:
     ]
 
     assert (
-        resolve_specs_with_only_file_owners(rule_runner, [FileGlobSpec("demo/*.txt")])
+        resolve_raw_specs_with_only_file_owners(rule_runner, [FileGlobSpec("demo/*.txt")])
         == all_unskipped_addresses
     )
     # We should deduplicate between glob and literal specs.
     assert (
-        resolve_specs_with_only_file_owners(
+        resolve_raw_specs_with_only_file_owners(
             rule_runner,
             [FileGlobSpec("demo/*.txt"), FileLiteralSpec("demo/f1.txt")],
         )
@@ -626,32 +630,34 @@ def test_specs_with_only_file_owners_glob(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_specs_with_only_file_owners_nonexistent_file(rule_runner: RuleRunner) -> None:
+def test_raw_specs_with_only_file_owners_nonexistent_file(rule_runner: RuleRunner) -> None:
     spec = FileLiteralSpec("demo/fake.txt")
     with engine_error(contains='Unmatched glob from CLI arguments: "demo/fake.txt"'):
-        resolve_specs_with_only_file_owners(rule_runner, [spec])
+        resolve_raw_specs_with_only_file_owners(rule_runner, [spec])
 
-    assert not resolve_specs_with_only_file_owners(rule_runner, [spec], ignore_nonexistent=True)
+    assert not resolve_raw_specs_with_only_file_owners(rule_runner, [spec], ignore_nonexistent=True)
 
 
-def test_specs_with_only_file_owners_no_owner(rule_runner: RuleRunner) -> None:
+def test_raw_specs_with_only_file_owners_no_owner(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--owners-not-found-behavior=error"])
     rule_runner.write_files({"no_owners/f.txt": ""})
     # Error for literal specs.
     with pytest.raises(ExecutionError) as exc:
-        resolve_specs_with_only_file_owners(rule_runner, [FileLiteralSpec("no_owners/f.txt")])
+        resolve_raw_specs_with_only_file_owners(rule_runner, [FileLiteralSpec("no_owners/f.txt")])
     assert "No owning targets could be found for the file `no_owners/f.txt`" in str(exc.value)
 
     # Do not error for glob specs.
-    assert not resolve_specs_with_only_file_owners(rule_runner, [FileGlobSpec("no_owners/*.txt")])
+    assert not resolve_raw_specs_with_only_file_owners(
+        rule_runner, [FileGlobSpec("no_owners/*.txt")]
+    )
 
 
 # -----------------------------------------------------------------------------------------------
-# Specs -> Targets
+# RawSpecs & Specs -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
-def test_resolve_addresses_from_specs(rule_runner: RuleRunner) -> None:
+def test_resolve_addresses_from_raw_specs(rule_runner: RuleRunner) -> None:
     """This tests that we correctly handle resolving from both address and filesystem specs."""
     rule_runner.write_files(
         {
@@ -722,7 +728,7 @@ def test_filtered_targets(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    specs = Specs(
+    specs = RawSpecs(
         recursive_globs=(RecursiveGlobSpec("addr_specs"),),
         file_globs=(FileGlobSpec("fs_specs/*.txt"),),
         filter_by_global_options=True,
@@ -731,7 +737,8 @@ def test_filtered_targets(rule_runner: RuleRunner) -> None:
     def check(tags_option: str | None, expected: set[Address]) -> None:
         if tags_option:
             rule_runner.set_options([f"--tag={tags_option}"])
-        result = rule_runner.request(FilteredTargets, [specs])
+        addresses = rule_runner.request(Addresses, [specs])
+        result = rule_runner.request(FilteredTargets, [addresses])
         assert {t.address for t in result} == expected
 
     addr_f1 = Address("addr_specs", relative_file_path="f1.txt")
@@ -792,8 +799,10 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
     def assert_paths(
         specs: Iterable[Spec], expected_files: set[str], expected_dirs: set[str]
     ) -> None:
-        specs_obj = Specs.create(
-            specs, convert_dir_literal_to_address_literal=False, filter_by_global_options=True
+        specs_obj = Specs(
+            includes=RawSpecs.create(
+                specs, convert_dir_literal_to_address_literal=False, filter_by_global_options=True
+            )
         )
         result = rule_runner.request(SpecsPaths, [specs_obj])
         assert set(result.files) == expected_files
@@ -901,7 +910,10 @@ def test_find_valid_field_sets(caplog) -> None:
         )
         return rule_runner.request(
             TargetRootsToFieldSets,
-            [request, Specs.create(specs, convert_dir_literal_to_address_literal=True)],
+            [
+                request,
+                Specs(includes=RawSpecs.create(specs, convert_dir_literal_to_address_literal=True)),
+            ],
         )
 
     valid = find_valid_field_sets(FieldSetSuperclass, [valid_spec, invalid_spec])
@@ -987,7 +999,7 @@ def test_no_applicable_targets_exception() -> None:
     invalid_tgt = Tgt3({}, Address("blah"))
     exc = NoApplicableTargetsException(
         [invalid_tgt],
-        Specs(file_literals=(FileLiteralSpec("foo.ext"),)),
+        Specs(includes=RawSpecs(file_literals=(FileLiteralSpec("foo.ext"),))),
         UnionMembership({}),
         applicable_target_types=[Tgt1, Tgt2],
         goal_description="the `foo` goal",
@@ -1018,7 +1030,7 @@ def test_no_applicable_targets_exception() -> None:
     # Test handling of `Specs`.
     exc = NoApplicableTargetsException(
         [invalid_tgt],
-        Specs(address_literals=(AddressLiteralSpec("foo", "bar"),)),
+        Specs(includes=RawSpecs(address_literals=(AddressLiteralSpec("foo", "bar"),))),
         UnionMembership({}),
         applicable_target_types=[Tgt1],
         goal_description="the `foo` goal",
@@ -1027,8 +1039,10 @@ def test_no_applicable_targets_exception() -> None:
     exc = NoApplicableTargetsException(
         [invalid_tgt],
         Specs(
-            address_literals=(AddressLiteralSpec("foo", "bar"),),
-            file_literals=(FileLiteralSpec("foo.ext"),),
+            includes=RawSpecs(
+                address_literals=(AddressLiteralSpec("foo", "bar"),),
+                file_literals=(FileLiteralSpec("foo.ext"),),
+            )
         ),
         UnionMembership({}),
         applicable_target_types=[Tgt1],

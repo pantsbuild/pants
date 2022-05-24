@@ -13,7 +13,7 @@ from typing import Iterable, NamedTuple, Sequence, cast
 
 from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AncestorGlobSpec, RecursiveGlobSpec, SpecsWithoutFileOwners
+from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -334,14 +334,14 @@ async def resolve_targets(
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
-    tgts = await Get(Targets, SpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),)))
+    tgts = await Get(Targets, RawSpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),)))
     return AllTargets(tgts)
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTargets:
     tgts = await Get(
-        UnexpandedTargets, SpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),))
+        UnexpandedTargets, RawSpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),))
     )
     return AllUnexpandedTargets(tgts)
 
@@ -657,24 +657,24 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # glob.
     live_candidate_specs = tuple(AncestorGlobSpec(directory=d) for d in live_dirs)
     deleted_candidate_specs = tuple(AncestorGlobSpec(directory=d) for d in deleted_dirs)
-    live_get: Get[FilteredTargets | Targets, SpecsWithoutFileOwners]
+    live_get: Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners]
     if owners_request.filter_by_global_options:
         live_get = Get(
             FilteredTargets,
-            SpecsWithoutFileOwners(
+            RawSpecsWithoutFileOwners(
                 ancestor_globs=live_candidate_specs, filter_by_global_options=True
             ),
         )
         deleted_get = Get(
             UnexpandedTargets,
-            SpecsWithoutFileOwners(
+            RawSpecsWithoutFileOwners(
                 ancestor_globs=deleted_candidate_specs, filter_by_global_options=True
             ),
         )
     else:
-        live_get = Get(Targets, SpecsWithoutFileOwners(ancestor_globs=live_candidate_specs))
+        live_get = Get(Targets, RawSpecsWithoutFileOwners(ancestor_globs=live_candidate_specs))
         deleted_get = Get(
-            UnexpandedTargets, SpecsWithoutFileOwners(ancestor_globs=deleted_candidate_specs)
+            UnexpandedTargets, RawSpecsWithoutFileOwners(ancestor_globs=deleted_candidate_specs)
         )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 

@@ -5,7 +5,7 @@ import logging
 from typing import cast
 
 from pants.base.deprecated import warn_or_error
-from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, Specs
+from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
@@ -108,13 +108,16 @@ def calculate_specs(
         )
 
     return Specs(
-        # We need both address_literals and file_literals to cover all our edge cases, including
-        # target-aware vs. target-less goals, e.g. `list` vs `count-loc`.
-        address_literals=tuple(address_literal_specs),
-        file_literals=file_literal_specs,
-        unmatched_glob_behavior=unmatched_cli_globs,
-        filter_by_global_options=True,
-        from_change_detection=True,
+        includes=RawSpecs(
+            # We need both address_literals and file_literals to cover all our edge cases, including
+            # target-aware vs. target-less goals, e.g. `list` vs `count-loc`.
+            address_literals=tuple(address_literal_specs),
+            file_literals=file_literal_specs,
+            unmatched_glob_behavior=unmatched_cli_globs,
+            filter_by_global_options=True,
+            from_change_detection=True,
+        ),
+        ignores=RawSpecs(),
     )
 
 

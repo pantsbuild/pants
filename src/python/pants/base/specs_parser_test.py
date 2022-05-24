@@ -54,9 +54,16 @@ def file_glob(val: str) -> FileGlobSpec:
 
 def assert_spec_parsed(build_root: Path, spec_str: str, expected_spec: Spec) -> None:
     parser = SpecsParser(str(build_root))
-    spec = parser.parse_spec(spec_str)
+    spec, is_ignore = parser.parse_spec(spec_str)
     assert isinstance(spec, type(expected_spec))
     assert spec == expected_spec
+    assert is_ignore is False
+
+    # Check ignores are also parsed correctly.
+    spec, is_ignore = parser.parse_spec(f"-{spec_str}")
+    assert isinstance(spec, type(expected_spec))
+    assert spec == expected_spec
+    assert is_ignore is True
 
 
 @pytest.mark.parametrize(
