@@ -13,6 +13,7 @@ from pants.engine.target import (
     InvalidFieldException,
     MultipleSourcesField,
     Target,
+    generate_multiple_sources_field_help_message,
 )
 from pants.util.strutil import softwrap
 
@@ -22,6 +23,9 @@ class SphinxProjectSourcesField(MultipleSourcesField):
     default = ("conf.py", "**/*.rst")
     expected_file_extensions = (".py", ".rst")
     uses_source_roots = False
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['conf.py', 'new_*.rst', '!old_ignore.rst']`"
+    )
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
