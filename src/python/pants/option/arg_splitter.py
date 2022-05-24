@@ -86,6 +86,11 @@ class ArgSplitter:
         self._known_scopes = {si.scope for si in known_scope_infos} | set(
             self._known_goal_scopes.keys()
         )
+        self._goal_single_dash_aliases = {
+            scope
+            for scope in self._known_goal_scopes.keys()
+            if scope.startswith("-") and not scope.startswith("--")
+        }
         self._unconsumed_args: list[
             str
         ] = []  # In reverse order, for efficient popping off the end.
@@ -220,14 +225,12 @@ class ArgSplitter:
         )
 
     def likely_a_spec(self, arg: str) -> bool:
-        """Return whether `arg` looks like a spec, rather than a goal name.
-
-        An arg is a spec if it looks like an AddressSpec or a FilesystemSpec.
-        """
-        return (
-            arg.startswith("!")
-            or any(c in arg for c in (os.path.sep, ".", ":", "*", "#"))
-            or os.path.exists(os.path.join(self._buildroot, arg))
+        """Return whether `arg` looks like a spec, rather than a goal name."""
+        # Disambiguate between ignore specs and builtin goals like `-h`.
+        if arg.startswith("-") and arg not in self._goal_single_dash_aliases:
+            return True
+        return any(c in arg for c in (os.path.sep, ".", ":", "*", "#")) or os.path.exists(
+            os.path.join(self._buildroot, arg)
         )
 
     def _consume_scope(self) -> tuple[str | None, list[str]]:
