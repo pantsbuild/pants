@@ -13,7 +13,10 @@ use tokio::net::TcpStream;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
-use crate::{Context, FallibleProcessResultWithPlatform, InputDigests, Platform, Process};
+use crate::{
+  CoalescedProcessBatch, Context, FallibleProcessResultWithPlatform, InputDigests, Platform,
+  Process,
+};
 
 #[cfg(test)]
 pub mod tests;
@@ -109,6 +112,15 @@ impl CommandRunner {
 
 #[async_trait]
 impl super::CommandRunner for CommandRunner {
+  async fn run_coalesced_batch(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: CoalescedProcessBatch,
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    self.inner.run_coalesced_batch(context, workunit, req).await
+  }
+
   async fn run(
     &self,
     context: Context,

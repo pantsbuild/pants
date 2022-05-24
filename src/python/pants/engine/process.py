@@ -135,6 +135,37 @@ class Process:
 
 
 @dataclass(frozen=True)
+class ProcessSandboxInfo:
+    input_digest: Digest
+    immutable_input_digests: FrozenDict[str, Digest]
+    use_nailgun: tuple[str, ...]
+    output_files: tuple[str, ...]
+    output_directories: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CoalescedProcessBatch:
+    files_to_sandboxes = FrozenDict[str, ProcessSandboxInfo]
+
+    common_argv: tuple[str, ...]
+    description: str = dataclasses.field(compare=False)
+    level: LogLevel
+    working_directory: str | None
+    env: FrozenDict[str, str]
+    timeout_seconds: int | float
+    append_only_caches: FrozenDict[str, str]
+    jdk_home: str | None
+    execution_slot_variable: str | None
+    platform: str | None
+
+    # NB: Assumed to be len(uncached_processes)
+    # concurrency_available: int
+
+    # Always SUCCESSFUL for now. @TODO?
+    # cache_scope: ProcessCacheScope
+
+
+@dataclass(frozen=True)
 class ProcessResult:
     """Result of executing a process which should not fail.
 

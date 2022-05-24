@@ -10,6 +10,7 @@ use std::time::Duration;
 use crate::context::Context;
 use crate::externs;
 use crate::externs::fs::{PyAddPrefix, PyFileDigest, PyMergeDigests, PyRemovePrefix};
+use crate::nodes::ExecuteCoalescedProcessBatch;
 use crate::nodes::{
   lift_directory_digest, task_side_effected, DownloadedFile, ExecuteProcess, NodeResult, Paths,
   RunId, SessionValues, Snapshot,
@@ -121,6 +122,13 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
+        product: types.process_result,
+        inputs: vec![types.coalesced_process_batch],
+      },
+      Box::new(coalesced_process_batch_request_to_process_result),
+    );
+    intrinsics.insert(
+      Intrinsic {
         product: types.directory_digest,
         inputs: vec![types.digest_subset],
       },
@@ -176,6 +184,83 @@ fn process_request_to_process_result(
     let process_request = ExecuteProcess::lift(&context.core.store(), args.pop().unwrap())
       .map_err(|e| throw(format!("Error lifting Process: {}", e)))
       .await?;
+
+    let result = context.get(process_request).await?.0;
+
+    let maybe_stdout = context
+      .core
+      .store()
+      .load_file_bytes_with(result.stdout_digest, |bytes: &[u8]| bytes.to_owned())
+      .await
+      .map_err(throw)?;
+
+    let maybe_stderr = context
+      .core
+      .store()
+      .load_file_bytes_with(result.stderr_digest, |bytes: &[u8]| bytes.to_owned())
+      .await
+      .map_err(throw)?;
+
+    let stdout_bytes = maybe_stdout.ok_or_else(|| {
+      throw(format!(
+        "Bytes from stdout Digest {:?} not found in store",
+        result.stdout_digest
+      ))
+    })?;
+
+    let stderr_bytes = maybe_stderr.ok_or_else(|| {
+      throw(format!(
+        "Bytes from stderr Digest {:?} not found in store",
+        result.stderr_digest
+      ))
+    })?;
+
+    let platform_name: String = result.platform.into();
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Ok(externs::unsafe_call(
+      py,
+      context.core.types.process_result,
+      &[
+        externs::store_bytes(py, &stdout_bytes),
+        Snapshot::store_file_digest(py, result.stdout_digest).map_err(throw)?,
+        externs::store_bytes(py, &stderr_bytes),
+        Snapshot::store_file_digest(py, result.stderr_digest).map_err(throw)?,
+        externs::store_i64(py, result.exit_code.into()),
+        Snapshot::store_directory_digest(py, result.output_directory).map_err(throw)?,
+        externs::unsafe_call(
+          py,
+          context.core.types.platform,
+          &[externs::store_utf8(py, &platform_name)],
+        ),
+        externs::unsafe_call(
+          py,
+          context.core.types.process_result_metadata,
+          &[
+            result
+              .metadata
+              .total_elapsed
+              .map(|d| externs::store_u64(py, Duration::from(d).as_millis() as u64))
+              .unwrap_or_else(|| Value::from(py.None())),
+            externs::store_utf8(py, result.metadata.source.into()),
+            externs::store_u64(py, result.metadata.source_run_id.0.into()),
+          ],
+        ),
+      ],
+    ))
+  }
+  .boxed()
+}
+
+fn coalesced_process_batch_request_to_process_result(
+  context: Context,
+  mut args: Vec<Value>,
+) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let process_request =
+      ExecuteCoalescedProcessBatch::lift(&context.core.store(), args.pop().unwrap())
+        .map_err(|e| throw(format!("Error lifting CoalescedProcessBatch: {}", e)))
+        .await?;
 
     let result = context.get(process_request).await?.0;
 

@@ -22,6 +22,7 @@ pub struct Types {
   pub download_file: TypeId,
   pub platform: TypeId,
   pub process: TypeId,
+  pub coalesced_process_batch: TypeId,
   pub process_result: TypeId,
   pub process_result_metadata: TypeId,
   pub coroutine: TypeId,

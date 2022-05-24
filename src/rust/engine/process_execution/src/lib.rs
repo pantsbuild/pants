@@ -562,6 +562,42 @@ impl Process {
 }
 
 ///
+/// @TODO
+///
+#[derive(DeepSizeOf, Derivative, Clone, Debug, Eq, Serialize)]
+#[derivative(PartialEq, Hash)]
+pub struct ProcessSandboxInfo {
+  pub input_digests: InputDigests,
+  pub output_files: BTreeSet<RelativePath>,
+  pub output_directories: BTreeSet<RelativePath>,
+}
+
+///
+/// @TODO
+///
+#[derive(DeepSizeOf, Derivative, Clone, Debug, Eq, Serialize)]
+#[derivative(PartialEq, Hash)]
+pub struct CoalescedProcessBatch {
+  pub files_to_sandboxes: BTreeMap<RelativePath, ProcessSandboxInfo>,
+
+  pub common_argv: Vec<String>,
+  pub env: BTreeMap<String, String>,
+  pub working_directory: Option<RelativePath>,
+  pub timeout: Option<std::time::Duration>,
+  pub execution_slot_variable: Option<String>,
+
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
+  pub description: String,
+
+  #[serde(serialize_with = "serialize_level")]
+  pub level: log::Level,
+
+  pub append_only_caches: BTreeMap<CacheName, RelativePath>,
+  pub jdk_home: Option<PathBuf>,
+  pub platform_constraint: Option<Platform>,
+}
+
+///
 /// Metadata surrounding an Process which factors into its cache key when cached
 /// externally from the engine graph (e.g. when using remote execution or an external process
 /// cache).
@@ -747,6 +783,13 @@ pub trait CommandRunner: Send + Sync {
     context: Context,
     workunit: &mut RunningWorkunit,
     req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, String>;
+
+  async fn run_coalesced_batch(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: CoalescedProcessBatch,
   ) -> Result<FallibleProcessResultWithPlatform, String>;
 }
 

@@ -16,6 +16,7 @@ use deepsize::DeepSizeOf;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use internment::Intern;
+use itertools::zip;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
 use pyo3::prelude::{Py, PyAny, Python};
 use pyo3::IntoPy;
@@ -275,6 +276,225 @@ pub fn lift_directory_digest(digest: &PyAny) -> Result<DirectoryDigest, String> 
 pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
   let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{}", e))?;
   Ok(py_file_digest.0)
+}
+
+/// A Node that represents several processes to cache individually, but run as one process.
+///
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
+pub struct ExecuteCoalescedProcessBatch {
+  coalesced_process_batch: process_execution::CoalescedProcessBatch,
+}
+
+impl ExecuteCoalescedProcessBatch {
+  async fn lift_files_to_sandboxes(
+    store: &Store,
+    value: &Value,
+  ) -> Result<BTreeMap<RelativePath, process_execution::ProcessSandboxInfo>, String> {
+    let all_input_digests_futs: Result<Vec<_>, String> = Python::with_gil(|py| {
+      let val = (**value).as_ref(py);
+      let py_files_to_sandboxes =
+        externs::getattr_from_str_frozendict::<&PyAny>(val, "files_to_sandboxes");
+      let all_input_digests = py_files_to_sandboxes
+        .values()
+        .map(|py_sandbox_info| {
+          let input_files =
+            lift_directory_digest(externs::getattr(py_sandbox_info, "input_digest").unwrap())
+              .map_err(|err| format!("Error parsing input_digest {}", err))?;
+          let immutable_inputs = externs::getattr_from_str_frozendict::<&PyAny>(
+            py_sandbox_info,
+            "immutable_input_digests",
+          )
+          .into_iter()
+          .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
+          .collect::<Result<BTreeMap<_, _>, String>>()?;
+          let use_nailgun = externs::getattr::<Vec<String>>(py_sandbox_info, "use_nailgun")
+            .unwrap()
+            .into_iter()
+            .map(RelativePath::new)
+            .collect::<Result<Vec<_>, _>>()?;
+
+          Ok(InputDigests::new(
+            store,
+            input_files,
+            immutable_inputs,
+            use_nailgun,
+          ))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+      Ok(all_input_digests)
+    });
+
+    let all_input_digests: Vec<InputDigests> = future::try_join_all(all_input_digests_futs?)
+      .await
+      .map_err(|e| format!("Failed to merge input digests for process: {}", e))?;
+
+    let files_to_sandboxes: Result<_, String> = Python::with_gil(|py| {
+      let val = (**value).as_ref(py);
+      let py_files_to_sandboxes =
+        externs::getattr_from_str_frozendict::<&PyAny>(val, "files_to_sandboxes");
+      Ok(BTreeMap::from_iter(
+        zip(py_files_to_sandboxes, all_input_digests)
+          .map(|((filename, py_sandbox_info), input_digests)| {
+            let path = RelativePath::new(filename)?;
+            let output_files = externs::getattr::<Vec<String>>(py_sandbox_info, "output_files")
+              .unwrap()
+              .into_iter()
+              .map(RelativePath::new)
+              .collect::<Result<_, _>>()?;
+            let output_directories =
+              externs::getattr::<Vec<String>>(py_sandbox_info, "output_directories")
+                .unwrap()
+                .into_iter()
+                .map(RelativePath::new)
+                .collect::<Result<_, _>>()?;
+            let sandbox_info = process_execution::ProcessSandboxInfo {
+              input_digests: input_digests,
+              output_files: output_files,
+              output_directories: output_directories,
+            };
+            Ok((path, sandbox_info))
+          })
+          .collect::<Result<Vec<_>, String>>()?,
+      ))
+    });
+    Ok(files_to_sandboxes?)
+  }
+
+  pub async fn lift(store: &Store, value: Value) -> Result<Self, String> {
+    let files_to_sandboxes = Self::lift_files_to_sandboxes(store, &value).await?;
+
+    let coalesced_process_batch: Result<_, String> = Python::with_gil(|py| {
+      let val = (*value).as_ref(py);
+
+      let timeout_in_seconds: f64 = externs::getattr(val, "timeout_seconds").unwrap();
+      let timeout = if timeout_in_seconds < 0.0 {
+        None
+      } else {
+        Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
+      };
+
+      let working_directory = match externs::getattr_as_optional_string(val, "working_directory") {
+        None => None,
+        Some(dir) => Some(RelativePath::new(dir)?),
+      };
+      let level = externs::val_to_log_level(externs::getattr(val, "level").unwrap())?;
+      let append_only_caches =
+        externs::getattr_from_str_frozendict::<&str>(val, "append_only_caches")
+          .into_iter()
+          .map(|(name, dest)| Ok((CacheName::new(name)?, RelativePath::new(dest)?)))
+          .collect::<Result<_, String>>()?;
+      let platform_constraint =
+        if let Some(p) = externs::getattr_as_optional_string(val, "platform") {
+          Some(Platform::try_from(p)?)
+        } else {
+          None
+        };
+
+      Ok(process_execution::CoalescedProcessBatch {
+        files_to_sandboxes: files_to_sandboxes,
+        common_argv: externs::getattr(val, "common_argv").unwrap(),
+        env: externs::getattr_from_str_frozendict(val, "env"),
+        working_directory: working_directory,
+        timeout: timeout,
+        execution_slot_variable: externs::getattr_as_optional_string(
+          val,
+          "execution_slot_variable",
+        ),
+        description: externs::getattr(val, "description").unwrap(),
+        level: level,
+        append_only_caches: append_only_caches,
+        jdk_home: externs::getattr_as_optional_string(val, "jdk_home").map(PathBuf::from),
+        platform_constraint: platform_constraint,
+      })
+    });
+
+    Ok(Self {
+      coalesced_process_batch: coalesced_process_batch?,
+    })
+  }
+}
+
+impl From<ExecuteCoalescedProcessBatch> for NodeKey {
+  fn from(n: ExecuteCoalescedProcessBatch) -> Self {
+    NodeKey::ExecuteCoalescedProcessBatch(Box::new(n))
+  }
+}
+
+#[async_trait]
+impl WrappedNode for ExecuteCoalescedProcessBatch {
+  type Item = ProcessResult;
+
+  async fn run_wrapped_node(
+    self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+  ) -> NodeResult<ProcessResult> {
+    let request = self.coalesced_process_batch;
+
+    let command_runner = &context.core.command_runner;
+
+    let execution_context = process_execution::Context::new(
+      context.session.workunit_store(),
+      context.session.build_id().to_string(),
+      context.session.run_id(),
+    );
+
+    let res = command_runner
+      .run_coalesced_batch(execution_context, workunit, request.clone())
+      .await
+      .map_err(throw)?;
+
+    let definition = serde_json::to_string(&request)
+      .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
+    workunit.update_metadata(|initial| {
+      initial.map(|(initial, level)| {
+        (
+          WorkunitMetadata {
+            stdout: Some(res.stdout_digest),
+            stderr: Some(res.stderr_digest),
+            user_metadata: vec![
+              (
+                "definition".to_string(),
+                UserMetadataItem::ImmediateString(definition),
+              ),
+              (
+                "source".to_string(),
+                UserMetadataItem::ImmediateString(format!("{:?}", res.metadata.source)),
+              ),
+              (
+                "exit_code".to_string(),
+                UserMetadataItem::ImmediateInt(res.exit_code as i64),
+              ),
+            ],
+            ..initial
+          },
+          level,
+        )
+      })
+    });
+    if let Some(total_elapsed) = res.metadata.total_elapsed {
+      let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
+      match res.metadata.source {
+        ProcessResultSource::RanLocally => {
+          workunit.increment_counter(Metric::LocalProcessTotalTimeRunMs, total_elapsed);
+          context
+            .session
+            .workunit_store()
+            .record_observation(ObservationMetric::LocalProcessTimeRunMs, total_elapsed);
+        }
+        ProcessResultSource::RanRemotely => {
+          workunit.increment_counter(Metric::RemoteProcessTotalTimeRunMs, total_elapsed);
+          context
+            .session
+            .workunit_store()
+            .record_observation(ObservationMetric::RemoteProcessTimeRunMs, total_elapsed);
+        }
+        _ => {}
+      }
+    }
+
+    Ok(ProcessResult(res))
+  }
 }
 
 /// A Node that represents a process to execute.
@@ -1239,6 +1459,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
 pub enum NodeKey {
   DigestFile(DigestFile),
   DownloadedFile(DownloadedFile),
+  ExecuteCoalescedProcessBatch(Box<ExecuteCoalescedProcessBatch>),
   ExecuteProcess(Box<ExecuteProcess>),
   ReadLink(ReadLink),
   Scandir(Scandir),
@@ -1253,6 +1474,7 @@ pub enum NodeKey {
 impl NodeKey {
   fn product_str(&self) -> String {
     match self {
+      &NodeKey::ExecuteCoalescedProcessBatch(..) => "ProcessResult".to_string(),
       &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
       &NodeKey::Select(ref s) => format!("{}", s.product),
@@ -1277,7 +1499,8 @@ impl NodeKey {
       // Explicitly listed so that if people add new NodeKeys they need to consider whether their
       // NodeKey represents an FS operation, and accordingly whether they need to add it to the
       // above list or the below list.
-      &NodeKey::ExecuteProcess { .. }
+      &NodeKey::ExecuteCoalescedProcessBatch { .. }
+      | &NodeKey::ExecuteProcess { .. }
       | &NodeKey::Select { .. }
       | &NodeKey::SessionValues { .. }
       | &NodeKey::RunId { .. }
@@ -1291,7 +1514,7 @@ impl NodeKey {
   fn workunit_level(&self) -> Level {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.level,
-      NodeKey::ExecuteProcess(..) => {
+      NodeKey::ExecuteCoalescedProcessBatch(..) | NodeKey::ExecuteProcess(..) => {
         // NB: The Node for a Process is statically rendered at Debug (rather than at
         // Process.level) because it is very likely to wrap a BoundedCommandRunner which
         // will block the workunit. We don't want to render at the Process's actual level
@@ -1310,6 +1533,7 @@ impl NodeKey {
   pub fn workunit_name(&self) -> &'static str {
     match self {
       NodeKey::Task(ref task) => &task.task.as_ref().display_info.name,
+      NodeKey::ExecuteCoalescedProcessBatch(..) => "coalesced_process_batch",
       NodeKey::ExecuteProcess(..) => "process",
       NodeKey::Snapshot(..) => "snapshot",
       NodeKey::Paths(..) => "paths",
@@ -1335,6 +1559,13 @@ impl NodeKey {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.path_globs)),
       NodeKey::Paths(ref s) => Some(format!("Finding files: {}", s.path_globs)),
+      NodeKey::ExecuteCoalescedProcessBatch(ecpr) => {
+        // NB: See Self::workunit_level for more information on why this is prefixed.
+        Some(format!(
+          "Scheduling: {}",
+          ecpr.coalesced_process_batch.description
+        ))
+      }
       NodeKey::ExecuteProcess(epr) => {
         // NB: See Self::workunit_level for more information on why this is prefixed.
         Some(format!("Scheduling: {}", epr.process.description))
@@ -1428,6 +1659,11 @@ impl Node for NodeKey {
           NodeKey::DownloadedFile(n) => {
             n.run_wrapped_node(context, workunit)
               .map_ok(NodeOutput::Snapshot)
+              .await
+          }
+          NodeKey::ExecuteCoalescedProcessBatch(n) => {
+            n.run_wrapped_node(context, workunit)
+              .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
               .await
           }
           NodeKey::ExecuteProcess(n) => {
@@ -1540,6 +1776,14 @@ impl Node for NodeKey {
 
   fn cacheable_item(&self, output: &NodeOutput) -> bool {
     match (self, output) {
+      (
+        NodeKey::ExecuteCoalescedProcessBatch(ref _ep),
+        NodeOutput::ProcessResult(ref _process_result),
+      ) => {
+        // NB We don't cache coalesced process objects in favor of querying the cache for individual
+        // processes.
+        false
+      }
       (NodeKey::ExecuteProcess(ref ep), NodeOutput::ProcessResult(ref process_result)) => {
         match ep.process.cache_scope {
           ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
@@ -1590,6 +1834,13 @@ impl Display for NodeKey {
     match self {
       &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({})", s.0.path.display()),
       &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({})", s.0),
+      &NodeKey::ExecuteCoalescedProcessBatch(ref s) => {
+        write!(
+          f,
+          "CoalescedProcessBatch({})",
+          s.coalesced_process_batch.description
+        )
+      }
       &NodeKey::ExecuteProcess(ref s) => {
         write!(f, "Process({})", s.process.description)
       }

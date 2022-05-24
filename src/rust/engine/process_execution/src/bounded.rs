@@ -1,21 +1,26 @@
 use std::borrow::Cow;
 use std::cmp::{max, min, Ordering, Reverse};
+use std::collections::BTreeSet;
 use std::collections::VecDeque;
 use std::future::Future;
 use std::sync::{atomic, Arc};
 use std::time::{Duration, Instant};
 
+use crate::InputDigests;
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use log::Level;
 use parking_lot::Mutex;
 use regex::Regex;
+use store::Store;
 use task_executor::Executor;
 use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 use tokio::time::sleep;
 use workunit_store::{in_workunit, RunningWorkunit};
 
-use crate::{Context, FallibleProcessResultWithPlatform, Process};
+use crate::{
+  CoalescedProcessBatch, Context, FallibleProcessResultWithPlatform, Process, ProcessCacheScope,
+};
 
 lazy_static! {
   // TODO: Runtime formatting is unstable in Rust, so we imitate it.
@@ -31,17 +36,20 @@ lazy_static! {
 ///
 #[derive(Clone)]
 pub struct CommandRunner {
+  store: Store,
   inner: Arc<dyn crate::CommandRunner>,
   sema: AsyncSemaphore,
 }
 
 impl CommandRunner {
   pub fn new(
+    store: Store,
     executor: &Executor,
     inner: Box<dyn crate::CommandRunner>,
     bound: usize,
   ) -> CommandRunner {
     CommandRunner {
+      store,
       inner: inner.into(),
       sema: AsyncSemaphore::new(
         executor,
@@ -55,6 +63,60 @@ impl CommandRunner {
 
 #[async_trait]
 impl crate::CommandRunner for CommandRunner {
+  async fn run_coalesced_batch(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: CoalescedProcessBatch,
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let mut argv = req.common_argv.clone();
+    argv.extend(
+      req
+        .files_to_sandboxes
+        .keys()
+        .map(|file| file.to_str().unwrap().to_string()),
+    );
+
+    let input_digests = InputDigests::new_from_merged(
+      &self.store,
+      req
+        .files_to_sandboxes
+        .values()
+        .map(|sandbox_info| sandbox_info.input_digests.clone())
+        .collect(),
+    )
+    .await?;
+
+    let mut output_files = BTreeSet::new();
+    let mut output_directories = BTreeSet::new();
+    for sandbox_info in req.files_to_sandboxes.values() {
+      output_files.append(&mut sandbox_info.output_files.clone());
+      output_directories.append(&mut sandbox_info.output_directories.clone());
+    }
+
+    let coalesced_process = Process {
+      argv: argv,
+      env: req.env.clone(),
+      working_directory: req.working_directory.clone(),
+      input_digests: input_digests,
+      output_files: output_files,
+      output_directories: output_directories,
+      timeout: req.timeout,
+      description: req.description.clone(),
+      level: req.level,
+      append_only_caches: req.append_only_caches.clone(),
+      jdk_home: req.jdk_home.clone(),
+      platform_constraint: req.platform_constraint,
+      execution_slot_variable: req.execution_slot_variable.clone(),
+      // @TODO: Is this universal?
+      concurrency_available: req.files_to_sandboxes.len(),
+      // @TODO: Shouldn't matter
+      cache_scope: ProcessCacheScope::Successful,
+    };
+
+    self.run(context, workunit, coalesced_process).await
+  }
+
   async fn run(
     &self,
     context: Context,

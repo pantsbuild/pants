@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from pathlib import PurePath
+import logging
 
 from pants.backend.python.lint.black.skip_field import SkipBlackField
 from pants.backend.python.lint.black.subsystem import Black
@@ -10,16 +12,19 @@ from pants.backend.python.target_types import InterpreterConstraintsField, Pytho
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import Digest, MergeDigests, PathGlobs
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import ProcessResult
+from pants.engine.process import ProcessResult, CoalescedProcessBatch, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -67,38 +72,58 @@ async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSet
         ):
             tool_interpreter_constraints = all_interpreter_constraints
 
-    black_pex_get = Get(
+    black_pex = await Get(
         VenvPex,
         PexRequest,
         black.to_pex_request(interpreter_constraints=tool_interpreter_constraints),
     )
-    config_files_get = Get(
-        ConfigFiles, ConfigFilesRequest, black.config_request(request.snapshot.dirs)
+
+    all_file_digests = await MultiGet(
+        Get(
+            Digest,
+            PathGlobs(
+                globs=(file,),
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"the file {file}",
+            ),
+        )
+        for file in request.snapshot.files
+    )
+    # @TODO: Theres either one or none configs, so maybe MultiGet is a bit aggressive
+    all_config_files = await MultiGet(
+        Get(ConfigFiles, ConfigFilesRequest, black.config_request([str(PurePath(file).parent)]))
+        for file in request.snapshot.files
+    )
+    all_input_digests = await MultiGet(
+        Get(Digest, MergeDigests((file_digest, config_files.snapshot.digest)))
+        for file_digest, config_files in zip(all_file_digests, all_config_files)
     )
 
-    black_pex, config_files = await MultiGet(black_pex_get, config_files_get)
-
-    input_digest = await Get(
-        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
+    processes = await MultiGet(
+        Get(
+            Process,
+            VenvPexProcess(
+                black_pex,
+                argv=(
+                    *(("--config", black.config) if black.config else ()),
+                    *black.args,
+                    "-W",
+                    "{pants_concurrency}",
+                    file,
+                ),
+                input_digest=input_digest,
+                output_files=(file,),
+                concurrency_available=1,
+                description=f"Run Black.",
+                level=LogLevel.DEBUG,
+            ),
+        )
+        for file, input_digest in zip(request.snapshot.files, all_input_digests)
     )
 
     result = await Get(
         ProcessResult,
-        VenvPexProcess(
-            black_pex,
-            argv=(
-                *(("--config", black.config) if black.config else ()),
-                "-W",
-                "{pants_concurrency}",
-                *black.args,
-                *request.snapshot.files,
-            ),
-            input_digest=input_digest,
-            output_files=request.snapshot.files,
-            concurrency_available=len(request.field_sets),
-            description=f"Run Black on {pluralize(len(request.field_sets), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
+        CoalescedProcessBatch(...),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -16,8 +17,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
-  ProcessMetadata, ProcessResultSource,
+  CoalescedProcessBatch, Context, FallibleProcessResultWithPlatform, Platform, Process,
+  ProcessCacheScope, ProcessMetadata, ProcessResultSource,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -49,16 +50,12 @@ impl CommandRunner {
       metadata,
     }
   }
-}
 
-#[async_trait]
-impl crate::CommandRunner for CommandRunner {
-  async fn run(
+  async fn cache_lookup(
     &self,
-    context: Context,
-    workunit: &mut RunningWorkunit,
-    req: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    context: &Context,
+    req: &Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ()> {
     let cache_lookup_start = Instant::now();
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
@@ -68,7 +65,7 @@ impl crate::CommandRunner for CommandRunner {
 
     let context2 = context.clone();
     let key2 = key.clone();
-    let cache_read_result = in_workunit!(
+    in_workunit!(
       "local_cache_read",
       Level::Trace,
       desc = Some(format!("Local cache lookup: {}", req.description)),
@@ -119,13 +116,15 @@ impl crate::CommandRunner for CommandRunner {
         }
       }
     )
-    .await;
+    .await
+  }
 
-    if let Ok(result) = cache_read_result {
-      return Ok(result);
-    }
-
-    let result = self.underlying.run(context.clone(), workunit, req).await?;
+  async fn cache_store(&self, process: &Process, result: &FallibleProcessResultWithPlatform) {
+    let write_failures_to_cache = process.cache_scope == ProcessCacheScope::Always;
+    let key = CacheKey {
+      digest: Some(crate::digest(&process, &self.metadata).into()),
+      key_type: CacheKeyType::Process.into(),
+    };
     if result.exit_code == 0 || write_failures_to_cache {
       let result = result.clone();
       in_workunit!("local_cache_write", Level::Trace, |workunit| async move {
@@ -136,9 +135,91 @@ impl crate::CommandRunner for CommandRunner {
           );
           workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
         }
-      })
-      .await;
+      });
     }
+  }
+}
+
+#[async_trait]
+impl crate::CommandRunner for CommandRunner {
+  async fn run_coalesced_batch(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    mut req: CoalescedProcessBatch,
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let mut uncached = BTreeMap::new();
+    let mut cached = Vec::new();
+    // @TODO: We probably should do some funny math on the cache saved time :)
+    // E.G. assume time for synth proc == coalesced process time / # files
+
+    for (filename, sandbox_info) in &req.files_to_sandboxes {
+      let synthetic_process = Process {
+        argv: req.common_argv.clone(),
+        env: req.env.clone(),
+        working_directory: req.working_directory.clone(),
+        input_digests: sandbox_info.input_digests.clone(),
+        output_files: sandbox_info.output_files.clone(),
+        output_directories: sandbox_info.output_directories.clone(),
+        timeout: req.timeout.clone(),
+        // @TODO: Maybe futz the description?
+        description: req.description.clone(),
+        level: req.level.clone(),
+        append_only_caches: req.append_only_caches.clone(),
+        jdk_home: req.jdk_home.clone(),
+        platform_constraint: req.platform_constraint.clone(),
+        execution_slot_variable: req.execution_slot_variable.clone(),
+        // @TODO: I think this is right?
+        concurrency_available: 1,
+        // @TODO: Hmm
+        cache_scope: ProcessCacheScope::Successful,
+      };
+
+      let cache_read_result = self.cache_lookup(&context, &synthetic_process).await;
+      if let Ok(result) = cache_read_result {
+        cached.push(result);
+      } else {
+        uncached.insert(filename.clone(), synthetic_process);
+      }
+    }
+
+    if uncached.is_empty() {
+      // @TODO: What to return?
+      Ok(cached[0].clone())
+    } else {
+      req
+        .files_to_sandboxes
+        .retain(|k, _| uncached.contains_key(&k));
+      let result = self
+        .underlying
+        .run_coalesced_batch(context.clone(), workunit, req)
+        .await?;
+
+      for process in uncached.values() {
+        // @TODO: What to store?
+        self.cache_store(&process, &result).await;
+      }
+      Ok(result)
+    }
+  }
+
+  async fn run(
+    &self,
+    context: Context,
+    workunit: &mut RunningWorkunit,
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let cache_read_result = self.cache_lookup(&context, &req).await;
+
+    if let Ok(result) = cache_read_result {
+      return Ok(result);
+    }
+
+    let result = self
+      .underlying
+      .run(context.clone(), workunit, req.clone())
+      .await?;
+    self.cache_store(&req, &result).await;
     Ok(result)
   }
 }

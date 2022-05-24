@@ -33,8 +33,8 @@ use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
-  ProcessResultMetadata, ProcessResultSource,
+  CoalescedProcessBatch, Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches,
+  Platform, Process, ProcessResultMetadata, ProcessResultSource,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -244,6 +244,16 @@ impl ChildResults {
 
 #[async_trait]
 impl super::CommandRunner for CommandRunner {
+  async fn run_coalesced_batch(
+    &self,
+    _context: Context,
+    _workunit: &mut RunningWorkunit,
+    _req: CoalescedProcessBatch,
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    assert!(false);
+    panic!("We shouldn't be locally running a coalesced process batch!");
+  }
+
   ///
   /// Runs a command on this machine in the passed working directory.
   ///

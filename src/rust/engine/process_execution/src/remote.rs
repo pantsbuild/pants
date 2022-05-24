@@ -43,8 +43,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
-  ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
+  CoalescedProcessBatch, Context, FallibleProcessResultWithPlatform, Platform, Process,
+  ProcessCacheScope, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -726,6 +726,15 @@ impl CommandRunner {
 
 #[async_trait]
 impl crate::CommandRunner for CommandRunner {
+  async fn run_coalesced_batch(
+    &self,
+    _context: Context,
+    _workunit: &mut RunningWorkunit,
+    _req: CoalescedProcessBatch,
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    panic!("Unimplemented");
+  }
+
   /// Run the given Process via the Remote Execution API.
   async fn run(
     &self,
