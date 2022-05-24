@@ -33,7 +33,7 @@ async def find_putative_targets(
     if not docker.tailor:
         return PutativeTargets()
 
-    all_dockerfiles = await Get(Paths, PathGlobs, req.search_paths.path_globs("*Dockerfile*"))
+    all_dockerfiles = await Get(Paths, PathGlobs, req.path_globs("*Dockerfile*"))
     unowned_dockerfiles = set(all_dockerfiles.files) - set(all_owned_sources)
     pts = []
     for dockerfile in sorted(unowned_dockerfiles):

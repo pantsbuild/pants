@@ -94,7 +94,7 @@ async def find_putative_targets(
 
     if python_setup.tailor_source_targets:
         # Find library/test/test_util targets.
-        all_py_files_globs: PathGlobs = req.search_paths.path_globs("*.py")
+        all_py_files_globs: PathGlobs = req.path_globs("*.py")
         all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
         unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
         classified_unowned_py_files = classify_source_files(unowned_py_files)
@@ -126,9 +126,9 @@ async def find_putative_targets(
             all_pipenv_lockfile_files,
             all_pyproject_toml_contents,
         ) = await MultiGet(
-            Get(Paths, PathGlobs, req.search_paths.path_globs("*requirements*.txt")),
-            Get(Paths, PathGlobs, req.search_paths.path_globs("Pipfile.lock")),
-            Get(DigestContents, PathGlobs, req.search_paths.path_globs("pyproject.toml")),
+            Get(Paths, PathGlobs, req.path_globs("*requirements*.txt")),
+            Get(Paths, PathGlobs, req.path_globs("Pipfile.lock")),
+            Get(DigestContents, PathGlobs, req.path_globs("pyproject.toml")),
         )
 
         def add_req_targets(files: Iterable[str], alias: str, target_name: str) -> None:
@@ -163,7 +163,7 @@ async def find_putative_targets(
 
         # Get all files whose content indicates that they are entry points or are __main__.py files.
         digest_contents = await Get(DigestContents, PathGlobs, all_py_files_globs)
-        all_main_py = await Get(Paths, PathGlobs, req.search_paths.path_globs("__main__.py"))
+        all_main_py = await Get(Paths, PathGlobs, req.path_globs("__main__.py"))
         entry_points = [
             file_content.path
             for file_content in digest_contents

@@ -40,11 +40,7 @@ async def find_putative_targets(
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
     all_cc_files_globs = PathGlobs(
-        [
-            os.path.join(d, "**", f"*{ext}")
-            for d in req.search_paths.dirs
-            for ext in CC_FILE_EXTENSIONS
-        ]
+        [os.path.join(d, "**", f"*{ext}") for d in req.dirs for ext in CC_FILE_EXTENSIONS]
     )
     all_cc_files = await Get(Paths, PathGlobs, all_cc_files_globs)
     unowned_cc_files = set(all_cc_files.files) - set(all_owned_sources)

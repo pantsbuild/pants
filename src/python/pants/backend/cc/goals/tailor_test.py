@@ -6,12 +6,7 @@ import pytest
 from pants.backend.cc.goals import tailor
 from pants.backend.cc.goals.tailor import PutativeCCTargetsRequest
 from pants.backend.cc.target_types import CCSourcesGeneratorTarget
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -38,9 +33,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeCCTargetsRequest(
-                PutativeTargetsSearchPaths(("src/native/owned", "src/native/unowned"))
-            ),
+            PutativeCCTargetsRequest(("src/native/owned", "src/native/unowned")),
             AllOwnedSources(["src/native/owned/OwnedFile.cc"]),
         ],
     )

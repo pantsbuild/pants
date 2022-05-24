@@ -9,12 +9,7 @@ from pants.backend.shell.target_types import (
     ShellSourcesGeneratorTarget,
     Shunit2TestsGeneratorTarget,
 )
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -56,9 +51,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeShellTargetsRequest(
-                PutativeTargetsSearchPaths(("src/sh/foo", "src/sh/foo/bar"))
-            ),
+            PutativeShellTargetsRequest(("src/sh/foo", "src/sh/foo/bar")),
             AllOwnedSources(["src/sh/foo/bar/baz1.sh", "src/sh/foo/bar/baz1_test.sh"]),
         ],
     )
@@ -105,9 +98,7 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeShellTargetsRequest(
-                PutativeTargetsSearchPaths(("src/sh/foo/bar", "src/sh/foo/qux"))
-            ),
+            PutativeShellTargetsRequest(("src/sh/foo/bar", "src/sh/foo/qux")),
             AllOwnedSources(["src/sh/foo/bar/bar.sh"]),
         ],
     )

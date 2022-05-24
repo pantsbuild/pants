@@ -6,12 +6,7 @@ import pytest
 from pants.backend.codegen.avro.tailor import PutativeAvroTargetsRequest
 from pants.backend.codegen.avro.tailor import rules as tailor_rules
 from pants.backend.codegen.avro.target_types import AvroSourcesGeneratorTarget
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -40,7 +35,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeAvroTargetsRequest(PutativeTargetsSearchPaths(("avro/foo", "avro/foo/bar"))),
+            PutativeAvroTargetsRequest(("avro/foo", "avro/foo/bar")),
             AllOwnedSources(["avro/foo/bar/baz1.avdl"]),
         ],
     )
@@ -77,12 +72,7 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
 
     pts = rule_runner.request(
         PutativeTargets,
-        [
-            PutativeAvroTargetsRequest(
-                PutativeTargetsSearchPaths(("avro/foo/bar", "avro/foo/qux"))
-            ),
-            AllOwnedSources([]),
-        ],
+        [PutativeAvroTargetsRequest(("avro/foo/bar", "avro/foo/qux")), AllOwnedSources([])],
     )
     assert (
         PutativeTargets(

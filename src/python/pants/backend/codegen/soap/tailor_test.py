@@ -6,12 +6,7 @@ import pytest
 from pants.backend.codegen.soap.tailor import PutativeWsdlTargetsRequest
 from pants.backend.codegen.soap.tailor import rules as tailor_rules
 from pants.backend.codegen.soap.target_types import WsdlSourcesGeneratorTarget
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -39,7 +34,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeWsdlTargetsRequest(PutativeTargetsSearchPaths(("src/wsdl", "src/wsdl/dir1"))),
+            PutativeWsdlTargetsRequest(("src/wsdl", "src/wsdl/dir1")),
             AllOwnedSources(["src/wsdl/simple.wsdl"]),
         ],
     )
