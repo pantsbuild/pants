@@ -468,8 +468,8 @@ async def find_valid_field_sets_for_target_roots(
         # since in that case we interpret the user's intent as "if there are relevant matching
         # targets, act on them". But we still want to warn if the specs were literal, or empty.
         #
-        # No need to check `specs.ignores` here, as change detection will set that. We don't want
-        # an ignore spec to trigger this warning, even if it was a literal.
+        # No need to check `specs.ignores` here, as change detection will not set that. Likewise,
+        # we don't want an ignore spec to trigger this warning, even if it was a literal.
         empty_ok = specs.includes.from_change_detection or (
             specs.includes
             and not specs.includes.address_literals
