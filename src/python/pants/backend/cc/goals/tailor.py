@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -39,10 +38,7 @@ async def find_putative_targets(
     req: PutativeCCTargetsRequest,
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
-    all_cc_files_globs = PathGlobs(
-        [os.path.join(d, "**", f"*{ext}") for d in req.dirs for ext in CC_FILE_EXTENSIONS]
-    )
-    all_cc_files = await Get(Paths, PathGlobs, all_cc_files_globs)
+    all_cc_files = await Get(Paths, PathGlobs, req.path_globs(*CC_FILE_EXTENSIONS))
     unowned_cc_files = set(all_cc_files.files) - set(all_owned_sources)
     classified_unowned_kotlin_files = classify_source_files(unowned_cc_files)
 
