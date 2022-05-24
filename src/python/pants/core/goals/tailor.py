@@ -11,6 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, cast
 
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecs, Spec, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
@@ -583,9 +584,23 @@ def specs_to_dirs(specs: RawSpecs) -> tuple[str, ...]:
             other_specs.append(spec)
     if other_specs:
         raise ValueError(
-            "The tailor goal only accepts literal directories as arguments, but you "
-            f"specified: {', '.join(str(spec) for spec in other_specs)}.  You can also "
-            "specify no arguments to run against the entire repository."
+            softwrap(
+                f"""
+                The global option `use_deprecated_cli_args_semantics` is set to `true`, so the
+                tailor goal is using deprecated semantics for CLI arguments. In this mode, the
+                tailor goal only accepts literal directories as arguments, which it will run
+                recursively on. You specified {', '.join(str(spec) for spec in other_specs)}
+
+                To fix, either set `use_deprecated_cli_args_semantics` to false, or rerun with
+                specifying only literal directories, e.g. `tailor dir1 dir2`. If changing
+                `use_deprecated_cli_args_semantics` to false, you should specify which directories
+                to run on when using `tailor`:
+
+                  * `::` to run on everything
+                  * `dir::` to run on `dir` and subdirs
+                  * `dir` to run on `dir`
+                """
+            )
         )
     # No specs at all means search the entire repo.
     return tuple(dir_specs) or ("",)
@@ -603,13 +618,32 @@ async def tailor(
 ) -> TailorGoal:
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
 
-    if global_options.use_deprecated_directory_cli_args_semantics:
-        dir_search_paths: tuple[str, ...] = ()
-        recursive_search_paths = specs_to_dirs(specs.includes)
+    dir_search_paths: tuple[str, ...] = ()
+    recursive_search_paths: tuple[str, ...] = ()
+    if specs:
+        if global_options.use_deprecated_directory_cli_args_semantics:
+            recursive_search_paths = specs_to_dirs(specs.includes)
+        else:
+            specs_paths = await Get(SpecsPaths, Specs, specs)
+            dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
     else:
-        specs_paths = await Get(SpecsPaths, Specs, specs)
-        dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
-        recursive_search_paths = ()
+        warn_or_error(
+            "2.14.0.dev0",
+            f"running `{bin_name()} tailor` without arguments",
+            softwrap(
+                f"""
+                Currently, `{bin_name()} tailor` without arguments will run against
+                every file in the project.
+
+                In Pants 2.14, you must use CLI arguments. Use:
+
+                  * `::` to run on everything
+                  * `dir::` to run on `dir` and subdirs
+                  * `dir` to run on `dir`
+                """
+            ),
+        )
+        recursive_search_paths = ("",)
 
     putative_targets_results = await MultiGet(
         Get(
