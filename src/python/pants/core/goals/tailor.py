@@ -604,7 +604,7 @@ async def tailor(
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
 
     if global_options.use_deprecated_directory_cli_args_semantics:
-        dir_search_paths = ()
+        dir_search_paths: tuple[str, ...] = ()
         recursive_search_paths = specs_to_dirs(specs)
     else:
         specs_paths = await Get(SpecsPaths, Specs, specs)
