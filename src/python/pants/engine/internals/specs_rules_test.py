@@ -713,8 +713,8 @@ def test_resolve_addresses_from_specs(rule_runner: RuleRunner) -> None:
     )
 
     def assert_resolved(specs: Iterable[str], expected: set[str]) -> None:
-        specs = SpecsParser().parse_specs(specs, convert_dir_literal_to_address_literal=False)
-        result = rule_runner.request(Addresses, [specs])
+        specs_obj = SpecsParser().parse_specs(specs, convert_dir_literal_to_address_literal=False)
+        result = rule_runner.request(Addresses, [specs_obj])
         assert {addr.spec for addr in result} == expected
 
     assert_resolved(["//:tgt"], {"//:tgt@resolve=a", "//:tgt@resolve=b"})
