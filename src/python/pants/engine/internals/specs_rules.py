@@ -22,6 +22,7 @@ from pants.base.specs import (
     RawSpecsWithOnlyFileOwners,
     RawSpecsWithoutFileOwners,
     RecursiveGlobSpec,
+    Specs,
 )
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import PathGlobs, Paths, SpecsPaths
@@ -65,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 
 @rule_helper
-async def _determine_literal_addresses_from_specs(
+async def _determine_literal_addresses_from_raw_specs(
     literal_specs: tuple[AddressLiteralSpec, ...]
 ) -> tuple[WrappedTarget, ...]:
     literal_addresses = await MultiGet(
@@ -104,7 +105,7 @@ async def _determine_literal_addresses_from_specs(
 
 
 @rule
-async def addresses_from_specs_without_file_owners(
+async def addresses_from_raw_specs_without_file_owners(
     specs: RawSpecsWithoutFileOwners,
     build_file_options: BuildFileOptions,
     specs_filter: SpecsFilter,
@@ -112,7 +113,9 @@ async def addresses_from_specs_without_file_owners(
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = specs.filter_by_global_options is False
 
-    literal_wrapped_targets = await _determine_literal_addresses_from_specs(specs.address_literals)
+    literal_wrapped_targets = await _determine_literal_addresses_from_raw_specs(
+        specs.address_literals
+    )
     matched_addresses.update(
         wrapped_tgt.target.address
         for wrapped_tgt in literal_wrapped_targets
@@ -178,7 +181,7 @@ def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNo
 
 
 @rule
-async def addresses_from_specs_with_only_file_owners(
+async def addresses_from_raw_specs_with_only_file_owners(
     specs: RawSpecsWithOnlyFileOwners, owners_not_found_behavior: OwnersNotFoundBehavior
 ) -> Addresses:
     """Find the owner(s) for each spec."""
@@ -210,12 +213,12 @@ async def addresses_from_specs_with_only_file_owners(
 
 
 # -----------------------------------------------------------------------------------------------
-# RawSpecs -> Targets
+# RawSpecs & Specs -> Targets
 # -----------------------------------------------------------------------------------------------
 
 
 @rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
-async def resolve_addresses_from_specs(specs: RawSpecs) -> Addresses:
+async def resolve_addresses_from_raw_specs(specs: RawSpecs) -> Addresses:
     without_file_owners, with_file_owners = await MultiGet(
         Get(Addresses, RawSpecsWithoutFileOwners, RawSpecsWithoutFileOwners.from_raw_specs(specs)),
         Get(
@@ -224,6 +227,13 @@ async def resolve_addresses_from_specs(specs: RawSpecs) -> Addresses:
     )
     # Use a set to dedupe.
     return Addresses(sorted({*without_file_owners, *with_file_owners}))
+
+
+@rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
+async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
+    # TODO(#15539): handle ignores.
+    includes = await Get(Addresses, RawSpecs, specs.includes)
+    return includes
 
 
 @rule
@@ -251,7 +261,7 @@ def setup_specs_filter(
 
 
 @rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
-async def resolve_specs_paths(specs: RawSpecs) -> SpecsPaths:
+async def resolve_specs_paths(specs: Specs) -> SpecsPaths:
     """Resolve all files matching the given specs.
 
     All matched targets will use their `sources` field. Certain specs like FileLiteralSpec will
@@ -262,8 +272,9 @@ async def resolve_specs_paths(specs: RawSpecs) -> SpecsPaths:
     https://github.com/pantsbuild/pants/issues/15478.
     """
 
+    # TODO(#15539): switch this whole rule to consider ignores.
     unfiltered_targets = await Get(
-        Targets, RawSpecs, dataclasses.replace(specs, filter_by_global_options=False)
+        Targets, RawSpecs, dataclasses.replace(specs.includes, filter_by_global_options=False)
     )
     filtered_targets = await Get(FilteredTargets, Targets, unfiltered_targets)
     all_sources_paths = await MultiGet(
@@ -276,7 +287,7 @@ async def resolve_specs_paths(specs: RawSpecs) -> SpecsPaths:
         itertools.chain.from_iterable(paths.files for paths in all_sources_paths)
     )
 
-    specs_snapshot_path_globs = specs.to_specs_snapshot_path_globs()
+    specs_snapshot_path_globs = specs.includes.to_specs_snapshot_path_globs()
     if specs_snapshot_path_globs.globs:
         target_less_paths = await Get(Paths, PathGlobs, specs_snapshot_path_globs)
         result_paths.update(target_less_paths.files)
@@ -308,7 +319,7 @@ class NoApplicableTargetsException(Exception):
     def __init__(
         self,
         targets: Iterable[Target],
-        specs: RawSpecs,
+        specs: Specs,
         union_membership: UnionMembership,
         *,
         applicable_target_types: Iterable[type[Target]],
@@ -368,7 +379,7 @@ class NoApplicableTargetsException(Exception):
     def create_from_field_sets(
         cls,
         targets: Iterable[Target],
-        specs: RawSpecs,
+        specs: Specs,
         union_membership: UnionMembership,
         registered_target_types: RegisteredTargetTypes,
         *,
@@ -425,13 +436,13 @@ class AmbiguousImplementationsException(Exception):
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
-    specs: RawSpecs,
+    specs: Specs,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> TargetRootsToFieldSets:
     # NB: This must be in an `await Get`, rather than the rule signature, to avoid a rule graph
     # issue.
-    targets = await Get(FilteredTargets, RawSpecs, specs)
+    targets = await Get(FilteredTargets, Specs, specs)
     field_sets_per_target = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
     )
@@ -452,11 +463,17 @@ async def find_valid_field_sets_for_target_roots(
         )
         if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
             raise no_applicable_exception
+
         # We squelch the warning if the specs came from change detection or only from globs,
         # since in that case we interpret the user's intent as "if there are relevant matching
         # targets, act on them". But we still want to warn if the specs were literal, or empty.
-        empty_ok = specs.from_change_detection or (
-            specs and not specs.address_literals and not specs.file_literals
+        #
+        # No need to check `specs.ignores` here, as change detection will set that. We don't want
+        # an ignore spec to trigger this warning, even if it was a literal.
+        empty_ok = specs.includes.from_change_detection or (
+            specs.includes
+            and not specs.includes.address_literals
+            and not specs.includes.file_literals
         )
         if (
             request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn

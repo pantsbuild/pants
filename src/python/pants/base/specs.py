@@ -308,26 +308,6 @@ class RawSpecs:
             or self.ancestor_globs
         )
 
-    def arguments_provided_description(self) -> str | None:
-        """A description of what the user specified, e.g. 'target arguments'."""
-        specs_descriptions = []
-        if self.address_literals:
-            specs_descriptions.append("target")
-        if self.file_literals or self.file_globs:
-            specs_descriptions.append("file")
-        if self.dir_literals:
-            specs_descriptions.append("directory")
-        if self.dir_globs or self.recursive_globs or self.ancestor_globs:
-            specs_descriptions.append("glob")
-
-        if not specs_descriptions:
-            return None
-        if len(specs_descriptions) == 1:
-            return f"{specs_descriptions[0]} arguments"
-        if len(specs_descriptions) == 2:
-            return " and ".join(specs_descriptions) + " arguments"
-        return ", ".join(specs_descriptions[:-1]) + f", and {specs_descriptions[-1]} arguments"
-
     def to_specs_snapshot_path_globs(self) -> PathGlobs:
         """`PathGlobs` to find all files from the specs, independent of targets."""
         relevant_specs: Iterable[
@@ -464,3 +444,52 @@ class RawSpecsWithOnlyFileOwners:
 
     def __bool__(self) -> bool:
         return bool(self.file_literals or self.file_globs)
+
+
+@dataclass(frozen=True)
+class Specs:
+    """The specs provided by the user for what to run on.
+
+    The `ignores` will filter out all relevant `includes`.
+
+    If your rule does not need to consider includes vs. ignores, e.g. to find all targets in a
+    directory,  you can directly use `RawSpecs`.
+    """
+
+    includes: RawSpecs = RawSpecs()
+    ignores: RawSpecs = RawSpecs()
+
+    def __bool__(self) -> bool:
+        return bool(self.includes) or bool(self.ignores)
+
+    def arguments_provided_description(self) -> str | None:
+        """A description of what the user specified, e.g. 'target arguments'."""
+        specs_descriptions = []
+        if self.includes.address_literals or self.ignores.address_literals:
+            specs_descriptions.append("target")
+        if (
+            self.includes.file_literals
+            or self.includes.file_globs
+            or self.ignores.file_literals
+            or self.ignores.file_globs
+        ):
+            specs_descriptions.append("file")
+        if self.includes.dir_literals or self.ignores.dir_literals:
+            specs_descriptions.append("directory")
+        if (
+            self.includes.dir_globs
+            or self.includes.recursive_globs
+            or self.includes.ancestor_globs
+            or self.ignores.dir_globs
+            or self.ignores.recursive_globs
+            or self.ignores.ancestor_globs
+        ):
+            specs_descriptions.append("glob")
+
+        if not specs_descriptions:
+            return None
+        if len(specs_descriptions) == 1:
+            return f"{specs_descriptions[0]} arguments"
+        if len(specs_descriptions) == 2:
+            return " and ".join(specs_descriptions) + " arguments"
+        return ", ".join(specs_descriptions[:-1]) + f", and {specs_descriptions[-1]} arguments"

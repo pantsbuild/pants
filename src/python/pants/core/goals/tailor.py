@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.specs import AncestorGlobSpec, RawSpecs, Spec
+from pants.base.specs import AncestorGlobSpec, RawSpecs, Spec, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -588,7 +588,7 @@ async def tailor(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
-    specs: RawSpecs,
+    specs: Specs,
     build_file_options: BuildFileOptions,
     global_options: GlobalOptions,
 ) -> TailorGoal:
@@ -596,10 +596,10 @@ async def tailor(
 
     if global_options.use_deprecated_directory_cli_args_semantics:
         search_paths = PutativeTargetsSearchPaths(
-            dirs=(), deprecated_recursive_dirs=specs_to_dirs(specs)
+            dirs=(), deprecated_recursive_dirs=specs_to_dirs(specs.includes)
         )
     else:
-        specs_paths = await Get(SpecsPaths, RawSpecs, specs)
+        specs_paths = await Get(SpecsPaths, Specs, specs)
         search_paths = PutativeTargetsSearchPaths(
             tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
         )

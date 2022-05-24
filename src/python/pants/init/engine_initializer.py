@@ -11,7 +11,7 @@ from typing import Any, ClassVar, Iterable, cast
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.specs import RawSpecs
+from pants.base.specs import Specs
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules import system_binaries
@@ -85,7 +85,7 @@ class GraphSession:
     goal_map: Any
 
     # NB: Keep this in sync with the method `run_goal_rules`.
-    goal_param_types: ClassVar[tuple[type, ...]] = (RawSpecs, Console, Workspace)
+    goal_param_types: ClassVar[tuple[type, ...]] = (Specs, Console, Workspace)
 
     def goal_consumed_subsystem_scopes(self, goal_name: str) -> tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
@@ -110,7 +110,7 @@ class GraphSession:
         *,
         union_membership: UnionMembership,
         goals: Iterable[str],
-        specs: RawSpecs,
+        specs: Specs,
         poll: bool = False,
         poll_delay: float | None = None,
     ) -> int:

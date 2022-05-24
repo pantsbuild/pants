@@ -7,7 +7,7 @@ import json
 from collections import deque
 from typing import Iterable
 
-from pants.base.specs import RawSpecs
+from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -101,14 +101,14 @@ async def paths(
     from_tgts, to_tgts = await MultiGet(
         Get(
             Targets,
-            RawSpecs,
+            Specs,
             specs_parser.parse_specs(
                 [path_from], convert_dir_literal_to_address_literal=convert_dir_literals
             ),
         ),
         Get(
             Targets,
-            RawSpecs,
+            Specs,
             specs_parser.parse_specs(
                 [path_to], convert_dir_literal_to_address_literal=convert_dir_literals
             ),

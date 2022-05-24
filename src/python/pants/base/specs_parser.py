@@ -19,6 +19,7 @@ from pants.base.specs import (
     RawSpecs,
     RecursiveGlobSpec,
     Spec,
+    Specs,
 )
 from pants.engine.internals import native_engine
 from pants.util.frozendict import FrozenDict
@@ -117,7 +118,7 @@ class SpecsParser:
         *,
         convert_dir_literal_to_address_literal: bool,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
-    ) -> RawSpecs:
+    ) -> Specs:
         include_specs = []
         ignore_specs = []
         for spec_str in specs:
@@ -127,9 +128,22 @@ class SpecsParser:
             else:
                 include_specs.append(spec)
 
-        return RawSpecs.create(
+        includes = RawSpecs.create(
             include_specs,
             convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
             unmatched_glob_behavior=unmatched_glob_behavior,
             filter_by_global_options=True,
         )
+        ignores = RawSpecs.create(
+            ignore_specs,
+            convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
+            unmatched_glob_behavior=unmatched_glob_behavior,
+            # By setting the below to False, we will end up matching some targets
+            # that cannot have been resolved by the include specs. For example, if the user runs
+            # `--filter-target-type=my_tgt :: !dir::`, the ignores may match targets that are not
+            # my_tgt. However, there also is no harm in over-matching with ignores. Setting
+            # this to False (over-conservatively?) ensures that if a user says to ignore
+            # something, we definitely do.
+            filter_by_global_options=False,
+        )
+        return Specs(includes, ignores)

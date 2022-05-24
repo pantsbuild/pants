@@ -167,7 +167,7 @@ async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuild
     specs_parser = SpecsParser()
     specs = specs_parser.parse_specs(
         request.definition.addresses, convert_dir_literal_to_address_literal=False
-    )
+    ).includes
     return BSPBuildTargetInternal(request.name, specs, request.definition)
 
 
