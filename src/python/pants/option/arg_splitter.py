@@ -161,16 +161,16 @@ class ArgSplitter:
             scope_to_flags[flag_scope].append(descoped_flag)
 
         global_flags = self._consume_flags()
-
         add_scope(GLOBAL_SCOPE)
         for flag in global_flags:
             assign_flag_to_scope(flag, GLOBAL_SCOPE)
+
         scope, flags = self._consume_scope()
         while scope:
             # `add_goal` returns the currently active scope to assign flags to.
             scope = add_goal(scope)
             for flag in flags:
-                assign_flag_to_scope(flag, scope)
+                assign_flag_to_scope(flag, GLOBAL_SCOPE if self.is_level_short_arg(flag) else scope)
             scope, flags = self._consume_scope()
 
         while self._unconsumed_args and not self._at_standalone_double_dash():
@@ -275,7 +275,7 @@ class ArgSplitter:
         if not self._unconsumed_args:
             return False
         arg = self._unconsumed_args[-1]
-        if not arg.startswith("--"):
+        if not arg.startswith("--") and not self.is_level_short_arg(arg):
             return False
         return not self._at_standalone_double_dash() and not self._at_scope()
 
@@ -285,3 +285,10 @@ class ArgSplitter:
     def _at_standalone_double_dash(self) -> bool:
         """At the value `--`, used to start passthrough args."""
         return bool(self._unconsumed_args) and self._unconsumed_args[-1] == "--"
+
+    def is_level_short_arg(self, arg: str) -> bool:
+        """We special case the `--level` global option to also be recognized with `-l`.
+
+        It's important that that this be classified as a global option.
+        """
+        return arg in {"-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror"}
