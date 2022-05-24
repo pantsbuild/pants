@@ -73,8 +73,7 @@ class ArgSplitter:
 
     Recognizes, e.g.:
 
-    ./pants check --foo lint -y target1: dir f.ext
-    ./pants check --foo lint -y target1: dir f.ext
+    ./pants check --foo lint target1: dir f.ext
     ./pants --global-opt check target1: dir f.ext --check-flag
     ./pants --check-flag check target1: dir f.ext
     ./pants goal -- passthru foo
@@ -162,19 +161,19 @@ class ArgSplitter:
             scope_to_flags[flag_scope].append(descoped_flag)
 
         global_flags = self._consume_flags()
-
         add_scope(GLOBAL_SCOPE)
         for flag in global_flags:
             assign_flag_to_scope(flag, GLOBAL_SCOPE)
+
         scope, flags = self._consume_scope()
         while scope:
             # `add_goal` returns the currently active scope to assign flags to.
             scope = add_goal(scope)
             for flag in flags:
-                assign_flag_to_scope(flag, scope)
+                assign_flag_to_scope(flag, GLOBAL_SCOPE if self.is_level_short_arg(flag) else scope)
             scope, flags = self._consume_scope()
 
-        while self._unconsumed_args and not self._at_double_dash():
+        while self._unconsumed_args and not self._at_standalone_double_dash():
             if self._at_flag():
                 arg = self._unconsumed_args.pop()
                 # We assume any args here are in global scope.
@@ -193,7 +192,7 @@ class ArgSplitter:
             elif not goals and NO_GOAL_NAME in self._known_goal_scopes:
                 builtin_goal = NO_GOAL_NAME
 
-        if self._at_double_dash():
+        if self._at_standalone_double_dash():
             self._unconsumed_args.pop()
             passthru = list(reversed(self._unconsumed_args))
 
@@ -273,15 +272,26 @@ class ArgSplitter:
         return default_scope, flag
 
     def _at_flag(self) -> bool:
-        return (
-            bool(self._unconsumed_args)
-            and self._unconsumed_args[-1].startswith("-")
-            and not self._at_double_dash()
-            and not self._at_scope()
-        )
+        if not self._unconsumed_args:
+            return False
+        arg = self._unconsumed_args[-1]
+        if not arg.startswith("--") and not self.is_level_short_arg(arg):
+            return False
+        return not self._at_standalone_double_dash() and not self._at_scope()
 
     def _at_scope(self) -> bool:
         return bool(self._unconsumed_args) and self._unconsumed_args[-1] in self._known_scopes
 
-    def _at_double_dash(self) -> bool:
+    def _at_standalone_double_dash(self) -> bool:
+        """At the value `--`, used to start passthrough args."""
         return bool(self._unconsumed_args) and self._unconsumed_args[-1] == "--"
+
+    def is_level_short_arg(self, arg: str) -> bool:
+        """We special case the `--level` global option to also be recognized with `-l`.
+
+        It's important that this be classified as a global option.
+
+        Note that we also need to recognize `-h` and `-v` as builtin goals. That is handled already
+        via `likely_a_spec()`.
+        """
+        return arg in {"-ltrace", "-ldebug", "-linfo", "-lwarn", "-lerror"}
