@@ -174,7 +174,7 @@ class ArgSplitter:
                 assign_flag_to_scope(flag, scope)
             scope, flags = self._consume_scope()
 
-        while self._unconsumed_args and not self._at_double_dash():
+        while self._unconsumed_args and not self._at_standalone_double_dash():
             if self._at_flag():
                 arg = self._unconsumed_args.pop()
                 # We assume any args here are in global scope.
@@ -193,7 +193,7 @@ class ArgSplitter:
             elif not goals and NO_GOAL_NAME in self._known_goal_scopes:
                 builtin_goal = NO_GOAL_NAME
 
-        if self._at_double_dash():
+        if self._at_standalone_double_dash():
             self._unconsumed_args.pop()
             passthru = list(reversed(self._unconsumed_args))
 
@@ -276,12 +276,13 @@ class ArgSplitter:
         return (
             bool(self._unconsumed_args)
             and self._unconsumed_args[-1].startswith("-")
-            and not self._at_double_dash()
+            and not self._at_standalone_double_dash()
             and not self._at_scope()
         )
 
     def _at_scope(self) -> bool:
         return bool(self._unconsumed_args) and self._unconsumed_args[-1] in self._known_scopes
 
-    def _at_double_dash(self) -> bool:
+    def _at_standalone_double_dash(self) -> bool:
+        """At the value `--`, used to start passthrough args."""
         return bool(self._unconsumed_args) and self._unconsumed_args[-1] == "--"
