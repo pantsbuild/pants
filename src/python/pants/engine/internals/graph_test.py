@@ -11,7 +11,7 @@ from typing import Iterable, List, Set, Tuple, Type, cast
 
 import pytest
 
-from pants.base.specs import RawSpecs
+from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
@@ -766,7 +766,7 @@ def test_owners_build_file(owners_rule_runner: RuleRunner) -> None:
 def generated_targets_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            QueryRule(Addresses, [RawSpecs]),
+            QueryRule(Addresses, [Specs]),
             QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
             QueryRule(_TargetParametrizations, [Address]),
         ],
