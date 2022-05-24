@@ -86,14 +86,17 @@ class ArgSplitter:
         self._known_scopes = {si.scope for si in known_scope_infos} | set(
             self._known_goal_scopes.keys()
         )
-        self._goal_single_dash_aliases = {
+
+        # Holds aliases like `-h` for `--help`. Used for disambiguation with ignore specs like
+        # `-dir::`.
+        self._single_dash_goal_aliases = {
             scope
             for scope in self._known_goal_scopes.keys()
             if scope.startswith("-") and not scope.startswith("--")
         }
-        self._unconsumed_args: list[
-            str
-        ] = []  # In reverse order, for efficient popping off the end.
+
+        # We store in reverse order, for efficient popping off the end.
+        self._unconsumed_args: list[str] = []
 
         # We allow --scope-flag-name anywhere on the cmd line, as an alternative to ...
         # scope --flag-name.
@@ -226,8 +229,8 @@ class ArgSplitter:
 
     def likely_a_spec(self, arg: str) -> bool:
         """Return whether `arg` looks like a spec, rather than a goal name."""
-        # Disambiguate between ignore specs and builtin goals like `-h`.
-        if arg.startswith("-") and arg not in self._goal_single_dash_aliases:
+        # Check if it's an ignore spec.
+        if arg.startswith("-") and arg not in self._single_dash_goal_aliases:
             return True
         return any(c in arg for c in (os.path.sep, ".", ":", "*", "#")) or os.path.exists(
             os.path.join(self._buildroot, arg)
