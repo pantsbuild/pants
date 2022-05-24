@@ -778,7 +778,6 @@ class BootstrapOptions:
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
     logdir = StrOption(
-        "-d",
         "--logdir",
         advanced=True,
         default=None,
