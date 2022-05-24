@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.base.specs import SPEC_IGNORE_PREFIX, Specs
+from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.environment import CompleteEnvironment
@@ -251,7 +251,7 @@ class LocalPantsRunner:
             specs = []
             for spec_str in self.options.specs:
                 spec, is_ignore = spec_parser.parse_spec(spec_str)
-                specs.append(f"{SPEC_IGNORE_PREFIX}{spec}" if is_ignore else str(spec))
+                specs.append(f"-{spec}" if is_ignore else str(spec))
 
             self.run_tracker.start(run_start_time=start_time, specs=specs)
             global_options = self.options.for_global_scope()

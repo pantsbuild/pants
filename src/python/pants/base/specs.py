@@ -13,8 +13,6 @@ from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.frozendict import FrozenDict
 
-SPEC_IGNORE_PREFIX = "!"
-
 
 class Spec(ABC):
     """A specification for what Pants should operate on."""

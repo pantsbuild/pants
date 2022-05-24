@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from pants.base.specs import (
-    SPEC_IGNORE_PREFIX,
     AddressLiteralSpec,
     DirGlobSpec,
     DirLiteralSpec,
@@ -61,7 +60,7 @@ def assert_spec_parsed(build_root: Path, spec_str: str, expected_spec: Spec) -> 
     assert is_ignore is False
 
     # Check ignores are also parsed correctly.
-    spec, is_ignore = parser.parse_spec(f"{SPEC_IGNORE_PREFIX}{spec_str}")
+    spec, is_ignore = parser.parse_spec(f"-{spec_str}")
     assert isinstance(spec, type(expected_spec))
     assert spec == expected_spec
     assert is_ignore is True

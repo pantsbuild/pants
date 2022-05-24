@@ -10,7 +10,6 @@ from typing import Iterable
 from pants.base.build_environment import get_buildroot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import (
-    SPEC_IGNORE_PREFIX,
     AddressLiteralSpec,
     DirGlobSpec,
     DirLiteralSpec,
@@ -72,7 +71,7 @@ class SpecsParser:
         :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
         """
         is_ignore = False
-        if spec.startswith(SPEC_IGNORE_PREFIX):
+        if spec.startswith("-"):
             is_ignore = True
             spec = spec[1:]
 
