@@ -306,7 +306,7 @@ class RawSpecs:
             or self.ancestor_globs
         )
 
-    def to_specs_snapshot_path_globs(self) -> PathGlobs:
+    def to_specs_paths_path_globs(self) -> PathGlobs:
         """`PathGlobs` to find all files from the specs, independent of targets."""
         relevant_specs: Iterable[
             FileLiteralSpec | FileGlobSpec | DirLiteralSpec | DirGlobSpec | RecursiveGlobSpec
