@@ -505,23 +505,23 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
 
 
-class LogLevelOption(EnumOption):
+class LogLevelOption(EnumOption[LogLevel, LogLevel]):
     """The `--level` option.
 
     This is a dedicated class because it's the only option where we allow both the short flag `-l`
     and the long flag `--level`.
     """
 
-    def __new__(cls):
+    def __new__(cls) -> LogLevelOption:
         self = super().__new__(
-            cls,
+            cls,  # type: ignore[arg-type]
             "--level",
             default=LogLevel.INFO,
             daemon=True,
             help="Set the logging level.",
         )
         self._flag_names = ("--level", "-l")
-        return self
+        return self  # type: ignore[return-value]
 
 
 class BootstrapOptions:
