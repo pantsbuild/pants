@@ -8,12 +8,7 @@ import pytest
 from pants.backend.helm.goals.tailor import PutativeHelmChartTargetsRequest
 from pants.backend.helm.goals.tailor import rules as helm_tailor_rules
 from pants.backend.helm.target_types import HelmChartTarget
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -37,9 +32,7 @@ def test_find_helm_charts(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeHelmChartTargetsRequest(
-                PutativeTargetsSearchPaths(("src/owned", "src/foo", "src/bar"))
-            ),
+            PutativeHelmChartTargetsRequest(("src/owned", "src/foo", "src/bar")),
             AllOwnedSources(["src/owned/Chart.yaml"]),
         ],
     )

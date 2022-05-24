@@ -36,9 +36,9 @@ async def find_putative_targets(
         return PutativeTargets()
 
     all_avsc_files, all_avpr_files, all_avdl_files = await MultiGet(
-        Get(Paths, PathGlobs, req.search_paths.path_globs("*.avsc")),
-        Get(Paths, PathGlobs, req.search_paths.path_globs("*.avpr")),
-        Get(Paths, PathGlobs, req.search_paths.path_globs("*.avdl")),
+        Get(Paths, PathGlobs, req.path_globs("*.avsc")),
+        Get(Paths, PathGlobs, req.path_globs("*.avpr")),
+        Get(Paths, PathGlobs, req.path_globs("*.avdl")),
     )
     unowned_avro_files = {
         *all_avsc_files.files,

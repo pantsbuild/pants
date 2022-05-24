@@ -6,12 +6,7 @@ import pytest
 from pants.backend.codegen.thrift.tailor import PutativeThriftTargetsRequest
 from pants.backend.codegen.thrift.tailor import rules as tailor_rules
 from pants.backend.codegen.thrift.target_types import ThriftSourcesGeneratorTarget
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -40,9 +35,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativeThriftTargetsRequest(
-                PutativeTargetsSearchPaths(("thrifts/foo", "thrifts/foo/bar"))
-            ),
+            PutativeThriftTargetsRequest(("thrifts/foo", "thrifts/foo/bar")),
             AllOwnedSources(["thrifts/foo/bar/baz1.thrift"]),
         ],
     )
@@ -79,12 +72,7 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
 
     pts = rule_runner.request(
         PutativeTargets,
-        [
-            PutativeThriftTargetsRequest(
-                PutativeTargetsSearchPaths(("thrifts/foo/bar", "thrifts/foo/qux"))
-            ),
-            AllOwnedSources([]),
-        ],
+        [PutativeThriftTargetsRequest(("thrifts/foo/bar", "thrifts/foo/qux")), AllOwnedSources([])],
     )
     assert (
         PutativeTargets(

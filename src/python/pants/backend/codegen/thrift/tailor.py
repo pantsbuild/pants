@@ -35,7 +35,7 @@ async def find_putative_thrift_targets(
     if not thrift_subsystem.tailor:
         return PutativeTargets()
 
-    all_thrift_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.thrift"))
+    all_thrift_files = await Get(Paths, PathGlobs, req.path_globs("*.thrift"))
     unowned_thrift_files = set(all_thrift_files.files) - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(

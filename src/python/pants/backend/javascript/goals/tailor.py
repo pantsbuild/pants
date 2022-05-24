@@ -40,11 +40,7 @@ async def find_putative_targets(
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
     all_js_files_globs = PathGlobs(
-        [
-            os.path.join(d, "**", f"*{ext}")
-            for d in req.search_paths.dirs
-            for ext in JS_FILE_EXTENSIONS
-        ]
+        [os.path.join(d, "**", f"*{ext}") for d in req.dirs for ext in JS_FILE_EXTENSIONS]
     )
     all_js_files = await Get(Paths, PathGlobs, all_js_files_globs)
     unowned_js_files = set(all_js_files.files) - set(all_owned_sources)

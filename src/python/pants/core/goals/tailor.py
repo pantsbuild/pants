@@ -54,7 +54,16 @@ from pants.util.strutil import softwrap
 @union
 @dataclass(frozen=True)
 class PutativeTargetsRequest(metaclass=ABCMeta):
-    search_paths: PutativeTargetsSearchPaths
+    dirs: tuple[str, ...]
+    deprecated_recursive_dirs: tuple[str, ...] = ()
+
+    def path_globs(self, filename_glob: str) -> PathGlobs:
+        return PathGlobs(
+            globs=(
+                *(os.path.join(d, filename_glob) for d in self.dirs),
+                *(os.path.join(d, "**", filename_glob) for d in self.deprecated_recursive_dirs),
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -595,17 +604,19 @@ async def tailor(
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
 
     if global_options.use_deprecated_directory_cli_args_semantics:
-        search_paths = PutativeTargetsSearchPaths(
-            dirs=(), deprecated_recursive_dirs=specs_to_dirs(specs.includes)
-        )
+        dir_search_paths: tuple[str, ...] = ()
+        recursive_search_paths = specs_to_dirs(specs.includes)
     else:
         specs_paths = await Get(SpecsPaths, Specs, specs)
-        search_paths = PutativeTargetsSearchPaths(
-            tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
-        )
+        dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
+        recursive_search_paths = ()
 
     putative_targets_results = await MultiGet(
-        Get(PutativeTargets, PutativeTargetsRequest, req_type(search_paths))
+        Get(
+            PutativeTargets,
+            PutativeTargetsRequest,
+            req_type(dir_search_paths, recursive_search_paths),
+        )
         for req_type in union_membership[PutativeTargetsRequest]
     )
     putative_targets = PutativeTargets.merge(putative_targets_results)

@@ -19,12 +19,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -55,10 +50,7 @@ def test_find_go_mod_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"unowned/go.mod": "", "owned/go.mod": "", "owned/BUILD": "go_mod()"})
     putative_targets = rule_runner.request(
         PutativeTargets,
-        [
-            PutativeGoTargetsRequest(PutativeTargetsSearchPaths(("unowned", "owned"))),
-            AllOwnedSources(["owned/go.mod"]),
-        ],
+        [PutativeGoTargetsRequest(("unowned", "owned")), AllOwnedSources(["owned/go.mod"])],
     )
     assert putative_targets == PutativeTargets(
         [
@@ -88,9 +80,7 @@ def test_find_go_package_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets,
         [
             PutativeGoTargetsRequest(
-                PutativeTargetsSearchPaths(
-                    ("unowned", "owned", "unowned/testdata", "unowned/vendor", "unowned/cmd/vendor")
-                )
+                ("unowned", "owned", "unowned/testdata", "unowned/vendor", "unowned/cmd/vendor")
             ),
             AllOwnedSources(["owned/f.go"]),
         ],
@@ -130,13 +120,11 @@ def test_find_go_binary_targets(rule_runner: RuleRunner) -> None:
         PutativeTargets,
         [
             PutativeGoTargetsRequest(
-                PutativeTargetsSearchPaths(
-                    (
-                        "missing_binary_tgt",
-                        "tgt_already_exists",
-                        "missing_pkg_and_binary_tgt",
-                        "main_set_to_different_dir",
-                    )
+                (
+                    "missing_binary_tgt",
+                    "tgt_already_exists",
+                    "missing_pkg_and_binary_tgt",
+                    "main_set_to_different_dir",
                 )
             ),
             AllOwnedSources(

@@ -35,7 +35,7 @@ async def find_putative_targets(
     if not soap_subsystem.tailor:
         return PutativeTargets()
 
-    all_wsdl_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.wsdl"))
+    all_wsdl_files = await Get(Paths, PathGlobs, req.path_globs("*.wsdl"))
     unowned_wsdl_files = set(all_wsdl_files.files) - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(

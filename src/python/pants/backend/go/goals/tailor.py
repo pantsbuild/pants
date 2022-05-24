@@ -53,7 +53,7 @@ async def find_putative_go_targets(
     putative_targets = []
 
     if golang_subsystem.tailor_go_mod_targets:
-        all_go_mod_files = await Get(Paths, PathGlobs, request.search_paths.path_globs("go.mod"))
+        all_go_mod_files = await Get(Paths, PathGlobs, request.path_globs("go.mod"))
         unowned_go_mod_files = set(all_go_mod_files.files) - set(all_owned_sources)
         for dirname, filenames in group_by_dir(unowned_go_mod_files).items():
             putative_targets.append(
@@ -66,7 +66,7 @@ async def find_putative_go_targets(
             )
 
     if golang_subsystem.tailor_package_targets:
-        all_go_files = await Get(Paths, PathGlobs, request.search_paths.path_globs("*.go"))
+        all_go_files = await Get(Paths, PathGlobs, request.path_globs("*.go"))
         unowned_go_files = set(all_go_files.files) - set(all_owned_sources)
         for dirname, filenames in group_by_dir(unowned_go_files).items():
             # Ignore paths that have `testdata` or `vendor` in them.
@@ -86,7 +86,7 @@ async def find_putative_go_targets(
 
     if golang_subsystem.tailor_binary_targets:
         all_go_files_digest_contents = await Get(
-            DigestContents, PathGlobs, request.search_paths.path_globs("*.go")
+            DigestContents, PathGlobs, request.path_globs("*.go")
         )
         main_package_dirs = [
             os.path.dirname(file_content.path)

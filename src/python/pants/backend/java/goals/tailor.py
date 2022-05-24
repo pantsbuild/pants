@@ -52,7 +52,7 @@ async def find_putative_targets(
     putative_targets = []
 
     if javac.tailor_source_targets:
-        all_java_files_globs = req.search_paths.path_globs("*.java")
+        all_java_files_globs = req.path_globs("*.java")
         all_java_files = await Get(Paths, PathGlobs, all_java_files_globs)
         unowned_java_files = set(all_java_files.files) - set(all_owned_sources)
         classified_unowned_java_files = classify_source_files(unowned_java_files)
