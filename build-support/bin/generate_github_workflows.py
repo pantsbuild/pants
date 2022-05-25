@@ -211,7 +211,7 @@ def rust_caches() -> Sequence[Step]:
 def install_jdk() -> Step:
     return {
         "name": "Install AdoptJDK",
-        "uses": "actions/setup-java@v2",
+        "uses": "actions/setup-java@v3",
         "with": {
             "distribution": "adopt",
             "java-version": "11",
@@ -222,7 +222,7 @@ def install_jdk() -> Step:
 def install_go() -> Step:
     return {
         "name": "Install Go",
-        "uses": "actions/setup-go@v2",
+        "uses": "actions/setup-go@v3",
         "with": {"go-version": "1.17.1"},
     }
 
@@ -254,7 +254,7 @@ def bootstrap_caches() -> Sequence[Step]:
 def native_binaries_upload() -> Step:
     return {
         "name": "Upload native binaries",
-        "uses": "actions/upload-artifact@v2",
+        "uses": "actions/upload-artifact@v3",
         "with": {
             "name": "native_binaries.${{ matrix.python-version }}.${{ runner.os }}",
             "path": "\n".join(NATIVE_FILES),
@@ -265,7 +265,7 @@ def native_binaries_upload() -> Step:
 def native_binaries_download() -> Step:
     return {
         "name": "Download native binaries",
-        "uses": "actions/download-artifact@v2",
+        "uses": "actions/download-artifact@v3",
         "with": {"name": "native_binaries.${{ matrix.python-version }}.${{ runner.os }}"},
     }
 
@@ -274,7 +274,7 @@ def setup_primary_python() -> Sequence[Step]:
     return [
         {
             "name": "Set up Python ${{ matrix.python-version }}",
-            "uses": "actions/setup-python@v2",
+            "uses": "actions/setup-python@v3",
             "with": {"python-version": "${{ matrix.python-version }}"},
         },
         {
@@ -299,7 +299,7 @@ def expose_all_pythons() -> Step:
 def upload_log_artifacts(name: str) -> Step:
     return {
         "name": "Upload pants.log",
-        "uses": "actions/upload-artifact@v2",
+        "uses": "actions/upload-artifact@v3",
         "if": "always()",
         "with": {"name": f"pants-log-{name}", "path": ".pants.d/pants.log"},
     }
@@ -749,7 +749,7 @@ def generate() -> dict[Path, str]:
                     "if": IS_PANTS_OWNER,
                     "steps": [
                         {
-                            "uses": "styfle/cancel-workflow-action@0.8.0",
+                            "uses": "styfle/cancel-workflow-action@0.9.1",
                             "with": {
                                 "workflow_id": "${{ github.event.workflow.id }}",
                                 "access_token": "${{ github.token }}",
