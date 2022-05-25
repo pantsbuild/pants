@@ -9,18 +9,11 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence
+from typing import Iterable, NamedTuple, Sequence, cast
 
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.base.exceptions import ResolveError
-from pants.base.specs import (
-    AddressSpecs,
-    AscendantAddresses,
-    FileLiteralSpec,
-    FilesystemSpecs,
-    MaybeEmptyDescendantAddresses,
-    Specs,
-)
+from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -29,17 +22,8 @@ from pants.engine.addresses import (
     UnparsedAddressInputs,
 )
 from pants.engine.collection import Collection
-from pants.engine.fs import (
-    EMPTY_SNAPSHOT,
-    Digest,
-    MergeDigests,
-    PathGlobs,
-    Paths,
-    Snapshot,
-    SpecsSnapshot,
-)
+from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
-from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizations as _TargetParametrizations,
@@ -57,7 +41,6 @@ from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     Field,
-    FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     FilteredTargets,
@@ -72,7 +55,6 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     MultipleSourcesField,
-    NoApplicableTargetsBehavior,
     OverridesField,
     RegisteredTargetTypes,
     SecondaryOwnerMixin,
@@ -85,8 +67,6 @@ from pants.engine.target import (
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
     TargetGenerator,
-    TargetRootsToFieldSets,
-    TargetRootsToFieldSetsRequest,
     Targets,
     TargetTypesToGenerateTargetsRequests,
     TransitiveTargets,
@@ -99,7 +79,11 @@ from pants.engine.target import (
     _generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions, OwnersNotFoundBehavior
+from pants.option.global_options import (
+    GlobalOptions,
+    OwnersNotFoundBehavior,
+    UnmatchedBuildFileGlobs,
+)
 from pants.source.filespec import matches_filespec
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
@@ -165,7 +149,7 @@ async def resolve_target_parametrizations(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
-    files_not_found_behavior: FilesNotFoundBehavior,
+    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
 ) -> _TargetParametrizations:
     assert not address.is_generated_target and not address.is_parametrized
 
@@ -224,7 +208,7 @@ async def resolve_target_parametrizations(
             overrides_flattened = overrides_field.flatten()
             if issubclass(target_type, TargetFilesGenerator):
                 override_globs = OverridesField.to_path_globs(
-                    address, overrides_flattened, files_not_found_behavior
+                    address, overrides_flattened, unmatched_build_file_globs
                 )
                 override_paths = await MultiGet(
                     Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
@@ -348,20 +332,17 @@ async def resolve_targets(
     return Targets(expanded_targets)
 
 
-@rule
-def filter_targets(targets: Targets, specs_filter: SpecsFilter) -> FilteredTargets:
-    return FilteredTargets(tgt for tgt in targets if specs_filter.matches(tgt))
-
-
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
-    tgts = await Get(Targets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+    tgts = await Get(Targets, RawSpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),)))
     return AllTargets(tgts)
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTargets:
-    tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+    tgts = await Get(
+        UnexpandedTargets, RawSpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),))
+    )
     return AllUnexpandedTargets(tgts)
 
 
@@ -613,8 +594,38 @@ async def coarsened_targets(request: CoarsenedTargetsRequest) -> CoarsenedTarget
 # -----------------------------------------------------------------------------------------------
 
 
-class InvalidOwnersOfArgs(Exception):
-    pass
+def _log_or_raise_unmatched_owners(
+    file_paths: Sequence[PurePath],
+    owners_not_found_behavior: OwnersNotFoundBehavior,
+    ignore_option: str | None = None,
+) -> None:
+    option_msg = (
+        f"\n\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
+        if ignore_option
+        else ""
+    )
+    if len(file_paths) == 1:
+        prefix = (
+            f"No owning targets could be found for the file `{file_paths[0]}`.\n\n"
+            f"Please check that there is a BUILD file in the parent directory "
+            f"{file_paths[0].parent} with a target whose `sources` field includes the file."
+        )
+    else:
+        prefix = (
+            f"No owning targets could be found for the files {sorted(map(str, file_paths))}`.\n\n"
+            f"Please check that there are BUILD files in each file's parent directory with a "
+            f"target whose `sources` field includes the file."
+        )
+    msg = (
+        f"{prefix} See {doc_url('targets')} for more information on target definitions."
+        f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
+        f"{doc_url('create-initial-build-files')}.{option_msg}"
+    )
+
+    if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+        logger.warning(msg)
+    else:
+        raise ResolveError(msg)
 
 
 @dataclass(frozen=True)
@@ -644,19 +655,27 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # For live files, we use Targets, which causes more precise, often file-level, targets
     # to be created. For deleted files we use UnexpandedTargets, which have the original declared
     # glob.
-    live_candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
-    deleted_candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
-    live_get: Get[FilteredTargets | Targets, AddressSpecs]
+    live_candidate_specs = tuple(AncestorGlobSpec(directory=d) for d in live_dirs)
+    deleted_candidate_specs = tuple(AncestorGlobSpec(directory=d) for d in deleted_dirs)
+    live_get: Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners]
     if owners_request.filter_by_global_options:
         live_get = Get(
-            FilteredTargets, AddressSpecs(live_candidate_specs, filter_by_global_options=True)
+            FilteredTargets,
+            RawSpecsWithoutFileOwners(
+                ancestor_globs=live_candidate_specs, filter_by_global_options=True
+            ),
         )
         deleted_get = Get(
-            UnexpandedTargets, AddressSpecs(deleted_candidate_specs, filter_by_global_options=True)
+            UnexpandedTargets,
+            RawSpecsWithoutFileOwners(
+                ancestor_globs=deleted_candidate_specs, filter_by_global_options=True
+            ),
         )
     else:
-        live_get = Get(Targets, AddressSpecs(live_candidate_specs))
-        deleted_get = Get(UnexpandedTargets, AddressSpecs(deleted_candidate_specs))
+        live_get = Get(Targets, RawSpecsWithoutFileOwners(ancestor_globs=live_candidate_specs))
+        deleted_get = Get(
+            UnexpandedTargets, RawSpecsWithoutFileOwners(ancestor_globs=deleted_candidate_specs)
+        )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
     matching_addresses: OrderedSet[Address] = OrderedSet()
@@ -708,145 +727,25 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 
 # -----------------------------------------------------------------------------------------------
-# Specs -> Addresses
-# -----------------------------------------------------------------------------------------------
-
-
-@rule
-def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
-    return global_options.owners_not_found_behavior
-
-
-def _log_or_raise_unmatched_owners(
-    file_paths: Sequence[PurePath],
-    owners_not_found_behavior: OwnersNotFoundBehavior,
-    ignore_option: str | None = None,
-) -> None:
-    option_msg = (
-        f"\n\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
-        if ignore_option
-        else ""
-    )
-    if len(file_paths) == 1:
-        prefix = (
-            f"No owning targets could be found for the file `{file_paths[0]}`.\n\n"
-            f"Please check that there is a BUILD file in the parent directory "
-            f"{file_paths[0].parent} with a target whose `sources` field includes the file."
-        )
-    else:
-        prefix = (
-            f"No owning targets could be found for the files {sorted(map(str, file_paths))}`.\n\n"
-            f"Please check that there are BUILD files in each file's parent directory with a "
-            f"target whose `sources` field includes the file."
-        )
-    msg = (
-        f"{prefix} See {doc_url('targets')} for more information on target definitions."
-        f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
-        f"{doc_url('create-initial-build-files')}.{option_msg}"
-    )
-
-    if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
-        logger.warning(msg)
-    else:
-        raise ResolveError(msg)
-
-
-@rule
-async def addresses_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs, owners_not_found_behavior: OwnersNotFoundBehavior
-) -> Addresses:
-    """Find the owner(s) for each FilesystemSpec."""
-    paths_per_include = await MultiGet(
-        Get(
-            Paths,
-            PathGlobs,
-            filesystem_specs.path_globs_for_spec(
-                spec, owners_not_found_behavior.to_glob_match_error_behavior()
-            ),
-        )
-        for spec in filesystem_specs.file_includes
-    )
-    owners_per_include = await MultiGet(
-        Get(Owners, OwnersRequest(paths.files, filter_by_global_options=True))
-        for paths in paths_per_include
-    )
-    addresses: set[Address] = set()
-    for spec, owners in zip(filesystem_specs.file_includes, owners_per_include):
-        if (
-            owners_not_found_behavior != OwnersNotFoundBehavior.ignore
-            and isinstance(spec, FileLiteralSpec)
-            and not owners
-        ):
-            _log_or_raise_unmatched_owners(
-                [PurePath(str(spec))],
-                owners_not_found_behavior,
-                ignore_option="--owners-not-found-behavior=ignore",
-            )
-        addresses.update(owners)
-    return Addresses(sorted(addresses))
-
-
-@rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
-async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
-    from_address_specs, from_filesystem_specs = await MultiGet(
-        Get(Addresses, AddressSpecs, specs.address_specs),
-        Get(Addresses, FilesystemSpecs, specs.filesystem_specs),
-    )
-    # We use a set to dedupe because it's possible to have the same address from both an address
-    # and filesystem spec.
-    return Addresses(sorted({*from_address_specs, *from_filesystem_specs}))
-
-
-# -----------------------------------------------------------------------------------------------
-# SourcesSnapshot
-# -----------------------------------------------------------------------------------------------
-
-
-@rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
-async def resolve_specs_snapshot(
-    specs: Specs, owners_not_found_behavior: OwnersNotFoundBehavior
-) -> SpecsSnapshot:
-    """Resolve all files matching the given specs.
-
-    Address specs will use their `SourcesField` field, and Filesystem specs will use whatever args
-    were given. Filesystem specs may safely refer to files with no owning target.
-    """
-    targets = await Get(Targets, AddressSpecs, specs.address_specs)
-    all_hydrated_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
-        for tgt in targets
-        if tgt.has_field(SourcesField)
-    )
-
-    filesystem_specs_digest = (
-        await Get(
-            Digest,
-            PathGlobs,
-            specs.filesystem_specs.to_path_globs(
-                owners_not_found_behavior.to_glob_match_error_behavior()
-            ),
-        )
-        if specs.filesystem_specs
-        else None
-    )
-
-    # NB: We merge into a single snapshot to avoid the same files being duplicated if they were
-    # covered both by address specs and filesystem specs.
-    digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
-    if filesystem_specs_digest:
-        digests.append(filesystem_specs_digest)
-    result = await Get(Snapshot, MergeDigests(digests))
-    return SpecsSnapshot(result)
-
-
-# -----------------------------------------------------------------------------------------------
 # Resolve SourcesField
 # -----------------------------------------------------------------------------------------------
 
 
 @rule
-def extract_files_not_found_behavior(global_options: GlobalOptions) -> FilesNotFoundBehavior:
-    return global_options.files_not_found_behavior
+def extract_unmatched_build_file_globs(
+    global_options: GlobalOptions,
+) -> UnmatchedBuildFileGlobs:
+    return cast(
+        UnmatchedBuildFileGlobs,
+        resolve_conflicting_options(
+            old_option="files_not_found_behavior",
+            new_option="unmatched_build_file_globs",
+            old_scope=global_options.options_scope,
+            new_scope=global_options.options_scope,
+            old_container=global_options.options,
+            new_container=global_options.options,
+        ),
+    )
 
 
 class AmbiguousCodegenImplementationsException(Exception):
@@ -894,7 +793,7 @@ class AmbiguousCodegenImplementationsException(Exception):
 @rule(desc="Hydrate the `sources` field")
 async def hydrate_sources(
     request: HydrateSourcesRequest,
-    files_not_found_behavior: FilesNotFoundBehavior,
+    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
     union_membership: UnionMembership,
 ) -> HydratedSources:
     sources_field = request.field
@@ -940,7 +839,7 @@ async def hydrate_sources(
 
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
-    path_globs = sources_field.path_globs(files_not_found_behavior)
+    path_globs = sources_field.path_globs(unmatched_build_file_globs)
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
     sources_field.validate_resolved_files(snapshot.files)
 
@@ -960,10 +859,10 @@ async def hydrate_sources(
 
 @rule(desc="Resolve `sources` field file names")
 async def resolve_source_paths(
-    request: SourcesPathsRequest, files_not_found_behavior: FilesNotFoundBehavior
+    request: SourcesPathsRequest, unmatched_build_file_globs: UnmatchedBuildFileGlobs
 ) -> SourcesPaths:
     sources_field = request.field
-    path_globs = sources_field.path_globs(files_not_found_behavior)
+    path_globs = sources_field.path_globs(unmatched_build_file_globs)
     paths = await Get(Paths, PathGlobs, path_globs)
     sources_field.validate_resolved_files(paths.files)
     return SourcesPaths(files=paths.files, dirs=paths.dirs)
@@ -1204,197 +1103,6 @@ async def resolve_unparsed_address_inputs(
 # -----------------------------------------------------------------------------------------------
 
 
-class NoApplicableTargetsException(Exception):
-    def __init__(
-        self,
-        targets: Iterable[Target],
-        specs: Specs,
-        union_membership: UnionMembership,
-        *,
-        applicable_target_types: Iterable[type[Target]],
-        goal_description: str,
-    ) -> None:
-        applicable_target_aliases = sorted(
-            {target_type.alias for target_type in applicable_target_types}
-        )
-        inapplicable_target_aliases = sorted({tgt.alias for tgt in targets})
-        msg = (
-            "No applicable files or targets matched."
-            if inapplicable_target_aliases
-            else "No files or targets specified."
-        )
-        msg += (
-            f" {goal_description.capitalize()} works "
-            f"with these target types:\n\n"
-            f"{bullet_list(applicable_target_aliases)}\n\n"
-        )
-
-        # Explain what was specified, if relevant.
-        if inapplicable_target_aliases:
-            if bool(specs.filesystem_specs) and bool(specs.address_specs):
-                specs_description = " files and targets with "
-            elif bool(specs.filesystem_specs):
-                specs_description = " files with "
-            elif bool(specs.address_specs):
-                specs_description = " targets with "
-            else:
-                specs_description = " "
-            msg += (
-                f"However, you only specified{specs_description}these target types:\n\n"
-                f"{bullet_list(inapplicable_target_aliases)}\n\n"
-            )
-
-        # Add a remedy.
-        #
-        # We sometimes suggest using `./pants filedeps` to find applicable files. However, this
-        # command only works if at least one of the targets has a SourcesField field.
-        #
-        # NB: Even with the "secondary owners" mechanism - used by target types like `pex_binary`
-        # and `python_awslambda` to still work with file args - those targets will not show the
-        # associated files when using filedeps.
-        filedeps_goal_works = any(
-            tgt.class_has_field(SourcesField, union_membership) for tgt in applicable_target_types
-        )
-        pants_filter_command = (
-            f"{bin_name()} filter --target-type={','.join(applicable_target_aliases)} ::"
-        )
-        remedy = (
-            f"Please specify relevant files and/or targets. Run `{pants_filter_command}` to "
-            "find all applicable targets in your project"
-        )
-        if filedeps_goal_works:
-            remedy += (
-                f", or run `{pants_filter_command} | xargs {bin_name()} filedeps` to find all "
-                "applicable files."
-            )
-        else:
-            remedy += "."
-        msg += remedy
-        super().__init__(msg)
-
-    @classmethod
-    def create_from_field_sets(
-        cls,
-        targets: Iterable[Target],
-        specs: Specs,
-        union_membership: UnionMembership,
-        registered_target_types: RegisteredTargetTypes,
-        *,
-        field_set_types: Iterable[type[FieldSet]],
-        goal_description: str,
-    ) -> NoApplicableTargetsException:
-        applicable_target_types = {
-            target_type
-            for field_set_type in field_set_types
-            for target_type in field_set_type.applicable_target_types(
-                registered_target_types.types, union_membership
-            )
-        }
-        return cls(
-            targets,
-            specs,
-            union_membership,
-            applicable_target_types=applicable_target_types,
-            goal_description=goal_description,
-        )
-
-
-class TooManyTargetsException(Exception):
-    def __init__(self, targets: Iterable[Target], *, goal_description: str) -> None:
-        addresses = sorted(tgt.address.spec for tgt in targets)
-        super().__init__(
-            f"{goal_description.capitalize()} only works with one valid target, but was given "
-            f"multiple valid targets:\n\n{bullet_list(addresses)}\n\n"
-            "Please select one of these targets to run."
-        )
-
-
-class AmbiguousImplementationsException(Exception):
-    """A target has multiple valid FieldSets, but a goal expects there to be one FieldSet."""
-
-    def __init__(
-        self,
-        target: Target,
-        field_sets: Iterable[FieldSet],
-        *,
-        goal_description: str,
-    ) -> None:
-        # TODO: improve this error message. A better error message would explain to users how they
-        #  can resolve the issue.
-        possible_field_sets_types = sorted(field_set.__class__.__name__ for field_set in field_sets)
-        super().__init__(
-            f"Multiple of the registered implementations for {goal_description} work for "
-            f"{target.address} (target type {repr(target.alias)}). It is ambiguous which "
-            "implementation to use.\n\nPossible implementations:\n\n"
-            f"{bullet_list(possible_field_sets_types)}"
-        )
-
-
-@rule
-async def find_valid_field_sets_for_target_roots(
-    request: TargetRootsToFieldSetsRequest,
-    specs: Specs,
-    union_membership: UnionMembership,
-    registered_target_types: RegisteredTargetTypes,
-) -> TargetRootsToFieldSets:
-    # NB: This must be in an `await Get`, rather than the rule signature, to avoid a rule graph
-    # issue.
-    targets = await Get(FilteredTargets, Specs, specs)
-    field_sets_per_target = await Get(
-        FieldSetsPerTarget, FieldSetsPerTargetRequest(request.field_set_superclass, targets)
-    )
-    targets_to_applicable_field_sets = {}
-    for tgt, field_sets in zip(targets, field_sets_per_target.collection):
-        if field_sets:
-            targets_to_applicable_field_sets[tgt] = field_sets
-
-    # Possibly warn or error if no targets were applicable.
-    if not targets_to_applicable_field_sets:
-        no_applicable_exception = NoApplicableTargetsException.create_from_field_sets(
-            targets,
-            specs,
-            union_membership,
-            registered_target_types,
-            field_set_types=union_membership[request.field_set_superclass],
-            goal_description=request.goal_description,
-        )
-        if request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.error:
-            raise no_applicable_exception
-        # We squelch the warning if the specs came from change detection or only from address globs,
-        # since in that case we interpret the user's intent as "if there are relevant matching
-        # targets, act on them". But we still want to warn if the specs were literal, or empty.
-        empty_ok = specs.from_change_detection or (
-            specs.address_specs.globs
-            and not specs.address_specs.literals
-            and not specs.filesystem_specs
-        )
-        if (
-            request.no_applicable_targets_behavior == NoApplicableTargetsBehavior.warn
-            and not empty_ok
-        ):
-            logger.warning(str(no_applicable_exception))
-
-    if request.num_shards > 0:
-        sharded_targets_to_applicable_field_sets = {
-            tgt: value
-            for tgt, value in targets_to_applicable_field_sets.items()
-            if request.is_in_shard(tgt.address.spec)
-        }
-        result = TargetRootsToFieldSets(sharded_targets_to_applicable_field_sets)
-    else:
-        result = TargetRootsToFieldSets(targets_to_applicable_field_sets)
-
-    if not request.expect_single_field_set:
-        return result
-    if len(result.targets) > 1:
-        raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
-    if len(result.field_sets) > 1:
-        raise AmbiguousImplementationsException(
-            result.targets[0], result.field_sets, goal_description=request.goal_description
-        )
-    return result
-
-
 @rule
 def find_valid_field_sets(
     request: FieldSetsPerTargetRequest, union_membership: UnionMembership
@@ -1417,7 +1125,6 @@ class GenerateFileTargets(GenerateTargetsRequest):
 @rule
 async def generate_file_targets(
     request: GenerateFileTargets,
-    files_not_found_behavior: FilesNotFoundBehavior,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
     sources_paths = await Get(
@@ -1446,7 +1153,6 @@ async def generate_file_targets(
 
 
 def rules():
-
     return [
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateFileTargets),

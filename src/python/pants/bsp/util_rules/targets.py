@@ -14,7 +14,7 @@ from typing_extensions import Protocol
 
 from pants.base.build_root import BuildRoot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.base.specs import AddressSpecs, Specs
+from pants.base.specs import RawSpecs, RawSpecsWithoutFileOwners
 from pants.base.specs_parser import SpecsParser
 from pants.bsp.goal import BSPGoal
 from pants.bsp.protocol import BSPHandlerMapping
@@ -132,7 +132,7 @@ class BSPTargetDefinition:
 @dataclass(frozen=True)
 class BSPBuildTargetInternal:
     name: str
-    specs: Specs
+    specs: RawSpecs
     definition: BSPTargetDefinition
 
     @property
@@ -165,7 +165,9 @@ class _ParseOneBSPMappingRequest:
 @rule
 async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuildTargetInternal:
     specs_parser = SpecsParser()
-    specs = specs_parser.parse_specs(request.definition.addresses)
+    specs = specs_parser.parse_specs(
+        request.definition.addresses, convert_dir_literal_to_address_literal=False
+    ).includes
     return BSPBuildTargetInternal(request.name, specs, request.definition)
 
 
@@ -258,7 +260,12 @@ async def resolve_bsp_build_target_addresses(
     bsp_target: BSPBuildTargetInternal,
     union_membership: UnionMembership,
 ) -> Targets:
-    targets = await Get(Targets, AddressSpecs, bsp_target.specs.address_specs)
+    # NB: Using `RawSpecs` directly rather than `RawSpecsWithoutFileOwners` results in a rule graph cycle.
+    targets = await Get(
+        Targets,
+        RawSpecsWithoutFileOwners,
+        RawSpecsWithoutFileOwners.from_raw_specs(bsp_target.specs),
+    )
     if bsp_target.definition.resolve_filter is None:
         return targets
 

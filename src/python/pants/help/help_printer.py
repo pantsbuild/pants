@@ -399,7 +399,7 @@ class HelpPrinter(MaybeColor):
             print(formatted_desc)
         print(f"\n\nActivated by {self.maybe_magenta(tinfo.provider)}")
         print("Valid fields:")
-        for field in sorted(tinfo.fields, key=lambda x: x.alias):
+        for field in sorted(tinfo.fields, key=lambda x: (-x.required, x.alias)):
             print()
             print(self.maybe_magenta(field.alias))
             indent = "    "

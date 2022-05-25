@@ -10,7 +10,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.black.skip_field import SkipBlackField
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -43,6 +43,7 @@ class Black(PythonToolBase):
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--target-version=py37 --quiet")
+    export = ExportToolOption()
     config = FileOption(
         "--config",
         default=None,
@@ -88,7 +89,9 @@ async def _black_interpreter_constraints(
         code_constraints = InterpreterConstraints.create_from_targets(
             (tgt for tgt in all_tgts if not tgt.get(SkipBlackField).value), python_setup
         )
-        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
+        if code_constraints is not None and code_constraints.requires_python38_or_newer(
+            python_setup.interpreter_universe
+        ):
             constraints = code_constraints
     return constraints
 
@@ -119,10 +122,12 @@ class BlackExportSentinel(ExportPythonToolSentinel):
     pass
 
 
-@rule(desc="Determine MyPy interpreter constraints (for `export` goal)", level=LogLevel.DEBUG)
+@rule(desc="Determine Black interpreter constraints (for `export` goal)", level=LogLevel.DEBUG)
 async def black_export(
     _: BlackExportSentinel, black: Black, python_setup: PythonSetup
 ) -> ExportPythonTool:
+    if not black.export:
+        return ExportPythonTool(resolve_name=black.options_scope, pex_request=None)
     constraints = await _black_interpreter_constraints(black, python_setup)
     return ExportPythonTool(
         resolve_name=black.options_scope,

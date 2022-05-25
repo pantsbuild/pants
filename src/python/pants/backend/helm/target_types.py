@@ -22,6 +22,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     Targets,
     TriBoolField,
+    generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
@@ -94,8 +95,19 @@ class HelmChartMetaSourceField(SingleSourceField):
 
 
 class HelmChartSourcesField(MultipleSourcesField):
-    default = ("values.yaml", "templates/*.yaml", "templates/*.tpl")
+    default = (
+        "values.yaml",
+        "values.yml",
+        "templates/*.yaml",
+        "templates/*.yml",
+        "templates/*.tpl",
+        "crds/*.yaml",
+        "crds/*.yml",
+    )
     expected_file_extensions = (".yaml", ".yml", ".tpl")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['values.yaml', 'templates/*.yaml', '!values_ignore.yaml']`"
+    )
 
 
 class HelmChartDependenciesField(Dependencies):
@@ -227,6 +239,9 @@ class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
     expected_file_extensions = (
         ".yaml",
         ".yml",
+    )
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*_test.yaml', '!ignore_test.yaml']`"
     )
 
 

@@ -71,6 +71,7 @@ async def ktlint_fmt(request: KtlintRequest, tool: KtlintSubsystem, jdk: Interna
             argv=args,
             classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
             input_digest=request.snapshot.digest,
+            extra_jvm_options=tool.jvm_options,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_immutable_input_digests,
             output_files=request.snapshot.files,

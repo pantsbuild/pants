@@ -60,6 +60,7 @@ from pants.engine.target import (
     TriBoolField,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
@@ -811,6 +812,9 @@ class PythonTestTarget(Target):
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
     expected_file_extensions = (".py", "")  # Note that this does not include `.pyi`.
     default = ("test_*.py", "*_test.py", "tests.py")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['test_*.py', '*_test.py', 'tests.py']`"
+    )
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
@@ -831,13 +835,13 @@ class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
 class PythonTestsOverrideField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         PythonTestTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo_test.py": {"timeout": 120]},\n'
-            '  "bar_test.py": {"timeout": 200]},\n'
-            '  ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo_test.py": {"timeout": 120]},
+            "bar_test.py": {"timeout": 200]},
+            ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},
+        }
+        """,
     )
 
 
@@ -875,18 +879,21 @@ class PythonSourceTarget(Target):
 class PythonSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         PythonSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo.py": {"skip_pylint": True]},\n'
-            '  "bar.py": {"skip_flake8": True]},\n'
-            '  ("foo.py", "bar.py"): {"tags": ["linter_disabled"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo.py": {"skip_pylint": True]},
+            "bar.py": {"skip_flake8": True]},
+            ("foo.py", "bar.py"): {"tags": ["linter_disabled"]},
+        }"
+        """,
     )
 
 
 class PythonTestUtilsGeneratingSourcesField(PythonGeneratingSourcesBase):
     default = ("conftest.py", "test_*.pyi", "*_test.pyi", "tests.pyi")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['conftest.py', 'test_*.pyi', '*_test.pyi', 'tests.pyi']`"
+    )
 
 
 class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
@@ -894,6 +901,9 @@ class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
         ("*.py", "*.pyi")
         + tuple(f"!{pat}" for pat in PythonTestsGeneratingSourcesField.default)
         + tuple(f"!{pat}" for pat in PythonTestUtilsGeneratingSourcesField.default)
+    )
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.py', 'new_*.py', '!old_ignore.py']`"
     )
 
 

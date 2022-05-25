@@ -17,6 +17,7 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
     Targets,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
@@ -66,7 +67,9 @@ class ProtobufSourceTarget(Target):
         f"""
         A single Protobuf file used to generate various languages.
 
-        See {doc_url('protobuf')}.
+        See language-specific docs:
+            Python: {doc_url('protobuf-python')}
+            Go: {doc_url('protobuf-go')}
         """
     )
 
@@ -93,18 +96,21 @@ def generator_settings(
 class ProtobufSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.proto",)
     expected_file_extensions = (".proto",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.proto', 'new_*.proto', '!old_ignore*.proto']`"
+    )
 
 
 class ProtobufSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ProtobufSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo.proto": {"grpc": True},\n'
-            '  "bar.proto": {"description": "our user model"},\n'
-            '  ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo.proto": {"grpc": True},
+            "bar.proto": {"description": "our user model"},
+            ("foo.proto", "bar.proto"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 

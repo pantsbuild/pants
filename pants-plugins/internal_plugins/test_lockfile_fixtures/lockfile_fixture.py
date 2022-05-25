@@ -50,16 +50,21 @@ class JVMLockfileFixture:
     serialized_lockfile: str
     requirements: ArtifactRequirements
 
-    def requirements_as_jvm_artifact_targets(self) -> str:
+    def requirements_as_jvm_artifact_targets(
+        self, *, version_in_target_name: bool = False, resolve: str | None = None
+    ) -> str:
         targets = ""
         for requirement in self.requirements:
+            maybe_version = f"_{requirement.coordinate.version}" if version_in_target_name else ""
+            maybe_resolve = f'resolve="{resolve}",' if resolve else ""
             targets += textwrap.dedent(
                 f"""\
             jvm_artifact(
-              name="{requirement.coordinate.group}_{requirement.coordinate.artifact}_{requirement.coordinate.version}",
+              name="{requirement.coordinate.group}_{requirement.coordinate.artifact}{maybe_version}",
               group="{requirement.coordinate.group}",
               artifact="{requirement.coordinate.artifact}",
               version="{requirement.coordinate.version}",
+              {maybe_resolve}
             )
             """
             )

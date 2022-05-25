@@ -180,42 +180,6 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         ["==2.7.*", global_constraint, ">=3.8"],
     )
 
-    # Also consider direct deps (but not transitive). They should be ANDed within each target's
-    # closure like normal, but then ORed across each closure.
-    assert_lockfile_request(
-        dedent(
-            """\
-            python_sources(
-                name='transitive_dep', interpreter_constraints=['==99'], skip_pylint=True,
-            )
-            python_sources(
-                name='dep',
-                dependencies=[":transitive_dep"],
-                interpreter_constraints=['==2.7.*', '==3.8.*'],
-                skip_pylint=True,
-            )
-            python_sources(name='app', dependencies=[":dep"], interpreter_constraints=['==2.7.*'])
-            """
-        ),
-        ["==2.7.*", "==2.7.*,==3.8.*"],
-    )
-    assert_lockfile_request(
-        dedent(
-            """\
-            python_sources(
-                name='lib1', interpreter_constraints=['==2.7.*', '==3.8.*'], skip_pylint=True
-            )
-            python_sources(name='app1', dependencies=[":lib1"], interpreter_constraints=['==2.7.*'])
-
-            python_sources(
-                name='lib2', interpreter_constraints=['>=3.7'], skip_pylint=True
-            )
-            python_sources(name='app2', dependencies=[":lib2"], interpreter_constraints=['==3.9.*'])
-            """
-        ),
-        ["==2.7.*", "==2.7.*,==3.8.*", ">=3.7,==3.9.*"],
-    )
-
     # Check that source_plugins are included, even if they aren't linted directly. Plugins
     # consider transitive deps.
     assert_lockfile_request(

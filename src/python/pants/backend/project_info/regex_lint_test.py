@@ -116,13 +116,9 @@ class TestMultiMatcherTest:
             .lstrip()
             .encode("utf8")
         )
-        assert (("python_header",), ("no_six",)) == matcher.check_content(
-            ("python_header", "no_six"), py_file_content, "utf8"
+        assert RegexMatchResult("f.py", ("python_header",), ("no_six",)) == matcher.check_content(
+            "f.py", py_file_content, ("python_header", "no_six"), "utf8"
         )
-
-        assert RegexMatchResult(
-            "foo/bar/baz.py", ("python_header",), ("no_six",)
-        ) == matcher.check_source_file("foo/bar/baz.py", py_file_content)
 
     def test_multiple_encodings_error(self, matcher: MultiMatcher) -> None:
         with pytest.raises(

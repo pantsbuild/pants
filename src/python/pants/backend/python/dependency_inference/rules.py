@@ -103,8 +103,8 @@ class PythonInferSubsystem(Subsystem):
             Infer a target's dependencies based on strings that look like dynamic
             dependencies, such as Django settings files expressing dependencies as strings.
 
-            To ignore any false positives, put `!{bad_address}` in the `dependencies` field
-            of your target.
+            To ignore a false positive, you can either put `# pants: no-infer-dep` on the line of
+            the string or put `!{bad_address}` in the `dependencies` field of your target.
             """
         ),
     )
@@ -125,8 +125,10 @@ class PythonInferSubsystem(Subsystem):
         help=softwrap(
             """
             Infer a target's asset dependencies based on strings that look like Posix
-            filepaths, such as those given to `open` or `pkgutil.get_data`. To ignore any
-            false positives, put `!{bad_address}` in the `dependencies` field of your target.
+            filepaths, such as those given to `open` or `pkgutil.get_data`.
+
+            To ignore a false positive, you can either put `# pants: no-infer-dep` on the line of
+            the string or put `!{bad_address}` in the `dependencies` field of your target.
             """
         ),
     )
@@ -387,11 +389,17 @@ async def infer_python_dependencies_via_source(
 
     _wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
     tgt = _wrapped_tgt.target
+    interpreter_constraints = InterpreterConstraints.create_from_targets([tgt], python_setup)
+    if interpreter_constraints is None:
+        # TODO: This would represent a target with a PythonSource field, but no
+        # InterpreterConstraints field. #15400 would allow inference to require both
+        # fields.
+        return InferredDependencies([])
     parsed_dependencies = await Get(
         ParsedPythonDependencies,
         ParsePythonDependenciesRequest(
             cast(PythonSourceField, request.sources_field),
-            InterpreterConstraints.create_from_targets([tgt], python_setup),
+            interpreter_constraints,
             string_imports=python_infer_subsystem.string_imports,
             string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
             assets=python_infer_subsystem.assets,

@@ -57,16 +57,12 @@ pytest.main(["--collect-only", *sys.argv[1:]], plugins=[collection_plugin])
 output = []
 cwd = Path.cwd()
 for item in collection_plugin.collected:
-    mark = item.get_closest_marker("jvm_lockfile")
-    if not mark:
-        continue
-
-    path = Path(item.path).relative_to(cwd)
-
-    output.append({
-        "kwargs": mark.kwargs,
-        "test_file_path": str(path),
-    })
+    for mark in item.iter_markers("jvm_lockfile"):
+        path = Path(item.path).relative_to(cwd)
+        output.append({
+            "kwargs": mark.kwargs,
+            "test_file_path": str(path),
+        })
 
 with open("tests.json", "w") as f:
     f.write(json.dumps(output))

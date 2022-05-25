@@ -21,7 +21,7 @@ def test_list_none() -> None:
 def test_list_invalid_dir() -> None:
     pants_run = run_pants(["list", "abcde::"])
     pants_run.assert_failure()
-    assert "ResolveError" in pants_run.stderr
+    assert "Unmatched glob from CLI arguments:" in pants_run.stderr
 
 
 def test_list_testproject() -> None:

@@ -240,7 +240,7 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockf
                 kotlin_sources(
                     name = 'main',
                     dependencies = [
-                        "3rdparty/jvm:joda-time_joda-time_2.10.10",
+                        "3rdparty/jvm:joda-time_joda-time",
                     ],
                 )
                 """
@@ -332,15 +332,8 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(
         {
             "BUILD": dedent(
                 """\
-                jvm_artifact(
-                    name = "joda-time_joda-time",
-                    group = "joda-time",
-                    artifact = "joda-time",
-                    version = "2.10.10",
-                )
                 kotlin_sources(
                     name = 'main',
-                    # `joda-time` needs to be here for compile to succeed
                 )
                 """
             ),
@@ -384,12 +377,12 @@ def test_compile_with_kotlinc_plugin(
     rule_runner.write_files(
         {
             "lib/BUILD": dedent(
-                f"""\
+                """\
                 kotlinc_plugin(
                     name = "allopen",
                     plugin_id = "org.jetbrains.kotlin.allopen",
                     plugin_args = ["annotation=lib.MarkOpen"],
-                    artifact = "3rdparty/jvm:org.jetbrains.kotlin_kotlin-allopen_{_KOTLIN_VERSION}",
+                    artifact = "3rdparty/jvm:org.jetbrains.kotlin_kotlin-allopen",
                 )
 
                 kotlin_sources()

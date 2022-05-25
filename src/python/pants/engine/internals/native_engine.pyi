@@ -26,7 +26,7 @@ class AddressParseException(Exception):
 
 def address_spec_parse(
     spec: str,
-) -> tuple[bool, tuple[str, str | None, str | None, tuple[tuple[str, str], ...]], str | None]: ...
+) -> tuple[tuple[str, str | None, str | None, tuple[tuple[str, str], ...]], str | None]: ...
 
 # ------------------------------------------------------------------------------
 # Scheduler

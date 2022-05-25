@@ -9,7 +9,7 @@ from typing import Iterable
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -46,6 +46,8 @@ class ClangFormat(PythonToolBase):
     default_lockfile_path = "src/python/pants/backend/cc/lint/clangformat/clangformat.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
+    export = ExportToolOption()
+
     def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
         """clang-format will use the closest configuration file to the file currently being
         formatted, so add all of them."""
@@ -79,6 +81,8 @@ class ClangFormatExportSentinel(ExportPythonToolSentinel):
 
 @rule
 def clangformat_export(_: ClangFormatExportSentinel, clangformat: ClangFormat) -> ExportPythonTool:
+    if not clangformat.export:
+        return ExportPythonTool(resolve_name=clangformat.options_scope, pex_request=None)
     return ExportPythonTool(
         resolve_name=clangformat.options_scope, pex_request=clangformat.to_pex_request()
     )

@@ -304,6 +304,7 @@ async def setup_scalapb_shim_classfiles(
                 scalapb_shim_source.path,
             ],
             input_digest=merged_digest,
+            extra_jvm_options=scalapb.jvm_options,
             output_directories=(dest_dir,),
             description="Compile ScalaPB shim with scalac",
             level=LogLevel.DEBUG,

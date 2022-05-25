@@ -72,12 +72,12 @@ class AvroSourcesGeneratingSourcesField(MultipleSourcesField):
 class AvroSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         AvroSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "bar.proto": {"description": "our user model"]},\n'
-            '  ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "bar.proto": {"description": "our user model"]},
+            ("foo.proto", "bar.proto"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 

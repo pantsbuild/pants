@@ -33,7 +33,7 @@ async def find_putative_targets(
     if not protoc.tailor:
         return PutativeTargets()
 
-    all_proto_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.proto"))
+    all_proto_files = await Get(Paths, PathGlobs, req.path_globs("*.proto"))
     unowned_proto_files = set(all_proto_files.files) - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(

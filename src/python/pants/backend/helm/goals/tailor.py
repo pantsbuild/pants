@@ -37,7 +37,7 @@ async def find_putative_helm_targets(
         return PutativeTargets()
 
     found_chart_paths = await MultiGet(
-        Get(Paths, PathGlobs, request.search_paths.path_globs(filename))
+        Get(Paths, PathGlobs, request.path_globs(filename))
         for filename in HELM_CHART_METADATA_FILENAMES
     )
     all_chart_files = chain.from_iterable([p.files for p in found_chart_paths])

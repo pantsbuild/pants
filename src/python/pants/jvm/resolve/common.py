@@ -197,7 +197,7 @@ class ArtifactRequirement:
             "jar": self.jar.address.spec if self.jar else "not_provided",
         }
         if self.excludes:
-            attrs["excludes"] = ",".join(self.excludes)
+            attrs["excludes"] = ",".join(sorted(self.excludes))
 
         return self.coordinate.to_coord_arg_str(attrs)
 

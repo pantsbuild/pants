@@ -19,6 +19,7 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.base.deprecated import warn_or_error
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
@@ -29,6 +30,8 @@ from pants.engine.fs import (
     FileContent,
     MergeDigests,
     PathGlobs,
+    Paths,
+    SpecsPaths,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -174,16 +177,40 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
+    specs_paths: SpecsPaths,
 ) -> UpdateBuildFilesGoal:
-    all_build_files = await Get(
-        DigestContents,
-        PathGlobs(
-            globs=(
-                *(os.path.join("**", p) for p in build_file_options.patterns),
-                *(f"!{p}" for p in build_file_options.ignores),
-            )
-        ),
+    build_file_path_globs = PathGlobs(
+        globs=(
+            *(os.path.join("**", p) for p in build_file_options.patterns),
+            *(f"!{p}" for p in build_file_options.ignores),
+        )
     )
+    if specs_paths.files:
+        all_build_file_paths = await Get(Paths, PathGlobs, build_file_path_globs)
+        specified_paths = set(specs_paths.files)
+        specified_build_files = await Get(
+            DigestContents,
+            PathGlobs(fp for fp in all_build_file_paths.files if fp in specified_paths),
+        )
+    else:
+        warn_or_error(
+            "2.14.0.dev0",
+            f"running `{bin_name()} update-build-files` without arguments",
+            softwrap(
+                f"""
+                Currently, `{bin_name()} update-build-files` without arguments will run against
+                every BUILD file in the project.
+
+                In Pants 2.14, you must use CLI arguments. Use:
+
+                  * `::` to run on everything
+                  * `dir::` to run on `dir` and subdirs
+                  * `dir` to run on `dir`
+                  * `dir/BUILD` to run on that single BUILD file
+                """
+            ),
+        )
+        specified_build_files = await Get(DigestContents, PathGlobs, build_file_path_globs)
 
     rewrite_request_classes = []
     for request in union_membership[RewrittenBuildFileRequest]:
@@ -203,7 +230,7 @@ async def update_build_files(
 
     build_file_to_lines = {
         build_file.path: tuple(build_file.content.decode("utf-8").splitlines())
-        for build_file in all_build_files
+        for build_file in specified_build_files
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:

@@ -10,7 +10,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.flake8.skip_field import SkipFlake8Field
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
@@ -80,6 +80,7 @@ class Flake8(PythonToolBase):
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore E123,W456 --enable-extensions H111")
+    export = ExportToolOption()
     config = FileOption(
         "--config",
         default=None,
@@ -240,17 +241,17 @@ async def _flake8_interpreter_constraints(
     # This ORs all unique interpreter constraints. The net effect is that every possible Python
     # interpreter used will be covered.
     all_tgts = await Get(AllTargets, AllTargetsRequest())
-    relevant_targets = tuple(tgt for tgt in all_tgts if Flake8FieldSet.is_applicable(tgt))
-    unique_constraints = set()
-    for tgt in relevant_targets:
-        if tgt.has_field(InterpreterConstraintsField):
-            constraints_field = tgt[InterpreterConstraintsField]
-            unique_constraints.add(
-                InterpreterConstraints.create_from_compatibility_fields(
-                    (constraints_field, *first_party_plugins.interpreter_constraints_fields),
-                    python_setup,
-                )
-            )
+    unique_constraints = {
+        InterpreterConstraints.create_from_compatibility_fields(
+            (
+                tgt[InterpreterConstraintsField],
+                *first_party_plugins.interpreter_constraints_fields,
+            ),
+            python_setup,
+        )
+        for tgt in all_tgts
+        if Flake8FieldSet.is_applicable(tgt)
+    }
     if not unique_constraints:
         unique_constraints.add(
             InterpreterConstraints.create_from_compatibility_fields(
@@ -320,6 +321,8 @@ async def flake8_export(
     first_party_plugins: Flake8FirstPartyPlugins,
     python_setup: PythonSetup,
 ) -> ExportPythonTool:
+    if not flake8.export:
+        return ExportPythonTool(resolve_name=flake8.options_scope, pex_request=None)
     constraints = await _flake8_interpreter_constraints(first_party_plugins, python_setup)
     return ExportPythonTool(
         resolve_name=flake8.options_scope,

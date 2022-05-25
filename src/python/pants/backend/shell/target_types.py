@@ -26,6 +26,7 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.util.enums import match
@@ -169,18 +170,21 @@ class Shunit2TestTarget(Target):
 
 class Shunit2TestsGeneratorSourcesField(ShellGeneratingSourcesBase):
     default = ("*_test.sh", "test_*.sh", "tests.sh")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['test.sh', 'test_*.sh', '!test_ignore.sh']`"
+    )
 
 
 class Shunit2TestsOverrideField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         Shunit2TestTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo_test.sh": {"timeout": 120]},\n'
-            '  "bar_test.sh": {"timeout": 200]},\n'
-            '  ("foo_test.sh", "bar_test.sh"): {"tags": ["slow_tests"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo_test.sh": {"timeout": 120]},
+            "bar_test.sh": {"timeout": 200]},
+            ("foo_test.sh", "bar_test.sh"): {"tags": ["slow_tests"]},
+        }
+        """,
     )
 
 
@@ -216,18 +220,21 @@ class ShellSourceTarget(Target):
 
 class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBase):
     default = ("*.sh",) + tuple(f"!{pat}" for pat in Shunit2TestsGeneratorSourcesField.default)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.sh', 'new_*.sh', '!old_ignore.sh']`"
+    )
 
 
 class ShellSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ShellSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo.sh": {"skip_shellcheck": True]},\n'
-            '  "bar.sh": {"skip_shfmt": True]},\n'
-            '  ("foo.sh", "bar.sh"): {"tags": ["linter_disabled"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo.sh": {"skip_shellcheck": True]},
+            "bar.sh": {"skip_shfmt": True]},
+            ("foo.sh", "bar.sh"): {"tags": ["linter_disabled"]},
+        }
+        """,
     )
 
 

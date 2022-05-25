@@ -35,7 +35,6 @@ from pants.option.errors import (
     MutuallyExclusiveOptionError,
     NoOptionNames,
     OptionAlreadyRegistered,
-    OptionNameDash,
     OptionNameDoubleDash,
     ParseError,
 )
@@ -573,10 +572,15 @@ class OptionsTest(unittest.TestCase):
         def register_global(*args, **kwargs):
             options.register(GLOBAL_SCOPE, *args, **kwargs)
 
-        register_global("-z", "--verbose", type=bool, help="Verbose output.")
-        register_global("-n", "--num", type=int, default=99)
-        # To test that we can use the same name on the global scope and another scope.
-        options.register("anotherscope", "-n", "--num", type=int, default=99)
+        register_global("--verbose", type=bool, help="Verbose output.")
+        register_global("--num", type=int, default=99)
+
+        # NB: `-l` on the global scope is the only short arg we allow. We need to make sure it
+        # works.
+        register_global("-l", "--level", type=str, help="What level to use.")
+
+        # Test that we can use the same name on the global scope and another scope.
+        options.register("anotherscope", "--num", type=int, default=99)
 
         register_global("--y", type=list, member_type=int)
         register_global(
@@ -701,9 +705,15 @@ class OptionsTest(unittest.TestCase):
         # Some basic smoke tests.
         options = self._parse(flags="--verbose")
         assert options.for_global_scope().verbose is True
-        options = self._parse(flags="-z compile path/to/tgt")
+        options = self._parse(flags="--verbose compile path/to/tgt")
         assert ["path/to/tgt"] == options.specs
         assert options.for_global_scope().verbose is True
+
+        options = self._parse(flags="-linfo")
+        assert options.for_global_scope().level == "info"
+        options = self._parse(flags="--level=info compile path/to/tgt")
+        assert ["path/to/tgt"] == options.specs
+        assert options.for_global_scope().level == "info"
 
         with pytest.raises(ParseError):
             self._parse(flags="--unregistered-option compile").for_global_scope()
@@ -1090,7 +1100,7 @@ class OptionsTest(unittest.TestCase):
                 options.for_global_scope()
 
         assertError(NoOptionNames)
-        assertError(OptionNameDash, "badname")
+        assertError(OptionNameDoubleDash, "badname")
         assertError(OptionNameDoubleDash, "-badname")
         assertError(InvalidKwarg, "--foo", badkwarg=42)
         assertError(ImplicitValIsNone, "--foo", implicit_value=None)

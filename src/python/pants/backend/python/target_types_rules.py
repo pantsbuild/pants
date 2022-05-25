@@ -43,7 +43,6 @@ from pants.backend.python.target_types import (
     ResolvePythonDistributionEntryPointsRequest,
 )
 from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -476,21 +475,10 @@ async def validate_python_dependencies(
         ):
             non_subset_items.append(f"{dep_ics}: {dep.target.address}")
 
-    # TODO: When this deprecation triggers, it should be converted into an exception, and
-    # all usages of the InterpreterConstraints methods:
-    #   * compute_for_targets
-    #   * create_from_compatibility_fields
-    #   * create_from_targets
-    # ... should be replaced with calls to InterpreterConstraintsField.value_or_global_default.
-    deprecated_conditional(
-        lambda: bool(non_subset_items),
-        removal_version="2.13.0.dev3",
-        entity=(
-            "the `interpreter_constraints` of a target not being a subset "
-            "of its dependencies' `interpreter_constraints`"
-        ),
-        hint=softwrap(
-            f"""
+    if non_subset_items:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
             The target {request.field_set.address} has the `interpreter_constraints` {target_ics},
             which are not a subset of the `interpreter_constraints` of some of its dependencies:
 
@@ -499,8 +487,8 @@ async def validate_python_dependencies(
             To fix this, you should likely adjust {request.field_set.address}'s
             `interpreter_constraints` to match the narrowest range in the above list.
             """
-        ),
-    )
+            )
+        )
 
     return ValidatedDependencies()
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, DefaultDict
 
+from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex
@@ -32,7 +33,7 @@ _RESERVED_NAMES = {"api-types", "global", "goals", "subsystems", "targets", "too
 
 
 # Subsystems used outside of any rule.
-_GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {GlobalOptions, Changed, CliOptions}
+_GLOBAL_SUBSYSTEMS: set[type[Subsystem]] = {GlobalOptions, Changed, CliOptions, FilterSubsystem}
 
 
 @dataclass(frozen=True)

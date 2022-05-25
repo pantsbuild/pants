@@ -13,6 +13,7 @@ from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
+    K8S_CRD_FILE,
     K8S_SERVICE_FILE,
 )
 from pants.backend.helm.util_rules import sources
@@ -48,6 +49,7 @@ def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:
             ),
             "Chart.yaml": HELM_CHART_FILE,
             "values.yaml": HELM_VALUES_FILE,
+            "crds/foo.yml": K8S_CRD_FILE,
             "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
             "templates/service.yaml": K8S_SERVICE_FILE,
             "resource.xml": "",
@@ -67,6 +69,7 @@ def test_source_templates_are_always_included(rule_runner: RuleRunner) -> None:
     )
 
     assert source_files.snapshot.files == (
+        "crds/foo.yml",
         "templates/_helpers.tpl",
         "templates/service.yaml",
         "values.yaml",

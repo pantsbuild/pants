@@ -10,6 +10,7 @@ import glob as glob_stdlib
 import itertools
 import logging
 import os.path
+import textwrap
 import zlib
 from abc import ABC, ABCMeta, abstractmethod
 from collections import deque
@@ -49,7 +50,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.global_options import FilesNotFoundBehavior
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
@@ -656,7 +657,7 @@ class Targets(Collection[Target]):
 # This distinct type is necessary because of https://github.com/pantsbuild/pants/issues/14977.
 #
 # NB: We still proactively apply filtering inside `AddressSpecs` and `FilesystemSpecs`, which is
-# earlier in the rule pipeline of `Specs -> Addresses -> UnexpandedTargets -> Targets ->
+# earlier in the rule pipeline of `RawSpecs -> Addresses -> UnexpandedTargets -> Targets ->
 # FilteredTargets`. That is necessary so that project-introspection goals like `list` which don't
 # use `FilteredTargets` still have filtering applied.
 class FilteredTargets(Collection[Target]):
@@ -1100,7 +1101,6 @@ def _generate_file_level_targets(
     union_membership: UnionMembership | None,
     *,
     add_dependencies_on_all_siblings: bool,
-    use_generated_address_syntax: bool = False,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.
@@ -1124,13 +1124,6 @@ def _generate_file_level_targets(
     # https://github.com/pantsbuild/pants/issues/15381.
     paths = [glob_stdlib.escape(path) for path in paths]
 
-    def generate_address(base_address: Address, relativized_fp: str) -> Address:
-        return (
-            base_address.create_generated(relativized_fp)
-            if use_generated_address_syntax
-            else base_address.create_file(relativized_fp)
-        )
-
     normalized_overrides = dict(overrides or {})
 
     all_generated_items: list[tuple[Address, str, dict[str, Any]]] = []
@@ -1141,13 +1134,13 @@ def _generate_file_level_targets(
         if generated_overrides is None:
             # No overrides apply.
             all_generated_items.append(
-                (generate_address(template_address, relativized_fp), fp, dict(template))
+                (template_address.create_file(relativized_fp), fp, dict(template))
             )
         else:
             # At least one override applies. Generate a target per set of fields.
             all_generated_items.extend(
                 (
-                    generate_address(overridden_address, relativized_fp),
+                    overridden_address.create_file(relativized_fp),
                     fp,
                     {**template, **override_fields},
                 )
@@ -1934,7 +1927,7 @@ class SourcesField(AsyncFieldMixin, Field):
         )
 
     @final
-    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:
         if not self.globs:
             return PathGlobs([])
 
@@ -1952,7 +1945,7 @@ class SourcesField(AsyncFieldMixin, Field):
         # Use fields default error behavior if defined, if we use default globs else the provided
         # error behavior.
         error_behavior = (
-            files_not_found_behavior.to_glob_match_error_behavior()
+            unmatched_build_file_globs.to_glob_match_error_behavior()
             if conjunction == GlobExpansionConjunction.all_match
             or self.default_glob_match_error_behavior is None
             else self.default_glob_match_error_behavior
@@ -2711,7 +2704,7 @@ class OverridesField(AsyncFieldMixin, Field):
         cls,
         address: Address,
         overrides_keys: Iterable[str],
-        files_not_found_behavior: FilesNotFoundBehavior,
+        unmatched_build_file_globs: UnmatchedBuildFileGlobs,
     ) -> tuple[PathGlobs, ...]:
         """Create a `PathGlobs` for each key.
 
@@ -2728,7 +2721,7 @@ class OverridesField(AsyncFieldMixin, Field):
         return tuple(
             PathGlobs(
                 [relativize_glob(glob)],
-                glob_match_error_behavior=files_not_found_behavior.to_glob_match_error_behavior(),
+                glob_match_error_behavior=unmatched_build_file_globs.to_glob_match_error_behavior(),
                 description_of_origin=f"the `overrides` field for {address}",
             )
             for glob in overrides_keys
@@ -2786,21 +2779,51 @@ class OverridesField(AsyncFieldMixin, Field):
         return result
 
 
+def generate_multiple_sources_field_help_message(files_example: str) -> str:
+    return softwrap(
+        """
+        A list of files and globs that belong to this target.
+
+        Paths are relative to the BUILD file's directory. You can ignore files/globs by
+        prefixing them with `!`.
+
+        """
+        + files_example
+    )
+
+
 def generate_file_based_overrides_field_help_message(
     generated_target_name: str, example: str
 ) -> str:
-    return (
-        f"Override the field values for generated `{generated_target_name}` targets.\n\n"
-        "Expects a dictionary of relative file paths and globs to a dictionary for the "
-        "overrides. You may either use a string for a single path / glob, "
-        "or a string tuple for multiple paths / globs. Each override is a dictionary of "
-        "field names to the overridden value.\n\n"
-        f"For example:\n\n```\n{example}\n```\n\n"
-        "File paths and globs are relative to the BUILD file's directory. Every overridden file is "
-        "validated to belong to this target's `sources` field.\n\n"
-        f"If you'd like to override a field's value for every `{generated_target_name}` target "
-        "generated by this target, change the field directly on this target rather than using the "
-        "`overrides` field.\n\n"
-        "You can specify the same file name in multiple keys, so long as you don't override the "
-        "same field more than one time for the file."
+    example = textwrap.dedent(example.lstrip("\n"))
+    example = textwrap.indent(example, " " * 4)
+    return "\n".join(
+        [
+            softwrap(
+                """
+                Override the field values for generated `{generated_target_name}` targets.
+
+                Expects a dictionary of relative file paths and globs to a dictionary for the
+                overrides. You may either use a string for a single path / glob,
+                or a string tuple for multiple paths / globs. Each override is a dictionary of
+                field names to the overridden value.
+
+                For example:
+                """
+            ),
+            example,
+            softwrap(
+                f"""
+                File paths and globs are relative to the BUILD file's directory. Every overridden file is
+                validated to belong to this target's `sources` field.
+
+                If you'd like to override a field's value for every `{generated_target_name}` target
+                generated by this target, change the field directly on this target rather than using the
+                `overrides` field.
+
+                You can specify the same file name in multiple keys, so long as you don't override the
+                same field more than one time for the file.
+                """
+            ),
+        ],
     )
