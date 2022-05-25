@@ -23,7 +23,7 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier
+from pants.bsp.spec.base import BuildTargetIdentifier
 from pants.bsp.spec.targets import DependencyModule
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
@@ -52,8 +52,8 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Target, Targets
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule, rule_helper
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
 from pants.jvm.bsp.compile import rules as jvm_compile_rules
@@ -104,31 +104,8 @@ class ScalaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
     field_set_type = ScalaMetadataFieldSet
 
 
-@dataclass(frozen=True)
-class ResolveScalaBSPBuildTargetRequest:
-    target: Target
-
-
-@dataclass(frozen=True)
-class ResolveScalaBSPBuildTargetResult:
-    build_target: BuildTarget
-    scala_runtime: Snapshot
-
-
-@dataclass(frozen=True)
-class MaterializeScalaRuntimeJarsRequest:
-    scala_version: str
-
-
-@dataclass(frozen=True)
-class MaterializeScalaRuntimeJarsResult:
-    content: Snapshot
-
-
-@rule
-async def materialize_scala_runtime_jars(
-    request: MaterializeScalaRuntimeJarsRequest,
-) -> MaterializeScalaRuntimeJarsResult:
+@rule_helper
+async def _materialize_scala_runtime_jars(scala_version: str) -> Snapshot:
     tool_classpath = await Get(
         ToolClasspath,
         ToolClasspathRequest(
@@ -137,24 +114,22 @@ async def materialize_scala_runtime_jars(
                     Coordinate(
                         group="org.scala-lang",
                         artifact="scala-compiler",
-                        version=request.scala_version,
+                        version=scala_version,
                     ),
                     Coordinate(
                         group="org.scala-lang",
                         artifact="scala-library",
-                        version=request.scala_version,
+                        version=scala_version,
                     ),
                 ]
             ),
         ),
     )
 
-    materialized_classpath_digest = await Get(
-        Digest,
-        AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{request.scala_version}"),
+    return await Get(
+        Snapshot,
+        AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{scala_version}"),
     )
-    materialized_classpath = await Get(Snapshot, Digest, materialized_classpath_digest)
-    return MaterializeScalaRuntimeJarsResult(materialized_classpath)
 
 
 @rule
@@ -186,9 +161,7 @@ async def bsp_resolve_scala_metadata(
     (resolve,) = resolves
 
     scala_version = scala.version_for_resolve(resolve)
-    scala_runtime = await Get(
-        MaterializeScalaRuntimeJarsResult, MaterializeScalaRuntimeJarsRequest(scala_version)
-    )
+    scala_runtime = await _materialize_scala_runtime_jars(scala_version)
 
     #
     # Extract the JDK paths from an lawful-evil process so we can supply it to the IDE.
@@ -268,7 +241,7 @@ async def bsp_resolve_scala_metadata(
 
     scala_jar_uris = tuple(
         build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
-        for p in scala_runtime.content.files
+        for p in scala_runtime.files
     )
 
     jvm_build_target = JvmBuildTarget(
@@ -285,7 +258,7 @@ async def bsp_resolve_scala_metadata(
             jars=scala_jar_uris,
             jvm_build_target=jvm_build_target,
         ),
-        digest=scala_runtime.content.digest,
+        digest=scala_runtime.digest,
     )
 
 
