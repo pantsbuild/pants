@@ -13,6 +13,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     Targets,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
@@ -67,6 +68,9 @@ class AvroSourceTarget(Target):
 class AvroSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.avsc", "*.avpr", "*.avdl")
     expected_file_extensions = (".avsc", ".avpr", ".avdl")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.avsc', 'new_*.avpr', '!old_ignore.avdl']`"
+    )
 
 
 class AvroSourcesOverridesField(OverridesField):
