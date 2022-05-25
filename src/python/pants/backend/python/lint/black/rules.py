@@ -17,7 +17,14 @@ from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests, PathGlobs
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.process import ProcessResult, CoalescedProcessBatch, Process
+from pants.engine.process import (
+    FallibleProcessResult,
+    MaybeCoalescedProcessBatch,
+    ProcessResult,
+    CoalescedProcessBatch,
+    Process,
+    ProcessSandboxInfo,
+)
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -99,31 +106,27 @@ async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSet
         for file_digest, config_files in zip(all_file_digests, all_config_files)
     )
 
-    processes = await MultiGet(
-        Get(
-            Process,
-            VenvPexProcess(
-                black_pex,
-                argv=(
-                    *(("--config", black.config) if black.config else ()),
-                    *black.args,
-                    "-W",
-                    "{pants_concurrency}",
-                    file,
-                ),
-                input_digest=input_digest,
-                output_files=(file,),
-                concurrency_available=1,
-                description=f"Run Black.",
-                level=LogLevel.DEBUG,
-            ),
-        )
-        for file, input_digest in zip(request.snapshot.files, all_input_digests)
-    )
-
     result = await Get(
-        ProcessResult,
-        CoalescedProcessBatch(...),
+        FallibleProcessResult,
+        # @TODO: We need to constuct this from a VenvPexProcess, so it gets the black pex and other
+        # relevant args
+        MaybeCoalescedProcessBatch(
+            files_to_sandboxes={
+                file: ProcessSandboxInfo(
+                    input_digest=input_digest,
+                    output_files=(file,),
+                )
+                for file, input_digest in zip(request.snapshot.files, all_input_digests)
+            },
+            argv=(
+                *(("--config", black.config) if black.config else ()),
+                *black.args,
+                "-W",
+                "{pants_concurrency}",
+            ),
+            description=f"Run Black.",
+            level=LogLevel.DEBUG,
+        ),
     )
     output_snapshot = await Get(Snapshot, Digest, result.output_digest)
     return FmtResult.create(request, result, output_snapshot, strip_chroot_path=True)

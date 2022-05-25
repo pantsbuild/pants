@@ -154,8 +154,10 @@ impl crate::CommandRunner for CommandRunner {
     // E.G. assume time for synth proc == coalesced process time / # files
 
     for (filename, sandbox_info) in &req.files_to_sandboxes {
+      let mut argv = req.common_argv.clone();
+      argv.push(filename.to_str().unwrap().to_string());
       let synthetic_process = Process {
-        argv: req.common_argv.clone(),
+        argv: argv,
         env: req.env.clone(),
         working_directory: req.working_directory.clone(),
         input_digests: sandbox_info.input_digests.clone(),

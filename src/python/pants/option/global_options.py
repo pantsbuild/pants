@@ -1660,6 +1660,11 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
     )
+    experimental_coalesced_process_batching = BoolOption(
+        "--experimental-coalesced-process-batching",
+        default=False,
+        help="@TODO: Help goes here!",
+    )
 
     @classmethod
     def validate_instance(cls, opts):
@@ -1895,3 +1900,13 @@ class NamedCachesDirOption:
     """
 
     val: PurePath
+
+
+@dataclass(frozen=True)
+class ExperimentalCoalescedProcessBatchingOption:
+    """A wrapper around the global option `experimental_coalesced_process_batching`.
+
+    Prefer to use this rather than requesting `GlobalOptions` for more precise invalidation.
+    """
+
+    val: bool

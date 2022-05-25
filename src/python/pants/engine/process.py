@@ -7,6 +7,7 @@ import dataclasses
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
+from multiprocessing.sharedctypes import Value
 from typing import Iterable, Mapping
 
 from pants.engine.engine_aware import SideEffecting
@@ -15,7 +16,10 @@ from pants.engine.internals.selectors import MultiGet
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, collect_rules, rule
-from pants.option.global_options import ProcessCleanupOption
+from pants.option.global_options import (
+    ExperimentalCoalescedProcessBatchingOption,
+    ProcessCleanupOption,
+)
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -134,7 +138,8 @@ class Process:
         self.platform = platform.value if platform is not None else None
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class ProcessSandboxInfo:
     input_digest: Digest
     immutable_input_digests: FrozenDict[str, Digest]
@@ -142,8 +147,23 @@ class ProcessSandboxInfo:
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
 
+    def __init__(
+        self,
+        input_digest: Digest = EMPTY_DIGEST,
+        immutable_input_digests: Mapping[str, Digest] | None = None,
+        use_nailgun: Iterable[str] = (),
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
+    ) -> None:
+        self.input_digest = input_digest
+        self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
+        self.use_nailgun = tuple(use_nailgun)
+        self.output_files = tuple(output_files or ())
+        self.output_directories = tuple(output_directories or ())
 
-@dataclass(frozen=True)
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class CoalescedProcessBatch:
     files_to_sandboxes = FrozenDict[str, ProcessSandboxInfo]
 
@@ -158,11 +178,50 @@ class CoalescedProcessBatch:
     execution_slot_variable: str | None
     platform: str | None
 
-    # NB: Assumed to be len(uncached_processes)
-    # concurrency_available: int
+    def __init__(
+        self,
+        files_to_sandboxes: Mapping[str, ProcessSandboxInfo],
+        argv: Iterable[str],
+        *,
+        description: str,
+        level: LogLevel = LogLevel.INFO,
+        working_directory: str | None = None,
+        env: Mapping[str, str] | None = None,
+        append_only_caches: Mapping[str, str] | None = None,
+        timeout_seconds: int | float | None = None,
+        jdk_home: str | None = None,
+        execution_slot_variable: str | None = None,
+        platform: Platform | None = None,
+    ) -> None:
+        if isinstance(argv, str):
+            raise ValueError("argv must be a sequence of strings, but was a single string.")
 
-    # Always SUCCESSFUL for now. @TODO?
-    # cache_scope: ProcessCacheScope
+        self.argv = tuple(argv)
+        self.files_to_sandboxes = FrozenDict(files_to_sandboxes)
+        self.description = description
+        self.level = level
+        self.working_directory = working_directory
+        self.env = FrozenDict(env or {})
+        self.append_only_caches = FrozenDict(append_only_caches or {})
+        # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
+        self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
+        self.jdk_home = jdk_home
+        self.execution_slot_variable = execution_slot_variable
+        self.platform = platform.value if platform is not None else None
+
+        immut_digest_keys = set()
+        for sandbox_info in self.files_to_sandboxes.values():
+            keys = sandbox_info.immutable_input_digests.keys()
+            duplicate_keys = keys & immut_digest_keys
+            if duplicate_keys:
+                raise ValueError(
+                    f"Duplicate keys found for immutable_input_digests: {duplicate_keys}"
+                )
+            immut_digest_keys |= keys
+
+
+class MaybeCoalescedProcessBatch(CoalescedProcessBatch):
+    pass
 
 
 @dataclass(frozen=True)
@@ -275,6 +334,52 @@ class ProcessExecutionFailure(Exception):
                 "\n\nUse `--no-process-cleanup` to preserve process chroots for inspection."
             )
         super().__init__("\n".join(err_strings))
+
+
+@rule
+async def run_maybe_coalesced_process_batch(
+    request: MaybeCoalescedProcessBatch,
+    use_coalesced_process_batch: ExperimentalCoalescedProcessBatchingOption,
+) -> FallibleProcessResult:
+    if use_coalesced_process_batch:
+        return await Get(FallibleProcessResult, CoalescedProcessBatch, request)
+    # Take all the little process pieces and merge them into the one process
+    input_digests = []
+    immutable_input_digests = {}
+    use_nailgun = set()
+    output_files = set()
+    output_directories = set()
+    for sandbox_info in request.files_to_sandboxes.values():
+        input_digests.append(sandbox_info.input_digest)
+        immutable_input_digests.update(sandbox_info.immutable_input_digests)
+        use_nailgun |= sandbox_info.use_nailgun
+        output_files |= sandbox_info.output_files
+        output_directories |= sandbox_info.output_directories
+
+    input_digest = await Get(Digest, MergeDigests(input_digests))
+
+    process = Process(
+        argv=request.common_argv + list(request.files_to_sandboxes),
+        description=request.description,
+        level=request.level,
+        input_digest=input_digest,
+        immutable_input_digests=immutable_input_digests,
+        use_nailgun=use_nailgun,
+        working_directory=request.working_directory,
+        env=request.env,
+        append_only_caches=request.append_only_caches,
+        output_files=output_files,
+        output_directories=output_directories,
+        timeout_seconds=request.timeout_seconds,
+        jdk_home=request.jdk_home,
+        execution_slot_variable=request.execution_slot_variable,
+        # @TODO: ruh roh
+        # concurrency_available=request.concurrency_available,
+        # @TODO: Cache scope? Probably put on the `maybe` type
+        # cache_scope=request.cache_scope,
+        platform=request.platform,
+    )
+    return await Get(FallibleProcessResult, Process, process)
 
 
 @rule
