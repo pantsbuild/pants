@@ -22,7 +22,7 @@ def discover_backends() -> List[str]:
 
 def assert_backends_load(backends: List[str]) -> None:
     run_pants(
-        ["--no-verify-config", "--version"], config={"GLOBAL": {"backend_packages": backends}}
+        ["--no-verify-config", "help-all"], config={"GLOBAL": {"backend_packages": backends}}
     ).assert_success(f"Failed to load: {backends}")
 
 
