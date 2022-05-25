@@ -67,12 +67,23 @@ class HelmRegistriesField(StringSequenceField):
     )
 
 
+class HelmSkipLintField(BoolField):
+    alias = "skip_lint"
+    default = False
+    help = softwrap(
+        f"""
+        If set to true, do not run any linting in this Helm chart when running `{bin_name()}
+        lint`.
+        """
+    )
+
+
 class HelmSkipPushField(BoolField):
     alias = "skip_push"
     default = False
     help = softwrap(
         f"""
-        If set to true, do not push this helm chart to registries when running `{bin_name()}
+        If set to true, do not push this Helm chart to registries when running `{bin_name()}
         publish`.
         """
     )
@@ -167,6 +178,7 @@ class HelmChartTarget(Target):
         HelmChartRepositoryField,
         HelmRegistriesField,
         HelmSkipPushField,
+        HelmSkipLintField,
     )
     help = "A Helm chart."
 
