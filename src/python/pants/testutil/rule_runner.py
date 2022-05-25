@@ -27,7 +27,7 @@ from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Works
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PyExecutor
-from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
+from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Effect, Get, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -174,6 +174,8 @@ class GoalRuleResult:
 class RuleRunner:
     build_root: str
     options_bootstrapper: OptionsBootstrapper
+    extra_session_values: dict[Any, Any]
+    max_workunit_verbosity: LogLevel
     build_config: BuildConfiguration
     scheduler: SchedulerSession
 
@@ -231,6 +233,8 @@ class RuleRunner:
 
         self.environment = CompleteEnvironment({})
         self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
+        self.extra_session_values = extra_session_values or {}
+        self.max_workunit_verbosity = max_workunit_verbosity
         options = self.options_bootstrapper.full_options(self.build_config)
         global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
@@ -248,35 +252,41 @@ class RuleRunner:
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
-        graph_session = EngineInitializer.setup_graph_extended(
-            pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
-                self.build_root, global_options
-            ),
-            use_gitignore=False,
-            local_store_options=local_store_options,
-            local_execution_root_dir=local_execution_root_dir,
-            named_caches_dir=named_caches_dir,
-            build_root=self.build_root,
-            build_configuration=self.build_config,
-            executor=_EXECUTOR,
-            execution_options=ExecutionOptions.from_options(global_options, dynamic_remote_options),
-            ca_certs_path=ca_certs_path,
-            engine_visualize_to=None,
-        ).new_session(
+        self._set_new_session(
+            EngineInitializer.setup_graph_extended(
+                pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
+                    self.build_root, global_options
+                ),
+                use_gitignore=False,
+                local_store_options=local_store_options,
+                local_execution_root_dir=local_execution_root_dir,
+                named_caches_dir=named_caches_dir,
+                build_root=self.build_root,
+                build_configuration=self.build_config,
+                executor=_EXECUTOR,
+                execution_options=ExecutionOptions.from_options(
+                    global_options, dynamic_remote_options
+                ),
+                ca_certs_path=ca_certs_path,
+                engine_visualize_to=None,
+            ).scheduler
+        )
+
+    def __repr__(self) -> str:
+        return f"RuleRunner(build_root={self.build_root})"
+
+    def _set_new_session(self, scheduler: Scheduler) -> None:
+        self.scheduler = scheduler.new_session(
             build_id="buildid_for_test",
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
                     CompleteEnvironment: self.environment,
-                    **(extra_session_values or {}),
+                    **self.extra_session_values,
                 }
             ),
-            max_workunit_level=max_workunit_verbosity,
+            max_workunit_level=self.max_workunit_verbosity,
         )
-        self.scheduler = graph_session.scheduler_session
-
-    def __repr__(self) -> str:
-        return f"RuleRunner(build_root={self.build_root})"
 
     @property
     def pants_workdir(self) -> str:
@@ -364,15 +374,15 @@ class RuleRunner:
         }
         self.options_bootstrapper = create_options_bootstrapper(args=args, env=env)
         self.environment = CompleteEnvironment(env)
-        self.scheduler = self.scheduler.scheduler.new_session(
-            build_id="buildid_for_test",
-            session_values=SessionValues(
-                {
-                    OptionsBootstrapper: self.options_bootstrapper,
-                    CompleteEnvironment: self.environment,
-                }
-            ),
-        )
+        self._set_new_session(self.scheduler.scheduler)
+
+    def set_session_values(
+        self,
+        extra_session_values: dict[Any, Any],
+    ) -> None:
+        """Update the engine Session with new session_values."""
+        self.extra_session_values = extra_session_values
+        self._set_new_session(self.scheduler.scheduler)
 
     def _invalidate_for(self, *relpaths: str):
         """Invalidates all files from the relpath, recursively up to the root.
