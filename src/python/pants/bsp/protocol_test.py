@@ -168,6 +168,12 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
 
     target_ids = (BuildTargetIdentifier("pants:default"),)
 
+    # We set a very high timeout here (was 15s) due to CI flakes as documented in:
+    #   https://github.com/pantsbuild/pants/issues/15657
+    # This seems to paper over some slow interaction between requests and the LMDB
+    # store as noted in the ticket.
+    timeout = 45
+
     with setup_bsp_server(
         jvm_rule_runner,
         notification_names={"build/taskStart", "build/taskProgress", "build/taskFinish"},
@@ -188,14 +194,14 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
                     "supportedScalaVersions": [],
                 },
             ).to_json_dict(),
-        ).result(timeout=15)
+        ).result(timeout=timeout)
 
         # build/initialized
         endpoint.notify("build/initialized")
 
         # workspace/buildTargets
         build_targets = WorkspaceBuildTargetsResult.from_json_dict(
-            endpoint.request("workspace/buildTargets").result(timeout=15)
+            endpoint.request("workspace/buildTargets").result(timeout=timeout)
         )
         assert len(build_targets.targets) == 1
         assert build_targets.targets[0].capabilities == BuildTargetCapabilities(can_compile=True)
@@ -205,25 +211,25 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
         sources = SourcesResult.from_json_dict(
             endpoint.request(
                 "buildTarget/sources", SourcesParams(target_ids).to_json_dict()
-            ).result(timeout=15)
+            ).result(timeout=timeout)
         )
         assert len(sources.items[0].sources) == 2
 
         # buildTarget/dependencySources - (NB: stubbed)
         _ = endpoint.request(
             "buildTarget/dependencySources", DependencySourcesParams(target_ids).to_json_dict()
-        ).result(timeout=15)
+        ).result(timeout=timeout)
 
         # buildTarget/resources - (NB: used only to index resources)
         _ = endpoint.request(
             "buildTarget/resources", ResourcesParams(target_ids).to_json_dict()
-        ).result(timeout=15)
+        ).result(timeout=timeout)
 
         # buildTarget/scalacOptions
         scalac_options = ScalacOptionsResult.from_json_dict(
             endpoint.request(
                 "buildTarget/scalacOptions", ScalacOptionsParams(target_ids).to_json_dict()
-            ).result(timeout=15)
+            ).result(timeout=timeout)
         )
         assert scalac_options.items[0].classpath
         class_directory = Path(urlparse(scalac_options.items[0].class_directory).path)
@@ -233,7 +239,7 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
         compile_result = CompileResult.from_json_dict(
             endpoint.request(
                 "buildTarget/compile", CompileParams(target_ids).to_json_dict()
-            ).result(timeout=15)
+            ).result(timeout=timeout)
         )
         assert StatusCode(compile_result.status_code) == StatusCode.OK
         notifications.assert_received_unordered(
