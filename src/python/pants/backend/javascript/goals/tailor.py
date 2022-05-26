@@ -38,7 +38,9 @@ async def find_putative_targets(
     req: PutativeJSTargetsRequest,
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
-    all_js_files = await Get(Paths, PathGlobs, req.path_globs(*JS_FILE_EXTENSIONS))
+    all_js_files = await Get(
+        Paths, PathGlobs, req.path_globs(*(f"*{ext}" for ext in JS_FILE_EXTENSIONS))
+    )
     unowned_js_files = set(all_js_files.files) - set(all_owned_sources)
     classified_unowned_js_files = classify_source_files(unowned_js_files)
 
