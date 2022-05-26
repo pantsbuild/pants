@@ -318,7 +318,12 @@ class RawSpecs:
             *self.recursive_globs,
         )
         return _create_path_globs(
-            (spec.to_glob() for spec in relevant_specs), self.unmatched_glob_behavior
+            (spec.to_glob() for spec in relevant_specs),
+            (
+                GlobMatchErrorBehavior.ignore
+                if self.from_change_detection
+                else self.unmatched_glob_behavior
+            ),
         )
 
 
