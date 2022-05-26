@@ -114,15 +114,25 @@ def assert_list_stdout(
 
 
 def assert_count_loc(
-    workdir: str, *, expected_num_files: int, extra_args: list[str] | None = None
+    workdir: str,
+    dependees: DependeesOption = DependeesOption.NONE,
+    *,
+    expected_num_files: int,
+    extra_args: list[str] | None = None,
 ) -> None:
     result = run_pants_with_workdir(
-        [*(extra_args or ()), "--changed-since=HEAD", "count-loc"],
+        [
+            *(extra_args or ()),
+            "--changed-since=HEAD",
+            f"--changed-dependees={dependees.value}",
+            "count-loc",
+        ],
         workdir=workdir,
         config=_PANTS_TOML,
     )
     result.assert_success()
     if expected_num_files:
+        print(result.stdout)
         assert f"Total                        {expected_num_files}" in result.stdout
     else:
         assert not result.stdout
@@ -130,25 +140,29 @@ def assert_count_loc(
 
 def test_no_changes(repo: str) -> None:
     assert_list_stdout(repo, [])
+    assert_count_loc(repo, expected_num_files=0)
 
 
 def test_change_no_deps(repo: str) -> None:
     append_to_file("standalone.sh", "# foo")
     for dependees in DependeesOption:
-        assert_list_stdout(repo, ["//:standalone"], dependees=dependees)
+        assert_list_stdout(repo, ["//:standalone"], dependees)
+        assert_count_loc(repo, expected_num_files=1)
 
 
 def test_change_transitive_dep(repo: str) -> None:
     append_to_file("transitive.sh", "# foo")
     assert_list_stdout(repo, ["//transitive.sh:lib"])
+    assert_count_loc(repo, expected_num_files=1)
+
+    assert_list_stdout(repo, ["//dep.sh:lib", "//transitive.sh:lib"], DependeesOption.DIRECT)
+    assert_count_loc(repo, DependeesOption.DIRECT, expected_num_files=2)
+
     assert_list_stdout(
-        repo, ["//dep.sh:lib", "//transitive.sh:lib"], dependees=DependeesOption.DIRECT
+        repo, ["//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib"], DependeesOption.TRANSITIVE
     )
-    assert_list_stdout(
-        repo,
-        ["//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib"],
-        dependees=DependeesOption.TRANSITIVE,
-    )
+
+    assert_count_loc(repo, DependeesOption.TRANSITIVE, expected_num_files=3)
 
 
 def test_unowned_file(repo: str) -> None:
@@ -173,23 +187,27 @@ def test_delete_generated_target(repo: str) -> None:
     """
     delete_file("transitive.sh")
     for dependees in DependeesOption:
-        assert_list_stdout(repo, ["//:lib"], dependees=dependees)
+        assert_list_stdout(repo, ["//:lib"], dependees)
+        # assert_count_loc(repo, dependees, expected_num_files=0)
 
     # Make sure that our fix for https://github.com/pantsbuild/pants/issues/15544 does not break
     # this test when using `--tag`.
     for dependees in (DependeesOption.NONE, DependeesOption.TRANSITIVE):
-        assert_list_stdout(repo, ["//:lib"], dependees=dependees, extra_args=["--tag=a"])
+        assert_list_stdout(repo, ["//:lib"], dependees, extra_args=["--tag=a"])
+        # assert_count_loc(repo, dependees, expected_num_files=0, extra_args=["--tag=a"])
 
     # If we also edit a sibling generated target, we should still (for now at least) include the
     # target generator.
     append_to_file("app.sh", "# foo")
     for dependees in DependeesOption:
-        assert_list_stdout(repo, ["//:lib", "//app.sh:lib"], dependees=dependees)
+        assert_list_stdout(repo, ["//:lib", "//app.sh:lib"], dependees)
+        # assert_count_loc(repo, dependees, expected_num_files=0)
 
 
 def test_delete_atom_target(repo: str) -> None:
     delete_file("standalone.sh")
     assert_list_stdout(repo, ["//:standalone"])
+    # assert_count_loc(repo, expected_num_files=0)
 
 
 def test_change_build_file(repo: str) -> None:
@@ -204,27 +222,36 @@ def test_change_build_file(repo: str) -> None:
         repo, ["//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib", "//:standalone"]
     )
 
+    # This is because the BUILD file gets expanded with all its targets, then their sources are
+    # used. This might not be desirable behavior.
+    assert_count_loc(repo, expected_num_files=4)
+
 
 def test_different_build_file_changed(repo: str) -> None:
     """Only invalidate if the BUILD file where a target is defined has changed, even if the changed
     BUILD file is in the same directory."""
-    create_file("BUILD.other", "")
+    create_file("BUILD.txt", "")
     assert_list_stdout(repo, [])
+    assert_count_loc(repo, expected_num_files=1)
 
 
 def test_tag_filtering(repo: str) -> None:
     append_to_file("dep.sh", "# foo")
     append_to_file("standalone.sh", "# foo")
-    assert_list_stdout(repo, ["//dep.sh:lib"], extra_args=["--tag=+b"])
-    assert_list_stdout(repo, ["//:standalone"], extra_args=["--tag=-b"])
-    assert_list_stdout(
-        repo, ["//dep.sh:lib"], dependees=DependeesOption.TRANSITIVE, extra_args=["--tag=+b"]
-    )
 
-    # Target-less goals should still respect the tag, per
-    # https://github.com/pantsbuild/pants/pull/15479.
+    assert_list_stdout(repo, ["//dep.sh:lib", "//:standalone"])
     assert_count_loc(repo, expected_num_files=2)
+
+    assert_list_stdout(repo, ["//dep.sh:lib"], extra_args=["--tag=+b"])
+    assert_count_loc(repo, expected_num_files=1, extra_args=["--tag=+b"])
+
+    assert_list_stdout(repo, ["//:standalone"], extra_args=["--tag=-b"])
     assert_count_loc(repo, expected_num_files=1, extra_args=["--tag=-b"])
+
+    assert_list_stdout(repo, ["//dep.sh:lib"], DependeesOption.TRANSITIVE, extra_args=["--tag=+b"])
+    assert_count_loc(
+        repo, DependeesOption.TRANSITIVE, expected_num_files=1, extra_args=["--tag=+b"]
+    )
 
     # Regression test for https://github.com/pantsbuild/pants/issues/14977: make sure a generated
     # target w/ different tags via `overrides` is excluded no matter what.
@@ -233,8 +260,11 @@ def test_tag_filtering(repo: str) -> None:
     assert_list_stdout(
         repo,
         ["//app.sh:lib", "//transitive.sh:lib"],
-        dependees=DependeesOption.TRANSITIVE,
+        DependeesOption.TRANSITIVE,
         extra_args=["--tag=-b"],
+    )
+    assert_count_loc(
+        repo, DependeesOption.TRANSITIVE, expected_num_files=2, extra_args=["--tag=-b"]
     )
 
     # Regression test for https://github.com/pantsbuild/pants/issues/15544. Don't filter
@@ -244,7 +274,8 @@ def test_tag_filtering(repo: str) -> None:
     # find the dependees of `dep.sh`, like `app.sh`, and only then apply the filter.
     reset_edits()
     append_to_file("dep.sh", "# foo")
-    assert_list_stdout(repo, [], dependees=DependeesOption.NONE, extra_args=["--tag=a"])
-    assert_list_stdout(
-        repo, ["//app.sh:lib"], dependees=DependeesOption.TRANSITIVE, extra_args=["--tag=a"]
-    )
+    assert_list_stdout(repo, [], DependeesOption.NONE, extra_args=["--tag=a"])
+    assert_count_loc(repo, DependeesOption.NONE, expected_num_files=0, extra_args=["--tag=a"])
+
+    assert_list_stdout(repo, ["//app.sh:lib"], DependeesOption.TRANSITIVE, extra_args=["--tag=a"])
+    assert_count_loc(repo, DependeesOption.TRANSITIVE, expected_num_files=1, extra_args=["--tag=a"])
