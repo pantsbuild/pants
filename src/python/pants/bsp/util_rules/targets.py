@@ -10,14 +10,23 @@ from pathlib import Path
 from typing import ClassVar, Generic, Sequence, Type, TypeVar
 
 import toml
+from typing_extensions import Protocol
 
 from pants.base.build_root import BuildRoot
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.base.specs import AddressSpecs, Specs
+from pants.base.specs import RawSpecs, RawSpecsWithoutFileOwners
 from pants.base.specs_parser import SpecsParser
 from pants.bsp.goal import BSPGoal
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BSPData, BuildTarget, BuildTargetCapabilities, BuildTargetIdentifier
+from pants.bsp.spec.base import (
+    BSPData,
+    BuildTarget,
+    BuildTargetCapabilities,
+    BuildTargetIdentifier,
+    StatusCode,
+    TaskId,
+    Uri,
+)
 from pants.bsp.spec.targets import (
     DependencyModule,
     DependencyModulesItem,
@@ -43,17 +52,50 @@ from pants.engine.target import (
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
-    StringField,
+    Target,
     Targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import bullet_list
 
 _logger = logging.getLogger(__name__)
 
 _FS = TypeVar("_FS", bound=FieldSet)
+
+
+@union
+@dataclass(frozen=True)
+class BSPResolveFieldFactoryRequest(Generic[_FS]):
+    """Requests an implementation of `BSPResolveFieldFactory` which can filter resolve fields.
+
+    TODO: This is to work around the fact that Field value defaulting cannot have arbitrary
+    subsystem requirements, and so `JvmResolveField` and `PythonResolveField` have methods
+    which compute the true value of the field given a subsytem argument. Consumers need to
+    be type aware, and `@rules` cannot have dynamic requirements.
+
+    See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
+    (including Field registrations) to have `@rule_helper` methods, which would allow the
+    computation of an AsyncFields to directly require a subsystem.
+    """
+
+    resolve_prefix: ClassVar[str]
+
+
+# TODO: Workaround for https://github.com/python/mypy/issues/5485, because we cannot directly use
+# a Callable.
+class _ResolveFieldFactory(Protocol):
+    def __call__(self, target: Target) -> str | None:
+        pass
+
+
+@dataclass(frozen=True)
+class BSPResolveFieldFactoryResult:
+    """Computes the resolve field value for a Target, if applicable."""
+
+    resolve_field_value: _ResolveFieldFactory
 
 
 @union
@@ -63,10 +105,7 @@ class BSPBuildTargetsMetadataRequest(Generic[_FS]):
 
     language_id: ClassVar[str]
     can_merge_metadata_from: ClassVar[tuple[str, ...]]
-    field_set_type: ClassVar[Type[_FS]]
-
-    resolve_prefix: ClassVar[str]
-    resolve_field: ClassVar[Type[StringField]]
+    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
 
     field_sets: tuple[_FS, ...]
 
@@ -77,12 +116,6 @@ class BSPBuildTargetsMetadataResult:
 
     # Metadata for the `data` field of the final `BuildTarget`.
     metadata: BSPData | None = None
-
-    # Build capabilities
-    can_compile: bool = False
-    can_test: bool = False
-    can_run: bool = False
-    can_debug: bool = False
 
     # Output to write into `.pants.d/bsp` for access by IDE.
     digest: Digest = EMPTY_DIGEST
@@ -99,7 +132,7 @@ class BSPTargetDefinition:
 @dataclass(frozen=True)
 class BSPBuildTargetInternal:
     name: str
-    specs: Specs
+    specs: RawSpecs
     definition: BSPTargetDefinition
 
     @property
@@ -132,7 +165,9 @@ class _ParseOneBSPMappingRequest:
 @rule
 async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuildTargetInternal:
     specs_parser = SpecsParser()
-    specs = specs_parser.parse_specs(request.definition.addresses)
+    specs = specs_parser.parse_specs(
+        request.definition.addresses, convert_dir_literal_to_address_literal=False
+    ).includes
     return BSPBuildTargetInternal(request.name, specs, request.definition)
 
 
@@ -225,7 +260,12 @@ async def resolve_bsp_build_target_addresses(
     bsp_target: BSPBuildTargetInternal,
     union_membership: UnionMembership,
 ) -> Targets:
-    targets = await Get(Targets, AddressSpecs, bsp_target.specs.address_specs)
+    # NB: Using `RawSpecs` directly rather than `RawSpecsWithoutFileOwners` results in a rule graph cycle.
+    targets = await Get(
+        Targets,
+        RawSpecsWithoutFileOwners,
+        RawSpecsWithoutFileOwners.from_raw_specs(bsp_target.specs),
+    )
     if bsp_target.definition.resolve_filter is None:
         return targets
 
@@ -237,13 +277,17 @@ async def resolve_bsp_build_target_addresses(
             f"prefix like `$lang:$filter`, but the configured value: `{resolve_filter}` did not."
         )
 
-    resolve_fields = {
-        bbtmr.resolve_field
-        for bbtmr in union_membership.get(BSPBuildTargetsMetadataRequest)
-        if bbtmr.resolve_prefix == resolve_prefix
-    }
+    # TODO: See `BSPResolveFieldFactoryRequest` re: this awkwardness.
+    factories = await MultiGet(
+        Get(BSPResolveFieldFactoryResult, BSPResolveFieldFactoryRequest, request())
+        for request in union_membership.get(BSPResolveFieldFactoryRequest)
+        if request.resolve_prefix == resolve_prefix
+    )
+
     return Targets(
-        t for t in targets if any(t.get(f).value == resolve_value for f in resolve_fields)
+        t
+        for t in targets
+        if any((factory.resolve_field_value)(t) == resolve_value for factory in factories)
     )
 
 
@@ -292,26 +336,34 @@ class GenerateOneBSPBuildTargetResult:
     digest: Digest = EMPTY_DIGEST
 
 
-def find_metadata_merge_order(
-    metadata_request_types: Sequence[Type[BSPBuildTargetsMetadataRequest]],
-) -> Sequence[Type[BSPBuildTargetsMetadataRequest]]:
-    if len(metadata_request_types) <= 1:
-        return metadata_request_types
+def merge_metadata(
+    metadata_results_by_request_type: Sequence[
+        tuple[type[BSPBuildTargetsMetadataRequest], BSPBuildTargetsMetadataResult]
+    ],
+) -> BSPData | None:
+    if not metadata_results_by_request_type:
+        return None
+    if len(metadata_results_by_request_type) == 1:
+        return metadata_results_by_request_type[0][1].metadata
 
     # Naive algorithm (since we only support Java and Scala backends), find the metadata request type that cannot
-    # merge from another and put that first.
-    if len(metadata_request_types) != 2:
+    # merge from another and use that one.
+    if len(metadata_results_by_request_type) != 2:
         raise AssertionError(
             "BSP core rules only support naive ordering of language-backend metadata. Contact Pants developers."
         )
-    if not metadata_request_types[0].can_merge_metadata_from:
-        return metadata_request_types
-    elif not metadata_request_types[1].can_merge_metadata_from:
-        return list(reversed(metadata_request_types))
+    if not metadata_results_by_request_type[0][0].can_merge_metadata_from:
+        metadata_index = 1
+    elif not metadata_results_by_request_type[1][0].can_merge_metadata_from:
+        metadata_index = 0
     else:
         raise AssertionError(
             "BSP core rules only support naive ordering of language-backend metadata. Contact Pants developers."
         )
+
+    # Pretend to merge the metadata into a single piece of metadata, but really just choose the metadata
+    # from the selected provider.
+    return metadata_results_by_request_type[metadata_index][1].metadata
 
 
 @rule
@@ -323,49 +375,49 @@ async def generate_one_bsp_build_target_request(
     # Find all Pants targets that are part of this BSP build target.
     targets = await Get(Targets, BSPBuildTargetInternal, request.bsp_target)
 
-    # Classify the targets by the language backends that claim them to provide metadata for them.
-    field_sets_by_lang_id: dict[str, OrderedSet[FieldSet]] = defaultdict(OrderedSet)
-    # lang_ids_by_field_set: dict[Type[FieldSet], set[str]] = defaultdict(set)
+    # Determine whether the targets are compilable.
+    can_compile = any(
+        req_type.field_set_type.is_applicable(t)  # type: ignore[misc]
+        for req_type in union_membership[BSPCompileRequest]
+        for t in targets
+    )
+
+    # Classify the targets by the language backends that claim to provide metadata for them.
+    field_sets_by_request_type: dict[
+        type[BSPBuildTargetsMetadataRequest], OrderedSet[FieldSet]
+    ] = defaultdict(OrderedSet)
     metadata_request_types: FrozenOrderedSet[
         Type[BSPBuildTargetsMetadataRequest]
     ] = union_membership.get(BSPBuildTargetsMetadataRequest)
-    metadata_request_types_by_lang_id = {
-        metadata_request_type.language_id: metadata_request_type
-        for metadata_request_type in metadata_request_types
-    }
+    metadata_request_types_by_lang_id: dict[str, type[BSPBuildTargetsMetadataRequest]] = {}
+    for metadata_request_type in metadata_request_types:
+        previous = metadata_request_types_by_lang_id.get(metadata_request_type.language_id)
+        if previous:
+            raise ValueError(
+                f"Multiple implementations claim to support `{metadata_request_type.language_id}`:"
+                f"{bullet_list([previous.__name__, metadata_request_type.__name__])}"
+                "\n"
+                "Do you have conflicting language support backends enabled?"
+            )
+        metadata_request_types_by_lang_id[metadata_request_type.language_id] = metadata_request_type
+
     for tgt in targets:
         for metadata_request_type in metadata_request_types:
             field_set_type: Type[FieldSet] = metadata_request_type.field_set_type
             if field_set_type.is_applicable(tgt):
-                field_sets_by_lang_id[metadata_request_type.language_id].add(
-                    field_set_type.create(tgt)
-                )
-                # lang_ids_by_field_set[field_set_type].add(metadata_request_type.language_id)
+                field_sets_by_request_type[metadata_request_type].add(field_set_type.create(tgt))
 
-    # TODO: Consider how to check whether the provided languages are compatible or whether compatible resolves
-    # selected.
-
-    # Request each language backend to provide metadata for the BuildTarget.
+    # Request each language backend to provide metadata for the BuildTarget, and then merge it.
     metadata_results = await MultiGet(
         Get(
             BSPBuildTargetsMetadataResult,
             BSPBuildTargetsMetadataRequest,
-            metadata_request_types_by_lang_id[lang_id](field_sets=tuple(field_sets)),
+            request_type(field_sets=tuple(field_sets)),
         )
-        for lang_id, field_sets in field_sets_by_lang_id.items()
+        for request_type, field_sets in field_sets_by_request_type.items()
     )
-    metadata_results_by_lang_id = {
-        lang_id: metadata_result
-        for lang_id, metadata_result in zip(field_sets_by_lang_id.keys(), metadata_results)
-    }
+    metadata = merge_metadata(list(zip(field_sets_by_request_type.keys(), metadata_results)))
 
-    # Pretend to merge the metadata into a single piece of metadata, but really just choose the metadata
-    # from the last provider.
-    metadata_merge_order = find_metadata_merge_order(
-        [metadata_request_types_by_lang_id[lang_id] for lang_id in field_sets_by_lang_id.keys()]
-    )
-    # TODO: None if no metadata obtained.
-    metadata = metadata_results_by_lang_id[metadata_merge_order[-1].language_id].metadata
     digest = await Get(Digest, MergeDigests([r.digest for r in metadata_results]))
 
     # Determine "base directory" for this build target using source roots.
@@ -393,12 +445,13 @@ async def generate_one_bsp_build_target_request(
             base_directory=base_directory.as_uri() if base_directory else None,
             tags=(),
             capabilities=BuildTargetCapabilities(
-                can_compile=any(r.can_compile for r in metadata_results),
-                can_test=any(r.can_test for r in metadata_results),
-                can_run=any(r.can_run for r in metadata_results),
-                can_debug=any(r.can_debug for r in metadata_results),
+                can_compile=can_compile,
+                can_debug=False,
+                # TODO: See https://github.com/pantsbuild/pants/issues/15050.
+                can_run=False,
+                can_test=False,
             ),
-            language_ids=tuple(sorted(field_sets_by_lang_id.keys())),
+            language_ids=tuple(sorted(req.language_id for req in field_sets_by_request_type)),
             dependencies=(),
             data=metadata,
         ),
@@ -516,7 +569,7 @@ async def bsp_dependency_sources(request: DependencySourcesParams) -> Dependency
 class BSPDependencyModulesRequest(Generic[_FS]):
     """Hook to allow language backends to provide dependency modules."""
 
-    field_set_type: ClassVar[Type[_FS]]
+    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
 
     field_sets: tuple[_FS, ...]
 
@@ -601,6 +654,61 @@ async def bsp_dependency_modules(
     return DependencyModulesResult(
         tuple(DependencyModulesItem(target=r.bsp_target_id, modules=r.modules) for r in responses)
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# Compile request.
+# See https://build-server-protocol.github.io/docs/specification.html#compile-request
+# -----------------------------------------------------------------------------------------------
+
+
+@union
+@dataclass(frozen=True)
+class BSPCompileRequest(Generic[_FS]):
+    """Hook to allow language backends to compile targets."""
+
+    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+
+    bsp_target: BSPBuildTargetInternal
+    field_sets: tuple[_FS, ...]
+    task_id: TaskId
+
+
+@dataclass(frozen=True)
+class BSPCompileResult:
+    """Result of compilation of a target capable of target compilation."""
+
+    status: StatusCode
+    output_digest: Digest
+
+
+# -----------------------------------------------------------------------------------------------
+# Resources request.
+# See https://build-server-protocol.github.io/docs/specification.html#resources-request
+#
+# NB: This method is used only for the _indexing_ of resources, and not to add them to the
+# classpath (in the case of JVM targets). BSPCompileRequest implementations need to handle
+# movement of resources to accessible classpath entries.
+# -----------------------------------------------------------------------------------------------
+
+
+@union
+@dataclass(frozen=True)
+class BSPResourcesRequest(Generic[_FS]):
+    """Hook to allow language backends to provide resources for targets."""
+
+    field_set_type: ClassVar[Type[_FS]]  # type: ignore[misc]
+
+    bsp_target: BSPBuildTargetInternal
+    field_sets: tuple[_FS, ...]
+
+
+@dataclass(frozen=True)
+class BSPResourcesResult:
+    """Resources for a target."""
+
+    resources: tuple[Uri, ...]
+    output_digest: Digest
 
 
 def rules():

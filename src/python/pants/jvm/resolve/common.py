@@ -142,7 +142,7 @@ class Coordinates(DeduplicatedCollection[Coordinate]):
     """An ordered list of `Coordinate`s."""
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True)
 class ArtifactRequirement:
     """A single Maven-style coordinate for a JVM dependency, along with information of how to fetch
     the dependency if it is not to be fetched from a Maven repository."""
@@ -197,7 +197,7 @@ class ArtifactRequirement:
             "jar": self.jar.address.spec if self.jar else "not_provided",
         }
         if self.excludes:
-            attrs["excludes"] = ",".join(self.excludes)
+            attrs["excludes"] = ",".join(sorted(self.excludes))
 
         return self.coordinate.to_coord_arg_str(attrs)
 

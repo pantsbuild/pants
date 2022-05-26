@@ -16,6 +16,7 @@ from pants.engine.internals.engine_testutil import assert_equal_with_printing
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler
 from pants.engine.rules import (
+    DuplicateRuleError,
     Get,
     MissingParameterTypeAnnotation,
     MissingReturnTypeAnnotation,
@@ -316,7 +317,10 @@ class TestRuleArgumentAnnotation:
             return False
 
         assert a_named_rule.rule is not None
-        assert a_named_rule.rule.canonical_name == "pants.engine.rules_test.a_named_rule"
+        assert (
+            a_named_rule.rule.canonical_name
+            == "pants.engine.rules_test.TestRuleArgumentAnnotation.test_annotations_kwargs.a_named_rule"
+        )
         assert a_named_rule.rule.desc is None
         assert a_named_rule.rule.level == LogLevel.INFO
 
@@ -990,6 +994,23 @@ class TestRuleGraph:
     def create_subgraph(self, requested_product, rules, subject, validate=True):
         scheduler = create_scheduler(rules, validate=validate)
         return "\n".join(scheduler.rule_subgraph_visualization([type(subject)], requested_product))
+
+
+def test_duplicated_rules() -> None:
+    err = (
+        r"Redeclaring rule pants\.engine\.rules_test\.test_duplicated_rules\.dup_a with "
+        r"<function test_duplicated_rules\.<locals>\.dup_a at .*> at line \d+, previously defined "
+        r"by <function test_duplicated_rules\.<locals>\.dup_a at .*> at line \d+\."
+    )
+    with pytest.raises(DuplicateRuleError, match=err):
+
+        @rule
+        async def dup_a() -> A:
+            return A()
+
+        @rule  # type: ignore[no-redef] # noqa: F811
+        async def dup_a() -> B:  # noqa: F811
+            return B()
 
 
 def test_invalid_rule_helper_name() -> None:

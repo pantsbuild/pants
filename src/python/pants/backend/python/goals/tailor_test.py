@@ -11,18 +11,16 @@ from pants.backend.python.goals.tailor import (
     classify_source_files,
     is_entry_point,
 )
+from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTargetGenerator
+from pants.backend.python.macros.poetry_requirements import PoetryRequirementsTargetGenerator
+from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.target_types import (
     PexBinary,
     PythonSourcesGeneratorTarget,
     PythonTestsGeneratorTarget,
     PythonTestUtilsGeneratorTarget,
 )
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -67,8 +65,13 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--no-python-tailor-ignore-solitary-init-files"])
     rule_runner.write_files(
         {
-            "3rdparty/requirements.txt": "",
+            "3rdparty/Pipfile.lock": "",
+            "3rdparty/pyproject.toml": "[tool.poetry]",
             "3rdparty/requirements-test.txt": "",
+            "already_owned/requirements.txt": "",
+            "already_owned/Pipfile.lock": "",
+            "already_owned/pyproject.toml": "[tool.poetry]",
+            "no_match/pyproject.toml": "# no poetry section",
             **{
                 f"src/python/foo/{fp}": ""
                 for fp in (
@@ -87,10 +90,14 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(
+                ("3rdparty", "already_owned", "no_match", "src/python/foo", "src/python/foo/bar")
+            ),
             AllOwnedSources(
                 [
-                    "3rdparty/requirements.txt",
+                    "already_owned/requirements.txt",
+                    "already_owned/Pipfile.lock",
+                    "already_owned/pyproject.toml",
                     "src/python/foo/bar/__init__.py",
                     "src/python/foo/bar/baz1.py",
                 ]
@@ -100,13 +107,23 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     assert (
         PutativeTargets(
             [
-                PutativeTarget(
-                    "3rdparty",
-                    "requirements-test.txt",
-                    "python_requirements",
-                    ("3rdparty/requirements-test.txt",),
-                    ("3rdparty/requirements-test.txt",),
-                    addressable=True,
+                PutativeTarget.for_target_type(
+                    PipenvRequirementsTargetGenerator,
+                    path="3rdparty",
+                    name="pipenv",
+                    triggering_sources=["3rdparty/Pipfile.lock"],
+                ),
+                PutativeTarget.for_target_type(
+                    PoetryRequirementsTargetGenerator,
+                    path="3rdparty",
+                    name="poetry",
+                    triggering_sources=["3rdparty/pyproject.toml"],
+                ),
+                PutativeTarget.for_target_type(
+                    PythonRequirementsTargetGenerator,
+                    path="3rdparty",
+                    name="reqs",
+                    triggering_sources=["3rdparty/requirements-test.txt"],
                     kwargs={"source": "requirements-test.txt"},
                 ),
                 PutativeTarget.for_target_type(
@@ -154,9 +171,7 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(
-                PutativeTargetsSearchPaths(("src/python/foo/bar", "src/python/foo/qux"))
-            ),
+            PutativePythonTargetsRequest(("src/python/foo/bar", "src/python/foo/qux")),
             AllOwnedSources(["src/python/foo/bar/__init__.py", "src/python/foo/bar/bar.py"]),
         ],
     )
@@ -197,13 +212,16 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                 "pex_binary(name='main1', entry_point='main1.py')\n"
                 "pex_binary(name='main2', entry_point='foo.main2')\n"
             ),
+            "src/python/foo/__main__.py": "",
         }
     )
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
-            AllOwnedSources([f"src/python/foo/{name}" for name in mains]),
+            PutativePythonTargetsRequest(("src/python/foo",)),
+            AllOwnedSources(
+                [f"src/python/foo/{name}" for name in mains] + ["src/python/foo/__main__.py"]
+            ),
         ],
     )
     assert (
@@ -215,6 +233,13 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                     "main3",
                     [],
                     kwargs={"entry_point": "main3.py"},
+                ),
+                PutativeTarget.for_target_type(
+                    PexBinary,
+                    "src/python/foo",
+                    "__main__",
+                    [],
+                    kwargs={"entry_point": "__main__.py"},
                 ),
             ]
         )
@@ -238,7 +263,9 @@ def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(
+                ("src/python/foo", "src/python/foo/bar", "src/python/foo/baz", "src/python/foo/qux")
+            ),
             AllOwnedSources([]),
         ],
     )

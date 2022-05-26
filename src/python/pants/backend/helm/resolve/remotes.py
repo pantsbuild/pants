@@ -51,6 +51,13 @@ class HelmRegistry:
         if self.alias:
             remotes[f"@{self.alias}"] = self
 
+    def repository_ref(self, repository: str | None) -> str:
+        return f"{self.address}/{repository or ''}".rstrip("/")
+
+    def package_ref(self, artifact_name: str, *, repository: str | None) -> str:
+        repo_ref = self.repository_ref(repository)
+        return f"{repo_ref}/{artifact_name}"
+
 
 @dataclass(frozen=True)
 class HelmRemotes:
@@ -85,8 +92,7 @@ class HelmRemotes:
 
     @memoized_method
     def registries(self) -> tuple[HelmRegistry, ...]:
-        deduped_regs = {r for _, r in self.all.items() if isinstance(r, HelmRegistry)}
-        return tuple(deduped_regs)
+        return tuple(set(self.all.values()))
 
     @property
     def default_registry(self) -> HelmRegistry | None:

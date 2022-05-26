@@ -1,18 +1,17 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
     TemplatedExternalTool,
 )
 from pants.engine.console import Console
-from pants.engine.fs import Digest, MergeDigests, SpecsSnapshot
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, SpecsPaths
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.option.option_types import ArgsListOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -63,27 +62,26 @@ class CountLinesOfCode(Goal):
 async def count_loc(
     console: Console,
     succinct_code_counter: SuccinctCodeCounter,
-    specs_snapshot: SpecsSnapshot,
+    specs_paths: SpecsPaths,
 ) -> CountLinesOfCode:
-    if not specs_snapshot.snapshot.files:
+    if not specs_paths.files:
         return CountLinesOfCode(exit_code=0)
 
-    scc_program = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        succinct_code_counter.get_request(Platform.current),
+    specs_digest, scc_program = await MultiGet(
+        Get(Digest, PathGlobs(globs=specs_paths.files)),
+        Get(
+            DownloadedExternalTool,
+            ExternalToolRequest,
+            succinct_code_counter.get_request(Platform.current),
+        ),
     )
-    input_digest = await Get(
-        Digest, MergeDigests((scc_program.digest, specs_snapshot.snapshot.digest))
-    )
+    input_digest = await Get(Digest, MergeDigests((scc_program.digest, specs_digest)))
     result = await Get(
         ProcessResult,
         Process(
             argv=(scc_program.exe, *succinct_code_counter.args),
             input_digest=input_digest,
-            description=(
-                f"Count lines of code for {pluralize(len(specs_snapshot.snapshot.files), 'file')}"
-            ),
+            description=f"Count lines of code for {pluralize(len(specs_paths.files), 'file')}",
             level=LogLevel.DEBUG,
         ),
     )

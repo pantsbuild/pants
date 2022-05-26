@@ -32,6 +32,7 @@ class BSPLanguageSupport:
     can_test: bool = False
     can_run: bool = False
     can_debug: bool = False
+    can_provide_resources: bool = False
 
 
 # -----------------------------------------------------------------------------------------------
@@ -54,6 +55,7 @@ async def bsp_build_initialize(
     test_provider_language_ids = []
     run_provider_language_ids = []
     debug_provider_language_ids = []
+    resources_provider = False
     language_support_impls = union_membership.get(BSPLanguageSupport)
     for lang in language_support_impls:
         if lang.can_compile:
@@ -64,6 +66,8 @@ async def bsp_build_initialize(
             run_provider_language_ids.append(lang.language_id)
         if lang.can_debug:
             debug_provider_language_ids.append(lang.language_id)
+        if lang.can_provide_resources:
+            resources_provider = True
 
     return InitializeBuildResult(
         display_name="Pants",
@@ -79,7 +83,7 @@ async def bsp_build_initialize(
             inverse_sources_provider=None,
             dependency_sources_provider=True,
             dependency_modules_provider=True,
-            resources_provider=None,
+            resources_provider=resources_provider,
             can_reload=None,
             build_target_changed_provider=None,
         ),

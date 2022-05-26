@@ -39,9 +39,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.79"
+    default_version = "v2.1.90"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.79,<3.0"
+    version_constraints = ">=2.1.90,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -50,11 +50,11 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "45b774bfe433aa353bd7c0a1c83264d00b6da1d82a7d126d2685443867f1eb69",
-                    "3735810",
+                    "2781255baf77c2a8fdc85c5e830f7191a6048fd91d2e20b5c7a20e5a0b7beb66",
+                    "3755345",
                 )
             )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64"]
+            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
         ]
 
 
@@ -171,8 +171,9 @@ async def setup_pex_cli_process(
     if request.concurrency_available > 0:
         global_args.extend(["--jobs", "{pants_concurrency}"])
 
-    if pex_runtime_env.verbosity > 0:
-        global_args.append(f"-{'v' * pex_runtime_env.verbosity}")
+    verbosity_args = (
+        [f"-{'v' * pex_runtime_env.verbosity}"] if pex_runtime_env.verbosity > 0 else []
+    )
 
     resolve_args = (
         [*cert_args, "--python-path", create_path_env_var(pex_env.interpreter_search_paths)]
@@ -180,8 +181,9 @@ async def setup_pex_cli_process(
         else []
     )
     args = [
-        *global_args,
         *request.subcommand,
+        *global_args,
+        *verbosity_args,
         *resolve_args,
         # NB: This comes at the end because it may use `--` passthrough args, # which must come at
         # the end.

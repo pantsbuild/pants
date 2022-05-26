@@ -230,6 +230,8 @@ def softwrap(text: str) -> str:
         - Replaces all occurrences of multiple spaces in a sentence with a single space
         - Replaces all occurrences of multiple newlines with exactly 2 newlines
         - Replaces singular newlines with a space (to turn a paragraph into one long line)
+            - Unless the following line is indented, in which case the newline and indentation
+              are preserved.
         - Double-newlines are preserved
         - Extra indentation is preserved, and also preserves the indented line's ending
             (If your indented line needs to be continued due to it being longer than the suggested
@@ -250,11 +252,32 @@ def softwrap(text: str) -> str:
     result_strs = []
     for i, line in enumerate(lines):
         line = _super_space_re.sub(r"\1 \2", line)
-        next_line = lines[i + 1] if i + 1 < len(lines) else None
-        if "\n" in (line, next_line) or line.startswith(" "):
+        next_line = lines[i + 1] if i + 1 < len(lines) else ""
+        if "\n" in (line, next_line) or line.startswith(" ") or next_line.startswith(" "):
             result_strs.append(line)
         else:
             result_strs.append(line.rstrip())
             result_strs.append(" ")
 
     return "".join(result_strs).rstrip()
+
+
+_MEMORY_UNITS = ["B", "KiB", "MiB", "GiB"]
+
+
+def fmt_memory_size(value: int, *, units: Iterable[str] = _MEMORY_UNITS) -> str:
+    """Formats a numeric value as amount of bytes alongside the biggest byte-based unit from the
+    list that represents the same amount without using decimals."""
+
+    if not units:
+        return str(value)
+
+    amount = value
+    unit_idx = 0
+
+    units = tuple(units)
+    while (amount >= 1024 and amount % 1024 == 0) and unit_idx < len(units) - 1:
+        amount = int(amount / 1024)
+        unit_idx += 1
+
+    return f"{int(amount)}{units[unit_idx]}"

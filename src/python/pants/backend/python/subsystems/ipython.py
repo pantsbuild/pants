@@ -52,14 +52,14 @@ class IPythonLockfileSentinel(GenerateToolLockfileSentinel):
 @rule(
     desc=(
         "Determine all Python interpreter versions used by iPython in your project (for lockfile "
-        "usage)"
+        "generation)"
     ),
     level=LogLevel.DEBUG,
 )
 async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    if not ipython.uses_lockfile:
+    if not ipython.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             ipython, use_pex=python_setup.generate_lockfiles_with_pex
         )

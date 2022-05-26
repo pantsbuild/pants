@@ -22,6 +22,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     Targets,
     TriBoolField,
+    generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
@@ -46,6 +47,7 @@ class HelmRegistriesField(StringSequenceField):
         By default, all configured registries with `default = true` are used.
 
         Example:
+
             # pants.toml
             [helm.registries.my-registry-alias]
             address = "oci://myregistrydomain:port"
@@ -65,12 +67,25 @@ class HelmRegistriesField(StringSequenceField):
     )
 
 
+class HelmSkipLintField(BoolField):
+    alias = "skip_lint"
+    default = False
+    help = softwrap(
+        f"""
+        If set to true, do not run any linting in this Helm chart when running `{bin_name()}
+        lint`.
+        """
+    )
+
+
 class HelmSkipPushField(BoolField):
     alias = "skip_push"
     default = False
-    help = (
-        "If set to true, do not push this helm chart "
-        f"to registries when running `{bin_name()} publish`."
+    help = softwrap(
+        f"""
+        If set to true, do not push this Helm chart to registries when running `{bin_name()}
+        publish`.
+        """
     )
 
 
@@ -91,8 +106,19 @@ class HelmChartMetaSourceField(SingleSourceField):
 
 
 class HelmChartSourcesField(MultipleSourcesField):
-    default = ("values.yaml", "templates/*.yaml", "templates/*.tpl")
+    default = (
+        "values.yaml",
+        "values.yml",
+        "templates/*.yaml",
+        "templates/*.yml",
+        "templates/*.tpl",
+        "crds/*.yaml",
+        "crds/*.yml",
+    )
     expected_file_extensions = (".yaml", ".yml", ".tpl")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['values.yaml', 'templates/*.yaml', '!values_ignore.yaml']`"
+    )
 
 
 class HelmChartDependenciesField(Dependencies):
@@ -100,27 +126,44 @@ class HelmChartDependenciesField(Dependencies):
 
 
 class HelmChartOutputPathField(OutputPathField):
-    help = (
-        "Where the built directory tree should be located.\n\n"
-        "If undefined, this will use the path to the BUILD file, "
-        "For example, `src/charts/mychart:tgt_name` would be "
-        "`src.charts.mychart/tgt_name/`.\n\n"
-        "Regardless of whether you use the default or set this field, the path will end with "
-        "Helms's file format of `<chart_name>-<chart_version>.tgz`, where "
-        "`chart_name` and `chart_version` are the values extracted from the Chart.yaml file. "
-        "So, using the default for this field, the target "
-        "`src/charts/mychart:tgt_name` might have a final path like "
-        "`src.charts.mychart/tgt_name/mychart-0.1.0.tgz`.\n\n"
-        f"When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. "
-        "`dist/`).\n\n"
-        "Warning: setting this value risks naming collisions with other package targets you may "
-        "have."
+    help = softwrap(
+        f"""
+        Where the built directory tree should be located.
+
+        If undefined, this will use the path to the BUILD file,
+        For example, `src/charts/mychart:tgt_name` would be
+        `src.charts.mychart/tgt_name/`.
+
+        Regardless of whether you use the default or set this field, the path will end with
+        Helms's file format of `<chart_name>-<chart_version>.tgz`, where
+        `chart_name` and `chart_version` are the values extracted from the Chart.yaml file.
+        So, using the default for this field, the target
+        `src/charts/mychart:tgt_name` might have a final path like
+        `src.charts.mychart/tgt_name/mychart-0.1.0.tgz`.
+
+        When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. `dist/`).
+
+        Warning: setting this value risks naming collisions with other package targets you may
+        have.
+        """
     )
 
 
 class HelmChartLintStrictField(TriBoolField):
     alias = "lint_strict"
     help = "If set to true, enables strict linting of this Helm chart."
+
+
+class HelmChartRepositoryField(StringField):
+    alias = "repository"
+    help = softwrap(
+        """
+        Repository to use in the Helm registry where this chart is going to be published.
+
+        If no value is given and `[helm].default-registry-repository` is undefined too, then the chart
+        will be pushed to the root of the OCI registry.
+        """
+    )
 
 
 class HelmChartTarget(Target):
@@ -132,7 +175,10 @@ class HelmChartTarget(Target):
         HelmChartDependenciesField,
         HelmChartOutputPathField,
         HelmChartLintStrictField,
+        HelmChartRepositoryField,
+        HelmRegistriesField,
         HelmSkipPushField,
+        HelmSkipLintField,
     )
     help = "A Helm chart."
 
@@ -205,6 +251,9 @@ class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
     expected_file_extensions = (
         ".yaml",
         ".yml",
+    )
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*_test.yaml', '!ignore_test.yaml']`"
     )
 
 

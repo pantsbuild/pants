@@ -185,3 +185,23 @@ def test_one_lint_result_per_chart(rule_runner: RuleRunner) -> None:
     assert lint_results[0].partition_description == "chart1"
     assert lint_results[1].exit_code == 0
     assert lint_results[1].partition_description == "chart2"
+
+
+def test_skip_lint(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/chart/BUILD": "helm_chart(skip_lint=True)",
+            "src/chart/Chart.yaml": gen_chart_file("chart", version="0.1.0"),
+            "src/chart/values.yaml": HELM_VALUES_FILE,
+            "src/chart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "src/chart/templates/service.yaml": K8S_SERVICE_FILE,
+        }
+    )
+
+    source_root_patterns = ("src/*",)
+
+    chart_target = rule_runner.get_target(Address("src/chart", target_name="chart"))
+    lint_results = run_helm_lint(
+        rule_runner, [chart_target], source_root_patterns=source_root_patterns
+    )
+    assert len(lint_results) == 0

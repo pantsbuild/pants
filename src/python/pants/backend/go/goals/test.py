@@ -29,7 +29,7 @@ from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConf
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
-from pants.core.target_types import FileSourceField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
@@ -289,7 +289,7 @@ async def run_go_tests(
             SourceFiles,
             SourceFilesRequest(
                 (dep.get(SourcesField) for dep in dependencies),
-                for_sources_types=(FileSourceField,),
+                for_sources_types=(FileSourceField, ResourceSourceField),
                 enable_codegen=True,
             ),
         ),

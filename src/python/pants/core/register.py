@@ -26,6 +26,7 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     FileTarget,
     GenericTarget,
+    HTTPSource,
     RelocatedFiles,
     ResourcesGeneratorTarget,
     ResourceTarget,
@@ -94,5 +95,8 @@ def target_types():
 
 def build_file_aliases():
     return BuildFileAliases(
-        objects={"parametrize": Parametrize},
+        objects={
+            "http_source": HTTPSource,
+            "parametrize": Parametrize,
+        },
     )

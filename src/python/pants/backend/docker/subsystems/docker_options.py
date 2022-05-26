@@ -73,28 +73,26 @@ class DockerOptions(Subsystem):
     )
     default_repository = StrOption(
         "--default-repository",
-        help=(
-            softwrap(
-                f"""
-                Configure the default repository name used in the Docker image tag.
+        help=softwrap(
+            f"""
+            Configure the default repository name used in the Docker image tag.
 
-                The value is formatted and may reference these variables (in addition to the normal
-                placeheolders derived from the Dockerfile and build args etc):
+            The value is formatted and may reference these variables (in addition to the normal
+            placeheolders derived from the Dockerfile and build args etc):
 
-                {bullet_list(["name", "directory", "parent_directory"])}
+            {bullet_list(["name", "directory", "parent_directory"])}
 
-                Example: `--default-repository="{{directory}}/{{name}}"`.
+            Example: `--default-repository="{{directory}}/{{name}}"`.
 
-                The `name` variable is the `docker_image`'s target name, `directory` and
-                `parent_directory` are the name of the directory in which the BUILD file is for the
-                target, and its parent directory respectively.
+            The `name` variable is the `docker_image`'s target name, `directory` and
+            `parent_directory` are the name of the directory in which the BUILD file is for the
+            target, and its parent directory respectively.
 
-                Use the `repository` field to set this value directly on a `docker_image` target.
+            Use the `repository` field to set this value directly on a `docker_image` target.
 
-                Any registries or tags are added to the image name as required, and should
-                not be part of the repository name.
-                """
-            )
+            Any registries or tags are added to the image name as required, and should
+            not be part of the repository name.
+            """
         ),
         default="{name}",
     )
@@ -213,6 +211,13 @@ class DockerOptions(Subsystem):
             they may be used by the Docker client.
             """
         ),
+        advanced=True,
+    )
+
+    tailor = BoolOption(
+        "--tailor",
+        default=True,
+        help="If true, add `docker_image` targets with the `tailor` goal.",
         advanced=True,
     )
 

@@ -288,6 +288,11 @@ impl super::CommandRunner for CommandRunner {
           }
         };
 
+        // Start working on a mutable version of the process.
+        let mut req = req;
+        // Update env, replacing `{chroot}` placeholders with `workdir_path`.
+        update_env(&workdir_path, &mut req);
+
         // Prepare the workdir.
         let exclusive_spawn = prepare_workdir(
           workdir_path.clone(),
@@ -594,6 +599,26 @@ pub trait CapturedWorkdir {
     req: Process,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
+}
+
+/// Updates the Process env.
+///
+/// Mutates the env for the process `req`, replacing any `{chroot}` placeholders with
+/// `workdir_path`.
+///
+/// This matches the behavior of interactive processes executed in a temporary directory and those
+/// executed by the `run` goal.
+///
+/// TODO: align this with the code path for interactive processes. Related issue #14386.
+///
+pub fn update_env(workdir_path: &Path, req: &mut Process) {
+  if let Some(workdir) = workdir_path.to_str() {
+    for value in req.env.values_mut() {
+      if value.contains("{chroot}") {
+        *value = value.replace("{chroot}", workdir);
+      }
+    }
+  }
 }
 
 /// Prepares the given workdir for use by the given Process.

@@ -20,6 +20,7 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
+from pants.util.strutil import softwrap
 
 
 class FiledepsSubsystem(LineOriented, GoalSubsystem):
@@ -29,25 +30,31 @@ class FiledepsSubsystem(LineOriented, GoalSubsystem):
     absolute = BoolOption(
         "--absolute",
         default=False,
-        help=(
-            "If True, output with absolute path. If unspecified, output with path relative to "
-            "the build root."
+        help=softwrap(
+            """
+            If True, output with absolute path. If unspecified, output with path relative to
+            the build root.
+            """
         ),
     )
     globs = BoolOption(
         "--globs",
         default=False,
-        help=(
-            "Instead of outputting filenames, output the original globs used in the BUILD "
-            "file. This will not include exclude globs (i.e. globs that start with `!`)."
+        help=softwrap(
+            """
+            Instead of outputting filenames, output the original globs used in the BUILD
+            file. This will not include exclude globs (i.e. globs that start with `!`).
+            """
         ),
     )
     transitive = BoolOption(
         "--transitive",
         default=False,
-        help=(
-            "If True, list files from all dependencies, including transitive dependencies. If "
-            "unspecified, only list files from the target."
+        help=softwrap(
+            """
+            If True, list files from all dependencies, including transitive dependencies. If
+            unspecified, only list files from the target.
+            """
         ),
     )
 

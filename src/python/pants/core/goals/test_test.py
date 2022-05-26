@@ -163,6 +163,7 @@ def run_test_rule(
         xml_dir=None,
         output=output,
         extra_env_vars=[],
+        shard="",
     )
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     union_membership = UnionMembership(

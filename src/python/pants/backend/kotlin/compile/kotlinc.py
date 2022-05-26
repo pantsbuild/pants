@@ -6,7 +6,14 @@ import itertools
 import logging
 
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet
+from pants.backend.kotlin.compile.kotlinc_plugins import (
+    KotlincPlugins,
+    KotlincPluginsForTargetRequest,
+    KotlincPluginsRequest,
+    KotlincPluginTargetsForTarget,
+)
 from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
+from pants.backend.kotlin.subsystems.kotlinc import KotlincSubsystem
 from pants.backend.kotlin.target_types import (
     KotlinFieldSet,
     KotlinGeneratorFieldSet,
@@ -49,6 +56,7 @@ def compute_output_jar_filename(ctgt: CoarsenedTarget) -> str:
 @rule(desc="Compile with kotlinc")
 async def compile_kotlin_source(
     kotlin: KotlinSubsystem,
+    kotlinc: KotlincSubsystem,
     request: CompileKotlinSourceRequest,
 ) -> FallibleClasspathEntry:
     # Request classpath entries for our direct dependencies.
@@ -83,13 +91,23 @@ async def compile_kotlin_source(
         ),
     )
 
-    component_members_and_scala_source_files = [
+    plugins_ = await MultiGet(
+        Get(
+            KotlincPluginTargetsForTarget,
+            KotlincPluginsForTargetRequest(target, request.resolve.name),
+        )
+        for target in request.component.members
+    )
+    plugins_request = KotlincPluginsRequest.from_target_plugins(plugins_, request.resolve)
+    local_plugins = await Get(KotlincPlugins, KotlincPluginsRequest, plugins_request)
+
+    component_members_and_kotlin_source_files = [
         (target, sources)
         for target, sources in component_members_and_source_files
         if sources.snapshot.digest != EMPTY_DIGEST
     ]
 
-    if not component_members_and_scala_source_files:
+    if not component_members_and_kotlin_source_files:
         # Is a generator, and so exports all of its direct deps.
         exported_digest = await Get(
             Digest, MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
@@ -103,6 +121,7 @@ async def compile_kotlin_source(
         )
 
     toolcp_relpath = "__toolcp"
+    local_kotlinc_plugins_relpath = "__localplugincp"
     usercp = "__cp"
 
     user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
@@ -115,7 +134,12 @@ async def compile_kotlin_source(
                     [
                         Coordinate(
                             group="org.jetbrains.kotlin",
-                            artifact="kotlin-compiler",
+                            artifact="kotlin-compiler-embeddable",
+                            version=kotlin_version,
+                        ),
+                        Coordinate(
+                            group="org.jetbrains.kotlin",
+                            artifact="kotlin-scripting-compiler-embeddable",
                             version=kotlin_version,
                         ),
                     ]
@@ -125,7 +149,10 @@ async def compile_kotlin_source(
         Get(
             Digest,
             MergeDigests(
-                (sources.snapshot.digest for _, sources in component_members_and_scala_source_files)
+                (
+                    sources.snapshot.digest
+                    for _, sources in component_members_and_kotlin_source_files
+                )
             ),
         ),
         Get(JdkEnvironment, JdkRequest, JdkRequest.from_target(request.component)),
@@ -133,6 +160,7 @@ async def compile_kotlin_source(
 
     extra_immutable_input_digests = {
         toolcp_relpath: tool_classpath.digest,
+        local_kotlinc_plugins_relpath: local_plugins.classpath.digest,
     }
     extra_nailgun_keys = tuple(extra_immutable_input_digests)
     extra_immutable_input_digests.update(user_classpath.immutable_inputs(prefix=usercp))
@@ -150,10 +178,12 @@ async def compile_kotlin_source(
                 *(("-classpath", classpath_arg) if classpath_arg else ()),
                 "-d",
                 output_file,
+                *(local_plugins.args(local_kotlinc_plugins_relpath)),
+                *kotlinc.args,
                 *sorted(
                     itertools.chain.from_iterable(
                         sources.snapshot.files
-                        for _, sources in component_members_and_scala_source_files
+                        for _, sources in component_members_and_kotlin_source_files
                     )
                 ),
             ],

@@ -114,7 +114,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="reqs", generated_name="pip"),
             ),
-            TargetGeneratorSourcesHelperTarget({"sources": ["requirements.txt"]}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"source": "requirements.txt"}, file_addr),
         },
     )
 
@@ -151,7 +151,7 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
                 {"requirements": ["repletewateringcan>=7"], "dependencies": [file_addr.spec]},
                 Address("", target_name="reqs", generated_name="repletewateringcan"),
             ),
-            TargetGeneratorSourcesHelperTarget({"sources": ["requirements.txt"]}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"source": "requirements.txt"}, file_addr),
         },
     )
 
@@ -181,6 +181,6 @@ def test_source_override(rule_runner: RuleRunner) -> None:
                 {"requirements": ["ansicolors>=1.18.0"], "dependencies": [file_addr.spec]},
                 Address("", target_name="reqs", generated_name="ansicolors"),
             ),
-            TargetGeneratorSourcesHelperTarget({"sources": ["subdir/requirements.txt"]}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"source": "subdir/requirements.txt"}, file_addr),
         },
     )

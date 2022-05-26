@@ -5,10 +5,23 @@ python_sources()
 
 python_tests(
     name="tests",
-    dependencies=[
-        # Used by `options_bootstrapper_test` and `config_test`.
-        "//BUILD_ROOT:files",
-        "//pants.toml:files",
-    ],
-    timeout=300,
+    overrides={
+        (
+            "config_test.py",
+            "options_test.py",
+            "options_bootstrapper_test.py",
+            "subsystem_test.py",
+        ): {
+            "dependencies": ["//BUILD_ROOT:files", "//pants.toml:files"],
+        },
+        "global_options_test.py": {
+            "dependencies": [
+                "//BUILD_ROOT:files",
+                "//pants.toml:files",
+                # This test loads `pants.toml`, which references many of these plugins.
+                "src/python/pants/bin:plugins",
+            ],
+        },
+        "options_integration_test.py": {"timeout": 150},
+    },
 )

@@ -121,7 +121,7 @@ class Outputting:
             stdout_file = open(self.output_file, "w")
             output_sink = stdout_file
         else:
-            output_sink = console.stdout
+            output_sink = console.stdout  # type: ignore[assignment]
         try:
             yield output_sink
         finally:

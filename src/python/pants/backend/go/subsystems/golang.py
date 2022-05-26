@@ -17,12 +17,12 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.option.option_types import StrListOption, StrOption
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -34,31 +34,97 @@ class GolangSubsystem(Subsystem):
     _go_search_paths = StrListOption(
         "--go-search-paths",
         default=["<PATH>"],
-        help=(
-            "A list of paths to search for Go.\n\n"
-            "Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`. "
-            "Earlier entries will be searched first.\n\n"
-            'The special string `"<PATH>"` will expand to the contents of the PATH env var.'
+        help=softwrap(
+            """
+            A list of paths to search for Go.
+
+            Specify absolute paths to directories with the `go` binary, e.g. `/usr/bin`.
+            Earlier entries will be searched first.
+
+            The special string `"<PATH>"` will expand to the contents of the PATH env var.
+            """
         ),
     )
-    # TODO(#13005): Support multiple Go versions in a project?
     expected_version = StrOption(
         "--expected-version",
         default="1.17",
-        help=(
-            "The Go version you are using, such as `1.17`.\n\n"
-            "Pants will only use Go distributions from `--go-search-paths` that have the "
-            "expected version, and it will error if none are found.\n\n"
-            "Do not include the patch version."
+        help=softwrap(
+            """
+            The Go version you are using, such as `1.17`.
+
+            Pants will only use Go distributions from `--go-search-paths` that have the
+            expected version, and it will error if none are found.
+
+            Do not include the patch version.
+            """
+        ),
+        removal_version="2.14.0.dev0",
+        removal_hint=(
+            "Use `[golang].minimum_expected_version` instead, which is more flexible. Pants will "
+            "now work if your local Go binary is newer than the expected minimum version; e.g. Go "
+            "1.18 works with the version set to `1.17`."
+        ),
+    )
+    minimum_version = StrOption(
+        "--minimum-expected-version",
+        default="1.17",
+        help=softwrap(
+            """
+            The minimum Go version the distribution discovered by Pants must support.
+
+            For example, if you set `'1.17'`, then Pants will look for a Go binary that is 1.17+,
+            e.g. 1.17 or 1.18.
+
+            You should still set the Go version for each module in your `go.mod` with the `go`
+            directive.
+
+            Do not include the patch version.
+            """
         ),
     )
     _subprocess_env_vars = StrListOption(
         "--subprocess-env-vars",
         default=["LANG", "LC_CTYPE", "LC_ALL", "PATH"],
-        help=(
-            "Environment variables to set when invoking the `go` tool. "
-            "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-            "or just `ENV_VAR` to copy the value from Pants's own environment."
+        help=softwrap(
+            """
+            Environment variables to set when invoking the `go` tool.
+            Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+            or just `ENV_VAR` to copy the value from Pants's own environment.
+            """
+        ),
+        advanced=True,
+    )
+
+    tailor_go_mod_targets = BoolOption(
+        "--tailor-go-mod-targets",
+        default=True,
+        help=softwrap(
+            """
+            If true, add a `go_mod` target with the `tailor` goal wherever there is a
+            `go.mod` file.
+            """
+        ),
+        advanced=True,
+    )
+    tailor_package_targets = BoolOption(
+        "--tailor-package-targets",
+        default=True,
+        help=softwrap(
+            """
+            If true, add a `go_package` target with the `tailor` goal in every directory with a
+            `.go` file.
+            """
+        ),
+        advanced=True,
+    )
+    tailor_binary_targets = BoolOption(
+        "--tailor-binary-targets",
+        default=True,
+        help=softwrap(
+            """
+            If true, add a `go_binary` target with the `tailor` goal in every directory with a
+            `.go` file with `package main`.
+            """
         ),
         advanced=True,
     )
@@ -80,6 +146,24 @@ class GolangSubsystem(Subsystem):
         return tuple(sorted(set(self._subprocess_env_vars)))
 
 
+def compatible_go_version(*, compiler_version: str, target_version: str) -> bool:
+    """Can the Go compiler handle the target version?
+
+    Inspired by
+    https://github.com/golang/go/blob/30501bbef9fcfc9d53e611aaec4d20bb3cdb8ada/src/cmd/go/internal/work/exec.go#L429-L445.
+
+    Input expected in the form `1.17`.
+    """
+    if target_version == "1.0":
+        return True
+
+    def parse(v: str) -> tuple[int, int]:
+        major, minor = v.split(".", maxsplit=1)
+        return int(major), int(minor)
+
+    return parse(target_version) <= parse(compiler_version)
+
+
 @dataclass(frozen=True)
 class GoRoot:
     """Path to the Go installation (the `GOROOT`)."""
@@ -90,21 +174,8 @@ class GoRoot:
     _raw_metadata: FrozenDict[str, str]
 
     def is_compatible_version(self, version: str) -> bool:
-        """Can this Go compiler handle the target version?
-
-        Inspired by
-        https://github.com/golang/go/blob/30501bbef9fcfc9d53e611aaec4d20bb3cdb8ada/src/cmd/go/internal/work/exec.go#L429-L445.
-
-        Input expected in the form `1.17`.
-        """
-        if version == "1.0":
-            return True
-
-        def parse(v: str) -> tuple[int, int]:
-            major, minor = v.split(".", maxsplit=1)
-            return int(major), int(minor)
-
-        return parse(version) <= parse(self.version)
+        """Can this Go compiler handle the target version?"""
+        return compatible_go_version(compiler_version=self.version, target_version=version)
 
     @property
     def full_version(self) -> str:
@@ -155,6 +226,8 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
         for binary_path in all_go_binary_paths.paths
     )
 
+    using_exact_match = not golang_subsystem.options.is_default("expected_version")
+
     invalid_versions = []
     for binary_path, version_result in zip(all_go_binary_paths.paths, version_results):
         try:
@@ -171,7 +244,14 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
                 f"{version_result}"
             )
 
-        if version == golang_subsystem.expected_version:
+        is_match = (
+            golang_subsystem.expected_version == version
+            if using_exact_match
+            else compatible_go_version(
+                compiler_version=version, target_version=golang_subsystem.minimum_version
+            )
+        )
+        if is_match:
             env_result = await Get(
                 ProcessResult,
                 Process(
@@ -187,25 +267,55 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
                 path=sdk_metadata["GOROOT"], version=version, _raw_metadata=FrozenDict(sdk_metadata)
             )
 
-        logger.debug(
-            f"Go binary at {binary_path.path} has version {version}, but this "
-            f"project is using {golang_subsystem.expected_version} "
-            "(set by `[golang].expected_version`). Ignoring."
-        )
+        if using_exact_match:
+            logger.debug(
+                f"Go binary at {binary_path.path} has version {version}, but this "
+                f"project is using {golang_subsystem.expected_version} "
+                "(set by `[golang].expected_version`). Ignoring."
+            )
+        else:
+            logger.debug(
+                f"Go binary at {binary_path.path} has version {version}, but this "
+                f"repository expects at least {golang_subsystem.expected_version} "
+                "(set by `[golang].expected_minimum_version`). Ignoring."
+            )
+
         invalid_versions.append((binary_path.path, version))
 
     invalid_versions_str = bullet_list(
         f"{path}: {version}" for path, version in sorted(invalid_versions)
     )
-    raise BinaryNotFoundError(
-        "Cannot find a `go` binary with the expected version of "
-        f"{golang_subsystem.expected_version} (set by `[golang].expected_version`).\n\n"
-        f"Found these `go` binaries, but they had different versions:\n\n"
-        f"{invalid_versions_str}\n\n"
-        "To fix, please install the expected version (https://golang.org/doc/install) and ensure "
-        "that it is discoverable via the option `[golang].go_search_paths`, or change "
-        "`[golang].expected_version`."
-    )
+    if using_exact_match:
+        err = softwrap(
+            f"""
+            Cannot find a `go` binary with the expected version of
+            {golang_subsystem.expected_version} (set by `[golang].expected_version`).
+
+            Found these `go` binaries, but they had different versions:
+
+            {invalid_versions_str}
+
+            To fix, please install the expected version (https://golang.org/doc/install)
+            and ensure that it is discoverable via the option `[golang].go_search_paths`, or change
+            `[golang].expected_version`.
+            """
+        )
+    else:
+        err = softwrap(
+            f"""
+            Cannot find a `go` binary compatible with the minimum version of
+            {golang_subsystem.minimum_version} (set by `[golang].minimum_expected_version`).
+
+            Found these `go` binaries, but they had incompatible versions:
+
+            {invalid_versions_str}
+
+            To fix, please install the expected version or newer (https://golang.org/doc/install)
+            and ensure that it is discoverable via the option `[golang].go_search_paths`, or change
+            `[golang].expected_minimum_version`.
+            """
+        )
+    raise BinaryNotFoundError(err)
 
 
 def rules():

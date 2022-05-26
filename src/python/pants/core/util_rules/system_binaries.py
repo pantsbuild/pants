@@ -306,10 +306,13 @@ class TarBinary(BinaryPath):
         )
         return (self.path, f"c{compression}f", output_filename, *input_files)
 
-    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
+    def extract_archive_argv(
+        self, archive_path: str, extract_path: str, *, archive_suffix: str
+    ) -> tuple[str, ...]:
         # Note that the `output_dir` must already exist.
         # The caller should validate that it's a valid `.tar` file.
-        return (self.path, "xf", archive_path, "-C", extract_path)
+        prog_args = ("-Ilz4",) if archive_suffix == ".tar.lz4" else ()
+        return (self.path, *prog_args, "-xf", archive_path, "-C", extract_path)
 
 
 class MkdirBinary(BinaryPath):
@@ -321,6 +324,10 @@ class ChmodBinary(BinaryPath):
 
 
 class DiffBinary(BinaryPath):
+    pass
+
+
+class ReadlinkBinary(BinaryPath):
     pass
 
 
@@ -416,6 +423,7 @@ async def create_binary_shims(
             argv=(bash.path, "-c", script),
             description=f"Setup binary shims so that Pants can {binary_shims_request.rationale}.",
             output_directories=(bin_relpath,),
+            level=LogLevel.DEBUG,
         ),
     )
     return BinaryShims(bin_relpath, result.output_digest)
@@ -686,6 +694,14 @@ async def find_diff() -> DiffBinary:
     return DiffBinary(first_path.path, first_path.fingerprint)
 
 
+@rule(desc="Finding the `readlink` binary", level=LogLevel.DEBUG)
+async def find_readlink() -> ReadlinkBinary:
+    request = BinaryPathRequest(binary_name="readlink", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="defererence symlinks")
+    return ReadlinkBinary(first_path.path, first_path.fingerprint)
+
+
 @rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
 async def find_git() -> GitBinary:
     request = BinaryPathRequest(binary_name="git", search_path=SEARCH_PATHS)
@@ -730,6 +746,10 @@ class DiffBinaryRequest:
     pass
 
 
+class ReadlinkBinaryRequest:
+    pass
+
+
 class GitBinaryRequest:
     pass
 
@@ -757,6 +777,13 @@ async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBin
 @rule
 async def find_mkdir_wrapper(_: MkdirBinaryRequest, mkdir_binary: MkdirBinary) -> MkdirBinary:
     return mkdir_binary
+
+
+@rule
+async def find_readlink_wrapper(
+    _: ReadlinkBinaryRequest, readlink_binary: ReadlinkBinary
+) -> ReadlinkBinary:
+    return readlink_binary
 
 
 @rule

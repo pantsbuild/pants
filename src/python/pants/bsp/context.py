@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Callable
 
 from pants.bsp.spec.lifecycle import InitializeBuildParams
-from pants.bsp.spec.task import BSPNotification
+from pants.bsp.spec.notification import BSPNotification
 
 # Wrapper type to provide BSP rules with the ability to interact with the BSP protocol driver.
 #

@@ -40,7 +40,7 @@ tokio = { version = "1.16", features = ["fs"] }
 tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower-service = "0.3"
 tryfuture = { path = "../../tryfuture" }
-uuid = { version = "0.8.2", features = ["v4"] }
+uuid = { version = "1.0.0", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
 
 [dev-dependencies]

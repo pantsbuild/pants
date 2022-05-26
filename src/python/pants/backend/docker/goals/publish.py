@@ -21,8 +21,8 @@ from pants.core.goals.publish import (
     PublishRequest,
 )
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.process import InteractiveProcess, InteractiveProcessRequest
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +72,10 @@ async def push_docker_images(
         )
 
     env = await Get(Environment, EnvironmentRequest(options.env_vars))
-    processes = []
     skip_push = defaultdict(set)
+    jobs: list[PublishPackages] = []
+    refs: list[str] = []
+    processes: list[Get] = []
 
     for tag in tags:
         for registry in options.registries().registries.values():
@@ -81,22 +83,30 @@ async def push_docker_images(
                 skip_push[registry.alias].add(tag)
                 break
         else:
+            refs.append(tag)
             processes.append(
-                PublishPackages(
-                    names=(tag,),
-                    process=InteractiveProcess.from_process(docker.push_image(tag, env)),
-                )
+                Get(InteractiveProcess, InteractiveProcessRequest(docker.push_image(tag, env)))
             )
+
+    interactive_processes = await MultiGet(processes)
+    for ref, process in zip(refs, interactive_processes):
+        jobs.append(
+            PublishPackages(
+                names=(ref,),
+                process=process,
+            )
+        )
+
     if skip_push:
         for name, skip_tags in skip_push.items():
-            processes.append(
+            jobs.append(
                 PublishPackages(
                     names=tuple(skip_tags),
                     description=f"(by `skip_push` on registry @{name})",
                 ),
             )
 
-    return PublishProcesses(processes)
+    return PublishProcesses(jobs)
 
 
 def rules():

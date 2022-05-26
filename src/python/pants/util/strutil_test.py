@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import textwrap
 from textwrap import dedent
 
 import pytest
@@ -10,6 +11,7 @@ from pants.util.strutil import (
     ensure_binary,
     ensure_text,
     first_paragraph,
+    fmt_memory_size,
     hard_wrap,
     path_safe,
     pluralize,
@@ -247,6 +249,25 @@ def test_softwrap_multiline() -> None:
     assert (
         softwrap(
             """
+                Do you believe in:
+                    UFOs
+                    astral projections
+                    mental telepathy
+                    ...
+            """
+        )
+        == (
+            "Do you believe in:"
+            "\n"
+            "    UFOs\n"
+            "    astral projections\n"
+            "    mental telepathy\n"
+            "    ..."
+        )
+    )
+    assert (
+        softwrap(
+            """
                 Roll Call:
 
                     ```
@@ -299,3 +320,53 @@ def test_softwrap_multiline() -> None:
         )
     )
     assert softwrap("A\n\n\nB") == "A\n\nB"
+    assert (
+        softwrap(
+            f"""
+                Roll Call:
+                {bullet_list(["Dr. Peter Venkman", "Dr. Egon Spengler", "Dr. Raymond Stantz"])}
+                All here.
+            """
+        )
+        == (
+            "Roll Call:\n"
+            "  * Dr. Peter Venkman\n"
+            "  * Dr. Egon Spengler\n"
+            "  * Dr. Raymond Stantz\n"
+            "All here."
+        )
+    )
+    # This models when we output stdout/stderr. The canonical way to do that is to indent every line
+    #   so that softwrap preserves common indentation and the output "looks right"
+    stdout = "* Dr. Peter Venkman\n* Dr. Egon Spengler\n* Dr. Raymond Stantz"
+    assert (
+        softwrap(
+            f"""
+                Roll Call:
+                {textwrap.indent(stdout, " "*2)}
+                All here.
+            """
+        )
+        == (
+            "Roll Call:\n"
+            "  * Dr. Peter Venkman\n"
+            "  * Dr. Egon Spengler\n"
+            "  * Dr. Raymond Stantz\n"
+            "All here."
+        )
+    )
+
+
+_TEST_MEMORY_SIZES_PARAMS = [
+    (312, "312B"),
+    (1028, "1028B"),
+    (2 * 1024, "2KiB"),
+    (2 * 1024 * 1024, "2MiB"),
+    (4 * 1024 * 1024 * 1024, "4GiB"),
+    (2 * 1024 * 1024 * 1024 * 1024, "2048GiB"),
+]
+
+
+@pytest.mark.parametrize("mem_size, expected", _TEST_MEMORY_SIZES_PARAMS)
+def test_fmt_memory_sizes(mem_size: int, expected: str) -> None:
+    assert fmt_memory_size(mem_size) == expected

@@ -447,7 +447,15 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/__init__.py": "",
             f"{PACKAGE}/uses_py2.py": "from project.py2 import add\nassert add(2, 2) == 4\n",
             f"{PACKAGE}/uses_py3.py": "from project.py3 import add\nassert add(2, 2) == 4\n",
-            f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['==2.7.*', '>=3.6'])",
+            f"{PACKAGE}/BUILD": dedent(
+                """python_sources(
+                overrides={
+                  'uses_py2.py': {'interpreter_constraints': ['==2.7.*']},
+                  'uses_py3.py': {'interpreter_constraints': ['>=3.6']},
+                }
+              )
+            """
+            ),
         }
     )
     py2_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
@@ -458,11 +466,11 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     py2_result, py3_result = sorted(result, key=lambda res: res.partition_description or "")
 
     assert py2_result.exit_code == 0
-    assert py2_result.partition_description == "['CPython==2.7.*', 'CPython==2.7.*,>=3.6']"
+    assert py2_result.partition_description == "['CPython==2.7.*']"
     assert "Success: no issues found" in py2_result.stdout
 
     assert py3_result.exit_code == 0
-    assert py3_result.partition_description == "['CPython==2.7.*,>=3.6', 'CPython>=3.6']"
+    assert py3_result.partition_description == "['CPython>=3.6']"
     assert "Success: no issues found" in py3_result.stdout
 
 
@@ -753,20 +761,30 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
     assert len(partitions) == 3
 
     def assert_partition(
-        partition: MyPyPartition, roots: list[Target], deps: list[Target], interpreter: str
+        partition: MyPyPartition,
+        roots: list[Target],
+        deps: list[Target],
+        interpreter: str,
+        resolve: str,
     ) -> None:
         root_addresses = {t.address for t in roots}
-        assert {t.address for t in partition.root_targets} == root_addresses
+        assert {fs.address for fs in partition.root_field_sets} == root_addresses
         assert {t.address for t in partition.closure} == {
             *root_addresses,
             *(t.address for t in deps),
         }
-        assert partition.interpreter_constraints == InterpreterConstraints([f"=={interpreter}.*"])
+        ics = [f"CPython=={interpreter}.*"]
+        assert partition.interpreter_constraints == InterpreterConstraints(ics)
+        assert partition.description() == f"{resolve}, {ics}"
 
-    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8")
-    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9")
+    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
+    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
     assert_partition(
-        partitions[2], [resolve_b_root1, resolve_b_root2], [resolve_b_dep1, resolve_b_dep2], "3.9"
+        partitions[2],
+        [resolve_b_root1, resolve_b_root2],
+        [resolve_b_dep1, resolve_b_dep2],
+        "3.9",
+        "b",
     )
 
 

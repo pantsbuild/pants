@@ -22,6 +22,7 @@ from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.docutil import bin_name
+from pants.util.strutil import softwrap
 
 _SCALAPB_RUNTIME_GROUP = "com.thesamet.scalapb"
 _SCALAPB_RUNTIME_ARTIFACT = "scalapb-runtime"
@@ -103,12 +104,16 @@ class ConflictingScalaPBRuntimeVersionInResolveError(ValueError):
         self, resolve_name: str, required_version: str, conflicting_coordinate: Coordinate
     ) -> None:
         super().__init__(
-            f"The JVM resolve `{resolve_name}` contains a `jvm_artifact` for version {conflicting_coordinate.version} "
-            f"of the ScalaPB runtime. This conflicts with version {required_version} which is the configured version "
-            "of ScalaPB for this resolve from the `[scalapb].version` option. "
-            "Please remove the `jvm_artifact` target with JVM coordinate "
-            f"{conflicting_coordinate.to_coord_str()}, then re-run "
-            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`"
+            softwrap(
+                f"""
+                The JVM resolve `{resolve_name}` contains a `jvm_artifact` for version
+                {conflicting_coordinate.version} of the ScalaPB runtime. This conflicts with version
+                {required_version} which is the configured version of ScalaPB for this resolve from
+                the `[scalapb].version` option. Please remove the `jvm_artifact` target with JVM
+                coordinate {conflicting_coordinate.to_coord_str()}, then re-run
+                `{bin_name()} generate-lockfiles --resolve={resolve_name}`
+                """
+            )
         )
 
 

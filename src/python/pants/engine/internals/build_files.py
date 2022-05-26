@@ -3,27 +3,20 @@
 
 from __future__ import annotations
 
-import itertools
 import os.path
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs import AddressSpecs
-from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
+from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
-from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
-from pants.engine.internals.parametrize import _TargetParametrizations
+from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import WrappedTarget
+from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
-from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import OrderedSet
 
 
 @dataclass(frozen=True)
@@ -169,100 +162,6 @@ async def find_target_adaptor(address: Address) -> TargetAdaptor:
             namespace=address_family.namespace,
         )
     return target_adaptor
-
-
-@rule
-def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFilter:
-    return AddressSpecsFilter(
-        tags=global_options.tag, exclude_target_regexps=global_options.exclude_target_regexp
-    )
-
-
-@rule
-async def addresses_from_address_specs(
-    address_specs: AddressSpecs,
-    build_file_options: BuildFileOptions,
-    specs_filter: AddressSpecsFilter,
-) -> Addresses:
-    matched_addresses: OrderedSet[Address] = OrderedSet()
-    filtering_disabled = address_specs.filter_by_global_options is False
-
-    # Resolve all `AddressLiteralSpec`s. Will error on invalid addresses.
-    literal_wrapped_targets = await MultiGet(
-        Get(
-            WrappedTarget,
-            AddressInput(
-                spec.path_component,
-                spec.target_component,
-                spec.generated_component,
-                spec.parameters,
-            ),
-        )
-        for spec in address_specs.literals
-    )
-    matched_addresses.update(
-        wrapped_tgt.target.address
-        for wrapped_tgt in literal_wrapped_targets
-        if filtering_disabled or specs_filter.matches(wrapped_tgt.target)
-    )
-    if not address_specs.globs:
-        return Addresses(matched_addresses)
-
-    # Resolve all `AddressGlobSpecs`.
-    build_file_paths = await Get(
-        Paths,
-        PathGlobs,
-        address_specs.to_build_file_path_globs(
-            build_patterns=build_file_options.patterns,
-            build_ignore_patterns=build_file_options.ignores,
-        ),
-    )
-    dirnames = {os.path.dirname(f) for f in build_file_paths.files}
-    address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
-    base_addresses = Addresses(
-        itertools.chain.from_iterable(
-            address_family.addresses_to_target_adaptors for address_family in address_families
-        )
-    )
-
-    target_parametrizations_list = await MultiGet(
-        Get(_TargetParametrizations, Address, base_address) for base_address in base_addresses
-    )
-    residence_dir_to_targets = defaultdict(list)
-    for target_parametrizations in target_parametrizations_list:
-        for tgt in target_parametrizations.all:
-            residence_dir_to_targets[tgt.residence_dir].append(tgt)
-
-    matched_globs = set()
-    for glob_spec in address_specs.globs:
-        for residence_dir in residence_dir_to_targets:
-            if not glob_spec.matches(residence_dir):
-                continue
-            matched_globs.add(glob_spec)
-            matched_addresses.update(
-                tgt.address
-                for tgt in residence_dir_to_targets[residence_dir]
-                if filtering_disabled or specs_filter.matches(tgt)
-            )
-
-    unmatched_globs = [
-        glob
-        for glob in address_specs.globs
-        if glob not in matched_globs and glob.error_if_no_matches
-    ]
-    if unmatched_globs:
-        glob_description = (
-            f"the address glob `{unmatched_globs[0]}`"
-            if len(unmatched_globs) == 1
-            else f"these address globs: {sorted(str(glob) for glob in unmatched_globs)}"
-        )
-        raise ResolveError(
-            f"No targets found for {glob_description}\n\n"
-            f"Do targets exist in those directories? Maybe run `{bin_name()} tailor` to generate "
-            f"BUILD files? See {doc_url('targets')} about targets and BUILD files."
-        )
-
-    return Addresses(sorted(matched_addresses))
 
 
 def rules():

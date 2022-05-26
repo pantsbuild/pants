@@ -23,7 +23,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import FieldSet, SourcesField, Targets
+from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
@@ -183,7 +183,7 @@ class Fmt(Goal):
 @goal_rule
 async def fmt(
     console: Console,
-    targets: Targets,
+    targets: FilteredTargets,
     fmt_subsystem: FmtSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
@@ -286,7 +286,8 @@ async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFm
             continue
         result = await Get(FmtResult, FmtRequest, request)
         results.append(result)
-        prior_formatter_result = result.output
+        if not result.skipped:
+            prior_formatter_result = result.output
     return _LanguageFmtResults(
         tuple(results),
         input=original_sources.snapshot.digest,

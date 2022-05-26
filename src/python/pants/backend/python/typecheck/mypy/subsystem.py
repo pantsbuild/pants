@@ -9,11 +9,13 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
+    InterpreterConstraintsField,
     PythonRequirementsField,
     PythonSourceField,
 )
@@ -28,7 +30,7 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -59,6 +61,7 @@ class MyPyFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
     sources: PythonSourceField
+    interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -75,7 +78,7 @@ class MyPy(PythonToolBase):
     name = "MyPy"
     help = "The MyPy Python type checker (http://mypy-lang.org/)."
 
-    default_version = "mypy==0.910"
+    default_version = "mypy==0.950"
     default_main = ConsoleScript("mypy")
 
     # See `mypy/rules.py`. We only use these default constraints in some situations.
@@ -90,6 +93,7 @@ class MyPy(PythonToolBase):
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--python-version 3.7 --disallow-any-expr")
+    export = ExportToolOption()
     config = FileOption(
         "--config",
         default=None,
@@ -268,6 +272,31 @@ async def mypy_first_party_plugins(
 
 
 # --------------------------------------------------------------------------------------
+# Interpreter constraints
+# --------------------------------------------------------------------------------------
+
+
+@rule_helper
+async def _mypy_interpreter_constraints(
+    mypy: MyPy, python_setup: PythonSetup
+) -> InterpreterConstraints:
+    constraints = mypy.interpreter_constraints
+    if mypy.options.is_default("interpreter_constraints"):
+        all_tgts = await Get(AllTargets, AllTargetsRequest())
+        unique_constraints = {
+            InterpreterConstraints.create_from_targets([tgt], python_setup)
+            for tgt in all_tgts
+            if MyPyFieldSet.is_applicable(tgt)
+        }
+        code_constraints = InterpreterConstraints(
+            itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
+        )
+        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
+            constraints = code_constraints
+    return constraints
+
+
+# --------------------------------------------------------------------------------------
 # Lockfile
 # --------------------------------------------------------------------------------------
 
@@ -277,7 +306,7 @@ class MyPyLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc="Determine if MyPy should use Python 3.8+ (for lockfile usage)",
+    desc="Determine MyPy interpreter constraints (for lockfile generation)",
     level=LogLevel.DEBUG,
 )
 async def setup_mypy_lockfile(
@@ -286,27 +315,12 @@ async def setup_mypy_lockfile(
     mypy: MyPy,
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
-    if not mypy.uses_lockfile:
+    if not mypy.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             mypy, use_pex=python_setup.generate_lockfiles_with_pex
         )
 
-    constraints = mypy.interpreter_constraints
-    if mypy.options.is_default("interpreter_constraints"):
-        all_tgts = await Get(AllTargets, AllTargetsRequest())
-        all_transitive_targets = await MultiGet(
-            Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
-            for tgt in all_tgts
-            if MyPyFieldSet.is_applicable(tgt)
-        )
-        unique_constraints = {
-            InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
-            for transitive_targets in all_transitive_targets
-        }
-        code_constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
-        if code_constraints.requires_python38_or_newer(python_setup.interpreter_universe):
-            constraints = code_constraints
-
+    constraints = await _mypy_interpreter_constraints(mypy, python_setup)
     return GeneratePythonLockfile.from_tool(
         mypy,
         constraints,
@@ -315,9 +329,38 @@ async def setup_mypy_lockfile(
     )
 
 
+# --------------------------------------------------------------------------------------
+# Export
+# --------------------------------------------------------------------------------------
+
+
+class MyPyExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule(desc="Determine MyPy interpreter constraints (for `export` goal)", level=LogLevel.DEBUG)
+async def mypy_export(
+    _: MyPyExportSentinel,
+    mypy: MyPy,
+    python_setup: PythonSetup,
+    first_party_plugins: MyPyFirstPartyPlugins,
+) -> ExportPythonTool:
+    if not mypy.export:
+        return ExportPythonTool(resolve_name=mypy.options_scope, pex_request=None)
+    constraints = await _mypy_interpreter_constraints(mypy, python_setup)
+    return ExportPythonTool(
+        resolve_name=mypy.options_scope,
+        pex_request=mypy.to_pex_request(
+            interpreter_constraints=constraints,
+            extra_requirements=first_party_plugins.requirement_strings,
+        ),
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, MyPyLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, MyPyExportSentinel),
     )

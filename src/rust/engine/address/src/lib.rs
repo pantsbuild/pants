@@ -33,8 +33,6 @@ pub struct AddressInput<'a> {
 }
 
 pub struct SpecInput<'a> {
-  /// True if the spec started with an `!`.
-  pub is_ignored: bool,
   /// The address (or literal, if no target/generated/parameters were specified) portion.
   pub address: AddressInput<'a>,
   /// If a spec wildcard was specified (`:` or `::`), its value.
@@ -43,7 +41,8 @@ pub struct SpecInput<'a> {
 
 peg::parser! {
     grammar parsers() for str {
-        rule path() -> &'input str = s:$([^':' | '@' | '#']*) { s }
+        rule path() -> &'input str =
+            s:$(([^':' | '@' | '#'] / ("@" !parameter()))*) { s }
 
         rule target_name() -> &'input str
             = quiet!{ s:$([^'#' | '@' | ':']+) { s } }
@@ -77,14 +76,12 @@ peg::parser! {
                 }
             }
 
-        rule ignore() -> () = "!" {}
 
         rule wildcard() -> &'input str = s:$("::" / ":") { s }
 
         pub(crate) rule spec() -> SpecInput<'input>
-            = is_ignored:ignore()? address:address() wildcard:wildcard()? {
+            = address:address() wildcard:wildcard()? {
                 SpecInput {
-                    is_ignored: is_ignored == Some(()),
                     address,
                     wildcard,
                 }

@@ -128,7 +128,7 @@ indexmap = "1.8"
 internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
-libc = "0.2.112"
+libc = "0.2.125"
 log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }

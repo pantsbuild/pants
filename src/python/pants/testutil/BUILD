@@ -8,31 +8,24 @@
 # tagging the wheel for all the supported Python versions.
 python_distribution(
     name="testutil_wheel",
-    dependencies=[":testutil", ":pants_integration_test", ":rule_runner", ":py_typed"],
+    dependencies=[":testutil", ":py_typed"],
     provides=setup_py(
         name="pantsbuild.pants.testutil",
         description="Test support for writing Pants plugins.",
         classifiers=["Topic :: Software Development :: Testing"],
+        # N.B.: Must match [python] interpreter_constraints in pants.toml.
         python_requires=">=3.7,<3.10",
     ),
 )
 
 python_sources(
-    sources=["*.py", "!rule_runner.py", "!test_base.py", "!pants_integration_test.py", "!_test.py"],
+    sources=["*.py", "pants_integration_test.py", "!_test.py"],
+    overrides={
+        "pants_integration_test.py": {
+            "dependencies": ["//BUILD_ROOT:files", "src/python/pants/__main__.py"]
+        },
+        "rule_runner.py": {"dependencies": ["//BUILD_ROOT:files"]},
+    },
 )
-
-python_sources(
-    name="rule_runner",
-    sources=["rule_runner.py", "test_base.py"],
-    dependencies=["//BUILD_ROOT:files"],
-)
-
-python_sources(
-    name="pants_integration_test",
-    sources=["pants_integration_test.py"],
-    dependencies=["//BUILD_ROOT:files", "src/python/pants/__main__.py"],
-)
-
-python_tests(name="tests", sources=["*_test.py", "!pants_integration_test.py"])
 
 resource(name="py_typed", source="py.typed")

@@ -3,7 +3,7 @@
 
 from pants.backend.java.bsp import rules as java_bsp_rules
 from pants.backend.java.compile import javac
-from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
+from pants.backend.java.dependency_inference import java_parser
 from pants.backend.java.dependency_inference import rules as dependency_inference_rules
 from pants.backend.java.goals import check, tailor
 from pants.backend.java.target_types import (
@@ -47,7 +47,6 @@ def rules():
         *lockfile.rules(),
         *coursier_fetch.rules(),
         *java_parser.rules(),
-        *java_parser_launcher.rules(),
         *resources.rules(),
         *symbol_mapper.rules(),
         *dependency_inference_rules.rules(),

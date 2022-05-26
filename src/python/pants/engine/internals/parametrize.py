@@ -16,6 +16,13 @@ from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list
 
 
+def _named_args_explanation(arg: str) -> str:
+    return (
+        f"To use `{arg}` as a parameter, you can pass it as a keyword argument to "
+        f"give it an alias. For example: `parametrize(short_memorable_name={arg})`"
+    )
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Parametrize:
@@ -43,21 +50,20 @@ class Parametrize:
             if not isinstance(arg, str):
                 raise Exception(
                     f"In {self}:\n  Positional arguments must be strings, but "
-                    f"`{arg}` was a `{type(arg).__name__}`."
+                    f"`{arg!r}` was a `{type(arg).__name__}`.\n\n"
+                    + _named_args_explanation(f"{arg!r}")
                 )
             previous_arg = parameters.get(arg)
             if previous_arg is not None:
                 raise Exception(
                     f"In {self}:\n  Positional arguments cannot have the same name as "
-                    f"keyword arguments. `{arg}` was also defined as `{arg}={previous_arg}`."
+                    f"keyword arguments. `{arg}` was also defined as `{arg}={previous_arg!r}`."
                 )
             banned_chars = BANNED_CHARS_IN_PARAMETERS & set(arg)
             if banned_chars:
                 raise Exception(
                     f"In {self}:\n  Positional argument `{arg}` contained separator characters "
-                    f"(`{'`,`'.join(banned_chars)}`).\n\n"
-                    "To use `{arg}` as a parameter, you can pass it as a keyword argument to "
-                    "give it an alias. For example: `parametrize(short_memorable_name='{arg}')`"
+                    f"(`{'`,`'.join(banned_chars)}`).\n\n" + _named_args_explanation(arg)
                 )
             parameters[arg] = arg
         return parameters
@@ -170,6 +176,29 @@ class _TargetParametrizations(Collection[_TargetParametrization]):
             if instance is not None:
                 return instance
         return None
+
+    def get_all_superset_targets(self, address: Address) -> Iterator[Address]:
+        """Yield the input address itself, or any parameterized addresses which are a superset of
+        the input address.
+
+        For example, an input address `dir:tgt` may yield `(dir:tgt@k=v1, dir:tgt@k=v2)`.
+
+        If no targets are a match, will yield nothing.
+        """
+        # Check for exact matches.
+        if self.get(address) is not None:
+            yield address
+            return
+
+        for parametrization in self:
+            if parametrization.original_target is not None and address.is_parametrized_subset_of(
+                parametrization.original_target.address
+            ):
+                yield parametrization.original_target.address
+
+            for parametrized_tgt in parametrization.parametrization.values():
+                if address.is_parametrized_subset_of(parametrized_tgt.address):
+                    yield parametrized_tgt.address
 
     def get_subset(self, address: Address, consumer: Target) -> Target:
         """Find the Target with the given Address, or with fields matching the given consumer."""

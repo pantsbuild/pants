@@ -50,7 +50,7 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_classmethod, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.osutil import CPU_COUNT
-from pants.util.strutil import softwrap
+from pants.util.strutil import fmt_memory_size, softwrap
 from pants.version import VERSION
 
 logger = logging.getLogger(__name__)
@@ -72,9 +72,20 @@ class DynamicUIRenderer(Enum):
     experimental_prodash = "experimental-prodash"
 
 
-class FilesNotFoundBehavior(Enum):
+class UnmatchedBuildFileGlobs(Enum):
     """What to do when globs do not match in BUILD files."""
 
+    warn = "warn"
+    error = "error"
+
+    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+        return GlobMatchErrorBehavior(self.value)
+
+
+class UnmatchedCliGlobs(Enum):
+    """What to do when globs do not match in CLI args."""
+
+    ignore = "ignore"
     warn = "warn"
     error = "error"
 
@@ -341,6 +352,9 @@ class ExecutionOptions:
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
 
+    process_total_child_memory_usage: int | None
+    process_per_child_memory_usage: int
+
     remote_store_address: str | None
     remote_store_headers: dict[str, str]
     remote_store_chunk_bytes: Any
@@ -381,6 +395,8 @@ class ExecutionOptions:
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+            process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
+            process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
             # Remote store setup.
             remote_store_address=dynamic_remote_options.store_address,
             remote_store_headers=dynamic_remote_options.store_headers,
@@ -453,6 +469,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     # Process execution setup.
+    process_total_child_memory_usage=None,
+    process_per_child_memory_usage=memory_size("512MiB"),
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
@@ -485,6 +503,25 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 )
 
 DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
+
+
+class LogLevelOption(EnumOption[LogLevel, LogLevel]):
+    """The `--level` option.
+
+    This is a dedicated class because it's the only option where we allow both the short flag `-l`
+    and the long flag `--level`.
+    """
+
+    def __new__(cls) -> LogLevelOption:
+        self = super().__new__(
+            cls,  # type: ignore[arg-type]
+            "--level",
+            default=LogLevel.INFO,
+            daemon=True,
+            help="Set the logging level.",
+        )
+        self._flag_names = ("-l", "--level")
+        return self  # type: ignore[return-value]
 
 
 class BootstrapOptions:
@@ -530,13 +567,7 @@ class BootstrapOptions:
         default=False,
         help="Re-resolve plugins, even if previously resolved.",
     )
-    level = EnumOption(
-        "-l",
-        "--level",
-        default=LogLevel.INFO,
-        daemon=True,
-        help="Set the logging level.",
-    )
+    level = LogLevelOption()
     show_log_target = BoolOption(
         "--show-log-target",
         default=False,
@@ -593,6 +624,7 @@ class BootstrapOptions:
         "--pants-version",
         advanced=True,
         default=pants_version(),
+        default_help_repr="<pants_version>",
         daemon=True,
         help=softwrap(
             f"""
@@ -732,7 +764,7 @@ class BootstrapOptions:
     pants_ignore = StrListOption(
         "--pants-ignore",
         advanced=True,
-        default=[".*/", _default_rel_distdir],
+        default=[".*/", _default_rel_distdir, "__pycache__"],
         help=softwrap(
             """
             Paths to ignore for all filesystem operations performed by pants
@@ -759,7 +791,6 @@ class BootstrapOptions:
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
     logdir = StrOption(
-        "-d",
         "--logdir",
         advanced=True,
         default=None,
@@ -1017,6 +1048,7 @@ class BootstrapOptions:
             """
         ),
         default=tempfile.gettempdir(),
+        default_help_repr="<tmp_dir>",
     )
     local_cache = BoolOption(
         "--local-cache",
@@ -1048,6 +1080,46 @@ class BootstrapOptions:
             """
             Path to a file containing PEM-format CA certificates used for verifying secure
             connections when downloading files required by a build.
+            """
+        ),
+    )
+    process_total_child_memory_usage = MemorySizeOption(
+        "--process-total-child-memory-usage",
+        advanced=True,
+        default=None,
+        default_help_repr="1GiB",
+        help=softwrap(
+            """
+            The maximum memory usage for all child processes.
+
+            This value participates in precomputing the pool size of child processes used by
+            `pantsd`. A high value would result in a high number of child processes spawned,
+            potentially overconsuming your resources and triggering the OS' OOM killer. A low
+            value would mean a low number of child processes launched and therefore less
+            paralellism for the tasks that need those processes.
+
+            If setting this value, consider also setting a value for the `process-per-child-memory-usage`
+            option too.
+
+            You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
+            `2GiB` or `2.12GiB`. A bare number will be in bytes.
+            """
+        ),
+    )
+    process_per_child_memory_usage = MemorySizeOption(
+        "--process-per-child-memory-usage",
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.process_per_child_memory_usage,
+        default_help_repr="512MiB",
+        help=softwrap(
+            """
+            The default memory usage for a child process.
+
+            Check the documentation for the `process-total-child-memory-usage` for advice on
+            how to choose an appropriate value for this option.
+
+            You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
+            `2GiB` or `2.12GiB`. A bare number will be in bytes.
             """
         ),
     )
@@ -1229,6 +1301,9 @@ class BootstrapOptions:
             See `--remote-execution-headers` as well.
             """
         ),
+        default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_store_headers).replace(
+            VERSION, "<pants_version>"
+        ),
     )
     remote_store_chunk_bytes = IntOption(
         "--remote-store-chunk-bytes",
@@ -1337,6 +1412,9 @@ class BootstrapOptions:
             See `--remote-store-headers` as well.
             """
         ),
+        default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_execution_headers).replace(
+            VERSION, "<pants_version>"
+        ),
     )
     remote_execution_overall_deadline_secs = IntOption(
         "--remote-execution-overall-deadline-secs",
@@ -1416,7 +1494,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     files_not_found_behavior = EnumOption(
         "--files-not-found-behavior",
-        default=FilesNotFoundBehavior.warn,
+        default=UnmatchedBuildFileGlobs.warn,
         help=softwrap(
             """
             What to do when files and globs specified in BUILD files, such as in the
@@ -1425,11 +1503,48 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
         advanced=True,
+        removal_version="2.14.0.dev0",
+        removal_hint=softwrap(
+            """
+            Use `[GLOBAL].unmatched_build_file_globs` instead, which behaves the same. This
+            option was renamed for clarity with the new `[GLOBAL].unmatched_cli_globs` option.
+            """
+        ),
+    )
+    unmatched_build_file_globs = EnumOption(
+        "--unmatched-build-file-globs",
+        default=UnmatchedBuildFileGlobs.warn,
+        help=softwrap(
+            """
+            What to do when files and globs specified in BUILD files, such as in the
+            `sources` field, cannot be found.
+
+            This usually happens when the files do not exist on your machine. It can also happen
+            if they are ignored by the `[GLOBAL].pants_ignore` option, which causes the files to be
+            invisible to Pants.
+            """
+        ),
+        advanced=True,
+    )
+    unmatched_cli_globs = EnumOption(
+        "--unmatched-cli-globs",
+        default=UnmatchedCliGlobs.error,
+        help=softwrap(
+            """
+            What to do when command line arguments, e.g. files and globs like `dir::`, cannot be
+            found.
+
+            This usually happens when the files do not exist on your machine. It can also happen
+            if they are ignored by the `[GLOBAL].pants_ignore` option, which causes the files to be
+            invisible to Pants.
+            """
+        ),
+        advanced=True,
     )
 
     owners_not_found_behavior = EnumOption(
         "--owners-not-found-behavior",
-        default=OwnersNotFoundBehavior.error,
+        default=OwnersNotFoundBehavior.ignore,
         help=softwrap(
             """
             What to do when file arguments do not have any owning target. This happens when
@@ -1437,6 +1552,17 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
         advanced=True,
+        removal_version="2.14.0.dev0",
+        removal_hint=softwrap(
+            """
+            This option is no longer useful with Pants because we have goals that work without any
+            targets, e.g. the `count-loc` goal or the `regex-lint` linter from the `lint` goal. This
+            option caused us to error on valid use cases.
+
+            For goals that require targets, like `list`, the unowned file will simply be ignored. If
+            no owners are found at all, most goals will warn and some like `run` will error.
+            """
+        ),
     )
 
     build_patterns = StrListOption(
@@ -1460,12 +1586,10 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         "--build-ignore",
         help=softwrap(
             """
-            Paths to ignore when identifying BUILD files.
+            Path globs or literals to ignore when identifying BUILD files.
 
             This does not affect any other filesystem operations; use `--pants-ignore` for
             that instead.
-
-            Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).
             """
         ),
         advanced=True,
@@ -1531,6 +1655,30 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
 
+    use_deprecated_directory_cli_args_semantics = BoolOption(
+        "--use-deprecated-directory-cli-args-semantics",
+        default=True,
+        help=softwrap(
+            f"""
+            If true, Pants will use the old, deprecated semantics for directory arguments like
+            `{bin_name()} test dir`: directories are shorthand for the target `dir:dir`, i.e. the
+            target that leaves off `name=`.
+
+            If false, Pants will use the new semantics: directory arguments will match all files
+            and targets in the directory, e.g. `{bin_name()} test dir` will run all tests in `dir`.
+
+            The new semantics will become the default in Pants 2.14, and the old semantics will be
+            removed in 2.15.
+
+            This also impacts the behavior of the `tailor` goal. If this option is true,
+            `{bin_name()} tailor` without additional arguments will run over the whole project, and
+            `{bin_name()} tailor dir` will run over `dir` and all recursive sub-directories. If
+            false, you must specify arguments, like `{bin_name()} tailor ::` to run over the
+            whole project; specifying a directory will only add targets for that directory.
+            """
+        ),
+    )
+
     @classmethod
     def validate_instance(cls, opts):
         """Validates an instance of global options for cases that are not prohibited via
@@ -1548,6 +1696,23 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             raise OptionsError(
                 "--rule-threads-core values less than 2 are not supported, but it was set to "
                 f"{opts.rule_threads_core}."
+            )
+
+        if (
+            opts.process_total_child_memory_usage is not None
+            and opts.process_total_child_memory_usage < opts.process_per_child_memory_usage
+        ):
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    Nailgun pool can not be initialised as the total amount of memory allowed is \
+                    smaller than the memory allocation for a single child process.
+
+                    - total child process memory allowed: {fmt_memory_size(opts.process_total_child_memory_usage)}
+
+                    - default child process memory: {fmt_memory_size(opts.process_per_child_memory_usage)}
+                    """
+                )
             )
 
         if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
@@ -1619,6 +1784,13 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         validate_remote_headers("remote_execution_headers")
         validate_remote_headers("remote_store_headers")
+
+        illegal_build_ignores = [i for i in opts.build_ignore if i.startswith("!")]
+        if illegal_build_ignores:
+            raise OptionsError(
+                "The `--build-ignore` option does not support negated globs, but was "
+                f"given: {illegal_build_ignores}."
+            )
 
     @staticmethod
     def create_py_executor(bootstrap_options: OptionValueContainer) -> PyExecutor:

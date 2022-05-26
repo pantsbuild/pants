@@ -10,14 +10,11 @@ import pytest
 
 from pants.base.specs import (
     AddressLiteralSpec,
-    AddressSpec,
-    DescendantAddresses,
+    DirGlobSpec,
     DirLiteralSpec,
     FileGlobSpec,
-    FileIgnoreSpec,
     FileLiteralSpec,
-    FilesystemSpec,
-    SiblingAddresses,
+    RecursiveGlobSpec,
     Spec,
 )
 from pants.base.specs_parser import SpecsParser
@@ -35,12 +32,12 @@ def address_literal(
     )
 
 
-def desc(directory: str) -> DescendantAddresses:
-    return DescendantAddresses(directory)
+def recursive_glob(directory: str) -> RecursiveGlobSpec:
+    return RecursiveGlobSpec(directory)
 
 
-def sib(directory: str) -> SiblingAddresses:
-    return SiblingAddresses(directory)
+def dir_glob(directory: str) -> DirGlobSpec:
+    return DirGlobSpec(directory)
 
 
 def dir_literal(v: str) -> DirLiteralSpec:
@@ -55,15 +52,18 @@ def file_glob(val: str) -> FileGlobSpec:
     return FileGlobSpec(val)
 
 
-def ignore(val: str) -> FileIgnoreSpec:
-    return FileIgnoreSpec(val)
-
-
 def assert_spec_parsed(build_root: Path, spec_str: str, expected_spec: Spec) -> None:
     parser = SpecsParser(str(build_root))
-    spec = parser.parse_spec(spec_str)
+    spec, is_ignore = parser.parse_spec(spec_str)
     assert isinstance(spec, type(expected_spec))
     assert spec == expected_spec
+    assert is_ignore is False
+
+    # Check ignores are also parsed correctly.
+    spec, is_ignore = parser.parse_spec(f"-{spec_str}")
+    assert isinstance(spec, type(expected_spec))
+    assert spec == expected_spec
+    assert is_ignore is True
 
 
 @pytest.mark.parametrize(
@@ -96,30 +96,30 @@ def test_address_literal_specs(
 @pytest.mark.parametrize(
     "spec,expected",
     [
-        (":", sib("")),
-        ("//:", sib("")),
-        ("a:", sib("a")),
-        ("//a:", sib("a")),
-        ("a/b:", sib("a/b")),
-        ("//a/b:", sib("a/b")),
+        (":", dir_glob("")),
+        ("//:", dir_glob("")),
+        ("a:", dir_glob("a")),
+        ("//a:", dir_glob("a")),
+        ("a/b:", dir_glob("a/b")),
+        ("//a/b:", dir_glob("a/b")),
     ],
 )
-def test_sibling(tmp_path: Path, spec: str, expected: SiblingAddresses) -> None:
+def test_dir_glob(tmp_path: Path, spec: str, expected: DirGlobSpec) -> None:
     assert_spec_parsed(tmp_path, spec, expected)
 
 
 @pytest.mark.parametrize(
     "spec,expected",
     [
-        ("::", desc("")),
-        ("//::", desc("")),
-        ("a::", desc("a")),
-        ("//a::", desc("a")),
-        ("a/b::", desc("a/b")),
-        ("//a/b::", desc("a/b")),
+        ("::", recursive_glob("")),
+        ("//::", recursive_glob("")),
+        ("a::", recursive_glob("a")),
+        ("//a::", recursive_glob("a")),
+        ("a/b::", recursive_glob("a/b")),
+        ("//a/b::", recursive_glob("a/b")),
     ],
 )
-def test_descendant(tmp_path: Path, spec: str, expected: DescendantAddresses) -> None:
+def test_recursive_glob(tmp_path: Path, spec: str, expected: RecursiveGlobSpec) -> None:
     assert_spec_parsed(tmp_path, spec, expected)
 
 
@@ -136,11 +136,6 @@ def test_files(tmp_path: Path) -> None:
 @pytest.mark.parametrize("spec", ["*", "**/*", "a/b/*", "a/b/test_*.py", "a/b/**/test_*"])
 def test_file_globs(tmp_path: Path, spec: str) -> None:
     assert_spec_parsed(tmp_path, spec, file_glob(spec))
-
-
-@pytest.mark.parametrize("spec", ["!", "!a/b/", "!/a/b/*"])
-def test_excludes(tmp_path: Path, spec: str) -> None:
-    assert_spec_parsed(tmp_path, spec, ignore(spec[1:]))
 
 
 def test_dir_literals(tmp_path: Path) -> None:
@@ -185,19 +180,19 @@ def test_ambiguous_files(tmp_path: Path, spec: str) -> None:
     [
         ("a", dir_literal("a")),
         ("a:a", address_literal("a", "a")),
-        ("a:", sib("a")),
-        ("a::", desc("a")),
+        ("a:", dir_glob("a")),
+        ("a::", recursive_glob("a")),
         ("a.txt", file_literal("a.txt")),
     ],
 )
-def test_absolute(tmp_path: Path, spec_suffix: str, expected: AddressSpec | FilesystemSpec) -> None:
+def test_absolute(tmp_path: Path, spec_suffix: str, expected: Spec) -> None:
     spec = os.path.join(tmp_path, spec_suffix)
     assert_spec_parsed(tmp_path, spec, expected)
 
 
 def test_invalid_absolute_path(tmp_path: Path) -> None:
     with pytest.raises(SpecsParser.BadSpecError):
-        assert_spec_parsed(tmp_path, "/not/the/buildroot/a", sib("a"))
+        assert_spec_parsed(tmp_path, "/not/the/buildroot/a", dir_glob("a"))
     with pytest.raises(SpecsParser.BadSpecError):
         assert_spec_parsed(tmp_path, "/not/the/buildroot/a.txt", file_literal("a.txt"))
 

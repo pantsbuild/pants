@@ -11,9 +11,6 @@ from pants.backend.java.dependency_inference.java_parser import (
     FallibleJavaSourceDependencyAnalysisResult,
 )
 from pants.backend.java.dependency_inference.java_parser import rules as java_parser_rules
-from pants.backend.java.dependency_inference.java_parser_launcher import (
-    rules as java_parser_launcher_rules,
-)
 from pants.backend.java.dependency_inference.types import JavaImport, JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourceField, JavaSourceTarget
 from pants.build_graph.address import Address
@@ -35,7 +32,6 @@ def rule_runner() -> RuleRunner:
         preserve_tmpdirs=True,
         rules=[
             *jvm_tool.rules(),
-            *java_parser_launcher_rules(),
             *java_parser_rules(),
             *source_files.rules(),
             *util_rules(),

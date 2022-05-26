@@ -5,6 +5,7 @@ print_stacktrace = true
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.python",
+  "pants.backend.experimental.python.docs.sphinx",
   "pants.backend.experimental.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
@@ -27,10 +28,11 @@ backend_packages.add = [
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
+  "internal_plugins.test_lockfile_fixtures",
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.18.0",
+  "toolchain.pants.plugin==0.19.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -64,7 +66,9 @@ ignore_warnings.add = [
   "DEPRECATED: pants.base.build_environment.get_git"
 ]
 
-files_not_found_behavior = "error"
+use_deprecated_directory_cli_args_semantics = false
+
+unmatched_build_file_globs = "error"
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
 remote_store_address = "grpcs://cache.toolchain.com:443"
@@ -111,7 +115,7 @@ ignore_adding_targets = [
   "src/python/pants/backend/go/go_sources/embedcfg:bin",
   "src/python/pants/backend/go/go_sources/generate_testmain:bin",
   "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
-  "src/python/pants/backend/python/dependency_inference/scripts:import_parser0",
+  "src/python/pants/backend/python/dependency_inference/scripts:dependency_parser0",
   "src/python/pants/backend/terraform:hcl2_parser0",
 ]
 
@@ -119,6 +123,10 @@ ignore_adding_targets = [
 venv_use_symlinks = true
 
 [python]
+# N.B.: When adjusting this to support new Python versions, you must update the Pants
+# `python_distrobution` targets, currently:
+# + src/python/pants:pants-packaged
+# + src/python/pants/testutil:testutil_wheel
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 resolves = { python-default = "3rdparty/python/user_reqs.lock" }
@@ -127,6 +135,7 @@ lockfile_generator = "pex"
 
 [python-infer]
 assets = true
+unowned_dependency_behavior = "error"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
@@ -197,12 +206,16 @@ default_resolve = "jvm_testprojects"
 jvm_testprojects = "3rdparty/jvm/testprojects.lockfile"
 # A resolve for the java_parser, which is shipped with Pants, and invoked with its own isolated
 # classpath. Consequently, we isolate it to its own lockfile.
-java_parser = "src/python/pants/backend/java/dependency_inference/java_parser.lockfile"
+# Note: The jvm_artifact targets in this resolve must be kept in sync with the requirements
+# in `generate_java_parser_lockfile_request`.
+java_parser_dev = "src/python/pants/backend/java/dependency_inference/java_parser.lock"
 # Has the same isolation requirements as `java_parser`.
-scala_parser = "src/python/pants/backend/scala/dependency_inference/scala_parser.lockfile"
+# Note: The jvm_artifact targets in this resolve must be kept in sync with with the requirements
+# in `generate_scala_parser_lockfile_request`.
+scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
 
 [scala]
-version_for_resolve = { "scala_parser" = '2.13.7' }
+version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
 [toolchain-setup]
 repo = "pants"
@@ -257,3 +270,4 @@ master = "src/python/pants/notes/master.rst"
 "2.10.x" = "src/python/pants/notes/2.10.x.md"
 "2.11.x" = "src/python/pants/notes/2.11.x.md"
 "2.12.x" = "src/python/pants/notes/2.12.x.md"
+"2.13.x" = "src/python/pants/notes/2.13.x.md"

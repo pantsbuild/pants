@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
+from typing import Mapping
 
 from pants.backend.java.dependency_inference.types import JavaSourceDependencyAnalysis
 from pants.backend.java.target_types import JavaSourceField
@@ -12,6 +14,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import symbol_mapper
+from pants.jvm.dependency_inference.artifact_mapper import MutableTrieNode
 from pants.jvm.dependency_inference.symbol_mapper import FirstPartyMappingRequest, SymbolMap
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
@@ -48,12 +51,12 @@ async def map_first_party_java_targets_to_symbols(
         source_analysis,
     )
 
-    dep_map = SymbolMap()
+    mapping: Mapping[str, MutableTrieNode] = defaultdict(MutableTrieNode)
     for (address, resolve), analysis in address_and_analysis:
         for top_level_type in analysis.top_level_types:
-            dep_map.add_symbol(top_level_type, address=address, resolve=resolve)
+            mapping[resolve].insert(top_level_type, [address], first_party=True)
 
-    return dep_map
+    return SymbolMap((resolve, node.frozen()) for resolve, node in mapping.items())
 
 
 def rules():

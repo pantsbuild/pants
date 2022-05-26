@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
+from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import (
     ScalaJunitTestsGeneratorSourcesField,
     ScalaJunitTestsGeneratorTarget,
@@ -65,20 +66,22 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
 async def find_putative_targets(
     req: PutativeScalaTargetsRequest,
     all_owned_sources: AllOwnedSources,
+    scala_subsystem: ScalaSubsystem,
 ) -> PutativeTargets:
-    all_scala_files_globs = req.search_paths.path_globs("*.scala")
-    all_scala_files = await Get(Paths, PathGlobs, all_scala_files_globs)
-    unowned_scala_files = set(all_scala_files.files) - set(all_owned_sources)
-    classified_unowned_scala_files = classify_source_files(unowned_scala_files)
-
     putative_targets = []
-    for tgt_type, paths in classified_unowned_scala_files.items():
-        for dirname, filenames in group_by_dir(paths).items():
-            putative_targets.append(
-                PutativeTarget.for_target_type(
-                    tgt_type, path=dirname, name=None, triggering_sources=sorted(filenames)
+
+    if scala_subsystem.tailor_source_targets:
+        all_scala_files_globs = req.path_globs("*.scala")
+        all_scala_files = await Get(Paths, PathGlobs, all_scala_files_globs)
+        unowned_scala_files = set(all_scala_files.files) - set(all_owned_sources)
+        classified_unowned_scala_files = classify_source_files(unowned_scala_files)
+        for tgt_type, paths in classified_unowned_scala_files.items():
+            for dirname, filenames in group_by_dir(paths).items():
+                putative_targets.append(
+                    PutativeTarget.for_target_type(
+                        tgt_type, path=dirname, name=None, triggering_sources=sorted(filenames)
+                    )
                 )
-            )
 
     return PutativeTargets(putative_targets)
 

@@ -11,7 +11,7 @@ from pants.backend.docker.lint.hadolint.rules import HadolintFieldSet, HadolintR
 from pants.backend.docker.lint.hadolint.rules import rules as hadolint_rules
 from pants.backend.docker.rules import rules as docker_rules
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.python.util_rules import pex
+from pants.core.goals import package
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
@@ -27,7 +27,7 @@ def rule_runner() -> RuleRunner:
             *docker_rules(),
             *external_tool.rules(),
             *hadolint_rules(),
-            *pex.rules(),
+            package.find_all_packageable_targets,
             *source_files.rules(),
             QueryRule(LintResults, [HadolintRequest]),
         ],
@@ -107,7 +107,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 def test_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            ".hadolint.yaml": "ignored: [DL3006, DL3011]",
+            ".hadolint.yaml": "ignored: [DL3006, DL3061, DL3011]",
             "a/Dockerfile": BAD_FILE,
             "a/BUILD": "docker_image()",
             "b/Dockerfile": BAD_FILE,

@@ -7,8 +7,9 @@ import os.path
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -43,6 +44,7 @@ class Yapf(PythonToolBase):
         "`--parallel`, will be ignored because Pants takes care of finding "
         "all the relevant files and running the formatting in parallel.",
     )
+    export = ExportToolOption()
     config = FileOption(
         "--config",
         default=None,
@@ -100,9 +102,21 @@ def setup_yapf_lockfile(
     return GeneratePythonLockfile.from_tool(yapf, use_pex=python_setup.generate_lockfiles_with_pex)
 
 
+class YapfExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+def yapf_export(_: YapfExportSentinel, yapf: Yapf) -> ExportPythonTool:
+    if not yapf.export:
+        return ExportPythonTool(resolve_name=yapf.options_scope, pex_request=None)
+    return ExportPythonTool(resolve_name=yapf.options_scope, pex_request=yapf.to_pex_request())
+
+
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, YapfLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, YapfExportSentinel),
     )

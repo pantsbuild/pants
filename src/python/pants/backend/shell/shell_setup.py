@@ -37,6 +37,16 @@ class ShellSetup(Subsystem):
         help="Infer Shell dependencies on other Shell files by analyzing `source` statements.",
         advanced=True,
     )
+    tailor = BoolOption(
+        "--tailor",
+        default=True,
+        help=softwrap(
+            """
+            If true, add `shell_sources` and `shunit2_tests` targets with
+            the `tailor` goal."""
+        ),
+        advanced=True,
+    )
 
     @memoized_method
     def executable_search_path(self, env: Environment) -> tuple[str, ...]:

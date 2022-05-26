@@ -133,9 +133,11 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
                 import "dir1/f.proto";
                 """
             ),
-            "src/protobuf/dir2/BUILD": (
-                "protobuf_sources(dependencies=['src/protobuf/dir1'], "
-                "python_source_root='src/python')"
+            "src/protobuf/dir2/BUILD": dedent(
+                """\
+                protobuf_sources(dependencies=['src/protobuf/dir1'],
+                python_source_root='src/python')
+                """
             ),
             # Test another source root.
             "tests/protobuf/test_protos/f.proto": dedent(

@@ -6,40 +6,31 @@ import json
 import os
 import pkgutil
 from dataclasses import dataclass
+from typing import Any, Iterator
 
-from pants.backend.kotlin.subsystems.kotlin import DEFAULT_KOTLIN_VERSION
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, DigestContents, Directory, FileContent
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.resolve.common import ArtifactRequirements, Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.option.global_options import ProcessCleanupOption
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
-_KOTLIN_PARSER_ARTIFACT_REQUIREMENTS = ArtifactRequirements.from_coordinates(
-    [
-        Coordinate(
-            group="org.jetbrains.kotlin",
-            artifact="kotlin-compiler",
-            version=DEFAULT_KOTLIN_VERSION,  # TODO: Make this follow the resolve?
-        ),
-        Coordinate(
-            group="org.jetbrains.kotlin",
-            artifact="kotlin-stdlib",
-            version=DEFAULT_KOTLIN_VERSION,  # TODO: Make this follow the resolve?
-        ),
-        Coordinate(
-            group="com.google.code.gson",
-            artifact="gson",
-            version="2.9.0",
-        ),
-    ]
-)
+_PARSER_KOTLIN_VERSION = "1.6.20"
+
+
+class KotlinParserToolLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = "kotlin-parser"
 
 
 @dataclass(frozen=True)
@@ -56,16 +47,86 @@ class KotlinImport:
             is_wildcard=d["isWildcard"],
         )
 
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "alias": self.alias,
+            "is_wildcard": self.is_wildcard,
+        }
+
 
 @dataclass(frozen=True)
 class KotlinSourceDependencyAnalysis:
+    package: str
     imports: frozenset[KotlinImport]
+    named_declarations: frozenset[str]
+    consumed_symbols_by_scope: FrozenDict[str, frozenset[str]]
+    scopes: frozenset[str]
+
+    def fully_qualified_consumed_symbols(self) -> Iterator[str]:
+        """Consumed symbols qualified in various ways.
+
+        This method _will_ introduce false-positives, because we will assume that the symbol could
+        have been provided by any wildcard import in scope, as well as being declared in the current
+        package.
+        """
+
+        def scope_and_parents(scope: str) -> Iterator[str]:
+            while True:
+                yield scope
+                if scope == "":
+                    break
+                scope, _, _ = scope.rpartition(".")
+
+        for consumption_scope, consumed_symbols in self.consumed_symbols_by_scope.items():
+            parent_scopes = tuple(scope_and_parents(consumption_scope))
+            for symbol in consumed_symbols:
+                symbol_rel_prefix, dot_in_symbol, symbol_rel_suffix = symbol.partition(".")
+                if not self.scopes or dot_in_symbol:
+                    # TODO: Similar to #13545: we assume that a symbol containing a dot might already
+                    # be fully qualified.
+                    yield symbol
+                for parent_scope in parent_scopes:
+                    if parent_scope in self.scopes:
+                        # A package declaration is a parent of this scope, and any of its symbols
+                        # could be in scope.
+                        yield f"{parent_scope}.{symbol}"
+
+                    for imp in self.imports if parent_scope == self.package else ():
+                        if imp.is_wildcard:
+                            # There is a wildcard import in a parent scope.
+                            yield f"{imp.name}.{symbol}"
+                        if dot_in_symbol:
+                            # If the parent scope has an import which defines the first token of the
+                            # symbol, then it might be a relative usage of an import.
+                            if imp.alias:
+                                if imp.alias == symbol_rel_prefix:
+                                    yield f"{imp.name}.{symbol_rel_suffix}"
+                            elif imp.name.endswith(f".{symbol_rel_prefix}"):
+                                yield f"{imp.name}.{symbol_rel_suffix}"
 
     @classmethod
     def from_json_dict(cls, d: dict) -> KotlinSourceDependencyAnalysis:
         return cls(
+            package=d["package"],
             imports=frozenset(KotlinImport.from_json_dict(i) for i in d["imports"]),
+            named_declarations=frozenset(d["namedDeclarations"]),
+            consumed_symbols_by_scope=FrozenDict(
+                {k: frozenset(v) for k, v in d["consumedSymbolsByScope"].items()}
+            ),
+            scopes=frozenset(d["scopes"]),
         )
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "package": self.package,
+            "imports": [imp.to_debug_json_dict() for imp in self.imports],
+            "named_declarations": list(self.named_declarations),
+            "consumed_symbols_by_scope": {
+                k: sorted(v) for k, v in self.consumed_symbols_by_scope.items()
+            },
+            "scopes": list(self.scopes),
+        }
 
 
 @dataclass(frozen=True)
@@ -85,7 +146,7 @@ async def analyze_kotlin_source_dependencies(
     # Use JDK 8 due to https://youtrack.jetbrains.com/issue/KTIJ-17192 and https://youtrack.jetbrains.com/issue/KT-37446.
     request = JdkRequest("adopt:8")
     env = await Get(JdkEnvironment, JdkRequest, request)
-    jdk = InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
+    jdk = InternalJdk.from_jdk_environment(env)
 
     if len(source_files.files) > 1:
         raise ValueError(
@@ -100,10 +161,13 @@ async def analyze_kotlin_source_dependencies(
     processorcp_relpath = "__processorcp"
     toolcp_relpath = "__toolcp"
 
+    parser_lockfile_request = await Get(
+        GenerateJvmLockfileFromTool, KotlinParserToolLockfileSentinel()
+    )
     (tool_classpath, prefixed_source_files_digest,) = await MultiGet(
         Get(
             ToolClasspath,
-            ToolClasspathRequest(artifact_requirements=_KOTLIN_PARSER_ARTIFACT_REQUIREMENTS),
+            ToolClasspathRequest(lockfile=parser_lockfile_request),
         ),
         Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
     )
@@ -174,6 +238,10 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
 
     parser_source = FileContent("KotlinParser.kt", parser_source_content)
 
+    parser_lockfile_request = await Get(
+        GenerateJvmLockfileFromTool, KotlinParserToolLockfileSentinel()
+    )
+
     tool_classpath, parser_classpath, source_digest = await MultiGet(
         Get(
             ToolClasspath,
@@ -183,8 +251,8 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
                     [
                         Coordinate(
                             group="org.jetbrains.kotlin",
-                            artifact="kotlin-compiler",
-                            version=DEFAULT_KOTLIN_VERSION,  # TODO: Pull from resolve or hard-code Kotlin version?
+                            artifact="kotlin-compiler-embeddable",
+                            version=_PARSER_KOTLIN_VERSION,  # TODO: Pull from resolve or hard-code Kotlin version?
                         ),
                     ]
                 ),
@@ -192,9 +260,7 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
         ),
         Get(
             ToolClasspath,
-            ToolClasspathRequest(
-                prefix="__parsercp", artifact_requirements=_KOTLIN_PARSER_ARTIFACT_REQUIREMENTS
-            ),
+            ToolClasspathRequest(prefix="__parsercp", lockfile=parser_lockfile_request),
         ),
         Get(Digest, CreateDigest([parser_source, Directory(dest_dir)])),
     )
@@ -237,5 +303,32 @@ async def setup_kotlin_parser_classfiles(jdk: InternalJdk) -> KotlinParserCompil
     return KotlinParserCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
+@rule
+def generate_kotlin_parser_lockfile_request(
+    _: KotlinParserToolLockfileSentinel,
+) -> GenerateJvmLockfileFromTool:
+    return GenerateJvmLockfileFromTool(
+        artifact_inputs=FrozenOrderedSet(
+            {
+                f"org.jetbrains.kotlin:kotlin-compiler:{_PARSER_KOTLIN_VERSION}",
+                f"org.jetbrains.kotlin:kotlin-stdlib:{_PARSER_KOTLIN_VERSION}",
+                "com.google.code.gson:gson:2.9.0",
+            }
+        ),
+        artifact_option_name="n/a",
+        lockfile_option_name="n/a",
+        resolve_name=KotlinParserToolLockfileSentinel.resolve_name,
+        read_lockfile_dest=DEFAULT_TOOL_LOCKFILE,
+        write_lockfile_dest="src/python/pants/backend/kotlin/dependency_inference/kotlin_parser.lock",
+        default_lockfile_resource=(
+            "pants.backend.kotlin.dependency_inference",
+            "kotlin_parser.lock",
+        ),
+    )
+
+
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(GenerateToolLockfileSentinel, KotlinParserToolLockfileSentinel),
+    )

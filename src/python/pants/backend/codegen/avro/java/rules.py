@@ -8,7 +8,11 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
-from pants.backend.codegen.avro.target_types import AvroSourceField
+from pants.backend.codegen.avro.target_types import (
+    AvroSourceField,
+    AvroSourcesGeneratorTarget,
+    AvroSourceTarget,
+)
 from pants.backend.java.target_types import JavaSourceField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -39,6 +43,7 @@ from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
@@ -147,6 +152,7 @@ async def compile_avro_source(
             input_digest=(
                 overridden_input_digest if overridden_input_digest is not None else input_digest
             ),
+            extra_jvm_options=avro_tools.jvm_options,
             extra_immutable_input_digests=extra_immutable_input_digests,
             extra_nailgun_keys=extra_immutable_input_digests,
             description="Generating Java sources from Avro source.",
@@ -218,4 +224,8 @@ def rules():
         *jdk_rules.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromAvroRequest),
         UnionRule(GenerateToolLockfileSentinel, AvroToolLockfileSentinel),
+        AvroSourceTarget.register_plugin_field(PrefixedJvmJdkField),
+        AvroSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
+        AvroSourceTarget.register_plugin_field(PrefixedJvmResolveField),
+        AvroSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
     )

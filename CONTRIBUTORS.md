@@ -25,6 +25,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Brian Wickman
 + Bruno Bieth
 + Caitie McCaffrey
++ Caleb Lloyd
 + Caspar Krieger
 + Chris Aniszczyk
 + Chris Borckholder
@@ -56,8 +57,10 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + David Taylor
 + David Turner
 + Derek Young
++ Dimitrios Bariamis
 + Divij Rajkumar
 + Dominic Hamon
++ Doron Somech
 + Dorothy Ordogh
 + Drew Rothstein
 + Dumitru Daniliuc
@@ -130,6 +133,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Justin Trobec
 + Karin Lundberg
 + Kaushik Srenevasan
++ Ken Howard
 + Ken Kawamoto
 + Kevin Oliver
 + Kevin Sweeney
@@ -255,5 +259,6 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + billybecker
 + eugene yokota
 + hephex
++ twunderlich-grapl
 + wimax-grapl
 + Ólafur Páll Geirsson

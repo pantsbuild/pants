@@ -184,6 +184,74 @@ K8S_POD_FILE = dedent(
   """
 )
 
+K8S_CRD_FILE = dedent(
+    """\
+  apiVersion: apiextensions.k8s.io/v1
+  kind: CustomResourceDefinition
+  metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: myplatforms.contoso.com
+  spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: contoso.com
+  names:
+    # plural name to be used in the URL: /apis/<group>/<version>/<plural>
+    plural: myplatforms
+    # singular name to be used as an alias on the CLI and for display
+    singular: myplatform
+    # kind is normally the CamelCased singular type. Your resource manifests use this.
+    kind: MyPlatform
+    # shortNames allow shorter string to match your resource on the CLI
+    shortNames:
+    - myp
+  # either Namespaced or Cluster
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      # Each version can be enabled/disabled by Served flag.
+      served: true
+      # One and only one version must be marked as the storage version.
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                appId:
+                  type: string
+                language:
+                  type: string
+                  enum:
+                  - csharp
+                  - python
+                  - go
+                os:
+                  type: string
+                  enum:
+                  - windows
+                  - linux
+                instanceSize:
+                  type: string
+                  enum:
+                    - small
+                    - medium
+                    - large
+                environmentType:
+                  type: string
+                  enum:
+                  - dev
+                  - test
+                  - prod
+                replicas:
+                  type: integer
+                  minimum: 1
+              required: ["appId", "language", "environmentType"]
+          required: ["spec"]
+  """
+)
+
 HELM_TEMPLATE_HELPERS_FILE = dedent(
     """\
   {{- define "fullname" -}}

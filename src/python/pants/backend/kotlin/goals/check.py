@@ -28,7 +28,7 @@ class KotlincCheckRequest(CheckRequest):
 
 
 @rule(desc="Check compilation for Kotlin", level=LogLevel.DEBUG)
-async def scalac_check(
+async def kotlinc_check(
     request: KotlincCheckRequest,
     classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> CheckResults:

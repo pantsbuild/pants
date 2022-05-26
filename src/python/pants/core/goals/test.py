@@ -39,6 +39,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
+    parse_shard_spec,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption, EnumOption, StrListOption, StrOption
@@ -204,7 +205,7 @@ _CD = TypeVar("_CD", bound=CoverageData)
 
 @union
 class CoverageDataCollection(Collection[_CD]):
-    element_type: ClassVar[type[_CD]]
+    element_type: ClassVar[type[_CD]]  # type: ignore[misc]
 
 
 @dataclass(frozen=True)
@@ -345,23 +346,6 @@ class TestSubsystem(GoalSubsystem):
         advanced=True,
         help="Path to write test reports to. Must be relative to the build root.",
     )
-    xml_dir = StrOption(
-        "--xml-dir",
-        metavar="<DIR>",
-        removal_version="2.13.0.dev0",
-        removal_hint=(
-            "Set the `report` option in [test] scope to emit reports to a standard location under "
-            "dist/. Set the `report-dir` option to customize that location."
-        ),
-        default=None,
-        advanced=True,
-        help=softwrap(
-            """
-            Specifying a directory causes Junit XML result files to be emitted under
-            that dir for each test run that supports producing them.
-            """
-        ),
-    )
     extra_env_vars = StrListOption(
         "--extra-env-vars",
         help=softwrap(
@@ -369,6 +353,27 @@ class TestSubsystem(GoalSubsystem):
             Additional environment variables to include in test processes.
             Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
             `ENV_VAR` to copy the value of a variable in Pants's own environment.
+            """
+        ),
+    )
+    shard = StrOption(
+        "--shard",
+        default="",
+        help=softwrap(
+            """
+            A shard specification of the form "k/N", where N is a positive integer and k is a
+            non-negative integer less than N.
+
+            If set, the request input targets will be deterministically partitioned into N disjoint
+            subsets of roughly equal size, and only the k'th subset will be used, with all others
+            discarded.
+
+            Useful for splitting large numbers of test files across multiple machines in CI.
+            For example, you can run three shards with --shard=0/3, --shard=1/3, --shard=2/3.
+
+            Note that the shards are roughly equal in size as measured by number of files.
+            No attempt is made to consider the size of different files, the time they have
+            taken to run in the past, or other such sophisticated measures.
             """
         ),
     )
@@ -417,12 +422,15 @@ async def run_tests(
                 exit_code = debug_result.exit_code
         return Test(exit_code)
 
+    shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
             goal_description=f"the `{test_subsystem.name}` goal",
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
+            shard=shard,
+            num_shards=num_shards,
         ),
     )
     results = await MultiGet(
@@ -448,10 +456,8 @@ async def run_tests(
                 path_prefix=str(distdir.relpath / "test" / result.address.path_safe_spec),
             )
 
-    if test_subsystem.report or test_subsystem.xml_dir:
-        report_dir = (
-            test_subsystem.report_dir(distdir) if test_subsystem.report else test_subsystem.xml_dir
-        )
+    if test_subsystem.report:
+        report_dir = test_subsystem.report_dir(distdir)
         merged_reports = await Get(
             Digest,
             MergeDigests(result.xml_results.digest for result in results if result.xml_results),

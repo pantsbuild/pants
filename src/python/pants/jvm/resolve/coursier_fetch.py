@@ -341,19 +341,29 @@ async def prepare_coursier_resolve_info(
         excludes_digest = await Get(Digest, CreateDigest([excludes_file_content]))
         extra_args += ["--local-exclude-file", LOCAL_EXCLUDE_FILE]
 
-    jar_files = await Get(SourceFiles, SourceFilesRequest(i[1] for i in jars))
-    jar_file_paths = jar_files.snapshot.files
+    jar_file_sources = await MultiGet(
+        Get(SourceFiles, SourceFilesRequest([jar_source_field])) for _, jar_source_field in jars
+    )
+    jar_file_paths = [jar_file_source.snapshot.files[0] for jar_file_source in jar_file_sources]
 
     resolvable_jar_requirements = [
         dataclasses.replace(
             req, jar=None, url=f"file:{Coursier.working_directory_placeholder}/{path}"
         )
-        for req, path in zip((i[0] for i in jars), jar_file_paths)
+        for (req, _), path in zip(jars, jar_file_paths)
     ]
 
     to_resolve = chain(no_jars, resolvable_jar_requirements)
 
-    digest = await Get(Digest, MergeDigests([jar_files.snapshot.digest, excludes_digest]))
+    digest = await Get(
+        Digest,
+        MergeDigests(
+            [
+                *(jar_file_source.snapshot.digest for jar_file_source in jar_file_sources),
+                excludes_digest,
+            ]
+        ),
+    )
 
     return CoursierResolveInfo(
         coord_arg_strings=frozenset(req.to_coord_arg_str() for req in to_resolve),
@@ -626,7 +636,7 @@ async def select_coursier_resolve_for_targets(
     resolve is required for multiple roots (such as when running a `repl` over unrelated code), and
     in that case there might be multiple CoarsenedTargets.
     """
-    targets = [t for ct in coarsened_targets.closure() for t in ct.members]
+    targets = list(coarsened_targets.closure())
 
     # Find a single resolve that is compatible with all targets in the closure.
     compatible_resolve: str | None = None
@@ -640,11 +650,11 @@ async def select_coursier_resolve_for_targets(
         elif resolve != compatible_resolve:
             all_compatible = False
 
-    if not compatible_resolve or not all_compatible:
+    if not all_compatible:
         raise NoCompatibleResolve(
             jvm, "The selected targets did not have a resolve in common", targets
         )
-    resolve = compatible_resolve
+    resolve = compatible_resolve or jvm.default_resolve
 
     # Load the resolve.
     resolve_path = jvm.resolves[resolve]
@@ -725,16 +735,16 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
         lockfile_req = request.lockfile
         assert lockfile_req is not None
         regen_command = f"`{GenerateLockfilesSubsystem.name} --resolve={lockfile_req.resolve_name}`"
-        if lockfile_req.lockfile_dest == DEFAULT_TOOL_LOCKFILE:
+        if lockfile_req.read_lockfile_dest == DEFAULT_TOOL_LOCKFILE:
             lockfile_bytes = importlib.resources.read_binary(
                 *lockfile_req.default_lockfile_resource
             )
             resolution = CoursierResolvedLockfile.from_serialized(lockfile_bytes)
         else:
-            lockfile_snapshot = await Get(Snapshot, PathGlobs([lockfile_req.lockfile_dest]))
+            lockfile_snapshot = await Get(Snapshot, PathGlobs([lockfile_req.read_lockfile_dest]))
             if not lockfile_snapshot.files:
                 raise ValueError(
-                    f"No lockfile found at {lockfile_req.lockfile_dest}, which is configured "
+                    f"No lockfile found at {lockfile_req.read_lockfile_dest}, which is configured "
                     f"by the option {lockfile_req.lockfile_option_name}."
                     f"Run {regen_command} to generate it."
                 )
@@ -743,7 +753,7 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
                 CoursierResolvedLockfile,
                 CoursierResolveKey(
                     name=lockfile_req.resolve_name,
-                    path=lockfile_req.lockfile_dest,
+                    path=lockfile_req.read_lockfile_dest,
                     digest=lockfile_snapshot.digest,
                 ),
             )
@@ -759,7 +769,7 @@ async def materialize_classpath_for_tool(request: ToolClasspathRequest) -> ToolC
             lockfile_inputs, LockfileContext.TOOL
         ):
             raise ValueError(
-                f"The lockfile {lockfile_req.lockfile_dest} (configured by the option "
+                f"The lockfile {lockfile_req.read_lockfile_dest} (configured by the option "
                 f"{lockfile_req.lockfile_option_name}) was generated with different requirements "
                 f"than are currently set via {lockfile_req.artifact_option_name}. Run "
                 f"{regen_command} to regenerate the lockfile."

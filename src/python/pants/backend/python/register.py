@@ -89,7 +89,7 @@ def rules():
 
 
 def target_types():
-    return [
+    return (
         PexBinary,
         PexBinariesGeneratorTarget,
         PythonDistribution,
@@ -104,4 +104,4 @@ def target_types():
         PipenvRequirementsTargetGenerator,
         PoetryRequirementsTargetGenerator,
         PythonRequirementsTargetGenerator,
-    ]
+    )

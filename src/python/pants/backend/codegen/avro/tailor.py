@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.avro.avro_subsystem import AvroSubsystem
 from pants.backend.codegen.avro.target_types import AvroSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -14,7 +15,7 @@ from pants.core.goals.tailor import (
     group_by_dir,
 )
 from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -27,18 +28,15 @@ class PutativeAvroTargetsRequest(PutativeTargetsRequest):
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Protobuf targets to create")
 async def find_putative_targets(
-    req: PutativeAvroTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeAvroTargetsRequest,
+    all_owned_sources: AllOwnedSources,
+    avro_subsystem: AvroSubsystem,
 ) -> PutativeTargets:
-    all_avsc_files, all_avpr_files, all_avdl_files = await MultiGet(
-        Get(Paths, PathGlobs, req.search_paths.path_globs("*.avsc")),
-        Get(Paths, PathGlobs, req.search_paths.path_globs("*.avpr")),
-        Get(Paths, PathGlobs, req.search_paths.path_globs("*.avdl")),
-    )
-    unowned_avro_files = {
-        *all_avsc_files.files,
-        *all_avpr_files.files,
-        *all_avdl_files.files,
-    } - set(all_owned_sources)
+    if not avro_subsystem.tailor:
+        return PutativeTargets()
+
+    all_avro_files = await Get(Paths, PathGlobs, req.path_globs("*.avsc", "*.avpr", "*.avdl"))
+    unowned_avro_files = set(all_avro_files.files) - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(
             AvroSourcesGeneratorTarget,

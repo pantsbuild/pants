@@ -1,10 +1,12 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import itertools
 import logging
 from itertools import chain
 
 from pants.core.target_types import ResourcesFieldSet, ResourcesGeneratorFieldSet
+from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.core.util_rules.system_binaries import ZipBinary
@@ -14,6 +16,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import SourcesField
 from pants.engine.unions import UnionRule
+from pants.jvm import compile
 from pants.jvm.compile import (
     ClasspathDependenciesRequest,
     ClasspathEntry,
@@ -23,6 +26,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,7 @@ class JvmResourcesRequest(ClasspathEntryRequest):
     )
 
 
-@rule(desc="Fetch with coursier")
+@rule(desc="Assemble resources")
 async def assemble_resources_jar(
     zip: ZipBinary,
     request: JvmResourcesRequest,
@@ -66,7 +70,7 @@ async def assemble_resources_jar(
         SourceFilesRequest([tgt.get(SourcesField) for tgt in request.component.members]),
     )
 
-    output_filename = f"{request.component.representative.address.path_safe_spec}.jar"
+    output_filename = f"{request.component.representative.address.path_safe_spec}.resources.jar"
     output_files = [output_filename]
 
     resources_jar_input_digest = source_files.snapshot.digest
@@ -78,9 +82,10 @@ async def assemble_resources_jar(
                 output_filename,
                 *source_files.snapshot.files,
             ],
-            description="Build partial JAR containing resources files",
+            description="Build resources JAR for {request.component}",
             input_digest=resources_jar_input_digest,
             output_files=output_files,
+            level=LogLevel.DEBUG,
         ),
     )
 
@@ -101,5 +106,7 @@ async def assemble_resources_jar(
 def rules():
     return [
         *collect_rules(),
+        *compile.rules(),
+        *stripped_source_files.rules(),
         UnionRule(ClasspathEntryRequest, JvmResourcesRequest),
     ]

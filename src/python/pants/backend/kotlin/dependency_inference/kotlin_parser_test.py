@@ -22,6 +22,7 @@ from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.resolve import jvm_tool
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -77,6 +78,15 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
 
             import java.io.File
 
+            open class Foo {
+              fun grok() {
+                val x = X()
+                val y = Y()
+              }
+            }
+
+            class Bar {}
+
             fun main(args: Array<String>) {
             }
             """
@@ -84,3 +94,29 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     )
 
     assert analysis.imports == {KotlinImport(name="java.io.File", alias=None, is_wildcard=False)}
+    assert analysis.named_declarations == {
+        "org.pantsbuild.backend.kotlin.Bar",
+        "org.pantsbuild.backend.kotlin.Foo",
+        "org.pantsbuild.backend.kotlin.main",
+    }
+    assert analysis.consumed_symbols_by_scope == FrozenDict(
+        {
+            "org.pantsbuild.backend.kotlin.Foo": frozenset(
+                {
+                    "X",
+                    "Y",
+                }
+            ),
+            "org.pantsbuild.backend.kotlin": frozenset(
+                {
+                    "Array",
+                    "String",
+                }
+            ),
+        }
+    )
+    assert analysis.scopes == {
+        "org.pantsbuild.backend.kotlin",
+        "org.pantsbuild.backend.kotlin.Foo",
+        "org.pantsbuild.backend.kotlin.Bar",
+    }

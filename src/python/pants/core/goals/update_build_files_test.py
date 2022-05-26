@@ -29,6 +29,7 @@ from pants.core.goals.update_build_files import (
     maybe_rename_deprecated_targets,
     update_build_files,
 )
+from pants.core.target_types import GenericTarget
 from pants.core.util_rules import config_files
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import RegisteredTargetTypes, StringField, Target, TargetGenerator
@@ -52,7 +53,7 @@ class MockRewriteReverseLines(RewrittenBuildFileRequest):
 @rule
 def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
     return RewrittenBuildFile(
-        request.path, (*request.lines, "added line"), change_descriptions=("Add a new line",)
+        request.path, (*request.lines, "# added line"), change_descriptions=("Add a new line",)
     )
 
 
@@ -79,8 +80,8 @@ def generic_goal_rule_runner() -> RuleRunner:
 
 def test_goal_rewrite_mode(generic_goal_rule_runner: RuleRunner) -> None:
     """Checks that we correctly write the changes and pipe fixers to each other."""
-    generic_goal_rule_runner.write_files({"BUILD": "line\n", "dir/BUILD": "line 1\nline 2\n"})
-    result = generic_goal_rule_runner.run_goal_rule(UpdateBuildFilesGoal)
+    generic_goal_rule_runner.write_files({"BUILD": "# line\n", "dir/BUILD": "# line 1\n# line 2\n"})
+    result = generic_goal_rule_runner.run_goal_rule(UpdateBuildFilesGoal, args=["::"])
     assert result.exit_code == 0
     assert result.stdout == dedent(
         """\
@@ -92,18 +93,22 @@ def test_goal_rewrite_mode(generic_goal_rule_runner: RuleRunner) -> None:
           - Reverse lines
         """
     )
-    assert Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "added line\nline\n"
+    assert (
+        Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "# added line\n# line\n"
+    )
     assert (
         Path(generic_goal_rule_runner.build_root, "dir/BUILD").read_text()
-        == "added line\nline 2\nline 1\n"
+        == "# added line\n# line 2\n# line 1\n"
     )
 
 
 def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
     """Checks that we correctly set the exit code and pipe fixers to each other."""
-    generic_goal_rule_runner.write_files({"BUILD": "line\n", "dir/BUILD": "line 1\nline 2\n"})
+    generic_goal_rule_runner.write_files({"BUILD": "# line\n", "dir/BUILD": "# line 1\n# line 2\n"})
     result = generic_goal_rule_runner.run_goal_rule(
-        UpdateBuildFilesGoal, global_args=["--pants-bin-name=./custom_pants"], args=["--check"]
+        UpdateBuildFilesGoal,
+        global_args=["--pants-bin-name=./custom_pants"],
+        args=["--check", "::"],
     )
     assert result.exit_code == 1
     assert result.stdout == dedent(
@@ -118,8 +123,10 @@ def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
         To fix `update-build-files` failures, run `./custom_pants update-build-files`.
         """
     )
-    assert Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "line\n"
-    assert Path(generic_goal_rule_runner.build_root, "dir/BUILD").read_text() == "line 1\nline 2\n"
+    assert Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "# line\n"
+    assert (
+        Path(generic_goal_rule_runner.build_root, "dir/BUILD").read_text() == "# line 1\n# line 2\n"
+    )
 
 
 # ------------------------------------------------------------------------------------------
@@ -141,13 +148,16 @@ def black_rule_runner() -> RuleRunner:
             SubsystemRule(Black),
             SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
-        )
+        ),
+        target_types=[GenericTarget],
     )
 
 
 def test_black_fixer_fixes(black_rule_runner: RuleRunner) -> None:
-    black_rule_runner.write_files({"BUILD": "tgt( name =  't' )"})
-    result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+    black_rule_runner.write_files({"BUILD": "target( name =  't' )"})
+    result = black_rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal, args=["::"], env_inherit=BLACK_ENV_INHERIT
+    )
     assert result.exit_code == 0
     assert result.stdout == dedent(
         """\
@@ -155,37 +165,42 @@ def test_black_fixer_fixes(black_rule_runner: RuleRunner) -> None:
           - Format with Black
         """
     )
-    assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
+    assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'target(name="t")\n'
 
 
 def test_black_fixer_noops(black_rule_runner: RuleRunner) -> None:
-    black_rule_runner.write_files({"BUILD": 'tgt(name="t")\n'})
-    result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+    black_rule_runner.write_files({"BUILD": 'target(name="t")\n'})
+    result = black_rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal, args=["::"], env_inherit=BLACK_ENV_INHERIT
+    )
     assert result.exit_code == 0
-    assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
+    assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'target(name="t")\n'
 
 
 def test_black_fixer_args(black_rule_runner: RuleRunner) -> None:
-    black_rule_runner.write_files({"BUILD": "tgt(name='t')\n"})
+    black_rule_runner.write_files({"BUILD": "target(name='t')\n"})
     result = black_rule_runner.run_goal_rule(
         UpdateBuildFilesGoal,
         global_args=["--black-args='--skip-string-normalization'"],
+        args=["::"],
         env_inherit=BLACK_ENV_INHERIT,
     )
     assert result.exit_code == 0
-    assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
+    assert Path(black_rule_runner.build_root, "BUILD").read_text() == "target(name='t')\n"
 
 
 def test_black_config(black_rule_runner: RuleRunner) -> None:
     black_rule_runner.write_files(
         {
             "pyproject.toml": "[tool.black]\nskip-string-normalization = 'true'\n",
-            "BUILD": "tgt(name='t')\n",
+            "BUILD": "target(name='t')\n",
         },
     )
-    result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+    result = black_rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal, args=["::"], env_inherit=BLACK_ENV_INHERIT
+    )
     assert result.exit_code == 0
-    assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
+    assert Path(black_rule_runner.build_root, "BUILD").read_text() == "target(name='t')\n"
 
 
 # ------------------------------------------------------------------------------------------
@@ -206,12 +221,13 @@ def run_yapf(
             SubsystemRule(Yapf),
             SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
-        )
+        ),
+        target_types=[GenericTarget],
     )
     rule_runner.write_files({"BUILD": build_content})
     goal_result = rule_runner.run_goal_rule(
         UpdateBuildFilesGoal,
-        args=["--update-build-files-formatter=yapf"],
+        args=["--update-build-files-formatter=yapf", "::"],
         global_args=extra_args or (),
         env_inherit=BLACK_ENV_INHERIT,
     )
@@ -220,7 +236,7 @@ def run_yapf(
 
 
 def test_yapf_fixer_fixes() -> None:
-    result, build = run_yapf("tgt( name =  't' )")
+    result, build = run_yapf("target( name =  't' )")
     assert result.exit_code == 0
     assert result.stdout == dedent(
         """\
@@ -228,14 +244,14 @@ def test_yapf_fixer_fixes() -> None:
           - Format with Yapf
         """
     )
-    assert build == "tgt(name='t')\n"
+    assert build == "target(name='t')\n"
 
 
 def test_yapf_fixer_noops() -> None:
-    result, build = run_yapf('tgt(name="t")\n')
+    result, build = run_yapf('target(name="t")\n')
     assert result.exit_code == 0
     assert not result.stdout
-    assert build == 'tgt(name="t")\n'
+    assert build == 'target(name="t")\n'
 
 
 # ------------------------------------------------------------------------------------------

@@ -57,21 +57,23 @@ class JvmResolveField(StringField, AsyncFieldMixin):
         return resolve
 
 
-class PrefixedJvmResolveField(JvmResolveField):
-    alias = "jvm_resolve"
-
-
 class JvmJdkField(StringField):
     alias = "jdk"
     required = False
-    help = (
-        "The major version of the JDK that this target should be built with. If not defined, "
-        "will default to `[jvm].default_source_jdk`."
+    help = softwrap(
+        """
+        The major version of the JDK that this target should be built with. If not defined,
+        will default to `[jvm].default_source_jdk`.
+        """
     )
 
 
 class PrefixedJvmJdkField(JvmJdkField):
     alias = "jvm_jdk"
+
+
+class PrefixedJvmResolveField(JvmResolveField):
+    alias = "jvm_resolve"
 
 
 # -----------------------------------------------------------------------------------------------
@@ -306,9 +308,11 @@ class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
 class JvmMainClassNameField(StringField):
     alias = "main"
     required = True
-    help = (
-        "`.`-separated name of the JVM class containing the `main()` method to be called when "
-        "executing this JAR."
+    help = softwrap(
+        """
+        `.`-separated name of the JVM class containing the `main()` method to be called when
+        executing this JAR.
+        """
     )
 
 
@@ -350,9 +354,11 @@ class JvmWarDescriptorAddressField(SingleSourceField):
 
 class JvmWarContentField(SpecialCasedDependencies):
     alias = "content"
-    help = (
-        "A list of addresses to `resources` and `files` targets with content to place in the "
-        "document root of this WAR file."
+    help = softwrap(
+        """
+        A list of addresses to `resources` and `files` targets with content to place in the
+        document root of this WAR file.
+        """
     )
 
 
@@ -366,7 +372,9 @@ class JvmWarTarget(Target):
         JvmWarDescriptorAddressField,
         OutputPathField,
     )
-    help = (
-        'A JSR 154 "web application archive" (or "war") with first-party and third-party code bundled for '
-        "deploys in Java Servlet containers."
+    help = softwrap(
+        """
+        A JSR 154 "web application archive" (or "war") with first-party and third-party code bundled for
+        deploys in Java Servlet containers.
+        """
     )

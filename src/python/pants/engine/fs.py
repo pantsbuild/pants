@@ -249,14 +249,12 @@ class Workspace(SideEffecting):
 
 
 @dataclass(frozen=True)
-class SpecsSnapshot:
+class SpecsPaths(Paths):
     """All files matched by command line specs.
 
     `@goal_rule`s may request this when they only need source files to operate and do not need any
     target information. This allows running on files with no owning targets.
     """
-
-    snapshot: Snapshot
 
 
 @dataclass(frozen=True)

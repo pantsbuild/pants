@@ -15,7 +15,7 @@ from pylsp_jsonrpc.exceptions import (  # type: ignore[import]
 from pylsp_jsonrpc.streams import JsonRpcStreamReader, JsonRpcStreamWriter  # type: ignore[import]
 
 from pants.bsp.context import BSPContext
-from pants.bsp.spec.task import BSPNotification
+from pants.bsp.spec.notification import BSPNotification
 from pants.engine.fs import Workspace
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
@@ -148,6 +148,10 @@ class BSPConnection:
             request = method_mapping.request_type.from_json_dict(params)
         except Exception:
             return _make_error_future(JsonRpcInvalidRequest())
+
+        # TODO: This should not be necessary: see https://github.com/pantsbuild/pants/issues/15435.
+        self._scheduler_session.new_run_id()
+
         workspace = Workspace(self._scheduler_session)
         params = Params(request, workspace)
         execution_request = self._scheduler_session.execution_request(

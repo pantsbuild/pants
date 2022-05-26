@@ -49,32 +49,27 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "758d257069757e96e4931cc34941afe991b788434dee2af024e2457d5f4de0dd",
-              "url": "https://files.pythonhosted.org/packages/f7/f8/f267be1887c212f585986cecbf4bb7c7d75138c5ad8516ad4c2885458b13/pex-2.1.79-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "5c8aa87ff4592f57667cf53a355b647f5f33ae41b944f39eb067ec0c3acf850f",
-              "url": "https://files.pythonhosted.org/packages/67/6f/ec1a1898b64eb1778218547792fa91e138a7a460d89adc7d3d8e01e8a942/pex-2.1.79.tar.gz"
+              "hash": "a1c00bb8ca43a44a76ed2b3c6b9acfd2804630d704c788e41474843d6250fb83",
+              "url": "https://files.pythonhosted.org/packages/b6/3b/95bfd873b10b15fb5ea5bcdad444803d4af4d2e3c967ab47d8adbd5c7730/pex-2.1.90-py2.py3-none-any.whl"
             }
           ],
           "project_name": "pex",
           "requires_dists": [
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.11,>=2.7",
-          "version": "2.1.79"
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.12,>=2.7",
+          "version": "2.1.90"
         }
       ],
       "platform_tag": [
-        "cp310",
-        "cp310",
+        "cp37",
+        "cp37m",
         "manylinux_2_35_x86_64"
       ]
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.79",
+  "pex_version": "2.1.90",
   "prefer_older_binary": false,
   "requirements": [
     "lambdex==0.1.6"

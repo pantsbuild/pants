@@ -81,7 +81,7 @@ async def generate_from_pipenv_requirement(
     }
 
     file_tgt = TargetGeneratorSourcesHelperTarget(
-        {TargetGeneratorSourcesHelperSourcesField.alias: [lock_rel_path]},
+        {TargetGeneratorSourcesHelperSourcesField.alias: lock_rel_path},
         Address(
             request.template_address.spec_path,
             target_name=request.template_address.target_name,

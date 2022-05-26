@@ -12,7 +12,6 @@ memory_summary = true
 
 [test]
 use_coverage = true
-xml_dir = "dist/test-results/"
 
 [pytest]
 args = ["--no-header", "--noskip", "-vv"]
@@ -35,6 +34,8 @@ restricted_token_matches =  """{
 
 [buildsense]
 enable = true
+collect_platform_data = true
+log_final_upload_latency = true
 
 [subprocess-environment]
 env_vars.add = [

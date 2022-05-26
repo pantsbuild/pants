@@ -45,6 +45,7 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     NestedDictStringToStringField,
+    OptionalSingleSourceField,
     OverridesField,
     ScalarField,
     SecondaryOwnerMixin,
@@ -59,6 +60,7 @@ from pants.engine.target import (
     TriBoolField,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
@@ -776,7 +778,6 @@ class SkipPythonTestsField(BoolField):
 
 
 _PYTHON_TEST_MOVED_FIELDS = (
-    *COMMON_TARGET_FIELDS,
     PythonTestsDependenciesField,
     PythonResolveField,
     PythonTestsTimeoutField,
@@ -789,7 +790,12 @@ _PYTHON_TEST_MOVED_FIELDS = (
 
 class PythonTestTarget(Target):
     alias = "python_test"
-    core_fields = (*_PYTHON_TEST_MOVED_FIELDS, PythonTestsDependenciesField, PythonTestSourceField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        *_PYTHON_TEST_MOVED_FIELDS,
+        PythonTestsDependenciesField,
+        PythonTestSourceField,
+    )
     help = softwrap(
         f"""
         A single Python test file, written in either Pytest style or unittest style.
@@ -806,6 +812,9 @@ class PythonTestTarget(Target):
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
     expected_file_extensions = (".py", "")  # Note that this does not include `.pyi`.
     default = ("test_*.py", "*_test.py", "tests.py")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['test_*.py', '*_test.py', 'tests.py']`"
+    )
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
@@ -826,21 +835,25 @@ class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
 class PythonTestsOverrideField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         PythonTestTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo_test.py": {"timeout": 120]},\n'
-            '  "bar_test.py": {"timeout": 200]},\n'
-            '  ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo_test.py": {"timeout": 120]},
+            "bar_test.py": {"timeout": 200]},
+            ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},
+        }
+        """,
     )
 
 
 class PythonTestsGeneratorTarget(TargetFilesGenerator):
     alias = "python_tests"
-    core_fields = (PythonTestsGeneratingSourcesField, PythonTestsOverrideField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PythonTestsGeneratingSourcesField,
+        PythonTestsOverrideField,
+    )
     generated_target_cls = PythonTestTarget
-    copied_fields = ()
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = _PYTHON_TEST_MOVED_FIELDS
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = "Generate a `python_test` target for each file in the `sources` field."
@@ -866,18 +879,21 @@ class PythonSourceTarget(Target):
 class PythonSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         PythonSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo.py": {"skip_pylint": True]},\n'
-            '  "bar.py": {"skip_flake8": True]},\n'
-            '  ("foo.py", "bar.py"): {"tags": ["linter_disabled"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo.py": {"skip_pylint": True]},
+            "bar.py": {"skip_flake8": True]},
+            ("foo.py", "bar.py"): {"tags": ["linter_disabled"]},
+        }"
+        """,
     )
 
 
 class PythonTestUtilsGeneratingSourcesField(PythonGeneratingSourcesBase):
     default = ("conftest.py", "test_*.pyi", "*_test.pyi", "tests.pyi")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['conftest.py', 'test_*.pyi', '*_test.pyi', 'tests.pyi']`"
+    )
 
 
 class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
@@ -885,6 +901,9 @@ class PythonSourcesGeneratingSourcesField(PythonGeneratingSourcesBase):
         ("*.py", "*.pyi")
         + tuple(f"!{pat}" for pat in PythonTestsGeneratingSourcesField.default)
         + tuple(f"!{pat}" for pat in PythonTestUtilsGeneratingSourcesField.default)
+    )
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.py', 'new_*.py', '!old_ignore.py']`"
     )
 
 
@@ -1294,6 +1313,19 @@ class SDistConfigSettingsField(ConfigSettingsField):
     help = "PEP-517 config settings to pass to the build backend when building an sdist."
 
 
+class BuildBackendEnvVarsField(StringSequenceField):
+    alias = "env_vars"
+    required = False
+    help = softwrap(
+        """
+        Environment variables to set when running the PEP-517 build backend.
+
+        Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+        or just `ENV_VAR` to copy the value from Pants's own environment.
+        """
+    )
+
+
 class GenerateSetupField(TriBoolField):
     alias = "generate_setup"
     required = False
@@ -1332,6 +1364,7 @@ class PythonDistribution(Target):
     alias = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        InterpreterConstraintsField,
         PythonDistributionDependenciesField,
         PythonDistributionEntryPointsField,
         PythonProvidesField,
@@ -1340,6 +1373,7 @@ class PythonDistribution(Target):
         SDistField,
         WheelConfigSettingsField,
         SDistConfigSettingsField,
+        BuildBackendEnvVarsField,
         LongDescriptionPathField,
     )
     help = softwrap(
@@ -1347,5 +1381,92 @@ class PythonDistribution(Target):
         A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
         See {doc_url('python-distributions')}.
+        """
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `vcs_version` target
+# -----------------------------------------------------------------------------------------------
+
+# The vcs_version target is defined and registered here in the python backend because the VCS
+# version functionality uses a lot of python machinery in its implementation, and because it is
+# (at least at the time of writing) highly unlikely to be used outside a python context in practice.
+# However, hypothetically, the source file generated by a vcs_version target can be in any language.
+# Therefore any language-specific fields (such as python_resolve) are registered as plugin fields
+# instead of provided directly here, even though the only language in question is python.
+
+
+class VCSVersionDummySourceField(OptionalSingleSourceField):
+    """A dummy SourceField for participation in the codegen machinery."""
+
+    alias = "_dummy_source"  # Leading underscore omits the field from help.
+    help = "A version string generated from VCS information"
+
+
+class VersionTagRegexField(StringField):
+    default = r"^(?:[\w-]+-)?(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$"
+    alias = "tag_regex"
+    help = softwrap(
+        """
+        A Python regex string to extract the version string from a VCS tag.
+
+        The regex needs to contain either a single match group, or a group named version,
+        that captures the actual version information.
+
+        Note that this is unrelated to the tags field and Pants's own tags concept.
+
+        See https://github.com/pypa/setuptools_scm for implementation details.
+        """
+    )
+
+
+class VersionGenerateToField(StringField):
+    required = True
+    alias = "generate_to"
+    help = softwrap(
+        """
+        Generate the version data to this relative path, using the template field.
+
+        Note that the generated output will not be written to disk in the source tree, but
+        will be available as a generated dependency to code that depends on this target.
+        """
+    )
+
+
+class VersionTemplateField(StringField):
+    required = True
+    alias = "template"
+    help = softwrap(
+        """
+        Generate the version data using this format string, which takes a version format kwarg.
+
+        E.g., 'version = "{version}"'
+        """
+    )
+
+
+class VCSVersion(Target):
+    alias = "vcs_version"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        VersionTagRegexField,
+        VCSVersionDummySourceField,
+        VersionGenerateToField,
+        VersionTemplateField,
+    )
+    help = softwrap(
+        f"""
+        Generates a version string from VCS state.
+
+        Uses a constrained but useful subset of the full functionality of setuptools_scm
+        (https://github.com/pypa/setuptools_scm). These constraints avoid pitfalls in the
+        interaction of setuptools_scm with Pants's hermetic environments.
+
+        In particular, we ignore any existing setuptools_scm config. Instead you must provide
+        a subset of that config in this target's fields.
+
+        If you need functionality that is not currently exposed here, please reach out to us at
+        {doc_url("getting-help")}.
         """
     )

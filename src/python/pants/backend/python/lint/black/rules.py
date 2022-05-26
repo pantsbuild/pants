@@ -14,9 +14,8 @@ from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
-from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -49,20 +48,24 @@ async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSet
     # when relevant. We only do this if if <3.8 can't be used, as we don't want a loose requirement
     # like `>=3.6` to result in requiring Python 3.8, which would error if 3.8 is not installed on
     # the machine.
-    all_interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-        (field_set.interpreter_constraints for field_set in request.field_sets),
-        python_setup,
-    )
-    tool_interpreter_constraints = (
-        all_interpreter_constraints
-        if (
-            black.options.is_default("interpreter_constraints")
-            and all_interpreter_constraints.requires_python38_or_newer(
-                python_setup.interpreter_universe
+    tool_interpreter_constraints = black.interpreter_constraints
+    if black.options.is_default("interpreter_constraints"):
+        try:
+            # Don't compute this unless we have to, since it might fail.
+            all_interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
+                (field_set.interpreter_constraints for field_set in request.field_sets),
+                python_setup,
             )
-        )
-        else black.interpreter_constraints
-    )
+        except ValueError:
+            raise ValueError(
+                "Could not compute an interpreter to run Black on, due to conflicting requirements "
+                "in the repo.\nPlease set `[black].interpreter_constraints` explicitly in "
+                "pants.toml to a suitable interpreter."
+            )
+        if all_interpreter_constraints.requires_python38_or_newer(
+            python_setup.interpreter_universe
+        ):
+            tool_interpreter_constraints = all_interpreter_constraints
 
     black_pex_get = Get(
         VenvPex,

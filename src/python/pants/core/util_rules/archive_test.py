@@ -1,15 +1,22 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import base64
 import gzip
+import subprocess
 import tarfile
 import zipfile
 from io import BytesIO
+from typing import Callable, cast
 
 import pytest
 
 from pants.core.util_rules import archive, system_binaries
-from pants.core.util_rules.archive import CreateArchive, ExtractedArchive
+from pants.core.util_rules.archive import (
+    CreateArchive,
+    ExtractedArchive,
+    MaybeExtractArchiveRequest,
+)
 from pants.core.util_rules.system_binaries import ArchiveFormat
 from pants.engine.fs import Digest, DigestContents, FileContent
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -23,9 +30,30 @@ def rule_runner() -> RuleRunner:
             *system_binaries.rules(),
             QueryRule(Digest, [CreateArchive]),
             QueryRule(ExtractedArchive, [Digest]),
+            QueryRule(ExtractedArchive, [MaybeExtractArchiveRequest]),
         ],
     )
 
+
+@pytest.fixture(
+    params=[pytest.param(True, id="fake_suffix"), pytest.param(False, id="actual_suffix")]
+)
+def extract_from_file_info(request, rule_runner):
+    use_fake_suffix = request.param
+
+    def impl(suffix: str, contents: bytes) -> DigestContents:
+        snapshot_file_suffix = ".slimfit" if use_fake_suffix else suffix
+        input_snapshot = rule_runner.make_snapshot({f"test{snapshot_file_suffix}": contents})
+        request = MaybeExtractArchiveRequest(
+            digest=input_snapshot.digest, use_suffix=suffix if use_fake_suffix else None
+        )
+        extracted_archive = rule_runner.request(ExtractedArchive, [request])
+        return cast(DigestContents, rule_runner.request(DigestContents, [extracted_archive.digest]))
+
+    return impl
+
+
+ExtractorFixtureT = Callable[[str, bytes], Digest]
 
 FILES = {"foo": b"bar", "hello/world": b"Hello, World!"}
 EXPECTED_DIGEST_CONTENTS = DigestContents(
@@ -34,21 +62,18 @@ EXPECTED_DIGEST_CONTENTS = DigestContents(
 
 
 @pytest.mark.parametrize("compression", [zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED])
-def test_extract_zip(rule_runner: RuleRunner, compression: int) -> None:
+def test_extract_zip(extract_from_file_info: ExtractorFixtureT, compression: int) -> None:
     io = BytesIO()
     with zipfile.ZipFile(io, "w", compression=compression) as zf:
         for name, content in FILES.items():
             zf.writestr(name, content)
     io.flush()
-    input_snapshot = rule_runner.make_snapshot({"test.zip": io.getvalue()})
-
-    extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
-    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    digest_contents = extract_from_file_info(".zip", io.getvalue())
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
 
 @pytest.mark.parametrize("compression", ["", "gz", "bz2", "xz"])
-def test_extract_tar(rule_runner: RuleRunner, compression: str) -> None:
+def test_extract_tar(extract_from_file_info: ExtractorFixtureT, compression: str) -> None:
     io = BytesIO()
     mode = f"w:{compression}" if compression else "w"
     with tarfile.open(mode=mode, fileobj=io) as tf:
@@ -56,15 +81,26 @@ def test_extract_tar(rule_runner: RuleRunner, compression: str) -> None:
             tarinfo = tarfile.TarInfo(name)
             tarinfo.size = len(content)
             tf.addfile(tarinfo, BytesIO(content))
-    ext = f"tar.{compression}" if compression else "tar"
-    input_snapshot = rule_runner.make_snapshot({f"test.{ext}": io.getvalue()})
-
-    extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
-    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    ext = f".tar.{compression}" if compression else ".tar"
+    digest_contents = extract_from_file_info(ext, io.getvalue())
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
 
-def test_extract_gz(rule_runner: RuleRunner) -> None:
+def test_extract_tarlz4(extract_from_file_info: ExtractorFixtureT):
+    if subprocess.run(["lz4", "--help"], check=False).returncode != 0:
+        pytest.skip(reason="lz4 not on PATH")
+
+    archive_content = base64.b64decode(
+        b"BCJNGGRAp9MAAACfdG1wL21zZy8AAQBI+AAwMDAwNzc1ADAwMDE3NTEIAAQCAP8HADE0MjMxNTUzMjAxADAxNDQwM"
+        b"gAgNZQASAUCAPUFdXN0YXIgIABqb3NodWFjYW5ub24dAAcCAA8gAA0PAgCkBAACf3R4dC50eHTGAEIA5QE4NjY0+"
+        b"AEECAIDAgAUNQAC7zQwNzAAMDE1NzYyACAwjgBCCwIADwAC7FtwYW50cxMBDwIA"
+        b"///////////////////////////////////////////////3UAAAAAAAAAAAABhrfd0="
+    )
+    digest_contents = extract_from_file_info(".tar.lz4", archive_content)
+    assert digest_contents == DigestContents([FileContent("tmp/msg/txt.txt", b"pants")])
+
+
+def test_extract_gz(extract_from_file_info: ExtractorFixtureT, rule_runner: RuleRunner) -> None:
     # NB: `gz` files are only compressed, and are not archives: they represent a single file.
     name = "test"
     content = b"Hello world!\n"
@@ -72,11 +108,8 @@ def test_extract_gz(rule_runner: RuleRunner) -> None:
     with gzip.GzipFile(fileobj=io, mode="w") as gzf:
         gzf.write(content)
     io.flush()
-    input_snapshot = rule_runner.make_snapshot({f"{name}.gz": io.getvalue()})
-
     rule_runner.set_options(args=[], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
-    extracted_archive = rule_runner.request(ExtractedArchive, [input_snapshot.digest])
-    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    digest_contents = extract_from_file_info(".gz", io.getvalue())
     assert digest_contents == DigestContents([FileContent(name, content)])
 
 

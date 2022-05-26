@@ -23,6 +23,7 @@ from pants.engine.target import (
     FieldSet,
     GenerateSourcesRequest,
     SourcesField,
+    Target,
     TargetFilesGenerator,
 )
 from pants.engine.unions import UnionMembership, union
@@ -118,7 +119,7 @@ class ClasspathEntryRequestFactory:
                 consume_only.append(impl)
 
         if len(compatible) == 1:
-            if not root and impl.root_only:
+            if not root and compatible[0].root_only:
                 raise ClasspathRootOnlyWasInner(
                     "The following targets had dependees, but can only be used as roots in a "
                     f"build graph:\n{component.bullet_list()}"
@@ -153,20 +154,30 @@ class ClasspathEntryRequestFactory:
         targets = component.members
         generator_sources = self.generator_sources.get(impl) or frozenset()
 
-        compatible_direct = sum(1 for t in targets for fs in impl.field_sets if fs.is_applicable(t))
-        compatible_codegen = sum(1 for t in targets for g in generator_sources if t.has_field(g))
-        compatible_codegen_target_generator = sum(
-            1
-            for t in targets
-            if isinstance(t, TargetFilesGenerator)
-            and any(field in t.generated_target_cls.core_fields for field in generator_sources)
-        )
+        def is_compatible(target: Target) -> bool:
+            return (
+                # Is directly applicable.
+                any(fs.is_applicable(target) for fs in impl.field_sets)
+                or
+                # Is applicable via generated sources.
+                any(target.has_field(g) for g in generator_sources)
+                or
+                # Is applicable via a generator.
+                (
+                    isinstance(target, TargetFilesGenerator)
+                    and any(
+                        field in target.generated_target_cls.core_fields
+                        for field in generator_sources
+                    )
+                )
+            )
 
-        compatible = compatible_direct + compatible_codegen + compatible_codegen_target_generator
+        compatible = sum(1 for t in targets if is_compatible(t))
         if compatible == 0:
             return _ClasspathEntryRequestClassification.INCOMPATIBLE
         if compatible == len(targets):
             return _ClasspathEntryRequestClassification.COMPATIBLE
+
         consume_only = sum(
             1 for t in targets for fs in impl.field_sets_consume_only if fs.is_applicable(t)
         )
@@ -392,7 +403,10 @@ def classpath_dependency_requests(
     classpath_entry_request: ClasspathEntryRequestFactory, request: ClasspathDependenciesRequest
 ) -> ClasspathEntryRequests:
     def ignore_because_generated(coarsened_dep: CoarsenedTarget) -> bool:
-        if len(coarsened_dep.members) == 1:
+        if not request.ignore_generated:
+            return False
+        if len(coarsened_dep.members) != 1:
+            # Do not ignore a dependency which is involved in a cycle.
             return False
         us = request.request.component.representative.address
         them = coarsened_dep.representative.address
@@ -403,7 +417,7 @@ def classpath_dependency_requests(
             component=coarsened_dep, resolve=request.request.resolve
         )
         for coarsened_dep in request.request.component.dependencies
-        if not request.ignore_generated or not ignore_because_generated(coarsened_dep)
+        if not ignore_because_generated(coarsened_dep)
     )
 
 

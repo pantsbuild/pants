@@ -11,12 +11,14 @@ from typing import Iterable
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     ConsoleScript,
+    InterpreterConstraintsField,
     PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
     PythonTestsTimeoutField,
@@ -26,7 +28,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -47,6 +49,7 @@ class PythonTestFieldSet(TestFieldSet):
     required_fields = (PythonTestSourceField,)
 
     source: PythonTestSourceField
+    interpreter_constraints: InterpreterConstraintsField
     timeout: PythonTestsTimeoutField
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
@@ -144,6 +147,8 @@ class PyTest(PythonToolBase):
         ),
     )
 
+    export = ExportToolOption()
+
     @property
     def all_requirements(self) -> tuple[str, ...]:
         return (self.version, *self.extra_requirements)
@@ -186,27 +191,10 @@ class PyTest(PythonToolBase):
         )
 
 
-class PytestLockfileSentinel(GenerateToolLockfileSentinel):
-    resolve_name = PyTest.options_scope
-
-
-@rule(
-    desc=(
-        "Determine all Python interpreter versions used by Pytest in your project (for "
-        "lockfile usage)"
-    ),
-    level=LogLevel.DEBUG,
-)
-async def setup_pytest_lockfile(
-    _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
-) -> GeneratePythonLockfile:
-    if not pytest.uses_lockfile:
-        return GeneratePythonLockfile.from_tool(
-            pytest, use_pex=python_setup.generate_lockfiles_with_pex
-        )
-
-    # Even though we run each python_tests target in isolation, we need a single lockfile that
-    # works with them all (and their transitive deps).
+@rule_helper
+async def _pytest_interpreter_constraints(python_setup: PythonSetup) -> InterpreterConstraints:
+    # Even though we run each python_tests target in isolation, we need a single set of constraints
+    # that works with them all (and their transitive deps).
     #
     # This first computes the constraints for each individual `python_test` target
     # (which will AND across each target in the closure). Then, it ORs all unique resulting
@@ -222,11 +210,59 @@ async def setup_pytest_lockfile(
         InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
         for transitive_targets in transitive_targets_per_test
     }
-    constraints = InterpreterConstraints(itertools.chain.from_iterable(unique_constraints))
+    constraints = InterpreterConstraints(
+        itertools.chain.from_iterable(ic for ic in unique_constraints if ic)
+    )
+    return constraints or InterpreterConstraints(python_setup.interpreter_constraints)
+
+
+class PytestLockfileSentinel(GenerateToolLockfileSentinel):
+    resolve_name = PyTest.options_scope
+
+
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Pytest in your project (for "
+        "lockfile generation)"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def setup_pytest_lockfile(
+    _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
+) -> GeneratePythonLockfile:
+    if not pytest.uses_custom_lockfile:
+        return GeneratePythonLockfile.from_tool(
+            pytest, use_pex=python_setup.generate_lockfiles_with_pex
+        )
+
+    constraints = await _pytest_interpreter_constraints(python_setup)
     return GeneratePythonLockfile.from_tool(
         pytest,
-        constraints or InterpreterConstraints(python_setup.interpreter_constraints),
+        constraints,
         use_pex=python_setup.generate_lockfiles_with_pex,
+    )
+
+
+class PytestExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule(
+    desc=(
+        "Determine all Python interpreter versions used by Pytest in your project (for "
+        "`export` goal)"
+    ),
+    level=LogLevel.DEBUG,
+)
+async def pytest_export(
+    _: PytestExportSentinel, pytest: PyTest, python_setup: PythonSetup
+) -> ExportPythonTool:
+    if not pytest.export:
+        return ExportPythonTool(resolve_name=pytest.options_scope, pex_request=None)
+    constraints = await _pytest_interpreter_constraints(python_setup)
+    return ExportPythonTool(
+        resolve_name=pytest.options_scope,
+        pex_request=pytest.to_pex_request(interpreter_constraints=constraints),
     )
 
 
@@ -235,4 +271,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, PytestLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, PytestExportSentinel),
     )

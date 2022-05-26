@@ -21,7 +21,7 @@ from pants.backend.go.util_rules.go_mod import (
 )
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.build_graph.address import Address
-from pants.core.target_types import ResourceSourceField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
@@ -307,9 +307,9 @@ async def setup_first_party_pkg_digest(
                     # TODO(#13795): Error if you depend on resources above the go_package?
                     if t.address.spec_path.startswith(request.address.spec_path)
                 ),
-                for_sources_types=(ResourceSourceField,),
-                # TODO: Switch to True. We need to be confident though that the generated files
-                #  are located below the go_package.
+                for_sources_types=(FileSourceField, ResourceSourceField),
+                # TODO(#13795): Switch to True. We need to be confident though that the generated
+                #  files are located below the go_package.
                 enable_codegen=False,
             ),
         )

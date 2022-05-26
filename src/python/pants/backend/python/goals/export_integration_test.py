@@ -1,102 +1,113 @@
-# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import os
-import sys
+import platform
+from dataclasses import dataclass
 from textwrap import dedent
+from typing import List, Mapping, MutableMapping
 
-import pytest
+from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
-from pants.backend.python import target_types_rules
-from pants.backend.python.goals import export
-from pants.backend.python.goals.export import ExportVenvsRequest
-from pants.backend.python.target_types import PythonRequirementTarget
-from pants.backend.python.util_rules import pex_from_targets
-from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.goals.export import ExportResults
-from pants.core.util_rules import distdir
-from pants.engine.rules import QueryRule
-from pants.engine.target import Targets
-from pants.testutil.rule_runner import RuleRunner
-from pants.util.frozendict import FrozenDict
-
-
-@pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[
-            *export.rules(),
-            *pex_from_targets.rules(),
-            *target_types_rules.rules(),
-            *distdir.rules(),
-            QueryRule(Targets, [AddressSpecs]),
-            QueryRule(ExportResults, [ExportVenvsRequest]),
-        ],
-        target_types=[PythonRequirementTarget],
-    )
+SOURCES = {
+    "3rdparty/BUILD": dedent(
+        """\
+        python_requirement(name='req1', requirements=['ansicolors==1.1.8'], resolve='a', modules=['colors'])
+        python_requirement(name='req2', requirements=['ansicolors==1.0.2'], resolve='b', modules=['colors'])
+        """
+    ),
+    "src/python/foo.py": "from colors import *",
+    "src/python/BUILD": "python_source(name='foo', source='foo.py', resolve=parametrize('a', 'b'))",
+}
 
 
-def test_export_venvs(rule_runner: RuleRunner) -> None:
-    # We know that the current interpreter exists on the system.
-    vinfo = sys.version_info
-    current_interpreter = f"{vinfo.major}.{vinfo.minor}.{vinfo.micro}"
-    rule_runner.write_files(
-        {
-            "src/foo/BUILD": dedent(
-                """\
-                python_requirement(name='req1', requirements=['ansicolors==1.1.8'], resolve='a')
-                python_requirement(name='req2', requirements=['ansicolors==1.1.8'], resolve='b')
-                """
-            ),
-            "lock.txt": "ansicolors==1.1.8",
-        }
-    )
+@dataclass
+class _ToolConfig:
+    name: str
+    version: str
+    experimental: bool = False
+    backend_prefix: str | None = "lint"
 
-    def run(enable_resolves: bool) -> ExportResults:
-        rule_runner.set_options(
-            [
-                f"--python-interpreter-constraints=['=={current_interpreter}']",
-                "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
-                f"--python-enable-resolves={enable_resolves}",
-                # Turn off lockfile validation to make the test simpler.
-                "--python-invalid-lockfile-behavior=ignore",
-            ],
-            env_inherit={"PATH", "PYENV_ROOT"},
-        )
-        targets = rule_runner.request(Targets, [AddressSpecs([DescendantAddresses("src/foo")])])
-        all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets)])
 
-        for result in all_results:
-            assert len(result.post_processing_cmds) == 2
+EXPORTED_TOOLS: List[_ToolConfig] = [
+    _ToolConfig(name="autoflake", version="1.3.1", experimental=True),
+    _ToolConfig(name="bandit", version="1.6.2"),
+    _ToolConfig(name="black", version="22.3.0"),
+    _ToolConfig(name="docformatter", version="1.3.1"),
+    _ToolConfig(name="flake8", version="4.0.1"),
+    _ToolConfig(name="isort", version="5.10.1"),
+    _ToolConfig(name="pylint", version="2.13.1"),
+    _ToolConfig(name="pyupgrade", version="2.31.1", experimental=True),
+    _ToolConfig(name="yapf", version="0.32.0"),
+    _ToolConfig(name="mypy", version="0.940", backend_prefix="typecheck"),
+    _ToolConfig(name="pytest", version="7.1.0", backend_prefix=None),
+]
 
-            ppc0 = result.post_processing_cmds[0]
-            assert ppc0.argv == (
-                os.path.join("{digest_root}", ".", "pex"),
-                os.path.join("{digest_root}", "requirements.pex"),
-                "venv",
-                "--pip",
-                "--collisions-ok",
-                "--remove=all",
-                f"{{digest_root}}/{current_interpreter}",
-            )
-            assert ppc0.extra_env == FrozenDict({"PEX_MODULE": "pex.tools"})
 
-            ppc1 = result.post_processing_cmds[1]
-            assert ppc1.argv == (
-                "rm",
-                "-f",
-                os.path.join("{digest_root}", ".", "pex"),
-            )
-            assert ppc1.extra_env == FrozenDict()
-
-        return all_results
-
-    resolve_results = run(enable_resolves=True)
-    assert len(resolve_results) == 2
-    assert {result.reldir for result in resolve_results} == {
-        "python/virtualenvs/a",
-        "python/virtualenvs/b",
+def build_config(tmpdir: str) -> Mapping:
+    cfg: MutableMapping = {
+        "GLOBAL": {
+            "backend_packages": ["pants.backend.python"],
+        },
+        "python": {
+            "enable_resolves": True,
+            "interpreter_constraints": [f"=={platform.python_version()}"],
+            "resolves": {
+                "a": f"{tmpdir}/3rdparty/a.lock",
+                "b": f"{tmpdir}/3rdparty/b.lock",
+            },
+        },
     }
+    for tool_config in EXPORTED_TOOLS:
+        cfg[tool_config.name] = {
+            "version": f"{tool_config.name}=={tool_config.version}",
+            "lockfile": f"{tmpdir}/3rdparty/{tool_config.name}.lock",
+        }
 
-    no_resolve_results = run(enable_resolves=False)
-    assert len(no_resolve_results) == 1
-    assert no_resolve_results[0].reldir == "python/virtualenv"
+        if not tool_config.backend_prefix:
+            continue
+
+        plugin_suffix = f"python.{tool_config.backend_prefix}.{tool_config.name}"
+
+        if tool_config.experimental:
+            plugin_suffix = f"experimental.{plugin_suffix}"
+
+        cfg["GLOBAL"]["backend_packages"].append(f"pants.backend.{plugin_suffix}")
+
+    return cfg
+
+
+def test_export() -> None:
+    with setup_tmpdir(SOURCES) as tmpdir:
+        run_pants(
+            ["generate-lockfiles", "export", f"{tmpdir}/::"], config=build_config(tmpdir)
+        ).assert_success()
+
+    export_prefix = os.path.join("dist", "export", "python", "virtualenvs")
+    py_minor_version = f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}"
+    for resolve, ansicolors_version in [("a", "1.1.8"), ("b", "1.0.2")]:
+        export_dir = os.path.join(export_prefix, resolve, platform.python_version())
+        assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
+
+        lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
+        expected_ansicolors_dir = os.path.join(
+            lib_dir, f"ansicolors-{ansicolors_version}.dist-info"
+        )
+        assert os.path.isdir(
+            expected_ansicolors_dir
+        ), f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
+
+    for tool_config in EXPORTED_TOOLS:
+        export_dir = os.path.join(export_prefix, "tools", tool_config.name)
+        assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
+
+        # NOTE: Not every tool implements --version so this is the best we can do.
+        lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
+        expected_tool_dir = os.path.join(
+            lib_dir, f"{tool_config.name}-{tool_config.version}.dist-info"
+        )
+        assert os.path.isdir(
+            expected_tool_dir
+        ), f"expected dist-info for {tool_config.name} '{expected_tool_dir}' does not exist"

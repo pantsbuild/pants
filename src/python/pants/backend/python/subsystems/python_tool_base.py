@@ -19,7 +19,7 @@ from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_L
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import Digest, FileContent
 from pants.option.errors import OptionsError
-from pants.option.option_types import StrListOption, StrOption
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
 from pants.util.strutil import softwrap
@@ -178,7 +178,19 @@ class PythonToolRequirementsBase(Subsystem):
 
     @property
     def uses_lockfile(self) -> bool:
+        """Return true if the tool is installed from a lockfile.
+
+        Note that this lockfile may be the default lockfile Pants distributes.
+        """
         return self.register_lockfile and self.lockfile != NO_TOOL_LOCKFILE
+
+    @property
+    def uses_custom_lockfile(self) -> bool:
+        """Return true if the tool is installed from a custom lockfile the user sets up."""
+        return self.register_lockfile and self.lockfile not in (
+            NO_TOOL_LOCKFILE,
+            DEFAULT_TOOL_LOCKFILE,
+        )
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:
@@ -273,4 +285,26 @@ class PythonToolBase(PythonToolRequirementsBase):
             extra_requirements=extra_requirements,
             main=main or self.main,
             sources=sources,
+        )
+
+
+class ExportToolOption(BoolOption):
+    """An `--export` option to toggle whether the `export` goal should include the tool."""
+
+    def __new__(cls):
+        return super().__new__(
+            cls,
+            "--export",
+            default=True,
+            help=(
+                lambda subsystem_cls: softwrap(
+                    f"""
+                    If true, export a virtual environment with {subsystem_cls.name} when running
+                    `{bin_name()} export`.
+
+                    This can be useful, for example, with IDE integrations to point your editor to
+                    the tool's binary.
+                    """
+                )
+            ),
         )

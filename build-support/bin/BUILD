@@ -18,6 +18,7 @@ python_tests(name="py_tests", overrides={"reversion_test.py": {"timeout": 90}})
 
 pex_binaries(
     entry_points=[
+        "cache_comparison.py",
         "changelog.py",
         "check_banned_imports.py",
         "check_inits.py",

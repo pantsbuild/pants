@@ -1211,7 +1211,12 @@ pub fn extract_output_files(
           .add_prefix(directory_digest, &RelativePath::new(dir.path)?)
           .await
       })
-      .map_err(|err| format!("Error saving remote output directory: {:?}", err)),
+      .map_err(|err| {
+        format!(
+          "Error saving remote output directory to local cache: {:?}",
+          err
+        )
+      }),
     );
   }
 

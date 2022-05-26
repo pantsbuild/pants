@@ -16,6 +16,7 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
     Targets,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
@@ -72,7 +73,8 @@ class ThriftSourceTarget(Target):
         f"""
         A single Thrift file used to generate various languages.
 
-        See {doc_url('thrift')}.
+        See language-specific docs:
+            Python: {doc_url('thrift-python')}
         """
     )
 
@@ -85,17 +87,20 @@ class ThriftSourceTarget(Target):
 class ThriftSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.thrift",)
     expected_file_extensions = (".thrift",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.thrift', 'new_*.thrift', '!old_ignore.thrift']`"
+    )
 
 
 class ThriftSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ThriftSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "bar.thrift": {"description": "our user model"]},\n'
-            '  ("foo.thrift", "bar.thrift"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "bar.thrift": {"description": "our user model"]},
+            ("foo.thrift", "bar.thrift"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 

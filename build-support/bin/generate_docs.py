@@ -25,6 +25,7 @@ import os
 import pkgutil
 import re
 import subprocess
+import textwrap
 from html.parser import HTMLParser
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, cast
@@ -36,9 +37,12 @@ from readme_api import DocRef, ReadmeAPI
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.help.help_info_extracter import to_help_str
+from pants.util.strutil import softwrap
 from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
+
+DOC_URL_RE = re.compile(r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)")
 
 
 def main() -> None:
@@ -50,17 +54,21 @@ def main() -> None:
 
     version = determine_pants_version(args.no_prompt)
     help_info = run_pants_help_all()
-    doc_urls = DocUrlMatcher().find_doc_urls(value_strs_iter(help_info))
+    doc_urls = find_doc_urls(value_strs_iter(help_info))
     logger.info("Found the following docsite URLs:")
     for url in sorted(doc_urls):
         logger.info(f"  {url}")
-    logger.info("Fetching titles...")
-    slug_to_title = get_titles(doc_urls)
-    logger.info("Found the following titles:")
-    for slug, title in sorted(slug_to_title.items()):
-        logger.info(f"  {slug}: {title}")
-    rewritten_help_info = rewrite_value_strs(help_info, slug_to_title)
-    generator = ReferenceGenerator(args, version, rewritten_help_info)
+
+    if not args.skip_check_urls:
+        logger.info("Fetching titles...")
+        slug_to_title = get_titles(doc_urls)
+        logger.info("Found the following titles:")
+        for slug, title in sorted(slug_to_title.items()):
+            logger.info(f"  {slug}: {title}")
+
+        help_info = rewrite_value_strs(help_info, slug_to_title)
+
+    generator = ReferenceGenerator(args, version, help_info)
     if args.sync:
         generator.sync()
     else:
@@ -78,37 +86,33 @@ def determine_pants_version(no_prompt: bool) -> str:
     )
     if key_confirmation and key_confirmation.lower() != "y":
         die(
-            "Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change "
-            "src/python/pants/VERSION."
+            softwrap(
+                """
+                Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change
+                src/python/pants/VERSION.
+                """
+            )
         )
     return version
 
 
 # Code to replace doc urls with appropriate markdown, for rendering on the docsite.
 
-_doc_url_pattern = r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)"
+
+def get_doc_slug(url: str) -> str:
+    mo = DOC_URL_RE.match(url)
+    if not mo:
+        raise ValueError(f"Not a docsite URL: {url}")
+    return cast(str, mo.group("slug"))
 
 
-class DocUrlMatcher:
-    """Utilities for regex matching docsite URLs."""
-
-    def __init__(self):
-        self._doc_url_re = re.compile(_doc_url_pattern)
-
-    def slug_for_url(self, url: str) -> str:
-        mo = self._doc_url_re.match(url)
-        if not mo:
-            raise ValueError(f"Not a docsite URL: {url}")
-        return cast(str, mo.group("slug"))
-
-    def find_doc_urls(self, strs: Iterable[str]) -> set[str]:
-        """Find all the docsite urls in the given strings."""
-        return {mo.group(0) for s in strs for mo in self._doc_url_re.finditer(s)}
+def find_doc_urls(strs: Iterable[str]) -> set[str]:
+    """Find all the docsite urls in the given strings."""
+    return {mo.group(0) for s in strs for mo in DOC_URL_RE.finditer(s)}
 
 
 class DocUrlRewriter:
     def __init__(self, slug_to_title: dict[str, str]):
-        self._doc_url_re = re.compile(_doc_url_pattern)
         self._slug_to_title = slug_to_title
 
     def _rewrite_url(self, mo: re.Match) -> str:
@@ -121,7 +125,7 @@ class DocUrlRewriter:
         return f"[{title}](doc:{slug})"
 
     def rewrite(self, s: str) -> str:
-        return self._doc_url_re.sub(self._rewrite_url, s)
+        return DOC_URL_RE.sub(self._rewrite_url, s)
 
 
 class TitleFinder(HTMLParser):
@@ -145,29 +149,38 @@ class TitleFinder(HTMLParser):
             self._title = data.strip()
 
     @property
-    def title(self) -> str | None:
-        return self._title
+    def title(self) -> str:
+        return self._title or ""
 
 
-def get_title_from_page_content(page_content: str) -> str:
-    title_finder = TitleFinder()
-    title_finder.feed(page_content)
-    return title_finder.title or ""
+def get_url(url: str):
+    response = requests.get(url)
+    if response.status_code != 200:
+        die(
+            softwrap(
+                f"""
+                Error getting URL: {url}
 
+                If the URL is pantsbuild.org, a `doc_url` link might be using the wrong slug or the
+                docs for this version might be unpublished. Otherwise, the link might be dead.
 
-def get_title(url: str) -> str:
-    return get_title_from_page_content(requests.get(url).text)
+                You can use `--skip-check-urls` to skip.
+                """
+            )
+        )
+    return response
 
 
 def get_titles(urls: set[str]) -> dict[str, str]:
     """Return map from slug->title for each given docsite URL."""
 
-    matcher = DocUrlMatcher()
     # TODO: Parallelize the http requests.
     #  E.g., by turning generate_docs.py into a plugin goal and using the engine.
     ret = {}
     for url in urls:
-        ret[matcher.slug_for_url(url)] = get_title(url)
+        title_finder = TitleFinder()
+        title_finder.feed(get_url(url).text)
+        ret[get_doc_slug(url)] = title_finder.title
     return ret
 
 
@@ -183,19 +196,33 @@ def create_parser() -> argparse.ArgumentParser:
         "--sync",
         action="store_true",
         default=False,
-        help="Whether to sync the generated reference docs to the docsite. "
-        "If unset, will generate markdown files to the path in --output "
-        "instead.  If set, --api-key must be set.",
+        help=softwrap(
+            """
+            Whether to sync the generated reference docs to the docsite.
+            If unset, will generate markdown files to the path in --output
+            instead.  If set, --api-key must be set.
+            """
+        ),
     )
     parser.add_argument(
         "--output",
         default=PosixPath(os.path.sep) / "tmp" / "pants_docs" / "help" / "option",
         type=Path,
-        help="Path to a directory under which we generate the markdown files. "
-        "Useful for viewing the files locally when testing and debugging "
-        "the renderer.",
+        help=softwrap(
+            """
+            Path to a directory under which we generate the markdown files.
+            Useful for viewing the files locally when testing and debugging
+            the renderer.
+            """
+        ),
     )
     parser.add_argument("--api-key", help="The readme.io API key to use. Required for --sync.")
+    parser.add_argument(
+        "--skip-check-urls",
+        action="store_true",
+        default=False,
+        help="Skip checking URLs (including pantsbuild.org ones).",
+    )
     return parser
 
 
@@ -215,7 +242,10 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.helm",
         "pants.backend.experimental.java",
         "pants.backend.experimental.java.lint.google_java_format",
+        "pants.backend.experimental.kotlin",
+        "pants.backend.experimental.kotlin.lint.ktlint",
         "pants.backend.experimental.python",
+        "pants.backend.experimental.python.docs.sphinx",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
         "pants.backend.experimental.python.packaging.pyoxidizer",
@@ -252,8 +282,17 @@ def run_pants_help_all() -> dict[str, Any]:
         run.check_returncode()
     except subprocess.CalledProcessError:
         logger.error(
-            f"Running {argv} failed with exit code {run.returncode}.\n\nstdout:\n{run.stdout}"
-            f"\n\nstderr:\n{run.stderr}"
+            softwrap(
+                f"""
+                Running {argv} failed with exit code {run.returncode}.
+
+                stdout:
+                {textwrap.indent(run.stdout, " " * 4)}
+
+                stderr:
+                {textwrap.indent(run.stderr, " " * 4)}
+                """
+            )
         )
         raise
     return cast("dict[str, Any]", json.loads(run.stdout))
@@ -398,7 +437,9 @@ class ReferenceGenerator:
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
                 field["description"] = str(field["description"])
-            target["fields"] = sorted(target["fields"], key=lambda fld: cast(str, fld["alias"]))
+            target["fields"] = sorted(
+                target["fields"], key=lambda fld: (-fld["required"], cast(str, fld["alias"]))
+            )
             target["description"] = str(target["description"])
 
         return cast(Dict[str, Dict[str, Any]], target_info)
