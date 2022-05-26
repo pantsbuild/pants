@@ -40,6 +40,7 @@ class ThingHelp(HelpRequest):
 
     advanced: bool = False
     things: tuple[str, ...] = ()
+    likely_specs: tuple[str, ...] = ()
 
 
 class VersionHelp(HelpRequest):

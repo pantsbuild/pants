@@ -161,12 +161,17 @@ class HelpPrinter(MaybeColor):
         Note: Ony useful if called after options have been registered.
         """
         help_request = cast(ThingHelp, self._help_request)
-        things = set(help_request.things)
+        # API types may end up in `likely_specs`, so include them in things to get help for.
+        things = set(help_request.things + help_request.likely_specs)
         help_table = self._get_thing_help_table()
         maybe_unknown_things = {thing for thing in things if thing not in help_table}
         disambiguated_things, unknown_things = self._disambiguate_things(
             maybe_unknown_things, help_table.keys()
         )
+        things = things - maybe_unknown_things | disambiguated_things
+        # Filter out likely specs from unknown things, as we don't want them to interfere.
+        unknown_things -= set(help_request.likely_specs)
+
         if unknown_things:
             # Only print help and suggestions for the first unknown thing.
             # It gets confusing to try and show suggestions for multiple cases.
@@ -183,7 +188,6 @@ class HelpPrinter(MaybeColor):
             )
             return 1
 
-        things = things - maybe_unknown_things | disambiguated_things
         if not things:
             self._print_global_help()
             return 0
