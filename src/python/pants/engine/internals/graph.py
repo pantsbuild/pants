@@ -13,6 +13,7 @@ from typing import Iterable, NamedTuple, Sequence, cast
 
 from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.base.exceptions import ResolveError
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
 from pants.engine.addresses import (
     Address,
@@ -662,19 +663,33 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         live_get = Get(
             FilteredTargets,
             RawSpecsWithoutFileOwners(
-                ancestor_globs=live_candidate_specs, filter_by_global_options=True
+                ancestor_globs=live_candidate_specs,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+                filter_by_global_options=True,
             ),
         )
         deleted_get = Get(
             UnexpandedTargets,
             RawSpecsWithoutFileOwners(
-                ancestor_globs=deleted_candidate_specs, filter_by_global_options=True
+                ancestor_globs=deleted_candidate_specs,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+                filter_by_global_options=True,
             ),
         )
     else:
-        live_get = Get(Targets, RawSpecsWithoutFileOwners(ancestor_globs=live_candidate_specs))
+        live_get = Get(
+            Targets,
+            RawSpecsWithoutFileOwners(
+                ancestor_globs=live_candidate_specs,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            ),
+        )
         deleted_get = Get(
-            UnexpandedTargets, RawSpecsWithoutFileOwners(ancestor_globs=deleted_candidate_specs)
+            UnexpandedTargets,
+            RawSpecsWithoutFileOwners(
+                ancestor_globs=deleted_candidate_specs,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            ),
         )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
