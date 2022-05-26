@@ -167,7 +167,11 @@ class HelpPrinter(MaybeColor):
         disambiguated_things, unknown_things = self._disambiguate_things(
             maybe_unknown_things, help_table.keys()
         )
-        if unknown_things:
+        things = things - maybe_unknown_things | disambiguated_things
+
+        if unknown_things and not things:
+            # Ignore unknown things if there are known things to show help for.
+
             # Only print help and suggestions for the first unknown thing.
             # It gets confusing to try and show suggestions for multiple cases.
             thing = unknown_things.pop()
@@ -183,7 +187,6 @@ class HelpPrinter(MaybeColor):
             )
             return 1
 
-        things = things - maybe_unknown_things | disambiguated_things
         if not things:
             self._print_global_help()
             return 0
