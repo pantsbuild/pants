@@ -1,8 +1,11 @@
 Active Maintainers
 ==================
 
+* Alexey Tereshenkov
 * Andreas Stenius
 * Benjy Weinberger
+* Carina C. Zona
+* Christopher Neugebauer
 * Daniel McClanahan
 * Daniel Wagner-Hall
 * Eric Arellano
@@ -11,6 +14,7 @@ Active Maintainers
 * Ity Kaul
 * Patrick Lawson
 * John Sirois
+* Joshua Cannon
 * Kris Wilson
 * Nora Howard
 * Stu Hood
