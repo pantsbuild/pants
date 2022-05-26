@@ -215,9 +215,13 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
         ).result(timeout=15)
 
         # buildTarget/resources - (NB: used only to index resources)
+        # We set the timeout higher here due to CI flakes as documented in:
+        #   https://github.com/pantsbuild/pants/issues/15657
+        # This seems to paper over some slow interaction between this request
+        # and the LMDB store as noted in the ticket.
         _ = endpoint.request(
             "buildTarget/resources", ResourcesParams(target_ids).to_json_dict()
-        ).result(timeout=15)
+        ).result(timeout=45)
 
         # buildTarget/scalacOptions
         scalac_options = ScalacOptionsResult.from_json_dict(
