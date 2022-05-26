@@ -1131,7 +1131,7 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
     for i, line in enumerate(content.splitlines()):
         line, _, _ = line.partition("--")
         line = line.strip().rstrip("\\")
-        if not line or line.startswith("#"):
+        if not line or line.startswith(("#", "-")):
             continue
         yield PipRequirement.parse(line, description_of_origin=f"{rel_path} at line {i + 1}")
 
