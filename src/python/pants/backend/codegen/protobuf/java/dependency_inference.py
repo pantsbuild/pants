@@ -1,6 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
+from typing import FrozenSet
 
 from pants.backend.codegen.protobuf.target_types import ProtobufDependenciesField
 from pants.build_graph.address import Address
@@ -34,7 +35,7 @@ class ProtobufJavaRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class ProtobufJavaRuntimeForResolve:
-    addresses: frozenset[Address]
+    addresses: FrozenSet[Address]
 
 
 @rule
