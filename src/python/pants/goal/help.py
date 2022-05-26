@@ -81,7 +81,8 @@ class ThingHelpBuiltinGoalBase(HelpBuiltinGoalBase):
         # them is deemed "likely a spec" by `pants.option.arg_splitter:ArgSplitter.likely_a_spec()`.
         return ThingHelp(
             advanced=self._advanced,
-            things=tuple(options.goals) + tuple(options.unknown_goals) + tuple(options.specs),
+            things=tuple(options.goals) + tuple(options.unknown_goals),
+            likely_specs=tuple(options.specs),
         )
 
 
