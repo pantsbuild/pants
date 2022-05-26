@@ -56,10 +56,11 @@ def test_strip_snapshot(rule_runner: RuleRunner) -> None:
     def get_stripped_files_for_snapshot(
         paths: list[str],
         *,
+        unstripped: Sequence[str] = (),
         source_root_patterns: Sequence[str] = ("src/python", "src/java", "tests/python"),
     ) -> list[str]:
-        input_snapshot = rule_runner.make_snapshot_of_empty_files(paths)
-        request = SourceFiles(input_snapshot, ())
+        input_snapshot = rule_runner.make_snapshot_of_empty_files((*paths, *unstripped))
+        request = SourceFiles(input_snapshot, tuple(unstripped))
         return get_stripped_files(rule_runner, request, source_root_patterns=source_root_patterns)
 
     # Normal source roots
@@ -76,6 +77,10 @@ def test_strip_snapshot(rule_runner: RuleRunner) -> None:
     assert get_stripped_files_for_snapshot(["tests/python/project_test/example.py"]) == [
         "project_test/example.py"
     ]
+
+    assert get_stripped_files_for_snapshot(
+        ["src/python/project/example.py"], unstripped=["no-root/data.json"]
+    ) == ["no-root/data.json", "project/example.py"]
 
     # Unrecognized source root
     unrecognized_source_root = "no-source-root/example.txt"

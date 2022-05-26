@@ -10,7 +10,7 @@ from typing import Iterable, NamedTuple
 
 import pytest
 
-from pants.core.target_types import FileSourceField
+from pants.core.target_types import ResourcesGeneratingSourcesField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
@@ -69,6 +69,8 @@ def assert_sources_resolved(
     expected: Iterable[TargetSources],
     expected_unrooted: Iterable[str] = (),
 ) -> None:
+    # Override the default of `/` being a source root so we can test `resource` handling.
+    rule_runner.set_options(["--source-root-patterns=['src/python']"])
     result = rule_runner.request(SourceFiles, [SourceFilesRequest(sources_fields)])
     assert list(result.snapshot.files) == sorted(
         set(itertools.chain.from_iterable(sources.full_paths for sources in expected))
@@ -99,9 +101,25 @@ def test_address_specs(rule_runner: RuleRunner) -> None:
 
 def test_unrooted_sources(rule_runner: RuleRunner) -> None:
     """Any SourcesField with `uses_source_roots=False`, such as `FilesSources`, should be marked as
-    unrooted sources."""
+    unrooted sources.
+
+    Additionally, resources can be safely marked as unrooted.
+    """
+    sources = TargetSources("no-root", "README.md")
+    field = mock_sources_field(rule_runner, sources, sources_field_cls=ResourceSourceField)
+    assert_sources_resolved(
+        rule_runner, [field], expected=[sources], expected_unrooted=sources.full_paths
+    )
+
     sources = TargetSources("src/python", "README.md")
-    field = mock_sources_field(rule_runner, sources, sources_field_cls=FileSourceField)
+    field = mock_sources_field(rule_runner, sources, sources_field_cls=ResourceSourceField)
+    assert_sources_resolved(rule_runner, [field], expected=[sources], expected_unrooted=[])
+
+    # Can handle `resources` too.
+    sources = TargetSources("no-root", ["README.md"])
+    field = mock_sources_field(
+        rule_runner, sources, sources_field_cls=ResourcesGeneratingSourcesField
+    )
     assert_sources_resolved(
         rule_runner, [field], expected=[sources], expected_unrooted=sources.full_paths
     )

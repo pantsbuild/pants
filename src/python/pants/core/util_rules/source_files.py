@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Set, Tuple, Type
 
-from pants.core.target_types import ResourceSourceField
+from pants.core.target_types import ResourcesGeneratingSourcesField, ResourceSourceField
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField
@@ -20,7 +20,7 @@ class SourceFiles:
     snapshot: Snapshot
 
     # The subset of files in snapshot that are not intended to have an associated source root.
-    # That is, the sources of files and unrooted resources() targets.
+    # For example, `resource` targets without a root.
     unrooted_files: Tuple[str, ...]
 
     @property
@@ -49,7 +49,7 @@ class SourceFilesRequest:
 
 @rule(desc="Get all relevant source files")
 async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
-    """Merge all `SourceBaseField`s into one Snapshot."""
+    """Merge all `SourceField`s into one Snapshot."""
     unrooted_files: Set[str] = set()
     all_hydrated_sources = await MultiGet(
         Get(
@@ -66,14 +66,11 @@ async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
     for hydrated_sources, sources_field in zip(all_hydrated_sources, request.sources_fields):
         if not sources_field.uses_source_roots:
             unrooted_files.update(hydrated_sources.snapshot.files)
-        elif isinstance(sources_field, ResourceSourceField):
+        elif isinstance(sources_field, (ResourceSourceField, ResourcesGeneratingSourcesField)):
             # Resources are special in that they can exist both in and out of source roots, with
             # their source root being optionally stripped.
-            files = list(map(PurePath, hydrated_sources.snapshot.files))
-            osrr = await Get(
-                OptionalSourceRootsResult,
-                SourceRootsRequest(files=files, dirs=()),
-            )
+            files = tuple(PurePath(f) for f in hydrated_sources.snapshot.files)
+            osrr = await Get(OptionalSourceRootsResult, SourceRootsRequest(files=files, dirs=()))
             for file in files:
                 if osrr.path_to_optional_root[file].source_root is None:
                     unrooted_files.add(str(file))
