@@ -11,7 +11,7 @@ from typing import Iterator
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_integration_test import run_pants_with_workdir
+from pants.testutil.pants_integration_test import PantsResult, run_pants_with_workdir
 from pants.util.contextutil import temporary_dir
 from pants.vcs.changed import DependeesOption
 
@@ -20,9 +20,6 @@ def _run_git(command: list[str]) -> None:
     subprocess.run(
         ["git", *command], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
-
-
-_PANTS_TOML = {"GLOBAL": {"backend_packages": ["pants.backend.shell"]}}
 
 
 @pytest.fixture
@@ -92,6 +89,25 @@ def reset_edits() -> None:
     _run_git(["checkout", "--", "."])
 
 
+def _run_pants_goal(
+    workdir: str,
+    goal: str,
+    dependees: DependeesOption = DependeesOption.NONE,
+    *,
+    extra_args: list[str] | None = None,
+) -> PantsResult:
+    return run_pants_with_workdir(
+        [
+            *(extra_args or ()),
+            "--changed-since=HEAD",
+            f"--changed-dependees={dependees.value}",
+            goal,
+        ],
+        workdir=workdir,
+        config={"GLOBAL": {"backend_packages": ["pants.backend.shell"]}},
+    )
+
+
 def assert_list_stdout(
     workdir: str,
     expected: list[str],
@@ -99,16 +115,7 @@ def assert_list_stdout(
     *,
     extra_args: list[str] | None = None,
 ) -> None:
-    result = run_pants_with_workdir(
-        [
-            *(extra_args or ()),
-            "--changed-since=HEAD",
-            f"--changed-dependees={dependees.value}",
-            "list",
-        ],
-        config=_PANTS_TOML,
-        workdir=workdir,
-    )
+    result = _run_pants_goal(workdir, "list", dependees=dependees, extra_args=extra_args)
     result.assert_success()
     assert sorted(result.stdout.strip().splitlines()) == sorted(expected)
 
@@ -120,19 +127,9 @@ def assert_count_loc(
     expected_num_files: int,
     extra_args: list[str] | None = None,
 ) -> None:
-    result = run_pants_with_workdir(
-        [
-            *(extra_args or ()),
-            "--changed-since=HEAD",
-            f"--changed-dependees={dependees.value}",
-            "count-loc",
-        ],
-        workdir=workdir,
-        config=_PANTS_TOML,
-    )
+    result = _run_pants_goal(workdir, "count-loc", dependees=dependees, extra_args=extra_args)
     result.assert_success()
     if expected_num_files:
-        print(result.stdout)
         assert f"Total                        {expected_num_files}" in result.stdout
     else:
         assert not result.stdout
@@ -188,26 +185,30 @@ def test_delete_generated_target(repo: str) -> None:
     delete_file("transitive.sh")
     for dependees in DependeesOption:
         assert_list_stdout(repo, ["//:lib"], dependees)
-        # assert_count_loc(repo, dependees, expected_num_files=0)
+        assert_count_loc(repo, dependees, expected_num_files=2)
 
     # Make sure that our fix for https://github.com/pantsbuild/pants/issues/15544 does not break
     # this test when using `--tag`.
     for dependees in (DependeesOption.NONE, DependeesOption.TRANSITIVE):
         assert_list_stdout(repo, ["//:lib"], dependees, extra_args=["--tag=a"])
-        # assert_count_loc(repo, dependees, expected_num_files=0, extra_args=["--tag=a"])
+        assert_count_loc(repo, dependees, expected_num_files=1, extra_args=["--tag=a"])
 
     # If we also edit a sibling generated target, we should still (for now at least) include the
     # target generator.
     append_to_file("app.sh", "# foo")
     for dependees in DependeesOption:
         assert_list_stdout(repo, ["//:lib", "//app.sh:lib"], dependees)
-        # assert_count_loc(repo, dependees, expected_num_files=0)
+        assert_count_loc(repo, dependees, expected_num_files=2)
 
 
 def test_delete_atom_target(repo: str) -> None:
     delete_file("standalone.sh")
     assert_list_stdout(repo, ["//:standalone"])
-    # assert_count_loc(repo, expected_num_files=0)
+
+    # The target-less goal code path will trigger checking that `sources` are valid.
+    result = _run_pants_goal(repo, "count-loc")
+    result.assert_failure()
+    assert "must have 1 file, but it had 0 files." in result.stderr
 
 
 def test_change_build_file(repo: str) -> None:
