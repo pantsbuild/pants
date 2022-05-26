@@ -52,8 +52,10 @@ class HelpPrinter(MaybeColor):
 
         if isinstance(self._help_request, VersionHelp):
             print(pants_version())
+            return 0
         elif isinstance(self._help_request, AllHelp):
             self._print_all_help()
+            return 0
         elif isinstance(self._help_request, ThingHelp):
             return self._print_thing_help()
         elif isinstance(self._help_request, UnknownGoalHelp):
@@ -68,7 +70,9 @@ class HelpPrinter(MaybeColor):
             print("No goals specified.")
             print_hint()
             return 1
-        return 0
+        else:
+            # Unexpected.
+            return 1
 
     def _print_alternatives(self, match: str, all_things: Iterable[str]) -> None:
         did_you_mean = list(difflib.get_close_matches(match, all_things))
