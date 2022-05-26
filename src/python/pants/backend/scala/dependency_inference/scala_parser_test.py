@@ -7,13 +7,14 @@ import pytest
 from pants.backend.scala import target_types
 from pants.backend.scala.dependency_inference import scala_parser
 from pants.backend.scala.dependency_inference.scala_parser import (
+    AnalyzeScalaSourceRequest,
     ScalaImport,
     ScalaSourceDependencyAnalysis,
 )
 from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
@@ -33,8 +34,8 @@ def rule_runner() -> RuleRunner:
             *jdk_rules.rules(),
             *target_types.rules(),
             *jvm_util_rules.rules(),
-            QueryRule(SourceFiles, (SourceFilesRequest,)),
-            QueryRule(ScalaSourceDependencyAnalysis, (SourceFiles,)),
+            QueryRule(AnalyzeScalaSourceRequest, (SourceFilesRequest,)),
+            QueryRule(ScalaSourceDependencyAnalysis, (AnalyzeScalaSourceRequest,)),
         ],
         target_types=[ScalaSourceTarget],
     )
@@ -52,8 +53,8 @@ def _analyze(rule_runner: RuleRunner, source: str) -> ScalaSourceDependencyAnaly
 
     target = rule_runner.get_target(address=Address("", target_name="source"))
 
-    source_files = rule_runner.request(
-        SourceFiles,
+    request = rule_runner.request(
+        AnalyzeScalaSourceRequest,
         [
             SourceFilesRequest(
                 (target.get(SourcesField),),
@@ -63,7 +64,7 @@ def _analyze(rule_runner: RuleRunner, source: str) -> ScalaSourceDependencyAnaly
         ],
     )
 
-    return rule_runner.request(ScalaSourceDependencyAnalysis, [source_files])
+    return rule_runner.request(ScalaSourceDependencyAnalysis, [request])
 
 
 def test_parser_simple(rule_runner: RuleRunner) -> None:
@@ -409,6 +410,28 @@ def test_package_object(rule_runner: RuleRunner) -> None:
         ),
     )
     assert sorted(analysis.provided_symbols) == ["foo.bar", "foo.bar.Hello"]
+
+
+def test_source3(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'2.13.8'}",
+            "--scalac-args=['-Xsource:3']",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            import bar.*
+            """
+        ),
+    )
+    assert analysis.imports_by_scope.get("foo") == (ScalaImport("bar", None, True),)
 
 
 def test_extract_annotations(rule_runner: RuleRunner) -> None:
