@@ -20,7 +20,7 @@ class SourceFiles:
     snapshot: Snapshot
 
     # The subset of files in snapshot that are not intended to have an associated source root.
-    # That is, the sources of unrooted resources() targets.
+    # That is, the sources of files and unrooted resources() targets.
     unrooted_files: Tuple[str, ...]
 
     @property
