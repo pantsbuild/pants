@@ -108,9 +108,7 @@ class HelpPrinter(MaybeColor):
             **_help_table(
                 self._all_help_info.name_to_target_type_info.keys(), self._print_target_help
             ),
-            **_help_table(
-                self._all_help_info.rule_output_type_to_rule_infos.keys(), self._print_api_type_help
-            ),
+            **_help_table(self._all_help_info.name_to_rule_info.keys(), self._print_api_type_help),
         }
 
     def _disambiguate_things(
@@ -283,7 +281,7 @@ class HelpPrinter(MaybeColor):
     def _print_all_api_types(self) -> None:
         self._print_title("Plugin API Types")
         api_type_descriptions: Dict[str, str] = {}
-        for api_type, rule_infos in self._all_help_info.rule_output_type_to_rule_infos.items():
+        for api_type, rule_infos in self._all_help_info.name_to_rule_info.items():
             if api_type.startswith("_"):
                 continue
             api_type_descriptions[api_type] = rule_infos[0].output_desc or ""

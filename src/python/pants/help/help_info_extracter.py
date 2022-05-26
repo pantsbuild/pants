@@ -8,8 +8,7 @@ import inspect
 import json
 from dataclasses import dataclass
 from enum import Enum
-from itertools import groupby
-from typing import Any, Callable, Iterable, Optional, Tuple, Type, Union, cast, get_type_hints
+from typing import Any, Callable, Optional, Tuple, Type, Union, cast, get_type_hints
 
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -249,16 +248,37 @@ class TargetTypeHelpInfo:
         )
 
 
+def maybe_cleandoc(doc: str | None) -> str | None:
+    return doc and inspect.cleandoc(doc)
+
+
 @dataclass(frozen=True)
 class RuleInfo:
+    """A container for help information for a rule.
+
+    The `description` is the `desc` provided to the `@rule` decorator, and `documentation` is the
+    rule's doc string.
+    """
+
     name: str
     description: str | None
-    help: str | None
+    documentation: str | None
     provider: str
+    output_type: str
     input_types: tuple[str, ...]
     input_gets: tuple[str, ...]
-    output_type: str
-    output_desc: str | None
+
+    @classmethod
+    def create(cls, rule: TaskRule, provider: str) -> RuleInfo:
+        return cls(
+            name=rule.canonical_name,
+            description=rule.desc,
+            documentation=maybe_cleandoc(rule.func.__doc__),
+            provider=provider,
+            input_types=tuple(selector.__name__ for selector in rule.input_selectors),
+            input_gets=tuple(str(constraints) for constraints in rule.input_gets),
+            output_type=rule.output_type.__name__,
+        )
 
 
 @dataclass(frozen=True)
@@ -268,7 +288,7 @@ class AllHelpInfo:
     scope_to_help_info: LazyFrozenDict[str, OptionScopeHelpInfo]
     name_to_goal_info: LazyFrozenDict[str, GoalHelpInfo]
     name_to_target_type_info: LazyFrozenDict[str, TargetTypeHelpInfo]
-    rule_output_type_to_rule_infos: LazyFrozenDict[str, tuple[RuleInfo, ...]]
+    name_to_rule_info: LazyFrozenDict[str, RuleInfo]
 
     def non_deprecated_option_scope_help_infos(self):
         for oshi in self.scope_to_help_info.values():
@@ -277,14 +297,7 @@ class AllHelpInfo:
 
     def asdict(self) -> dict[str, Any]:
         return {
-            field: {
-                thing: (
-                    tuple(dataclasses.asdict(t) for t in info)
-                    if isinstance(info, tuple)
-                    else dataclasses.asdict(info)
-                )
-                for thing, info in value.items()
-            }
+            field: {thing: dataclasses.asdict(info) for thing, info in value.items()}
             for field, value in dataclasses.asdict(self).items()
         }
 
@@ -408,7 +421,7 @@ class HelpInfoExtracter:
             scope_to_help_info=scope_to_help_info,
             name_to_goal_info=name_to_goal_info,
             name_to_target_type_info=name_to_target_type_info,
-            rule_output_type_to_rule_infos=cls.get_rule_infos(build_configuration),
+            name_to_rule_info=cls.get_rule_infos(build_configuration),
         )
 
     @staticmethod
@@ -484,52 +497,24 @@ class HelpInfoExtracter:
         # Pick the shortest backend name.
         return sorted(providers, key=len)[0]
 
-    @staticmethod
-    def maybe_cleandoc(doc: str | None) -> str | None:
-        return doc and inspect.cleandoc(doc)
-
-    @staticmethod
-    def rule_info_output_type(rule_info: RuleInfo) -> str:
-        return rule_info.output_type
-
     @classmethod
     def get_rule_infos(
         cls, build_configuration: BuildConfiguration | None
-    ) -> LazyFrozenDict[str, tuple[RuleInfo, ...]]:
+    ) -> LazyFrozenDict[str, RuleInfo]:
         if build_configuration is None:
             return LazyFrozenDict({})
 
-        rule_infos = [
-            RuleInfo(
-                name=rule.canonical_name,
-                description=rule.desc,
-                help=cls.maybe_cleandoc(rule.func.__doc__),
-                provider=cls.get_provider(providers),
-                input_types=tuple(selector.__name__ for selector in rule.input_selectors),
-                input_gets=tuple(str(constraints) for constraints in rule.input_gets),
-                output_type=rule.output_type.__name__,
-                output_desc=cls.maybe_cleandoc(rule.output_type.__doc__),
-            )
-            for rule, providers in build_configuration.rule_to_providers.items()
-            if isinstance(rule, TaskRule)
-        ]
-
-        def _capture(t: Iterable[RuleInfo]) -> Callable[[], tuple[RuleInfo, ...]]:
-            # The `t` value from `groupby` is only live for the duration of the current for-loop
-            # iteration, so we capture the data here now.
-            data = tuple(t)
-
-            def load() -> tuple[RuleInfo, ...]:
-                return data
+        def rule_info_loader(rule: TaskRule, provider: str) -> Callable[[], RuleInfo]:
+            def load() -> RuleInfo:
+                return RuleInfo.create(rule, provider)
 
             return load
 
         return LazyFrozenDict(
             {
-                rule_output_type: _capture(infos)
-                for rule_output_type, infos in groupby(
-                    sorted(rule_infos, key=cls.rule_info_output_type), key=cls.rule_info_output_type
-                )
+                rule.canonical_name: rule_info_loader(rule, cls.get_provider(providers))
+                for rule, providers in build_configuration.rule_to_providers.items()
+                if isinstance(rule, TaskRule)
             }
         )
 

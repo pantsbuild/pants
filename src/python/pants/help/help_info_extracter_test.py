@@ -410,7 +410,7 @@ def test_get_all_help_info():
     assert scope_to_help_info["bar"] == expected_scope_to_help__bar
     assert scope_to_help_info["bar-old"] == expected_scope_to_help__bar_old
 
-    rule_output_help = all_help_info_dict["rule_output_type_to_rule_infos"]
+    rule_output_help = all_help_info_dict["name_to_rule_info"]
     assert rule_output_help == {
         "Foo": (
             {
