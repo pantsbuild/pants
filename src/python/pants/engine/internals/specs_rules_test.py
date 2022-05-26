@@ -658,7 +658,7 @@ def test_raw_specs_with_only_file_owners_no_owner(rule_runner: RuleRunner) -> No
 
 
 def test_resolve_addresses_from_raw_specs(rule_runner: RuleRunner) -> None:
-    """This tests that we correctly handle resolving from both address and filesystem specs."""
+    """This tests that we correctly handle resolving from both specs with and without owners."""
     rule_runner.write_files(
         {
             "fs_spec/f.txt": "",
@@ -694,6 +694,49 @@ def test_resolve_addresses_from_raw_specs(rule_runner: RuleRunner) -> None:
         Address("multiple_files"),
         Address("multiple_files", relative_file_path="f2.txt"),
     }
+
+
+def test_resolve_addresses_from_specs(rule_runner: RuleRunner) -> None:
+    """Test that ignore specs win out over include specs, no matter what."""
+    rule_runner.write_files(
+        {
+            "f.txt": "",
+            "BUILD": dedent(
+                """\
+                file_generator(name='files', sources=['f.txt'])
+                nonfile_generator(name='nonfile')
+                target(name='tgt', resolve=parametrize("a", "b"))
+                """
+            ),
+            "subdir/BUILD": "target(name='tgt')",
+        }
+    )
+
+    def assert_resolved(specs: Iterable[str], expected: set[str]) -> None:
+        specs_obj = SpecsParser().parse_specs(specs, convert_dir_literal_to_address_literal=False)
+        result = rule_runner.request(Addresses, [specs_obj])
+        assert {addr.spec for addr in result} == expected
+
+    assert_resolved(["//:tgt"], {"//:tgt@resolve=a", "//:tgt@resolve=b"})
+    assert_resolved(["//:tgt", "-//:tgt@resolve=a"], {"//:tgt@resolve=b"})
+    assert_resolved(["//:tgt", "-//:tgt"], set())
+
+    assert_resolved(
+        ["::"],
+        {
+            "//:tgt@resolve=a",
+            "//:tgt@resolve=b",
+            "//:files",
+            "//f.txt:files",
+            "//:nonfile",
+            "//:nonfile#gen",
+            "subdir:tgt",
+        },
+    )
+    assert_resolved(
+        ["::", "-subdir::", "-//:nonfile", "-f.txt"],
+        {"//:tgt@resolve=a", "//:tgt@resolve=b", "//:files", "//:nonfile#gen"},
+    )
 
 
 def test_filtered_targets(rule_runner: RuleRunner) -> None:
@@ -770,8 +813,9 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
 
     Some important edge cases:
     - Files without owning targets still show up.
-    - If a file is owned by a target, and that target is filtered out e.g. via `--tags`, the file
-      must not show up.
+    - If a file is owned by a target, and that target is ignored with a spec, or is filtered out
+      e.g. via `--tags`, the file must not show up.
+    - If a file is explicitly ignored via specs, it must now show up.
     """
     rule_runner.write_files(
         {
@@ -797,44 +841,37 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--tag=-ignore"])
 
     def assert_paths(
-        specs: Iterable[Spec], expected_files: set[str], expected_dirs: set[str]
+        specs: Iterable[str], expected_files: set[str], expected_dirs: set[str]
     ) -> None:
-        specs_obj = Specs(
-            includes=RawSpecs.create(
-                specs, convert_dir_literal_to_address_literal=False, filter_by_global_options=True
-            )
-        )
+        specs_obj = SpecsParser().parse_specs(specs, convert_dir_literal_to_address_literal=False)
         result = rule_runner.request(SpecsPaths, [specs_obj])
         assert set(result.files) == expected_files
         assert set(result.dirs) == expected_dirs
 
     all_expected_demo_files = {"demo/f1.txt", "demo/f2.txt", "demo/unowned.foo"}
+    assert_paths(["demo:f1", "demo/*.txt", "demo/unowned.foo"], all_expected_demo_files, {"demo"})
+
     assert_paths(
-        [
-            AddressLiteralSpec("demo", "f1"),
-            FileGlobSpec("demo/*.txt"),
-            FileLiteralSpec("demo/unowned.foo"),
-        ],
-        all_expected_demo_files,
-        {"demo"},
+        ["demo:", "-demo:f1", "-demo/f2.txt"], {"demo/unowned.foo", "demo/BUILD"}, {"demo"}
     )
+    assert_paths(["demo/*.foo", "-demo/unowned.foo"], set(), set())
 
-    for dir_spec in (DirLiteralSpec, DirGlobSpec):
-        assert_paths([dir_spec("")], {"f.txt"}, set())
-        assert_paths([dir_spec("unowned")], {"unowned/f.txt"}, {"unowned"})
-        assert_paths([dir_spec("demo")], {*all_expected_demo_files, "demo/BUILD"}, {"demo"})
+    assert_paths([":"], {"f.txt"}, set())
+    for dir_suffix in ("", ":"):
+        assert_paths([f"unowned{dir_suffix}"], {"unowned/f.txt"}, {"unowned"})
+        assert_paths([f"demo{dir_suffix}"], {*all_expected_demo_files, "demo/BUILD"}, {"demo"})
 
     assert_paths(
-        [RecursiveGlobSpec("")],
+        ["::"],
         {*all_expected_demo_files, "demo/BUILD", "f.txt", "unowned/f.txt", "unowned/subdir/f.txt"},
         {"demo", "unowned", "unowned/subdir"},
     )
     assert_paths(
-        [RecursiveGlobSpec("unowned")],
+        ["unowned::"],
         {"unowned/f.txt", "unowned/subdir/f.txt"},
         {"unowned", "unowned/subdir"},
     )
-    assert_paths([RecursiveGlobSpec("demo")], {*all_expected_demo_files, "demo/BUILD"}, {"demo"})
+    assert_paths(["demo::"], {*all_expected_demo_files, "demo/BUILD"}, {"demo"})
 
 
 # -----------------------------------------------------------------------------------------------
