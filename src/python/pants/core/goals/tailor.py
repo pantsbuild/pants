@@ -263,7 +263,14 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
 class TailorSubsystem(GoalSubsystem):
     name = "tailor"
-    help = "Auto-generate BUILD file targets for new source files."
+    help = softwrap(
+        """
+        Auto-generate BUILD file targets for new source files.
+
+        Each specific `tailor` implementation may be disabled through language-specific options,
+        e.g. `[python].tailor_pex_binary_targets` and `[shell-setup].tailor`.
+        """
+    )
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
