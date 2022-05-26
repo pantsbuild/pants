@@ -39,7 +39,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -119,12 +119,12 @@ jobs:
         '
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-bootstrap-linux
         path: .pants.d/pants.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
         path: '.pants
@@ -190,7 +190,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -253,7 +253,7 @@ jobs:
 
         '
     - name: Upload native binaries
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
         path: '.pants
@@ -344,7 +344,7 @@ jobs:
       run: ./build-support/bin/release.sh build-fs-util
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-wheels-linux
         path: .pants.d/pants.log
@@ -445,7 +445,7 @@ jobs:
       run: ./build-support/bin/release.sh build-fs-util
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-wheels-macos
         path: .pants.d/pants.log
@@ -500,7 +500,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -511,7 +511,7 @@ jobs:
 
         '
     - name: Download native binaries
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - if: github.event_name != 'pull_request'
@@ -527,7 +527,7 @@ jobs:
         '
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-lint
         path: .pants.d/pants.log
@@ -565,12 +565,12 @@ jobs:
 
         '
     - name: Install AdoptJDK
-      uses: actions/setup-java@v2
+      uses: actions/setup-java@v3
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
@@ -586,7 +586,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -599,7 +599,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - if: github.event_name != 'pull_request'
@@ -613,7 +613,7 @@ jobs:
         '
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-python-test-linux-0_3
         path: .pants.d/pants.log
@@ -651,12 +651,12 @@ jobs:
 
         '
     - name: Install AdoptJDK
-      uses: actions/setup-java@v2
+      uses: actions/setup-java@v3
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
@@ -672,7 +672,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -685,7 +685,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - if: github.event_name != 'pull_request'
@@ -699,7 +699,7 @@ jobs:
         '
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-python-test-linux-1_3
         path: .pants.d/pants.log
@@ -737,12 +737,12 @@ jobs:
 
         '
     - name: Install AdoptJDK
-      uses: actions/setup-java@v2
+      uses: actions/setup-java@v3
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
@@ -758,7 +758,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -771,7 +771,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - if: github.event_name != 'pull_request'
@@ -785,7 +785,7 @@ jobs:
         '
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-python-test-linux-2_3
         path: .pants.d/pants.log
@@ -825,12 +825,12 @@ jobs:
 
         '
     - name: Install AdoptJDK
-      uses: actions/setup-java@v2
+      uses: actions/setup-java@v3
       with:
         distribution: adopt
         java-version: '11'
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -843,7 +843,7 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Download native binaries
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - if: github.event_name != 'pull_request'
@@ -855,7 +855,7 @@ jobs:
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-python-test-macos
         path: .pants.d/pants.log

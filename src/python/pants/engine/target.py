@@ -1991,16 +1991,6 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
     """
 
     alias = "sources"
-    help = softwrap(
-        """
-        A list of files and globs that belong to this target.
-
-        Paths are relative to the BUILD file's directory. You can ignore files/globs by
-        prefixing them with `!`.
-
-        Example: `sources=['example.ext', 'test_*.ext', '!test_ignore.ext']`.
-        """
-    )
 
     ban_subdirectories: ClassVar[bool] = False
 
