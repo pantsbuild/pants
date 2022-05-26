@@ -58,11 +58,15 @@ class PutativeTargetsRequest(metaclass=ABCMeta):
     dirs: tuple[str, ...]
     deprecated_recursive_dirs: tuple[str, ...] = ()
 
-    def path_globs(self, filename_glob: str) -> PathGlobs:
+    def path_globs(self, *filename_globs: str) -> PathGlobs:
         return PathGlobs(
             globs=(
-                *(os.path.join(d, filename_glob) for d in self.dirs),
-                *(os.path.join(d, "**", filename_glob) for d in self.deprecated_recursive_dirs),
+                *(os.path.join(d, glob) for d in self.dirs for glob in filename_globs),
+                *(
+                    os.path.join(d, "**", glob)
+                    for d in self.deprecated_recursive_dirs
+                    for glob in filename_globs
+                ),
             )
         )
 

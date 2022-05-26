@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -39,10 +38,9 @@ async def find_putative_targets(
     req: PutativeJSTargetsRequest,
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
-    all_js_files_globs = PathGlobs(
-        [os.path.join(d, "**", f"*{ext}") for d in req.dirs for ext in JS_FILE_EXTENSIONS]
+    all_js_files = await Get(
+        Paths, PathGlobs, req.path_globs(*(f"*{ext}" for ext in JS_FILE_EXTENSIONS))
     )
-    all_js_files = await Get(Paths, PathGlobs, all_js_files_globs)
     unowned_js_files = set(all_js_files.files) - set(all_owned_sources)
     classified_unowned_js_files = classify_source_files(unowned_js_files)
 
