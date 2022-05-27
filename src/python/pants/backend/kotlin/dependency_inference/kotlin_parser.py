@@ -146,7 +146,7 @@ async def analyze_kotlin_source_dependencies(
     # Use JDK 8 due to https://youtrack.jetbrains.com/issue/KTIJ-17192 and https://youtrack.jetbrains.com/issue/KT-37446.
     request = JdkRequest("adopt:8")
     env = await Get(JdkEnvironment, JdkRequest, request)
-    jdk = InternalJdk(env._digest, env.nailgun_jar, env.coursier, env.jre_major_version)
+    jdk = InternalJdk.from_jdk_environment(env)
 
     if len(source_files.files) > 1:
         raise ValueError(
