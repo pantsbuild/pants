@@ -15,7 +15,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     TargetGenerator,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.strutil import softwrap
 from pants.version import MAJOR_MINOR, PANTS_SEMVER
 
@@ -86,7 +86,7 @@ def determine_version() -> str:
 
 @rule
 def generate_from_pants_requirements(
-    request: GenerateFromPantsRequirementsRequest,
+    request: GenerateFromPantsRequirementsRequest, union_membership: UnionMembership
 ) -> GeneratedTargets:
     generator = request.generator
     version = determine_version()
@@ -99,6 +99,8 @@ def generate_from_pants_requirements(
                 **request.template,
             },
             request.template_address.create_generated(dist),
+            name_explicitly_set=request.generator_name_explicitly_set,
+            union_membership=union_membership,
         )
 
     result = [create_tgt("pantsbuild.pants", "pants")]

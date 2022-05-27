@@ -519,6 +519,42 @@ def test_dep_no_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> No
     }
 
 
+def test_name_explicitly_set(transitive_targets_rule_runner: RuleRunner) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "dir1/f.txt": "",
+            "dir1/BUILD": dedent(
+                """\
+                generator(sources=['f.txt'])
+                generator(name='nombre', sources=['f.txt'])
+                """
+            ),
+            "dir2/BUILD": dedent(
+                """\
+                target()
+                target(name='nombre')
+                """
+            ),
+            "same_name/BUILD": "target(name='same_name')",
+        }
+    )
+
+    def assert_is_set(addr: Address, expected: bool) -> None:
+        tgt = transitive_targets_rule_runner.get_target(addr)
+        assert tgt.name_explicitly_set is expected
+
+    assert_is_set(Address("dir1"), False)
+    assert_is_set(Address("dir1", relative_file_path="f.txt"), False)
+    assert_is_set(Address("dir1", target_name="nombre"), True)
+    assert_is_set(Address("dir1", target_name="nombre", relative_file_path="f.txt"), True)
+
+    assert_is_set(Address("dir2"), False)
+    assert_is_set(Address("dir2", target_name="nombre"), True)
+
+    # Even if the name is the same as the default, we should recognize when it's explicitly set.
+    assert_is_set(Address("same_name"), True)
+
+
 def test_deprecated_field_name(transitive_targets_rule_runner: RuleRunner, caplog) -> None:
     transitive_targets_rule_runner.write_files({"BUILD": "target(name='t', deprecated_field=[])"})
     transitive_targets_rule_runner.get_target(Address("", target_name="t"))

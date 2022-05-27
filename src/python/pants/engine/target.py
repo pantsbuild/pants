@@ -298,12 +298,14 @@ class Target:
     plugin_fields: tuple[type[Field], ...]
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
+    name_explicitly_set: bool
 
     @final
     def __init__(
         self,
         unhydrated_values: dict[str, Any],
         address: Address,
+        name_explicitly_set: bool = True,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
         # rarely directly instantiate Targets and should instead use the engine to request them.
@@ -341,6 +343,7 @@ class Target:
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
         self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
+        self.name_explicitly_set = name_explicitly_set
         self.field_values = self._calculate_field_values(unhydrated_values, address)
         self.validate()
 
@@ -1024,6 +1027,8 @@ class GenerateTargetsRequest(Generic[_TargetGenerator]):
     # applied within overrides.
     overrides: dict[str, dict[Address, dict[str, Any]]] = dataclasses.field(hash=False)
 
+    generator_name_explicitly_set: bool
+
     def require_unparametrized_overrides(self) -> dict[str, dict[str, Any]]:
         """Flattens overrides for `GenerateTargetsRequest` impls which don't support `parametrize`.
 
@@ -1100,6 +1105,7 @@ def _generate_file_level_targets(
     # NB: Should only ever be set to `None` in tests.
     union_membership: UnionMembership | None,
     *,
+    generator_name_explicitly_set: bool,
     add_dependencies_on_all_siblings: bool,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
@@ -1176,7 +1182,8 @@ def _generate_file_level_targets(
         return generated_target_cls(
             generated_target_fields,
             address,
-            union_membership,
+            name_explicitly_set=generator_name_explicitly_set,
+            union_membership=union_membership,
             residence_dir=os.path.dirname(full_fp),
         )
 

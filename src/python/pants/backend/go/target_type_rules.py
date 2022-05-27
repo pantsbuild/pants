@@ -225,6 +225,8 @@ async def generate_targets_from_go_mod(
         return TargetGeneratorSourcesHelperTarget(
             {TargetGeneratorSourcesHelperSourcesField.alias: fp},
             generator_addr.create_file(fp),
+            name_explicitly_set=request.generator_name_explicitly_set,
+            union_membership=union_membership,
         )
 
     file_tgts = [gen_file_tgt("go.mod")]
@@ -240,7 +242,8 @@ async def generate_targets_from_go_mod(
             },
             # E.g. `src/go:mod#github.com/google/uuid`.
             generator_addr.create_generated(pkg_info.import_path),
-            union_membership,
+            name_explicitly_set=request.generator_name_explicitly_set,
+            union_membership=union_membership,
             residence_dir=generator_addr.spec_path,
         )
 

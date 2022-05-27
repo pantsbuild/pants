@@ -29,3 +29,7 @@ class TargetAdaptor:
             and self.name == other.name
             and self.kwargs == other.kwargs
         )
+
+    @property
+    def name_explicitly_set(self) -> bool:
+        return self.name is not None
