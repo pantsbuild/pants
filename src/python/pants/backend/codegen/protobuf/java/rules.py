@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
+from pants.backend.codegen.protobuf.java import dependency_inference
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
@@ -125,6 +126,7 @@ def rules():
     return [
         *collect_rules(),
         *pex.rules(),
+        *dependency_inference.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
