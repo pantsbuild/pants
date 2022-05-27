@@ -1,5 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
@@ -293,203 +294,204 @@ def test_get_all_help_info():
     )
 
     all_help_info_dict = all_help_info.asdict()
-    expected_scope_to_help__global = {
-        "scope": GLOBAL_SCOPE,
-        "description": "Global options.",
-        "provider": "",
-        "is_goal": False,
-        "deprecated_scope": None,
-        "basic": (
-            {
-                "display_args": ("--opt1=<int>",),
-                "comma_separated_display_args": "--opt1=<int>",
-                "scoped_cmd_line_args": ("--opt1",),
-                "unscoped_cmd_line_args": ("--opt1",),
-                "config_key": "opt1",
-                "env_var": "PANTS_OPT1",
-                "value_history": {
-                    "ranked_values": (
-                        {"rank": Rank.NONE, "value": None, "details": None},
-                        {"rank": Rank.HARDCODED, "value": 42, "details": None},
-                    ),
-                },
-                "typ": int,
-                "default": 42,
-                "help": "Option 1",
-                "deprecation_active": False,
-                "deprecated_message": None,
-                "removal_version": None,
-                "removal_hint": None,
-                "choices": None,
-                "comma_separated_choices": None,
-            },
-            {
-                "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
-                "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
-                "scoped_cmd_line_args": ("-l", "--level"),
-                "unscoped_cmd_line_args": ("-l", "--level"),
-                "config_key": "level",
-                "env_var": "PANTS_LEVEL",
-                "value_history": {
-                    "ranked_values": (
-                        {"rank": Rank.NONE, "value": None, "details": None},
-                        {"rank": Rank.HARDCODED, "value": LogLevel.INFO, "details": None},
-                    ),
-                },
-                "typ": LogLevel,
-                "default": LogLevel.INFO,
-                "help": "Set the logging level.",
-                "deprecation_active": False,
-                "deprecated_message": None,
-                "removal_version": None,
-                "removal_hint": None,
-                "choices": ("trace", "debug", "info", "warn", "error"),
-                "comma_separated_choices": "trace, debug, info, warn, error",
-            },
-        ),
-        "advanced": tuple(),
-        "deprecated": tuple(),
-    }
-    expected_scope_to_help__foo = {
-        "scope": "foo",
-        "provider": "help_info_extracter_test",
-        "description": "A foo.",
-        "is_goal": False,
-        "deprecated_scope": None,
-        "basic": (),
-        "advanced": (
-            {
-                "display_args": ("--[no-]foo-opt2",),
-                "comma_separated_display_args": "--[no-]foo-opt2",
-                "scoped_cmd_line_args": ("--foo-opt2", "--no-foo-opt2"),
-                "unscoped_cmd_line_args": ("--opt2", "--no-opt2"),
-                "config_key": "opt2",
-                "env_var": "PANTS_FOO_OPT2",
-                "value_history": {
-                    "ranked_values": (
-                        {"rank": Rank.NONE, "value": None, "details": None},
-                        {"rank": Rank.HARDCODED, "value": True, "details": None},
-                    ),
-                },
-                "typ": bool,
-                "default": True,
-                "help": "Option 2",
-                "deprecation_active": False,
-                "deprecated_message": None,
-                "removal_version": None,
-                "removal_hint": None,
-                "choices": None,
-                "comma_separated_choices": None,
-            },
-        ),
-        "deprecated": tuple(),
-    }
-    expected_scope_to_help__bar = {
-        "scope": "bar",
-        "provider": "help_info_extracter_test",
-        "description": "The bar goal.",
-        "is_goal": True,
-        "deprecated_scope": "bar-old",
-        "basic": tuple(),
-        "advanced": tuple(),
-        "deprecated": tuple(),
-    }
-    expected_scope_to_help__bar_old = {
-        "scope": "bar-old",
-        "provider": "help_info_extracter_test",
-        "description": "The bar goal.",
-        "is_goal": True,
-        "deprecated_scope": "bar-old",
-        "basic": tuple(),
-        "advanced": tuple(),
-        "deprecated": tuple(),
-    }
-    scope_to_help_info = all_help_info_dict["scope_to_help_info"]
-    assert scope_to_help_info[GLOBAL_SCOPE] == expected_scope_to_help__global
-    assert scope_to_help_info["foo"] == expected_scope_to_help__foo
-    assert scope_to_help_info["bar"] == expected_scope_to_help__bar
-    assert scope_to_help_info["bar-old"] == expected_scope_to_help__bar_old
-
-    rule_output_help = all_help_info_dict["rule_output_type_to_rule_infos"]
-    assert rule_output_help == {
-        "Foo": (
-            {
-                "description": None,
-                "help": "A foo.",
-                "input_gets": ("Get(ScopedOptions, Scope, ..)",),
-                "input_types": (),
-                "name": "construct_scope_foo",
-                "output_desc": None,
-                "output_type": "Foo",
-                "provider": "help_info_extracter_test",
-            },
-        ),
-        "Target": (
-            {
-                "description": None,
-                "help": "This rule is for testing info extraction only.",
-                "input_gets": (),
-                "input_types": ("Foo",),
-                "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
-                "output_desc": (
-                    "A Target represents an addressable set of metadata.\n\n    Set the "
-                    "`help` class property with a description, which will be used in "
-                    "`./pants help`. For the\n    best rendering, use soft wrapping (e.g. "
-                    "implicit string concatenation) within paragraphs, but\n    hard wrapping "
-                    "(`\n`) to separate distinct paragraphs and/or lists.\n    "
+    expected_all_help_info_dict = {
+        "scope_to_help_info": {
+            GLOBAL_SCOPE: {
+                "scope": GLOBAL_SCOPE,
+                "description": "Global options.",
+                "provider": "",
+                "is_goal": False,
+                "deprecated_scope": None,
+                "basic": (
+                    {
+                        "display_args": ("--opt1=<int>",),
+                        "comma_separated_display_args": "--opt1=<int>",
+                        "scoped_cmd_line_args": ("--opt1",),
+                        "unscoped_cmd_line_args": ("--opt1",),
+                        "config_key": "opt1",
+                        "env_var": "PANTS_OPT1",
+                        "value_history": {
+                            "ranked_values": (
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": 42, "details": None},
+                            ),
+                        },
+                        "typ": int,
+                        "default": 42,
+                        "help": "Option 1",
+                        "deprecation_active": False,
+                        "deprecated_message": None,
+                        "removal_version": None,
+                        "removal_hint": None,
+                        "choices": None,
+                        "comma_separated_choices": None,
+                    },
+                    {
+                        "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
+                        "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                        "scoped_cmd_line_args": ("-l", "--level"),
+                        "unscoped_cmd_line_args": ("-l", "--level"),
+                        "config_key": "level",
+                        "env_var": "PANTS_LEVEL",
+                        "value_history": {
+                            "ranked_values": (
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": LogLevel.INFO, "details": None},
+                            ),
+                        },
+                        "typ": LogLevel,
+                        "default": LogLevel.INFO,
+                        "help": "Set the logging level.",
+                        "deprecation_active": False,
+                        "deprecated_message": None,
+                        "removal_version": None,
+                        "removal_hint": None,
+                        "choices": ("trace", "debug", "info", "warn", "error"),
+                        "comma_separated_choices": "trace, debug, info, warn, error",
+                    },
                 ),
-                "output_type": "Target",
-                "provider": "help_info_extracter_test",
+                "advanced": tuple(),
+                "deprecated": tuple(),
             },
-        ),
-    }
-
-    name_to_goal_info = all_help_info_dict["name_to_goal_info"]
-    assert name_to_goal_info == {
-        "bar": {
-            "name": "bar",
-            "provider": "help_info_extracter_test",
-            "description": "The bar goal.",
-            "consumed_scopes": ("somescope", "used_by_bar"),
-            "is_implemented": True,
+            "foo": {
+                "scope": "foo",
+                "provider": "help_info_extracter_test",
+                "description": "A foo.",
+                "is_goal": False,
+                "deprecated_scope": None,
+                "basic": (),
+                "advanced": (
+                    {
+                        "display_args": ("--[no-]foo-opt2",),
+                        "comma_separated_display_args": "--[no-]foo-opt2",
+                        "scoped_cmd_line_args": ("--foo-opt2", "--no-foo-opt2"),
+                        "unscoped_cmd_line_args": ("--opt2", "--no-opt2"),
+                        "config_key": "opt2",
+                        "env_var": "PANTS_FOO_OPT2",
+                        "value_history": {
+                            "ranked_values": (
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": True, "details": None},
+                            ),
+                        },
+                        "typ": bool,
+                        "default": True,
+                        "help": "Option 2",
+                        "deprecation_active": False,
+                        "deprecated_message": None,
+                        "removal_version": None,
+                        "removal_hint": None,
+                        "choices": None,
+                        "comma_separated_choices": None,
+                    },
+                ),
+                "deprecated": tuple(),
+            },
+            "bar": {
+                "scope": "bar",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "is_goal": True,
+                "deprecated_scope": "bar-old",
+                "basic": tuple(),
+                "advanced": tuple(),
+                "deprecated": tuple(),
+            },
+            "bar-old": {
+                "scope": "bar-old",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "is_goal": True,
+                "deprecated_scope": "bar-old",
+                "basic": tuple(),
+                "advanced": tuple(),
+                "deprecated": tuple(),
+            },
         },
-        "bar-old": {
-            "name": "bar",
-            "provider": "help_info_extracter_test",
-            "description": "The bar goal.",
-            "consumed_scopes": ("somescope", "used_by_bar-old"),
-            "is_implemented": True,
-        },
-    }
-
-    name_to_target_type_info = all_help_info_dict["name_to_target_type_info"]
-    assert name_to_target_type_info == {
-        "baz_library": {
-            "alias": "baz_library",
-            "provider": "help_info_extracter_test",
-            "summary": "A library of baz-es.",
-            "description": "A library of baz-es.\n\nUse it however you like.",
-            "fields": (
+        "rule_output_type_to_rule_infos": {
+            "Foo": (
                 {
-                    "alias": "qux",
-                    "provider": "",
-                    "default": "'blahblah'",
-                    "description": "A qux string.",
-                    "required": False,
-                    "type_hint": "str | None",
-                },
-                {
-                    "alias": "quux",
-                    "provider": "",
-                    "default": None,
-                    "description": "A quux int.\n\nMust be non-zero. Or zero. "
-                    "Whatever you like really.",
-                    "required": True,
-                    "type_hint": "int",
+                    "description": None,
+                    "help": "A foo.",
+                    "input_gets": ("Get(ScopedOptions, Scope, ..)",),
+                    "input_types": (),
+                    "name": "construct_scope_foo",
+                    "output_desc": None,
+                    "output_type": "Foo",
+                    "provider": "help_info_extracter_test",
                 },
             ),
-        }
+            "Target": (
+                {
+                    "description": None,
+                    "help": "This rule is for testing info extraction only.",
+                    "input_gets": (),
+                    "input_types": ("Foo",),
+                    "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                    "output_desc": (
+                        "A Target represents an addressable set of metadata.\n\n    Set the "
+                        "`help` class property with a description, which will be used in "
+                        "`./pants help`. For the\n    best rendering, use soft wrapping (e.g. "
+                        "implicit string concatenation) within paragraphs, but\n    hard wrapping "
+                        "(`\n`) to separate distinct paragraphs and/or lists.\n    "
+                    ),
+                    "output_type": "Target",
+                    "provider": "help_info_extracter_test",
+                },
+            ),
+        },
+        "name_to_goal_info": {
+            "bar": {
+                "name": "bar",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "consumed_scopes": ("somescope", "used_by_bar"),
+                "is_implemented": True,
+            },
+            "bar-old": {
+                "name": "bar",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "consumed_scopes": ("somescope", "used_by_bar-old"),
+                "is_implemented": True,
+            },
+        },
+        "name_to_target_type_info": {
+            "baz_library": {
+                "alias": "baz_library",
+                "provider": "help_info_extracter_test",
+                "summary": "A library of baz-es.",
+                "description": "A library of baz-es.\n\nUse it however you like.",
+                "fields": (
+                    {
+                        "alias": "qux",
+                        "provider": "",
+                        "default": "'blahblah'",
+                        "description": "A qux string.",
+                        "required": False,
+                        "type_hint": "str | None",
+                    },
+                    {
+                        "alias": "quux",
+                        "provider": "",
+                        "default": None,
+                        "description": "A quux int.\n\nMust be non-zero. Or zero. "
+                        "Whatever you like really.",
+                        "required": True,
+                        "type_hint": "int",
+                    },
+                ),
+            }
+        },
     }
+
+    # Break down this colossal structure into pieces so it is easier to spot where the issue is.
+    # Check keys equality first, then contents
+    assert set(expected_all_help_info_dict) == set(all_help_info_dict)
+    for key in all_help_info_dict:
+        actual = all_help_info_dict[key]
+        expected = expected_all_help_info_dict[key]
+        assert expected == actual
 
 
 def test_pretty_print_type_hint() -> None:
