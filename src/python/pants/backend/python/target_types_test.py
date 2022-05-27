@@ -356,6 +356,7 @@ def test_parse_requirements_file() -> None:
         r"""\
         # Comment.
         --find-links=https://duckduckgo.com
+        -r more_reqs.txt
         ansicolors>=1.18.0
         Django==3.2 ; python_version>'3'
         Un-Normalized-PROJECT  # Inline comment.

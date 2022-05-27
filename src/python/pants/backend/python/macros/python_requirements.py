@@ -53,14 +53,15 @@ class PythonRequirementsTargetGenerator(TargetGenerator):
     alias = "python_requirements"
     help = softwrap(
         """
-        Generate a `python_requirement` for each entry in a requirements.txt-style file.
+        Generate a `python_requirement` for each entry in a requirements.txt-style file from the
+        `source` field.
 
         This works with pip-style requirements files:
         https://pip.pypa.io/en/latest/reference/requirements-file-format/. However, pip options
         like `--hash` are (for now) ignored.
 
-        Instead of pip-style VCS requirements, use direct references from PEP 440:
-        https://www.python.org/dev/peps/pep-0440/#direct-references.
+        Pants will not follow `-r reqs.txt` lines. Instead, add a dedicated `python_requirements`
+        target generator for that additional requirements file.
         """
     )
     generated_target_cls = PythonRequirementTarget
