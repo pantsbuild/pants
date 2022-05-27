@@ -376,11 +376,26 @@ class SourceAnalysisTraverser extends Traverser {
 }
 
 object ScalaParser {
-  def analyze(pathStr: String): Analysis = {
+  def analyze(pathStr: String, scalaVersion: String, source3: Boolean): Analysis = {
     val path = java.nio.file.Paths.get(pathStr)
     val bytes = java.nio.file.Files.readAllBytes(path)
     val text = new String(bytes, "UTF-8")
-    val input = Input.VirtualFile(path.toString, text)
+
+    val dialect =
+      scalaVersion.take(4) match {
+        case "2.10"            => dialects.Scala210
+        case "2.11"            => dialects.Scala211
+        case "2.12" if source3 => dialects.Scala212Source3
+        case "2.12"            => dialects.Scala212
+        case "2.13" if source3 => dialects.Scala213Source3
+        case "2.13"            => dialects.Scala213
+        case "3.0"             => dialects.Scala3
+        case _ =>
+          if (scalaVersion.take(2) == "3.") dialects.Scala3
+          else dialects.Scala213
+      }
+
+    val input = dialect(Input.VirtualFile(path.toString, text))
 
     val tree = input.parse[Source].get
 
@@ -391,7 +406,10 @@ object ScalaParser {
 
   def main(args: Array[String]): Unit = {
     val outputPath = java.nio.file.Paths.get(args(0))
-    val analysis = analyze(args(1))
+    val pathStr = args(1)
+    val scalaVersion = args(2)
+    val source3 = args(3).toBoolean
+    val analysis = analyze(pathStr, scalaVersion, source3)
 
     val json = analysis.asJson.noSpaces
     java.nio.file.Files.write(
