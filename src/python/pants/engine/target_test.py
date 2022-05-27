@@ -28,6 +28,7 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidFieldTypeException,
     InvalidGeneratedTargetException,
+    InvalidSequenceFieldChoiceException,
     InvalidTargetException,
     MultipleSourcesField,
     NestedDictStringToStringField,
@@ -770,6 +771,34 @@ def test_string_sequence_field() -> None:
         Example("strings are technically iterable...", addr)
     with pytest.raises(InvalidFieldTypeException):
         Example(["hello", 0, "world"], addr)
+
+
+def test_string_sequence_field_valid_choices() -> None:
+    class GivenStrings(StringSequenceField):
+        alias = "example"
+        valid_choices = ("arugula", "kale", "spinach")
+
+    class LeafyGreens(Enum):
+        ARUGULA = "arugula"
+        KALE = "kale"
+        SPINACH = "spinach"
+
+    class GivenEnum(StringSequenceField):
+        alias = "example"
+        valid_choices = LeafyGreens
+        default = (LeafyGreens.KALE.value,)
+
+    addr = Address("", target_name="example")
+    assert GivenStrings(["arugula", "spinach"], addr).value == ("arugula", "spinach")
+    assert GivenEnum(["arugula", "spinach"], addr).value == ("arugula", "spinach")
+
+    assert GivenStrings(None, addr).value is None
+    assert GivenEnum(None, addr).value == ("kale",)
+
+    with pytest.raises(InvalidSequenceFieldChoiceException):
+        GivenStrings(["carrot"], addr)
+    with pytest.raises(InvalidSequenceFieldChoiceException):
+        GivenEnum(["carrot"], addr)
 
 
 def test_dict_string_to_string_field() -> None:

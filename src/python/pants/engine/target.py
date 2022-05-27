@@ -1507,6 +1507,21 @@ class InvalidFieldChoiceException(InvalidFieldException):
         )
 
 
+class InvalidSequenceFieldChoiceException(InvalidFieldException):
+    def __init__(
+        self,
+        address: Address,
+        field_alias: str,
+        raw_value: Optional[Any],
+        *,
+        valid_choices: Iterable[Any],
+    ) -> None:
+        super().__init__(
+            f"Each item in the {repr(field_alias)} field in target {address} must be "
+            f"one of {sorted(valid_choices)}, but one item was {repr(raw_value)}."
+        )
+
+
 class UnrecognizedTargetTypeException(Exception):
     def __init__(
         self,
@@ -1720,12 +1735,25 @@ class SequenceField(Generic[T], Field):
 class StringSequenceField(SequenceField[str]):
     expected_element_type = str
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
+    valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
-        return super().compute_value(raw_value, address)
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default and cls.valid_choices is not None:
+            valid_choices = set(
+                cls.valid_choices
+                if isinstance(cls.valid_choices, tuple)
+                else (choice.value for choice in cls.valid_choices)
+            )
+            for choice in value_or_default:
+                if choice not in valid_choices:
+                    raise InvalidSequenceFieldChoiceException(
+                        address, cls.alias, choice, valid_choices=valid_choices
+                    )
+        return value_or_default
 
 
 class DictStringToStringField(Field):
