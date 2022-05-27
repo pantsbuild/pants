@@ -73,7 +73,7 @@ impl ImmutableInputs {
     //
     // We take the final approach here currently (for simplicity's sake), but the advanced variant
     // of approach 2 might eventually be worthwhile.
-    cell
+    let value = cell
       .get_or_try_init(async {
         let chroot = TempDir::new_in(self.workdir.path()).map_err(|e| {
           format!(
@@ -93,10 +93,11 @@ impl ImmutableInputs {
         // is not cleaned up.
         let _ = chroot.into_path();
 
-        Ok(dest)
+        let res: Result<_, String> = Ok(dest);
+        res
       })
-      .await
-      .cloned()
+      .await?;
+    Ok(value.clone())
   }
 
   ///
