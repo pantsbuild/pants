@@ -56,7 +56,9 @@ class PythonRequirementsTargetGenerator(TargetGenerator):
         "https://pip.pypa.io/en/latest/reference/requirements-file-format/. However, pip options "
         "like `--hash` are (for now) ignored.\n\n"
         "Instead of pip-style VCS requirements, use direct references from PEP 440: "
-        "https://www.python.org/dev/peps/pep-0440/#direct-references."
+        "https://www.python.org/dev/peps/pep-0440/#direct-references.\n\n"
+        "Pants will not follow `-r reqs.txt` lines. Instead, add a dedicated `python_requirements` "
+        "target generator for that additional requirements file."
     )
     generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.
