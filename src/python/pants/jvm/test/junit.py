@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 
@@ -19,7 +21,12 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Targets
+from pants.engine.target import (
+    Dependencies,
+    SourcesField,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
@@ -69,9 +76,9 @@ async def setup_junit_for_target(
     test_subsystem: TestSubsystem,
 ) -> TestSetup:
 
-    jdk, dependencies = await MultiGet(
+    jdk, transitive_tgts = await MultiGet(
         Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)),
-        Get(Targets, DependenciesRequest(request.field_set.dependencies)),
+        Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
     )
 
     lockfile_request = await Get(GenerateJvmLockfileFromTool, JunitToolLockfileSentinel())
@@ -81,7 +88,7 @@ async def setup_junit_for_target(
         Get(
             SourceFiles,
             SourceFilesRequest(
-                (dep.get(SourcesField) for dep in dependencies),
+                (dep.get(SourcesField) for dep in transitive_tgts.dependencies),
                 for_sources_types=(FileSourceField,),
                 enable_codegen=True,
             ),
@@ -126,6 +133,7 @@ async def setup_junit_for_target(
             *junit.args,
         ],
         input_digest=input_digest,
+        extra_jvm_options=junit.jvm_options,
         extra_immutable_input_digests=extra_immutable_input_digests,
         output_directories=(reports_dir,),
         description=f"Run JUnit 5 ConsoleLauncher against {request.field_set.address}",

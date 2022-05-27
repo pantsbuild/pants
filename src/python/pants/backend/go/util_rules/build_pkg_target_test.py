@@ -49,7 +49,7 @@ class GoCodegenBuildFilesRequest(GoCodegenBuildRequest):
 
 
 @rule
-async def generate_from_file(request: GoCodegenBuildFilesRequest) -> BuildGoPackageRequest:
+async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBuildGoPackageRequest:
     content = dedent(
         """\
         package gen
@@ -71,14 +71,17 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> BuildGoPack
     thirdparty_dep = await Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(deps[0]))
     assert thirdparty_dep.request is not None
 
-    return BuildGoPackageRequest(
+    return FallibleBuildGoPackageRequest(
+        request=BuildGoPackageRequest(
+            import_path="codegen.com/gen",
+            digest=digest,
+            dir_path="codegen",
+            go_file_names=("f.go",),
+            s_file_names=(),
+            direct_dependencies=(thirdparty_dep.request,),
+            minimum_go_version=None,
+        ),
         import_path="codegen.com/gen",
-        digest=digest,
-        dir_path="codegen",
-        go_file_names=("f.go",),
-        s_file_names=(),
-        direct_dependencies=(thirdparty_dep.request,),
-        minimum_go_version=None,
     )
 
 

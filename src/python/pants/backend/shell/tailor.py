@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
+from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellSourcesGeneratorTarget,
     Shunit2TestsGeneratorSourcesField,
@@ -46,9 +47,12 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate shell targets to create")
 async def find_putative_targets(
-    req: PutativeShellTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeShellTargetsRequest, all_owned_sources: AllOwnedSources, shell_setup: ShellSetup
 ) -> PutativeTargets:
-    all_shell_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.sh"))
+    if not shell_setup.tailor:
+        return PutativeTargets()
+
+    all_shell_files = await Get(Paths, PathGlobs, req.path_globs("*.sh"))
     unowned_shell_files = set(all_shell_files.files) - set(all_owned_sources)
     classified_unowned_shell_files = classify_source_files(unowned_shell_files)
     pts = []

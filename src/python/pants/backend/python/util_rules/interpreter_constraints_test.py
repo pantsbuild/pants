@@ -125,13 +125,40 @@ def test_merge_interpreter_constraints() -> None:
     # No interpreter is shorthand for CPython, which is how Pex behaves
     assert_merged(inp=[[">=3.5"], ["CPython==3.7.*"]], expected=["CPython>=3.5,==3.7.*"])
 
-    # Different Python interpreters, which are guaranteed to fail when ANDed but are safe when ORed.
-    with pytest.raises(ValueError):
-        InterpreterConstraints.merge_constraint_sets([["CPython==3.7.*"], ["PyPy==43.0"]])
-    assert_merged(inp=[["CPython==3.7.*", "PyPy==43.0"]], expected=["CPython==3.7.*", "PyPy==43.0"])
-
-    # Ensure we can handle empty input.
+    # Handle empty constraints correctly.
+    assert_merged(inp=[[], []], expected=[])
+    assert_merged(inp=[[], ["==3.8.*"]], expected=["CPython==3.8.*"])
+    assert_merged(inp=[[">=3.8.2"], [], ["==3.8.*"]], expected=["CPython>=3.8.2,==3.8.*"])
     assert_merged(inp=[], expected=[])
+
+    # Handle mixed types correctly when there is a solution.
+    assert_merged(inp=[["CPython==3.7.*", "PyPy==43.0"]], expected=["CPython==3.7.*", "PyPy==43.0"])
+    assert_merged(
+        inp=[["CPython==3.7.*", "PyPy>=43.0"], ["PyPy<44.0"]], expected=["PyPy>=43.0,<44.0"]
+    )
+    assert_merged(
+        inp=[
+            ["CPython==3.7.*", "Jython", "PyPy>=43.0"],
+            ["PyPy<44.0", "Jython>=1.2"],
+            ["Jython<1.3", "PyPy<44.0"],
+        ],
+        expected=["PyPy>=43.0,<44.0", "Jython>=1.2,<1.3"],
+    )
+
+    # Ensure we error when there is no solution.
+    def assert_impossible(constraints, expected_msg):
+        with pytest.raises(ValueError) as excinfo:
+            print(InterpreterConstraints.merge_constraint_sets(constraints))
+        assert str(excinfo.value) == (
+            "These interpreter constraints cannot be merged, as they require conflicting "
+            f"interpreter types: {expected_msg}"
+        )
+
+    assert_impossible([["CPython==3.7.*"], ["PyPy==43.0"]], "(CPython==3.7.*) AND (PyPy==43.0)")
+    assert_impossible(
+        [["CPython==3.7.*", "Jython>=1.2"], ["PyPy==43.0", "Stackless<3.7"]],
+        "(CPython==3.7.* OR Jython>=1.2) AND (PyPy==43.0 OR Stackless<3.7)",
+    )
 
 
 @pytest.mark.parametrize(

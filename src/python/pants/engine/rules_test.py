@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import ast
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -16,17 +15,17 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.engine_testutil import assert_equal_with_printing
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler
-from pants.engine.internals.selectors import AwaitableConstraints, GetParseError
 from pants.engine.rules import (
+    DuplicateRuleError,
     Get,
     MissingParameterTypeAnnotation,
     MissingReturnTypeAnnotation,
     QueryRule,
     RuleIndex,
     UnrecognizedRuleArgument,
-    _RuleVisitor,
     goal_rule,
     rule,
+    rule_helper,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
@@ -84,123 +83,6 @@ def fmt_rule(
         )
         gets_str = f", gets=[{optional_line_sep}{get_members}{optional_line_sep}]"
     return f"@rule({fmt_rust_function(rule)}({params_str}) -> {product}{gets_str})"
-
-
-class TestRuleVisitor:
-    @staticmethod
-    def _parse_rule_gets(rule_text: str, **types: Type) -> List[AwaitableConstraints]:
-        rule_visitor = _RuleVisitor(
-            resolve_type=lambda name: types[name], source_file_name="parse_rules.py"
-        )
-        rule_visitor.visit(ast.parse(rule_text))
-        return rule_visitor.awaitables
-
-    @classmethod
-    def _parse_single_get(cls, rule_text: str, **types) -> AwaitableConstraints:
-        gets = cls._parse_rule_gets(rule_text, **types)
-        assert len(gets) == 1, f"Expected 1 Get expression, found {len(gets)}."
-        return gets[0]
-
-    def test_single_get(self) -> None:
-        get = self._parse_single_get(
-            dedent(
-                """
-                async def rule():
-                    a = await Get(A, B, 42)
-                """
-            ),
-            A=str,
-            B=int,
-        )
-        assert get.output_type == str
-        assert get.input_type == int
-
-    def test_multiple_gets(self) -> None:
-        gets = self._parse_rule_gets(
-            dedent(
-                """
-                async def rule():
-                    a = await Get(A, B, 42)
-                    if len(a) > 1:
-                        c = await Get(C, A("bob"))
-                """
-            ),
-            A=str,
-            B=int,
-            C=bool,
-        )
-
-        assert len(gets) == 2
-        get_a, get_c = gets
-
-        assert get_a.output_type == str
-        assert get_a.input_type == int
-
-        assert get_c.output_type == bool
-        assert get_c.input_type == str
-
-    def test_multiget_homogeneous(self) -> None:
-        get = self._parse_single_get(
-            dedent(
-                """
-                async def rule():
-                    a = await MultiGet(Get(A, B(x)) for x in range(5))
-                """
-            ),
-            A=str,
-            B=int,
-        )
-        assert get.output_type == str
-        assert get.input_type == int
-
-    def test_multiget_heterogeneous(self) -> None:
-        gets = self._parse_rule_gets(
-            dedent(
-                """
-                async def rule():
-                    a = await MultiGet(Get(A, B, 42), Get(B, A('bob')))
-                """
-            ),
-            A=str,
-            B=int,
-        )
-
-        assert len(gets) == 2
-        get_a, get_b = gets
-
-        assert get_a.output_type == str
-        assert get_a.input_type == int
-
-        assert get_b.output_type == int
-        assert get_b.input_type == str
-
-    def test_get_no_index_call_no_subject_call_allowed(self) -> None:
-        gets = self._parse_rule_gets("get_type: type = Get")
-        assert len(gets) == 0
-
-    def test_valid_get_unresolvable_product_type(self) -> None:
-        with pytest.raises(KeyError):
-            self._parse_rule_gets("Get(DNE, A(42))", A=int)
-
-    def test_valid_get_unresolvable_subject_declared_type(self) -> None:
-        with pytest.raises(KeyError):
-            self._parse_rule_gets("Get(int, DNE, 'bob')")
-
-    def test_invalid_get_no_subject_args(self) -> None:
-        with pytest.raises(GetParseError):
-            self._parse_rule_gets("Get(A, )", A=int)
-
-    def test_invalid_get_too_many_subject_args(self) -> None:
-        with pytest.raises(GetParseError):
-            self._parse_rule_gets("Get(A, B, 'bob', 3)", A=int, B=str)
-
-    def test_invalid_get_invalid_subject_arg_no_constructor_call(self) -> None:
-        with pytest.raises(GetParseError):
-            self._parse_rule_gets("Get(A, 'bob')", A=int)
-
-    def test_invalid_get_invalid_product_type_not_a_type_name(self) -> None:
-        with pytest.raises(GetParseError):
-            self._parse_rule_gets("Get(call(), A('bob'))", A=str)
 
 
 @dataclass(frozen=True)
@@ -435,7 +317,10 @@ class TestRuleArgumentAnnotation:
             return False
 
         assert a_named_rule.rule is not None
-        assert a_named_rule.rule.canonical_name == "pants.engine.rules_test.a_named_rule"
+        assert (
+            a_named_rule.rule.canonical_name
+            == "pants.engine.rules_test.TestRuleArgumentAnnotation.test_annotations_kwargs.a_named_rule"
+        )
         assert a_named_rule.rule.desc is None
         assert a_named_rule.rule.level == LogLevel.INFO
 
@@ -587,6 +472,7 @@ class TestRuleGraph:
         ) in str(cm.value)
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_not_fulfillable_duplicated_dependency(self) -> None:
         # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
         # Only the unfulfillable one should be in the errors.
@@ -631,6 +517,7 @@ class TestRuleGraph:
     @pytest.mark.skip(
         reason="TODO(#10649): Fix and re-enable once reachability checks are restored."
     )
+    @pytest.mark.no_error_if_skipped
     def test_unreachable_rule(self) -> None:
         """Test that when one rule "shadows" another, we get an error."""
 
@@ -827,6 +714,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_noop_removal_in_subgraph(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
@@ -859,6 +747,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_noop_removal_full_single_subject_type(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
@@ -887,6 +776,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_root_tuple_removed_when_no_matches(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
@@ -922,6 +812,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_noop_removal_transitive(self) -> None:
         # If a noop-able rule has rules that depend on it,
         # they should be removed from the graph.
@@ -990,6 +881,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_depends_on_multiple_one_noop(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
@@ -1065,6 +957,7 @@ class TestRuleGraph:
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
+    @pytest.mark.no_error_if_skipped
     def test_get_simple(self) -> None:
         @rule
         async def a() -> A:  # type: ignore[return]
@@ -1101,3 +994,52 @@ class TestRuleGraph:
     def create_subgraph(self, requested_product, rules, subject, validate=True):
         scheduler = create_scheduler(rules, validate=validate)
         return "\n".join(scheduler.rule_subgraph_visualization([type(subject)], requested_product))
+
+
+def test_duplicated_rules() -> None:
+    err = (
+        r"Redeclaring rule pants\.engine\.rules_test\.test_duplicated_rules\.dup_a with "
+        r"<function test_duplicated_rules\.<locals>\.dup_a at .*> at line \d+, previously defined "
+        r"by <function test_duplicated_rules\.<locals>\.dup_a at .*> at line \d+\."
+    )
+    with pytest.raises(DuplicateRuleError, match=err):
+
+        @rule
+        async def dup_a() -> A:
+            return A()
+
+        @rule  # type: ignore[no-redef] # noqa: F811
+        async def dup_a() -> B:  # noqa: F811
+            return B()
+
+
+def test_invalid_rule_helper_name() -> None:
+    with pytest.raises(ValueError, match="must be private"):
+
+        @rule_helper
+        async def foo() -> A:
+            pass
+
+
+def test_cant_be_both_rule_and_rule_helper() -> None:
+    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
+
+        @rule_helper
+        @rule
+        async def _func1() -> A:
+            pass
+
+    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
+
+        @rule
+        @rule_helper
+        async def _func2() -> A:
+            pass
+
+
+def test_synchronous_rule_helper() -> None:
+    with pytest.raises(ValueError, match="must be async"):
+
+        @rule_helper
+        def _foo() -> A:
+            pass

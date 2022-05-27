@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from textwrap import dedent
 
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField
@@ -27,9 +26,11 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
     ValidNumbers,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.util.enums import match
+from pants.util.strutil import softwrap
 
 
 class ShellSourceField(SingleSourceField):
@@ -109,9 +110,12 @@ class Shunit2TestDependenciesField(Dependencies):
 
 class Shunit2TestTimeoutField(IntField):
     alias = "timeout"
-    help = (
-        "A timeout (in seconds) used by each test file belonging to this target.\n\n"
-        "If unset, the test will never time out."
+    help = softwrap(
+        """
+        A timeout (in seconds) used by each test file belonging to this target.
+
+        If unset, the test will never time out.
+        """
     )
     valid_numbers = ValidNumbers.positive_only
 
@@ -143,15 +147,19 @@ class Shunit2TestTarget(Target):
         Shunit2ShellField,
         RuntimePackageDependenciesField,
     )
-    help = (
-        "A single test file for Bourne-based shell scripts using the shunit2 test framework.\n\n"
-        "To use, add tests to your file per https://github.com/kward/shunit2/. Specify the shell "
-        f"to run with by either setting the field `{Shunit2ShellField.alias}` or including a "
-        f"shebang. To test the same file with multiple shells, create multiple `shunit2_tests` "
-        f"targets, one for each shell.\n\n"
-        f"Pants will automatically download the `shunit2` bash script and add "
-        f"`source ./shunit2` to your test for you. If you already have `source ./shunit2`, "
-        f"Pants will overwrite it to use the correct relative path."
+    help = softwrap(
+        f"""
+        A single test file for Bourne-based shell scripts using the shunit2 test framework.
+
+        To use, add tests to your file per https://github.com/kward/shunit2/. Specify the shell
+        to run with by either setting the field `{Shunit2ShellField.alias}` or including a
+        shebang. To test the same file with multiple shells, create multiple `shunit2_tests`
+        targets, one for each shell.
+
+        Pants will automatically download the `shunit2` bash script and add
+        `source ./shunit2` to your test for you. If you already have `source ./shunit2`,
+        Pants will overwrite it to use the correct relative path.
+        """
     )
 
 
@@ -162,18 +170,21 @@ class Shunit2TestTarget(Target):
 
 class Shunit2TestsGeneratorSourcesField(ShellGeneratingSourcesBase):
     default = ("*_test.sh", "test_*.sh", "tests.sh")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['test.sh', 'test_*.sh', '!test_ignore.sh']`"
+    )
 
 
 class Shunit2TestsOverrideField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         Shunit2TestTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo_test.sh": {"timeout": 120]},\n'
-            '  "bar_test.sh": {"timeout": 200]},\n'
-            '  ("foo_test.sh", "bar_test.sh"): {"tags": ["slow_tests"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo_test.sh": {"timeout": 120]},
+            "bar_test.sh": {"timeout": 200]},
+            ("foo_test.sh", "bar_test.sh"): {"tags": ["slow_tests"]},
+        }
+        """,
     )
 
 
@@ -182,15 +193,12 @@ class Shunit2TestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Shunit2TestsGeneratorSourcesField,
-        Shunit2TestDependenciesField,
         Shunit2TestsOverrideField,
     )
     generated_target_cls = Shunit2TestTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        Shunit2TestDependenciesField,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        Shunit2TestDependenciesField,
         Shunit2TestTimeoutField,
         SkipShunit2TestsField,
         Shunit2ShellField,
@@ -212,18 +220,21 @@ class ShellSourceTarget(Target):
 
 class ShellSourcesGeneratingSourcesField(ShellGeneratingSourcesBase):
     default = ("*.sh",) + tuple(f"!{pat}" for pat in Shunit2TestsGeneratorSourcesField.default)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.sh', 'new_*.sh', '!old_ignore.sh']`"
+    )
 
 
 class ShellSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ShellSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo.sh": {"skip_shellcheck": True]},\n'
-            '  "bar.sh": {"skip_shfmt": True]},\n'
-            '  ("foo.sh", "bar.sh"): {"tags": ["linter_disabled"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo.sh": {"skip_shellcheck": True]},
+            "bar.sh": {"skip_shfmt": True]},
+            ("foo.sh", "bar.sh"): {"tags": ["linter_disabled"]},
+        }
+        """,
     )
 
 
@@ -231,16 +242,12 @@ class ShellSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "shell_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         ShellSourcesGeneratingSourcesField,
         ShellSourcesOverridesField,
     )
     generated_target_cls = ShellSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-    )
-    moved_fields = ()
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (Dependencies,)
     help = "Generate a `shell_source` target for each file in the `sources` field."
 
 
@@ -257,9 +264,12 @@ class ShellCommandCommandField(StringField):
 
 class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
-    help = (
-        "Specify the shell command output files and directories.\n\n"
-        "Use a trailing slash on directory names, i.e. `my_dir/`."
+    help = softwrap(
+        """
+        Specify the shell command output files and directories.
+
+        Use a trailing slash on directory names, i.e. `my_dir/`.
+        """
     )
 
 
@@ -280,11 +290,14 @@ class ShellCommandTimeoutField(IntField):
 class ShellCommandToolsField(StringSequenceField):
     alias = "tools"
     required = True
-    help = (
-        "Specify required executable tools that might be used.\n\n"
-        "Only the tools explicitly provided will be available on the search PATH, "
-        "and these tools must be found on the paths provided by "
-        "[shell-setup].executable_search_paths (which defaults to the system PATH)."
+    help = softwrap(
+        """
+        Specify required executable tools that might be used.
+
+        Only the tools explicitly provided will be available on the search PATH,
+        and these tools must be found on the paths provided by
+        [shell-setup].executable_search_paths (which defaults to the system PATH).
+        """
     )
 
 
@@ -312,28 +325,27 @@ class ShellCommandTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
     )
-    help = (
-        "Execute any external tool for its side effects.\n"
-        + dedent(
-            """\
+    help = softwrap(
+        """
+        Execute any external tool for its side effects.
 
-            Example BUILD file:
+        Example BUILD file:
 
-                experimental_shell_command(
-                  command="./my-script.sh --flag",
-                  tools=["tar", "curl", "cat", "bash", "env"],
-                  dependencies=[":scripts"],
-                  outputs=["results/", "logs/my-script.log"],
-                )
+            experimental_shell_command(
+                command="./my-script.sh --flag",
+                tools=["tar", "curl", "cat", "bash", "env"],
+                dependencies=[":scripts"],
+                outputs=["results/", "logs/my-script.log"],
+            )
 
-                shell_sources(name="scripts")
+            shell_sources(name="scripts")
 
-            """
-        )
-        + "Remember to add this target to the dependencies of each consumer, such as your "
-        "`python_tests` or `docker_image`. When relevant, Pants will run your `command` and "
-        "insert the `outputs` into that consumer's context.\n\n"
-        "The command may be retried and/or cancelled, so ensure that it is idempotent."
+        Remember to add this target to the dependencies of each consumer, such as your
+        `python_tests` or `docker_image`. When relevant, Pants will run your `command` and
+        insert the `outputs` into that consumer's context.
+
+        The command may be retried and/or cancelled, so ensure that it is idempotent.
+        """
     )
 
 
@@ -345,26 +357,25 @@ class ShellCommandRunTarget(Target):
         ShellCommandCommandField,
         ShellCommandRunWorkdirField,
     )
-    help = (
-        "Run a script in the workspace, with all dependencies packaged/copied into a chroot.\n"
-        + dedent(
-            """\
+    help = softwrap(
+        """
+        Run a script in the workspace, with all dependencies packaged/copied into a chroot.
 
-            Example BUILD file:
+        Example BUILD file:
 
-                experimental_run_shell_command(
-                  command="./scripts/my-script.sh --data-files-dir={chroot}",
-                  dependencies=["src/project/files:data"],
-                )
+            experimental_run_shell_command(
+                command="./scripts/my-script.sh --data-files-dir={chroot}",
+                dependencies=["src/project/files:data"],
+            )
 
-            """
-        )
-        + "The `command` may use either `{chroot}` on the command line, or the `$CHROOT` "
-        "environment variable to get the root directory for where any dependencies are located.\n\n"
-        "In contrast to the `experimental_shell_command`, in addition to `workdir` you only have "
-        "the `command` and `dependencies` fields as the `tools` you are going to use are already "
-        "on the PATH which is inherited from the Pants environment. Also, the `outputs` does not "
-        "apply, as any output files produced will end up directly in your project tree."
+        The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
+        environment variable to get the root directory for where any dependencies are located.
+
+        In contrast to the `experimental_shell_command`, in addition to `workdir` you only have
+        the `command` and `dependencies` fields as the `tools` you are going to use are already
+        on the PATH which is inherited from the Pants environment. Also, the `outputs` does not
+        apply, as any output files produced will end up directly in your project tree.
+        """
     )
 
 

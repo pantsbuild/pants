@@ -10,6 +10,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
+from pants.util.strutil import softwrap
 
 
 class Shellcheck(TemplatedExternalTool):
@@ -42,10 +43,12 @@ class Shellcheck(TemplatedExternalTool):
         "--config-discovery",
         default=True,
         advanced=True,
-        help=(
-            "If true, Pants will include all relevant `.shellcheckrc` and `shellcheckrc` files "
-            "during runs. See https://www.mankier.com/1/shellcheck#RC_Files for where these "
-            "can be located."
+        help=softwrap(
+            """
+            If true, Pants will include all relevant `.shellcheckrc` and `shellcheckrc` files
+            during runs. See https://www.mankier.com/1/shellcheck#RC_Files for where these
+            can be located.
+            """
         ),
     )
 

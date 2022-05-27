@@ -399,6 +399,7 @@ impl Sessions {
         .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
       let (abort_handle, abort_registration) = AbortHandle::new_pair();
       let sessions = sessions.clone();
+      #[allow(clippy::let_underscore_lock)]
       let _ = executor.spawn(Abortable::new(
         async move {
           loop {
@@ -452,7 +453,8 @@ impl Sessions {
   /// Waits at most `timeout` for Sessions to complete.
   ///
   pub async fn shutdown(&self, timeout: Duration) -> Result<(), String> {
-    if let Some(sessions) = self.sessions.lock().take() {
+    let sessions_opt = self.sessions.lock().take();
+    if let Some(sessions) = sessions_opt {
       // Collect clones of the cancellation tokens for each Session, which allows us to watch for
       // them to have been dropped.
       let (build_ids, cancellation_latches): (Vec<_>, Vec<_>) = sessions

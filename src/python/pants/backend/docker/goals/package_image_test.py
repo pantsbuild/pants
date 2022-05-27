@@ -274,6 +274,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 docker_image(name="unreg", image_tags=["1.2.3"], registries=[])
                 docker_image(name="def", image_tags=["1.2.3"])
                 docker_image(name="multi", image_tags=["1.2.3"], registries=["@reg2", "@reg1"])
+                docker_image(name="extra_tags", image_tags=["1.2.3"], registries=["@reg1", "@extra"])
                 """
             ),
             "docker/test/Dockerfile": "FROM python:3.8",
@@ -285,6 +286,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         "registries": {
             "reg1": {"address": "myregistry1domain:port"},
             "reg2": {"address": "myregistry2domain:port", "default": "true"},
+            "extra": {"address": "extra", "extra_image_tags": ["latest"]},
         },
     }
 
@@ -343,6 +345,17 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
             "Built docker images: \n"
             "  * myregistry2domain:port/multi:1.2.3\n"
             "  * myregistry1domain:port/multi:1.2.3"
+        ),
+        options=options,
+    )
+    assert_build(
+        rule_runner,
+        Address("docker/test", target_name="extra_tags"),
+        (
+            "Built docker images: \n"
+            "  * myregistry1domain:port/extra_tags:1.2.3\n"
+            "  * extra/extra_tags:1.2.3\n"
+            "  * extra/extra_tags:latest"
         ),
         options=options,
     )
@@ -980,3 +993,28 @@ def test_get_context_root(
 )
 def test_parse_image_id_from_docker_build_output(expected: str, stdout: str, stderr: str) -> None:
     assert expected == parse_image_id_from_docker_build_output(stdout.encode(), stderr.encode())
+
+
+@pytest.mark.parametrize(
+    "raw_values, expect_raises, image_refs",
+    [
+        (dict(name="lowercase"), no_exception(), ("lowercase:latest",)),
+        (dict(name="CamelCase"), no_exception(), ("camelcase:latest",)),
+        (dict(image_tags=["CamelCase"]), no_exception(), ("image:CamelCase",)),
+        (dict(registries=["REG1.example.net"]), no_exception(), ("REG1.example.net/image:latest",)),
+    ],
+)
+def test_image_ref_formatting(
+    raw_values: dict, expect_raises: ContextManager, image_refs: tuple[str, ...]
+) -> None:
+    address = Address("test", target_name=raw_values.pop("name", "image"))
+    tgt = DockerImageTarget(raw_values, address)
+    field_set = DockerFieldSet.create(tgt)
+    default_repository = "{name}"
+    registries = DockerRegistries.from_dict({})
+    interpolation_context = DockerInterpolationContext.from_dict({})
+    with expect_raises:
+        assert (
+            field_set.image_refs(default_repository, registries, interpolation_context)
+            == image_refs
+        )

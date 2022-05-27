@@ -16,6 +16,7 @@ from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
+from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -55,10 +56,11 @@ def rule_runner() -> RuleRunner:
         ),
     ],
 )
-def test_putative_target_addresses(files: list[tuple[str, str]], rule_runner: RuleRunner) -> None:
+def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunner) -> None:
     dockerfile_content = dedent(
         """\
-        FROM base
+        ARG BASE_IMAGE=:base
+        FROM $BASE_IMAGE
         COPY some.target/binary.pex some.target/tool.pex /bin
         COPY --from=scratch this.is/ignored.pex /opt
         COPY binary another/cli.pex tool /bin
@@ -71,10 +73,13 @@ def test_putative_target_addresses(files: list[tuple[str, str]], rule_runner: Ru
 
     addr = Address("test")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
-    assert info.putative_target_addresses == (
-        "some/target:binary",
-        "some/target:tool",
-        "another:cli",
+    assert info.from_image_addresses == (":base",)
+    assert info.copy_source_paths == (
+        "some.target/binary.pex",
+        "some.target/tool.pex",
+        "binary",
+        "another/cli.pex",
+        "tool",
     )
 
 
@@ -192,3 +197,15 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
         # Stage 2 is not pinned with a tag.
         "stage3 v0.54.0",
     )
+
+
+def test_generate_lockfile_without_python_backend() -> None:
+    """Regression test for https://github.com/pantsbuild/pants/issues/14876."""
+    run_pants(
+        [
+            "--backend-packages=pants.backend.docker",
+            "--dockerfile-parser-lockfile=dp.lock",
+            "generate-lockfiles",
+            "--resolve=dockerfile-parser",
+        ]
+    ).assert_success()

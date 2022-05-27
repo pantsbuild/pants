@@ -2,7 +2,9 @@ use std::collections::HashSet;
 use std::sync::atomic;
 use std::time::Duration;
 
-use crate::{SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
+use internment::Intern;
+
+use crate::{Level, ParentIds, SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[test]
 fn heavy_hitters_basic() {
@@ -56,6 +58,72 @@ fn straggling_workunits_blocked_path() {
   assert!(ws.straggling_workunits(Duration::from_secs(0)).is_empty());
 }
 
+#[tokio::test]
+async fn disabled_workunit_is_filtered() {
+  // Create a chain of completed workunits like: Info -> Trace -> Info (where `Trace` is below the
+  // minimum level recoded in the store).
+  let ws = create_store(
+    vec![],
+    vec![],
+    vec![
+      wu_level(0, None, Level::Info),
+      wu_level(1, Some(0), Level::Trace),
+      wu_level(2, Some(1), Level::Info),
+    ],
+  );
+
+  // Confirm that latest_workunits reports the two Info level workunits while fixing up parent links.
+  let (_, completed) = ws.latest_workunits(Level::Info);
+  assert_eq!(completed.len(), 2);
+  assert_eq!(completed[0].parent_ids, ParentIds::new());
+  assert_eq!(
+    completed[1].parent_ids,
+    vec![SpanId(0)].into_iter().collect::<ParentIds>()
+  );
+}
+
+#[tokio::test]
+async fn workunit_escalation_is_recorded() {
+  // Create a store which will disable Debug level workunits.
+  let ws = WorkunitStore::new(true, Level::Info);
+  ws.init_thread_state(None);
+
+  // Start a workunit at Debug (below the level of the store).
+  let new_desc = "One more thing!";
+  in_workunit!(
+    "super_fine",
+    Level::Debug,
+    desc = Some("Should be ignored".to_owned()),
+    |workunit| async move {
+      workunit.update_metadata(|metadata| {
+        // Ensure that it has no metadata (i.e.: is disabled).
+        assert!(metadata.is_none());
+
+        // Then return new metadata and raise the workunit's level.
+        Some((
+          WorkunitMetadata {
+            desc: Some(new_desc.to_owned()),
+            ..WorkunitMetadata::default()
+          },
+          Level::Info,
+        ))
+      });
+    }
+  )
+  .await;
+
+  // Finally, confirm that the workunit did end up recorded using the new level.
+  let (started, completed) = ws.latest_workunits(Level::Info);
+  assert!(started.is_empty());
+  assert_eq!(
+    completed
+      .into_iter()
+      .map(|wu| wu.metadata.and_then(|m| m.desc))
+      .collect::<Vec<_>>(),
+    vec![Some(new_desc.to_owned())]
+  );
+}
+
 #[test]
 fn workunit_span_id_has_16_digits_len_hex_format() {
   let number: u64 = 1;
@@ -86,11 +154,11 @@ fn create_store(
 ) -> WorkunitStore {
   let completed_ids = completed
     .iter()
-    .map(|(span_id, _, _)| *span_id)
+    .map(|(_, span_id, _, _)| *span_id)
     .collect::<HashSet<_>>();
   let blocked_ids = blocked
     .iter()
-    .map(|(span_id, _, _)| *span_id)
+    .map(|(_, span_id, _, _)| *span_id)
     .collect::<HashSet<_>>();
   let ws = WorkunitStore::new(true, log::Level::Debug);
 
@@ -100,16 +168,22 @@ fn create_store(
     .chain(blocked.into_iter())
     .chain(completed.into_iter())
     .collect::<Vec<_>>();
-  all.sort_by(|a, b| a.0.cmp(&b.0));
+  all.sort_by(|a, b| a.1.cmp(&b.1));
 
   // Start all workunits in SpanId order.
   let workunits = all
     .into_iter()
-    .map(|(span_id, parent_id, metadata)| {
+    .map(|(level, span_id, parent_id, metadata)| {
       if let Some(parent_id) = parent_id {
         assert!(span_id > parent_id);
       }
-      ws.start_workunit(span_id, format!("{}", span_id.0), parent_id, metadata)
+      ws._start_workunit(
+        span_id,
+        Intern::new(format!("{}", span_id.0)).as_ref(),
+        level,
+        parent_id,
+        Some(metadata),
+      )
     })
     .collect::<Vec<_>>();
 
@@ -131,21 +205,18 @@ fn create_store(
 
 // Used with `create_store` to quickly create a tree of anonymous workunits (with names equal to
 // their SpanIds).
-type AnonymousWorkunit = (SpanId, Option<SpanId>, WorkunitMetadata);
+type AnonymousWorkunit = (Level, SpanId, Option<SpanId>, WorkunitMetadata);
 
 fn wu_root(span_id: u64) -> AnonymousWorkunit {
-  wu_meta(span_id, None, WorkunitMetadata::default())
+  wu_level(span_id, None, Level::Info)
 }
 
 fn wu(span_id: u64, parent_id: u64) -> AnonymousWorkunit {
-  wu_meta(span_id, Some(parent_id), WorkunitMetadata::default())
+  wu_level(span_id, Some(parent_id), Level::Info)
 }
 
-fn wu_meta(
-  span_id: u64,
-  parent_id: Option<u64>,
-  mut metadata: WorkunitMetadata,
-) -> AnonymousWorkunit {
+fn wu_level(span_id: u64, parent_id: Option<u64>, level: Level) -> AnonymousWorkunit {
+  let mut metadata = WorkunitMetadata::default();
   metadata.desc = Some(format!("{}", span_id));
-  (SpanId(span_id), parent_id.map(SpanId), metadata)
+  (level, SpanId(span_id), parent_id.map(SpanId), metadata)
 }

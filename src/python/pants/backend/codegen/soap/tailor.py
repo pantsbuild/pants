@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.codegen.soap.soap_subsystem import SoapSubsystem
 from pants.backend.codegen.soap.target_types import WsdlSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -27,9 +28,14 @@ class PutativeWsdlTargetsRequest(PutativeTargetsRequest):
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate WSDL targets to create")
 async def find_putative_targets(
-    req: PutativeWsdlTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeWsdlTargetsRequest,
+    all_owned_sources: AllOwnedSources,
+    soap_subsystem: SoapSubsystem,
 ) -> PutativeTargets:
-    all_wsdl_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.wsdl"))
+    if not soap_subsystem.tailor:
+        return PutativeTargets()
+
+    all_wsdl_files = await Get(Paths, PathGlobs, req.path_globs("*.wsdl"))
     unowned_wsdl_files = set(all_wsdl_files.files) - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(

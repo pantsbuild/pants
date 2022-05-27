@@ -5,14 +5,12 @@ from __future__ import annotations
 
 import logging
 import re
-import textwrap
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Iterable
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, LintResults
-from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -21,6 +19,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -74,16 +73,22 @@ class ValidationConfig:
 
 class RegexLintSubsystem(Subsystem):
     options_scope = "regex-lint"
-    help = (
-        "Lint your code using regex patterns, e.g. to check for copyright headers.\n\n"
-        "To activate this with the `lint` goal, you must set `[regex-lint].config`.\n\n"
-        "Unlike other linters, this can run on files not owned by targets, such as BUILD files. To "
-        "run on those, use `lint '**'` rather than `lint ::`, for example. Unfortunately, "
-        "`--changed-since=<sha>` does not yet cause this linter to run. We are exploring how to "
-        "improve both these gotchas."
+    help = softwrap(
+        """
+        Lint your code using regex patterns, e.g. to check for copyright headers.
+
+        To activate this with the `lint` goal, you must set `[regex-lint].config`.
+
+        Unlike other linters, this can run on files not owned by targets, such as BUILD files.
+        """
     )
-    schema_help = textwrap.dedent(
-        """\
+
+    _config = DictOption[Any](
+        "--config",
+        help=softwrap(
+            """
+            Config schema is as follows:
+
                 ```
                 {
                 'required_matches': {
@@ -110,17 +115,13 @@ class RegexLintSubsystem(Subsystem):
                 ]
                 }
                 ```
-                """
-    )
 
-    _config = DictOption[Any](
-        "--config",
-        help=(
-            f"Config schema is as follows:\n\n{schema_help}\n\n"
-            "Meaning: if a file matches some path pattern, its content must match all the "
-            "corresponding content patterns.\n\n"
-            "It's often helpful to load this config from a JSON or YAML file. To do that, set "
-            "`[regex-lint].config = '@path/to/config.yaml'`, for example."
+            Meaning: if a file matches some path pattern, its content must match all the
+            corresponding content patterns.
+
+            It's often helpful to load this config from a JSON or YAML file. To do that, set
+            `[regex-lint].config = '@path/to/config.yaml'`, for example.
+            """
         ),
         fromfile=True,
     )
@@ -142,10 +143,6 @@ class RegexMatchResult:
     path: str
     matching: tuple
     nonmatching: tuple
-
-
-class RegexMatchResults(Collection[RegexMatchResult]):
-    pass
 
 
 class Matcher:
@@ -183,7 +180,7 @@ class ContentMatcher(Matcher):
 
 
 class MultiMatcher:
-    def __init__(self, config: ValidationConfig):
+    def __init__(self, config: ValidationConfig) -> None:
         """Class to check multiple regex matching on files.
 
         :param dict config: Regex matching config (see above).
@@ -222,23 +219,9 @@ class MultiMatcher:
         self._content_matchers = {cp.name: ContentMatcher(cp) for cp in config.content_patterns}
         self._required_matches = config.required_matches
 
-    def check_source_file(self, path, content):
-        content_pattern_names, encoding = self.get_applicable_content_pattern_names(path)
-        matching, nonmatching = self.check_content(content_pattern_names, content, encoding)
-        return RegexMatchResult(path, matching, nonmatching)
-
-    def check_content(self, content_pattern_names, content, encoding):
-        """Check which of the named patterns matches the given content.
-
-        Returns a pair (matching, nonmatching), in which each element is a tuple of pattern names.
-
-        :param iterable content_pattern_names: names of content patterns to check.
-        :param bytes content: the content to check.
-        :param str encoding: the expected encoding of content.
-        """
-        if not content_pattern_names or not encoding:
-            return (), ()
-
+    def check_content(
+        self, path: str, content: bytes, content_pattern_names: Iterable[str], encoding: str
+    ) -> RegexMatchResult:
         matching = []
         nonmatching = []
         for content_pattern_name in content_pattern_names:
@@ -246,9 +229,9 @@ class MultiMatcher:
                 matching.append(content_pattern_name)
             else:
                 nonmatching.append(content_pattern_name)
-        return tuple(matching), tuple(nonmatching)
+        return RegexMatchResult(path, tuple(matching), tuple(nonmatching))
 
-    def get_applicable_content_pattern_names(self, path):
+    def get_applicable_content_pattern_names(self, path: str) -> tuple[set[str], str | None]:
         """Return the content patterns applicable to a given path.
 
         Returns a tuple (applicable_content_pattern_names, content_encoding).
@@ -257,7 +240,7 @@ class MultiMatcher:
         applicable_content_pattern_names will be empty).
         """
         encodings = set()
-        applicable_content_pattern_names = set()
+        applicable_content_pattern_names: set[str] = set()
         for path_pattern_name, content_pattern_names in self._required_matches.items():
             m = self._path_matchers[path_pattern_name]
             if m.matches(path):
@@ -285,17 +268,30 @@ async def lint_with_regex_patterns(
     if multi_matcher is None:
         return LintResults((), linter_name=request.name)
 
-    digest_contents = await Get(DigestContents, PathGlobs(request.file_paths))
-    regex_match_results = RegexMatchResults(
-        multi_matcher.check_source_file(file_content.path, file_content.content)
-        for file_content in sorted(digest_contents, key=lambda fc: fc.path)
+    file_to_content_pattern_names_and_encoding = {}
+    for fp in request.file_paths:
+        content_pattern_names, encoding = multi_matcher.get_applicable_content_pattern_names(fp)
+        if content_pattern_names and encoding:
+            file_to_content_pattern_names_and_encoding[fp] = (content_pattern_names, encoding)
+
+    digest_contents = await Get(
+        DigestContents, PathGlobs(globs=file_to_content_pattern_names_and_encoding.keys())
     )
+
+    result = []
+    for file_content in digest_contents:
+        content_patterns, encoding = file_to_content_pattern_names_and_encoding[file_content.path]
+        result.append(
+            multi_matcher.check_content(
+                file_content.path, file_content.content, content_patterns, encoding
+            )
+        )
 
     stdout = ""
     detail_level = regex_lint_subsystem.detail_level
     num_matched_all = 0
     num_nonmatched_some = 0
-    for rmr in regex_match_results:
+    for rmr in sorted(result, key=lambda rmr: rmr.path):
         if not rmr.matching and not rmr.nonmatching:
             continue
         if detail_level == DetailLevel.names:

@@ -237,6 +237,57 @@ def test_infer_unqualified_symbol_from_intermediate_scope(rule_runner: RuleRunne
     assert deps == InferredDependencies([Address("bar", relative_file_path="B.scala")])
 
 
+def test_overlapping_package_unambiguous(rule_runner: RuleRunner) -> None:
+    # Test that declaring a `type` alias inside of a `package object` is unambiguous with a
+    # `class`/`object` of the same name in another file.
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "scala_sources()",
+            "foo/A.scala": dedent(
+                """\
+                package org.pantsbuild.foo
+
+                import org.pantsbuild.bar.Bar
+
+                object A {
+                  def main(args: Array[String]): Unit = {
+                    println(Bar.Bar)
+                  }
+                }
+                """
+            ),
+            "bar/BUILD": "scala_sources()",
+            "bar/package.scala": dedent(
+                """\
+                package org.pantsbuild
+
+                package object bar {
+                  type Bar = String
+                }
+                """
+            ),
+            "bar/B.scala": dedent(
+                """\
+                package org.pantsbuild.bar
+                object Bar {
+                  val Bar = 3
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo", relative_file_path="A.scala"))
+    deps = rule_runner.request(
+        InferredDependencies, [InferScalaSourceDependencies(tgt[ScalaSourceField])]
+    )
+    assert deps == InferredDependencies(
+        [
+            Address("bar", relative_file_path="package.scala"),
+            Address("bar", relative_file_path="B.scala"),
+        ]
+    )
+
+
 @maybe_skip_jdk_test
 def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(

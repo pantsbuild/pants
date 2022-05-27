@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Dict, Sequence, cast
@@ -12,6 +13,8 @@ from typing import Any, Dict, Sequence, cast
 import toml
 import yaml
 from common import die
+
+from pants.util.strutil import softwrap
 
 HEADER = dedent(
     """\
@@ -67,44 +70,83 @@ IS_PANTS_OWNER = "${{ github.repository_owner == 'pantsbuild' }}"
 # ----------------------------------------------------------------------
 
 
-def checkout() -> Sequence[Step]:
-    """Get prior commits and the commit message."""
+def ensure_category_label() -> Sequence[Step]:
+    """Check that exactly one category label is present on a pull request."""
     return [
+        {
+            "if": "github.event_name == 'pull_request'",
+            "name": "Ensure category label",
+            "uses": "mheap/github-action-required-labels@v1",
+            "env": {"GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}"},
+            "with": {
+                "mode": "exactly",
+                "count": 1,
+                "labels": softwrap(
+                    """
+                    category:new feature, category:user api change,
+                    category:plugin api change, category:performance, category:bugfix,
+                    category:documentation, category:internal
+                    """
+                ),
+            },
+        }
+    ]
+
+
+def checkout(*, containerized: bool = False) -> Sequence[Step]:
+    """Get prior commits and the commit message."""
+    steps = [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
         # for details on how we get the commit message here.
         # We need to fetch a few commits back, to be able to access HEAD^2 in the PR case.
         {
             "name": "Check out code",
-            "uses": "actions/checkout@v2",
+            "uses": "actions/checkout@v3",
             "with": {"fetch-depth": 10},
         },
-        # For a push event, the commit we care about is HEAD itself.
-        # This CI currently only runs on PRs, so this is future-proofing.
-        {
-            "name": "Get commit message for branch builds",
-            "if": "github.event_name == 'push'",
-            "run": dedent(
-                """\
+    ]
+    if containerized:
+        steps.append(
+            # Work around https://github.com/actions/checkout/issues/760 for our container jobs.
+            # See:
+            # + https://github.blog/2022-04-12-git-security-vulnerability-announced
+            # + https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-24765
+            {
+                "name": "Configure Git",
+                "run": 'git config --global safe.directory "$GITHUB_WORKSPACE"',
+            }
+        )
+    steps.extend(
+        [
+            # For a push event, the commit we care about is HEAD itself.
+            # This CI currently only runs on PRs, so this is future-proofing.
+            {
+                "name": "Get commit message for branch builds",
+                "if": "github.event_name == 'push'",
+                "run": dedent(
+                    """\
                 echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
                 echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
                 echo "EOF" >> $GITHUB_ENV
                 """
-            ),
-        },
-        # For a pull_request event, the commit we care about is the second parent of the merge
-        # commit. This CI currently only runs on PRs, so this is future-proofing.
-        {
-            "name": "Get commit message for PR builds",
-            "if": "github.event_name == 'pull_request'",
-            "run": dedent(
-                """\
+                ),
+            },
+            # For a pull_request event, the commit we care about is the second parent of the merge
+            # commit. This CI currently only runs on PRs, so this is future-proofing.
+            {
+                "name": "Get commit message for PR builds",
+                "if": "github.event_name == 'pull_request'",
+                "run": dedent(
+                    """\
                 echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
                 echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
                 echo "EOF" >> $GITHUB_ENV
                 """
-            ),
-        },
-    ]
+                ),
+            },
+        ]
+    )
+    return steps
 
 
 def setup_toolchain_auth() -> Step:
@@ -116,17 +158,6 @@ def setup_toolchain_auth() -> Step:
             echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
             """
         ),
-    }
-
-
-def pants_virtualenv_cache() -> Step:
-    return {
-        "name": "Cache Pants Virtualenv",
-        "uses": "actions/cache@v2",
-        "with": {
-            "path": "~/.cache/pants/pants_dev_deps\n",
-            "key": "${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles('3rdparty/python/**', 'pants.toml') }}\n",
-        },
     }
 
 
@@ -159,18 +190,18 @@ def rust_caches() -> Sequence[Step]:
     return [
         {
             "name": "Cache Rust toolchain",
-            "uses": "actions/cache@v2",
+            "uses": "actions/cache@v3",
             "with": {
                 "path": f"~/.rustup/toolchains/{rust_channel()}-*\n~/.rustup/update-hashes\n~/.rustup/settings.toml\n",
-                "key": "${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}",
+                "key": "${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1",
             },
         },
         {
             "name": "Cache Cargo",
-            "uses": "actions/cache@v2",
+            "uses": "actions/cache@v3",
             "with": {
                 "path": "~/.cargo/registry\n~/.cargo/git\n",
-                "key": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}\n",
+                "key": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-${{ hashFiles('src/rust/engine/Cargo.*') }}-v1\n",
                 "restore-keys": "${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain') }}-\n",
             },
         },
@@ -180,7 +211,7 @@ def rust_caches() -> Sequence[Step]:
 def install_jdk() -> Step:
     return {
         "name": "Install AdoptJDK",
-        "uses": "actions/setup-java@v2",
+        "uses": "actions/setup-java@v3",
         "with": {
             "distribution": "adopt",
             "java-version": "11",
@@ -191,7 +222,7 @@ def install_jdk() -> Step:
 def install_go() -> Step:
     return {
         "name": "Install Go",
-        "uses": "actions/setup-go@v2",
+        "uses": "actions/setup-go@v3",
         "with": {"go-version": "1.17.1"},
     }
 
@@ -199,7 +230,6 @@ def install_go() -> Step:
 def bootstrap_caches() -> Sequence[Step]:
     return [
         *rust_caches(),
-        pants_virtualenv_cache(),
         # NB: This caching is only intended for the bootstrap jobs to avoid them needing to
         # re-compile when possible. Compare to the upload-artifact and download-artifact actions,
         # which are how the bootstrap jobs share the compiled binaries with the other jobs like
@@ -212,10 +242,10 @@ def bootstrap_caches() -> Sequence[Step]:
         },
         {
             "name": "Cache native engine",
-            "uses": "actions/cache@v2",
+            "uses": "actions/cache@v3",
             "with": {
                 "path": "\n".join(NATIVE_FILES),
-                "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}\n",
+                "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1\n",
             },
         },
     ]
@@ -224,7 +254,7 @@ def bootstrap_caches() -> Sequence[Step]:
 def native_binaries_upload() -> Step:
     return {
         "name": "Upload native binaries",
-        "uses": "actions/upload-artifact@v2",
+        "uses": "actions/upload-artifact@v3",
         "with": {
             "name": "native_binaries.${{ matrix.python-version }}.${{ runner.os }}",
             "path": "\n".join(NATIVE_FILES),
@@ -235,7 +265,7 @@ def native_binaries_upload() -> Step:
 def native_binaries_download() -> Step:
     return {
         "name": "Download native binaries",
-        "uses": "actions/download-artifact@v2",
+        "uses": "actions/download-artifact@v3",
         "with": {"name": "native_binaries.${{ matrix.python-version }}.${{ runner.os }}"},
     }
 
@@ -244,7 +274,7 @@ def setup_primary_python() -> Sequence[Step]:
     return [
         {
             "name": "Set up Python ${{ matrix.python-version }}",
-            "uses": "actions/setup-python@v2",
+            "uses": "actions/setup-python@v3",
             "with": {"python-version": "${{ matrix.python-version }}"},
         },
         {
@@ -269,7 +299,7 @@ def expose_all_pythons() -> Step:
 def upload_log_artifacts(name: str) -> Step:
     return {
         "name": "Upload pants.log",
-        "uses": "actions/upload-artifact@v2",
+        "uses": "actions/upload-artifact@v3",
         "if": "always()",
         "with": {"name": f"pants-log-{name}", "path": ".pants.d/pants.log"},
     }
@@ -291,10 +321,42 @@ def download_apache_thrift() -> Step:
 
 
 def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
+    def test_python_linux(shard: str) -> dict[str, Any]:
+        return {
+            "name": f"Test Python (Linux) Shard {shard}",
+            "runs-on": LINUX_VERSION,
+            "needs": "bootstrap_pants_linux",
+            "strategy": {"matrix": {"python-version": python_versions}},
+            "timeout-minutes": 90,
+            "if": IS_PANTS_OWNER,
+            "steps": [
+                *checkout(),
+                install_jdk(),
+                install_go(),
+                download_apache_thrift(),
+                *setup_primary_python(),
+                expose_all_pythons(),
+                native_binaries_download(),
+                setup_toolchain_auth(),
+                {
+                    "name": f"Run Python test shard {shard}",
+                    "run": f"./pants test --shard={shard} ::\n",
+                },
+                upload_log_artifacts(name=f"python-test-linux-{shard.replace('/', '_')}"),
+            ],
+        }
+
     jobs = {
+        "check_labels": {
+            "name": "Ensure PR has a category label",
+            "runs-on": LINUX_VERSION,
+            "if": IS_PANTS_OWNER,
+            "steps": ensure_category_label(),
+        },
         "bootstrap_pants_linux": {
             "name": "Bootstrap Pants, test+lint Rust (Linux)",
             "runs-on": LINUX_VERSION,
+            "needs": "check_labels",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
@@ -343,27 +405,9 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 },
             ],
         },
-        "test_python_linux": {
-            "name": "Test Python (Linux)",
-            "runs-on": LINUX_VERSION,
-            "needs": "bootstrap_pants_linux",
-            "strategy": {"matrix": {"python-version": python_versions}},
-            "timeout-minutes": 90,
-            "if": IS_PANTS_OWNER,
-            "steps": [
-                *checkout(),
-                install_jdk(),
-                install_go(),
-                download_apache_thrift(),
-                *setup_primary_python(),
-                expose_all_pythons(),
-                pants_virtualenv_cache(),
-                native_binaries_download(),
-                setup_toolchain_auth(),
-                {"name": "Run Python tests", "run": "./pants test ::\n"},
-                upload_log_artifacts(name="python-test-linux"),
-            ],
-        },
+        "test_python_linux_0": test_python_linux("0/3"),
+        "test_python_linux_1": test_python_linux("1/3"),
+        "test_python_linux_2": test_python_linux("2/3"),
         "lint_python": {
             "name": "Lint Python and Shell",
             "runs-on": LINUX_VERSION,
@@ -374,7 +418,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             "steps": [
                 *checkout(),
                 *setup_primary_python(),
-                pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
                 {
@@ -391,11 +434,13 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         "bootstrap_pants_macos": {
             "name": "Bootstrap Pants, test Rust (macOS)",
             "runs-on": MACOS_VERSION,
+            "needs": "check_labels",
             "strategy": {"matrix": {"python-version": python_versions}},
             "env": DISABLE_REMOTE_CACHE_ENV,
             "timeout-minutes": 40,
             "if": IS_PANTS_OWNER,
             "steps": [
+                *ensure_category_label(),
                 *checkout(),
                 *setup_primary_python(),
                 *bootstrap_caches(),
@@ -426,14 +471,15 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 install_jdk(),
                 *setup_primary_python(),
                 expose_all_pythons(),
-                pants_virtualenv_cache(),
                 native_binaries_download(),
                 setup_toolchain_auth(),
                 {
                     "name": "Run Python tests",
-                    "run": (
-                        "./pants --tag=+platform_specific_behavior test :: "
-                        "-- -m platform_specific_behavior\n"
+                    "run": softwrap(
+                        """
+                        ./pants --tag=+platform_specific_behavior test ::
+                        -- -m platform_specific_behavior
+                        """
                     ),
                 },
                 upload_log_artifacts(name="python-test-macos"),
@@ -450,8 +496,13 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     "run": dedent(
                         # We use MODE=debug on PR builds to speed things up, given that those are
                         # only smoke tests of our release process.
+                        # Note that the build-local-pex run is just for smoke-testing that pex
+                        # builds work, and it must come *before* the build-wheels runs, since
+                        # it cleans out `dist/deploy`, which the build-wheels runs populate for
+                        # later attention by deploy_to_s3.py.
                         """\
                         [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+                        ./build-support/bin/release.sh build-local-pex
                         ./build-support/bin/release.sh build-wheels
                         USE_PY38=true ./build-support/bin/release.sh build-wheels
                         USE_PY39=true ./build-support/bin/release.sh build-wheels
@@ -471,6 +522,11 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 },
             ]
 
+        build_wheels_common = {
+            "needs": "check_labels",
+            "env": DISABLE_REMOTE_CACHE_ENV,
+            "if": IS_PANTS_OWNER,
+        }
         deploy_to_s3_step = {
             "name": "Deploy to S3",
             "run": "./build-support/bin/deploy_to_s3.py",
@@ -482,15 +538,14 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         }
         jobs.update(
             {
-                "build_wheels_linux": {
-                    "name": "Build wheels and fs_util (Linux)",
+                "build_wheels_linux_x86_64": {
+                    "name": "Build wheels and fs_util (Linux x86/64)",
                     "runs-on": LINUX_VERSION,
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
                     "timeout-minutes": 65,
-                    "env": DISABLE_REMOTE_CACHE_ENV,
-                    "if": IS_PANTS_OWNER,
+                    **build_wheels_common,
                     "steps": [
-                        *checkout(),
+                        *checkout(containerized=True),
                         install_rustup(),
                         {
                             "name": "Expose Pythons",
@@ -507,12 +562,11 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         deploy_to_s3_step,
                     ],
                 },
-                "build_wheels_macos": {
-                    "name": "Build wheels and fs_util (macOS)",
+                "build_wheels_macos_x86_64": {
+                    "name": "Build wheels and fs_util (macOS x86/64)",
                     "runs-on": MACOS_VERSION,
-                    "timeout-minutes": 65,
-                    "env": DISABLE_REMOTE_CACHE_ENV,
-                    "if": IS_PANTS_OWNER,
+                    "timeout-minutes": 80,
+                    **build_wheels_common,
                     "steps": [
                         *checkout(),
                         setup_toolchain_auth(),
@@ -530,6 +584,104 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             }
         )
     return jobs
+
+
+@dataclass(frozen=True)
+class WorkflowInput:
+    name: str
+    type_str: str
+    default: str | int | None = None
+
+
+def workflow_dispatch_inputs(
+    workflow_inputs: Sequence[WorkflowInput],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Builds `on.workflow_dispatch.inputs` and a corresponding `env` section to consume them."""
+    inputs = {
+        wi.name.lower(): {
+            "required": (wi.default is None),
+            "type": wi.type_str,
+            **({} if wi.default is None else {"default": wi.default}),
+        }
+        for wi in workflow_inputs
+    }
+    env = {
+        wi.name: ("${{ github.event.inputs." + wi.name.lower() + " }}") for wi in workflow_inputs
+    }
+    return inputs, env
+
+
+def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
+    cc_inputs, cc_env = workflow_dispatch_inputs(
+        [
+            WorkflowInput(
+                "PANTS_ARGS",
+                "string",
+                default="check lint test ::",
+            ),
+            WorkflowInput(
+                "BASE_REF",
+                "string",
+                default="main",
+            ),
+            WorkflowInput(
+                "BUILD_COMMIT",
+                "string",
+            ),
+            WorkflowInput(
+                "SOURCE_DIFFSPEC",
+                "string",
+            ),
+            WorkflowInput(
+                "SOURCE_DIFFSPEC_STEP",
+                "int",
+                default=1,
+            ),
+        ]
+    )
+
+    jobs = {
+        "cache_comparison": {
+            "runs-on": "ubuntu-latest",
+            "timeout-minutes": 90,
+            # TODO: This job doesn't actually need to run as a matrix, but `setup_primary_python`
+            # assumes that jobs are.
+            "strategy": {"matrix": {"python-version": [PYTHON37_VERSION]}},
+            "steps": [
+                *checkout(),
+                setup_toolchain_auth(),
+                *setup_primary_python(),
+                expose_all_pythons(),
+                {
+                    "name": "Prepare cache comparison",
+                    "run": dedent(
+                        # NB: The fetch depth is arbitrary, but is meant to capture the
+                        # most likely `diffspecs` used as arguments.
+                        """\
+                        MODE=debug ./pants package build-support/bin/cache_comparison.py
+                        git fetch --no-tags --depth=1024 origin "$BASE_REF"
+                        """
+                    ),
+                    "env": cc_env,
+                },
+                {
+                    "name": "Run cache comparison",
+                    "run": dedent(
+                        """\
+                        dist/build-support.bin/cache_comparison_py.pex \\
+                          --args="$PANTS_ARGS" \\
+                          --build-commit="$BUILD_COMMIT" \\
+                          --source-diffspec="$SOURCE_DIFFSPEC" \\
+                          --source-diffspec-step=$SOURCE_DIFFSPEC_STEP
+                        """
+                    ),
+                    "env": cc_env,
+                },
+            ],
+        }
+    }
+
+    return jobs, cc_inputs
 
 
 # ----------------------------------------------------------------------
@@ -597,7 +749,7 @@ def generate() -> dict[Path, str]:
                     "if": IS_PANTS_OWNER,
                     "steps": [
                         {
-                            "uses": "styfle/cancel-workflow-action@0.8.0",
+                            "uses": "styfle/cancel-workflow-action@0.9.1",
                             "with": {
                                 "workflow_id": "${{ github.event.workflow.id }}",
                                 "access_token": "${{ github.token }}",
@@ -630,8 +782,20 @@ def generate() -> dict[Path, str]:
         }
     )
 
+    cc_jobs, cc_inputs = cache_comparison_jobs_and_inputs()
+    cache_comparison_yaml = yaml.dump(
+        {
+            "name": "Cache Comparison",
+            # Kicked off manually.
+            "on": {"workflow_dispatch": {"inputs": cc_inputs}},
+            "jobs": cc_jobs,
+        },
+        Dumper=NoAliasDumper,
+    )
+
     return {
         Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
+        Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
         Path(".github/workflows/cancel.yaml"): f"{HEADER}\n\n{cancel_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/test-cron.yaml"): f"{HEADER}\n\n{test_cron_yaml}",

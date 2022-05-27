@@ -25,7 +25,7 @@ from pants.backend.go.util_rules import (
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.test import TestResult
-from pants.core.target_types import FileTarget
+from pants.core.target_types import FileTarget, ResourceTarget
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.process import ProcessResult
@@ -51,7 +51,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(TestResult, [GoTestFieldSet]),
             QueryRule(ProcessResult, [GoSdkProcess]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, FileTarget],
+        target_types=[GoModTarget, GoPackageTarget, FileTarget, ResourceTarget],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
@@ -507,6 +507,7 @@ def test_both_internal_and_external_tests_fail(rule_runner: RuleRunner) -> None:
     assert "FAIL: TestAddExternal" in result.stdout
 
 
+@pytest.mark.no_error_if_skipped
 def test_fuzz_target_supported(rule_runner: RuleRunner) -> None:
     go_version_result = rule_runner.request(
         ProcessResult, [GoSdkProcess(["version"], description="Get `go` version.")]
@@ -616,7 +617,7 @@ def test_compilation_error(rule_runner: RuleRunner) -> None:
     assert "failed to parse" in result.stderr
 
 
-def test_file_dependencies(rule_runner: RuleRunner) -> None:
+def test_resource_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.txt": "",
@@ -625,7 +626,7 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
                 """
                 go_mod(name='mod')
                 go_package(dependencies=[":testdata", "//:root"])
-                file(name="testdata", source="testdata/f.txt")
+                resource(name="testdata", source="testdata/f.txt")
                 """
             ),
             "foo/go.mod": "module foo",

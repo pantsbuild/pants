@@ -499,8 +499,15 @@ impl<R: Rule> Builder<R> {
         }
       }
 
+      // TODO: This value is mostly arbitrary, but should be increased to allow for solving the
+      // largest known rulesets that we've encountered. It should really only be triggered in
+      // case of implementation bugs (as we would prefer for a solution to fail via the usual
+      // pathways if it can).
+      //
+      // See https://github.com/pantsbuild/pants/issues/11269 for plans to improve this
+      // implementation.
       iteration += 1;
-      if iteration > 100000 {
+      if iteration > 10000000 {
         looping = true;
       }
       if iteration % 1000 == 0 {
@@ -1121,7 +1128,7 @@ impl<R: Rule> Builder<R> {
       .flat_map(|(_, errors)| {
         let mut errors = errors.clone();
         errors.sort();
-        errors.into_iter().map(|e| e.trim().replace("\n", "\n    "))
+        errors.into_iter().map(|e| e.trim().replace('\n', "\n    "))
       })
       .collect::<Vec<_>>();
 

@@ -4,6 +4,7 @@
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.option_types import BoolOption, SkipOption
 from pants.util.docutil import git_url
+from pants.util.strutil import softwrap
 
 
 class GoogleJavaFormatSubsystem(JvmToolBase):
@@ -24,8 +25,10 @@ class GoogleJavaFormatSubsystem(JvmToolBase):
     aosp = BoolOption(
         "--aosp",
         default=False,
-        help=(
-            "Use AOSP style instead of Google Style (4-space indentation). "
-            '("AOSP" is the Android Open Source Project.)'
+        help=softwrap(
+            """
+            Use AOSP style instead of Google Style (4-space indentation).
+            ("AOSP" is the Android Open Source Project.)
+            """
         ),
     )

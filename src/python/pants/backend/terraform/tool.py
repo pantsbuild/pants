@@ -14,6 +14,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
+from pants.option.option_types import BoolOption
 from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
@@ -40,6 +41,13 @@ class TerraformTool(TemplatedExternalTool):
             "1.0.7|macos_x86_64|80ae021d6143c7f7cbf4571f65595d154561a2a25fd934b7a8ccc1ebf3014b9b|33020029",
             "1.0.7|linux_x86_64|bc79e47649e2529049a356f9e60e06b47462bf6743534a10a4c16594f443be7b|32671441",
         ]
+
+    tailor = BoolOption(
+        "--tailor",
+        default=True,
+        help="If true, add `terraform_module` targets with the `tailor` goal.",
+        advanced=True,
+    )
 
 
 @dataclass(frozen=True)

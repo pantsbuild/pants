@@ -16,10 +16,12 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
     Targets,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -67,7 +69,14 @@ class ThriftSourceTarget(Target):
         ThriftDependenciesField,
         ThriftSourceField,
     )
-    help = f"A single Thrift file used to generate various languages.\n\nSee {doc_url('thrift')}."
+    help = softwrap(
+        f"""
+        A single Thrift file used to generate various languages.
+
+        See language-specific docs:
+            Python: {doc_url('thrift-python')}
+        """
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -78,17 +87,20 @@ class ThriftSourceTarget(Target):
 class ThriftSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.thrift",)
     expected_file_extensions = (".thrift",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.thrift', 'new_*.thrift', '!old_ignore.thrift']`"
+    )
 
 
 class ThriftSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ThriftSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "bar.thrift": {"description": "our user model"]},\n'
-            '  ("foo.thrift", "bar.thrift"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "bar.thrift": {"description": "our user model"]},
+            ("foo.thrift", "bar.thrift"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 
@@ -96,16 +108,12 @@ class ThriftSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "thrift_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ThriftDependenciesField,
         ThriftSourcesGeneratingSourcesField,
         ThriftSourcesOverridesField,
     )
     generated_target_cls = ThriftSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        ThriftDependenciesField,
-    )
-    moved_fields = ()
+    copied_fields = (*COMMON_TARGET_FIELDS,)
+    moved_fields = (ThriftDependenciesField,)
     settings_request_cls = GeneratorSettingsRequest
     help = "Generate a `thrift_source` target for each file in the `sources` field."
 

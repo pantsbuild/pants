@@ -79,12 +79,8 @@ class OptionAlreadyRegistered(RegistrationError):
     """An option with this name was already registered on this scope."""
 
 
-class OptionNameDash(RegistrationError):
-    """Option name must begin with a dash."""
-
-
 class OptionNameDoubleDash(RegistrationError):
-    """Long option name must begin with a double-dash."""
+    """Option name must begin with a double-dash."""
 
 
 class PassthroughType(RegistrationError):
@@ -134,16 +130,6 @@ class ConfigError(OptionsError):
 
 class ConfigValidationError(ConfigError):
     """A config file is invalid."""
-
-
-class NoSectionError(ConfigError):
-    def __init__(self, section: str):
-        super().__init__(f"No section: {section}")
-
-
-class NoOptionError(ConfigError):
-    def __init__(self, option: str, section: str):
-        super().__init__(f"No option {option} in section {section}")
 
 
 class InterpolationMissingOptionError(ConfigError):

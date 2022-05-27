@@ -1,20 +1,21 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField, PythonSourceField
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.typecheck.mypy.skip_field import SkipMyPyField
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
     MyPyConfigFile,
     MyPyFirstPartyPlugins,
 )
-from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules import partition, pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
@@ -29,7 +30,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import CoarsenedTargets, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -49,9 +50,14 @@ class MyPyFieldSet(FieldSet):
 
 @dataclass(frozen=True)
 class MyPyPartition:
-    root_targets: FrozenOrderedSet[Target]
+    root_field_sets: FrozenOrderedSet[MyPyFieldSet]
     closure: FrozenOrderedSet[Target]
+    resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
+
+    def description(self) -> str:
+        ics = str(sorted(str(c) for c in self.interpreter_constraints))
+        return f"{self.resolve_description}, {ics}" if self.resolve_description else ics
 
 
 class MyPyPartitions(Collection[MyPyPartition]):
@@ -125,16 +131,15 @@ async def mypy_typecheck_partition(
     closure_sources_get = Get(PythonSourceFiles, PythonSourceFilesRequest(partition.closure))
     roots_sources_get = Get(
         SourceFiles,
-        SourceFilesRequest(tgt.get(PythonSourceField) for tgt in partition.root_targets),
+        SourceFilesRequest(fs.sources for fs in partition.root_field_sets),
     )
 
     # See `requirements_venv_pex` for how this will get wrapped in a `VenvPex`.
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (tgt.address for tgt in partition.root_targets),
+            (fs.address for fs in partition.root_field_sets),
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
-            internal_only=True,
         ),
     )
     extra_type_stubs_pex_get = Get(
@@ -246,51 +251,26 @@ async def mypy_typecheck_partition(
     )
 
 
-# TODO(#10863): Improve the performance of this, especially by not needing to calculate transitive
-#  targets per field set. Doing that would require changing how we calculate interpreter
-#  constraints to be more like how we determine resolves, i.e. only inspecting the root target
-#  (and later validating the closure is compatible).
 @rule(desc="Determine if necessary to partition MyPy input", level=LogLevel.DEBUG)
 async def mypy_determine_partitions(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
 ) -> MyPyPartitions:
-    # When determining how to batch by interpreter constraints, we must consider the entire
-    # transitive closure to get the final resulting constraints.
-    transitive_targets_per_field_set = await MultiGet(
-        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
-        for field_set in request.field_sets
+
+    resolve_and_interpreter_constraints_to_coarsened_targets = (
+        await partition._by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
 
-    resolve_and_interpreter_constraints_to_transitive_targets = defaultdict(set)
-    for transitive_targets in transitive_targets_per_field_set:
-        resolve = transitive_targets.roots[0][PythonResolveField].normalized_value(python_setup)
-        interpreter_constraints = (
-            InterpreterConstraints.create_from_targets(transitive_targets.closure, python_setup)
-            or mypy.interpreter_constraints
+    return MyPyPartitions(
+        MyPyPartition(
+            FrozenOrderedSet(roots),
+            FrozenOrderedSet(CoarsenedTargets(root_cts).closure()),
+            resolve if len(python_setup.resolves) > 1 else None,
+            interpreter_constraints or mypy.interpreter_constraints,
         )
-        resolve_and_interpreter_constraints_to_transitive_targets[
-            (resolve, interpreter_constraints)
-        ].add(transitive_targets)
-
-    partitions = []
-    for (_resolve, interpreter_constraints), all_transitive_targets in sorted(
-        resolve_and_interpreter_constraints_to_transitive_targets.items()
-    ):
-        combined_roots: OrderedSet[Target] = OrderedSet()
-        combined_closure: OrderedSet[Target] = OrderedSet()
-        for transitive_targets in all_transitive_targets:
-            combined_roots.update(transitive_targets.roots)
-            combined_closure.update(transitive_targets.closure)
-        partitions.append(
-            # Note that we don't need to pass the resolve. pex_from_targets.py will already
-            # calculate it by inspecting the roots & validating that all dependees are valid.
-            MyPyPartition(
-                FrozenOrderedSet(combined_roots),
-                FrozenOrderedSet(combined_closure),
-                interpreter_constraints,
-            )
+        for (resolve, interpreter_constraints), (roots, root_cts) in sorted(
+            resolve_and_interpreter_constraints_to_coarsened_targets.items()
         )
-    return MyPyPartitions(partitions)
+    )
 
 
 # TODO(#10864): Improve performance, e.g. by leveraging the MyPy cache.

@@ -29,6 +29,7 @@ def test_unimplemented_goals_noop() -> None:
 
 
 @pytest.mark.skip(reason="Flaky test. https://github.com/pantsbuild/pants/issues/10478")
+@pytest.mark.no_error_if_skipped
 class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     hermetic = False
 

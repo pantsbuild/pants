@@ -19,6 +19,7 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.util.collections import deep_getsizeof
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -30,22 +31,28 @@ class StatsAggregatorSubsystem(Subsystem):
     log = BoolOption(
         "--log",
         default=False,
-        help=(
-            "At the end of the Pants run, log all counter metrics and summaries of "
-            "observation histograms, e.g. the number of cache hits and the time saved by "
-            "caching.\n\n"
-            "For histogram summaries to work, you must add `hdrhistogram` to `[GLOBAL].plugins`."
+        help=softwrap(
+            """
+            At the end of the Pants run, log all counter metrics and summaries of
+            observation histograms, e.g. the number of cache hits and the time saved by
+            caching.
+
+            For histogram summaries to work, you must add `hdrhistogram` to `[GLOBAL].plugins`.
+            """
         ),
         advanced=True,
     )
     memory_summary = BoolOption(
         "--memory-summary",
         default=False,
-        help=(
-            "At the end of the Pants run, report a summary of memory usage.\n\n"
-            "Keys are the total size in bytes, the count, and the name. Note that the total size "
-            "is for all instances added together, so you can use total_size // count to get the "
-            "average size."
+        help=softwrap(
+            """
+            At the end of the Pants run, report a summary of memory usage.
+
+            Keys are the total size in bytes, the count, and the name. Note that the total size
+            is for all instances added together, so you can use total_size // count to get the
+            average size.
+            """
         ),
         advanced=True,
     )
@@ -113,7 +120,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
 
         if not (self.log and self.has_histogram_module):
             return
-        from hdrh.histogram import HdrHistogram
+        from hdrh.histogram import HdrHistogram  # pants: no-infer-dep
 
         histograms = context.get_observation_histograms()["histograms"]
         if not histograms:

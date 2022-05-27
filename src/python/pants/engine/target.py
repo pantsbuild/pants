@@ -6,9 +6,12 @@ from __future__ import annotations
 import collections.abc
 import dataclasses
 import enum
+import glob as glob_stdlib
 import itertools
 import logging
 import os.path
+import textwrap
+import zlib
 from abc import ABC, ABCMeta, abstractmethod
 from collections import deque
 from dataclasses import dataclass
@@ -24,6 +27,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -35,7 +39,7 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.deprecated import warn_or_error
-from pants.engine.addresses import Address, UnparsedAddressInputs, assert_single_address
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -46,7 +50,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.global_options import FilesNotFoundBehavior
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
@@ -55,7 +59,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import bullet_list, pluralize
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -351,9 +355,20 @@ class Target:
             valid_aliases.add(field_type.alias)
             aliases_to_field_types[field_type.alias] = field_type
             if field_type.deprecated_alias is not None:
+                valid_aliases.add(field_type.deprecated_alias)
                 aliases_to_field_types[field_type.deprecated_alias] = field_type
+
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
+                if isinstance(self, TargetGenerator):
+                    # Even though moved_fields don't live on the target generator, they are valid
+                    # for users to specify. It's intentional that these are only used for
+                    # `InvalidFieldException` and are not stored as normal fields with
+                    # `aliases_to_field_types`.
+                    for field_type in self.moved_fields:
+                        valid_aliases.add(field_type.alias)
+                        if field_type.deprecated_alias is not None:
+                            valid_aliases.add(field_type.deprecated_alias)
                 raise InvalidFieldException(
                     f"Unrecognized field `{alias}={value}` in target {address}. Valid fields for "
                     f"the target type `{self.alias}`: {sorted(valid_aliases)}.",
@@ -441,7 +456,7 @@ class Target:
             ),
             None,
         )
-        return cast(Optional[Type[_F]], subclass)
+        return subclass
 
     @final
     def _maybe_get(self, field: Type[_F]) -> Optional[_F]:
@@ -639,6 +654,25 @@ class Targets(Collection[Target]):
         return self[0]
 
 
+# This distinct type is necessary because of https://github.com/pantsbuild/pants/issues/14977.
+#
+# NB: We still proactively apply filtering inside `AddressSpecs` and `FilesystemSpecs`, which is
+# earlier in the rule pipeline of `RawSpecs -> Addresses -> UnexpandedTargets -> Targets ->
+# FilteredTargets`. That is necessary so that project-introspection goals like `list` which don't
+# use `FilteredTargets` still have filtering applied.
+class FilteredTargets(Collection[Target]):
+    """A heterogenous collection of Target instances that have been filtered with the global options
+    `--tag` and `--exclude-target-regexp`.
+
+    Outside of the extra filtering, this type is identical to `Targets`, including its handling of
+    target generators.
+    """
+
+    def expect_single(self) -> Target:
+        assert_single_address([tgt.address for tgt in self])
+        return self[0]
+
+
 class UnexpandedTargets(Collection[Target]):
     """Like `Targets`, but will not replace target generators with their generated targets (e.g.
     replace `python_sources` "BUILD targets" with generated `python_source` "file targets")."""
@@ -678,18 +712,52 @@ class CoarsenedTarget(EngineAwareParameter):
         """The addresses and type aliases of all members of the cycle."""
         return bullet_list(sorted(f"{t.address.spec}\t({type(t).alias})" for t in self.members))
 
+    def closure(self, visited: Set[CoarsenedTarget] | None = None) -> Iterator[Target]:
+        """All Targets reachable from this root."""
+        return (t for ct in self.coarsened_closure(visited) for t in ct.members)
+
+    def coarsened_closure(
+        self, visited: Set[CoarsenedTarget] | None = None
+    ) -> Iterator[CoarsenedTarget]:
+        """All CoarsenedTargets reachable from this root."""
+
+        visited = visited or set()
+        queue = deque([self])
+        while queue:
+            ct = queue.popleft()
+            if ct in visited:
+                continue
+            visited.add(ct)
+            yield ct
+            queue.extend(ct.dependencies)
+
     def __hash__(self) -> int:
         return self._hashcode
+
+    def _eq_helper(self, other: CoarsenedTarget, equal_items: set[tuple[int, int]]) -> bool:
+        key = (id(self), id(other))
+        if key[0] == key[1] or key in equal_items:
+            return True
+
+        is_eq = (
+            self._hashcode == other._hashcode
+            and self.members == other.members
+            and len(self.dependencies) == len(other.dependencies)
+            and all(
+                l._eq_helper(r, equal_items) for l, r in zip(self.dependencies, other.dependencies)
+            )
+        )
+
+        # NB: We only track equal items because any non-equal item will cause the entire
+        # operation to shortcircuit.
+        if is_eq:
+            equal_items.add(key)
+        return is_eq
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, CoarsenedTarget):
             return NotImplemented
-        return (
-            self._hashcode == other._hashcode
-            and self.members == other.members
-            # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
-            and self.dependencies == other.dependencies
-        )
+        return self._eq_helper(other, set())
 
     def __str__(self) -> str:
         if len(self.members) > 1:
@@ -707,18 +775,50 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
     To collect all reachable CoarsenedTarget members, use `def closure`.
     """
 
-    def closure(self) -> Iterator[CoarsenedTarget]:
-        """All CoarsenedTargets reachable from these CoarsenedTarget roots."""
+    def by_address(self) -> dict[Address, CoarsenedTarget]:
+        """Compute a mapping from Address to containing CoarsenedTarget."""
+        return {t.address: ct for ct in self for t in ct.members}
 
-        visited = set()
-        queue = deque(self)
-        while queue:
-            ct = queue.popleft()
-            if ct in visited:
-                continue
-            visited.add(ct)
-            yield ct
-            queue.extend(ct.dependencies)
+    def closure(self) -> Iterator[Target]:
+        """All Targets reachable from these CoarsenedTarget roots."""
+        visited: Set[CoarsenedTarget] = set()
+        return (t for root in self for t in root.closure(visited))
+
+    def coarsened_closure(self) -> Iterator[CoarsenedTarget]:
+        """All CoarsenedTargets reachable from these CoarsenedTarget roots."""
+        visited: Set[CoarsenedTarget] = set()
+        return (ct for root in self for ct in root.coarsened_closure(visited))
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, CoarsenedTargets):
+            return NotImplemented
+        equal_items: set[tuple[int, int]] = set()
+        return len(self) == len(other) and all(
+            l._eq_helper(r, equal_items) for l, r in zip(self, other)
+        )
+
+    __hash__ = Tuple.__hash__
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class CoarsenedTargetsRequest:
+    """A request to get CoarsenedTargets for input roots."""
+
+    roots: Tuple[Address, ...]
+    expanded_targets: bool
+    include_special_cased_deps: bool
+
+    def __init__(
+        self,
+        roots: Iterable[Address],
+        *,
+        expanded_targets: bool = False,
+        include_special_cased_deps: bool = False,
+    ) -> None:
+        self.roots = tuple(roots)
+        self.expanded_targets = expanded_targets
+        self.include_special_cased_deps = include_special_cased_deps
 
 
 @dataclass(frozen=True)
@@ -841,6 +941,21 @@ class TargetGenerator(Target):
     # acting as a convenient place for them to be specified.
     moved_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    def validate(self) -> None:
+        super().validate()
+
+        copied_dependencies_field_types = [
+            field_type.__name__
+            for field_type in type(self).copied_fields
+            if issubclass(field_type, Dependencies)
+        ]
+        if copied_dependencies_field_types:
+            raise InvalidTargetException(
+                f"Using a `Dependencies` field subclass ({copied_dependencies_field_types}) as a "
+                "`TargetGenerator.copied_field`. `Dependencies` fields should be "
+                "`TargetGenerator.moved_field`s, to avoid redundant graph edges."
+            )
+
 
 class TargetFilesGenerator(TargetGenerator):
     """A TargetGenerator which generates a Target per file matched by the generator.
@@ -851,6 +966,18 @@ class TargetFilesGenerator(TargetGenerator):
     """
 
     settings_request_cls: ClassVar[type[TargetFilesGeneratorSettingsRequest] | None] = None
+
+    def validate(self) -> None:
+        super().validate()
+
+        if self.has_field(MultipleSourcesField) and not self[MultipleSourcesField].value:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target generator at {self.address} has an empty "
+                f"`{self[MultipleSourcesField].alias}` field; so it will not generate any targets. "
+                "If its purpose is to act as an alias for its dependencies, then it should be "
+                "declared as a `target(..)` generic target instead. If it is unused, then it "
+                "should be removed."
+            )
 
 
 @union
@@ -882,7 +1009,7 @@ _TargetGenerator = TypeVar("_TargetGenerator", bound=TargetGenerator)
 @union
 @dataclass(frozen=True)
 class GenerateTargetsRequest(Generic[_TargetGenerator]):
-    generate_from: ClassVar[type[_TargetGenerator]]
+    generate_from: ClassVar[type[_TargetGenerator]]  # type: ignore[misc]
 
     # The TargetGenerator instance to generate targets for.
     generator: _TargetGenerator
@@ -949,12 +1076,14 @@ class GeneratedTargets(FrozenDict[Address, Target]):
         super().__init__(mapping)
 
 
-class TargetTypesToGenerateTargetsRequests(FrozenDict[Type[Target], Type[GenerateTargetsRequest]]):
+class TargetTypesToGenerateTargetsRequests(
+    FrozenDict[Type[TargetGenerator], Type[GenerateTargetsRequest]]
+):
     def is_generator(self, tgt: Target) -> bool:
         """Does this target type generate other targets?"""
-        return bool(self.request_for(type(tgt)))
+        return isinstance(tgt, TargetGenerator) and bool(self.request_for(type(tgt)))
 
-    def request_for(self, tgt_cls: type[Target]) -> type[GenerateTargetsRequest] | None:
+    def request_for(self, tgt_cls: type[TargetGenerator]) -> type[GenerateTargetsRequest] | None:
         """Return the request type for the given Target, or None."""
         if issubclass(tgt_cls, TargetFilesGenerator):
             return self.get(TargetFilesGenerator)
@@ -972,7 +1101,6 @@ def _generate_file_level_targets(
     union_membership: UnionMembership | None,
     *,
     add_dependencies_on_all_siblings: bool,
-    use_generated_address_syntax: bool = False,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
     for the `sources` field only referring to the path and using a new address.
@@ -992,12 +1120,9 @@ def _generate_file_level_targets(
      as the key.
     """
 
-    def generate_address(base_address: Address, relativized_fp: str) -> Address:
-        return (
-            base_address.create_generated(relativized_fp)
-            if use_generated_address_syntax
-            else base_address.create_file(relativized_fp)
-        )
+    # Paths will have already been globbed, so they should be escaped. See
+    # https://github.com/pantsbuild/pants/issues/15381.
+    paths = [glob_stdlib.escape(path) for path in paths]
 
     normalized_overrides = dict(overrides or {})
 
@@ -1009,13 +1134,13 @@ def _generate_file_level_targets(
         if generated_overrides is None:
             # No overrides apply.
             all_generated_items.append(
-                (generate_address(template_address, relativized_fp), fp, dict(template))
+                (template_address.create_file(relativized_fp), fp, dict(template))
             )
         else:
             # At least one override applies. Generate a target per set of fields.
             all_generated_items.extend(
                 (
-                    generate_address(overridden_address, relativized_fp),
+                    overridden_address.create_file(relativized_fp),
                     fp,
                     {**template, **override_fields},
                 )
@@ -1033,10 +1158,13 @@ def _generate_file_level_targets(
 
     def gen_tgt(address: Address, full_fp: str, generated_target_fields: dict[str, Any]) -> Target:
         if add_dependencies_on_all_siblings:
-            if not generator.has_field(Dependencies):
+            if union_membership and not generated_target_cls.class_has_field(
+                Dependencies, union_membership
+            ):
                 raise AssertionError(
-                    f"The `{generator.alias}` target {template_address.spec} does "
-                    "not have a `dependencies` field, and thus cannot "
+                    f"The {type(generator).__name__} target class generates "
+                    f"{generated_target_cls.__name__} targets, which do not "
+                    f"have a `{Dependencies.alias}` field, and thus cannot "
                     "`add_dependencies_on_all_siblings`."
                 )
             original_deps = generated_target_fields.get(Dependencies.alias, ())
@@ -1175,9 +1303,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     @final
     @classmethod
     def create(cls: Type[_FS], tgt: Target) -> _FS:
-        return cls(  # type: ignore[call-arg]
-            address=tgt.address, **_get_field_set_fields_from_target(cls, tgt)
-        )
+        return cls(address=tgt.address, **_get_field_set_fields_from_target(cls, tgt))
 
     def debug_hint(self) -> str:
         return self.address.spec
@@ -1218,6 +1344,33 @@ class NoApplicableTargetsBehavior(Enum):
     error = "error"
 
 
+def parse_shard_spec(shard_spec: str, origin: str = "") -> Tuple[int, int]:
+    def invalid():
+        origin_str = f" from {origin}" if origin else ""
+        return ValueError(
+            f"Invalid shard specification {shard_spec}{origin_str}. Use a string of the form "
+            '"k/N" where k and N are integers, and 0 <= k < N .'
+        )
+
+    if not shard_spec:
+        return 0, -1
+    shard_str, _, num_shards_str = shard_spec.partition("/")
+    try:
+        shard, num_shards = int(shard_str), int(num_shards_str)
+    except ValueError:
+        raise invalid()
+    if shard < 0 or shard >= num_shards:
+        raise invalid()
+    return shard, num_shards
+
+
+def get_shard(key: str, num_shards: int) -> int:
+    # Note: hash() is not guaranteed to be stable across processes, and adler32 is not
+    # well-distributed for small strings, so we use crc32. It's faster to compute than
+    # a cryptographic hash, which would be overkill.
+    return zlib.crc32(key.encode()) % num_shards
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class TargetRootsToFieldSetsRequest(Generic[_FS]):
@@ -1225,6 +1378,8 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
     goal_description: str
     no_applicable_targets_behavior: NoApplicableTargetsBehavior
     expect_single_field_set: bool
+    shard: int
+    num_shards: int
 
     def __init__(
         self,
@@ -1233,11 +1388,23 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         goal_description: str,
         no_applicable_targets_behavior: NoApplicableTargetsBehavior,
         expect_single_field_set: bool = False,
+        shard: int = 0,
+        num_shards: int = -1,
     ) -> None:
+        if expect_single_field_set and num_shards != -1:
+            raise ValueError(
+                "At most one of shard_spec and expect_single_field_set may be set"
+                " on a TargetRootsToFieldSetsRequest instance"
+            )
         self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
         self.no_applicable_targets_behavior = no_applicable_targets_behavior
         self.expect_single_field_set = expect_single_field_set
+        self.shard = shard
+        self.num_shards = num_shards
+
+    def is_in_shard(self, key: str) -> bool:
+        return get_shard(key, self.num_shards) == self.shard
 
 
 @frozen_after_init
@@ -1363,15 +1530,15 @@ class ScalarField(Generic[T], Field):
 
             @classmethod
             def compute_value(
-                cls, raw_value: Optional[MyPluginObject], *, address: Address
+                cls, raw_value: Optional[MyPluginObject], address: Address
             ) -> Optional[MyPluginObject]:
                 return super().compute_value(raw_value, address=address)
     """
 
-    expected_type: ClassVar[Type[T]]
+    expected_type: ClassVar[Type[T]]  # type: ignore[misc]
     expected_type_description: ClassVar[str]
     value: Optional[T]
-    default: ClassVar[Optional[T]] = None
+    default: ClassVar[Optional[T]] = None  # type: ignore[misc]
 
     @classmethod
     def compute_value(cls, raw_value: Optional[Any], address: Address) -> Optional[T]:
@@ -1511,10 +1678,10 @@ class SequenceField(Generic[T], Field):
                 return super().compute_value(raw_value, address=address)
     """
 
-    expected_element_type: ClassVar[Type[T]]
+    expected_element_type: ClassVar[Type]
     expected_type_description: ClassVar[str]
     value: Optional[Tuple[T, ...]]
-    default: ClassVar[Optional[Tuple[T, ...]]] = None
+    default: ClassVar[Optional[Tuple[T, ...]]] = None  # type: ignore[misc]
 
     @classmethod
     def compute_value(
@@ -1760,7 +1927,7 @@ class SourcesField(AsyncFieldMixin, Field):
         )
 
     @final
-    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> PathGlobs:
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:
         if not self.globs:
             return PathGlobs([])
 
@@ -1778,7 +1945,7 @@ class SourcesField(AsyncFieldMixin, Field):
         # Use fields default error behavior if defined, if we use default globs else the provided
         # error behavior.
         error_behavior = (
-            files_not_found_behavior.to_glob_match_error_behavior()
+            unmatched_build_file_globs.to_glob_match_error_behavior()
             if conjunction == GlobExpansionConjunction.all_match
             or self.default_glob_match_error_behavior is None
             else self.default_glob_match_error_behavior
@@ -1824,16 +1991,31 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
     """
 
     alias = "sources"
-    help = (
-        "A list of files and globs that belong to this target.\n\n"
-        "Paths are relative to the BUILD file's directory. You can ignore files/globs by "
-        "prefixing them with `!`.\n\n"
-        "Example: `sources=['example.ext', 'test_*.ext', '!test_ignore.ext']`."
-    )
+
+    ban_subdirectories: ClassVar[bool] = False
 
     @property
     def globs(self) -> tuple[str, ...]:
         return self.value or ()
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        value = super().compute_value(raw_value, address)
+        if cls.ban_subdirectories:
+            invalid_globs = [glob for glob in (value or ()) if "**" in glob or os.path.sep in glob]
+            if invalid_globs:
+                raise InvalidFieldException(
+                    softwrap(
+                        f"""
+                        The {repr(cls.alias)} field in target {address} must only have globs for
+                        the target's directory, i.e. it cannot include values with `**` or
+                        `{os.path.sep}`. It was set to: {sorted(value or ())}
+                        """
+                    )
+                )
+        return value
 
 
 class OptionalSingleSourceField(SourcesField, StringField):
@@ -1849,9 +2031,12 @@ class OptionalSingleSourceField(SourcesField, StringField):
     """
 
     alias = "source"
-    help = (
-        "A single file that belongs to this target.\n\n"
-        "Path is relative to the BUILD file's directory, e.g. `source='example.ext'`."
+    help = softwrap(
+        """
+        A single file that belongs to this target.
+
+        Path is relative to the BUILD file's directory, e.g. `source='example.ext'`.
+        """
     )
     required = False
     default: ClassVar[str | None] = None
@@ -2116,23 +2301,29 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     alias = "dependencies"
-    help = (
-        "Addresses to other targets that this target depends on, e.g. "
-        "['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].\n\n"
-        "This augments any dependencies inferred by Pants, such as by analyzing your imports. Use "
-        f"`{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final "
-        "result.\n\n"
-        f"See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for "
-        "more about how addresses are formed, including for generated targets. You can also run "
-        f"`{bin_name()} list ::` to find all addresses in your project, or "
-        f"`{bin_name()} list dir:` to find all addresses defined in that directory.\n\n"
-        "If the target is in the same BUILD file, you can leave off the BUILD file path, e.g. "
-        "`:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use "
-        "`./` for the file path, e.g. `./main.py:tgt`; for all other generated targets, "
-        "use `:tgt#generated_name`.\n\n"
-        "You may exclude dependencies by prefixing with `!`, e.g. "
-        "`['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are intended for false positives "
-        "with dependency inference; otherwise, simply leave off the dependency from the BUILD file."
+    help = softwrap(
+        f"""
+        Addresses to other targets that this target depends on, e.g.
+        ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
+
+        This augments any dependencies inferred by Pants, such as by analyzing your imports. Use
+        `{bin_name()} dependencies` or `{bin_name()} peek` on this target to get the final
+        result.
+
+        See {doc_url('targets#target-addresses')} and {doc_url('targets#target-generation')} for
+        more about how addresses are formed, including for generated targets. You can also run
+        `{bin_name()} list ::` to find all addresses in your project, or
+        `{bin_name()} list dir:` to find all addresses defined in that directory.
+
+        If the target is in the same BUILD file, you can leave off the BUILD file path, e.g.
+        `:tgt` instead of `helloworld/subdir:tgt`. For generated first-party addresses, use
+        `./` for the file path, e.g. `./main.py:tgt`; for all other generated targets,
+        use `:tgt#generated_name`.
+
+        You may exclude dependencies by prefixing with `!`, e.g.
+        `['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are intended for false positives
+        with dependency inference; otherwise, simply leave off the dependency from the BUILD file.
+        """
     )
     supports_transitive_excludes = False
 
@@ -2351,7 +2542,7 @@ class InferDependenciesRequest(Generic[SF], EngineAwareParameter):
     """
 
     sources_field: SF
-    infer_from: ClassVar[Type[SF]]
+    infer_from: ClassVar[Type[SourcesField]]
 
     def debug_hint(self) -> str:
         return self.sources_field.address.spec
@@ -2373,6 +2564,28 @@ class InferredDependencies:
         return iter(self.dependencies)
 
 
+FS = TypeVar("FS", bound="FieldSet")
+
+
+@union
+@dataclass(frozen=True)
+class ValidateDependenciesRequest(Generic[FS], ABC):
+    """A request to validate dependencies after they have been computed.
+
+    An implementing rule should raise an exception if dependencies are invalid.
+    """
+
+    field_set_type: ClassVar[Type[FS]]  # type: ignore[misc]
+
+    field_set: FS
+    dependencies: Addresses
+
+
+@dataclass(frozen=True)
+class ValidatedDependencies:
+    pass
+
+
 class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     """Subclass this for fields that act similarly to the `dependencies` field, but are handled
     differently than normal dependencies.
@@ -2387,7 +2600,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
 
     To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,
-    tgt.get(MyField).to_unparsed_address_inputs()`.
+    tgt.get(MyField).to_unparsed_address_inputs())`.
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
@@ -2401,18 +2614,24 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 class Tags(StringSequenceField):
     alias = "tags"
-    help = (
-        "Arbitrary strings to describe a target.\n\nFor example, you may tag some test targets "
-        f"with 'integration_test' so that you could run `{bin_name()} --tag='integration_test' test ::` "
-        "to only run on targets with that tag."
+    help = softwrap(
+        f"""
+        Arbitrary strings to describe a target.
+
+        For example, you may tag some test targets with 'integration_test' so that you could run
+        `{bin_name()} --tag='integration_test' test ::`  to only run on targets with that tag.
+        """
     )
 
 
 class DescriptionField(StringField):
     alias = "description"
-    help = (
-        f"A human-readable description of the target.\n\nUse `{bin_name()} list --documented ::` to see "
-        "all targets with descriptions."
+    help = softwrap(
+        f"""
+        A human-readable description of the target.
+
+        Use `{bin_name()} list --documented ::` to see all targets with descriptions.
+        """
     )
 
 
@@ -2475,7 +2694,7 @@ class OverridesField(AsyncFieldMixin, Field):
         cls,
         address: Address,
         overrides_keys: Iterable[str],
-        files_not_found_behavior: FilesNotFoundBehavior,
+        unmatched_build_file_globs: UnmatchedBuildFileGlobs,
     ) -> tuple[PathGlobs, ...]:
         """Create a `PathGlobs` for each key.
 
@@ -2492,7 +2711,7 @@ class OverridesField(AsyncFieldMixin, Field):
         return tuple(
             PathGlobs(
                 [relativize_glob(glob)],
-                glob_match_error_behavior=files_not_found_behavior.to_glob_match_error_behavior(),
+                glob_match_error_behavior=unmatched_build_file_globs.to_glob_match_error_behavior(),
                 description_of_origin=f"the `overrides` field for {address}",
             )
             for glob in overrides_keys
@@ -2550,21 +2769,51 @@ class OverridesField(AsyncFieldMixin, Field):
         return result
 
 
+def generate_multiple_sources_field_help_message(files_example: str) -> str:
+    return softwrap(
+        """
+        A list of files and globs that belong to this target.
+
+        Paths are relative to the BUILD file's directory. You can ignore files/globs by
+        prefixing them with `!`.
+
+        """
+        + files_example
+    )
+
+
 def generate_file_based_overrides_field_help_message(
     generated_target_name: str, example: str
 ) -> str:
-    return (
-        f"Override the field values for generated `{generated_target_name}` targets.\n\n"
-        "Expects a dictionary of relative file paths and globs to a dictionary for the "
-        "overrides. You may either use a string for a single path / glob, "
-        "or a string tuple for multiple paths / globs. Each override is a dictionary of "
-        "field names to the overridden value.\n\n"
-        f"For example:\n\n```\n{example}\n```\n\n"
-        "File paths and globs are relative to the BUILD file's directory. Every overridden file is "
-        "validated to belong to this target's `sources` field.\n\n"
-        f"If you'd like to override a field's value for every `{generated_target_name}` target "
-        "generated by this target, change the field directly on this target rather than using the "
-        "`overrides` field.\n\n"
-        "You can specify the same file name in multiple keys, so long as you don't override the "
-        "same field more than one time for the file."
+    example = textwrap.dedent(example.lstrip("\n"))
+    example = textwrap.indent(example, " " * 4)
+    return "\n".join(
+        [
+            softwrap(
+                """
+                Override the field values for generated `{generated_target_name}` targets.
+
+                Expects a dictionary of relative file paths and globs to a dictionary for the
+                overrides. You may either use a string for a single path / glob,
+                or a string tuple for multiple paths / globs. Each override is a dictionary of
+                field names to the overridden value.
+
+                For example:
+                """
+            ),
+            example,
+            softwrap(
+                f"""
+                File paths and globs are relative to the BUILD file's directory. Every overridden file is
+                validated to belong to this target's `sources` field.
+
+                If you'd like to override a field's value for every `{generated_target_name}` target
+                generated by this target, change the field directly on this target rather than using the
+                `overrides` field.
+
+                You can specify the same file name in multiple keys, so long as you don't override the
+                same field more than one time for the file.
+                """
+            ),
+        ],
     )

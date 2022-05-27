@@ -1,10 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import string
 from collections import namedtuple
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 import pytest
 
@@ -13,6 +14,7 @@ from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, Pa
 from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
+    CoarsenedTarget,
     DictStringToStringField,
     DictStringToStringSequenceField,
     ExplicitlyProvidedDependencies,
@@ -39,10 +41,13 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
     ValidNumbers,
+    generate_file_based_overrides_field_help_message,
+    get_shard,
+    parse_shard_spec,
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import FilesNotFoundBehavior
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import FrozenInstanceError
@@ -440,6 +445,35 @@ def test_target_residence_dir() -> None:
         FortranTarget({}, Address("some_dir/subdir"), residence_dir="another_dir").residence_dir
         == "another_dir"
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# Test CoarsenedTarget
+# -----------------------------------------------------------------------------------------------
+
+
+def test_coarsened_target_equality() -> None:
+    a, b = (FortranTarget({}, Address(name)) for name in string.ascii_lowercase[:2])
+
+    def ct(members: List[Target], dependencies: List[CoarsenedTarget] = []):
+        return CoarsenedTarget(members, dependencies)
+
+    assert ct([]) == ct([])
+
+    assert ct([a]) == ct([a])
+    assert ct([a]) != ct([b])
+
+    # Unique instances.
+    assert ct([], [ct([a])]) == ct([], [ct([a])])
+    assert ct([], [ct([a])]) != ct([], [ct([b])])
+
+    # Create two root CTs (with unique `id`s), which contain some reused instances.
+    def nested():
+        ct_a = ct([a])
+        return ct([], [ct_a, ct([], [ct_a])])
+
+    assert id(nested()) != id(nested())
+    assert nested() == nested()
 
 
 # -----------------------------------------------------------------------------------------------
@@ -941,7 +975,7 @@ def test_multiple_sources_path_globs(
         default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
     sources = TestMultipleSourcesField(field_value, Address("test"))
-    actual = sources.path_globs(FilesNotFoundBehavior.warn)
+    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn)
     for attr, expect in zip(expected._fields, expected):
         if expect is not SKIP:
             assert getattr(actual, attr) == expect
@@ -1001,7 +1035,7 @@ def test_single_source_path_globs(
 
     sources = TestSingleSourceField(field_value, Address("test"))
 
-    actual = sources.path_globs(FilesNotFoundBehavior.warn)
+    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn)
     for attr, expect in zip(expected._fields, expected):
         if expect is not SKIP:
             assert getattr(actual, attr) == expect
@@ -1023,6 +1057,17 @@ def test_single_source_field_bans_globs() -> None:
         TestSingleSourceField("*.ext", Address("project"))
     with pytest.raises(InvalidFieldException):
         TestSingleSourceField("!f.ext", Address("project"))
+
+
+def test_multiple_sources_field_ban_subdirs() -> None:
+    class TestSources(MultipleSourcesField):
+        ban_subdirectories = True
+
+    assert TestSources(["f.ext"], Address("project")).value == ("f.ext",)
+    with pytest.raises(InvalidFieldException):
+        TestSources(["**"], Address("project"))
+    with pytest.raises(InvalidFieldException):
+        TestSources(["dir/f.ext"], Address("project"))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1292,7 +1337,7 @@ def test_overrides_field_normalization() -> None:
         {"foo.ext": tgt1_override, ("foo.ext", "bar*.ext"): tgt2_override}, Address("dir")
     )
     globs = OverridesField.to_path_globs(
-        Address("dir"), path_field.flatten(), FilesNotFoundBehavior.error
+        Address("dir"), path_field.flatten(), UnmatchedBuildFileGlobs.error
     )
     assert [path_globs.globs for path_globs in globs] == [
         ("dir/foo.ext",),
@@ -1301,7 +1346,7 @@ def test_overrides_field_normalization() -> None:
     assert OverridesField.flatten_paths(
         addr,
         [
-            (paths, globs, overrides)
+            (paths, globs, cast(Dict[str, Any], overrides))
             for (paths, overrides), globs in zip(
                 [
                     (Paths(("dir/foo.ext",), ()), tgt1_override),
@@ -1316,7 +1361,7 @@ def test_overrides_field_normalization() -> None:
         "dir/bar2.ext": tgt2_override,
     }
     assert path_field.flatten() == {
-        "foo.ext": {**tgt1_override, **tgt2_override},
+        "foo.ext": {**tgt2_override, **tgt1_override},
         "bar*.ext": tgt2_override,
     }
     with pytest.raises(InvalidFieldException):
@@ -1328,3 +1373,51 @@ def test_overrides_field_normalization() -> None:
                 (Paths(("dir/foo.ext", "dir/bar.ext"), ()), PathGlobs([]), tgt1_override),
             ],
         )
+
+
+# -----------------------------------------------------------------------------------------------
+# Test utility functions
+# -----------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "shard_spec,expected",
+    (
+        ("0/4", (0, 4)),
+        ("1/4", (1, 4)),
+        ("2/4", (2, 4)),
+        ("3/4", (3, 4)),
+        ("0/2", (0, 2)),
+        ("1/2", (1, 2)),
+        ("0/1", (0, 1)),
+    ),
+)
+def test_parse_shard_spec_good(shard_spec, expected) -> None:
+    assert parse_shard_spec(shard_spec) == expected
+
+
+@pytest.mark.parametrize("shard_spec", ("0/0", "1/1", "4/4", "5/4", "-1/4", "foo/4"))
+def test_parse_shard_spec_bad(shard_spec) -> None:
+    with pytest.raises(ValueError):
+        parse_shard_spec(shard_spec)
+
+
+def test_get_shard() -> None:
+    assert get_shard("foo/bar/1", 2) == 0
+    assert get_shard("foo/bar/4", 2) == 1
+
+
+def test_generate_file_based_overrides_field_help_message() -> None:
+    # Just test the Example: part looks right
+    message = generate_file_based_overrides_field_help_message(
+        "alias",
+        """
+        overrides={
+            "bar.proto": {"description": "our user model"]},
+            ("foo.proto", "bar.proto"): {"tags": ["overridden"]},
+        }
+        """,
+    )
+    assert "example:\n    overrides={\n" in message
+    assert '\n        "bar.proto"' in message
+    assert "\n    }\n\nFile" in message

@@ -57,3 +57,34 @@ def test_docker_registries() -> None:
     assert next(registries.get("myunregistereddomain:port")) == DockerRegistryOptions(
         address="myunregistereddomain:port"
     )
+
+
+def test_skip_push() -> None:
+    registries = DockerRegistries.from_dict(
+        {
+            "reg1": {"address": "registry1"},
+            "reg2": {"address": "registry2", "skip_push": True},
+            "reg3": {"address": "registry3", "skip_push": "false"},
+        }
+    )
+
+    reg1, reg2, reg3 = registries.get("@reg1", "@reg2", "@reg3")
+    assert reg1.skip_push is False
+    assert reg2.skip_push is True
+    assert reg3.skip_push is False
+
+
+def test_extra_image_tags() -> None:
+    registries = DockerRegistries.from_dict(
+        {
+            "reg1": {"address": "registry1"},
+            "reg2": {
+                "address": "registry2",
+                "extra_image_tags": ["latest", "v{build_args.VERSION}"],
+            },
+        }
+    )
+
+    reg1, reg2 = registries.get("@reg1", "@reg2")
+    assert reg1.extra_image_tags == ()
+    assert reg2.extra_image_tags == ("latest", "v{build_args.VERSION}")

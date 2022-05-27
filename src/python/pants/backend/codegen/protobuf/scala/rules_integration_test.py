@@ -18,15 +18,21 @@ from pants.backend.scala import target_types
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
 from pants.build_graph.address import Address
-from pants.core.util_rules import config_files, source_files, stripped_source_files
+from pants.core.util_rules import config_files, distdir, source_files, stripped_source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm import classpath
+from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.jdk_rules import rules as jdk_rules
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
+from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
@@ -52,6 +58,35 @@ message HelloReply {
 }
 """
 
+SCALAPB_RESOLVE = TestCoursierWrapper.new(
+    entries=(
+        CoursierLockfileEntry(
+            coord=Coordinate(
+                group="com.thesamet.scalapb",
+                artifact="scalapb-runtime_2.13",
+                version="0.11.6",
+            ),
+            file_name="scalapb-runtime_2.13-0.11.6.jar",
+            direct_dependencies=Coordinates([]),
+            dependencies=Coordinates([]),
+            file_digest=FileDigest(
+                "439b613f40b9ac43db4d68de5bef36befc56393d9c9cd002e2b965ce94f6f793",
+                2426575,
+            ),
+        ),
+    ),
+).serialize(
+    [
+        ArtifactRequirement(
+            Coordinate(
+                group="com.thesamet.scalapb",
+                artifact="scalapb-runtime_2.13",
+                version="0.11.6",
+            )
+        )
+    ]
+)
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -70,6 +105,8 @@ def rule_runner() -> RuleRunner:
             *protobuf_target_types_rules(),
             *stripped_source_files.rules(),
             *scala_protobuf_rules(),
+            *artifact_mapper.rules(),
+            *distdir.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateScalaFromProtobufRequest]),
             QueryRule(DigestContents, (Digest,)),
@@ -78,6 +115,7 @@ def rule_runner() -> RuleRunner:
             ScalaSourceTarget,
             ScalaSourcesGeneratorTarget,
             ProtobufSourcesGeneratorTarget,
+            JvmArtifactTarget,
         ],
     )
     rule_runner.set_options(
@@ -163,6 +201,18 @@ def test_generates_scala(rule_runner: RuleRunner) -> None:
             "tests/protobuf/test_protos/BUILD": (
                 "protobuf_sources(dependencies=['src/protobuf/dir2'])"
             ),
+            "3rdparty/jvm/default.lock": SCALAPB_RESOLVE,
+            "3rdparty/BUILD": dedent(
+                """\
+                jvm_artifact(
+                  name="com.thesamet.scalapb_scalapb-runtime_2.13",
+                  group="com.thesamet.scalapb",
+                  artifact="scalapb-runtime_2.13",
+                  version="0.11.6",
+                  resolve="jvm-default",
+                )
+                """
+            ),
         }
     )
 
@@ -203,6 +253,18 @@ def test_top_level_proto_root(rule_runner: RuleRunner) -> None:
                 """
             ),
             "protos/BUILD": "protobuf_sources()",
+            "3rdparty/jvm/default.lock": SCALAPB_RESOLVE,
+            "3rdparty/BUILD": dedent(
+                """\
+                jvm_artifact(
+                  name="com.thesamet.scalapb_scalapb-runtime_2.13",
+                  group="com.thesamet.scalapb",
+                  artifact="scalapb-runtime_2.13",
+                  version="0.11.6",
+                  resolve="jvm-default",
+                )
+                """
+            ),
         }
     )
     assert_files_generated(
@@ -234,6 +296,18 @@ def test_generates_fs2_grpc_via_jvm_plugin(rule_runner: RuleRunner) -> None:
               rpc bothStreaming (stream TestMessage) returns (stream TestMessage);
             }
             """
+            ),
+            "3rdparty/jvm/default.lock": SCALAPB_RESOLVE,
+            "3rdparty/BUILD": dedent(
+                """\
+                jvm_artifact(
+                  name="com.thesamet.scalapb_scalapb-runtime_2.13",
+                  group="com.thesamet.scalapb",
+                  artifact="scalapb-runtime_2.13",
+                  version="0.11.6",
+                  resolve="jvm-default",
+                )
+                """
             ),
         }
     )

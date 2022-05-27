@@ -11,16 +11,17 @@ from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Ta
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
 from pants.option.config import Config
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, LogLevelOption
 from pants.option.option_types import BoolOption, IntOption
 from pants.option.options import Options
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
+from pants.util.logging import LogLevel
 
 
-class LogLevel(Enum):
+class LogLevelSimple(Enum):
     INFO = "info"
     DEBUG = "debug"
 
@@ -132,8 +133,8 @@ def test_default() -> None:
     do_test(["--foo"], {"type": int, "default": 65536, "default_help_repr": "64KiB"}, "64KiB")
     do_test(["--foo"], {"type": list}, "[]")
     do_test(["--foo"], {"type": dict}, "{}")
-    do_test(["--foo"], {"type": LogLevel}, "None")
-    do_test(["--foo"], {"type": LogLevel, "default": LogLevel.DEBUG}, "debug")
+    do_test(["--foo"], {"type": LogLevelSimple}, "None")
+    do_test(["--foo"], {"type": LogLevelSimple, "default": LogLevelSimple.DEBUG}, "debug")
 
 
 def test_compute_default():
@@ -146,7 +147,7 @@ def test_compute_default():
     do_test("foo", type=str, default="foo")
     do_test(None, type=str, default=None)
     do_test([1, 2, 3], type=list, member_type=int, default=[1, 2, 3])
-    do_test(LogLevel.INFO, type=LogLevel, default=LogLevel.INFO)
+    do_test(LogLevelSimple.INFO, type=LogLevelSimple, default=LogLevelSimple.INFO)
 
 
 def test_deprecated():
@@ -193,13 +194,13 @@ def test_choices() -> None:
 
 
 def test_choices_enum() -> None:
-    kwargs = {"type": LogLevel}
+    kwargs = {"type": LogLevelSimple}
     ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
     assert ohi.choices == ("info", "debug")
 
 
 def test_list_of_enum() -> None:
-    kwargs = {"type": list, "member_type": LogLevel}
+    kwargs = {"type": list, "member_type": LogLevelSimple}
     ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
     assert ohi.choices == ("info", "debug")
 
@@ -229,7 +230,9 @@ def test_get_all_help_info():
         options_scope = GLOBAL_SCOPE
         help = "Global options."
 
-        opt1 = IntOption("-o", "--opt1", default=42, help="Option 1")
+        opt1 = IntOption("--opt1", default=42, help="Option 1")
+        # This is special in having a short option `-l`. Make sure it works.
+        level = LogLevelOption()
 
     class Foo(Subsystem):
         options_scope = "foo"
@@ -301,10 +304,10 @@ def test_get_all_help_info():
                 "deprecated_scope": None,
                 "basic": (
                     {
-                        "display_args": ("-o=<int>", "--opt1=<int>"),
-                        "comma_separated_display_args": "-o=<int>, --opt1=<int>",
-                        "scoped_cmd_line_args": ("-o", "--opt1"),
-                        "unscoped_cmd_line_args": ("-o", "--opt1"),
+                        "display_args": ("--opt1=<int>",),
+                        "comma_separated_display_args": "--opt1=<int>",
+                        "scoped_cmd_line_args": ("--opt1",),
+                        "unscoped_cmd_line_args": ("--opt1",),
                         "config_key": "opt1",
                         "env_var": "PANTS_OPT1",
                         "value_history": {
@@ -322,6 +325,29 @@ def test_get_all_help_info():
                         "removal_hint": None,
                         "choices": None,
                         "comma_separated_choices": None,
+                    },
+                    {
+                        "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
+                        "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                        "scoped_cmd_line_args": ("-l", "--level"),
+                        "unscoped_cmd_line_args": ("-l", "--level"),
+                        "config_key": "level",
+                        "env_var": "PANTS_LEVEL",
+                        "value_history": {
+                            "ranked_values": (
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": LogLevel.INFO, "details": None},
+                            ),
+                        },
+                        "typ": LogLevel,
+                        "default": LogLevel.INFO,
+                        "help": "Set the logging level.",
+                        "deprecation_active": False,
+                        "deprecated_message": None,
+                        "removal_version": None,
+                        "removal_hint": None,
+                        "choices": ("trace", "debug", "info", "warn", "error"),
+                        "comma_separated_choices": "trace, debug, info, warn, error",
                     },
                 ),
                 "advanced": tuple(),
@@ -382,38 +408,6 @@ def test_get_all_help_info():
                 "deprecated": tuple(),
             },
         },
-        "rule_output_type_to_rule_infos": {
-            "Foo": (
-                {
-                    "description": None,
-                    "help": "A foo.",
-                    "input_gets": ("Get(ScopedOptions, Scope, ..)",),
-                    "input_types": (),
-                    "name": "construct_scope_foo",
-                    "output_desc": None,
-                    "output_type": "Foo",
-                    "provider": "help_info_extracter_test",
-                },
-            ),
-            "Target": (
-                {
-                    "description": None,
-                    "help": "This rule is for testing info extraction only.",
-                    "input_gets": (),
-                    "input_types": ("Foo",),
-                    "name": "pants.help.help_info_extracter_test.rule_info_test",
-                    "output_desc": (
-                        "A Target represents an addressable set of metadata.\n\n    Set the "
-                        "`help` class property with a description, which will be used in "
-                        "`./pants help`. For the\n    best rendering, use soft wrapping (e.g. "
-                        "implicit string concatenation) within paragraphs, but\n    hard wrapping "
-                        "(`\n`) to separate distinct paragraphs and/or lists.\n    "
-                    ),
-                    "output_type": "Target",
-                    "provider": "help_info_extracter_test",
-                },
-            ),
-        },
         "name_to_goal_info": {
             "bar": {
                 "name": "bar",
@@ -457,8 +451,35 @@ def test_get_all_help_info():
                 ),
             }
         },
+        "name_to_rule_info": {
+            "construct_scope_foo": {
+                "description": None,
+                "documentation": "A foo.",
+                "input_gets": ("Get(ScopedOptions, Scope, ..)",),
+                "input_types": (),
+                "name": "construct_scope_foo",
+                "output_type": "Foo",
+                "provider": "help_info_extracter_test",
+            },
+            "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test": {
+                "description": None,
+                "documentation": "This rule is for testing info extraction only.",
+                "input_gets": (),
+                "input_types": ("Foo",),
+                "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                "output_type": "Target",
+                "provider": "help_info_extracter_test",
+            },
+        },
     }
-    assert expected_all_help_info_dict == all_help_info_dict
+
+    # Break down this colossal structure into pieces so it is easier to spot where the issue is.
+    # Check keys equality first, then contents
+    assert set(expected_all_help_info_dict) == set(all_help_info_dict)
+    for key in all_help_info_dict:
+        actual = all_help_info_dict[key]
+        expected = expected_all_help_info_dict[key]
+        assert expected == actual
 
 
 def test_pretty_print_type_hint() -> None:

@@ -37,10 +37,12 @@ from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
-    ThirdPartyPackageToArtifactMapping,
+    ConflictingJvmArtifactVersion,
+    MissingJvmArtifacts,
+    find_jvm_artifacts_or_raise,
 )
-from pants.jvm.dependency_inference.symbol_mapper import FirstPartySymbolMapping
-from pants.jvm.resolve.common import ArtifactRequirement
+from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
+from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
@@ -55,8 +57,7 @@ async def infer_scala_dependencies_via_source_analysis(
     request: InferScalaSourceDependencies,
     scala_infer_subsystem: ScalaInferSubsystem,
     jvm: JvmSubsystem,
-    first_party_symbol_map: FirstPartySymbolMapping,
-    third_party_artifact_mapping: ThirdPartyPackageToArtifactMapping,
+    symbol_mapping: SymbolMapping,
 ) -> InferredDependencies:
     if not scala_infer_subsystem.imports:
         return InferredDependencies([])
@@ -79,24 +80,17 @@ async def infer_scala_dependencies_via_source_analysis(
 
     dependencies: OrderedSet[Address] = OrderedSet()
     for symbol in symbols:
-        first_party_matches = first_party_symbol_map.symbols.addresses_for_symbol(
-            symbol, resolve=resolve
-        )
-        third_party_matches = third_party_artifact_mapping.addresses_for_symbol(symbol, resolve)
-        matches = first_party_matches.union(third_party_matches)
-        if not matches:
-            continue
+        for matches in symbol_mapping.addresses_for_symbol(symbol, resolve).values():
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                matches,
+                address,
+                import_reference="type",
+                context=f"The target {address} imports `{symbol}`",
+            )
 
-        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-            matches,
-            address,
-            import_reference="type",
-            context=f"The target {address} imports `{symbol}`",
-        )
-
-        maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
-        if maybe_disambiguated:
-            dependencies.add(maybe_disambiguated)
+            maybe_disambiguated = explicitly_provided_deps.disambiguated(matches)
+            if maybe_disambiguated:
+                dependencies.add(maybe_disambiguated)
 
     return InferredDependencies(dependencies)
 
@@ -116,7 +110,7 @@ class ScalaRuntimeForResolveRequest:
 
 @dataclass(frozen=True)
 class ScalaRuntimeForResolve:
-    address: Address
+    addresses: frozenset[Address]
 
 
 @rule
@@ -126,28 +120,28 @@ async def resolve_scala_library_for_resolve(
     jvm: JvmSubsystem,
     scala_subsystem: ScalaSubsystem,
 ) -> ScalaRuntimeForResolve:
-
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
 
-    for tgt in jvm_artifact_targets:
-        if tgt[JvmResolveField].normalized_value(jvm) != request.resolve_name:
-            continue
-
-        artifact = ArtifactRequirement.from_jvm_artifact_target(tgt)
-        if (
-            artifact.coordinate.group != SCALA_LIBRARY_GROUP
-            or artifact.coordinate.artifact != SCALA_LIBRARY_ARTIFACT
-        ):
-            continue
-
-        if artifact.coordinate.version != scala_version:
-            raise ConflictingScalaLibraryVersionInResolveError(
-                request.resolve_name, scala_version, artifact.coordinate
-            )
-
-        return ScalaRuntimeForResolve(tgt.address)
-
-    raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
+    try:
+        addresses = find_jvm_artifacts_or_raise(
+            required_coordinates=[
+                Coordinate(
+                    group=SCALA_LIBRARY_GROUP,
+                    artifact=SCALA_LIBRARY_ARTIFACT,
+                    version=scala_version,
+                )
+            ],
+            resolve=request.resolve_name,
+            jvm_artifact_targets=jvm_artifact_targets,
+            jvm=jvm,
+        )
+        return ScalaRuntimeForResolve(addresses)
+    except ConflictingJvmArtifactVersion as ex:
+        raise ConflictingScalaLibraryVersionInResolveError(
+            request.resolve_name, scala_version, ex.found_coordinate
+        )
+    except MissingJvmArtifacts:
+        raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
 
 
 @rule(desc="Inject dependency on scala-library artifact for Scala target.")
@@ -165,7 +159,7 @@ async def inject_scala_library_dependency(
     scala_library_target_info = await Get(
         ScalaRuntimeForResolve, ScalaRuntimeForResolveRequest(resolve)
     )
-    return InjectedDependencies((scala_library_target_info.address,))
+    return InjectedDependencies(scala_library_target_info.addresses)
 
 
 @rule(desc="Inject dependency on scala plugin artifacts for Scala target.")

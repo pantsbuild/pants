@@ -33,7 +33,7 @@ from packaging.version import Version
 from reversion import reversion
 
 from pants.util.memo import memoized_property
-from pants.util.strutil import strip_prefix
+from pants.util.strutil import softwrap, strip_prefix
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
@@ -71,6 +71,13 @@ _known_packages = [
 _expected_owners = {"benjyw", "John.Sirois", "stuhood"}
 
 _expected_maintainers = {"EricArellano", "gshuflin", "illicitonion", "wisechengyi"}
+
+
+# Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
+# otherwise inclusion of that plugin will fail due to its `pytest` import not being included in the pex.
+DISABLED_BACKENDS_CONFIG = {
+    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures"]',
+}
 
 
 class PackageAccessValidator:
@@ -257,9 +264,13 @@ class Package:
         # very likely that a release will fail.
         if not versions_by_freshness_ascending and available_mb < 0:
             print(
-                f"There are no stale artifacts to prune (older than {MINIMUM_STALE_AGE}) and "
-                "we are over capacity: the release is very likely to fail. See "
-                "[https://github.com/pantsbuild/pants/issues/11614].",
+                softwrap(
+                    f"""
+                    There are no stale artifacts to prune (older than {MINIMUM_STALE_AGE}) and
+                    we are over capacity: the release is very likely to fail. See
+                    [https://github.com/pantsbuild/pants/issues/11614].
+                    """
+                ),
                 file=sys.stderr,
             )
 
@@ -294,6 +305,10 @@ def validate_pants_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[st
                 ],
                 check=True,
                 stdout=subprocess.PIPE,
+                env={
+                    **os.environ,
+                    **DISABLED_BACKENDS_CONFIG,
+                },
             )
             .stdout.decode()
             .strip()
@@ -311,8 +326,12 @@ def validate_pants_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list[st
     outputted_version = run_venv_pants(["--version"])
     if outputted_version != version:
         die(
-            f"Installed version of Pants ({outputted_version}) did not match requested "
-            f"version ({version})!"
+            softwrap(
+                f"""
+                Installed version of Pants ({outputted_version}) did not match requested
+                version ({version})!
+                """
+            )
         )
     run_venv_pants(["list", "src::"])
 
@@ -371,9 +390,11 @@ def validate_testutil_pkg(version: str, venv_bin_dir: Path, extra_pip_args: list
             [
                 venv_bin_dir / "python",
                 "-c",
-                (
-                    "import pants.testutil.option_util, pants.testutil.rule_runner, "
-                    "pants.testutil.pants_integration_test"
+                softwrap(
+                    """
+                    import pants.testutil.option_util, pants.testutil.rule_runner,
+                    pants.testutil.pants_integration_test
+                    """
                 ),
             ],
             env={**os.environ, "PYTHONPATH": pythonpath},
@@ -556,8 +577,12 @@ def download_pex_bin() -> Iterator[Path]:
         )
     except (FileNotFoundError, StopIteration) as exc:
         die(
-            "Could not find a requirement starting with `pex==` in "
-            f"3rdparty/python/requirements.txt: {repr(exc)}"
+            softwrap(
+                f"""
+                Could not find a requirement starting with `pex==` in
+                3rdparty/python/requirements.txt: {repr(exc)}
+                """
+            )
         )
 
     with TemporaryDirectory() as tempdir:
@@ -615,8 +640,14 @@ def build_pants_wheels() -> None:
             failed_packages = ",".join(package.name for package in PACKAGES)
             failed_targets = " ".join(package.target for package in PACKAGES)
             die(
-                f"Failed to build packages {failed_packages} for {version} with targets "
-                f"{failed_targets}.\n\n{e!r}",
+                softwrap(
+                    f"""
+                    Failed to build packages {failed_packages} for {version} with targets
+                    {failed_targets}.
+
+                    {e!r}
+                    """
+                )
             )
 
         # TODO(#10718): Allow for sdist releases. We can build an sdist for
@@ -629,8 +660,12 @@ def build_pants_wheels() -> None:
             # platform.
             if not is_cross_platform(found_wheels) and len(found_wheels) > 1:
                 die(
-                    f"Found multiple wheels for {package} in the `dist/` folder, but was "
-                    f"expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}."
+                    softwrap(
+                        f"""
+                        Found multiple wheels for {package} in the `dist/` folder, but was
+                        expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}.
+                        """
+                    )
                 )
             for wheel in found_wheels:
                 if not (dest / wheel.name).exists():
@@ -684,8 +719,12 @@ def build_3rdparty_wheels() -> None:
         )
         if not python_requirements:
             die(
-                f"No 3rd-party dependencies detected for {pkg_tgts}. Is `./pants dependencies` "
-                "broken?"
+                softwrap(
+                    f"""
+                    No 3rd-party dependencies detected for {pkg_tgts}. Is `./pants dependencies`
+                    broken?
+                    """
+                )
             )
         reqs = itertools.chain.from_iterable(
             obj["requirements"]
@@ -742,6 +781,7 @@ def build_fs_util() -> None:
 #  capabilities, we should improve Pants. When porting, using `runtime_package_dependencies` to do
 #  the validation.
 def build_pex(fetch: bool) -> None:
+    stable = os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE"
     if fetch:
         extra_pex_args = [
             "--python-shebang",
@@ -774,6 +814,8 @@ def build_pex(fetch: bool) -> None:
     if fetch:
         fetch_prebuilt_wheels(CONSTANTS.deploy_dir, include_3rdparty=True)
         check_pants_wheels_present(CONSTANTS.deploy_dir)
+        if stable:
+            reversion_prebuilt_wheels()
     else:
         build_pants_wheels()
         build_3rdparty_wheels()
@@ -809,14 +851,22 @@ def build_pex(fetch: bool) -> None:
             check=True,
         )
 
-    if os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE":
+    if stable:
         stable_dest = CONSTANTS.deploy_dir / "pex" / f"pants.{CONSTANTS.pants_stable_version}.pex"
         stable_dest.parent.mkdir(parents=True, exist_ok=True)
         dest.rename(stable_dest)
         dest = stable_dest
     green(f"Built {dest}")
 
-    subprocess.run([sys.executable, str(dest), "--no-pantsd", "--version"], env=env, check=True)
+    with TemporaryDirectory() as tmpdir:
+        validated_pex_path = Path(tmpdir, "pants.pex")
+        shutil.copyfile(dest, validated_pex_path)
+        validated_pex_path.chmod(0o777)
+        Path(tmpdir, "BUILD_ROOT").touch()
+        # We also need to filter out Pants options like `PANTS_CONFIG_FILES` and disable certain internal backends.
+        env = {k: v for k, v in env.items() if not k.startswith("PANTS_")}
+        env.update(DISABLED_BACKENDS_CONFIG)
+        subprocess.run([validated_pex_path, "--version"], env=env, check=True, cwd=dest.parent)
     green(f"Validated {dest}")
 
 
@@ -878,8 +928,12 @@ def publish_apple_silicon() -> None:
     )
     if not expected_whl.exists():
         die(
-            f"Failed to find {expected_whl}. Are you running from the correct platform and "
-            f"macOS version?"
+            softwrap(
+                f"""
+                Failed to find {expected_whl}. Are you running from the correct platform and
+                macOS version?
+                """
+            )
         )
 
     create_twine_venv()
@@ -897,15 +951,23 @@ def check_clean_git_branch() -> None:
     )
     if git_status:
         die(
-            "Uncommitted changes detected when running `git status`. You must be on a clean branch "
-            "to release."
+            softwrap(
+                """
+                Uncommitted changes detected when running `git status`. You must be on a clean branch
+                to release.
+                """
+            )
         )
     valid_branch_pattern = r"^(main)|([0-9]+\.[0-9]+\.x)$"
     git_branch = get_git_branch()
     if not re.match(valid_branch_pattern, git_branch):
         die(
-            "On an invalid branch. You must either be on `main` or a release branch like "
-            f"`2.4.x`. Detected: {git_branch}"
+            softwrap(
+                f"""
+                On an invalid branch. You must either be on `main` or a release branch like
+                `2.4.x`. Detected: {git_branch}
+                """
+            )
         )
 
 
@@ -919,8 +981,12 @@ def check_pgp() -> None:
     key_confirmation = input("\nIs this the correct key? [Y/n]: ")
     if key_confirmation and key_confirmation.lower() != "y":
         die(
-            "Please configure the key you intend to use. See "
-            "https://www.pantsbuild.org/docs/release-process."
+            softwrap(
+                """
+                Please configure the key you intend to use. See
+                https://www.pantsbuild.org/docs/release-process.
+                """
+            )
         )
 
 
@@ -1004,12 +1070,18 @@ def prompt_artifact_freshness() -> None:
     if stale_versions:
         print("\n".join(f"Stale:\n  {sv}" for sv in stale_versions))
         input(
-            "\nTo ensure that there is adequate storage for new artifacts, the stale release "
-            "artifacts listed above should be deleted via [https://pypi.org/]'s UI.\n"
-            "If you have any concerns about the listed artifacts, or do not have access to "
-            "delete them yourself, please raise an issue in #development Slack or on "
-            "[https://github.com/pantsbuild/pants/issues/11614].\n"
-            "Press enter when you have deleted the listed artifacts: "
+            softwrap(
+                """
+                To ensure that there is adequate storage for new artifacts, the stale release
+                artifacts listed above should be deleted via [https://pypi.org/]'s UI.
+
+                If you have any concerns about the listed artifacts, or do not have access to
+                delete them yourself, please raise an issue in #development Slack or on
+                [https://github.com/pantsbuild/pants/issues/11614].
+
+                Press enter when you have deleted the listed artifacts:
+                """
+            )
         )
     else:
         print("No stale artifacts detected.")
@@ -1017,18 +1089,28 @@ def prompt_artifact_freshness() -> None:
 
 def prompt_apple_silicon() -> None:
     input(
-        f"We need to release for Apple Silicon. Please message Eric on Slack asking to release "
-        f"for {CONSTANTS.pants_stable_version}.\n\n"
-        f"(You do not need to wait for Eric to finish their part. You can continue in the release "
-        f"process once you've messaged them.)"
-        f"\n\nHit enter when you've messaged Eric: "
+        softwrap(
+            f"""
+            We need to release for Apple Silicon. Please message Eric on Slack asking to release
+            for {CONSTANTS.pants_stable_version}.
+
+            (You do not need to wait for Eric to finish their part. You can continue in the release
+            process once you've messaged them.)
+
+            Hit enter when you've messaged Eric:
+            """
+        )
     )
 
 
 def prompt_to_generate_docs() -> None:
     has_docs_access = input(
-        "\nThe docs now need to be regenerated. Do you already have editing access to "
-        "readme.com? [Y/n]: "
+        softwrap(
+            """
+            The docs now need to be regenerated. Do you already have editing access to
+            readme.com? [Y/n]:
+            """
+        )
     )
     # This URL will work regardless of the current version, so long as we don't delete 2.5 from
     # the docs.
@@ -1036,16 +1118,29 @@ def prompt_to_generate_docs() -> None:
     docs_cmd = "./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>"
     if has_docs_access and has_docs_access.lower() != "y":
         print(
-            "\nPlease ask in the #maintainers Slack channel to be added to Readme.com. Please "
-            "enable two-factor authentication!\n\n"
-            f"Then go to {api_key_url} to find your API key. Run this command:\n\n\t{docs_cmd}\n\n"
-            "(If you are not comfortable getting permissions, you can ask another maintainer to "
-            "run this script in the #maintainers Slack.)"
+            softwrap(
+                f"""
+                Please ask in the #maintainers Slack channel to be added to Readme.com. Please
+                enable two-factor authentication!
+
+                Then go to {api_key_url} to find your API key. Run this command:
+
+                    {docs_cmd}
+
+                (If you are not comfortable getting permissions, you can ask another maintainer to
+                run this script in the #maintainers Slack.)
+                """
+            )
         )
     else:
         print(
-            f"\nPlease go to {api_key_url} to find your API key. Then, run this command:\n\n"
-            f"\t{docs_cmd}"
+            softwrap(
+                f"""
+                Please go to {api_key_url} to find your API key. Then, run this command:
+
+                    {docs_cmd}
+            """
+            )
         )
 
 
@@ -1145,8 +1240,12 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
         if is_cross_platform(local_files) and len(local_files) != 6:
             formatted_local_files = ", ".join(f.name for f in local_files)
             missing_packages.append(
-                f"{package.name} (expected 6 wheels, {{macosx, linux}} x {{cp37m, cp38, cp39}}, "
-                f"but found {formatted_local_files})"
+                softwrap(
+                    f"""
+                    {package.name} (expected 6 wheels, {{macosx, linux}} x {{cp37m, cp38, cp39}},
+                    but found {formatted_local_files})
+                    """
+                )
             )
     if missing_packages:
         formatted_missing = "\n  ".join(missing_packages)

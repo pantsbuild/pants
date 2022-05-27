@@ -13,7 +13,7 @@ use regex::Regex;
 use task_executor::Executor;
 use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 use tokio::time::sleep;
-use workunit_store::{in_workunit, RunningWorkunit, WorkunitMetadata};
+use workunit_store::{in_workunit, RunningWorkunit};
 
 use crate::{Context, FallibleProcessResultWithPlatform, Process};
 
@@ -63,19 +63,15 @@ impl crate::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let semaphore_acquisition = self.sema.acquire(process.concurrency_available);
     let permit = in_workunit!(
-      context.workunit_store.clone(),
-      "acquire_command_runner_slot".to_owned(),
-      WorkunitMetadata {
-        // TODO: The UI uses the presence of a blocked workunit below a parent as an indication that
-        // the parent is blocked. If this workunit is filtered out, parents nodes which are waiting
-        // for the semaphore will render, even though they are effectively idle.
-        //
-        // https://github.com/pantsbuild/pants/issues/14680 will likely allow for a more principled
-        // solution to this problem, such as removing the mutable `blocking` flag, and then never
-        // filtering blocked workunits at creation time, regardless of level.
-        level: Level::Debug,
-        ..WorkunitMetadata::default()
-      },
+      "acquire_command_runner_slot",
+      // TODO: The UI uses the presence of a blocked workunit below a parent as an indication that
+      // the parent is blocked. If this workunit is filtered out, parents nodes which are waiting
+      // for the semaphore will render, even though they are effectively idle.
+      //
+      // https://github.com/pantsbuild/pants/issues/14680 will likely allow for a more principled
+      // solution to this problem, such as removing the mutable `blocking` flag, and then never
+      // filtering blocked workunits at creation time, regardless of level.
+      Level::Debug,
       |workunit| async move {
         let _blocking_token = workunit.blocking();
         semaphore_acquisition.await

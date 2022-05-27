@@ -96,7 +96,7 @@ class PublishFieldSet(Generic[_T], FieldSet, metaclass=ABCMeta):
     """
 
     # Subclasses must provide this, to a union member (subclass) of `PublishRequest`.
-    publish_request_type: ClassVar[Type[_T]]
+    publish_request_type: ClassVar[Type[_T]]  # type: ignore[misc]
 
     @final
     def _request(self, packages: tuple[BuiltPackage, ...]) -> _T:
@@ -240,6 +240,7 @@ async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
             outputs.append(pub.get_output_data(published=False, status=status))
             continue
 
+        logger.debug(f"Execute {pub.process}")
         res = await Effect(InteractiveProcessResult, InteractiveProcess, pub.process)
         if res.exit_code == 0:
             sigil = console.sigil_succeeded()

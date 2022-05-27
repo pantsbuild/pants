@@ -9,6 +9,7 @@ import tokenize
 from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
+from pathlib import PurePath
 from typing import Any, Iterable
 
 from pants.base.exceptions import MappingError
@@ -57,13 +58,6 @@ class ParseState(threading.local):
         return list(self._target_adapters)
 
 
-_AMBIGUOUS_PYTHON_MACRO_SYMBOLS = {
-    "python_requirements",
-    "pipenv_requirements",
-    "poetry_requirements",
-}
-
-
 class Parser:
     def __init__(
         self,
@@ -71,10 +65,9 @@ class Parser:
         build_root: str,
         target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
-        use_deprecated_python_macros: bool = True,
     ) -> None:
         self._symbols, self._parse_state = self._generate_symbols(
-            build_root, target_type_aliases, object_aliases, use_deprecated_python_macros
+            build_root, target_type_aliases, object_aliases
         )
 
     @staticmethod
@@ -82,7 +75,6 @@ class Parser:
         build_root: str,
         target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
-        use_deprecated_python_macros: bool,
     ) -> tuple[dict[str, Any], ParseState]:
         # N.B.: We re-use the thread local ParseState across symbols for performance reasons.
         # This allows a single construction of all symbols here that can be re-used for each BUILD
@@ -107,19 +99,17 @@ class Parser:
                 parse_state.add(target_adaptor)
                 return target_adaptor
 
-        symbols: dict[str, Any] = dict(object_aliases.objects)
-        symbols.update(
-            (alias, Registrar(alias))
-            for alias in target_type_aliases
-            if not use_deprecated_python_macros or alias not in _AMBIGUOUS_PYTHON_MACRO_SYMBOLS
-        )
+        symbols: dict[str, Any] = {
+            **object_aliases.objects,
+            "build_file_dir": lambda: PurePath(parse_state.rel_path()),
+        }
+        symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 
         parse_context = ParseContext(
             build_root=build_root, type_aliases=symbols, rel_path_oracle=parse_state
         )
         for alias, object_factory in object_aliases.context_aware_object_factories.items():
-            if use_deprecated_python_macros or alias not in _AMBIGUOUS_PYTHON_MACRO_SYMBOLS:
-                symbols[alias] = object_factory(parse_context)
+            symbols[alias] = object_factory(parse_context)
 
         return symbols, parse_state
 

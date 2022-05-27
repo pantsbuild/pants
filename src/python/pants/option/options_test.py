@@ -35,7 +35,6 @@ from pants.option.errors import (
     MutuallyExclusiveOptionError,
     NoOptionNames,
     OptionAlreadyRegistered,
-    OptionNameDash,
     OptionNameDoubleDash,
     ParseError,
 )
@@ -350,7 +349,7 @@ def test_deprecated_options(caplog) -> None:
         opts = create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config)
         assert opts.for_scope(scope)[opt] == expected
         assert len(caplog.records) == 1
-        assert "will be removed in version" in caplog.text
+        assert "is scheduled to be removed in version" in caplog.text
         assert opt in caplog.text
 
     assert_deprecated(GLOBAL_SCOPE, "old1", ["--old1=x"], expected="x")
@@ -416,7 +415,7 @@ def test_deprecated_options_start_version(caplog) -> None:
         == "x"
     )
     assert len(caplog.records) == 1
-    assert "will be removed in version" in caplog.text
+    assert "is scheduled to be removed in version" in caplog.text
     assert "past_start" in caplog.text
 
 
@@ -509,8 +508,16 @@ def test_scope_deprecation_default_config_section(caplog) -> None:
 
 class OptionsTest(unittest.TestCase):
     @staticmethod
-    def _create_config(config: dict[str, dict[str, str]] | None = None) -> Config:
-        return Config.load([FileContent("test_config.toml", toml.dumps(config or {}).encode())])
+    def _create_config(
+        config: dict[str, dict[str, str]] | None = None,
+        config2: dict[str, dict[str, str]] | None = None,
+    ) -> Config:
+        return Config.load(
+            [
+                FileContent("test_config.toml", toml.dumps(config or {}).encode()),
+                FileContent("test_config2.toml", toml.dumps(config2 or {}).encode()),
+            ]
+        )
 
     def _parse(
         self,
@@ -518,12 +525,13 @@ class OptionsTest(unittest.TestCase):
         flags: str = "",
         env: dict[str, str] | None = None,
         config: dict[str, dict[str, Any]] | None = None,
+        config2: dict[str, dict[str, Any]] | None = None,
         bootstrap_option_values=None,
     ) -> Options:
         args = ["./pants", *shlex.split(flags)]
         options = Options.create(
             env=env or {},
-            config=self._create_config(config),
+            config=self._create_config(config, config2),
             known_scope_infos=OptionsTest._known_scope_infos,
             args=args,
             bootstrap_option_values=bootstrap_option_values,
@@ -564,10 +572,15 @@ class OptionsTest(unittest.TestCase):
         def register_global(*args, **kwargs):
             options.register(GLOBAL_SCOPE, *args, **kwargs)
 
-        register_global("-z", "--verbose", type=bool, help="Verbose output.")
-        register_global("-n", "--num", type=int, default=99)
-        # To test that we can use the same name on the global scope and another scope.
-        options.register("anotherscope", "-n", "--num", type=int, default=99)
+        register_global("--verbose", type=bool, help="Verbose output.")
+        register_global("--num", type=int, default=99)
+
+        # NB: `-l` on the global scope is the only short arg we allow. We need to make sure it
+        # works.
+        register_global("-l", "--level", type=str, help="What level to use.")
+
+        # Test that we can use the same name on the global scope and another scope.
+        options.register("anotherscope", "--num", type=int, default=99)
 
         register_global("--y", type=list, member_type=int)
         register_global(
@@ -692,9 +705,15 @@ class OptionsTest(unittest.TestCase):
         # Some basic smoke tests.
         options = self._parse(flags="--verbose")
         assert options.for_global_scope().verbose is True
-        options = self._parse(flags="-z compile path/to/tgt")
+        options = self._parse(flags="--verbose compile path/to/tgt")
         assert ["path/to/tgt"] == options.specs
         assert options.for_global_scope().verbose is True
+
+        options = self._parse(flags="-linfo")
+        assert options.for_global_scope().level == "info"
+        options = self._parse(flags="--level=info compile path/to/tgt")
+        assert ["path/to/tgt"] == options.specs
+        assert options.for_global_scope().level == "info"
 
         with pytest.raises(ParseError):
             self._parse(flags="--unregistered-option compile").for_global_scope()
@@ -771,10 +790,14 @@ class OptionsTest(unittest.TestCase):
             flags: str = "",
             env_val: str | None = None,
             config_val: str | None = None,
+            config2_val: str | None = None,
         ) -> None:
             env = {"PANTS_GLOBAL_LISTY": env_val} if env_val else None
             config = {"GLOBAL": {"listy": config_val}} if config_val else None
-            global_options = self._parse(flags=flags, env=env, config=config).for_global_scope()
+            config2 = {"GLOBAL": {"listy": config2_val}} if config2_val else None
+            global_options = self._parse(
+                flags=flags, env=env, config=config, config2=config2
+            ).for_global_scope()
             assert global_options.listy == expected
 
         default = [1, 2, 3]
@@ -795,8 +818,12 @@ class OptionsTest(unittest.TestCase):
         check(
             flags="--listy=+[8,9]",
             env_val="+[6,7]",
-            config_val="+[4,5]",
-            expected=[*default, 4, 5, 6, 7, 8, 9],
+            config_val="+[4,5],+[45]",
+            expected=[*default, 4, 5, 45, 6, 7, 8, 9],
+        )
+        check(
+            config_val="+[4,5],-[4]",
+            expected=[*default, 5],
         )
 
         # Appending and filtering across env, config and flags (in the right order).
@@ -804,7 +831,8 @@ class OptionsTest(unittest.TestCase):
             flags="--listy=-[1,5,6]",
             env_val="+[6,7]",
             config_val="+[4,5]",
-            expected=[2, 3, 4, 7],
+            config2_val="+[99]",
+            expected=[2, 3, 4, 99, 7],
         )
         check(
             flags="--listy=+[8,9]",
@@ -812,6 +840,17 @@ class OptionsTest(unittest.TestCase):
             config_val="+[4,5],-[3]",
             expected=[1, 2, 8, 9],
         )
+        # Appending a value from a fromfile.
+        with temporary_file(binary_mode=False) as fp:
+            fp.write("-[3]")
+            fp.close()
+            check(
+                flags="--listy=+[8,9]",
+                env_val="-[4,5]",
+                config_val="+[4,5]",
+                config2_val=f"@{fp.name}",
+                expected=[1, 2, 8, 9],
+            )
 
         # Overwriting from env, then appending and filtering.
         check(
@@ -826,7 +865,8 @@ class OptionsTest(unittest.TestCase):
             flags="--listy=+[8,9]",
             env_val="+[6,7]",
             config_val="[4,5]",
-            expected=[4, 5, 6, 7, 8, 9],
+            config2_val="-[4]",
+            expected=[5, 6, 7, 8, 9],
         )
 
         # Overwriting from flags.
@@ -971,9 +1011,13 @@ class OptionsTest(unittest.TestCase):
             expected: dict[str, str],
             flags: str = "",
             config_val: str | None = None,
+            config2_val: str | None = None,
         ) -> None:
             config = {"GLOBAL": {"dicty": config_val}} if config_val else None
-            global_options = self._parse(flags=flags, config=config).for_global_scope()
+            config2 = {"GLOBAL": {"dicty": config2_val}} if config2_val else None
+            global_options = self._parse(
+                flags=flags, config=config, config2=config2
+            ).for_global_scope()
             assert global_options.dicty == expected
 
         default = {"a": "b"}
@@ -987,6 +1031,12 @@ class OptionsTest(unittest.TestCase):
 
         check(config_val='{"c": "d"}', expected=specified_args)
         check(config_val='+{"c": "d"}', expected=all_args)
+        check(
+            config_val='+{"c": "d"}',
+            config2_val='+{"e": "f"}',
+            flags='--dicty=\'+{"g": "h"}\'',
+            expected={**all_args, "e": "f", "g": "h"},
+        )
         check(
             config_val='+{"c": "d"}',
             flags='--dicty=\'+{"e": "f"}\'',
@@ -1050,7 +1100,7 @@ class OptionsTest(unittest.TestCase):
                 options.for_global_scope()
 
         assertError(NoOptionNames)
-        assertError(OptionNameDash, "badname")
+        assertError(OptionNameDoubleDash, "badname")
         assertError(OptionNameDoubleDash, "-badname")
         assertError(InvalidKwarg, "--foo", badkwarg=42)
         assertError(ImplicitValIsNone, "--foo", implicit_value=None)

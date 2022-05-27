@@ -15,13 +15,13 @@ from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
-    NoCompatibleResolveException,
     RequirementsPexRequest,
 )
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
+from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -29,6 +29,7 @@ from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequ
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: PythonSetup) -> None:
@@ -42,19 +43,27 @@ def validate_compatible_resolve(root_targets: Iterable[Target], python_setup: Py
         for root in root_targets
         if root.has_field(PythonResolveField)
     }
+
+    def maybe_get_resolve(t: Target) -> str | None:
+        if not t.has_field(PythonResolveField):
+            return None
+        return t[PythonResolveField].normalized_value(python_setup)
+
     if len(root_resolves) > 1:
-        raise NoCompatibleResolveException(
-            python_setup,
-            "The input targets did not have a resolve in common",
+        raise NoCompatibleResolveException.bad_input_roots(
             root_targets,
-            (
-                "To work around this, choose which resolve you want to use from above. "
-                f'Then, run `{bin_name()} peek :: | jq -r \'.[] | select(.resolve == "example") | '
-                f'.["address"]\' | xargs {bin_name()} repl`, where you replace "example" with the '
-                "resolve name, and possibly replace the specs `::` with what you were using "
-                "before. If the resolve is the `[python].default_resolve`, use "
-                '`select(.resolve == "example" or .resolve == null)`. These queries will result in '
-                "opening a REPL with only targets using the desired resolve."
+            maybe_get_resolve=maybe_get_resolve,
+            doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+            workaround=softwrap(
+                f"""
+                To work around this, choose which resolve you want to use from above. Then, run
+                `{bin_name()} peek :: | jq -r \'.[] | select(.resolve == "example") |
+                .["address"]\' | xargs {bin_name()} repl`, where you replace "example" with the
+                resolve name, and possibly replace the specs `::` with what you were using
+                before. If the resolve is the `[python].default_resolve`, use
+                `select(.resolve == "example" or .resolve == null)`. These queries will result in
+                opening a REPL with only targets using the desired resolve.
+                """
             ),
         )
 
@@ -74,7 +83,7 @@ async def create_python_repl_request(
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
     )
 
-    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses, internal_only=True))
+    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses))
     local_dists_request = Get(
         LocalDistsPex,
         LocalDistsPexRequest(
@@ -128,7 +137,7 @@ async def create_ipython_repl_request(
         Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses)),
     )
 
-    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses, internal_only=True))
+    requirements_request = Get(Pex, RequirementsPexRequest(request.addresses))
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
     )

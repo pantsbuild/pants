@@ -33,7 +33,7 @@ mod snapshot_ops;
 mod snapshot_ops_tests;
 #[cfg(test)]
 mod snapshot_tests;
-pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, SubsetParams};
+pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
@@ -64,7 +64,7 @@ use remexec::{ServerCapabilities, Tree};
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tryfuture::try_future;
-use workunit_store::{get_workunit_store_handle, in_workunit, Level, Metric, WorkunitMetadata};
+use workunit_store::{in_workunit, Level, Metric};
 
 use crate::remote::ByteStoreError;
 
@@ -385,7 +385,11 @@ impl Store {
     let mut directories = Vec::new();
     tree.walk(&mut |_, entry| match entry {
       directory::Entry::Directory(d) => {
-        directories.push((Some(d.digest()), d.as_remexec_directory().to_bytes()))
+        let directory = d.as_remexec_directory();
+        if cfg!(debug_assertions) {
+          protos::verify_directory_canonical(d.digest(), &directory).unwrap();
+        }
+        directories.push((Some(d.digest()), directory.to_bytes()))
       }
       directory::Entry::File(_) => (),
     });
@@ -410,14 +414,18 @@ impl Store {
     initial_lease: bool,
   ) -> Result<Digest, String> {
     let local = self.local.clone();
-    local
+    let digest = local
       .store_bytes(
         EntryType::Directory,
         None,
         directory.to_bytes(),
         initial_lease,
       )
-      .await
+      .await?;
+    if cfg!(debug_assertions) {
+      protos::verify_directory_canonical(digest, directory)?;
+    }
+    Ok(digest)
   }
 
   ///
@@ -512,7 +520,7 @@ impl Store {
             )
           })?;
           if cfg!(debug_assertions) {
-            protos::verify_directory_canonical(digest, &directory).unwrap();
+            protos::verify_directory_canonical(digest, &directory)?;
           }
           Ok(directory)
         },
@@ -792,20 +800,14 @@ impl Store {
       Some(_) => Ok(()),
       None => {
         log::debug!("Missing file digest from remote store: {:?}", file_digest);
-        if let Some(workunit_store_handle) = get_workunit_store_handle() {
-          in_workunit!(
-            workunit_store_handle.store,
-            "missing_file_counter".to_owned(),
-            WorkunitMetadata {
-              level: Level::Trace,
-              ..WorkunitMetadata::default()
-            },
-            |workunit| async move {
-              workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
-            },
-          )
-          .await;
-        }
+        in_workunit!(
+          "missing_file_counter",
+          Level::Trace,
+          |workunit| async move {
+            workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
+          },
+        )
+        .await;
         Err("File did not exist in the remote store.".to_owned())
       }
     }

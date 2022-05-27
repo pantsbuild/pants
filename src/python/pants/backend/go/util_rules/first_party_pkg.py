@@ -21,7 +21,7 @@ from pants.backend.go.util_rules.go_mod import (
 )
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.build_graph.address import Address
-from pants.core.target_types import ResourceSourceField
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.engine_aware import EngineAwareParameter
@@ -81,8 +81,8 @@ class FirstPartyPkgAnalysis:
     xtest_imports: tuple[str, ...]
 
     go_files: tuple[str, ...]
-    test_files: tuple[str, ...]
-    xtest_files: tuple[str, ...]
+    test_go_files: tuple[str, ...]
+    xtest_go_files: tuple[str, ...]
 
     s_files: tuple[str, ...]
 
@@ -101,6 +101,81 @@ class FallibleFirstPartyPkgAnalysis:
     import_path: str
     exit_code: int = 0
     stderr: str | None = None
+
+    @classmethod
+    def from_process_result(
+        cls,
+        result: FallibleProcessResult,
+        *,
+        dir_path: str,
+        import_path: str,
+        minimum_go_version: str,
+        description_of_source: str,
+    ) -> FallibleFirstPartyPkgAnalysis:
+        if result.exit_code != 0:
+            return cls(
+                analysis=None,
+                import_path=import_path,
+                exit_code=result.exit_code,
+                stderr=(
+                    f"Failed to analyze Go sources generated from {import_path}.\n\n"
+                    "This may be a bug in Pants. Please report this issue at "
+                    "https://github.com/pantsbuild/pants/issues/new/choose and include the following data: "
+                    f"error:\n{result.stderr.decode()}"
+                ),
+            )
+
+        try:
+            metadata = json.loads(result.stdout)
+        except json.JSONDecodeError as ex:
+            return cls(
+                analysis=None,
+                import_path=import_path,
+                exit_code=1,
+                stderr=f"Failed to decode JSON document from analysis: {ex}",
+            )
+
+        if "Error" in metadata or "InvalidGoFiles" in metadata:
+            error = metadata.get("Error", "")
+            if error:
+                error += "\n"
+            if "InvalidGoFiles" in metadata:
+                error += "\n".join(
+                    f"{filename}: {error}"
+                    for filename, error in metadata.get("InvalidGoFiles", {}).items()
+                )
+                error += "\n"
+            return cls(analysis=None, import_path=import_path, exit_code=1, stderr=error)
+
+        if "CgoFiles" in metadata:
+            return cls(
+                analysis=None,
+                import_path=import_path,
+                exit_code=1,
+                stderr=(
+                    f"The {description_of_source} includes `CgoFiles`, which Pants does "
+                    "not yet support. Please open a feature request at "
+                    "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
+                    "prioritize adding support.\n\n"
+                ),
+            )
+
+        analysis = FirstPartyPkgAnalysis(
+            dir_path=dir_path,
+            import_path=import_path,
+            imports=tuple(metadata.get("Imports", [])),
+            test_imports=tuple(metadata.get("TestImports", [])),
+            xtest_imports=tuple(metadata.get("XTestImports", [])),
+            go_files=tuple(metadata.get("GoFiles", [])),
+            test_go_files=tuple(metadata.get("TestGoFiles", [])),
+            xtest_go_files=tuple(metadata.get("XTestGoFiles", [])),
+            s_files=tuple(metadata.get("SFiles", [])),
+            minimum_go_version=minimum_go_version,
+            embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
+            test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
+            xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
+        )
+        return cls(analysis, import_path)
 
 
 @dataclass(frozen=True)
@@ -186,53 +261,13 @@ async def analyze_first_party_package(
             env={"CGO_ENABLED": "0"},
         ),
     )
-    if result.exit_code != 0:
-        return FallibleFirstPartyPkgAnalysis(
-            analysis=None,
-            import_path=import_path_info.import_path,
-            exit_code=result.exit_code,
-            stderr=result.stdout.decode("utf-8"),
-        )
-
-    metadata = json.loads(result.stdout)
-    if "Error" in metadata or "InvalidGoFiles" in metadata:
-        error = metadata.get("Error", "")
-        if error:
-            error += "\n"
-        if "InvalidGoFiles" in metadata:
-            error += "\n".join(
-                f"{filename}: {error}"
-                for filename, error in metadata.get("InvalidGoFiles", {}).items()
-            )
-            error += "\n"
-        return FallibleFirstPartyPkgAnalysis(
-            analysis=None, import_path=import_path_info.import_path, exit_code=1, stderr=error
-        )
-
-    if "CgoFiles" in metadata:
-        raise NotImplementedError(
-            f"The first-party package {request.address} includes `CgoFiles`, which Pants does "
-            "not yet support. Please open a feature request at "
-            "https://github.com/pantsbuild/pants/issues/new/choose so that we know to "
-            "prioritize adding support.\n\n"
-        )
-
-    analysis = FirstPartyPkgAnalysis(
+    return FallibleFirstPartyPkgAnalysis.from_process_result(
+        result,
         dir_path=request.address.spec_path,
         import_path=import_path_info.import_path,
-        imports=tuple(metadata.get("Imports", [])),
-        test_imports=tuple(metadata.get("TestImports", [])),
-        xtest_imports=tuple(metadata.get("XTestImports", [])),
-        go_files=tuple(metadata.get("GoFiles", [])),
-        test_files=tuple(metadata.get("TestGoFiles", [])),
-        xtest_files=tuple(metadata.get("XTestGoFiles", [])),
-        s_files=tuple(metadata.get("SFiles", [])),
-        minimum_go_version=go_mod_info.minimum_go_version,
-        embed_patterns=tuple(metadata.get("EmbedPatterns", [])),
-        test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
-        xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
+        minimum_go_version=go_mod_info.minimum_go_version or "",
+        description_of_source=f"first-party Go package `{request.address}`",
     )
-    return FallibleFirstPartyPkgAnalysis(analysis, import_path_info.import_path)
 
 
 @rule
@@ -272,9 +307,9 @@ async def setup_first_party_pkg_digest(
                     # TODO(#13795): Error if you depend on resources above the go_package?
                     if t.address.spec_path.startswith(request.address.spec_path)
                 ),
-                for_sources_types=(ResourceSourceField,),
-                # TODO: Switch to True. We need to be confident though that the generated files
-                #  are located below the go_package.
+                for_sources_types=(FileSourceField, ResourceSourceField),
+                # TODO(#13795): Switch to True. We need to be confident though that the generated
+                #  files are located below the go_package.
                 enable_codegen=False,
             ),
         )

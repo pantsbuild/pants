@@ -248,7 +248,11 @@ class LocalPantsRunner:
     def run(self, start_time: float) -> ExitCode:
         with maybe_profiled(self.profile_path):
             spec_parser = SpecsParser()
-            specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
+            specs = []
+            for spec_str in self.options.specs:
+                spec, is_ignore = spec_parser.parse_spec(spec_str)
+                specs.append(f"-{spec}" if is_ignore else str(spec))
+
             self.run_tracker.start(run_start_time=start_time, specs=specs)
             global_options = self.options.for_global_scope()
 

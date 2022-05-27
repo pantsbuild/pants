@@ -31,7 +31,11 @@ from pants.backend.go.util_rules import (
 )
 from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
-from pants.core.target_types import GenericTarget
+from pants.core.target_types import (
+    GenericTarget,
+    TargetGeneratorSourcesHelperSourcesField,
+    TargetGeneratorSourcesHelperTarget,
+)
 from pants.engine.addresses import Addresses
 from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.rules import QueryRule
@@ -130,15 +134,19 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
             )
         )
 
+    go_mod_file_tgts = {Address("foo", relative_file_path=fp) for fp in ("go.mod", "go.sum")}
+
     assert get_deps(Address("foo/cmd")) == {Address("foo/pkg")}
     assert get_deps(Address("foo/pkg")) == {Address("foo", generated_name="rsc.io/quote")}
     assert get_deps(Address("foo", generated_name="rsc.io/quote")) == {
-        Address("foo", generated_name="rsc.io/sampler")
+        Address("foo", generated_name="rsc.io/sampler"),
+        *go_mod_file_tgts,
     }
     assert get_deps(Address("foo", generated_name="rsc.io/sampler")) == {
-        Address("foo", generated_name="golang.org/x/text/language")
+        Address("foo", generated_name="golang.org/x/text/language"),
+        *go_mod_file_tgts,
     }
-    assert not get_deps(Address("foo", generated_name="golang.org/x/text"))
+    assert get_deps(Address("foo", generated_name="golang.org/x/text")) == go_mod_file_tgts
     # Compilation failures should not blow up Pants.
     assert not get_deps(Address("foo/bad"))
 
@@ -196,13 +204,24 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
     )
     generated = rule_runner.request(_TargetParametrizations, [Address("src/go")]).parametrizations
 
+    file_tgts = [
+        TargetGeneratorSourcesHelperTarget(
+            {TargetGeneratorSourcesHelperSourcesField.alias: fp},
+            Address("src/go", relative_file_path=fp),
+        )
+        for fp in ("go.mod", "go.sum")
+    ]
+
     def gen_third_party_tgt(import_path: str) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
-            {GoImportPathField.alias: import_path},
+            {
+                GoImportPathField.alias: import_path,
+                Dependencies.alias: [t.address.spec for t in file_tgts],
+            },
             Address("src/go", generated_name=import_path),
         )
 
-    assert set(generated.values()) == {
+    all_third_party = {
         gen_third_party_tgt(pkg)
         for pkg in (
             "github.com/google/uuid",
@@ -218,6 +237,7 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
             "golang.org/x/xerrors/internal",
         )
     }
+    assert set(generated.values()) == {*file_tgts, *all_third_party}
 
 
 def test_third_party_package_targets_cannot_be_manually_created() -> None:

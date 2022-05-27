@@ -23,19 +23,24 @@ from pants.engine.process import InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, StringSequenceField
 from pants.option.global_options import GlobalOptions
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
 
 class PythonRepositoriesField(StringSequenceField):
     alias = "repositories"
-    help = (
-        "List of URL addresses or Twine repository aliases where to publish the Python package.\n\n"
-        "Twine is used for publishing Python packages, so the address to any kind of repository "
-        "that Twine supports may be used here.\n\n"
-        "Aliases are prefixed with `@` to refer to a config section in your Twine configuration, "
-        "such as a `.pypirc` file. Use `@pypi` to upload to the public PyPi repository, which is "
-        "the default when using Twine directly."
+    help = softwrap(
+        """
+        List of URL addresses or Twine repository aliases where to publish the Python package.
+
+        Twine is used for publishing Python packages, so the address to any kind of repository
+        that Twine supports may be used here.
+
+        Aliases are prefixed with `@` to refer to a config section in your Twine configuration,
+        such as a `.pypirc` file. Use `@pypi` to upload to the public PyPi repository, which is
+        the default when using Twine directly.
+        """
     )
 
     # Twine uploads to 'pypi' by default, but we don't set default to ["@pypi"] here to make it

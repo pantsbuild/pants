@@ -16,7 +16,7 @@ parking_lot = "0.12"
 regex = "1"
 stdio = { path = "../stdio" }
 tokio = { version = "1.16" }
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1.0", features = ["v4"] }
 
 [build-dependencies]
-cargo_metadata = "0.10"
+cargo_metadata = "0.14"

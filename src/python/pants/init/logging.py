@@ -136,7 +136,7 @@ def _python_logging_setup(
             level.set_level_for(logging.getLogger(key))
 
         if logger.isEnabledFor(LogLevel.TRACE.level):
-            http.client.HTTPConnection.debuglevel = 1  # type: ignore[attr-defined]
+            http.client.HTTPConnection.debuglevel = 1
             requests_logger = logging.getLogger("requests.packages.urllib3")
             LogLevel.TRACE.set_level_for(requests_logger)
             requests_logger.propagate = True
@@ -216,7 +216,7 @@ def initialize_stdio_raw(
             encoding=locale.getpreferredencoding(False),
         )
 
-        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[assignment]
         # Install a Python logger that will route through the Rust logger.
         with _python_logging_setup(
             global_level, log_levels_by_target, print_stacktrace=print_stacktrace
@@ -224,7 +224,7 @@ def initialize_stdio_raw(
             yield
     finally:
         sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
-        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[assignment]
 
 
 def pants_log_path(workdir: PurePath) -> PurePath:

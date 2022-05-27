@@ -27,6 +27,7 @@ from pants.core.target_types import FileTarget
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import InjectedDependencies, InvalidFieldException
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.strutil import softwrap
 
 
 @pytest.fixture
@@ -192,9 +193,14 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     assert_injected(Address("project", target_name="ambiguous"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "project:ambiguous has the field `handler='ambiguous.py:func'`, which maps to the Python "
-        "module `project.ambiguous`"
-    ) in caplog.text
+        softwrap(
+            """
+            project:ambiguous has the field `handler='ambiguous.py:func'`, which maps to the Python
+            module `project.ambiguous`
+            """
+        )
+        in caplog.text
+    )
     assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
 
     # Test that ignores can disambiguate an otherwise ambiguous handler. Ensure we don't log a
@@ -221,9 +227,14 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     assert_injected(Address("project", target_name="another_root__module_used"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/"
-        "ambiguous_in_another_root.py']"
-    ) in caplog.text
+        softwrap(
+            """
+            ['project/ambiguous_in_another_root.py:ambiguous_in_another_root',
+            'src/py/project/ambiguous_in_another_root.py']
+            """
+        )
+        in caplog.text
+    )
 
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
@@ -281,8 +292,12 @@ def test_at_least_one_target_platform(rule_runner: RuleRunner) -> None:
         ExecutionError,
         match=r".*{}.*".format(
             re.escape(
-                "InvalidTargetException: The `python_awslambda` target project:neither must "
-                "specify either a `runtime` or `complete_platforms` or both."
+                softwrap(
+                    """
+                    InvalidTargetException: The `python_awslambda` target project:neither must
+                    specify either a `runtime` or `complete_platforms` or both.
+                    """
+                )
             )
         ),
     ):

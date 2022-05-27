@@ -38,6 +38,7 @@ from pants.backend.python.target_types import PexBinary
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.shell.target_types import ShellSourcesGeneratorTarget, ShellSourceTarget
 from pants.backend.shell.target_types import rules as shell_target_types_rules
+from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
@@ -64,6 +65,7 @@ def create_rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *shell_target_types_rules(),
             *target_types_rules.rules(),
+            package.find_all_packageable_targets,
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(DockerBuildContext, (DockerBuildContextRequest,)),
         ],
@@ -593,7 +595,8 @@ def test_create_docker_build_context() -> None:
             address=Address("test"),
             digest=EMPTY_DIGEST,
             source="test/Dockerfile",
-            putative_target_addresses=(),
+            from_image_addresses=(),
+            copy_source_paths=(),
             version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
             build_args=DockerBuildArgs.from_strings(),
             from_image_build_arg_names=(),

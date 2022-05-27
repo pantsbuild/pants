@@ -23,7 +23,7 @@ def test_invalid_options() -> None:
     }
     config_errors = [
         "ERROR] Invalid option 'invalid_global' under [GLOBAL]",
-        "ERROR] Invalid scope [invalid_scope]",
+        "ERROR] Invalid section [invalid_scope]",
         "ERROR] Invalid option 'bad_option' under [pytest]",
     ]
 
@@ -84,7 +84,7 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
         result.assert_success()
         assert unmatched_glob_warning in result.stderr
         assert (
-            "DEPRECATED: option 'deprecated' in scope 'mock-options' will be removed in version "
+            "DEPRECATED: option 'deprecated' in scope 'mock-options' is scheduled to be removed in version "
             "999.99.9.dev0."
         ) in result.stderr
 

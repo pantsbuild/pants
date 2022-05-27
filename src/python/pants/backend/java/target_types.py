@@ -14,6 +14,7 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
     TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
 )
 from pants.jvm.target_types import (
     JunitTestSourceField,
@@ -69,21 +70,21 @@ class JunitTestTarget(Target):
 
 class JavaTestsGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*Test.java",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Test.java', '!TestIgnore.java']`"
+    )
 
 
 class JunitTestsGeneratorTarget(TargetFilesGenerator):
     alias = "junit_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         JavaTestsGeneratorSourcesField,
     )
     generated_target_cls = JunitTestTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        Dependencies,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
@@ -111,21 +112,21 @@ class JavaSourceTarget(Target):
 
 class JavaSourcesGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*.java",) + tuple(f"!{pat}" for pat in JavaTestsGeneratorSourcesField.default)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Example.java', 'New*.java', '!OldExample.java']`"
+    )
 
 
 class JavaSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "java_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
         JavaSourcesGeneratorSourcesField,
     )
     generated_target_cls = JavaSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        Dependencies,
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,

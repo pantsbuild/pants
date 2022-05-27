@@ -57,7 +57,7 @@ def is_deprecation_active(start_version: str | None) -> bool:
 
 def get_deprecated_tense(removal_version: str) -> str:
     """Provides the grammatical tense for a given deprecated version vs the current version."""
-    return "will be" if (Version(removal_version) >= PANTS_SEMVER) else "was"
+    return "is scheduled to be" if (Version(removal_version) >= PANTS_SEMVER) else "was"
 
 
 @memoized_method
@@ -72,11 +72,11 @@ def validate_deprecation_semver(version_string: str, version_description: str) -
     :raises DeprecationError: if the version_string parameter is invalid.
     """
     if version_string is None:
-        raise MissingSemanticVersionError(f"The {version_string} must be provided.")
+        raise MissingSemanticVersionError(f"The {version_description} must be provided.")
     if not isinstance(version_string, str):
         raise BadSemanticVersionError(
             f"The {version_description} must be a version string but was {version_string} with "
-            f"type {type(version_description)}."
+            f"type {type(version_string)}."
         )
 
     try:

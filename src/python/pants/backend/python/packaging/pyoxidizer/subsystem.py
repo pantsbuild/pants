@@ -4,21 +4,25 @@
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.option.option_types import ArgsListOption
+from pants.util.strutil import softwrap
 
 
 class PyOxidizer(PythonToolBase):
     options_scope = "pyoxidizer"
     name = "PyOxidizer"
-    help = (
-        "The PyOxidizer utility for packaging Python code in a Rust binary "
-        "(https://pyoxidizer.readthedocs.io/en/stable/pyoxidizer.html).\n\n"
-        "Used with the `pyoxidizer_binary` target."
+    help = softwrap(
+        """
+        The PyOxidizer utility for packaging Python code in a Rust binary
+        (https://pyoxidizer.readthedocs.io/en/stable/pyoxidizer.html).
+
+        Used with the `pyoxidizer_binary` target.
+        """
     )
 
     default_version = "pyoxidizer==0.18.0"
     default_main = ConsoleScript("pyoxidizer")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.8"]
+    default_interpreter_constraints = ["CPython>=3.8,<4"]
 
     args = ArgsListOption(example="--release")

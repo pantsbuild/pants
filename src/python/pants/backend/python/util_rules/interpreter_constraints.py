@@ -6,7 +6,7 @@ from __future__ import annotations
 import functools
 import itertools
 from collections import defaultdict
-from typing import Iterable, Iterator, Sequence, TypeVar
+from typing import Iterable, Iterator, Sequence, Tuple, TypeVar
 
 from pkg_resources import Requirement
 from typing_extensions import Protocol
@@ -18,6 +18,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import Target
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
@@ -36,8 +37,23 @@ class FieldSetWithInterpreterConstraints(Protocol):
 _FS = TypeVar("_FS", bound=FieldSetWithInterpreterConstraints)
 
 
+RawConstraints = Tuple[str, ...]
+
+
 # The current maxes are 2.7.18 and 3.6.15.  We go much higher, for safety.
 _PATCH_VERSION_UPPER_BOUND = 30
+
+
+@memoized
+def interpreter_constraints_contains(
+    a: RawConstraints, b: RawConstraints, interpreter_universe: tuple[str, ...]
+) -> bool:
+    """A memoized version of `InterpreterConstraints.contains`.
+
+    This is a function in order to keep the memoization cache on the module rather than on an
+    instance. It can't go on `PythonSetup`, since that would cause a cycle with this module.
+    """
+    return InterpreterConstraints(a).contains(InterpreterConstraints(b), interpreter_universe)
 
 
 # Normally we would subclass `DeduplicatedCollection`, but we want a custom constructor.
@@ -77,6 +93,12 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         return parsed_requirement
 
     @classmethod
+    def merge(cls, ics: Iterable[InterpreterConstraints]) -> InterpreterConstraints:
+        return InterpreterConstraints(
+            cls.merge_constraint_sets(tuple(str(requirement) for requirement in ic) for ic in ics)
+        )
+
+    @classmethod
     def merge_constraint_sets(cls, constraint_sets: Iterable[Iterable[str]]) -> list[Requirement]:
         """Given a collection of constraints sets, merge by ORing within each individual constraint
         set and ANDing across each distinct constraint set.
@@ -84,10 +106,20 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         For example, given `[["CPython>=2.7", "CPython<=3"], ["CPython==3.6.*"]]`, return
         `["CPython>=2.7,==3.6.*", "CPython<=3,==3.6.*"]`.
         """
+        # A sentinel to indicate a requirement that is impossible to satisfy (i.e., one that
+        # requires two different interpreter types).
+        impossible = Requirement.parse("IMPOSSIBLE")
+
         # Each element (a Set[ParsedConstraint]) will get ANDed. We use sets to deduplicate
         # identical top-level parsed constraint sets.
+
+        # First filter out any empty constraint_sets, as those represent "no constraints", i.e.,
+        # any interpreters are allowed, so omitting them has the logical effect of ANDing them with
+        # the others, without having to deal with the vacuous case below.
+        constraint_sets = [cs for cs in constraint_sets if cs]
         if not constraint_sets:
             return []
+
         parsed_constraint_sets: set[frozenset[Requirement]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
@@ -100,28 +132,9 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             merged_specs: set[tuple[str, str]] = set()
             expected_interpreter = parsed_constraints[0].project_name
             for parsed_constraint in parsed_constraints:
-                if parsed_constraint.project_name == expected_interpreter:
-                    merged_specs.update(parsed_constraint.specs)
-                    continue
-
-                def key_fn(req: Requirement):
-                    return req.project_name
-
-                # NB: We must pre-sort the data for itertools.groupby() to work properly.
-                sorted_constraints = sorted(parsed_constraints, key=key_fn)
-                attempted_interpreters = {
-                    interp: sorted(
-                        str(parsed_constraint) for parsed_constraint in parsed_constraints
-                    )
-                    for interp, parsed_constraints in itertools.groupby(
-                        sorted_constraints, key=key_fn
-                    )
-                }
-                raise ValueError(
-                    "Tried ANDing Python interpreter constraints with different interpreter "
-                    "types. Please use only one interpreter type. Got "
-                    f"{attempted_interpreters}."
-                )
+                if parsed_constraint.project_name != expected_interpreter:
+                    return impossible
+                merged_specs.update(parsed_constraint.specs)
 
             formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
             return Requirement.parse(f"{expected_interpreter}{formatted_specs}")
@@ -133,31 +146,54 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
                 return 0
             return -1 if req1.specs < req2.specs else 1
 
-        return sorted(
+        ored_constraints = sorted(
             {
                 and_constraints(constraints_product)
                 for constraints_product in itertools.product(*parsed_constraint_sets)
             },
             key=functools.cmp_to_key(cmp_constraints),
         )
+        ret = [cs for cs in ored_constraints if cs != impossible]
+        if not ret:
+            # There are no possible combinations.
+            attempted_str = " AND ".join(f"({' OR '.join(cs)})" for cs in constraint_sets)
+            raise ValueError(
+                "These interpreter constraints cannot be merged, as they require "
+                f"conflicting interpreter types: {attempted_str}"
+            )
+        return ret
 
     @classmethod
     def create_from_targets(
         cls, targets: Iterable[Target], python_setup: PythonSetup
-    ) -> InterpreterConstraints:
-        return cls.create_from_compatibility_fields(
-            (
-                tgt[InterpreterConstraintsField]
-                for tgt in targets
-                if tgt.has_field(InterpreterConstraintsField)
-            ),
-            python_setup,
-        )
+    ) -> InterpreterConstraints | None:
+        """Returns merged InterpreterConstraints for the given Targets.
+
+        If none of the given Targets have InterpreterConstraintsField, returns None.
+
+        NB: Because Python targets validate that they have ICs which are a subset of their
+        dependencies, merging constraints like this is only necessary when you are _mixing_ code
+        which might not have any inter-dependencies, such as when you're merging un-related roots.
+        """
+        fields = [
+            tgt[InterpreterConstraintsField]
+            for tgt in targets
+            if tgt.has_field(InterpreterConstraintsField)
+        ]
+        if not fields:
+            return None
+        return cls.create_from_compatibility_fields(fields, python_setup)
 
     @classmethod
     def create_from_compatibility_fields(
         cls, fields: Iterable[InterpreterConstraintsField], python_setup: PythonSetup
     ) -> InterpreterConstraints:
+        """Returns merged InterpreterConstraints for the given `InterpreterConstraintsField`s.
+
+        NB: Because Python targets validate that they have ICs which are a subset of their
+        dependencies, merging constraints like this is only necessary when you are _mixing_ code
+        which might not have any inter-dependencies, such as when you're merging un-related roots.
+        """
         constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
@@ -352,6 +388,8 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         This is restricted to the set of minor Python versions specified in `universe`.
         """
+        if self == other:
+            return True
         this = self.enumerate_python_versions(interpreter_universe)
         that = other.enumerate_python_versions(interpreter_universe)
         return this.issuperset(that)

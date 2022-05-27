@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import cast
 
 import pytest
 
@@ -11,8 +12,9 @@ from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGene
 from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import DigestContents, FileDigest
+from pants.engine.internals.parametrize import Parametrize
 from pants.jvm.goals import lockfile
-from pants.jvm.goals.lockfile import GenerateJvmLockfile, RequestedJVMserResolveNames
+from pants.jvm.goals.lockfile import GenerateJvmLockfile, RequestedJVMUserResolveNames
 from pants.jvm.resolve.common import (
     ArtifactRequirement,
     ArtifactRequirements,
@@ -39,10 +41,11 @@ def rule_runner() -> RuleRunner:
             *external_tool_rules(),
             *source_files.rules(),
             *util_rules(),
-            QueryRule(UserGenerateLockfiles, [RequestedJVMserResolveNames]),
+            QueryRule(UserGenerateLockfiles, [RequestedJVMUserResolveNames]),
             QueryRule(GenerateLockfileResult, [GenerateJvmLockfile]),
         ],
         target_types=[JvmArtifactTarget],
+        objects={"parametrize": Parametrize},
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -83,26 +86,48 @@ def test_generate_lockfile(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_artifact_collision(rule_runner: RuleRunner) -> None:
+    # Test that an artifact with fully populated but identical fields can be generated.
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                def mk(name):
+                  jvm_artifact(
+                      name=name,
+                      group='group',
+                      artifact='artifact',
+                      version='1',
+                      jar='jar.jar',
+                      excludes=['ex:clude'],
+                  )
+
+                mk('one')
+                mk('two')
+                """
+            ),
+        }
+    )
+
+    result = rule_runner.request(
+        UserGenerateLockfiles, [RequestedJVMUserResolveNames(["jvm-default"])]
+    )
+    # Because each instance of the jar field is unique.
+    assert len(cast(GenerateJvmLockfile, result[0]).artifacts) == 2
+
+
+@maybe_skip_jdk_test
 def test_multiple_resolves(rule_runner: RuleRunner) -> None:
-    # TODO: Adjust to use https://github.com/pantsbuild/pants/pull/14408 for the
-    # duplicated artifact.
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
                 jvm_artifact(
-                    name='hamcrest_a',
+                    name='hamcrest',
                     group='org.hamcrest',
                     artifact='hamcrest-core',
                     version="1.3",
-                    resolve="a",
-                )
-                jvm_artifact(
-                    name='hamcrest_b',
-                    group='org.hamcrest',
-                    artifact='hamcrest-core',
-                    version="1.3",
-                    resolve="b",
+                    resolve=parametrize("a", "b"),
                 )
 
                 jvm_artifact(
@@ -126,7 +151,7 @@ def test_multiple_resolves(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(["--jvm-resolves={'a': 'a.lock', 'b': 'b.lock'}"], env_inherit={"PATH"})
 
-    result = rule_runner.request(UserGenerateLockfiles, [RequestedJVMserResolveNames(["a", "b"])])
+    result = rule_runner.request(UserGenerateLockfiles, [RequestedJVMUserResolveNames(["a", "b"])])
     hamcrest_core = ArtifactRequirement(Coordinate("org.hamcrest", "hamcrest-core", "1.3"))
     assert set(result) == {
         GenerateJvmLockfile(

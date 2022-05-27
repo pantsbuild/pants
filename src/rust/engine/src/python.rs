@@ -84,6 +84,10 @@ impl<'x> Params {
   pub fn type_ids(&self) -> impl Iterator<Item = TypeId> + '_ {
     self.0.iter().map(|k| *k.type_id())
   }
+
+  pub fn is_empty(&self) -> bool {
+    self.0.is_empty()
+  }
 }
 
 ///
@@ -421,7 +425,7 @@ impl Failure {
       locals.set_item("tb", tb).unwrap();
       locals.set_item("val", &val).unwrap();
       py.eval(
-        "''.join(traceback.format_exception(etype=None, value=val, tb=tb))",
+        "''.join(traceback.format_exception(None, value=val, tb=tb))",
         None,
         Some(locals),
       )

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -31,13 +30,20 @@ from pants.backend.python.util_rules.pex import (
     PexRequest,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.python.util_rules.pex_requirements import Lockfile, PexRequirements
+from pants.backend.python.util_rules.pex_requirements import (
+    EntireLockfile,
+    LoadedLockfile,
+    LoadedLockfileRequest,
+    Lockfile,
+    PexRequirements,
+)
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
     StrippedPythonSourceFiles,
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
+from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
@@ -46,7 +52,7 @@ from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequ
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import bullet_list, path_safe
+from pants.util.strutil import path_safe
 
 logger = logging.getLogger(__name__)
 
@@ -191,42 +197,12 @@ async def interpreter_constraints_for_targets(
 @dataclass(frozen=True)
 class ChosenPythonResolve:
     name: str
-    lockfile_path: str
+    lockfile: Lockfile
 
 
 @dataclass(frozen=True)
 class ChosenPythonResolveRequest:
     addresses: Addresses
-
-
-# Note: Inspired by `coursier_fetch.py`.
-class NoCompatibleResolveException(Exception):
-    """No compatible resolve could be found for a set of targets."""
-
-    def __init__(
-        self,
-        python_setup: PythonSetup,
-        msg_prefix: str,
-        relevant_targets: Iterable[Target],
-        msg_suffix: str = "",
-    ) -> None:
-        resolves_to_addresses = defaultdict(list)
-        for tgt in relevant_targets:
-            if tgt.has_field(PythonResolveField):
-                resolve = tgt[PythonResolveField].normalized_value(python_setup)
-                resolves_to_addresses[resolve].append(tgt.address.spec)
-
-        formatted_resolve_lists = "\n\n".join(
-            f"{resolve}:\n{bullet_list(sorted(addresses))}"
-            for resolve, addresses in sorted(resolves_to_addresses.items())
-        )
-        super().__init__(
-            f"{msg_prefix}:\n\n"
-            f"{formatted_resolve_lists}\n\n"
-            "Targets which will be used together must all have the same resolve (from the "
-            f"[resolve]({doc_url('reference-python_test#coderesolvecode')}) "
-            "field) in common." + (f"\n\n{msg_suffix}" if msg_suffix else "")
-        )
 
 
 @rule
@@ -235,47 +211,56 @@ async def choose_python_resolve(
 ) -> ChosenPythonResolve:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
 
+    def maybe_get_resolve(t: Target) -> str | None:
+        if not t.has_field(PythonResolveField):
+            return None
+        return t[PythonResolveField].normalized_value(python_setup)
+
     # First, choose the resolve by inspecting the root targets.
     root_resolves = {
         root[PythonResolveField].normalized_value(python_setup)
         for root in transitive_targets.roots
         if root.has_field(PythonResolveField)
     }
-    if not root_resolves:
-        # If there are no relevant targets, we fall back to the default resolve. This is relevant,
-        # for example, when running `./pants repl` with no specs or only on non-Python targets.
-        return ChosenPythonResolve(
-            name=python_setup.default_resolve,
-            lockfile_path=python_setup.resolves[python_setup.default_resolve],
-        )
-
-    if len(root_resolves) > 1:
-        raise NoCompatibleResolveException(
-            python_setup,
-            "The input targets did not have a resolve in common",
-            transitive_targets.roots,
-        )
-
-    chosen_resolve = next(iter(root_resolves))
-
-    # Then, validate that all transitive deps are compatible.
-    for tgt in transitive_targets.dependencies:
-        if (
-            tgt.has_field(PythonResolveField)
-            and tgt[PythonResolveField].normalized_value(python_setup) != chosen_resolve
-        ):
-            plural = ("s", "their") if len(transitive_targets.roots) > 1 else ("", "its")
-            raise NoCompatibleResolveException(
-                python_setup,
-                (
-                    f"The resolve chosen for the root target{plural[0]} was {chosen_resolve}, but "
-                    f"some of {plural[1]} dependencies are not compatible with that resolve"
-                ),
-                transitive_targets.closure,
+    if root_resolves:
+        if len(root_resolves) > 1:
+            raise NoCompatibleResolveException.bad_input_roots(
+                transitive_targets.roots,
+                maybe_get_resolve=maybe_get_resolve,
+                doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+                workaround=None,
             )
 
+        chosen_resolve = next(iter(root_resolves))
+
+        # Then, validate that all transitive deps are compatible.
+        for tgt in transitive_targets.dependencies:
+            if (
+                tgt.has_field(PythonResolveField)
+                and tgt[PythonResolveField].normalized_value(python_setup) != chosen_resolve
+            ):
+                raise NoCompatibleResolveException.bad_dependencies(
+                    maybe_get_resolve=maybe_get_resolve,
+                    doc_url_slug="python-third-party-dependencies#multiple-lockfiles",
+                    root_resolve=chosen_resolve,
+                    root_targets=transitive_targets.roots,
+                    dependencies=transitive_targets.dependencies,
+                )
+
+    else:
+        # If there are no relevant targets, we fall back to the default resolve. This is relevant,
+        # for example, when running `./pants repl` with no specs or only on non-Python targets.
+        chosen_resolve = python_setup.default_resolve
+
     return ChosenPythonResolve(
-        name=chosen_resolve, lockfile_path=python_setup.resolves[chosen_resolve]
+        name=chosen_resolve,
+        lockfile=Lockfile(
+            file_path=python_setup.resolves[chosen_resolve],
+            file_path_description_of_origin=(
+                f"the resolve `{chosen_resolve}` (from `[python].resolves`)"
+            ),
+            resolve_name=chosen_resolve,
+        ),
     )
 
 
@@ -337,7 +322,6 @@ async def determine_requirement_strings_in_closure(
 @dataclass(unsafe_hash=True)
 class _RepositoryPexRequest:
     addresses: Addresses
-    requirements: PexRequirements
     hardcoded_interpreter_constraints: InterpreterConstraints | None
     platforms: PexPlatforms
     complete_platforms: CompletePlatforms
@@ -347,7 +331,6 @@ class _RepositoryPexRequest:
     def __init__(
         self,
         addresses: Iterable[Address],
-        requirements: PexRequirements,
         *,
         internal_only: bool,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
@@ -356,7 +339,6 @@ class _RepositoryPexRequest:
         additional_lockfile_args: tuple[str, ...] = (),
     ) -> None:
         self.addresses = Addresses(addresses)
-        self.requirements = requirements
         self.internal_only = internal_only
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
         self.platforms = platforms
@@ -376,7 +358,81 @@ class _ConstraintsRepositoryPexRequest:
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
+async def create_pex_from_targets(
+    request: PexFromTargetsRequest, python_setup: PythonSetup
+) -> PexRequest:
+    requirements: PexRequirements | EntireLockfile = PexRequirements()
+    if request.include_requirements:
+        requirements = await Get(PexRequirements, _PexRequirementsRequest(request.addresses))
+
+        pex_native_subsetting_supported = False
+        if python_setup.enable_resolves:
+            # TODO: Once `requirement_constraints` is removed in favor of `enable_resolves`,
+            # `ChosenPythonResolveRequest` and `_PexRequirementsRequest` should merge and
+            # do a single transitive walk to replace this method.
+            chosen_resolve = await Get(
+                ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
+            )
+            loaded_lockfile = await Get(
+                LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile)
+            )
+            pex_native_subsetting_supported = loaded_lockfile.is_pex_native
+            if loaded_lockfile.constraints_strings:
+                requirements = dataclasses.replace(
+                    requirements, constraints_strings=loaded_lockfile.constraints_strings
+                )
+
+        should_return_entire_lockfile = (
+            python_setup.run_against_entire_lockfile and request.internal_only
+        )
+        should_request_repository_pex = (
+            # The entire lockfile was explicitly requested.
+            should_return_entire_lockfile
+            # The legacy `resolve_all_constraints`+`requirement_constraints` options were used.
+            or (
+                # TODO: The constraints.txt resolve for `resolve_all_constraints` will be removed as
+                # part of #12314.
+                python_setup.resolve_all_constraints
+                and python_setup.requirement_constraints
+            )
+            # A non-PEX-native lockfile was used, and so we cannot subset it.
+            or not pex_native_subsetting_supported
+        )
+
+        if should_request_repository_pex:
+            repository_pex_request = await Get(
+                OptionalPexRequest,
+                _RepositoryPexRequest(
+                    request.addresses,
+                    hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
+                    platforms=request.platforms,
+                    complete_platforms=request.complete_platforms,
+                    internal_only=request.internal_only,
+                    additional_lockfile_args=request.additional_lockfile_args,
+                ),
+            )
+            if should_return_entire_lockfile:
+                if repository_pex_request.maybe_pex_request is None:
+                    raise ValueError(
+                        "[python].run_against_entire_lockfile was set, but could not find a "
+                        "lockfile or constraints file for this target set. See "
+                        f"{doc_url('python-third-party-dependencies')} for details."
+                    )
+                return repository_pex_request.maybe_pex_request
+
+            repository_pex = await Get(OptionalPex, OptionalPexRequest, repository_pex_request)
+            requirements = dataclasses.replace(requirements, from_superset=repository_pex.maybe_pex)
+        elif python_setup.enable_resolves:
+            # NB: We confirmed above that this is a PEX-native lockfile, so it can be used as a
+            # superset.
+            chosen_resolve = await Get(
+                ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
+            )
+            loaded_lockfile = await Get(
+                LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile)
+            )
+            requirements = dataclasses.replace(requirements, from_superset=loaded_lockfile)
+
     interpreter_constraints = await Get(
         InterpreterConstraints,
         InterpreterConstraintsRequest,
@@ -425,26 +481,6 @@ async def create_pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
 
     description = request.description
 
-    if request.include_requirements:
-        requirements = await Get(PexRequirements, _PexRequirementsRequest(request.addresses))
-    else:
-        requirements = PexRequirements()
-
-    if requirements:
-        repository_pex = await Get(
-            OptionalPex,
-            _RepositoryPexRequest(
-                request.addresses,
-                requirements=requirements,
-                hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
-                platforms=request.platforms,
-                complete_platforms=request.complete_platforms,
-                internal_only=request.internal_only,
-                additional_lockfile_args=request.additional_lockfile_args,
-            ),
-        )
-        requirements = dataclasses.replace(requirements, repository_pex=repository_pex.maybe_pex)
-
     return PexRequest(
         output_filename=request.output_filename,
         internal_only=request.internal_only,
@@ -465,6 +501,10 @@ async def create_pex_from_targets(request: PexFromTargetsRequest) -> PexRequest:
 async def get_repository_pex(
     request: _RepositoryPexRequest, python_setup: PythonSetup
 ) -> OptionalPexRequest:
+    # NB: It isn't safe to resolve against an entire lockfile or constraints file if
+    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
+    if request.platforms or request.complete_platforms:
+        return OptionalPexRequest(None)
 
     interpreter_constraints = await Get(
         InterpreterConstraints,
@@ -493,19 +533,14 @@ async def get_repository_pex(
         )
         repository_pex_request = PexRequest(
             description=(
-                f"Installing {chosen_resolve.lockfile_path} for the resolve `{chosen_resolve.name}`"
+                f"Installing {chosen_resolve.lockfile.file_path} "
+                f"for the resolve `{chosen_resolve.name}`"
             ),
             output_filename=f"{path_safe(chosen_resolve.name)}_lockfile.pex",
             internal_only=request.internal_only,
-            requirements=Lockfile(
-                file_path=chosen_resolve.lockfile_path,
-                file_path_description_of_origin=(
-                    f"the resolve `{chosen_resolve.name}` (from `[python].resolves`)"
-                ),
-                resolve_name=chosen_resolve.name,
-                req_strings=request.requirements.req_strings,
-            ),
+            requirements=EntireLockfile(chosen_resolve.lockfile),
             interpreter_constraints=interpreter_constraints,
+            layout=PexLayout.PACKED,
             platforms=request.platforms,
             complete_platforms=request.complete_platforms,
             additional_args=request.additional_lockfile_args,
@@ -520,9 +555,7 @@ async def _setup_constraints_repository_pex(
     global_requirement_constraints: GlobalRequirementConstraints,
 ) -> OptionalPexRequest:
     request = constraints_request.repository_pex_request
-    # NB: it isn't safe to resolve against the whole constraints file if
-    # platforms are in use. See https://github.com/pantsbuild/pants/issues/12222.
-    if not python_setup.resolve_all_constraints or request.platforms or request.complete_platforms:
+    if not python_setup.resolve_all_constraints:
         return OptionalPexRequest(None)
 
     constraints_path = python_setup.requirement_constraints
@@ -591,9 +624,9 @@ async def _setup_constraints_repository_pex(
         requirements=PexRequirements(
             all_constraints,
             constraints_strings=(str(constraint) for constraint in global_requirement_constraints),
-            # TODO: See PexRequirements docs.
-            is_all_constraints_resolve=True,
         ),
+        # Monolithic PEXes like the repository PEX should always use the Packed layout.
+        layout=PexLayout.PACKED,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
         complete_platforms=request.complete_platforms,
@@ -605,56 +638,36 @@ async def _setup_constraints_repository_pex(
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class RequirementsPexRequest:
+    """Requests a PEX containing only thirdparty requirements for internal/non-portable use.
+
+    Used as part of an optimization to reduce the "overhead" (in terms of both time and space) of
+    thirdparty requirements by taking advantage of certain PEX features.
+    """
+
     addresses: tuple[Address, ...]
-    internal_only: bool
     hardcoded_interpreter_constraints: InterpreterConstraints | None
 
     def __init__(
         self,
         addresses: Iterable[Address],
         *,
-        internal_only: bool,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
     ) -> None:
         self.addresses = Addresses(addresses)
-        self.internal_only = internal_only
         self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
 
 
 @rule
-async def get_requirements_pex(request: RequirementsPexRequest, setup: PythonSetup) -> PexRequest:
-    if setup.run_against_entire_lockfile and request.internal_only:
-        requirements = await Get(
-            PexRequirements, _PexRequirementsRequest(Addresses(request.addresses))
-        )
-        opt_pex_request = await Get(
-            OptionalPexRequest,
-            _RepositoryPexRequest(
-                addresses=sorted(request.addresses),
-                requirements=requirements,
-                internal_only=request.internal_only,
-                hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
-            ),
-        )
-        if opt_pex_request.maybe_pex_request is None:
-            raise ValueError(
-                "[python].run_against_entire_lockfile was set, but could not find a "
-                "lockfile or constraints file for this target set. See "
-                f"{doc_url('python-third-party-dependencies')} for details."
-            )
-        return opt_pex_request.maybe_pex_request
-
-    pex_request = await Get(
-        PexRequest,
-        PexFromTargetsRequest(
-            addresses=sorted(request.addresses),
-            output_filename="requirements.pex",
-            internal_only=request.internal_only,
-            include_source_files=False,
-            hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
-        ),
+async def generalize_requirementspexrequest(
+    request: RequirementsPexRequest,
+) -> PexFromTargetsRequest:
+    return PexFromTargetsRequest(
+        addresses=sorted(request.addresses),
+        output_filename="requirements.pex",
+        internal_only=True,
+        include_source_files=False,
+        hardcoded_interpreter_constraints=request.hardcoded_interpreter_constraints,
     )
-    return pex_request
 
 
 def rules():

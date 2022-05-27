@@ -13,9 +13,11 @@ from pants.engine.target import (
     TargetFilesGenerator,
     Targets,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -49,7 +51,13 @@ class AvroSourceTarget(Target):
         AvroDependenciesField,
         AvroSourceField,
     )
-    help = f"A single Avro file used to generate various languages.\n\nSee {doc_url('avro')}."
+    help = softwrap(
+        f"""
+        A single Avro file used to generate various languages.
+
+        See {doc_url('avro')}.
+        """
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -60,17 +68,20 @@ class AvroSourceTarget(Target):
 class AvroSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.avsc", "*.avpr", "*.avdl")
     expected_file_extensions = (".avsc", ".avpr", ".avdl")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.avsc', 'new_*.avpr', '!old_ignore.avdl']`"
+    )
 
 
 class AvroSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         AvroSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "bar.proto": {"description": "our user model"]},\n'
-            '  ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "bar.proto": {"description": "our user model"]},
+            ("foo.proto", "bar.proto"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 
@@ -78,16 +89,12 @@ class AvroSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "avro_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        AvroDependenciesField,
         AvroSourcesGeneratingSourcesField,
         AvroSourcesOverridesField,
     )
     generated_target_cls = AvroSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        AvroDependenciesField,
-    )
-    moved_fields = ()
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (AvroDependenciesField,)
     help = "Generate a `avro_source` target for each file in the `sources` field."
 
 

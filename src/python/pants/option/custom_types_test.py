@@ -65,10 +65,12 @@ def test_flatten_shlexed_list() -> None:
 
 
 class TestCustomTypes:
-    def assert_list_parsed(self, s: str, *, expected: ParsedList) -> None:
+    @staticmethod
+    def assert_list_parsed(s: str, *, expected: ParsedList) -> None:
         assert expected == ListValueComponent.create(s).val
 
-    def assert_split_list(self, s: str, *, expected: List[str]) -> None:
+    @staticmethod
+    def assert_split_list(s: str, *, expected: List[str]) -> None:
         assert expected == ListValueComponent._split_modifier_expr(s)
 
     def test_unset_bool(self):
@@ -149,7 +151,6 @@ class TestCustomTypes:
         self.assert_split_list("+1,2],-[3,4", expected=["+1,2]", "-[3,4"])
         self.assert_split_list("+(1,2],-[3,4)", expected=["+(1,2]", "-[3,4)"])
 
-    #
     @pytest.mark.xfail(
         reason="The heuristic list modifier expression splitter cannot handle certain very unlikely cases."
     )

@@ -13,10 +13,11 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Bootstrap Pants, test+lint Rust (Linux)
+    needs: check_labels
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -38,7 +39,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -49,10 +50,10 @@ jobs:
 
         '
     - name: Cache Rust toolchain
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.58.1-*
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1
+        path: '~/.rustup/toolchains/1.61.0-*
 
           ~/.rustup/update-hashes
 
@@ -60,10 +61,10 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -74,16 +75,6 @@ jobs:
         restore-keys: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
-
-          '
     - id: get-engine-hash
       name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
@@ -91,9 +82,9 @@ jobs:
         '
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
+        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -128,12 +119,12 @@ jobs:
         '
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-bootstrap-linux
         path: .pants.d/pants.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
         path: '.pants
@@ -163,10 +154,21 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Bootstrap Pants, test Rust (macOS)
+    needs: check_labels
     runs-on: macos-10.15
     steps:
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: github.event_name == 'pull_request'
+      name: Ensure category label
+      uses: mheap/github-action-required-labels@v1
+      with:
+        count: 1
+        labels: category:new feature, category:user api change, category:plugin api
+          change, category:performance, category:bugfix, category:documentation, category:internal
+        mode: exactly
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -188,7 +190,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -199,10 +201,10 @@ jobs:
 
         '
     - name: Cache Rust toolchain
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.58.1-*
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1
+        path: '~/.rustup/toolchains/1.61.0-*
 
           ~/.rustup/update-hashes
 
@@ -210,10 +212,10 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -224,16 +226,6 @@ jobs:
         restore-keys: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-
 
           '
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
-
-          '
     - id: get-engine-hash
       name: Get native engine hash
       run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
@@ -241,9 +233,9 @@ jobs:
         '
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}
+        key: '${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
 
           '
         path: '.pants
@@ -261,7 +253,7 @@ jobs:
 
         '
     - name: Upload native binaries
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
         path: '.pants
@@ -279,19 +271,22 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 40
-  build_wheels_linux:
+  build_wheels_linux_x86_64:
     container: quay.io/pypa/manylinux2014_x86_64:latest
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Build wheels and fs_util (Linux)
+    name: Build wheels and fs_util (Linux x86/64)
+    needs: check_labels
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
+    - name: Configure Git
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - if: github.event_name == 'push'
       name: Get commit message for branch builds
       run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
@@ -331,6 +326,8 @@ jobs:
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
+        ./build-support/bin/release.sh build-local-pex
+
         ./build-support/bin/release.sh build-wheels
 
         USE_PY38=true ./build-support/bin/release.sh build-wheels
@@ -347,7 +344,7 @@ jobs:
       run: ./build-support/bin/release.sh build-fs-util
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-wheels-linux
         path: .pants.d/pants.log
@@ -358,16 +355,17 @@ jobs:
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 65
-  build_wheels_macos:
+  build_wheels_macos_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Build wheels and fs_util (macOS)
+    name: Build wheels and fs_util (macOS x86/64)
+    needs: check_labels
     runs-on: macos-10.15
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -396,10 +394,10 @@ jobs:
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
     - name: Cache Rust toolchain
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}
-        path: '~/.rustup/toolchains/1.58.1-*
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain') }}-v1
+        path: '~/.rustup/toolchains/1.61.0-*
 
           ~/.rustup/update-hashes
 
@@ -407,10 +405,10 @@ jobs:
 
           '
     - name: Cache Cargo
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         key: '${{ runner.os }}-cargo-${{ hashFiles(''rust-toolchain'') }}-${{ hashFiles(''src/rust/engine/Cargo.*'')
-          }}
+          }}-v1
 
           '
         path: '~/.cargo/registry
@@ -427,6 +425,8 @@ jobs:
       if: github.event_name == 'push' || !contains(env.COMMIT_MESSAGE, '[ci skip-build-wheels]')
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+
+        ./build-support/bin/release.sh build-local-pex
 
         ./build-support/bin/release.sh build-wheels
 
@@ -445,7 +445,7 @@ jobs:
       run: ./build-support/bin/release.sh build-fs-util
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-wheels-macos
         path: .pants.d/pants.log
@@ -455,7 +455,22 @@ jobs:
       if: github.event_name == 'push'
       name: Deploy to S3
       run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 65
+    timeout-minutes: 80
+  check_labels:
+    if: ${{ github.repository_owner == 'pantsbuild' }}
+    name: Ensure PR has a category label
+    runs-on: ubuntu-20.04
+    steps:
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: github.event_name == 'pull_request'
+      name: Ensure category label
+      uses: mheap/github-action-required-labels@v1
+      with:
+        count: 1
+        labels: category:new feature, category:user api change, category:plugin api
+          change, category:performance, category:bugfix, category:documentation, category:internal
+        mode: exactly
   lint_python:
     if: ${{ github.repository_owner == 'pantsbuild' }}
     name: Lint Python and Shell
@@ -463,7 +478,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -485,7 +500,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -495,18 +510,8 @@ jobs:
         }}.*'']" >> $GITHUB_ENV
 
         '
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
-
-          '
     - name: Download native binaries
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - if: github.event_name != 'pull_request'
@@ -522,7 +527,7 @@ jobs:
         '
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-lint
         path: .pants.d/pants.log
@@ -531,14 +536,14 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 30
-  test_python_linux:
+  test_python_linux_0:
     if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Test Python (Linux)
+    name: Test Python (Linux) Shard 0/3
     needs: bootstrap_pants_linux
     runs-on: ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -560,12 +565,12 @@ jobs:
 
         '
     - name: Install AdoptJDK
-      uses: actions/setup-java@v2
+      uses: actions/setup-java@v3
       with:
         distribution: adopt
         java-version: '11'
     - name: Install Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
@@ -581,7 +586,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -593,18 +598,8 @@ jobs:
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
-
-          '
     - name: Download native binaries
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - if: github.event_name != 'pull_request'
@@ -612,31 +607,29 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
-    - name: Run Python tests
-      run: './pants test ::
+    - name: Run Python test shard 0/3
+      run: './pants test --shard=0/3 ::
 
         '
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-linux
+        name: pants-log-python-test-linux-0_3
         path: .pants.d/pants.log
     strategy:
       matrix:
         python-version:
         - '3.7'
     timeout-minutes: 90
-  test_python_macos:
-    env:
-      ARCHFLAGS: -arch x86_64
+  test_python_linux_1:
     if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Test Python (macOS)
-    needs: bootstrap_pants_macos
-    runs-on: macos-10.15
+    name: Test Python (Linux) Shard 1/3
+    needs: bootstrap_pants_linux
+    runs-on: ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 10
     - if: github.event_name == 'push'
@@ -658,12 +651,28 @@ jobs:
 
         '
     - name: Install AdoptJDK
-      uses: actions/setup-java@v2
+      uses: actions/setup-java@v3
       with:
         distribution: adopt
         java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.17.1
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "$HOME/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
+        -o "$HOME/.thrift/thrift"
+
+        chmod +x "$HOME/.thrift/thrift"
+
+        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+
+        '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -675,18 +684,166 @@ jobs:
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Cache Pants Virtualenv
-      uses: actions/cache@v2
-      with:
-        key: '${{ runner.os }}-pants-venv-${{ matrix.python-version }}-${{ hashFiles(''3rdparty/python/**'',
-          ''pants.toml'') }}
-
-          '
-        path: '~/.cache/pants/pants_dev_deps
-
-          '
     - name: Download native binaries
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Run Python test shard 1/3
+      run: './pants test --shard=1/3 ::
+
+        '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-linux-1_3
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
+  test_python_linux_2:
+    if: ${{ github.repository_owner == 'pantsbuild' }}
+    name: Test Python (Linux) Shard 2/3
+    needs: bootstrap_pants_linux
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.17.1
+    - if: runner.os == 'Linux'
+      name: Download Apache `thrift` binary (Linux)
+      run: 'mkdir -p "$HOME/.thrift"
+
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
+        -o "$HOME/.thrift/thrift"
+
+        chmod +x "$HOME/.thrift/thrift"
+
+        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+
+        '
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Run Python test shard 2/3
+      run: './pants test --shard=2/3 ::
+
+        '
+    - if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-linux-2_3
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
+  test_python_macos:
+    env:
+      ARCHFLAGS: -arch x86_64
+    if: ${{ github.repository_owner == 'pantsbuild' }}
+    name: Test Python (macOS)
+    needs: bootstrap_pants_macos
+    runs-on: macos-10.15
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - if: github.event_name == 'push'
+      name: Get commit message for branch builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - if: github.event_name == 'pull_request'
+      name: Get commit message for PR builds
+      run: 'echo "COMMIT_MESSAGE<<EOF" >> $GITHUB_ENV
+
+        echo "$(git log --format=%B -n 1 HEAD^2)" >> $GITHUB_ENV
+
+        echo "EOF" >> $GITHUB_ENV
+
+        '
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Expose Pythons
+      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.${{ runner.os }}
     - if: github.event_name != 'pull_request'
@@ -695,12 +852,10 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
-
-        '
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
     - if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants-log-python-test-macos
         path: .pants.d/pants.log

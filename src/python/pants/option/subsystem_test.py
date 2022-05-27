@@ -3,8 +3,10 @@
 
 import pytest
 
+from pants.option.config import Config
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.options import Options
 from pants.option.subsystem import Subsystem
 
 
@@ -55,3 +57,19 @@ def test_is_valid_scope_name() -> None:
     check_false("foo.bar.")
     check_false("foo--bar")
     check_false("foo-bar-")
+
+
+def test_register_options_blessed(caplog) -> None:
+    class GoodToGo(Subsystem):
+        options_scope = "good-to-go"
+
+    options = Options.create(
+        env={},
+        config=Config.load([]),
+        known_scope_infos=[GoodToGo.get_scope_info()],
+        args=["./pants"],
+        bootstrap_option_values=None,
+    )
+    GoodToGo.register_options_on_scope(options)
+
+    assert not caplog.records, "The current blessed means of registering options should never warn."

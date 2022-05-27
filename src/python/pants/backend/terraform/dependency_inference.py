@@ -13,8 +13,10 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
-from pants.base.specs import AddressSpecs, MaybeEmptySiblingAddresses
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.goals.tailor import group_by_dir
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
@@ -28,6 +30,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 
 
@@ -35,14 +38,14 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     options_scope = "terraform-hcl2-parser"
     help = "Used to parse Terraform modules to infer their dependencies."
 
-    default_version = "python-hcl2==3.0.3"
+    default_version = "python-hcl2==3.0.5"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.terraform", "hcl2_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/terraform/hcl2_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.terraform", "hcl2.lock")
+    default_lockfile_path = "src/python/pants/backend/terraform/hcl2.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
 
@@ -97,13 +100,16 @@ class ParseTerraformModuleSources:
 async def setup_process_for_parse_terraform_module_sources(
     request: ParseTerraformModuleSources, parser: ParserSetup
 ) -> Process:
+    dir_paths = ", ".join(sorted(group_by_dir(request.paths).keys()))
+
     process = await Get(
         Process,
         VenvPexProcess(
             parser.pex,
             argv=request.paths,
             input_digest=request.sources_digest,
-            description="Parse Terraform module sources.",
+            description=f"Parse Terraform module sources: {dir_paths}",
+            level=LogLevel.DEBUG,
         ),
     )
     return process
@@ -133,7 +139,11 @@ async def infer_terraform_module_dependencies(
 
     # For each path, see if there is a `terraform_module` target at the specified spec_path.
     candidate_targets = await Get(
-        Targets, AddressSpecs([MaybeEmptySiblingAddresses(path) for path in candidate_spec_paths])
+        Targets,
+        RawSpecs(
+            dir_globs=tuple(DirGlobSpec(path) for path in candidate_spec_paths),
+            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+        ),
     )
     # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module
     # per directory.

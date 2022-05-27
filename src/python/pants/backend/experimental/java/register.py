@@ -3,7 +3,7 @@
 
 from pants.backend.java.bsp import rules as java_bsp_rules
 from pants.backend.java.compile import javac
-from pants.backend.java.dependency_inference import java_parser, java_parser_launcher
+from pants.backend.java.dependency_inference import java_parser
 from pants.backend.java.dependency_inference import rules as dependency_inference_rules
 from pants.backend.java.goals import check, tailor
 from pants.backend.java.target_types import (
@@ -13,6 +13,7 @@ from pants.backend.java.target_types import (
     JunitTestTarget,
 )
 from pants.backend.java.target_types import rules as target_types_rules
+from pants.core.util_rules import archive
 from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.dependency_inference import symbol_mapper
@@ -46,7 +47,6 @@ def rules():
         *lockfile.rules(),
         *coursier_fetch.rules(),
         *java_parser.rules(),
-        *java_parser_launcher.rules(),
         *resources.rules(),
         *symbol_mapper.rules(),
         *dependency_inference_rules.rules(),
@@ -58,4 +58,5 @@ def rules():
         *run_deploy_jar.rules(),
         *war_rules(),
         *java_bsp_rules.rules(),
+        *archive.rules(),
     ]

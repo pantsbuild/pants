@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.project_info import peek
 from pants.backend.project_info.peek import Peek, TargetData, TargetDatas
-from pants.base.specs import AddressSpecs, DescendantAddresses
+from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
@@ -71,9 +71,9 @@ from pants.testutil.rule_runner import RuleRunner
             [
                 TargetData(
                     FilesGeneratorTarget(
-                        {"sources": []}, Address("example", target_name="files_target")
+                        {"sources": ["foo.txt"]}, Address("example", target_name="files_target")
                     ),
-                    tuple(),
+                    ("foo.txt",),
                     tuple(),
                 )
             ],
@@ -85,11 +85,14 @@ from pants.testutil.rule_runner import RuleRunner
                     "address": "example:files_target",
                     "target_type": "files",
                     "dependencies": [],
-                    "dependencies_raw": null,
                     "description": null,
                     "overrides": null,
-                    "sources": [],
-                    "sources_raw": [],
+                    "sources": [
+                      "foo.txt"
+                    ],
+                    "sources_raw": [
+                      "foo.txt"
+                    ],
                     "tags": null
                   }
                 ]
@@ -166,14 +169,14 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *peek.rules(),
-            QueryRule(TargetDatas, [AddressSpecs]),
+            QueryRule(TargetDatas, [RawSpecs]),
         ],
         target_types=[FilesGeneratorTarget, GenericTarget],
     )
 
 
 def test_non_matching_build_target(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"some_name/BUILD": "files(sources=[])"})
+    rule_runner.write_files({"some_name/BUILD": "target()"})
     result = rule_runner.run_goal_rule(Peek, args=["other_name"])
     assert result.stdout == "[]\n"
 
@@ -192,7 +195,7 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             "foo/b.txt": "",
         }
     )
-    tds = rule_runner.request(TargetDatas, [AddressSpecs([DescendantAddresses("foo")])])
+    tds = rule_runner.request(TargetDatas, [RawSpecs(recursive_globs=(RecursiveGlobSpec("foo"),))])
     assert list(tds) == [
         TargetData(
             GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),

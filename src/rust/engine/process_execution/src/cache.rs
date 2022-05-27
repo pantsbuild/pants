@@ -69,13 +69,9 @@ impl crate::CommandRunner for CommandRunner {
     let context2 = context.clone();
     let key2 = key.clone();
     let cache_read_result = in_workunit!(
-      context.workunit_store.clone(),
-      "local_cache_read".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("Local cache lookup: {}", req.description)),
-        ..WorkunitMetadata::default()
-      },
+      "local_cache_read",
+      Level::Trace,
+      desc = Some(format!("Local cache lookup: {}", req.description)),
       |workunit| async move {
         workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
@@ -92,10 +88,16 @@ impl crate::CommandRunner for CommandRunner {
             }
             // When we successfully use the cache, we change the description and increase the level
             // (but not so much that it will be logged by default).
-            workunit.update_metadata(|initial| WorkunitMetadata {
-              desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
-              level: Level::Debug,
-              ..initial
+            workunit.update_metadata(|initial| {
+              initial.map(|(initial, _)| {
+                (
+                  WorkunitMetadata {
+                    desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+                    ..initial
+                  },
+                  Level::Debug,
+                )
+              })
             });
             Ok(result)
           }
@@ -126,23 +128,15 @@ impl crate::CommandRunner for CommandRunner {
     let result = self.underlying.run(context.clone(), workunit, req).await?;
     if result.exit_code == 0 || write_failures_to_cache {
       let result = result.clone();
-      in_workunit!(
-        context.workunit_store.clone(),
-        "local_cache_write".to_owned(),
-        WorkunitMetadata {
-          level: Level::Trace,
-          ..WorkunitMetadata::default()
-        },
-        |workunit| async move {
-          if let Err(err) = self.store(&key, &result).await {
-            warn!(
-              "Error storing process execution result to local cache: {} - ignoring and continuing",
-              err
-            );
-            workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
-          }
+      in_workunit!("local_cache_write", Level::Trace, |workunit| async move {
+        if let Err(err) = self.store(&key, &result).await {
+          warn!(
+            "Error storing process execution result to local cache: {} - ignoring and continuing",
+            err
+          );
+          workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
         }
-      )
+      })
       .await;
     }
     Ok(result)

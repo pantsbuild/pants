@@ -38,10 +38,11 @@ use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use futures::future::try_join_all;
 use futures::try_join;
 use hashing::Digest;
+use itertools::Itertools;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
-use store::{SnapshotOps, SnapshotOpsError, Store};
+use store::{SnapshotOps, Store};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 pub mod bounded;
@@ -87,6 +88,7 @@ pub enum Platform {
   Macos_x86_64,
   Macos_arm64,
   Linux_x86_64,
+  Linux_arm64,
 }
 
 impl Platform {
@@ -100,6 +102,15 @@ impl Platform {
         ..
       } if sysname.to_lowercase() == "linux" && machine.to_lowercase() == "x86_64" => {
         Ok(Platform::Linux_x86_64)
+      }
+      uname::Info {
+        ref sysname,
+        ref machine,
+        ..
+      } if sysname.to_lowercase() == "linux"
+        && (machine.to_lowercase() == "arm64" || machine.to_lowercase() == "aarch64") =>
+      {
+        Ok(Platform::Linux_arm64)
       }
       uname::Info {
         ref sysname,
@@ -131,6 +142,7 @@ impl From<Platform> for String {
   fn from(platform: Platform) -> String {
     match platform {
       Platform::Linux_x86_64 => "linux_x86_64".to_string(),
+      Platform::Linux_arm64 => "linux_arm64".to_string(),
       Platform::Macos_arm64 => "macos_arm64".to_string(),
       Platform::Macos_x86_64 => "macos_x86_64".to_string(),
     }
@@ -144,6 +156,7 @@ impl TryFrom<String> for Platform {
       "macos_arm64" => Ok(Platform::Macos_arm64),
       "macos_x86_64" => Ok(Platform::Macos_x86_64),
       "linux_x86_64" => Ok(Platform::Linux_x86_64),
+      "linux_arm64" => Ok(Platform::Linux_arm64),
       other => Err(format!(
         "Unknown platform {:?} encountered in parsing",
         other
@@ -241,7 +254,7 @@ impl InputDigests {
     input_files: DirectoryDigest,
     immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
     use_nailgun: Vec<RelativePath>,
-  ) -> Result<Self, SnapshotOpsError> {
+  ) -> Result<Self, String> {
     // Collect all digests into `complete`.
     let mut complete_digests = try_join_all(
       immutable_inputs
@@ -272,6 +285,53 @@ impl InputDigests {
       input_files,
       immutable_inputs,
       use_nailgun,
+    })
+  }
+
+  pub async fn new_from_merged(store: &Store, from: Vec<InputDigests>) -> Result<Self, String> {
+    let mut merged_immutable_inputs = BTreeMap::new();
+    for input_digests in from.iter() {
+      let size_before = merged_immutable_inputs.len();
+      let immutable_inputs = &input_digests.immutable_inputs;
+      merged_immutable_inputs.append(&mut immutable_inputs.clone());
+      if size_before + immutable_inputs.len() != merged_immutable_inputs.len() {
+        return Err(format!(
+          "Tried to merge two-or-more immutable inputs at the same path with different values! \
+            The collision involved one of the entries in: {immutable_inputs:?}"
+        ));
+      }
+    }
+
+    let complete_digests = from
+      .iter()
+      .map(|input_digests| input_digests.complete.clone())
+      .collect();
+    let nailgun_digests = from
+      .iter()
+      .map(|input_digests| input_digests.nailgun.clone())
+      .collect();
+    let input_files_digests = from
+      .iter()
+      .map(|input_digests| input_digests.input_files.clone())
+      .collect();
+    let (complete, nailgun, input_files) = try_join!(
+      store.merge(complete_digests),
+      store.merge(nailgun_digests),
+      store.merge(input_files_digests),
+    )?;
+    Ok(Self {
+      complete: complete,
+      nailgun: nailgun,
+      input_files: input_files,
+      immutable_inputs: merged_immutable_inputs,
+      use_nailgun: Itertools::concat(
+        from
+          .iter()
+          .map(|input_digests| input_digests.use_nailgun.clone()),
+      )
+      .into_iter()
+      .unique()
+      .collect(),
     })
   }
 
@@ -333,6 +393,9 @@ impl Default for InputDigests {
 
 ///
 /// A process to be executed.
+///
+/// When executing a `Process` using the `local::CommandRunner`, any `{chroot}` placeholders in the
+/// environment variables are replaced with the temporary sandbox path.
 ///
 #[derive(DeepSizeOf, Derivative, Clone, Debug, Eq, Serialize)]
 #[derivative(PartialEq, Hash)]
@@ -459,6 +522,14 @@ impl Process {
   ///
   pub fn env(mut self, env: BTreeMap<String, String>) -> Process {
     self.env = env;
+    self
+  }
+
+  ///
+  /// Replaces the working_directory for this process.
+  ///
+  pub fn working_directory(mut self, working_directory: Option<RelativePath>) -> Process {
+    self.working_directory = working_directory;
     self
   }
 

@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.codegen.protobuf.lint.buf import skip_field
-from pants.backend.codegen.protobuf.lint.buf.rules import rules as buf_rules
+from pants.backend.codegen.protobuf.lint.buf.format_rules import rules as buf_format_rules
+from pants.backend.codegen.protobuf.lint.buf.lint_rules import rules as buf_lint_rules
 
 
 def rules():
-    return (*buf_rules(), *skip_field.rules())
+    return (*buf_format_rules(), *buf_lint_rules(), *skip_field.rules())

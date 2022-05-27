@@ -18,12 +18,13 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
 from pants.util.docutil import git_url
+from pants.util.strutil import softwrap
 
 
 class TwineSubsystem(PythonToolBase):
     options_scope = "twine"
     name = "Twine"
-    help = "The utility for publishing Python distributions to PyPi and other Python repositories."
+    help = "The utility for publishing Python distributions to PyPI and other Python repositories."
 
     default_version = "twine>=3.7.1,<3.8"
     default_main = ConsoleScript("twine")
@@ -35,11 +36,11 @@ class TwineSubsystem(PythonToolBase):
     default_extra_requirements = ["colorama>=0.4.3"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.subsystems", "twine_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/twine_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "twine.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/twine.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("publish")
@@ -48,33 +49,40 @@ class TwineSubsystem(PythonToolBase):
         "--config",
         default=None,
         advanced=True,
-        help=lambda cls: (
-            "Path to a .pypirc config file to use. "
-            "(https://packaging.python.org/specifications/pypirc/)\n\n"
-            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-            "this option if the config is located in a non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            Path to a .pypirc config file to use.
+            (https://packaging.python.org/specifications/pypirc/)
+
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
         ),
     )
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,
         advanced=True,
-        help=lambda cls: (
-            "If true, Pants will include all relevant config files during runs "
-            "(`.pypirc`).\n\n"
-            f"Use `[{cls.options_scope}].config` instead if your config is in a "
-            "non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include all relevant config files during runs (`.pypirc`).
+
+            Use `[{cls.options_scope}].config` instead if your config is in a non-standard location.
+            """
         ),
     )
     ca_certs_path = StrOption(
         "--ca-certs-path",
         advanced=True,
         default="<inherit>",
-        help=(
-            "Path to a file containing PEM-format CA certificates used for verifying secure "
-            "connections when publishing python distributions.\n\n"
-            'Uses the value from `[GLOBAL].ca_certs_path` by default. Set to `"<none>"` to '
-            "not use the default CA certificate."
+        help=softwrap(
+            """
+            Path to a file containing PEM-format CA certificates used for verifying secure
+            connections when publishing python distributions.
+
+            Uses the value from `[GLOBAL].ca_certs_path` by default. Set to `"<none>"` to
+            not use the default CA certificate.
+            """
         ),
     )
 

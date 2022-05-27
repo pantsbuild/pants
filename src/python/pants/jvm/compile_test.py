@@ -20,7 +20,11 @@ import pytest
 
 from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
 from pants.backend.codegen.protobuf.java.rules import rules as protobuf_rules
-from pants.backend.codegen.protobuf.target_types import ProtobufSourceField, ProtobufSourceTarget
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufSourceField,
+    ProtobufSourcesGeneratorTarget,
+    ProtobufSourceTarget,
+)
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.java.compile.javac import CompileJavaSourceRequest
 from pants.backend.java.compile.javac import rules as javac_rules
@@ -151,6 +155,7 @@ def rule_runner() -> RuleRunner:
             JavaSourcesGeneratorTarget,
             JvmArtifactTarget,
             ProtobufSourceTarget,
+            ProtobufSourcesGeneratorTarget,
             ScalaSourcesGeneratorTarget,
         ],
     )
@@ -249,6 +254,7 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
                 java_sources(name='java')
                 jvm_artifact(name='jvm_artifact', group='ex', artifact='ex', version='0.0.0')
                 protobuf_source(name='proto', source="f.proto")
+                protobuf_sources(name='protos')
                 {DEFAULT_SCALA_LIBRARY_TARGET}
                 """
             ),
@@ -256,7 +262,7 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
             "3rdparty/jvm/default.lock": DEFAULT_LOCKFILE,
         }
     )
-    scala, java, jvm_artifact, proto = rule_runner.request(
+    scala, java, jvm_artifact, proto, protos = rule_runner.request(
         UnexpandedTargets,
         [
             Addresses(
@@ -265,6 +271,7 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
                     Address("", target_name="java"),
                     Address("", target_name="jvm_artifact"),
                     Address("", target_name="proto"),
+                    Address("", target_name="protos"),
                 ]
             )
         ],
@@ -282,6 +289,7 @@ def test_request_classification(rule_runner: RuleRunner) -> None:
     assert (CompileScalaSourceRequest, None) == classify([scala], all_members, generators)
     assert (CoursierFetchRequest, None) == classify([jvm_artifact], all_members, generators)
     assert (CompileJavaSourceRequest, None) == classify([proto], all_members, generators)
+    assert (CompileJavaSourceRequest, None) == classify([protos], all_members, generators)
 
     # Partially compatible.
     assert (CompileJavaSourceRequest, CompileScalaSourceRequest) == classify(

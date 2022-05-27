@@ -47,9 +47,7 @@ use parking_lot::Mutex;
 use protos::require_digest;
 use serde_derive::Serialize;
 use std::collections::BTreeMap;
-use store::{
-  Snapshot, SnapshotOps, SnapshotOpsError, Store, StoreFileByDigest, SubsetParams, UploadSummary,
-};
+use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest, SubsetParams, UploadSummary};
 
 #[derive(Debug)]
 enum ExitCode {
@@ -622,11 +620,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               .strip_prefix(subset_digest, &RelativePath::new(prefix_to_strip)?)
               .await;
           }
-          digest = result.map_err(|err| match err {
-            SnapshotOpsError::String(string)
-            | SnapshotOpsError::DigestMergeFailure(string)
-            | SnapshotOpsError::GlobMatchError(string) => string,
-          })?;
+          digest = result?;
 
           // TODO: The below operations don't strictly need persistence: we could render the
           // relevant `DigestTrie` directly. See #13112.

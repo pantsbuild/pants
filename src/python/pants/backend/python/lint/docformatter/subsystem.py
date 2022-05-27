@@ -3,8 +3,9 @@
 
 
 from pants.backend.python.goals import lockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -23,15 +24,16 @@ class Docformatter(PythonToolBase):
     default_main = ConsoleScript("docformatter")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.lint.docformatter", "lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/lint/docformatter/lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.lint.docformatter", "docformatter.lock")
+    default_lockfile_path = "src/python/pants/backend/python/lint/docformatter/docformatter.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--wrap-summaries=100 --pre-summary-newline")
+    export = ExportToolOption()
 
 
 class DocformatterLockfileSentinel(GenerateToolLockfileSentinel):
@@ -47,9 +49,25 @@ def setup_lockfile_request(
     )
 
 
+class DocformatterExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+def docformatter_export(
+    _: DocformatterExportSentinel, docformatter: Docformatter
+) -> ExportPythonTool:
+    if not docformatter.export:
+        return ExportPythonTool(resolve_name=docformatter.options_scope, pex_request=None)
+    return ExportPythonTool(
+        resolve_name=docformatter.options_scope, pex_request=docformatter.to_pex_request()
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, DocformatterLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, DocformatterExportSentinel),
     )

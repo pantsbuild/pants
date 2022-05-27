@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.backend.python.lint.docformatter.skip_field import SkipDocformatterField
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
@@ -10,11 +9,10 @@ from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.native_engine import Snapshot
+from pants.engine.process import ProcessResult
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -32,91 +30,38 @@ class DocformatterFieldSet(FieldSet):
         return tgt.get(SkipDocformatterField).value
 
 
-class DocformatterRequest(FmtRequest, LintTargetsRequest):
+class DocformatterRequest(FmtRequest):
     field_set_type = DocformatterFieldSet
     name = Docformatter.options_scope
-
-
-@dataclass(frozen=True)
-class SetupRequest:
-    request: DocformatterRequest
-    check_only: bool
-
-
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_digest: Digest
-
-
-def generate_args(
-    *, source_files: SourceFiles, docformatter: Docformatter, check_only: bool
-) -> Tuple[str, ...]:
-    return ("--check" if check_only else "--in-place", *docformatter.args, *source_files.files)
-
-
-@rule(level=LogLevel.DEBUG)
-async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
-
-    docformatter_pex_get = Get(VenvPex, PexRequest, docformatter.to_pex_request())
-    source_files_get = Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.source for field_set in setup_request.request.field_sets),
-    )
-    source_files, docformatter_pex = await MultiGet(source_files_get, docformatter_pex_get)
-
-    source_files_snapshot = (
-        source_files.snapshot
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
-    )
-
-    process = await Get(
-        Process,
-        VenvPexProcess(
-            docformatter_pex,
-            argv=generate_args(
-                source_files=source_files,
-                docformatter=docformatter,
-                check_only=setup_request.check_only,
-            ),
-            input_digest=source_files_snapshot.digest,
-            output_files=source_files_snapshot.files,
-            description=(
-                f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'file')}."
-            ),
-            level=LogLevel.DEBUG,
-        ),
-    )
-    return Setup(process, original_digest=source_files_snapshot.digest)
 
 
 @rule(desc="Format with docformatter", level=LogLevel.DEBUG)
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
     if docformatter.skip:
         return FmtResult.skip(formatter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=False))
-    result = await Get(ProcessResult, Process, setup.process)
-    return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, formatter_name=request.name
+    docformatter_pex = await Get(VenvPex, PexRequest, docformatter.to_pex_request())
+    result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            docformatter_pex,
+            argv=(
+                "--in-place",
+                *docformatter.args,
+                *request.snapshot.files,
+            ),
+            input_digest=request.snapshot.digest,
+            output_files=request.snapshot.files,
+            description=(f"Run Docformatter on {pluralize(len(request.field_sets), 'file')}."),
+            level=LogLevel.DEBUG,
+        ),
     )
-
-
-@rule(desc="Lint with docformatter", level=LogLevel.DEBUG)
-async def docformatter_lint(
-    request: DocformatterRequest, docformatter: Docformatter
-) -> LintResults:
-    if docformatter.skip:
-        return LintResults([], linter_name=request.name)
-    setup = await Get(Setup, SetupRequest(request, check_only=True))
-    result = await Get(FallibleProcessResult, Process, setup.process)
-    return LintResults([LintResult.from_fallible_process_result(result)], linter_name=request.name)
+    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
+    return FmtResult.create(request, result, output_snapshot)
 
 
 def rules():
     return [
         *collect_rules(),
         UnionRule(FmtRequest, DocformatterRequest),
-        UnionRule(LintTargetsRequest, DocformatterRequest),
         *pex.rules(),
     ]

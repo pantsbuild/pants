@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
+from pants.backend.codegen.protobuf.java import dependency_inference
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
@@ -32,7 +33,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.jvm.target_types import JvmJdkField
+from pants.jvm.target_types import PrefixedJvmJdkField, PrefixedJvmResolveField
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 
@@ -121,15 +122,14 @@ async def generate_java_from_protobuf(
     return GeneratedSources(source_root_restored)
 
 
-class PrefixedJvmJdkField(JvmJdkField):
-    alias = "jvm_jdk"
-
-
 def rules():
     return [
         *collect_rules(),
         *pex.rules(),
+        *dependency_inference.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
+        ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
     ]

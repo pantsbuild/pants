@@ -30,7 +30,6 @@ from pants.backend.python.target_types import (
     PythonRequirementTypeStubModulesField,
 )
 from pants.base.build_root import BuildRoot
-from pants.base.parse_context import ParseContext
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
@@ -45,7 +44,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InvalidFieldException,
     SingleSourceField,
-    Target,
+    TargetGenerator,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -106,6 +105,16 @@ def get_max_tilde(parsed_version: Version) -> str:
     return f"{major}.{minor}.0"
 
 
+def get_max_wildcard(parsed_version: Version) -> str:
+    # Note: Assumes this is not a global wildcard, so parsed_version.release has
+    # at least two components.
+    release = list(parsed_version.release)
+    release[-2] += 1
+    major = release[0]
+    minor = release[1]
+    return f"{major}.{minor}.0"
+
+
 def parse_str_version(attributes: str, **kwargs: str) -> str:
     valid_specifiers = "<>!~="
     pep440_reqs = []
@@ -114,12 +123,10 @@ def parse_str_version(attributes: str, **kwargs: str) -> str:
     extras_str = kwargs["extras_str"]
     comma_split_reqs = (i.strip() for i in attributes.split(","))
     for req in comma_split_reqs:
-        is_caret = req[0] == "^"
-        # ~= is an acceptable default operator; however, ~ is not, and IS NOT the same as ~=
-        is_tilde = req[0] == "~" and req[1] != "="
-        if is_caret or is_tilde:
+
+        def parse_version(version_str: str) -> Version:
             try:
-                parsed_version = Version(req[1:])
+                return Version(version_str)
             except InvalidVersion:
                 raise InvalidVersion(
                     f'Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the '
@@ -128,12 +135,29 @@ def parse_str_version(attributes: str, **kwargs: str) -> str:
                     "that we can update Pants' Poetry macro to support this."
                 )
 
-            max_ver = get_max_caret(parsed_version) if is_caret else get_max_tilde(parsed_version)
+        if not req:
+            continue
+        if req[0] == "^":
+            parsed_version = parse_version(req[1:])
+            max_ver = get_max_caret(parsed_version)
             min_ver = f"{parsed_version.public}"
             pep440_reqs.append(f">={min_ver},<{max_ver}")
+        elif req[0] == "~" and req[1] != "=":
+            # ~= is an acceptable default operator; however, ~ is not, and IS NOT the same as ~=
+            parsed_version = parse_version(req[1:])
+            max_ver = get_max_tilde(parsed_version)
+            min_ver = f"{parsed_version.public}"
+            pep440_reqs.append(f">={min_ver},<{max_ver}")
+        elif req[-1] == "*":
+            if req != "*":  # This is not a global wildcard.
+                # To parse we replace the * with a 0.
+                parsed_version = parse_version(f"{req[:-1]}0")
+                max_ver = get_max_wildcard(parsed_version)
+                min_ver = f"{parsed_version.public}"
+                pep440_reqs.append(f">={min_ver},<{max_ver}")
         else:
             pep440_reqs.append(req if req[0] in valid_specifiers else f"=={req}")
-    return f"{proj_name}{extras_str} {','.join(pep440_reqs)}"
+    return f"{proj_name}{extras_str} {','.join(pep440_reqs)}".rstrip()
 
 
 def parse_python_constraint(constr: str | None, fp: str) -> str:
@@ -178,18 +202,6 @@ class PyProjectToml:
     build_root: PurePath
     toml_relpath: PurePath
     toml_contents: str
-
-    @classmethod
-    def deprecated_macro_create(
-        cls, parse_context: ParseContext, pyproject_toml_relpath: str
-    ) -> PyProjectToml:
-        build_root = Path(parse_context.build_root)
-        toml_relpath = PurePath(parse_context.rel_path, pyproject_toml_relpath)
-        return cls(
-            build_root=build_root,
-            toml_relpath=toml_relpath,
-            toml_contents=(build_root / toml_relpath).read_text(),
-        )
 
     def parse(self) -> Mapping[str, Any]:
         return toml.loads(self.toml_contents)
@@ -398,9 +410,10 @@ class PoetryRequirementsSourceField(SingleSourceField):
     required = False
 
 
-class PoetryRequirementsTargetGenerator(Target):
+class PoetryRequirementsTargetGenerator(TargetGenerator):
     alias = "poetry_requirements"
     help = "Generate a `python_requirement` for each entry in a Poetry pyproject.toml."
+    generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -408,8 +421,9 @@ class PoetryRequirementsTargetGenerator(Target):
         TypeStubsModuleMappingField,
         PoetryRequirementsSourceField,
         RequirementsOverrideField,
-        PythonRequirementResolveField,
     )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (PythonRequirementResolveField,)
 
 
 class GenerateFromPoetryRequirementsRequest(GenerateTargetsRequest):
@@ -429,10 +443,10 @@ async def generate_from_python_requirement(
     }
 
     file_tgt = TargetGeneratorSourcesHelperTarget(
-        {TargetGeneratorSourcesHelperSourcesField.alias: [pyproject_rel_path]},
+        {TargetGeneratorSourcesHelperSourcesField.alias: pyproject_rel_path},
         Address(
-            generator.address.spec_path,
-            target_name=generator.address.target_name,
+            request.template_address.spec_path,
+            target_name=request.template_address.target_name,
             relative_file_path=pyproject_rel_path,
         ),
     )
@@ -454,16 +468,8 @@ async def generate_from_python_requirement(
         )
     )
 
-    # Validate the resolve is legal.
-    generator[PythonRequirementResolveField].normalized_value(python_setup)
-
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
-    inherited_fields = {
-        field.alias: field.value
-        for field in request.generator.field_values.values()
-        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementResolveField))
-    }
 
     def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:
         normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
@@ -475,7 +481,7 @@ async def generate_from_python_requirement(
 
         return PythonRequirementTarget(
             {
-                **inherited_fields,
+                **request.template,
                 PythonRequirementsField.alias: [parsed_req],
                 PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
                 PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
@@ -486,14 +492,14 @@ async def generate_from_python_requirement(
                 Dependencies.alias: [file_tgt.address.spec],
                 **tgt_overrides,
             },
-            generator.address.create_generated(parsed_req.project_name),
+            request.template_address.create_generated(parsed_req.project_name),
         )
 
     result = tuple(generate_tgt(requirement) for requirement in requirements) + (file_tgt,)
 
     if overrides:
         raise InvalidFieldException(
-            f"Unused key in the `overrides` field for {request.generator.address}: "
+            f"Unused key in the `overrides` field for {request.template_address}: "
             f"{sorted(overrides)}"
         )
 

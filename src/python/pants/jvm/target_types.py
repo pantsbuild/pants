@@ -26,6 +26,7 @@ from pants.engine.target import (
 )
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
+from pants.util.strutil import softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Generic resolve support fields
@@ -35,9 +36,12 @@ from pants.util.docutil import git_url
 class JvmResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
     required = False
-    help = (
-        "The resolve from `[jvm].resolves` to use when compiling this target.\n\n"
-        "If not defined, will default to `[jvm].default_resolve`.\n\n"
+    help = softwrap(
+        """
+        The resolve from `[jvm].resolves` to use when compiling this target.
+
+        If not defined, will default to `[jvm].default_resolve`.
+        """
         # TODO: Document expectations for dependencies once we validate that.
     )
 
@@ -56,10 +60,20 @@ class JvmResolveField(StringField, AsyncFieldMixin):
 class JvmJdkField(StringField):
     alias = "jdk"
     required = False
-    help = (
-        "The major version of the JDK that this target should be built with. If not defined, "
-        "will default to `[jvm].default_source_jdk`."
+    help = softwrap(
+        """
+        The major version of the JDK that this target should be built with. If not defined,
+        will default to `[jvm].default_source_jdk`.
+        """
     )
+
+
+class PrefixedJvmJdkField(JvmJdkField):
+    alias = "jvm_jdk"
+
+
+class PrefixedJvmResolveField(JvmResolveField):
+    alias = "jvm_resolve"
 
 
 # -----------------------------------------------------------------------------------------------
@@ -75,10 +89,12 @@ class JvmArtifactGroupField(StringField):
     alias = "group"
     required = True
     value: str
-    help = (
-        "The 'group' part of a Maven-compatible coordinate to a third-party JAR artifact.\n\n"
-        "For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the group is "
-        "`com.google.guava`."
+    help = softwrap(
+        """
+        The 'group' part of a Maven-compatible coordinate to a third-party JAR artifact.
+
+        For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the group is `com.google.guava`.
+        """
     )
 
 
@@ -86,9 +102,12 @@ class JvmArtifactArtifactField(StringField):
     alias = "artifact"
     required = True
     value: str
-    help = (
-        "The 'artifact' part of a Maven-compatible coordinate to a third-party JAR artifact.\n\n"
-        "For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the artifact is `guava`."
+    help = softwrap(
+        """
+        The 'artifact' part of a Maven-compatible coordinate to a third-party JAR artifact.
+
+        For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the artifact is `guava`.
+        """
     )
 
 
@@ -96,33 +115,44 @@ class JvmArtifactVersionField(StringField):
     alias = "version"
     required = True
     value: str
-    help = (
-        "The 'version' part of a Maven-compatible coordinate to a third-party JAR artifact.\n\n"
-        "For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the version is `30.1.1-jre`."
+    help = softwrap(
+        """
+        The 'version' part of a Maven-compatible coordinate to a third-party JAR artifact.
+
+        For the JAR coordinate `com.google.guava:guava:30.1.1-jre`, the version is `30.1.1-jre`.
+        """
     )
 
 
 class JvmArtifactUrlField(StringField):
     alias = "url"
     required = False
-    help = (
-        "A URL that points to the location of this artifact.\n\n"
-        "If specified, Pants will not fetch this artifact from default Maven repositories, and "
-        "will instead fetch the artifact from this URL. To use default maven "
-        "repositories, do not set this value.\n\n"
-        "Note that `file:` URLs are not supported. Instead, use the `jar` field for local "
-        "artifacts."
+    help = softwrap(
+        """
+        A URL that points to the location of this artifact.
+
+        If specified, Pants will not fetch this artifact from default Maven repositories, and
+        will instead fetch the artifact from this URL. To use default maven
+        repositories, do not set this value.
+
+        Note that `file:` URLs are not supported. Instead, use the `jar` field for local
+        artifacts.
+        """
     )
 
 
 class JvmArtifactJarSourceField(OptionalSingleSourceField):
     alias = "jar"
     expected_file_extensions = (".jar",)
-    help = (
-        "A local JAR file that provides this artifact to the lockfile resolver, instead of a "
-        "Maven repository.\n\n"
-        "Path is relative to the BUILD file.\n\n"
-        "Use the `url` field for remote artifacts."
+    help = softwrap(
+        """
+        A local JAR file that provides this artifact to the lockfile resolver, instead of a
+        Maven repository.
+
+        Path is relative to the BUILD file.
+
+        Use the `url` field for remote artifacts.
+        """
     )
 
     @classmethod
@@ -130,67 +160,89 @@ class JvmArtifactJarSourceField(OptionalSingleSourceField):
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default and value_or_default.startswith("file:"):
             raise InvalidFieldException(
-                f"The `{cls.alias}` field does not support `file:` URLS, but the target "
-                f"{address} sets the field to `{value_or_default}`.\n\n"
-                "Instead, use the `jar` field to specify the relative path to the local jar file."
+                softwrap(
+                    f"""
+                    The `{cls.alias}` field does not support `file:` URLS, but the target
+                    {address} sets the field to `{value_or_default}`.
+
+                    Instead, use the `jar` field to specify the relative path to the local jar file.
+                    """
+                )
             )
         return value_or_default
 
 
 class JvmArtifactPackagesField(StringSequenceField):
     alias = "packages"
-    help = (
-        "The JVM packages this artifact provides for the purposes of dependency inference.\n\n"
-        'For example, the JVM artifact `junit:junit` might provide `["org.junit.**"]`.\n\n'
-        "Usually you can leave this field off. If unspecified, Pants will fall back to the "
-        "`[java-infer].third_party_import_mapping`, then to a built in mapping "
-        f"({_DEFAULT_PACKAGE_MAPPING_URL}), and then finally it will default to "
-        "the normalized `group` of the artifact. For example, in the absence of any other mapping "
-        "the artifact `io.confluent:common-config` would default to providing "
-        '`["io.confluent.**"]`.\n\n'
-        "The package path may be made recursive to match symbols in subpackages "
-        'by adding `.**` to the end of the package path. For example, specify `["org.junit.**"]` '
-        "to infer a dependency on the artifact for any file importing a symbol from `org.junit` or "
-        "its subpackages."
+    help = softwrap(
+        f"""
+        The JVM packages this artifact provides for the purposes of dependency inference.
+
+        For example, the JVM artifact `junit:junit` might provide `["org.junit.**"]`.
+
+        Usually you can leave this field off. If unspecified, Pants will fall back to the
+        `[java-infer].third_party_import_mapping`, then to a built in mapping
+        ({_DEFAULT_PACKAGE_MAPPING_URL}), and then finally it will default to
+        the normalized `group` of the artifact. For example, in the absence of any other mapping
+        the artifact `io.confluent:common-config` would default to providing
+        `["io.confluent.**"]`.
+
+        The package path may be made recursive to match symbols in subpackages
+        by adding `.**` to the end of the package path. For example, specify `["org.junit.**"]`
+        to infer a dependency on the artifact for any file importing a symbol from `org.junit` or
+        its subpackages.
+        """
     )
 
 
 class JvmProvidesTypesField(StringSequenceField):
     alias = "experimental_provides_types"
-    help = (
-        "Signals that the specified types should be fulfilled by these source files during "
-        "dependency inference.\n\n"
-        "This allows for specific types within packages that are otherwise inferred as "
-        "belonging to `jvm_artifact` targets to be unambiguously inferred as belonging "
-        "to this first-party source.\n\n"
-        "If a given type is defined, at least one source file captured by this target must "
-        "actually provide that symbol."
+    help = softwrap(
+        """
+        Signals that the specified types should be fulfilled by these source files during
+        dependency inference.
+
+        This allows for specific types within packages that are otherwise inferred as
+        belonging to `jvm_artifact` targets to be unambiguously inferred as belonging
+        to this first-party source.
+
+        If a given type is defined, at least one source file captured by this target must
+        actually provide that symbol.
+        """
     )
 
 
 class JvmArtifactExcludeDependenciesField(StringSequenceField):
     alias = "excludes"
-    help = (
-        "A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded "
-        "as dependencies when this artifact is resolved.\n\n"
-        "This does not prevent this artifact from being included in the resolve as a dependency "
-        "of other artifacts that depend on it, and is currently intended as a way to resolve "
-        "version conflicts in complex resolves.\n\n"
-        "These values are passed directly to Coursier, and if specified incorrectly will show a "
-        "parse error from Coursier."
+    help = softwrap(
+        """
+        A list of unversioned coordinates (i.e. `group:artifact`) that should be excluded
+        as dependencies when this artifact is resolved.
+
+        This does not prevent this artifact from being included in the resolve as a dependency
+        of other artifacts that depend on it, and is currently intended as a way to resolve
+        version conflicts in complex resolves.
+
+        These values are passed directly to Coursier, and if specified incorrectly will show a
+        parse error from Coursier.
+        """
     )
 
 
 class JvmArtifactResolveField(JvmResolveField):
-    help = (
-        "The resolve from `[jvm].resolves` that this artifact should be included in.\n\n"
-        "If not defined, will default to `[jvm].default_resolve`.\n\n"
-        "When generating a lockfile for a particular resolve via the `coursier-resolve` goal, "
-        "it will include all artifacts that are declared compatible with that resolve. First-party "
-        "targets like `java_source` and `scala_source` also declare which resolve they use "
-        "via the `resolve` field; so, for your first-party code to use "
-        "a particular `jvm_artifact` target, that artifact must be included in the resolve "
-        "used by that code."
+    help = softwrap(
+        """
+        The resolve from `[jvm].resolves` that this artifact should be included in.
+
+        If not defined, will default to `[jvm].default_resolve`.
+
+        When generating a lockfile for a particular resolve via the `coursier-resolve` goal,
+        it will include all artifacts that are declared compatible with that resolve. First-party
+        targets like `java_source` and `scala_source` also declare which resolve they use
+        via the `resolve` field; so, for your first-party code to use
+        a particular `jvm_artifact` target, that artifact must be included in the resolve
+        used by that code.
+        """
     )
 
 
@@ -219,12 +271,16 @@ class JvmArtifactTarget(Target):
         JvmArtifactResolveField,
         JvmArtifactExcludeDependenciesField,
     )
-    help = (
-        "A third-party JVM artifact, as identified by its Maven-compatible coordinate.\n\n"
-        "That is, an artifact identified by its `group`, `artifact`, and `version` components.\n\n"
-        "Each artifact is associated with one or more resolves (a logical name you give to a "
-        "lockfile). For this artifact to be used by your first-party code, it must be "
-        "associated with the resolve(s) used by that code. See the `resolve` field."
+    help = softwrap(
+        """
+        A third-party JVM artifact, as identified by its Maven-compatible coordinate.
+
+        That is, an artifact identified by its `group`, `artifact`, and `version` components.
+
+        Each artifact is associated with one or more resolves (a logical name you give to a
+        lockfile). For this artifact to be used by your first-party code, it must be
+        associated with the resolve(s) used by that code. See the `resolve` field.
+        """
     )
 
     def validate(self) -> None:
@@ -252,9 +308,11 @@ class JunitTestSourceField(SingleSourceField, metaclass=ABCMeta):
 class JvmMainClassNameField(StringField):
     alias = "main"
     required = True
-    help = (
-        "`.`-separated name of the JVM class containing the `main()` method to be called when "
-        "executing this JAR."
+    help = softwrap(
+        """
+        `.`-separated name of the JVM class containing the `main()` method to be called when
+        executing this JAR.
+        """
     )
 
 
@@ -269,10 +327,13 @@ class DeployJarTarget(Target):
         JvmResolveField,
         RestartableField,
     )
-    help = (
-        "A `jar` file with first and third-party code bundled for deploys.\n\n"
-        "The JAR will contain class files for both first-party code and "
-        "third-party dependencies, all in a common directory structure."
+    help = softwrap(
+        """
+        A `jar` file with first and third-party code bundled for deploys.
+
+        The JAR will contain class files for both first-party code and
+        third-party dependencies, all in a common directory structure.
+        """
     )
 
 
@@ -293,9 +354,11 @@ class JvmWarDescriptorAddressField(SingleSourceField):
 
 class JvmWarContentField(SpecialCasedDependencies):
     alias = "content"
-    help = (
-        "A list of addresses to `resources` and `files` targets with content to place in the "
-        "document root of this WAR file."
+    help = softwrap(
+        """
+        A list of addresses to `resources` and `files` targets with content to place in the
+        document root of this WAR file.
+        """
     )
 
 
@@ -309,7 +372,9 @@ class JvmWarTarget(Target):
         JvmWarDescriptorAddressField,
         OutputPathField,
     )
-    help = (
-        'A JSR 154 "web application archive" (or "war") with first-party and third-party code bundled for '
-        "deploys in Java Servlet containers."
+    help = softwrap(
+        """
+        A JSR 154 "web application archive" (or "war") with first-party and third-party code bundled for
+        deploys in Java Servlet containers.
+        """
     )

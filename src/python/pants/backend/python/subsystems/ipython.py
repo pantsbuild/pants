@@ -28,8 +28,8 @@ class IPython(PythonToolBase):
     default_main = ConsoleScript("ipython")
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.python.subsystems", "ipython_lockfile.txt")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/ipython_lockfile.txt"
+    default_lockfile_resource = ("pants.backend.python.subsystems", "ipython.lock")
+    default_lockfile_path = "src/python/pants/backend/python/subsystems/ipython.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
     ignore_cwd = BoolOption(
@@ -52,14 +52,14 @@ class IPythonLockfileSentinel(GenerateToolLockfileSentinel):
 @rule(
     desc=(
         "Determine all Python interpreter versions used by iPython in your project (for lockfile "
-        "usage)"
+        "generation)"
     ),
     level=LogLevel.DEBUG,
 )
 async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
-    if not ipython.uses_lockfile:
+    if not ipython.uses_custom_lockfile:
         return GeneratePythonLockfile.from_tool(
             ipython, use_pex=python_setup.generate_lockfiles_with_pex
         )

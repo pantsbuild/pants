@@ -17,8 +17,16 @@ from colors import green, red
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex_requirements import (
+    EntireLockfile,
+    LoadedLockfile,
+    LoadedLockfileRequest,
+)
+from pants.base.deprecated import warn_or_error
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter
@@ -29,14 +37,16 @@ from pants.engine.fs import (
     FileContent,
     MergeDigests,
     PathGlobs,
+    Paths,
+    SpecsPaths,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.parser import ParseError
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import RegisteredTargetTypes
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.target import RegisteredTargetTypes, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
 from pants.util.dirutil import recursive_dirname
@@ -44,6 +54,7 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -102,13 +113,17 @@ class DeprecationFixerRequest(RewrittenBuildFileRequest):
 
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
-    help = (
-        "Format and fix safe deprecations in BUILD files.\n\n"
-        "This does not handle the full Pants upgrade. You must still manually change "
-        "`pants_version` in `pants.toml` and you may need to manually address some deprecations. "
-        f"See {doc_url('upgrade-tips')} for upgrade tips.\n\n"
-        "This goal is run without arguments. It will run over all BUILD files in your "
-        "project."
+    help = softwrap(
+        f"""
+        Format and fix safe deprecations in BUILD files.
+
+        This does not handle the full Pants upgrade. You must still manually change
+        `pants_version` in `pants.toml` and you may need to manually address some deprecations.
+        See {doc_url('upgrade-tips')} for upgrade tips.
+
+        This goal is run without arguments. It will run over all BUILD files in your
+        project.
+        """
     )
 
     @classmethod
@@ -118,22 +133,27 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
     check = BoolOption(
         "--check",
         default=False,
-        help=(
-            "Do not write changes to disk, only write back what would change. Return code "
-            "0 means there would be no changes, and 1 means that there would be. "
+        help=softwrap(
+            """
+            Do not write changes to disk, only write back what would change. Return code
+            0 means there would be no changes, and 1 means that there would be.
+            """
         ),
     )
     fmt = BoolOption(
         "--fmt",
         default=True,
-        help=(
-            "Format BUILD files using Black or Yapf.\n\n"
-            "Set `[black].args` / `[yapf].args`, `[black].config` / `[yapf].config` , "
-            "and `[black].config_discovery` / `[yapf].config_discovery` to change "
-            "Black's or Yapf's behavior. Set "
-            "`[black].interpreter_constraints` / `[yapf].interpreter_constraints` "
-            "and `[python].interpreter_search_path` to change which interpreter is "
-            "used to run the formatter."
+        help=softwrap(
+            """
+            Format BUILD files using Black or Yapf.
+
+            Set `[black].args` / `[yapf].args`, `[black].config` / `[yapf].config` ,
+            and `[black].config_discovery` / `[yapf].config_discovery` to change
+            Black's or Yapf's behavior. Set
+            `[black].interpreter_constraints` / `[yapf].interpreter_constraints`
+            and `[python].interpreter_search_path` to change which interpreter is
+            used to run the formatter.
+            """
         ),
     )
     formatter = EnumOption(
@@ -144,18 +164,11 @@ class UpdateBuildFilesSubsystem(GoalSubsystem):
     fix_safe_deprecations = BoolOption(
         "--fix-safe-deprecations",
         default=True,
-        help=(
-            "Automatically fix deprecations, such as target type renames, that are safe "
-            "because they do not change semantics."
-        ),
-    )
-    fix_python_macros = BoolOption(
-        "--fix-python-macros",
-        default=False,
-        help=(
-            "Update references to targets generated from `python_requirements` and "
-            "`poetry_requirements` from the old deprecated macro mechanism to the new target "
-            f"generation mechanism described at {doc_url('targets#target-generation')}.\n\n"
+        help=softwrap(
+            """
+            Automatically fix deprecations, such as target type renames, that are safe
+            because they do not change semantics.
+            """
         ),
     )
 
@@ -171,16 +184,40 @@ async def update_build_files(
     console: Console,
     workspace: Workspace,
     union_membership: UnionMembership,
+    specs_paths: SpecsPaths,
 ) -> UpdateBuildFilesGoal:
-    all_build_files = await Get(
-        DigestContents,
-        PathGlobs(
-            globs=(
-                *(os.path.join("**", p) for p in build_file_options.patterns),
-                *(f"!{p}" for p in build_file_options.ignores),
-            )
-        ),
+    build_file_path_globs = PathGlobs(
+        globs=(
+            *(os.path.join("**", p) for p in build_file_options.patterns),
+            *(f"!{p}" for p in build_file_options.ignores),
+        )
     )
+    if specs_paths.files:
+        all_build_file_paths = await Get(Paths, PathGlobs, build_file_path_globs)
+        specified_paths = set(specs_paths.files)
+        specified_build_files = await Get(
+            DigestContents,
+            PathGlobs(fp for fp in all_build_file_paths.files if fp in specified_paths),
+        )
+    else:
+        warn_or_error(
+            "2.14.0.dev0",
+            f"running `{bin_name()} update-build-files` without arguments",
+            softwrap(
+                f"""
+                Currently, `{bin_name()} update-build-files` without arguments will run against
+                every BUILD file in the project.
+
+                In Pants 2.14, you must use CLI arguments. Use:
+
+                  * `::` to run on everything
+                  * `dir::` to run on `dir` and subdirs
+                  * `dir` to run on `dir`
+                  * `dir/BUILD` to run on that single BUILD file
+                """
+            ),
+        )
+        specified_build_files = await Get(DigestContents, PathGlobs, build_file_path_globs)
 
     rewrite_request_classes = []
     for request in union_membership[RewrittenBuildFileRequest]:
@@ -200,7 +237,7 @@ async def update_build_files(
 
     build_file_to_lines = {
         build_file.path: tuple(build_file.content.decode("utf-8").splitlines())
-        for build_file in all_build_files
+        for build_file in specified_build_files
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:
@@ -262,6 +299,36 @@ async def update_build_files(
     return UpdateBuildFilesGoal(exit_code=1 if update_build_files_subsystem.check else 0)
 
 
+@rule_helper
+async def _find_python_interpreter_constraints_from_lockfile(
+    subsystem: PythonToolBase,
+) -> InterpreterConstraints:
+    """If a lockfile is used, will try to find the interpreter constraints used to generate the
+    lock.
+
+    This allows us to work around https://github.com/pantsbuild/pants/issues/14912.
+    """
+    # If the tool's interpreter constraints are explicitly set, or it is not using a lockfile at
+    # all, then we should use the tool's interpreter constraints option.
+    if not subsystem.options.is_default("interpreter_constraints") or not subsystem.uses_lockfile:
+        return subsystem.interpreter_constraints
+
+    # If using Pants's default lockfile, we can simply use the tool's default interpreter
+    # constraints, which we trust were used to generate Pants's default tool lockfile.
+    if not subsystem.uses_custom_lockfile:
+        return InterpreterConstraints(subsystem.default_interpreter_constraints)
+
+    # Else, try to load the metadata block from the lockfile.
+    requirements = subsystem.pex_requirements()
+    assert isinstance(requirements, EntireLockfile)
+    lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(requirements.lockfile))
+    return (
+        lockfile.metadata.valid_for_interpreter_constraints
+        if lockfile.metadata
+        else subsystem.interpreter_constraints
+    )
+
+
 # ------------------------------------------------------------------------------------------
 # Yapf formatter fixer
 # ------------------------------------------------------------------------------------------
@@ -275,7 +342,8 @@ class FormatWithYapfRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_yapf(
     request: FormatWithYapfRequest, yapf: Yapf
 ) -> RewrittenBuildFile:
-    yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request())
+    yapf_ics = await _find_python_interpreter_constraints_from_lockfile(yapf)
+    yapf_pex_get = Get(VenvPex, PexRequest, yapf.to_pex_request(interpreter_constraints=yapf_ics))
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, yapf.config_request(recursive_dirname(request.path))
@@ -328,7 +396,10 @@ class FormatWithBlackRequest(RewrittenBuildFileRequest):
 async def format_build_file_with_black(
     request: FormatWithBlackRequest, black: Black
 ) -> RewrittenBuildFile:
-    black_pex_get = Get(VenvPex, PexRequest, black.to_pex_request())
+    black_ics = await _find_python_interpreter_constraints_from_lockfile(black)
+    black_pex_get = Get(
+        VenvPex, PexRequest, black.to_pex_request(interpreter_constraints=black_ics)
+    )
     build_file_digest_get = Get(Digest, CreateDigest([request.to_file_content()]))
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, black.config_request(recursive_dirname(request.path))
@@ -474,13 +545,17 @@ def determine_renamed_field_types(
 ) -> RenamedFieldTypes:
     target_field_renames: DefaultDict[str, dict[str, str]] = defaultdict(dict)
     for tgt in target_types.types:
-        field_renames = target_field_renames[tgt.alias]
-        if tgt.deprecated_alias is not None:
-            target_field_renames[tgt.deprecated_alias] = field_renames
+        field_types = list(tgt.class_field_types(union_membership))
+        if issubclass(tgt, TargetGenerator):
+            field_types.extend(tgt.moved_fields)
 
-        for field_type in tgt.class_field_types(union_membership):
+        for field_type in field_types:
             if field_type.deprecated_alias is not None:
-                field_renames[field_type.deprecated_alias] = field_type.alias
+                target_field_renames[tgt.alias][field_type.deprecated_alias] = field_type.alias
+
+        # Make sure we also update deprecated fields in deprecated targets.
+        if tgt.deprecated_alias is not None:
+            target_field_renames[tgt.deprecated_alias] = target_field_renames[tgt.alias]
 
     return RenamedFieldTypes.from_dict(target_field_renames)
 

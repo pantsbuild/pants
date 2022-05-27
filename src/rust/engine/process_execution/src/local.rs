@@ -30,7 +30,7 @@ use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tryfuture::try_future;
-use workunit_store::{in_workunit, Level, Metric, RunningWorkunit, WorkunitMetadata};
+use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
@@ -255,15 +255,11 @@ impl super::CommandRunner for CommandRunner {
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let req_debug_repr = format!("{:#?}", req);
     in_workunit!(
-      context.workunit_store.clone(),
-      "run_local_process".to_owned(),
-      WorkunitMetadata {
-        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-        // renders at the Process's level.
-        level: req.level,
-        desc: Some(req.description.clone()),
-        ..WorkunitMetadata::default()
-      },
+      "run_local_process",
+      req.level,
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      desc = Some(req.description.clone()),
       |workunit| async move {
         // Set up a temporary workdir, which will optionally be preserved.
         let (workdir_path, maybe_workdir) = {
@@ -292,12 +288,16 @@ impl super::CommandRunner for CommandRunner {
           }
         };
 
+        // Start working on a mutable version of the process.
+        let mut req = req;
+        // Update env, replacing `{chroot}` placeholders with `workdir_path`.
+        update_env(&workdir_path, &mut req);
+
         // Prepare the workdir.
         let exclusive_spawn = prepare_workdir(
           workdir_path.clone(),
           &req,
           req.input_digests.input_files.clone(),
-          context.clone(),
           self.store.clone(),
           self.executor.clone(),
           &self.named_caches,
@@ -601,6 +601,26 @@ pub trait CapturedWorkdir {
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }
 
+/// Updates the Process env.
+///
+/// Mutates the env for the process `req`, replacing any `{chroot}` placeholders with
+/// `workdir_path`.
+///
+/// This matches the behavior of interactive processes executed in a temporary directory and those
+/// executed by the `run` goal.
+///
+/// TODO: align this with the code path for interactive processes. Related issue #14386.
+///
+pub fn update_env(workdir_path: &Path, req: &mut Process) {
+  if let Some(workdir) = workdir_path.to_str() {
+    for value in req.env.values_mut() {
+      if value.contains("{chroot}") {
+        *value = value.replace("{chroot}", workdir);
+      }
+    }
+  }
+}
+
 /// Prepares the given workdir for use by the given Process.
 ///
 /// Returns true if the executable for the Process was created in the workdir, indicating that
@@ -617,7 +637,6 @@ pub async fn prepare_workdir(
   workdir_path: PathBuf,
   req: &Process,
   materialized_input_digest: DirectoryDigest,
-  context: Context,
   store: Store,
   executor: task_executor::Executor,
   named_caches: &NamedCaches,
@@ -633,36 +652,32 @@ pub async fn prepare_workdir(
 
   // Capture argv0 as the executable path so that we can test whether we have created it in the
   // sandbox.
-  let maybe_executable_path = RelativePath::new(&req.argv[0]).map(|relative_path| {
-    if let Some(working_directory) = &req.working_directory {
-      working_directory.join(relative_path)
+  let maybe_executable_path = {
+    let mut executable_path = PathBuf::from(&req.argv[0]);
+    if executable_path.is_relative() {
+      if let Some(working_directory) = &req.working_directory {
+        executable_path = working_directory.as_ref().join(executable_path)
+      }
+      Some(executable_path)
     } else {
-      relative_path
+      None
     }
-  });
+  };
 
   // Start with async materialization of input snapshots, followed by synchronous materialization
   // of other configured inputs. Note that we don't do this in parallel, as that might cause
   // non-determinism when paths overlap: see the method doc.
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
-  in_workunit!(
-    context.workunit_store.clone(),
-    "setup_sandbox".to_owned(),
-    WorkunitMetadata {
-      level: Level::Debug,
-      ..WorkunitMetadata::default()
-    },
-    |_workunit| async move {
-      store2
-        .materialize_directory(
-          workdir_path_2,
-          materialized_input_digest,
-          Permissions::Writable,
-        )
-        .await
-    },
-  )
+  in_workunit!("setup_sandbox", Level::Debug, |_workunit| async move {
+    store2
+      .materialize_directory(
+        workdir_path_2,
+        materialized_input_digest,
+        Permissions::Writable,
+      )
+      .await
+  },)
   .await?;
 
   let workdir_path2 = workdir_path.clone();

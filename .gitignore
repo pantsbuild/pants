@@ -31,6 +31,7 @@ __pycache__/
 .classpath
 .factorypath
 .python
+.python-version
 .pydevproject
 .pytest_cache/
 codegen/classes/

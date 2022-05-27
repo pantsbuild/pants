@@ -24,6 +24,7 @@ from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 
 class JvmToolBase(Subsystem):
@@ -45,36 +46,55 @@ class JvmToolBase(Subsystem):
         "--version",
         advanced=True,
         default=lambda cls: cls.default_version,
-        help=lambda cls: (
-            "Version string for the tool. This is available for substitution in the "
-            f"`[{cls.options_scope}].artifacts` option by including the string "
-            "`{version}`."
+        help=lambda cls: softwrap(
+            f"""
+            Version string for the tool. This is available for substitution in the
+            `[{cls.options_scope}].artifacts` option by including the string `{{version}}`.
+            """
         ),
     )
     artifacts = StrListOption(
         "--artifacts",
         advanced=True,
         default=lambda cls: list(cls.default_artifacts),
-        help=lambda cls: (
-            "Artifact requirements for this tool using specified as either the address of a `jvm_artifact` "
-            "target or, alternatively, as a colon-separated Maven coordinates (e.g., group:name:version). "
-            "For Maven coordinates, the string `{version}` version will be substituted with the value of the "
-            f"`[{cls.options_scope}].version` option."
+        help=lambda cls: softwrap(
+            f"""
+            Artifact requirements for this tool using specified as either the address of a `jvm_artifact`
+            target or, alternatively, as a colon-separated Maven coordinates (e.g., group:name:version).
+            For Maven coordinates, the string `{{version}}` version will be substituted with the value of the
+            `[{cls.options_scope}].version` option.
+            """
         ),
     )
     lockfile = StrOption(
         "--lockfile",
         default=DEFAULT_TOOL_LOCKFILE,
         advanced=True,
-        help=lambda cls: (
-            "Path to a lockfile used for installing the tool.\n\n"
-            f"Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by "
-            "Pants, so long as you have not changed the `--version` option. "
-            f"See {cls.default_lockfile_url} for the default lockfile contents.\n\n"
-            "To use a custom lockfile, set this option to a file path relative to the "
-            f"build root, then run `{bin_name()} jvm-generate-lockfiles "
-            f"--resolve={cls.options_scope}`.\n\n"
+        help=lambda cls: softwrap(
+            f"""
+            Path to a lockfile used for installing the tool.
+
+            Set to the string `{DEFAULT_TOOL_LOCKFILE}` to use a lockfile provided by
+            Pants, so long as you have not changed the `--version` option.
+            See {cls.default_lockfile_url} for the default lockfile contents.
+
+            To use a custom lockfile, set this option to a file path relative to the
+            build root, then run `{bin_name()} jvm-generate-lockfiles
+            --resolve={cls.options_scope}`.
+            """
         ),
+    )
+    jvm_options = StrListOption(
+        "--jvm-options",
+        help=lambda cls: softwrap(
+            f"""
+            List of JVM options to pass to `{cls.options_scope}` JVM processes.
+
+            Options set here will be added to those set in `[jvm].global_options`. Please
+            check the documentation for the `jvm` subsystem to see what values are accepted here.
+            """
+        ),
+        advanced=True,
     )
 
     @property
@@ -126,9 +146,13 @@ async def gather_coordinates_for_jvm_lockfile(
 
     if other_targets:
         raise ValueError(
-            "The following addresses reference targets that are not `jvm_artifact` targets. "
-            f"Please only supply the addresses of `jvm_artifact` for the `{request.option_name}` "
-            f"option. The problematic addresses are: {', '.join(str(tgt.address) for tgt in other_targets)}."
+            softwrap(
+                f"""
+                The following addresses reference targets that are not `jvm_artifact` targets.
+                Please only supply the addresses of `jvm_artifact` for the `{request.option_name}`
+                option. The problematic addresses are: {', '.join(str(tgt.address) for tgt in other_targets)}.
+                """
+            )
         )
 
     return ArtifactRequirements(requirements)
@@ -147,7 +171,8 @@ class GenerateJvmLockfileFromTool:
     artifact_option_name: str
     lockfile_option_name: str
     resolve_name: str
-    lockfile_dest: str
+    read_lockfile_dest: str  # Path to lockfile when reading, or DEFAULT_TOOL_LOCKFILE to read from resource.
+    write_lockfile_dest: str  # Path to lockfile when generating the lockfile.
     default_lockfile_resource: tuple[str, str]
 
     @classmethod
@@ -157,7 +182,8 @@ class GenerateJvmLockfileFromTool:
             artifact_option_name=f"[{tool.options_scope}].artifacts",
             lockfile_option_name=f"[{tool.options_scope}].lockfile",
             resolve_name=tool.options_scope,
-            lockfile_dest=tool.lockfile,
+            read_lockfile_dest=tool.lockfile,
+            write_lockfile_dest=tool.lockfile,
             default_lockfile_resource=tool.default_lockfile_resource,
         )
 
@@ -171,7 +197,11 @@ async def setup_lockfile_request_from_tool(
         GatherJvmCoordinatesRequest(request.artifact_inputs, request.artifact_option_name),
     )
     return GenerateJvmLockfile(
-        artifacts=artifacts, resolve_name=request.resolve_name, lockfile_dest=request.lockfile_dest
+        artifacts=artifacts,
+        resolve_name=request.resolve_name,
+        lockfile_dest=request.write_lockfile_dest
+        if request.read_lockfile_dest != DEFAULT_TOOL_LOCKFILE
+        else DEFAULT_TOOL_LOCKFILE,
     )
 
 

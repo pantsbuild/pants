@@ -6,7 +6,6 @@ from __future__ import annotations
 import copy
 import inspect
 import json
-import os
 import re
 import typing
 from collections import defaultdict
@@ -19,7 +18,7 @@ import yaml
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
-from pants.option.config import Config
+from pants.option.config import DEFAULT_SECTION, Config
 from pants.option.custom_types import (
     DictValueComponent,
     ListValueComponent,
@@ -44,7 +43,6 @@ from pants.option.errors import (
     MutuallyExclusiveOptionError,
     NoOptionNames,
     OptionAlreadyRegistered,
-    OptionNameDash,
     OptionNameDoubleDash,
     ParseError,
     PassthroughType,
@@ -397,11 +395,10 @@ class Parser:
 
         if not args:
             error(NoOptionNames)
-        # validate args.
+        # Validate args.
         for arg in args:
-            if not arg.startswith("-"):
-                error(OptionNameDash, arg_name=arg)
-            if not arg.startswith("--") and len(arg) > 2:
+            # We ban short args like `-x`, except for special casing the global option `-l`.
+            if not arg.startswith("--") and not (self.scope == GLOBAL_SCOPE and arg == "-l"):
                 error(OptionNameDoubleDash, arg_name=arg)
 
         # Validate kwargs.
@@ -582,31 +579,40 @@ class Parser:
             else:
                 return val_or_str
 
+        # Helper function to merge multiple values from a single rank (e.g., multiple flags,
+        # or multiple config files).
+        def merge_in_rank(vals):
+            if not vals:
+                return None
+            expanded_vals = [to_value_type(expand(x)) for x in vals]
+            if is_list_option(kwargs):
+                return ListValueComponent.merge(expanded_vals)
+            if is_dict_option(kwargs):
+                return DictValueComponent.merge(expanded_vals)
+            return expanded_vals[-1]  # Last value wins.
+
         # Get value from config files, and capture details about its derivation.
         config_details = None
         config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
-        config_default_val_or_str = expand(self._config.get(Config.DEFAULT_SECTION, dest))
-        config_val_or_str = expand(self._config.get(config_section, dest))
-        config_source_file = self._config.get_source_for_option(
-            config_section, dest
-        ) or self._config.get_source_for_option(Config.DEFAULT_SECTION, dest)
-        if config_source_file is not None:
-            config_source_file = os.path.relpath(config_source_file)
-            config_details = f"from {config_source_file}"
+        config_default_val = merge_in_rank(self._config.get(DEFAULT_SECTION, dest))
+        config_val = merge_in_rank(self._config.get(config_section, dest))
+        config_source_files = self._config.get_sources_for_option(config_section, dest)
+        if config_source_files:
+            config_details = f"from {', '.join(config_source_files)}"
 
         # Get value from environment, and capture details about its derivation.
         env_vars = self.get_env_var_names(self._scope, dest)
-        env_val_or_str = None
+        env_val = None
         env_details = None
         if self._env:
             for env_var in env_vars:
                 if env_var in self._env:
-                    env_val_or_str = expand(self._env.get(env_var))
+                    env_val = merge_in_rank([self._env.get(env_var)])
                     env_details = f"from env var {env_var}"
                     break
 
         # Get value from cmd-line flags.
-        flag_vals = [to_value_type(expand(x)) for x in flag_val_strs]
+        flag_vals = list(flag_val_strs)
         if kwargs.get("passthrough"):
             # NB: Passthrough arguments are either of type `str` or `shell_str`
             # (see self._validate): the former never need interpretation, and the latter do not
@@ -615,39 +621,21 @@ class Parser:
             flag_vals.append(
                 ListValueComponent(ListValueComponent.MODIFY, [*passthru_arg_strs], [])
             )
-
-        if is_list_option(kwargs):
-            # Note: It's important to set flag_val to None if no flags were specified, so we can
-            # distinguish between no flags set vs. explicit setting of the value to [].
-            flag_val = ListValueComponent.merge(flag_vals) if flag_vals else None
-        elif is_dict_option(kwargs):
-            # Note: It's important to set flag_val to None if no flags were specified, so we can
-            # distinguish between no flags set vs. explicit setting of the value to {}.
-            flag_val = DictValueComponent.merge(flag_vals) if flag_vals else None
-        elif len(flag_vals) > 1:
+        if len(flag_vals) > 1 and not (is_list_option(kwargs) or is_dict_option(kwargs)):
             raise ParseError(
                 f"Multiple cmd line flags specified for option {dest} in {self._scope_str()}"
             )
-        elif len(flag_vals) == 1:
-            flag_val = flag_vals[0]
-        else:
-            flag_val = None
+        flag_val = merge_in_rank(flag_vals)
         flag_details = None if flag_val is None else "from command-line flag"
 
         # Rank all available values.
-        # Note that some of these values may already be of the value type, but type conversion
-        # is idempotent, so this is OK.
-
         values_to_rank = [
-            (to_value_type(x), detail)
-            for (x, detail) in [
-                (flag_val, flag_details),
-                (env_val_or_str, env_details),
-                (config_val_or_str, config_details),
-                (config_default_val_or_str, config_details),
-                (kwargs.get("default"), None),
-                (None, None),
-            ]
+            (flag_val, flag_details),
+            (env_val, env_details),
+            (config_val, config_details),
+            (config_default_val, config_details),
+            (to_value_type(kwargs.get("default")), None),
+            (None, None),
         ]
         # Note that ranked_vals will always have at least one element, and all elements will be
         # instances of RankedValue (so none will be None, although they may wrap a None value).

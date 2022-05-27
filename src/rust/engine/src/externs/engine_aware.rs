@@ -11,39 +11,37 @@ use crate::Value;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use workunit_store::{ArtifactOutput, Level, RunningWorkunit, UserMetadataItem};
+use workunit_store::{ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, WorkunitMetadata};
 
 // Note: these functions should not panic, but we also don't preserve errors (e.g. to log) because
 // we rely on MyPy to catch TypeErrors with using the APIs incorrectly. So we convert errors to
 // be like the user did not set extra metadata.
 
 #[derive(Default, Clone, Debug)]
-pub(crate) struct EngineAwareReturnType {
-  level: Option<Level>,
-  message: Option<String>,
-  metadata: Vec<(String, UserMetadataItem)>,
-  artifacts: Vec<(String, ArtifactOutput)>,
-}
+pub(crate) struct EngineAwareReturnType;
 
 impl EngineAwareReturnType {
-  pub(crate) fn from_task_result(task_result: &PyAny) -> Self {
-    Self {
-      level: Self::level(task_result),
-      message: Self::message(task_result),
-      artifacts: Self::artifacts(task_result).unwrap_or_else(Vec::new),
-      metadata: metadata(task_result).unwrap_or_else(Vec::new),
-    }
-  }
+  pub(crate) fn update_workunit(workunit: &mut RunningWorkunit, task_result: &PyAny) {
+    workunit.update_metadata(|old| {
+      let new_level = Self::level(task_result);
 
-  pub(crate) fn update_workunit(self, workunit: &mut RunningWorkunit) {
-    workunit.update_metadata(|mut metadata| {
-      if let Some(new_level) = self.level {
-        metadata.level = new_level;
-      }
-      metadata.message = self.message;
-      metadata.artifacts.extend(self.artifacts);
-      metadata.user_metadata.extend(self.metadata);
+      // If the metadata already existed, or if its level changed, we need to update it.
+      let (mut metadata, level) = if let Some((metadata, old_level)) = old {
+        (metadata, new_level.unwrap_or(old_level))
+      } else if let Some(level) = new_level {
+        (WorkunitMetadata::default(), level)
+      } else {
+        return None;
+      };
+
+      metadata.message = Self::message(task_result);
       metadata
+        .artifacts
+        .extend(Self::artifacts(task_result).unwrap_or_default());
+      metadata
+        .user_metadata
+        .extend(metadata_for(task_result).unwrap_or_default());
+      Some((metadata, level))
     });
   }
 
@@ -103,11 +101,11 @@ impl EngineAwareParameter {
   }
 
   pub fn metadata(obj: &PyAny) -> Vec<(String, UserMetadataItem)> {
-    metadata(obj).unwrap_or_else(Vec::new)
+    metadata_for(obj).unwrap_or_default()
   }
 }
 
-fn metadata(obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
+fn metadata_for(obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
   let metadata_val = obj.call_method0("metadata").ok()?;
   if metadata_val.is_none() {
     return None;

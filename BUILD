@@ -7,10 +7,12 @@ shell_sources(name="scripts", sources=["cargo", "pants"], description="Nothing m
 # https://github.com/pantsbuild/pants/pull/8105.
 files(
     name="files",
-    sources=["BUILD_ROOT", ".gitignore", "pants.toml"],
+    sources=["BUILD_ROOT", "pants.toml"],
     tags=["testing", "this"],
     description="""
 We use `BUILD_ROOT` to establish the build root, rather than `./pants`, per
 https://github.com/pantsbuild/pants/pull/8105.
 """,
 )
+
+python_test_utils(name="test_utils")

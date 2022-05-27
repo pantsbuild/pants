@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
@@ -12,8 +13,9 @@ from pants.core.goals.fmt import Fmt, FmtRequest, FmtResult
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import FieldSet, MultipleSourcesField, Target
+from pants.engine.target import FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.logging import LogLevel
@@ -22,20 +24,20 @@ FORTRAN_FILE = FileContent("formatted.f98", b"READ INPUT TAPE 5\n")
 SMALLTALK_FILE = FileContent("formatted.st", b"y := self size + super size.')\n")
 
 
-class FortranSources(MultipleSourcesField):
+class FortranSource(SingleSourceField):
     pass
 
 
 class FortranTarget(Target):
     alias = "fortran"
-    core_fields = (FortranSources,)
+    core_fields = (FortranSource,)
 
 
 @dataclass(frozen=True)
 class FortranFieldSet(FieldSet):
-    required_fields = (FortranSources,)
+    required_fields = (FortranSource,)
 
-    sources: FortranSources
+    sources: FortranSource
 
 
 class FortranFmtRequest(FmtRequest):
@@ -45,30 +47,28 @@ class FortranFmtRequest(FmtRequest):
 
 @rule
 async def fortran_fmt(request: FortranFmtRequest) -> FmtResult:
-    output = (
-        await Get(Digest, CreateDigest([FORTRAN_FILE]))
-        if any(fs.address.target_name == "needs_formatting" for fs in request.field_sets)
-        else EMPTY_DIGEST
-    )
+    if not any(fs.address.target_name == "needs_formatting" for fs in request.field_sets):
+        return FmtResult.skip(formatter_name=request.name)
+    output = await Get(Snapshot, CreateDigest([FORTRAN_FILE]))
     return FmtResult(
-        input=EMPTY_DIGEST, output=output, stdout="", stderr="", formatter_name=request.name
+        input=request.snapshot, output=output, stdout="", stderr="", formatter_name=request.name
     )
 
 
-class SmalltalkSources(MultipleSourcesField):
+class SmalltalkSource(SingleSourceField):
     pass
 
 
 class SmalltalkTarget(Target):
     alias = "smalltalk"
-    core_fields = (SmalltalkSources,)
+    core_fields = (SmalltalkSource,)
 
 
 @dataclass(frozen=True)
 class SmalltalkFieldSet(FieldSet):
-    required_fields = (SmalltalkSources,)
+    required_fields = (SmalltalkSource,)
 
-    sources: SmalltalkSources
+    source: SmalltalkSource
 
 
 class SmalltalkNoopRequest(FmtRequest):
@@ -78,10 +78,10 @@ class SmalltalkNoopRequest(FmtRequest):
 
 @rule
 async def smalltalk_noop(request: SmalltalkNoopRequest) -> FmtResult:
-    result_digest = await Get(Digest, CreateDigest([SMALLTALK_FILE]))
+    assert request.snapshot != EMPTY_SNAPSHOT
     return FmtResult(
-        input=result_digest,
-        output=result_digest,
+        input=request.snapshot,
+        output=request.snapshot,
         stdout="",
         stderr="",
         formatter_name=request.name,
@@ -95,6 +95,7 @@ class SmalltalkSkipRequest(FmtRequest):
 
 @rule
 def smalltalk_skip(request: SmalltalkSkipRequest) -> FmtResult:
+    assert request.snapshot != EMPTY_SNAPSHOT
     return FmtResult.skip(formatter_name=request.name)
 
 
@@ -113,16 +114,6 @@ def fmt_rule_runner(
     )
 
 
-def fortran_digest(rule_runner: RuleRunner) -> Digest:
-    return rule_runner.make_snapshot({FORTRAN_FILE.path: FORTRAN_FILE.content.decode()}).digest
-
-
-def merged_digest(rule_runner: RuleRunner) -> Digest:
-    return rule_runner.make_snapshot(
-        {fc.path: fc.content.decode() for fc in (FORTRAN_FILE, SMALLTALK_FILE)}
-    ).digest
-
-
 def run_fmt(
     rule_runner: RuleRunner, *, target_specs: List[str], only: list[str] | None = None
 ) -> str:
@@ -138,19 +129,26 @@ def run_fmt(
 def test_summary() -> None:
     rule_runner = fmt_rule_runner(
         target_types=[FortranTarget, SmalltalkTarget],
-        fmt_request_types=[FortranFmtRequest, SmalltalkNoopRequest, SmalltalkSkipRequest],
+        # NB: Keep SmalltalkSkipRequest before SmalltalkNoopRequest so it runs first. This helps test
+        # a bug where a formatter run after a skipped formatter was receiving an empty snapshot.
+        # See https://github.com/pantsbuild/pants/issues/15406
+        fmt_request_types=[FortranFmtRequest, SmalltalkSkipRequest, SmalltalkNoopRequest],
     )
 
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                fortran(name='f1')
-                fortran(name='needs_formatting')
-                smalltalk(name='s1')
-                smalltalk(name='s2')
+                fortran(name='f1', source="ft1.f98")
+                fortran(name='needs_formatting', source="formatted.f98")
+                smalltalk(name='s1', source="st1.st")
+                smalltalk(name='s2', source="formatted.st")
                 """,
             ),
+            "ft1.f98": "READ INPUT TAPE 5\n",
+            "formatted.f98": "READ INPUT TAPE 5",
+            "st1.st": "y := self size + super size.')",
+            "formatted.st": "y := self size + super size.')\n",
         },
     )
 
@@ -168,7 +166,8 @@ def test_summary() -> None:
     smalltalk_file = Path(rule_runner.build_root, SMALLTALK_FILE.path)
     assert fortran_file.is_file()
     assert fortran_file.read_text() == FORTRAN_FILE.content.decode()
-    assert not smalltalk_file.is_file()
+    assert smalltalk_file.is_file()
+    assert smalltalk_file.read_text() == SMALLTALK_FILE.content.decode()
 
     stderr = run_fmt(
         rule_runner,
@@ -184,40 +183,35 @@ def test_streaming_output_skip() -> None:
     assert result.message() == "formatter skipped."
 
 
-def test_streaming_output_changed() -> None:
+def test_streaming_output_changed(caplog) -> None:
+    caplog.set_level(logging.DEBUG)
     changed_digest = Digest(EMPTY_DIGEST.fingerprint, 2)
+    changed_snapshot = Snapshot._unsafe_create(changed_digest, [], [])
     result = FmtResult(
-        input=EMPTY_DIGEST,
-        output=changed_digest,
+        input=EMPTY_SNAPSHOT,
+        output=changed_snapshot,
         stdout="stdout",
         stderr="stderr",
         formatter_name="formatter",
     )
     assert result.level() == LogLevel.WARN
-    assert result.message() == dedent(
-        """\
-        formatter made changes.
-        stdout
-        stderr
-
-        """
-    )
+    assert result.message() == "formatter made changes."
+    assert ["Output from formatter\nstdout\nstderr"] == [
+        rec.message for rec in caplog.records if rec.levelno == logging.DEBUG
+    ]
 
 
-def test_streaming_output_not_changed() -> None:
+def test_streaming_output_not_changed(caplog) -> None:
+    caplog.set_level(logging.DEBUG)
     result = FmtResult(
-        input=EMPTY_DIGEST,
-        output=EMPTY_DIGEST,
+        input=EMPTY_SNAPSHOT,
+        output=EMPTY_SNAPSHOT,
         stdout="stdout",
         stderr="stderr",
         formatter_name="formatter",
     )
     assert result.level() == LogLevel.INFO
-    assert result.message() == dedent(
-        """\
-        formatter made no changes.
-        stdout
-        stderr
-
-        """
-    )
+    assert result.message() == "formatter made no changes."
+    assert ["Output from formatter\nstdout\nstderr"] == [
+        rec.message for rec in caplog.records if rec.levelno == logging.DEBUG
+    ]

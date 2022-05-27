@@ -11,7 +11,7 @@ python_sources(
 
 python_sources(name="hcl2_parser", sources=["hcl2_parser.py"])
 
-resource(name="lockfile", source="hcl2_lockfile.txt")
+resource(name="lockfile", source="hcl2.lock")
 
 python_tests(name="tests", sources=["*_test.py", "!dependency_inference_test.py"])
 python_tests(

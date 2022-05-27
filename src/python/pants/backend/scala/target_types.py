@@ -18,6 +18,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.target_types import (
@@ -26,6 +27,7 @@ from pants.jvm.target_types import (
     JvmProvidesTypesField,
     JvmResolveField,
 )
+from pants.util.strutil import softwrap
 
 
 class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
@@ -51,12 +53,16 @@ class ScalaDependenciesField(Dependencies):
 
 
 class ScalaConsumedPluginNamesField(StringSequenceField):
-    help = (
-        "The names of Scala plugins that this source file requires.\n\n"
-        "The plugin must be defined by a corresponding `scalac_plugin` AND `jvm_artifact` target, "
-        "and must be present in this target's resolve's lockfile.\n\n"
-        "If not specified, this will default to the plugins specified in "
-        "`[scalac].plugins_for_resolve` for this target's resolve."
+    help = softwrap(
+        """
+        The names of Scala plugins that this source file requires.
+
+        The plugin must be defined by a corresponding `scalac_plugin` AND `jvm_artifact` target,
+        and must be present in this target's resolve's lockfile.
+
+        If not specified, this will default to the plugins specified in
+        `[scalac].plugins_for_resolve` for this target's resolve.
+        """
     )
 
     alias = "scalac_plugins"
@@ -102,6 +108,9 @@ class ScalatestTestTarget(Target):
 
 class ScalatestTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Spec.scala", "*Suite.scala")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Spec.scala', '!SuiteIgnore.scala']`"
+    )
 
 
 class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
@@ -109,23 +118,22 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalatestTestsGeneratorSourcesField,
-        ScalaDependenciesField,
     )
     generated_target_cls = ScalatestTestTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        ScalaDependenciesField,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
         JvmJdkField,
         JvmProvidesTypesField,
         JvmResolveField,
     )
     settings_request_cls = ScalaSettingsRequest
-    help = (
-        "Generate a `scalatest_test` target for each file in the `sources` field (defaults to "
-        f"all files in the directory matching {ScalatestTestsGeneratorSourcesField.default})."
+    help = softwrap(
+        f"""
+        Generate a `scalatest_test` target for each file in the `sources` field (defaults to
+        all files in the directory matching {ScalatestTestsGeneratorSourcesField.default}).
+        """
     )
 
 
@@ -154,6 +162,9 @@ class ScalaJunitTestTarget(Target):
 
 class ScalaJunitTestsGeneratorSourcesField(ScalaGeneratorSourcesField):
     default = ("*Test.scala",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Test.scala', '!TestIgnore.scala']`"
+    )
 
 
 class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
@@ -161,14 +172,11 @@ class ScalaJunitTestsGeneratorTarget(TargetFilesGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ScalaJunitTestsGeneratorSourcesField,
-        ScalaDependenciesField,
     )
     generated_target_cls = ScalaJunitTestTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        ScalaDependenciesField,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
         JvmJdkField,
         JvmProvidesTypesField,
@@ -208,21 +216,21 @@ class ScalaSourcesGeneratorSourcesField(ScalaGeneratorSourcesField):
         *(f"!{pat}" for pat in (ScalaJunitTestsGeneratorSourcesField.default)),
         *(f"!{pat}" for pat in (ScalatestTestsGeneratorSourcesField.default)),
     )
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Example.scala', 'New*.scala', '!OldIgnore.scala']`"
+    )
 
 
 class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "scala_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ScalaDependenciesField,
         ScalaSourcesGeneratorSourcesField,
     )
     generated_target_cls = ScalaSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        ScalaDependenciesField,
-    )
+    copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
+        ScalaDependenciesField,
         ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmJdkField,
@@ -245,9 +253,12 @@ class ScalacPluginArtifactField(StringField):
 
 class ScalacPluginNameField(StringField):
     alias = "plugin_name"
-    help = (
-        "The name that `scalac` should use to load the plugin.\n\n"
-        "If not set, the plugin name defaults to the target name."
+    help = softwrap(
+        """
+        The name that `scalac` should use to load the plugin.
+
+        If not set, the plugin name defaults to the target name.
+        """
     )
 
 
@@ -258,13 +269,17 @@ class ScalacPluginTarget(Target):
         ScalacPluginArtifactField,
         ScalacPluginNameField,
     )
-    help = (
-        "A plugin for `scalac`.\n\n"
-        "Currently only thirdparty plugins are supported. To enable a plugin, define this "
-        "target type, and set the `artifact=` field to the address of a `jvm_artifact` that "
-        "provides the plugin.\n\n"
-        "If the `scalac`-loaded name of the plugin does not match the target's name, "
-        "additionally set the `plugin_name=` field."
+    help = softwrap(
+        """
+        A plugin for `scalac`.
+
+        Currently only thirdparty plugins are supported. To enable a plugin, define this
+        target type, and set the `artifact=` field to the address of a `jvm_artifact` that
+        provides the plugin.
+
+        If the `scalac`-loaded name of the plugin does not match the target's name,
+        additionally set the `plugin_name=` field.
+        """
     )
 
 

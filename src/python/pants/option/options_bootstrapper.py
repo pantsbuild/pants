@@ -133,12 +133,11 @@ class OptionsBootstrapper:
                     read_file(path, binary_mode=True),
                 )
 
-            env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
             bargs = cls._get_bootstrap_args(args)
 
             config_file_paths = cls.get_config_file_paths(env=env, args=args)
             config_files_products = [filecontent_for(p) for p in config_file_paths]
-            pre_bootstrap_config = Config.load(config_files_products)
+            pre_bootstrap_config = Config.load(config_files_products, env=env)
 
             initial_bootstrap_options = cls.parse_bootstrap_options(
                 env, bargs, pre_bootstrap_config
@@ -160,17 +159,17 @@ class OptionsBootstrapper:
             post_bootstrap_config = Config.load(
                 full_config_files_products,
                 seed_values=bootstrap_option_values.as_dict(),
+                env=env,
             )
-
-            env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
 
             # Finally, we expand any aliases and re-populate the bootstrap args, in case there
             # were any from aliases.
             # stuhood: This could potentially break the rust client when aliases are used:
             # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
+            alias_vals = post_bootstrap_config.get("cli", "alias")
             alias_dict = parse_expression(
                 name="cli.alias",
-                val=post_bootstrap_config.get("cli", "alias") or "{}",
+                val=alias_vals[-1] if alias_vals else "{}",
                 acceptable_types=dict,
             )
             alias = CliAlias.from_dict(alias_dict)
@@ -185,6 +184,11 @@ class OptionsBootstrapper:
             # remote pants runners.
             os.environ["PANTS_BIN_NAME"] = bootstrap_option_values.pants_bin_name
 
+            env_tuples = tuple(
+                sorted(
+                    (item for item in env.items() if item[0].startswith("PANTS_")),
+                )
+            )
             return cls(
                 env_tuples=env_tuples,
                 bootstrap_args=bargs,

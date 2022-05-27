@@ -151,12 +151,10 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/f.py": "'''docstring'''\nCONSTANT: str = ''\n",
-            # NB: Avoid Python 3.8+ for this test due to issues with astroid/ast.
-            # See https://github.com/pantsbuild/pants/issues/10547.
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_sources(name='py2', interpreter_constraints=['==2.7.*'])
-                python_sources(name='py3', interpreter_constraints=['CPython>=3.6,<3.8'])
+                python_sources(name='py3', interpreter_constraints=['CPython>=3.7,<4'])
                 """
             ),
         }
@@ -190,7 +188,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert "invalid syntax (<string>, line 2) (syntax-error)" in batched_py2_result.stdout
 
     assert batched_py3_result.exit_code == 0
-    assert batched_py3_result.partition_description == "['CPython<3.8,>=3.6']"
+    assert batched_py3_result.partition_description == "['CPython<4,>=3.7']"
     assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
 
 
@@ -517,18 +515,28 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
     assert len(partitions) == 3
 
     def assert_partition(
-        partition: PylintPartition, roots: list[Target], deps: list[Target], interpreter: str
+        partition: PylintPartition,
+        roots: list[Target],
+        deps: list[Target],
+        interpreter: str,
+        resolve: str,
     ) -> None:
         root_addresses = {t.address for t in roots}
-        assert {t.address for t in partition.root_targets} == root_addresses
+        assert {fs.address for fs in partition.root_field_sets} == root_addresses
         assert {t.address for t in partition.closure} == {
             *root_addresses,
             *(t.address for t in deps),
         }
-        assert partition.interpreter_constraints == InterpreterConstraints([f"=={interpreter}.*"])
+        ics = [f"CPython=={interpreter}.*"]
+        assert partition.interpreter_constraints == InterpreterConstraints(ics)
+        assert partition.description() == f"{resolve}, {ics}"
 
-    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8")
-    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9")
+    assert_partition(partitions[0], [resolve_a_py38_root], [resolve_a_py38_dep], "3.8", "a")
+    assert_partition(partitions[1], [resolve_a_py39_root], [resolve_a_py39_dep], "3.9", "a")
     assert_partition(
-        partitions[2], [resolve_b_root1, resolve_b_root2], [resolve_b_dep1, resolve_b_dep2], "3.9"
+        partitions[2],
+        [resolve_b_root1, resolve_b_root2],
+        [resolve_b_dep1, resolve_b_dep2],
+        "3.9",
+        "b",
     )

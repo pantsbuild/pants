@@ -22,7 +22,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import OrderedSet
-from pants.util.strutil import create_path_env_var
+from pants.util.strutil import create_path_env_var, softwrap
 
 
 class PexRuntimeEnvironment(Subsystem):
@@ -34,10 +34,13 @@ class PexRuntimeEnvironment(Subsystem):
     _executable_search_paths = StrListOption(
         "--executable-search-paths",
         default=["<PATH>"],
-        help=(
-            "The PATH value that will be used by the PEX subprocess and any subprocesses it "
-            'spawns.\n\nThe special string "<PATH>" will expand to the contents of the PATH '
-            "env var."
+        help=softwrap(
+            """
+            The PATH value that will be used by the PEX subprocess and any subprocesses it
+            spawns.
+
+            The special string `"<PATH>"` will expand to the contents of the PATH env var.
+            """
         ),
         advanced=True,
         metavar="<binary-paths>",
@@ -45,18 +48,21 @@ class PexRuntimeEnvironment(Subsystem):
     _verbosity = IntOption(
         "--verbosity",
         default=0,
-        help=("Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging)."),
+        help="Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging).",
         advanced=True,
     )
     venv_use_symlinks = BoolOption(
         "--venv-use-symlinks",
         default=False,
-        help=(
-            "When possible, use venvs whose site-packages directories are populated with"
-            "symlinks.\n\nEnabling this can save space in the `--named-caches-dir` directory "
-            "and lead to slightly faster execution times for Pants Python goals. Some "
-            "distributions do not work with symlinked venvs though, so you may not be able to "
-            "enable this optimization as a result."
+        help=softwrap(
+            """
+            When possible, use venvs whose site-packages directories are populated with symlinks.
+
+            Enabling this can save space in the `--named-caches-dir` directory
+            and lead to slightly faster execution times for Pants Python goals. Some
+            distributions do not work with symlinked venvs though, so you may not be able to
+            enable this optimization as a result.
+            """
         ),
         advanced=True,
     )

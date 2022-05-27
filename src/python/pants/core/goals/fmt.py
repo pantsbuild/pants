@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import itertools
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Iterable, TypeVar
 
 from pants.core.goals.style_request import (
     StyleRequest,
@@ -17,63 +18,77 @@ from pants.core.goals.style_request import (
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import Digest, MergeDigests, Snapshot, SnapshotDiff, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT
 from pants.engine.process import FallibleProcessResult, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import SourcesField, Targets
+from pants.engine.target import FieldSet, FilteredTargets, SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import IntOption, StrListOption
 from pants.util.collections import partition_sequentially
 from pants.util.logging import LogLevel
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
 _F = TypeVar("_F", bound="FmtResult")
+_FS = TypeVar("_FS", bound=FieldSet)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class FmtResult(EngineAwareReturnType):
-    input: Digest
-    output: Digest
+    input: Snapshot
+    output: Snapshot
     stdout: str
     stderr: str
     formatter_name: str
 
     @classmethod
-    def skip(cls: type[_F], *, formatter_name: str) -> _F:
-        return cls(
-            input=EMPTY_DIGEST,
-            output=EMPTY_DIGEST,
-            stdout="",
-            stderr="",
-            formatter_name=formatter_name,
-        )
-
-    @classmethod
-    def from_process_result(
+    def create(
         cls,
+        request: FmtRequest,
         process_result: ProcessResult | FallibleProcessResult,
+        output: Snapshot,
         *,
-        original_digest: Digest,
-        formatter_name: str,
         strip_chroot_path: bool = False,
     ) -> FmtResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
         return cls(
-            input=original_digest,
-            output=process_result.output_digest,
+            input=request.snapshot,
+            output=output,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
+            formatter_name=request.name,
+        )
+
+    def __post_init__(self):
+        # NB: We debug log stdout/stderr because `message` doesn't log it.
+        log = f"Output from {self.formatter_name}"
+        if self.stdout:
+            log += f"\n{self.stdout}"
+        if self.stderr:
+            log += f"\n{self.stderr}"
+        logger.debug(log)
+
+    @classmethod
+    def skip(cls: type[_F], *, formatter_name: str) -> _F:
+        return cls(
+            input=EMPTY_SNAPSHOT,
+            output=EMPTY_SNAPSHOT,
+            stdout="",
+            stderr="",
             formatter_name=formatter_name,
         )
 
     @property
     def skipped(self) -> bool:
         return (
-            self.input == EMPTY_DIGEST
-            and self.output == EMPTY_DIGEST
+            self.input == EMPTY_SNAPSHOT
+            and self.output == EMPTY_SNAPSHOT
             and not self.stdout
             and not self.stderr
         )
@@ -91,13 +106,20 @@ class FmtResult(EngineAwareReturnType):
         if self.skipped:
             return f"{self.formatter_name} skipped."
         message = "made changes." if self.did_change else "made no changes."
-        output = ""
-        if self.stdout:
-            output += f"\n{self.stdout}"
-        if self.stderr:
-            output += f"\n{self.stderr}"
-        if output:
-            output = f"{output.rstrip()}\n\n"
+
+        # NB: Instead of printing out `stdout` and `stderr`, we just print a list of files which
+        # changed. We do this for two reasons:
+        #   1. This is run as part of both `fmt` and `lint`, and we want consistent output between both
+        #   2. Different formatters have different stdout/stderr. This way is consistent across all
+        #       formatters.
+        if self.did_change:
+            output = "".join(
+                f"\n  {file}"
+                for file in SnapshotDiff.from_snapshots(self.input, self.output).changed_files
+            )
+        else:
+            output = ""
+
         return f"{self.formatter_name} {message}{output}"
 
     def cacheable(self) -> bool:
@@ -106,8 +128,14 @@ class FmtResult(EngineAwareReturnType):
 
 
 @union
-class FmtRequest(StyleRequest):
-    pass
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class FmtRequest(StyleRequest[_FS]):
+    snapshot: Snapshot
+
+    def __init__(self, field_sets: Iterable[_FS], snapshot: Snapshot) -> None:
+        self.snapshot = snapshot
+        super().__init__(field_sets)
 
 
 @dataclass(frozen=True)
@@ -155,7 +183,7 @@ class Fmt(Goal):
 @goal_rule
 async def fmt(
     console: Console,
-    targets: Targets,
+    targets: FilteredTargets,
     fmt_subsystem: FmtSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
@@ -252,14 +280,14 @@ async def fmt_language(language_fmt_request: _LanguageFmtRequest) -> _LanguageFm
                 for target in language_fmt_request.targets
                 if fmt_request_type.field_set_type.is_applicable(target)
             ),
-            prior_formatter_result=prior_formatter_result,
+            snapshot=prior_formatter_result,
         )
         if not request.field_sets:
             continue
         result = await Get(FmtResult, FmtRequest, request)
         results.append(result)
-        if result.did_change:
-            prior_formatter_result = await Get(Snapshot, Digest, result.output)
+        if not result.skipped:
+            prior_formatter_result = result.output
     return _LanguageFmtResults(
         tuple(results),
         input=original_sources.snapshot.digest,

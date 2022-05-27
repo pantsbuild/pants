@@ -17,10 +17,12 @@ from pants.engine.target import (
     TargetFilesGeneratorSettingsRequest,
     Targets,
     generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 # NB: We subclass Dependencies so that specific backends can add dependency injection rules to
@@ -61,9 +63,14 @@ class ProtobufSourceTarget(Target):
         ProtobufSourceField,
         ProtobufGrpcToggleField,
     )
-    help = (
-        "A single Protobuf file used to generate various languages.\n\n"
-        f"See {doc_url('protobuf')}."
+    help = softwrap(
+        f"""
+        A single Protobuf file used to generate various languages.
+
+        See language-specific docs:
+            Python: {doc_url('protobuf-python')}
+            Go: {doc_url('protobuf-go')}
+        """
     )
 
 
@@ -89,18 +96,21 @@ def generator_settings(
 class ProtobufSourcesGeneratingSourcesField(MultipleSourcesField):
     default = ("*.proto",)
     expected_file_extensions = (".proto",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.proto', 'new_*.proto', '!old_ignore*.proto']`"
+    )
 
 
 class ProtobufSourcesOverridesField(OverridesField):
     help = generate_file_based_overrides_field_help_message(
         ProtobufSourceTarget.alias,
-        (
-            "overrides={\n"
-            '  "foo.proto": {"grpc": True]},\n'
-            '  "bar.proto": {"description": "our user model"]},\n'
-            '  ("foo.proto", "bar.proto"): {"tags": ["overridden"]},\n'
-            "}"
-        ),
+        """
+        overrides={
+            "foo.proto": {"grpc": True},
+            "bar.proto": {"description": "our user model"},
+            ("foo.proto", "bar.proto"): {"tags": ["overridden"]},
+        }
+        """,
     )
 
 
@@ -108,16 +118,15 @@ class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "protobuf_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ProtobufDependenciesField,
         ProtobufSourcesGeneratingSourcesField,
         ProtobufSourcesOverridesField,
     )
     generated_target_cls = ProtobufSourceTarget
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        ProtobufGrpcToggleField,
         ProtobufDependenciesField,
     )
-    moved_fields = (ProtobufGrpcToggleField,)
     settings_request_cls = GeneratorSettingsRequest
     help = "Generate a `protobuf_source` target for each file in the `sources` field."
 

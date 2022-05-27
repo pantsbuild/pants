@@ -6,6 +6,9 @@ python_requirements(
     module_mapping={
         "strawberry-graphql": ["strawberry"],
     },
+    overrides={
+        "humbug": {"dependencies": ["#setuptools"]},
+    },
 )
 
 # Useful when using IntelliJ/PyCharm remote debugging. Importing `pydevd_pycharm` at

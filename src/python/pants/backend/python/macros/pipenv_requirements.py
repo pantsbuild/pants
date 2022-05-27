@@ -35,7 +35,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InvalidFieldException,
     SingleSourceField,
-    Target,
+    TargetGenerator,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -46,9 +46,10 @@ class PipenvSourceField(SingleSourceField):
     required = False
 
 
-class PipenvRequirementsTargetGenerator(Target):
+class PipenvRequirementsTargetGenerator(TargetGenerator):
     alias = "pipenv_requirements"
     help = "Generate a `python_requirement` for each entry in `Pipenv.lock`."
+    generated_target_cls = PythonRequirementTarget
     # Note that this does not have a `dependencies` field.
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -56,8 +57,9 @@ class PipenvRequirementsTargetGenerator(Target):
         TypeStubsModuleMappingField,
         PipenvSourceField,
         RequirementsOverrideField,
-        PythonRequirementResolveField,
     )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (PythonRequirementResolveField,)
 
 
 class GenerateFromPipenvRequirementsRequest(GenerateTargetsRequest):
@@ -79,10 +81,10 @@ async def generate_from_pipenv_requirement(
     }
 
     file_tgt = TargetGeneratorSourcesHelperTarget(
-        {TargetGeneratorSourcesHelperSourcesField.alias: [lock_rel_path]},
+        {TargetGeneratorSourcesHelperSourcesField.alias: lock_rel_path},
         Address(
-            generator.address.spec_path,
-            target_name=generator.address.target_name,
+            request.template_address.spec_path,
+            target_name=request.template_address.target_name,
             relative_file_path=lock_rel_path,
         ),
     )
@@ -97,16 +99,8 @@ async def generate_from_pipenv_requirement(
     )
     lock_info = json.loads(digest_contents[0].content)
 
-    # Validate the resolve is legal.
-    generator[PythonRequirementResolveField].normalized_value(python_setup)
-
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
-    inherited_fields = {
-        field.alias: field.value
-        for field in request.generator.field_values.values()
-        if isinstance(field, (*COMMON_TARGET_FIELDS, PythonRequirementResolveField))
-    }
 
     def generate_tgt(raw_req: str, info: dict) -> PythonRequirementTarget:
         if info.get("extras"):
@@ -125,7 +119,7 @@ async def generate_from_pipenv_requirement(
 
         return PythonRequirementTarget(
             {
-                **inherited_fields,
+                **request.template,
                 PythonRequirementsField.alias: [parsed_req],
                 PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
                 PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
@@ -136,7 +130,7 @@ async def generate_from_pipenv_requirement(
                 Dependencies.alias: [file_tgt.address.spec],
                 **tgt_overrides,
             },
-            generator.address.create_generated(parsed_req.project_name),
+            request.template_address.create_generated(parsed_req.project_name),
         )
 
     result = tuple(
@@ -146,7 +140,7 @@ async def generate_from_pipenv_requirement(
 
     if overrides:
         raise InvalidFieldException(
-            f"Unused key in the `overrides` field for {request.generator.address}: "
+            f"Unused key in the `overrides` field for {request.template_address}: "
             f"{sorted(overrides)}"
         )
 

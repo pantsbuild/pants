@@ -159,7 +159,7 @@ impl PySnapshot {
   }
 
   fn __repr__(&self) -> PyResult<String> {
-    let (dirs, files): (Vec<_>, Vec<_>) = self.0.tree.files_and_directories();
+    let (files, dirs): (Vec<_>, Vec<_>) = self.0.tree.files_and_directories();
 
     Ok(format!(
       "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
@@ -212,6 +212,32 @@ impl PySnapshot {
         .into_iter()
         .map(|path| PyString::new(py, &path.to_string_lossy()))
         .collect::<Vec<_>>(),
+    )
+  }
+
+  // NB: Prefix with underscore. The Python call will be hidden behind a helper which returns a much
+  // richer type.
+  fn _diff<'py>(&self, other: &PySnapshot, py: Python<'py>) -> &'py PyTuple {
+    let result = self.0.tree.diff(&other.0.tree);
+
+    let into_tuple = |x: &Vec<PathBuf>| -> &'py PyTuple {
+      PyTuple::new(
+        py,
+        x.iter()
+          .map(|path| PyString::new(py, &path.to_string_lossy()))
+          .collect::<Vec<_>>(),
+      )
+    };
+
+    PyTuple::new(
+      py,
+      vec![
+        into_tuple(&result.our_unique_files),
+        into_tuple(&result.our_unique_dirs),
+        into_tuple(&result.their_unique_files),
+        into_tuple(&result.their_unique_dirs),
+        into_tuple(&result.changed_files),
+      ],
     )
   }
 }

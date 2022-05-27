@@ -27,6 +27,7 @@ from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +40,11 @@ class RunFieldSet(FieldSet, metaclass=ABCMeta):
 class RestartableField(BoolField):
     alias = "restartable"
     default = False
-    help = (
-        "If true, runs of this target with the `run` goal may be interrupted and "
-        "restarted when its input files change."
+    help = softwrap(
+        """
+        If true, runs of this target with the `run` goal may be interrupted and
+        restarted when its input files change.
+        """
     )
 
 
@@ -68,13 +71,17 @@ class RunRequest:
 
 class RunSubsystem(GoalSubsystem):
     name = "run"
-    help = (
-        "Runs a binary target.\n\n"
-        "This goal propagates the return code of the underlying executable.\n\n"
-        "If your application can safely be restarted while it is running, you can pass "
-        "`restartable=True` on your binary target (for supported types), and the `run` goal "
-        "will automatically restart them as all relevant files change. This can be particularly "
-        "useful for server applications."
+    help = softwrap(
+        """
+        Runs a binary target.
+
+        This goal propagates the return code of the underlying executable.
+
+        If your application can safely be restarted while it is running, you can pass
+        `restartable=True` on your binary target (for supported types), and the `run` goal
+        will automatically restart them as all relevant files change. This can be particularly
+        useful for server applications.
+        """
     )
 
     @classmethod
@@ -89,8 +96,16 @@ class RunSubsystem(GoalSubsystem):
     cleanup = BoolOption(
         "--cleanup",
         default=True,
-        help="Whether to clean up the temporary directory in which the binary is chrooted. "
-        "Set to false to retain the directory, e.g., for debugging.",
+        help=softwrap(
+            """
+            Whether to clean up the temporary directory in which the binary is chrooted.
+            Set this to false to retain the directory, e.g., for debugging.
+
+            Note that setting the global --process-cleanup option to false will also conserve
+            this directory, along with those of all other processes that Pants executes.
+            This option is more selective and controls just the target binary's directory.
+            """
+        ),
     )
 
 
@@ -119,11 +134,11 @@ async def run(
     request = await Get(RunRequest, RunFieldSet, field_set)
     wrapped_target = await Get(WrappedTarget, Address, field_set.address)
     restartable = wrapped_target.target.get(RestartableField).value
+    # Cleanup is the default, so we want to preserve the chroot if either option is off.
+    cleanup = run_subsystem.cleanup and global_options.process_cleanup
 
-    with temporary_dir(
-        root_dir=global_options.pants_workdir, cleanup=run_subsystem.cleanup
-    ) as tmpdir:
-        if not run_subsystem.cleanup:
+    with temporary_dir(root_dir=global_options.pants_workdir, cleanup=cleanup) as tmpdir:
+        if not cleanup:
             logger.info(f"Preserving running binary chroot {tmpdir}")
         workspace.write_digest(
             request.digest,

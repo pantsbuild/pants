@@ -114,7 +114,7 @@ def test_requirements_txt(rule_runner: RuleRunner) -> None:
                 },
                 Address("", target_name="reqs", generated_name="pip"),
             ),
-            TargetGeneratorSourcesHelperTarget({"sources": ["requirements.txt"]}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"source": "requirements.txt"}, file_addr),
         },
     )
 
@@ -151,7 +151,7 @@ def test_multiple_versions(rule_runner: RuleRunner) -> None:
                 {"requirements": ["repletewateringcan>=7"], "dependencies": [file_addr.spec]},
                 Address("", target_name="reqs", generated_name="repletewateringcan"),
             ),
-            TargetGeneratorSourcesHelperTarget({"sources": ["requirements.txt"]}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"source": "requirements.txt"}, file_addr),
         },
     )
 
@@ -168,15 +168,6 @@ def test_invalid_req(rule_runner: RuleRunner) -> None:
             expected_targets=set(),
         )
 
-    # Give a nice error message if it looks like they're using pip VCS-style requirements.
-    with engine_error(contains="It looks like you're trying to use a pip VCS-style requirement?"):
-        assert_python_requirements(
-            rule_runner,
-            "python_requirements(name='reqs')",
-            "git+https://github.com/pypa/pip.git#egg=pip",
-            expected_targets=set(),
-        )
-
 
 def test_source_override(rule_runner: RuleRunner) -> None:
     file_addr = Address("", target_name="reqs", relative_file_path="subdir/requirements.txt")
@@ -190,6 +181,6 @@ def test_source_override(rule_runner: RuleRunner) -> None:
                 {"requirements": ["ansicolors>=1.18.0"], "dependencies": [file_addr.spec]},
                 Address("", target_name="reqs", generated_name="ansicolors"),
             ),
-            TargetGeneratorSourcesHelperTarget({"sources": ["subdir/requirements.txt"]}, file_addr),
+            TargetGeneratorSourcesHelperTarget({"source": "subdir/requirements.txt"}, file_addr),
         },
     )

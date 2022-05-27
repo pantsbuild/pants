@@ -10,14 +10,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.base.specs import (
-    AddressLiteralSpec,
-    AddressSpecs,
-    DirLiteralSpec,
-    FileLiteralSpec,
-    FilesystemSpecs,
-    Specs,
-)
+from pants.base.specs import AddressLiteralSpec, DirLiteralSpec, FileLiteralSpec, RawSpecs
 from pants.core.goals import tailor
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -27,7 +20,6 @@ from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
-    PutativeTargetsSearchPaths,
     TailorGoal,
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
@@ -49,8 +41,9 @@ from pants.testutil.rule_runner import RuleRunner
 
 
 class MockPutativeTargetsRequest:
-    def __init__(self, search_paths: PutativeTargetsSearchPaths):
-        assert search_paths.dirs == ("",)
+    def __init__(self, dirs: tuple[str, ...], deprecated_recursive_dirs: tuple[str, ...]):
+        assert dirs == ("",)
+        assert not deprecated_recursive_dirs
 
 
 class FortranSources(MultipleSourcesField):
@@ -83,7 +76,7 @@ class PutativeFortranTargetsRequest(PutativeTargetsRequest):
 async def find_fortran_targets(
     req: PutativeFortranTargetsRequest, all_owned_sources: AllOwnedSources
 ) -> PutativeTargets:
-    all_fortran_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.f90"))
+    all_fortran_files = await Get(Paths, PathGlobs, req.path_globs("*.f90"))
     unowned_shell_files = set(all_fortran_files.files) - set(all_owned_sources)
 
     tests_filespec = Filespec(includes=list(FortranTestsSources.default))
@@ -237,28 +230,6 @@ def test_root_targets_are_explicitly_named(rule_runner: RuleRunner) -> None:
                     "fortran_library",
                     ["foo.f90"],
                     FortranLibrarySources.default,
-                )
-            ]
-        )
-        == ptgts
-    )
-
-
-def test_root_macros_dont_get_named(rule_runner: RuleRunner) -> None:
-    # rule_runner.write_files({"macro_trigger.txt": ""})
-    ptgt = PutativeTarget("", "", "fortran_macro", [], [], addressable=False)
-    unpts = rule_runner.request(UniquelyNamedPutativeTargets, [PutativeTargets([ptgt])])
-    ptgts = unpts.putative_targets
-    assert (
-        PutativeTargets(
-            [
-                PutativeTarget(
-                    "",
-                    "",
-                    "fortran_macro",
-                    [],
-                    [],
-                    addressable=False,
                 )
             ]
         )
@@ -463,43 +434,36 @@ def test_group_by_dir() -> None:
 
 
 def test_specs_to_dirs() -> None:
-    assert specs_to_dirs(Specs(AddressSpecs([]), FilesystemSpecs([]))) == ("",)
+    assert specs_to_dirs(RawSpecs()) == ("",)
+    assert specs_to_dirs(RawSpecs(address_literals=(AddressLiteralSpec("src/python/foo"),))) == (
+        "src/python/foo",
+    )
+    assert specs_to_dirs(RawSpecs(dir_literals=(DirLiteralSpec("src/python/foo"),))) == (
+        "src/python/foo",
+    )
     assert specs_to_dirs(
-        Specs(AddressSpecs([AddressLiteralSpec("src/python/foo")]), FilesystemSpecs([]))
-    ) == ("src/python/foo",)
-    assert specs_to_dirs(
-        Specs(AddressSpecs([]), FilesystemSpecs([DirLiteralSpec("src/python/foo")]))
-    ) == ("src/python/foo",)
-    assert specs_to_dirs(
-        Specs(
-            AddressSpecs(
-                [AddressLiteralSpec("src/python/foo"), AddressLiteralSpec("src/python/bar")]
-            ),
-            FilesystemSpecs([]),
+        RawSpecs(
+            address_literals=(
+                AddressLiteralSpec("src/python/foo"),
+                AddressLiteralSpec("src/python/bar"),
+            )
         )
     ) == ("src/python/foo", "src/python/bar")
 
     with pytest.raises(ValueError):
-        specs_to_dirs(
-            Specs(AddressSpecs([]), FilesystemSpecs([FileLiteralSpec("src/python/foo.py")]))
-        )
+        specs_to_dirs(RawSpecs(file_literals=(FileLiteralSpec("src/python/foo.py"),)))
+
+    with pytest.raises(ValueError):
+        specs_to_dirs(RawSpecs(address_literals=(AddressLiteralSpec("src/python/bar", "tgt"),)))
 
     with pytest.raises(ValueError):
         specs_to_dirs(
-            Specs(AddressSpecs([AddressLiteralSpec("src/python/bar", "tgt")]), FilesystemSpecs([]))
-        )
-
-    with pytest.raises(ValueError):
-        specs_to_dirs(
-            Specs(
-                AddressSpecs(
-                    [
-                        AddressLiteralSpec(
-                            "src/python/bar", target_component=None, generated_component="gen"
-                        )
-                    ]
-                ),
-                FilesystemSpecs([]),
+            RawSpecs(
+                address_literals=(
+                    AddressLiteralSpec(
+                        "src/python/bar", target_component=None, generated_component="gen"
+                    ),
+                )
             )
         )
 
@@ -596,8 +560,7 @@ def test_all_owned_sources(rule_runner: RuleRunner) -> None:
 
 def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
-        PutativeTargets,
-        [MockPutativeFortranModuleRequest(PutativeTargetsSearchPaths(tuple("")))],
+        PutativeTargets, [MockPutativeFortranModuleRequest(("dir",))]
     )
     assert putative_targets == PutativeTargets(
         [PutativeTarget.for_target_type(FortranModule, "dir", "dir", [])]
@@ -607,7 +570,7 @@ def test_target_type_with_no_sources_field(rule_runner: RuleRunner) -> None:
         _ = PutativeTarget.for_target_type(FortranModule, "dir", "dir", ["a.f90"])
     expected_msg = (
         "A target of type FortranModule was proposed at address dir:dir with explicit sources a.f90, "
-        "but this target type does not have a `sources` field."
+        "but this target type does not have a `source` or `sources` field."
     )
     assert str(excinfo.value) == expected_msg
 
@@ -638,7 +601,7 @@ def test_filter_by_ignores() -> None:
         ignore_adding_targets=["project:bad", "//:bad", "unused:t"],
     )
 
-    def make_ptgt(path: str, name: str, *, addressable: bool = True) -> PutativeTarget:
+    def make_ptgt(path: str, name: str) -> PutativeTarget:
         return PutativeTarget(
             path=path,
             name=name,
@@ -650,7 +613,6 @@ def test_filter_by_ignores() -> None:
     valid_ptgts = [
         make_ptgt("", "good"),
         make_ptgt("project", "good"),
-        make_ptgt("project", "caof_macro", addressable=False),
         make_ptgt("path_ignore_not_recursive/subdir", "t"),
         make_ptgt("global_build_ignore_not_recursive/subdir", "t"),
     ]

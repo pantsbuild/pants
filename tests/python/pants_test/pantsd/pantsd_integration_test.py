@@ -62,7 +62,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context(log_level="debug") as ctx:
-            with setup_tmpdir({"foo/BUILD": "files(sources=[])"}) as tmpdir:
+            with setup_tmpdir({"foo/BUILD": "target()"}) as tmpdir:
                 ctx.runner(["list", f"{tmpdir}/foo::"])
                 ctx.checker.assert_started()
 
@@ -72,7 +72,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_broken_pipe(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             run = self.run_pants_with_workdir(
-                "help | head -1", workdir=workdir, config=pantsd_config, shell=True
+                "help | head -1",
+                workdir=workdir,
+                config=pantsd_config,
+                shell=True,
+                # FIXME: Why is this necessary to set?
+                set_pants_ignore=False,
             )
             self.assertNotIn("broken pipe", run.stderr.lower())
             checker.assert_started()
@@ -267,6 +272,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 assert line_pair[0] == line_pair[1]
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7622")
+    @pytest.mark.no_error_if_skipped
     def test_pantsd_filesystem_invalidation(self):
         """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
         with self.pantsd_successful_run_context() as ctx:
@@ -415,6 +421,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             os.unlink(pidpath)
 
     @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/8193")
+    @pytest.mark.no_error_if_skipped
     def test_pantsd_memory_usage(self):
         """Validates that after N runs, memory usage has increased by no more than X percent."""
         number_of_runs = 10
@@ -468,7 +475,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         test_path = "daemon_correctness_test_0001"
         test_build_file = os.path.join(test_path, "BUILD")
         test_src_file = os.path.join(test_path, "some_file.py")
-        filedeps_cmd = ["--files-not-found-behavior=warn", "filedeps", test_path]
+        filedeps_cmd = ["--unmatched-build-file-globs=warn", "filedeps", test_path]
 
         try:
             with self.pantsd_successful_run_context() as ctx:

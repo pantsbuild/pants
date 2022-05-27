@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.java.target_types import JavaSourceField, JavaSourceTarget
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JavaSourceTarget
 from pants.engine.target import BoolField
 
 
@@ -12,4 +12,7 @@ class SkipGoogleJavaFormatField(BoolField):
 
 
 def rules():
-    return [JavaSourceTarget.register_plugin_field(JavaSourceField)]
+    return [
+        JavaSourceTarget.register_plugin_field(SkipGoogleJavaFormatField),
+        JavaSourcesGeneratorTarget.register_plugin_field(SkipGoogleJavaFormatField),
+    ]

@@ -25,7 +25,7 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
     transitive = BoolOption(
         "--transitive",
         default=False,
-        help=("List all transitive dependencies. If unspecified, list direct dependencies only."),
+        help="List all transitive dependencies. If unspecified, list direct dependencies only.",
     )
     closed = BoolOption(
         "--closed",

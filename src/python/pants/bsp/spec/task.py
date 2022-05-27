@@ -4,20 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any
 
 from pants.bsp.spec.base import StatusCode, TaskId
 from pants.bsp.spec.compile import CompileReport, CompileTask
-
-
-class BSPNotification:
-    """Base class for all notifications so that a notification carries its RPC method name."""
-
-    notification_name: ClassVar[str]
-
-    def to_json_dict(self) -> dict[str, Any]:
-        raise NotImplementedError
-
+from pants.bsp.spec.notification import BSPNotification
 
 # -----------------------------------------------------------------------------------------------
 # Task Notifications

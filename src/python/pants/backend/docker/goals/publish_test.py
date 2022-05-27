@@ -131,14 +131,19 @@ def test_docker_push_images(rule_runner: RuleRunner) -> None:
 
 
 def test_docker_push_registries(rule_runner: RuleRunner) -> None:
+    registries = {
+        "inhouse1": {"address": "inhouse1.registry"},
+        "inhouse2": {"address": "inhouse2.registry"},
+    }
+    rule_runner.set_options(
+        [f"--docker-registries={registries}"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     result, docker = run_publish(
         rule_runner,
         Address("src/registries"),
         {
-            "registries": {
-                "inhouse1": {"address": "inhouse1.registry"},
-                "inhouse2": {"address": "inhouse2.registry"},
-            }
+            "registries": registries,
         },
     )
     assert len(result) == 2
@@ -165,6 +170,43 @@ def test_docker_push_registries(rule_runner: RuleRunner) -> None:
                 "inhouse2.registry/registries/registries:latest",
             )
         ),
+    )
+
+
+def test_docker_skip_push_registries(rule_runner: RuleRunner) -> None:
+    registries = {
+        "inhouse1": {"address": "inhouse1.registry"},
+        "inhouse2": {"address": "inhouse2.registry", "skip_push": True},
+    }
+    rule_runner.set_options(
+        [f"--docker-registries={registries}"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    result, docker = run_publish(
+        rule_runner,
+        Address("src/registries"),
+        {
+            "registries": registries,
+        },
+    )
+    assert len(result) == 2
+    assert_publish(
+        result[0],
+        ("inhouse1.registry/registries/registries:latest",),
+        None,
+        process_assertion(
+            argv=(
+                docker.path,
+                "push",
+                "inhouse1.registry/registries/registries:latest",
+            )
+        ),
+    )
+    assert_publish(
+        result[1],
+        ("inhouse2.registry/registries/registries:latest",),
+        "(by `skip_push` on registry @inhouse2)",
+        None,
     )
 
 

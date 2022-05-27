@@ -1,38 +1,21 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::HashMap;
 use std::convert::From;
 use std::iter::Iterator;
-use std::path::PathBuf;
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::BytesMut;
 use fs::{
-  directory, DigestTrie, DirectoryDigest, ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob,
-  PreparedPathGlobs, RelativePath, DOUBLE_STAR_GLOB, EMPTY_DIRECTORY_DIGEST, SINGLE_STAR_GLOB,
+  directory, DigestTrie, DirectoryDigest, GlobMatching, PreparedPathGlobs, RelativePath,
+  EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, FutureExt};
-use glob::Pattern;
-use hashing::{Digest, EMPTY_DIGEST};
-use indexmap::{self, IndexMap};
+use hashing::Digest;
 use itertools::Itertools;
 use log::log_enabled;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::require_digest;
-
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub enum SnapshotOpsError {
-  String(String),
-  DigestMergeFailure(String),
-  GlobMatchError(String),
-}
-
-impl From<String> for SnapshotOpsError {
-  fn from(err: String) -> Self {
-    Self::String(err)
-  }
-}
 
 ///
 /// Parameters used to determine which files and directories to operate on within a parent snapshot.
@@ -173,384 +156,6 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
 }
 
 ///
-/// When we evaluate a recursive glob during the subset() operation, we perform some relatively
-/// complex logic to coalesce globs in subdirectories, and to short-circuit retrieving
-/// subdirectories from the store at all if we don't need to inspect their contents
-/// (e.g. if a glob ends in "**"). This struct isolates that complexity, allowing the code in
-/// subset() to just operate on the higher-level GlobbedFilesAndDirectories struct.
-///
-struct IntermediateGlobbedFilesAndDirectories {
-  globbed_files: IndexMap<PathBuf, remexec::FileNode>,
-  globbed_directories: IndexMap<PathBuf, remexec::DirectoryNode>,
-  cur_dir_files: IndexMap<PathBuf, remexec::FileNode>,
-  cur_dir_directories: IndexMap<PathBuf, remexec::DirectoryNode>,
-  todo_directories: IndexMap<PathBuf, Vec<RestrictedPathGlob>>,
-  prefix: PathBuf,
-  multiple_globs: MultipleGlobs,
-}
-
-struct GlobbedFilesAndDirectories {
-  // All of the subdirectories of the source Directory that is currently being subsetted,
-  // *regardless of whether the glob is matched yet*.
-  cur_dir_directories: IndexMap<PathBuf, remexec::DirectoryNode>,
-  // All of the files of the source Directory matching the current glob.
-  globbed_files: IndexMap<PathBuf, remexec::FileNode>,
-  // All of the matching subdirectories of the source Directory *after* being subsetted to match the
-  // current glob.
-  globbed_directories: IndexMap<PathBuf, remexec::DirectoryNode>,
-  // All of the matching subdirectories of the source Directory, *before* being subsetted to match
-  // the current glob.
-  todo_directories: IndexMap<PathBuf, Vec<RestrictedPathGlob>>,
-  exclude: Arc<GitignoreStyleExcludes>,
-}
-
-impl IntermediateGlobbedFilesAndDirectories {
-  fn from_cur_dir_and_globs(
-    cur_dir: remexec::Directory,
-    multiple_globs: MultipleGlobs,
-    prefix: PathBuf,
-  ) -> Self {
-    let cur_dir_files: IndexMap<PathBuf, remexec::FileNode> = cur_dir
-      .files
-      .into_iter()
-      .map(|file_node| (PathBuf::from(file_node.name.clone()), file_node))
-      .collect();
-    let cur_dir_directories: IndexMap<PathBuf, remexec::DirectoryNode> = cur_dir
-      .directories
-      .into_iter()
-      .map(|directory_node| (PathBuf::from(directory_node.name.clone()), directory_node))
-      .collect();
-
-    let globbed_files: IndexMap<PathBuf, remexec::FileNode> = IndexMap::new();
-    let globbed_directories: IndexMap<PathBuf, remexec::DirectoryNode> = IndexMap::new();
-    let todo_directories: IndexMap<PathBuf, Vec<RestrictedPathGlob>> = IndexMap::new();
-
-    IntermediateGlobbedFilesAndDirectories {
-      globbed_files,
-      globbed_directories,
-      cur_dir_files,
-      cur_dir_directories,
-      todo_directories,
-      prefix,
-      multiple_globs,
-    }
-  }
-
-  async fn populate_globbed_files_and_directories(
-    self,
-  ) -> Result<GlobbedFilesAndDirectories, SnapshotOpsError> {
-    let IntermediateGlobbedFilesAndDirectories {
-      mut globbed_files,
-      mut globbed_directories,
-      // NB: When iterating over files, we can remove them from `cur_dir_files` after they are
-      // successfully matched once, hence the `mut` declaration. This is a small
-      // optimization. However, when iterating over directories, different DirWildcard instances
-      // within a single Vec<PathGlob> can result in having multiple different DirWildcard instances
-      // created after matching against a single directory node! So we do *not* mark
-      // `cur_dir_directories` as `mut`.
-      mut cur_dir_files,
-      cur_dir_directories,
-      mut todo_directories,
-      prefix,
-      multiple_globs: MultipleGlobs { include, exclude },
-    } = self;
-
-    // Populate globbed_{files,directories} by iterating over all the globs.
-    for path_glob in include.into_iter() {
-      let wildcard = match &path_glob {
-        RestrictedPathGlob::Wildcard { wildcard } => wildcard,
-        RestrictedPathGlob::DirWildcard { wildcard, .. } => wildcard,
-      };
-
-      // TODO(#12462): Remove allow once upstream resolves https://github.com/rust-lang/rust-clippy/issues/6066.
-      #[allow(clippy::needless_collect)]
-      let matching_files: Vec<PathBuf> = cur_dir_files
-        .keys()
-        .filter(|path| {
-          // NB: match just the current path component against the wildcard, but use the prefix
-          // when checking against the `exclude` patterns!
-          wildcard.matches_path(path) && !exclude.is_ignored_path(&prefix.join(path), false)
-        })
-        .cloned()
-        .collect();
-      for file_path in matching_files.into_iter() {
-        // NB: remove any matched files from `cur_dir_files`, so they are successfully matched
-        // against at most once.
-        let file_node = cur_dir_files.remove(&file_path).unwrap();
-        globbed_files.insert(file_path, file_node);
-      }
-
-      // TODO(#12462): Remove allow once upstream resolves https://github.com/rust-lang/rust-clippy/issues/6066.
-      #[allow(clippy::needless_collect)]
-      let matching_directories: Vec<PathBuf> = cur_dir_directories
-        .keys()
-        .filter(|path| {
-          // NB: match just the current path component against the wildcard, but use the prefix
-          // when checking against the `exclude` patterns!
-          wildcard.matches_path(path) && !exclude.is_ignored_path(&prefix.join(path), true)
-        })
-        .cloned()
-        .collect();
-      for directory_path in matching_directories.into_iter() {
-        // NB: do *not* remove the directory for `cur_dir_directories` after it is matched
-        // successfully once!
-        let directory_node = cur_dir_directories.get(&directory_path).unwrap();
-
-        // TODO(#9967): Figure out how to consume the existing glob matching logic that works on
-        // `Vfs` instances!
-        match &path_glob {
-          RestrictedPathGlob::Wildcard { wildcard } => {
-            // NB: We interpret globs such that the *only* way to have a glob match the contents of
-            // a whole directory is to end in '/**' or '/**/*'.
-
-            if exclude.maybe_is_parent_of_ignored_path(&directory_path) {
-              // Leave this directory in todo_directories, so we process ignore patterns correctly.
-              continue;
-            }
-
-            if *wildcard == *DOUBLE_STAR_GLOB {
-              globbed_directories.insert(directory_path, directory_node.clone());
-            } else if !globbed_directories.contains_key(&directory_path) {
-              // We know this matched a directory node, but not its contents. We produce an empty
-              // directory here. We avoid doing this if we have already globbed a full directory,
-              // since we take the union of all matched subglobs.
-              let mut empty_node = directory_node.clone();
-              empty_node.digest = Some(to_bazel_digest(EMPTY_DIGEST));
-              globbed_directories.insert(directory_path, empty_node);
-            };
-          }
-          RestrictedPathGlob::DirWildcard {
-            wildcard,
-            remainder,
-          } => {
-            let mut subdir_globs: Vec<RestrictedPathGlob> = vec![];
-            if (*wildcard == *DOUBLE_STAR_GLOB) || (*wildcard == *SINGLE_STAR_GLOB) {
-              // Here we short-circuit all cases which would swallow up a directory without
-              // subsetting it or needing to perform any further recursive work.
-              let is_short_circuit_pattern: bool = match &remainder[..] {
-                [] => true,
-                // NB: Very often, /**/* is seen ending zsh-style globs, which means the same as
-                // ending in /**. Because we want to *avoid* recursing and just use the subdirectory
-                // as-is for /**/* and /**, we `continue` here in both cases.
-                [single_glob] if *single_glob == *SINGLE_STAR_GLOB => true,
-                [double_glob] if *double_glob == *DOUBLE_STAR_GLOB => true,
-                [double_glob, single_glob]
-                  if *double_glob == *DOUBLE_STAR_GLOB && *single_glob == *SINGLE_STAR_GLOB =>
-                {
-                  true
-                }
-                _ => false,
-              };
-              if is_short_circuit_pattern
-                && !exclude.maybe_is_parent_of_ignored_path(&directory_path)
-              {
-                globbed_directories.insert(directory_path, directory_node.clone());
-                continue;
-              }
-              // In this case, there is a remainder glob which will be used to subset the contents
-              // of any subdirectories. We ensure ** is recursive by cloning the ** and all the
-              // remainder globs and pushing it to `subdir_globs` whenever we need to recurse into
-              // subdirectories.
-              let with_double_star = RestrictedPathGlob::DirWildcard {
-                wildcard: wildcard.clone(),
-                remainder: remainder.clone(),
-              };
-              subdir_globs.push(with_double_star);
-            } else {
-              assert_ne!(0, remainder.len());
-            }
-            match remainder.len() {
-              0 => (),
-              1 => {
-                let next_glob = RestrictedPathGlob::Wildcard {
-                  wildcard: remainder.get(0).unwrap().clone(),
-                };
-                subdir_globs.push(next_glob);
-              }
-              _ => {
-                let next_glob = RestrictedPathGlob::DirWildcard {
-                  wildcard: remainder.get(0).unwrap().clone(),
-                  remainder: remainder[1..].to_vec(),
-                };
-                subdir_globs.push(next_glob);
-              }
-            }
-            // Append to the existing globs, and collate at the end of this iteration.
-            let entry = todo_directories
-              .entry(directory_path)
-              .or_insert_with(Vec::new);
-            entry.extend(subdir_globs);
-          }
-        }
-      }
-    }
-
-    Ok(GlobbedFilesAndDirectories {
-      cur_dir_directories,
-      globbed_files,
-      globbed_directories,
-      todo_directories,
-      exclude,
-    })
-  }
-}
-
-async fn snapshot_glob_match<T: SnapshotOps + 'static>(
-  store: T,
-  digest: Digest,
-  path_globs: PreparedPathGlobs,
-) -> Result<Digest, SnapshotOpsError> {
-  // Split the globs into PathGlobs that can be incrementally matched against individual directory
-  // components.
-  let initial_match_context = UnexpandedSubdirectoryContext {
-    digest,
-    multiple_globs: path_globs.as_expandable_globs().into(),
-  };
-  let mut unexpanded_stack: IndexMap<PathBuf, UnexpandedSubdirectoryContext> =
-    [(PathBuf::new(), initial_match_context)]
-      .iter()
-      .map(|(a, b)| (a.clone(), b.clone()))
-      .collect();
-  let mut partially_expanded_stack: IndexMap<PathBuf, PartiallyExpandedDirectoryContext> =
-    IndexMap::new();
-
-  // 1. Determine all the digests we need to recurse through and modify in order to respect a glob
-  // which may match over multiple contiguous directory components.
-  while let Some((
-    prefix,
-    UnexpandedSubdirectoryContext {
-      digest,
-      multiple_globs,
-    },
-  )) = unexpanded_stack.pop()
-  {
-    // 1a. Extract a single level of directory structure from the digest.
-    let cur_dir = store
-      .load_directory(digest)
-      .await?
-      .ok_or_else(|| format!("directory digest {:?} was not found!", digest))?;
-
-    // 1b. Filter files and directories by globs.
-    let intermediate_globbed = IntermediateGlobbedFilesAndDirectories::from_cur_dir_and_globs(
-      cur_dir,
-      multiple_globs,
-      prefix.clone(),
-    );
-    let GlobbedFilesAndDirectories {
-      cur_dir_directories,
-      globbed_files,
-      globbed_directories,
-      todo_directories,
-      exclude,
-    } = intermediate_globbed
-      .populate_globbed_files_and_directories()
-      .await?;
-
-    // 1c. Push context structs that specify unexpanded directories onto `unexpanded_stack`.
-    let dependencies: Vec<PathBuf> = todo_directories
-      .keys()
-      .filter_map(|subdir_path| {
-        // If we ever encounter a directory *with* a remainder, we have to ensure that that
-        // directory is *not* in `globbed_directories`, which are *not* subsetted at all.
-        // NB: Because our goal is to *union* all of the includes, if a directory is in
-        // `globbed_directories`, we can skip processing it for subsetting here!
-        if globbed_directories.contains_key(subdir_path) {
-          None
-        } else {
-          Some(prefix.join(subdir_path))
-        }
-      })
-      .collect();
-
-    for (subdir_name, all_path_globs) in todo_directories.into_iter() {
-      let full_name = prefix.join(&subdir_name);
-      let bazel_digest = cur_dir_directories
-        .get(&subdir_name)
-        .unwrap()
-        .digest
-        .clone();
-      // TODO(tonic): Use require_digest here by figure out how to properly return the error.
-      let digest = require_digest(bazel_digest.as_ref())
-        .map_err(|msg| SnapshotOpsError::String(format!("Failed to parse digest: {}", msg)))?;
-      let multiple_globs = MultipleGlobs {
-        include: all_path_globs,
-        exclude: exclude.clone(),
-      };
-      unexpanded_stack.insert(
-        full_name,
-        UnexpandedSubdirectoryContext {
-          digest,
-          multiple_globs,
-        },
-      );
-    }
-
-    // 1d. Push a context struct onto `partially_expanded_stack` which has "dependencies" on all
-    // subdirectories to be globbed in `directory_promises`. IndexMap is backed by a vector and can
-    // act as a stack, so we can be sure that when we finally retrieve this context struct from the
-    // stack, we will have already globbed all of its subdirectories.
-    let partially_expanded_context = PartiallyExpandedDirectoryContext {
-      files: globbed_files.into_iter().map(|(_, node)| node).collect(),
-      known_directories: globbed_directories
-        .into_iter()
-        .map(|(_, node)| node)
-        .collect(),
-      directory_promises: dependencies,
-    };
-    partially_expanded_stack.insert(prefix, partially_expanded_context);
-  }
-
-  // 2. Zip back up the recursively subsetted directory protos.
-  let mut completed_digests: IndexMap<PathBuf, Digest> = IndexMap::new();
-  while let Some((
-    prefix,
-    PartiallyExpandedDirectoryContext {
-      files,
-      known_directories,
-      directory_promises,
-    },
-  )) = partially_expanded_stack.pop()
-  {
-    let completed_nodes: Vec<remexec::DirectoryNode> = directory_promises
-        .into_iter()
-        .map(|dependency| {
-          // NB: Note that all "dependencies" here are subdirectories that need to be globbed before
-          // their parent directory can be entered into the store.
-          let digest = completed_digests.get(&dependency).ok_or_else(|| {
-            format!(
-              "expected subdirectory to glob {:?} to be available from completed_digests {:?} -- internal error",
-              &dependency, &completed_digests
-            )
-          })?;
-          // NB: Get the name *relative* to the current directory.
-          let name = dependency.strip_prefix(prefix.clone()).map_err(|e| format!("{:?}", e))?;
-          let fixed_directory_node = remexec::DirectoryNode {
-            name: format!("{}", name.display()),
-            digest: Some(to_bazel_digest(*digest)),
-          };
-          Ok(fixed_directory_node)
-        })
-        .collect::<Result<Vec<remexec::DirectoryNode>, String>>()?;
-
-    // Create the new protobuf with the merged nodes.
-    let all_directories: Vec<remexec::DirectoryNode> = known_directories
-      .into_iter()
-      .chain(completed_nodes.into_iter())
-      .collect();
-    let final_directory = remexec::Directory {
-      files,
-      directories: all_directories,
-      ..remexec::Directory::default()
-    };
-    let digest = store.record_directory(&final_directory).await?;
-    completed_digests.insert(prefix, digest);
-  }
-
-  let final_digest = completed_digests.get(&PathBuf::new()).unwrap();
-  Ok(*final_digest)
-}
-
-///
 /// High-level operations to manipulate and merge `Digest`s.
 ///
 /// These methods take care to avoid redundant work when traversing Directory protos. Prefer to use
@@ -574,21 +179,15 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
   ///
   /// Given N Snapshots, returns a new Snapshot that merges them.
   ///
-  async fn merge(
-    &self,
-    digests: Vec<DirectoryDigest>,
-  ) -> Result<DirectoryDigest, SnapshotOpsError> {
-    merge_directories(self.clone(), digests).await.map_err(|e| {
-      let e: SnapshotOpsError = e.into();
-      e
-    })
+  async fn merge(&self, digests: Vec<DirectoryDigest>) -> Result<DirectoryDigest, String> {
+    merge_directories(self.clone(), digests).await
   }
 
   async fn add_prefix(
     &self,
     digest: DirectoryDigest,
     prefix: &RelativePath,
-  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+  ) -> Result<DirectoryDigest, String> {
     Ok(
       self
         .load_digest_trie(digest)
@@ -602,7 +201,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     &self,
     digest: DirectoryDigest,
     prefix: &RelativePath,
-  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+  ) -> Result<DirectoryDigest, String> {
     Ok(
       self
         .load_digest_trie(digest)
@@ -616,85 +215,25 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     &self,
     directory_digest: DirectoryDigest,
     params: SubsetParams,
-  ) -> Result<DirectoryDigest, SnapshotOpsError> {
-    // TODO: Port subset for #13112. For now, we just ensure that the directory is persisted so
-    // that we can load it while subsetting.
-    let input_digest = directory_digest.todo_as_digest();
-    let tree = self.load_digest_trie(directory_digest).await?;
-    let _ = self.record_digest_trie(tree).await?;
+  ) -> Result<DirectoryDigest, String> {
+    let input_tree = self.load_digest_trie(directory_digest.clone()).await?;
+    let path_stats = input_tree
+      .expand_globs(params.globs, None)
+      .await
+      .map_err(|err| format!("Error matching globs against {directory_digest:?}: {}", err))?;
 
-    let SubsetParams { globs } = params;
-    let output_digest = snapshot_glob_match(self.clone(), input_digest, globs).await?;
-    Ok(DirectoryDigest::todo_from_digest(output_digest))
+    let mut files = HashMap::new();
+    input_tree.walk(&mut |path, entry| match entry {
+      directory::Entry::File(f) => {
+        files.insert(path.to_owned(), f.digest());
+      }
+      directory::Entry::Directory(_) => (),
+    });
+
+    Ok(DigestTrie::from_path_stats(path_stats, &files)?.into())
   }
 
-  async fn create_empty_dir(
-    &self,
-    path: &RelativePath,
-  ) -> Result<DirectoryDigest, SnapshotOpsError> {
+  async fn create_empty_dir(&self, path: &RelativePath) -> Result<DirectoryDigest, String> {
     self.add_prefix(EMPTY_DIRECTORY_DIGEST.clone(), path).await
   }
-}
-
-struct PartiallyExpandedDirectoryContext {
-  pub files: Vec<remexec::FileNode>,
-  pub known_directories: Vec<remexec::DirectoryNode>,
-  pub directory_promises: Vec<PathBuf>,
-}
-
-#[derive(Clone, Debug)]
-enum RestrictedPathGlob {
-  Wildcard {
-    wildcard: Pattern,
-  },
-  DirWildcard {
-    wildcard: Pattern,
-    remainder: Vec<Pattern>,
-  },
-}
-
-impl From<PathGlob> for RestrictedPathGlob {
-  fn from(glob: PathGlob) -> Self {
-    match glob {
-      PathGlob::Wildcard { wildcard, .. } => RestrictedPathGlob::Wildcard { wildcard },
-      PathGlob::DirWildcard {
-        wildcard,
-        remainder,
-        ..
-      } => RestrictedPathGlob::DirWildcard {
-        wildcard,
-        remainder,
-      },
-    }
-  }
-}
-
-// TODO(tonic): Replace uses of this method with `.into` or equivalent.
-fn to_bazel_digest(digest: Digest) -> remexec::Digest {
-  remexec::Digest {
-    hash: digest.hash.to_hex(),
-    size_bytes: digest.size_bytes as i64,
-  }
-}
-
-#[derive(Clone)]
-struct MultipleGlobs {
-  pub include: Vec<RestrictedPathGlob>,
-  pub exclude: Arc<GitignoreStyleExcludes>,
-}
-
-impl From<ExpandablePathGlobs> for MultipleGlobs {
-  fn from(globs: ExpandablePathGlobs) -> Self {
-    let ExpandablePathGlobs { include, exclude } = globs;
-    MultipleGlobs {
-      include: include.into_iter().map(|x| x.into()).collect(),
-      exclude,
-    }
-  }
-}
-
-#[derive(Clone)]
-struct UnexpandedSubdirectoryContext {
-  pub digest: Digest,
-  pub multiple_globs: MultipleGlobs,
 }

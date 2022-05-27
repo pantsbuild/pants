@@ -28,12 +28,10 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::cmp::Reverse;
-use std::collections::hash_map::Entry;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::future::Future;
 use std::sync::atomic::{self, AtomicBool};
-use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -46,8 +44,11 @@ pub use log::Level;
 pub use metrics::{Metric, ObservationMetric};
 use parking_lot::Mutex;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
+use petgraph::visit::{VisitMap, Visitable};
 use rand::thread_rng;
 use rand::Rng;
+use smallvec::SmallVec;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task_local;
 
 mod metrics;
@@ -80,10 +81,152 @@ impl std::fmt::Display for SpanId {
   }
 }
 
-type RunningWorkunitGraph = StableDiGraph<SpanId, (), u32>;
+type ParentIds = SmallVec<[SpanId; 2]>;
+
+/// Stores the content of running workunits, and tombstones for workunits which have completed,
+/// but which still had children when they completed (in which case the stored Workunit will be
+/// None, making them effectively invisible aside from their SpanId, Level, and ParentIds).
+#[derive(Default)]
+struct RunningWorkunitGraph {
+  graph: StableDiGraph<SpanId, (), u32>,
+  entries: HashMap<SpanId, (NodeIndex<u32>, Level, Option<Workunit>)>,
+}
+
+impl RunningWorkunitGraph {
+  /// Get a reference to workunit for the given SpanId, if it is still running.
+  fn get(&self, span_id: SpanId) -> Option<&Workunit> {
+    self
+      .entries
+      .get(&span_id)
+      .and_then(|(_, _, workunit)| workunit.as_ref())
+  }
+
+  /// Add a running workunit to the graph.
+  fn add(&mut self, workunit: Workunit) {
+    let parent_ids = workunit.parent_ids.clone();
+    let child = self.graph.add_node(workunit.span_id);
+    self
+      .entries
+      .insert(workunit.span_id, (child, workunit.level, Some(workunit)));
+    for parent_id in parent_ids {
+      if let Some((parent, _, _)) = self.entries.get(&parent_id) {
+        self.graph.add_edge(*parent, child, ());
+      }
+    }
+  }
+
+  /// Complete a workunit, and remove it from the graph.
+  ///
+  /// We keep tombstone entries in the graph if they have children when they complete, in order
+  /// to allow workunits to complete out of order/asynchronously while still tracking parent
+  /// information.
+  fn complete(
+    &mut self,
+    span_id: SpanId,
+    new_metadata: Option<WorkunitMetadata>,
+    end_time: SystemTime,
+  ) -> Option<Workunit> {
+    match self.entries.entry(span_id) {
+      hash_map::Entry::Vacant(_) => {
+        log::warn!("No previously-started workunit found for id: {}", span_id);
+        None
+      }
+      hash_map::Entry::Occupied(mut entry) => {
+        // If the entry is not a tombstone, take the workunit (which will make it a tombstone).
+        let (node, _, workunit) = entry.get_mut();
+        let mut workunit = workunit.take()?;
+
+        workunit.parent_ids = self
+          .graph
+          .neighbors_directed(*node, petgraph::Direction::Incoming)
+          .map(|parent_node_id| self.graph[parent_node_id])
+          .collect();
+
+        // If the workunit does not have children, remove it from the graph: otherwise, the entry
+        // will be preserved as a tombstone.
+        if self
+          .graph
+          .neighbors_directed(*node, petgraph::Direction::Outgoing)
+          .next()
+          .is_none()
+        {
+          self.graph.remove_node(*node);
+          entry.remove();
+        }
+
+        match workunit.state {
+          WorkunitState::Completed { .. } => {
+            log::warn!("Workunit {} was already completed", span_id);
+          }
+          WorkunitState::Started { start_time, .. } => {
+            let time_span = TimeSpan::from_start_and_end_systemtime(&start_time, &end_time);
+            workunit.state = WorkunitState::Completed { time_span };
+          }
+        };
+        workunit.metadata = new_metadata;
+        Some(workunit)
+      }
+    }
+  }
+
+  /// Return the non-blocked leaves of the graph.
+  fn running_leaves(&self) -> impl Iterator<Item = SpanId> + '_ {
+    self
+      .graph
+      .externals(petgraph::Direction::Outgoing)
+      .map(|entry| self.graph[entry])
+      .flat_map(|span_id| self.get(span_id))
+      .filter_map(|workunit| {
+        if workunit.state.blocked() {
+          None
+        } else {
+          Some(workunit.span_id)
+        }
+      })
+  }
+
+  /// Find the first parents matching the given conditions.
+  ///
+  /// Once a parent has been matched (or considered to be terminal) then none of its parents will
+  /// be visited.
+  fn first_matched_parents(
+    &self,
+    span_ids: impl IntoIterator<Item = SpanId>,
+    is_visible: impl Fn(Level, Option<&Workunit>) -> bool,
+  ) -> HashSet<SpanId> {
+    let mut visited = self.graph.visit_map();
+    let mut to_visit = span_ids.into_iter().collect::<Vec<_>>();
+    let mut parent_ids = HashSet::new();
+    while let Some(current_span_id) = to_visit.pop() {
+      let (node, level, workunit) = if let Some(entry) = self.entries.get(&current_span_id) {
+        entry
+      } else {
+        continue;
+      };
+      if !visited.visit(*node) {
+        continue;
+      }
+
+      // Is the current workunit visible?
+      if is_visible(*level, workunit.as_ref()) {
+        parent_ids.insert(current_span_id);
+        continue;
+      }
+
+      // If not, try its parents.
+      to_visit.extend(
+        self
+          .graph
+          .neighbors_directed(*node, petgraph::Direction::Incoming)
+          .map(|parent_node_id| self.graph[parent_node_id]),
+      );
+    }
+    parent_ids
+  }
+}
 
 ///
-/// Workunits form a tree of running, blocked, and completed work, with parent ids propagated via
+/// Workunits form a DAG of running, blocked, and completed work, with parent ids propagated via
 /// thread-local state.
 ///
 /// While running (the Started state), a copy of a Workunit is generally kept on the stack by the
@@ -94,31 +237,47 @@ type RunningWorkunitGraph = StableDiGraph<SpanId, (), u32>;
 /// When the `in_workunit!` macro exits, the Workunit on the stack is completed by storing any
 /// local mutated values as the final value of the Workunit.
 ///
+/// NB: A Workunit which has too low a level for the WorkunitStore is called "disabled", but is
+/// still recorded (without any metadata). This is for a few reasons:
+///   1. It can be important to have accurate transitive parents when workunits are treated as a
+///      DAG (see #14680): otherwise, adding an additional parent to an existing workunit is
+///      tricky, because granularity is lost. For example: if `A -> B -> C` are workunits, and `B`
+///      is disabled, an attempt to add a new parent to `B` would not have a record of the
+///      relationship to `C`.
+///   2. When a workunit completes, it is able to adjust its level (if it errored, for example),
+///      and it is cleaner semantically to re-enable a disabled workunit when it completes than
+///      to special case the creation of a the workunit at that point.
+///
 #[derive(Clone, Debug)]
 pub struct Workunit {
-  pub name: String,
+  pub name: &'static str,
+  pub level: Level,
   pub span_id: SpanId,
-  pub parent_id: Option<SpanId>,
+  // When a workunit starts, it (optionally) has a single parent. But as it runs, it
+  // it may gain additional parents due to memoization.
+  // TODO: Not yet implemented: see https://github.com/pantsbuild/pants/issues/14680.
+  pub parent_ids: ParentIds,
   pub state: WorkunitState,
-  pub metadata: WorkunitMetadata,
+  pub metadata: Option<WorkunitMetadata>,
 }
 
 impl Workunit {
   fn log_workunit_state(&self, canceled: bool) {
-    if !log::log_enabled!(self.metadata.level) {
-      return;
-    }
+    let metadata = match self.metadata.as_ref() {
+      Some(metadata) if log::log_enabled!(self.level) => metadata,
+      _ => return,
+    };
+
     let state = match (&self.state, canceled) {
       (_, true) => "Canceled:",
       (WorkunitState::Started { .. }, _) => "Starting:",
       (WorkunitState::Completed { .. }, _) => "Completed:",
     };
 
-    let level = self.metadata.level;
-    let identifier = if let Some(ref s) = self.metadata.desc {
+    let identifier = if let Some(ref s) = metadata.desc {
       s.as_str()
     } else {
-      self.name.as_str()
+      self.name
     };
 
     /* This length calculation doesn't treat multi-byte unicode charcters identically
@@ -139,13 +298,13 @@ impl Workunit {
       identifier.to_string()
     };
 
-    let message = if let Some(ref s) = self.metadata.message {
+    let message = if let Some(ref s) = metadata.message {
       format!(" - {}", s)
     } else {
       "".to_string()
     };
 
-    log!(level, "{} {}{}", state, effective_identifier, message);
+    log!(self.level, "{} {}{}", state, effective_identifier, message);
   }
 }
 
@@ -161,13 +320,6 @@ pub enum WorkunitState {
 }
 
 impl WorkunitState {
-  fn completed(&self) -> bool {
-    match self {
-      WorkunitState::Completed { .. } => true,
-      WorkunitState::Started { .. } => false,
-    }
-  }
-
   fn blocked(&self) -> bool {
     match self {
       WorkunitState::Started { blocked, .. } => blocked.load(atomic::Ordering::Relaxed),
@@ -196,29 +348,14 @@ pub enum ArtifactOutput {
   Snapshot(Arc<dyn DirectoryDigest>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub message: Option<String>,
-  pub level: Level,
   pub stdout: Option<hashing::Digest>,
   pub stderr: Option<hashing::Digest>,
   pub artifacts: Vec<(String, ArtifactOutput)>,
   pub user_metadata: Vec<(String, UserMetadataItem)>,
-}
-
-impl Default for WorkunitMetadata {
-  fn default() -> WorkunitMetadata {
-    WorkunitMetadata {
-      level: Level::Info,
-      desc: None,
-      message: None,
-      stdout: None,
-      stderr: None,
-      artifacts: Vec::new(),
-      user_metadata: Vec::new(),
-    }
-  }
 }
 
 /// Abstract id for passing user metadata items around
@@ -229,271 +366,158 @@ pub enum UserMetadataItem {
   ImmediateString(String),
 }
 
+#[derive(Clone)]
 enum StoreMsg {
   Started(Workunit),
-  Completed(SpanId, Option<WorkunitMetadata>, SystemTime),
-  Canceled(SpanId),
+  Completed(SpanId, Level, Option<WorkunitMetadata>, SystemTime),
+  Canceled(SpanId, SystemTime),
 }
 
 #[derive(Clone)]
 pub struct WorkunitStore {
   log_starting_workunits: bool,
   max_level: Level,
-  streaming_workunit_data: StreamingWorkunitData,
-  heavy_hitters_data: HeavyHittersData,
+  senders: [UnboundedSender<StoreMsg>; 2],
+  streaming_workunit_data: Arc<Mutex<StreamingWorkunitData>>,
+  heavy_hitters_data: Arc<Mutex<HeavyHittersData>>,
   metrics_data: Arc<MetricsData>,
 }
 
-#[derive(Clone)]
 struct StreamingWorkunitData {
-  msg_rx: Arc<Mutex<Receiver<StoreMsg>>>,
-  msg_tx: Arc<Mutex<Sender<StoreMsg>>>,
-  workunit_records: Arc<Mutex<HashMap<SpanId, Workunit>>>,
+  receiver: UnboundedReceiver<StoreMsg>,
+  running_graph: RunningWorkunitGraph,
 }
 
 impl StreamingWorkunitData {
-  fn new() -> StreamingWorkunitData {
-    let (msg_tx, msg_rx) = channel();
+  fn new(receiver: UnboundedReceiver<StoreMsg>) -> StreamingWorkunitData {
     StreamingWorkunitData {
-      msg_tx: Arc::new(Mutex::new(msg_tx)),
-      msg_rx: Arc::new(Mutex::new(msg_rx)),
-      workunit_records: Arc::new(Mutex::new(HashMap::new())),
+      receiver,
+      running_graph: RunningWorkunitGraph::default(),
     }
   }
 
   pub fn latest_workunits(&mut self, max_verbosity: log::Level) -> (Vec<Workunit>, Vec<Workunit>) {
-    let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
-    let mut started_messages = vec![];
-    let mut completed_messages = vec![];
+    let should_emit = |level: Level, _: Option<&Workunit>| -> bool { level <= max_verbosity };
 
-    {
-      let receiver = self.msg_rx.lock();
-      while let Ok(msg) = receiver.try_recv() {
-        match msg {
-          StoreMsg::Started(started) => started_messages.push(started),
-          StoreMsg::Completed(span, metadata, time) => {
-            completed_messages.push((span, metadata, time))
+    let mut started_workunits = Vec::new();
+    let mut completed_workunits = Vec::new();
+    while let Ok(msg) = self.receiver.try_recv() {
+      match msg {
+        StoreMsg::Started(mut started) => {
+          self.running_graph.add(started.clone());
+
+          if should_emit(started.level, Some(&started)) {
+            started.parent_ids = self
+              .running_graph
+              .first_matched_parents(started.parent_ids, should_emit)
+              .into_iter()
+              .collect();
+            started_workunits.push(started);
           }
-          StoreMsg::Canceled(..) => (),
         }
-      }
-    }
-
-    let mut workunit_records = self.workunit_records.lock();
-    let mut started_workunits: Vec<Workunit> = vec![];
-    for mut started in started_messages.into_iter() {
-      let span_id = started.span_id;
-      workunit_records.insert(span_id, started.clone());
-
-      if should_emit(&started) {
-        started.parent_id =
-          first_matched_parent(&workunit_records, started.parent_id, |_| false, should_emit);
-        started_workunits.push(started);
-      }
-    }
-
-    let mut completed_workunits: Vec<Workunit> = vec![];
-    for (span_id, new_metadata, end_time) in completed_messages.into_iter() {
-      match workunit_records.entry(span_id) {
-        Entry::Vacant(_) => {
-          log::warn!("No previously-started workunit found for id: {}", span_id);
-          continue;
-        }
-        Entry::Occupied(o) => {
-          let (span_id, mut workunit) = o.remove_entry();
-          let time_span = match workunit.state {
-            WorkunitState::Completed { .. } => {
-              log::warn!("Workunit {} was already completed", span_id);
-              continue;
+        StoreMsg::Completed(span_id, level, new_metadata, end_time) => {
+          if let Some(mut workunit) = self.running_graph.complete(span_id, new_metadata, end_time) {
+            workunit.level = level;
+            if should_emit(level, Some(&workunit)) {
+              workunit.parent_ids = self
+                .running_graph
+                .first_matched_parents(workunit.parent_ids, should_emit)
+                .into_iter()
+                .collect();
+              completed_workunits.push(workunit);
             }
-            WorkunitState::Started { start_time, .. } => {
-              TimeSpan::from_start_and_end_systemtime(&start_time, &end_time)
-            }
-          };
-          let new_state = WorkunitState::Completed { time_span };
-          workunit.state = new_state;
-          if let Some(metadata) = new_metadata {
-            workunit.metadata = metadata;
-          }
-          workunit_records.insert(span_id, workunit.clone());
-
-          if should_emit(&workunit) {
-            workunit.parent_id = first_matched_parent(
-              &workunit_records,
-              workunit.parent_id,
-              |_| false,
-              should_emit,
-            );
-            completed_workunits.push(workunit);
           }
         }
+        StoreMsg::Canceled(..) => (),
       }
     }
+
     (started_workunits, completed_workunits)
   }
 }
 
-#[derive(Clone)]
 struct HeavyHittersData {
-  inner: Arc<Mutex<HeavyHittersInnerStore>>,
-  msg_tx: Arc<Mutex<Sender<StoreMsg>>>,
-  msg_rx: Arc<Mutex<Receiver<StoreMsg>>>,
+  receiver: UnboundedReceiver<StoreMsg>,
+  running_graph: RunningWorkunitGraph,
 }
 
 impl HeavyHittersData {
-  fn new() -> HeavyHittersData {
-    let (msg_tx, msg_rx) = channel();
+  fn new(receiver: UnboundedReceiver<StoreMsg>) -> HeavyHittersData {
     HeavyHittersData {
-      inner: Arc::new(Mutex::new(HeavyHittersInnerStore {
-        running_graph: RunningWorkunitGraph::new(),
-        span_id_to_graph: HashMap::new(),
-        workunit_records: HashMap::new(),
-      })),
-      msg_rx: Arc::new(Mutex::new(msg_rx)),
-      msg_tx: Arc::new(Mutex::new(msg_tx)),
+      receiver,
+      running_graph: RunningWorkunitGraph::default(),
     }
   }
 
-  fn add_started_workunit_to_store(started: Workunit, inner_store: &mut HeavyHittersInnerStore) {
-    let span_id = started.span_id;
-    let parent_id = started.parent_id;
-
-    inner_store.workunit_records.insert(span_id, started);
-
-    let child = inner_store.running_graph.add_node(span_id);
-    inner_store.span_id_to_graph.insert(span_id, child);
-    if let Some(parent_id) = parent_id {
-      if let Some(parent) = inner_store.span_id_to_graph.get(&parent_id) {
-        inner_store.running_graph.add_edge(*parent, child, ());
-      }
-    }
-  }
-
-  fn add_completed_workunit_to_store(
-    span_id: SpanId,
-    new_metadata: Option<WorkunitMetadata>,
-    end_time: SystemTime,
-    inner_store: &mut HeavyHittersInnerStore,
-  ) {
-    if let Some(node) = inner_store.span_id_to_graph.remove(&span_id) {
-      inner_store.running_graph.remove_node(node);
-    }
-
-    match inner_store.workunit_records.entry(span_id) {
-      Entry::Vacant(_) => {
-        log::warn!("No previously-started workunit found for id: {}", span_id);
-      }
-      Entry::Occupied(mut o) => {
-        let workunit = o.get_mut();
-        match workunit.state {
-          WorkunitState::Completed { .. } => {
-            log::warn!("Workunit {} was already completed", span_id);
-          }
-          WorkunitState::Started { start_time, .. } => {
-            let time_span = TimeSpan::from_start_and_end_systemtime(&start_time, &end_time);
-            workunit.state = WorkunitState::Completed { time_span };
-          }
-        };
-        if let Some(metadata) = new_metadata {
-          workunit.metadata = metadata;
-        }
-      }
-    }
-  }
-
-  fn refresh_store(&self) {
-    let mut inner = self.inner.lock();
-    let receiver = self.msg_rx.lock();
-    while let Ok(msg) = receiver.try_recv() {
+  fn refresh_store(&mut self) {
+    while let Ok(msg) = self.receiver.try_recv() {
       match msg {
-        StoreMsg::Started(started) => Self::add_started_workunit_to_store(started, &mut inner),
-        StoreMsg::Completed(span_id, new_metadata, time) => {
-          Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner)
+        StoreMsg::Started(started) => self.running_graph.add(started),
+        StoreMsg::Completed(span_id, _level, new_metadata, time) => {
+          let _ = self.running_graph.complete(span_id, new_metadata, time);
         }
-        StoreMsg::Canceled(span_id) => {
-          inner.workunit_records.remove(&span_id);
-          if let Some(node) = inner.span_id_to_graph.remove(&span_id) {
-            inner.running_graph.remove_node(node);
-          }
+        StoreMsg::Canceled(span_id, time) => {
+          let _ = self.running_graph.complete(span_id, None, time);
         }
       }
     }
   }
 
-  fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
+  fn heavy_hitters(&mut self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
     self.refresh_store();
 
-    let inner = self.inner.lock();
-
-    // Initialize the heap with the leaves of the running workunit graph, sorted oldest first.
-    let mut queue: BinaryHeap<(Reverse<SystemTime>, SpanId)> = inner
+    // Initialize the heap with the visible parents of the leaves of the running workunit graph,
+    // sorted oldest first.
+    let mut queue: BinaryHeap<(Reverse<SystemTime>, SpanId)> = self
       .running_graph
-      .externals(petgraph::Direction::Outgoing)
-      .map(|entry| inner.running_graph[entry])
-      .flat_map(|span_id: SpanId| {
-        let workunit: &Workunit = inner.workunit_records.get(&span_id)?;
-        match workunit.state {
-          WorkunitState::Started {
-            ref blocked,
-            start_time,
-            ..
-          } if !blocked.load(atomic::Ordering::Relaxed) => Some((Reverse(start_time), span_id)),
-          _ => None,
-        }
+      .first_matched_parents(self.running_graph.running_leaves(), Self::is_visible)
+      .into_iter()
+      .flat_map(|span_id| self.running_graph.get(span_id))
+      .filter_map(|workunit| match workunit.state {
+        WorkunitState::Started { start_time, .. } => Some((Reverse(start_time), workunit.span_id)),
+        _ => None,
       })
       .collect();
 
-    // Output the visible parents of the longest running leaves.
+    // Output the longest running visible parents.
     let mut res = HashMap::new();
-    while let Some((_dur, span_id)) = queue.pop() {
-      // If the leaf is visible or has a visible parent, emit it.
-      let parent_span_id = if let Some(span_id) = first_matched_parent(
-        &inner.workunit_records,
-        Some(span_id),
-        |wu| wu.state.completed(),
-        Self::is_visible,
-      ) {
-        span_id
-      } else {
-        continue;
-      };
-
-      let workunit = inner.workunit_records.get(&parent_span_id).unwrap();
-      if let Some(effective_name) = workunit.metadata.desc.as_ref() {
-        if let Some(start_time) = Self::start_time_for(workunit) {
-          res.insert(parent_span_id, (effective_name.to_string(), start_time));
-          if res.len() >= k {
-            break;
-          }
+    while let Some((Reverse(start_time), span_id)) = queue.pop() {
+      let workunit = self.running_graph.get(span_id).unwrap();
+      if let Some(effective_name) = workunit.metadata.as_ref().and_then(|m| m.desc.as_ref()) {
+        res.insert(workunit.span_id, (effective_name.to_string(), start_time));
+        if res.len() >= k {
+          break;
         }
       }
     }
     res
   }
 
-  fn straggling_workunits(&self, duration_threshold: Duration) -> Vec<(Duration, String)> {
+  fn straggling_workunits(&mut self, duration_threshold: Duration) -> Vec<(Duration, String)> {
     self.refresh_store();
     let now = SystemTime::now();
-    let inner = self.inner.lock();
 
-    let matching_visible_parents = inner
+    // Collect the visible parents of running (non-blocked) leaves of the graph which have been
+    // running for longer than the threshold.
+    let matching_visible_parents = self
       .running_graph
-      .externals(petgraph::Direction::Outgoing)
-      .map(|entry| inner.running_graph[entry])
-      .flat_map(|span_id: SpanId| inner.workunit_records.get(&span_id))
-      .filter_map(|workunit| match Self::duration_for(now, workunit) {
-        Some(duration) if !workunit.state.blocked() && duration >= duration_threshold => {
-          first_matched_parent(
-            &inner.workunit_records,
-            Some(workunit.span_id),
-            |wu| wu.state.completed(),
-            Self::is_visible,
-          )
-          .and_then(|span_id| inner.workunit_records.get(&span_id))
-          .and_then(|wu| wu.metadata.desc.as_ref())
-          .map(|desc| (desc.clone(), duration))
+      .first_matched_parents(self.running_graph.running_leaves(), Self::is_visible)
+      .into_iter()
+      .flat_map(|span_id| self.running_graph.get(span_id))
+      .filter_map(|workunit| {
+        let duration = Self::duration_for(now, workunit)?;
+        if duration >= duration_threshold {
+          Some((
+            workunit
+              .metadata
+              .as_ref()
+              .and_then(|m| m.desc.as_ref())?
+              .clone(),
+            duration,
+          ))
+        } else {
+          None
         }
-        _ => None,
       })
       .collect::<HashMap<_, _>>();
 
@@ -510,10 +534,12 @@ impl HeavyHittersData {
     stragglers
   }
 
-  fn is_visible(workunit: &Workunit) -> bool {
-    workunit.metadata.level <= Level::Debug
-      && workunit.metadata.desc.is_some()
-      && matches!(workunit.state, WorkunitState::Started { .. })
+  fn is_visible(level: Level, workunit: Option<&Workunit>) -> bool {
+    level <= Level::Debug
+      && workunit
+        .and_then(|wu| wu.metadata.as_ref())
+        .and_then(|m| m.desc.as_ref())
+        .is_some()
   }
 
   fn start_time_for(workunit: &Workunit) -> Option<SystemTime> {
@@ -528,49 +554,22 @@ impl HeavyHittersData {
   }
 }
 
-#[derive(Default)]
-pub struct HeavyHittersInnerStore {
-  running_graph: RunningWorkunitGraph,
-  span_id_to_graph: HashMap<SpanId, NodeIndex<u32>>,
-  workunit_records: HashMap<SpanId, Workunit>,
-}
-
-fn first_matched_parent(
-  workunit_records: &HashMap<SpanId, Workunit>,
-  mut span_id: Option<SpanId>,
-  is_terminal: impl Fn(&Workunit) -> bool,
-  is_visible: impl Fn(&Workunit) -> bool,
-) -> Option<SpanId> {
-  while let Some(current_span_id) = span_id {
-    let workunit = workunit_records.get(&current_span_id);
-
-    if let Some(workunit) = workunit {
-      // Should we continue visiting parents?
-      if is_terminal(workunit) {
-        break;
-      }
-
-      // Is the current workunit visible?
-      if is_visible(workunit) {
-        return Some(current_span_id);
-      }
-    }
-
-    // If not, try its parent.
-    span_id = workunit.and_then(|workunit| workunit.parent_id);
-  }
-  None
-}
-
 impl WorkunitStore {
   pub fn new(log_starting_workunits: bool, max_level: Level) -> WorkunitStore {
+    // NB: Although it would be nice not to have seperate allocations per consumer, it is
+    // difficult to use a channel like `tokio::sync::broadcast` due to that channel being bounded.
+    // Subscribers receive messages at very different rates, and adjusting the workunit level
+    // affects the total number of messages that might be queued at any given time.
+    let (sender1, receiver1) = mpsc::unbounded_channel();
+    let (sender2, receiver2) = mpsc::unbounded_channel();
     WorkunitStore {
       log_starting_workunits,
       max_level,
       // TODO: Create one `StreamingWorkunitData` per subscriber, and zero if no subscribers are
       // installed.
-      streaming_workunit_data: StreamingWorkunitData::new(),
-      heavy_hitters_data: HeavyHittersData::new(),
+      senders: [sender1, sender2],
+      streaming_workunit_data: Arc::new(Mutex::new(StreamingWorkunitData::new(receiver1))),
+      heavy_hitters_data: Arc::new(Mutex::new(HeavyHittersData::new(receiver2))),
       metrics_data: Arc::default(),
     }
   }
@@ -591,7 +590,10 @@ impl WorkunitStore {
   /// in ascending order by their duration.
   ///
   pub fn straggling_workunits(&self, threshold: Duration) -> Vec<(Duration, String)> {
-    self.heavy_hitters_data.straggling_workunits(threshold)
+    self
+      .heavy_hitters_data
+      .lock()
+      .straggling_workunits(threshold)
   }
 
   ///
@@ -599,20 +601,38 @@ impl WorkunitStore {
   /// first visible parents.
   ///
   pub fn heavy_hitters(&self, k: usize) -> HashMap<SpanId, (String, SystemTime)> {
-    self.heavy_hitters_data.heavy_hitters(k)
+    self.heavy_hitters_data.lock().heavy_hitters(k)
   }
 
-  fn start_workunit(
+  fn send(&self, msg: StoreMsg) {
+    let send_inner = |sender: &UnboundedSender<StoreMsg>, msg: StoreMsg| {
+      sender
+        .send(msg)
+        .unwrap_or_else(|_| panic!("Receivers are static, and should always be present."));
+    };
+    // Send clones to the first N-1 senders, and the owned value to the final sender.
+    for sender in &self.senders[0..self.senders.len() - 1] {
+      send_inner(sender, msg.clone());
+    }
+    send_inner(&self.senders[self.senders.len() - 1], msg);
+  }
+
+  ///
+  /// NB: Public for macro use. Use `in_workunit!` instead.
+  ///
+  pub fn _start_workunit(
     &self,
     span_id: SpanId,
-    name: String,
+    name: &'static str,
+    level: Level,
     parent_id: Option<SpanId>,
-    metadata: WorkunitMetadata,
+    metadata: Option<WorkunitMetadata>,
   ) -> Workunit {
     let started = Workunit {
       name,
+      level,
       span_id,
-      parent_id,
+      parent_ids: parent_id.into_iter().collect(),
       state: WorkunitState::Started {
         start_time: std::time::SystemTime::now(),
         blocked: Arc::new(AtomicBool::new(false)),
@@ -620,18 +640,7 @@ impl WorkunitStore {
       metadata,
     };
 
-    self
-      .heavy_hitters_data
-      .msg_tx
-      .lock()
-      .send(StoreMsg::Started(started.clone()))
-      .unwrap();
-    self
-      .streaming_workunit_data
-      .msg_tx
-      .lock()
-      .send(StoreMsg::Started(started.clone()))
-      .unwrap();
+    self.send(StoreMsg::Started(started.clone()));
 
     if self.log_starting_workunits {
       started.log_workunit_state(false)
@@ -640,34 +649,23 @@ impl WorkunitStore {
   }
 
   fn complete_workunit(&self, workunit: Workunit) {
-    let time = std::time::SystemTime::now();
-    self.complete_workunit_impl(workunit, time)
+    self.complete_workunit_impl(workunit, std::time::SystemTime::now())
   }
 
   fn cancel_workunit(&self, workunit: Workunit) {
     workunit.log_workunit_state(true);
-    self
-      .heavy_hitters_data
-      .msg_tx
-      .lock()
-      .send(StoreMsg::Canceled(workunit.span_id))
-      .unwrap();
+    self.send(StoreMsg::Canceled(
+      workunit.span_id,
+      std::time::SystemTime::now(),
+    ));
   }
 
   fn complete_workunit_impl(&self, mut workunit: Workunit, end_time: SystemTime) {
+    let level = workunit.level;
     let span_id = workunit.span_id;
-    let new_metadata = Some(workunit.metadata.clone());
+    let new_metadata = workunit.metadata.clone();
 
-    let tx = self.streaming_workunit_data.msg_tx.lock();
-    tx.send(StoreMsg::Completed(span_id, new_metadata.clone(), end_time))
-      .unwrap();
-
-    self
-      .heavy_hitters_data
-      .msg_tx
-      .lock()
-      .send(StoreMsg::Completed(span_id, new_metadata, end_time))
-      .unwrap();
+    self.send(StoreMsg::Completed(span_id, level, new_metadata, end_time));
 
     let start_time = match workunit.state {
       WorkunitState::Started { start_time, .. } => start_time,
@@ -684,7 +682,8 @@ impl WorkunitStore {
 
   pub fn add_completed_workunit(
     &self,
-    name: String,
+    name: &'static str,
+    level: Level,
     start_time: SystemTime,
     end_time: SystemTime,
     parent_id: Option<SpanId>,
@@ -694,33 +693,25 @@ impl WorkunitStore {
 
     let workunit = Workunit {
       name,
+      level,
       span_id,
-      parent_id,
+      parent_ids: parent_id.into_iter().collect(),
       state: WorkunitState::Started {
         start_time,
         blocked: Arc::new(AtomicBool::new(false)),
       },
-      metadata,
+      metadata: Some(metadata),
     };
 
-    self
-      .heavy_hitters_data
-      .msg_tx
-      .lock()
-      .send(StoreMsg::Started(workunit.clone()))
-      .unwrap();
-    self
-      .streaming_workunit_data
-      .msg_tx
-      .lock()
-      .send(StoreMsg::Started(workunit.clone()))
-      .unwrap();
-
+    self.send(StoreMsg::Started(workunit.clone()));
     self.complete_workunit_impl(workunit, end_time);
   }
 
-  pub fn latest_workunits(&mut self, max_verbosity: log::Level) -> (Vec<Workunit>, Vec<Workunit>) {
-    self.streaming_workunit_data.latest_workunits(max_verbosity)
+  pub fn latest_workunits(&self, max_verbosity: log::Level) -> (Vec<Workunit>, Vec<Workunit>) {
+    self
+      .streaming_workunit_data
+      .lock()
+      .latest_workunits(max_verbosity)
   }
 
   pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {
@@ -783,15 +774,11 @@ impl WorkunitStore {
   }
 
   pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
-    let store = WorkunitStore::new(false, Level::Debug);
+    let store = WorkunitStore::new(false, Level::Trace);
     store.init_thread_state(None);
-    let workunit = store.start_workunit(
-      SpanId(0),
-      "testing".to_owned(),
-      None,
-      WorkunitMetadata::default(),
-    );
-    (store.clone(), RunningWorkunit::new(store, Some(workunit)))
+    let workunit =
+      store._start_workunit(SpanId(0), "testing", Level::Info, None, Option::default());
+    (store.clone(), RunningWorkunit::new(store, workunit))
   }
 }
 
@@ -844,56 +831,49 @@ pub fn expect_workunit_store_handle() -> WorkunitStoreHandle {
   get_workunit_store_handle().expect("A WorkunitStore has not been set for this thread.")
 }
 
+/// Run the given async block. If the level given by the WorkunitMetadata is above a configured
+/// threshold, the block will run inside of a workunit recorded in the workunit store.
 ///
-/// NB: Public for macro usage: use the `in_workunit!` macro.
-///
-pub fn _start_workunit(
-  store_handle: &mut WorkunitStoreHandle,
-  name: String,
-  initial_metadata: WorkunitMetadata,
-) -> RunningWorkunit {
-  let span_id = SpanId::new();
-  let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
-  let workunit = store_handle
-    .store
-    .start_workunit(span_id, name, parent_id, initial_metadata);
-  RunningWorkunit::new(store_handle.store.clone(), Some(workunit))
-}
-
+/// NB: This macro may only be used on a thread with a WorkunitStore configured (via
+/// `WorkunitStore::init_thread_state`). Although it would be an option to silently ignore
+/// workunits recorded from other threads, that would usually represent a bug caused by failing to
+/// propagate state between threads.
 #[macro_export]
 macro_rules! in_workunit {
-  ($workunit_store: expr, $workunit_name: expr, $workunit_metadata: expr, |$workunit: ident| $f: expr $(,)?) => {{
-    // TODO: The workunit store argument is unused: remove in separate patch.
-    std::mem::drop($workunit_store);
-
+  ($workunit_name: expr, $workunit_level: expr $(, $workunit_field_name:ident = $workunit_field_value:expr)*, |$workunit: ident| $f: expr $(,)?) => {{
     use futures::future::FutureExt;
     let mut store_handle = $crate::expect_workunit_store_handle();
-    // TODO: Move Level out of the metadata to allow skipping construction if disabled.
-    let workunit_metadata = $workunit_metadata;
-    if store_handle.store.max_level() >= workunit_metadata.level {
-      let mut $workunit =
-        $crate::_start_workunit(&mut store_handle, $workunit_name, workunit_metadata);
-      $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
-        let result = {
-          let $workunit = &mut $workunit;
-          $f
-        }
-        .await;
-        $workunit.complete();
-        result
-      })
-      .boxed()
-    } else {
-      async move {
-        let mut $workunit = $crate::RunningWorkunit::new(store_handle.store, None);
-        {
-          let $workunit = &mut $workunit;
-          $f
-        }
-        .await
+    let level: log::Level  = $workunit_level;
+    let mut $workunit = {
+      let workunit_metadata =
+        if store_handle.store.max_level() >= level {
+          Some($crate::WorkunitMetadata {
+            $(
+                  $workunit_field_name: $workunit_field_value,
+            )*
+            ..Default::default()
+          })
+        } else {
+          None
+        };
+      let span_id = $crate::SpanId::new();
+      let parent_id = std::mem::replace(&mut store_handle.parent_id, Some(span_id));
+      let workunit =
+        store_handle
+          .store
+          ._start_workunit(span_id, $workunit_name, level, parent_id, workunit_metadata);
+      $crate::RunningWorkunit::new(store_handle.store.clone(), workunit)
+    };
+    $crate::scope_task_workunit_store_handle(Some(store_handle), async move {
+      let result = {
+        let $workunit = &mut $workunit;
+        $f
       }
-      .boxed()
-    }
+      .await;
+      $workunit.complete();
+      result
+    })
+    .boxed()
   }};
 }
 
@@ -903,20 +883,35 @@ pub struct RunningWorkunit {
 }
 
 impl RunningWorkunit {
-  pub fn new(store: WorkunitStore, workunit: Option<Workunit>) -> RunningWorkunit {
-    RunningWorkunit { store, workunit }
+  pub fn new(store: WorkunitStore, workunit: Workunit) -> RunningWorkunit {
+    RunningWorkunit {
+      store,
+      workunit: Some(workunit),
+    }
+  }
+
+  pub fn record_observation(&mut self, metric: ObservationMetric, value: u64) {
+    self.store.record_observation(metric, value);
   }
 
   pub fn increment_counter(&mut self, counter_name: Metric, change: u64) {
     self.store.increment_counter(counter_name, change);
   }
 
+  ///
+  /// If the workunit is enabled, receives its current metadata. If Some((metadata, level)) is
+  /// returned by the function, the workunit will complete as enabled if the new Level is high
+  /// enough to enable it.
+  ///
   pub fn update_metadata<F>(&mut self, f: F)
   where
-    F: FnOnce(WorkunitMetadata) -> WorkunitMetadata,
+    F: FnOnce(Option<(WorkunitMetadata, Level)>) -> Option<(WorkunitMetadata, Level)>,
   {
     if let Some(ref mut workunit) = self.workunit {
-      workunit.metadata = f(workunit.metadata.clone())
+      if let Some((metadata, level)) = f(workunit.metadata.clone().map(|m| (m, workunit.level))) {
+        workunit.level = level;
+        workunit.metadata = Some(metadata);
+      }
     }
   }
 

@@ -249,14 +249,25 @@ class Workspace(SideEffecting):
 
 
 @dataclass(frozen=True)
-class SpecsSnapshot:
+class SpecsPaths(Paths):
     """All files matched by command line specs.
 
     `@goal_rule`s may request this when they only need source files to operate and do not need any
     target information. This allows running on files with no owning targets.
     """
 
-    snapshot: Snapshot
+
+@dataclass(frozen=True)
+class SnapshotDiff:
+    our_unique_files: tuple[str, ...] = ()
+    our_unique_dirs: tuple[str, ...] = ()
+    their_unique_files: tuple[str, ...] = ()
+    their_unique_dirs: tuple[str, ...] = ()
+    changed_files: tuple[str, ...] = ()
+
+    @classmethod
+    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":
+        return cls(*ours._diff(theirs))
 
 
 def rules():

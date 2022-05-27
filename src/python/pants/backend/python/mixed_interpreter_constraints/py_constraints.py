@@ -15,8 +15,8 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
+    AllTargets,
     AllTargetsRequest,
-    AllUnexpandedTargets,
     RegisteredTargetTypes,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -24,6 +24,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.option_types import BoolOption
 from pants.util.docutil import bin_name
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +36,20 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
     summary = BoolOption(
         "--summary",
         default=False,
-        help=(
-            "Output a CSV summary of interpreter constraints for your whole repository. The "
-            "headers are `Target`, `Constraints`, `Transitive Constraints`, `# Dependencies`, "
-            "and `# Dependees`.\n\nThis information can be useful when prioritizing a "
-            "migration from one Python version to another (e.g. to Python 3). Use "
-            "`# Dependencies` and `# Dependees` to help prioritize which targets are easiest "
-            "to port (low # dependencies) and highest impact to port (high # dependees).\n\n"
-            "Use a tool like Pandas or Excel to process the CSV. Use the option "
-            "`--py-constraints-output-file=summary.csv` to write directly to a file."
+        help=softwrap(
+            """
+            Output a CSV summary of interpreter constraints for your whole repository. The
+            headers are `Target`, `Constraints`, `Transitive Constraints`, `# Dependencies`,
+            and `# Dependees`.
+
+            This information can be useful when prioritizing a migration from one Python version to
+            another (e.g. to Python 3). Use `# Dependencies` and `# Dependees` to help prioritize
+            which targets are easiest to port (low # dependencies) and highest impact to port
+            (high # dependees).
+
+            Use a tool like Pandas or Excel to process the CSV. Use the option
+            `--py-constraints-output-file=summary.csv` to write directly to a file.
+            """
         ),
     )
 
@@ -69,8 +75,7 @@ async def py_constraints(
             )
             return PyConstraintsGoal(exit_code=1)
 
-        # TODO: Stop including the target generator? I don't think it's relevant for this goal.
-        all_targets = await Get(AllUnexpandedTargets, AllTargetsRequest())
+        all_targets = await Get(AllTargets, AllTargetsRequest())
         all_python_targets = tuple(
             t for t in all_targets if t.has_field(InterpreterConstraintsField)
         )
