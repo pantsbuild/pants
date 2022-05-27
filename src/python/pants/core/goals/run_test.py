@@ -64,7 +64,9 @@ def single_target_run(
             run,
             rule_args=[
                 create_goal_subsystem(RunSubsystem, args=[], cleanup=True),
-                create_subsystem(GlobalOptions, pants_workdir=rule_runner.pants_workdir),
+                create_subsystem(
+                    GlobalOptions, pants_workdir=rule_runner.pants_workdir, process_cleanup=True
+                ),
                 workspace,
                 BuildRoot(),
                 rule_runner.environment,
