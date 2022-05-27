@@ -16,6 +16,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     UnversionedCoordinate,
     find_jvm_artifacts_or_raise,
 )
+from pants.jvm.dependency_inference.artifact_mapper import rules as artifact_mapper_rules
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.docutil import bin_name
@@ -103,5 +104,6 @@ class MissingProtobufJavaRuntimeInResolveError(ValueError):
 def rules():
     return (
         *collect_rules(),
+        *artifact_mapper_rules(),
         UnionRule(InjectDependenciesRequest, InjectProtobufJavaRuntimeDependencyRequest),
     )
