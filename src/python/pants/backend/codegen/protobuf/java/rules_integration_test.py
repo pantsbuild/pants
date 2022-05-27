@@ -16,7 +16,13 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
+from pants.jvm.dependency_inference import artifact_mapper
+from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
+from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
+from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+from pants.jvm.target_types import JvmArtifactTarget
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GRPC_PROTO_STANZA = """
@@ -41,18 +47,48 @@ message HelloReply {
 }
 """
 
+PROTOBUF_JAVA_RESOLVE = TestCoursierWrapper.new(
+    entries=(
+        CoursierLockfileEntry(
+            coord=Coordinate(
+                group="com.google.protobuf",
+                artifact="protobuf-java",
+                version="3.19.4",
+            ),
+            file_name="com.google.protobuf_protobuf-java_3.19.4.jar",
+            direct_dependencies=Coordinates([]),
+            dependencies=Coordinates([]),
+            file_digest=FileDigest(
+                "e8f524c2ad5965aae31b0527bf9d4e3bc19b0dfba8c05aef114fccc7f057c94d",
+                1681869,
+            ),
+        ),
+    ),
+).serialize(
+    [
+        ArtifactRequirement(
+            Coordinate(
+                group="com.google.protobuf",
+                artifact="protobuf-java",
+                version="3.19.4",
+            )
+        )
+    ]
+)
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *protobuf_rules(),
+            *artifact_mapper.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateJavaFromProtobufRequest]),
         ],
-        target_types=[ProtobufSourcesGeneratorTarget],
+        target_types=[ProtobufSourcesGeneratorTarget, JvmArtifactTarget],
     )
 
 
@@ -128,6 +164,18 @@ def test_generates_java(rule_runner: RuleRunner) -> None:
             ),
             "tests/protobuf/test_protos/BUILD": (
                 "protobuf_sources(dependencies=['src/protobuf/dir2'])"
+            ),
+            "3rdparty/jvm/default.lock": PROTOBUF_JAVA_RESOLVE,
+            "3rdparty/BUILD": dedent(
+                """\
+                    jvm_artifact(
+                        name="com.google.protobuf_protobuf-java_3.19.4",
+                        group="com.google.protobuf",
+                        artifact="protobuf-java",
+                        version="3.19.4",
+                        resolve="jvm-default",
+                    )
+                """
             ),
         }
     )
