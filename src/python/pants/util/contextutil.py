@@ -109,7 +109,10 @@ def temporary_dir(
     You may specify the following keyword args:
     :param root_dir: The parent directory to create the temporary directory.
     :param cleanup: Whether or not to clean up the temporary directory.
+    :param suffix: If not None the directory name will end with this suffix.
     :param permissions: If provided, sets the directory permissions to this mode.
+    :param prefix: If not None, the directory name will begin with this prefix,
+                   otherwise a default prefix is used.
     """
     path = tempfile.mkdtemp(dir=root_dir, suffix=suffix, prefix=prefix)
 

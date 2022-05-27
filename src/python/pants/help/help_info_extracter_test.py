@@ -1,5 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
@@ -528,8 +529,10 @@ def test_get_all_help_info():
 
     # Break down this colossal structure into pieces so it is easier to spot where the issue is.
     # Check keys equality first, then contents
-    assert list(expected_all_help_info_dict) == list(all_help_info_dict)
-    for (expected, actual) in zip(expected_all_help_info_dict.items(), all_help_info_dict.items()):
+    assert set(expected_all_help_info_dict) == set(all_help_info_dict)
+    for key in all_help_info_dict:
+        actual = all_help_info_dict[key]
+        expected = expected_all_help_info_dict[key]
         assert expected == actual
 
 
