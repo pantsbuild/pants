@@ -408,38 +408,6 @@ def test_get_all_help_info():
                 "deprecated": tuple(),
             },
         },
-        "rule_output_type_to_rule_infos": {
-            "Foo": (
-                {
-                    "description": None,
-                    "help": "A foo.",
-                    "input_gets": ("Get(ScopedOptions, Scope, ..)",),
-                    "input_types": (),
-                    "name": "construct_scope_foo",
-                    "output_desc": None,
-                    "output_type": "Foo",
-                    "provider": "help_info_extracter_test",
-                },
-            ),
-            "Target": (
-                {
-                    "description": None,
-                    "help": "This rule is for testing info extraction only.",
-                    "input_gets": (),
-                    "input_types": ("Foo",),
-                    "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
-                    "output_desc": (
-                        "A Target represents an addressable set of metadata.\n\n    Set the "
-                        "`help` class property with a description, which will be used in "
-                        "`./pants help`. For the\n    best rendering, use soft wrapping (e.g. "
-                        "implicit string concatenation) within paragraphs, but\n    hard wrapping "
-                        "(`\n`) to separate distinct paragraphs and/or lists.\n    "
-                    ),
-                    "output_type": "Target",
-                    "provider": "help_info_extracter_test",
-                },
-            ),
-        },
         "name_to_goal_info": {
             "bar": {
                 "name": "bar",
@@ -482,6 +450,26 @@ def test_get_all_help_info():
                     },
                 ),
             }
+        },
+        "name_to_rule_info": {
+            "construct_scope_foo": {
+                "description": None,
+                "documentation": "A foo.",
+                "input_gets": ("Get(ScopedOptions, Scope, ..)",),
+                "input_types": (),
+                "name": "construct_scope_foo",
+                "output_type": "Foo",
+                "provider": "help_info_extracter_test",
+            },
+            "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test": {
+                "description": None,
+                "documentation": "This rule is for testing info extraction only.",
+                "input_gets": (),
+                "input_types": ("Foo",),
+                "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                "output_type": "Target",
+                "provider": "help_info_extracter_test",
+            },
         },
     }
 
