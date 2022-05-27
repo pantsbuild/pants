@@ -558,20 +558,24 @@ def run_rule_with_mocks(
     """
 
     task_rule = getattr(rule, "rule", None)
-    if task_rule is None:
-        raise TypeError(f"Expected to receive a decorated `@rule`; got: {rule}")
+    rule_helper = getattr(rule, "rule_helper", None)
+    if task_rule is None and rule_helper is None:
+        raise TypeError(f"Expected to receive a decorated `@rule` or `@rule_helper`; got: {rule}")
 
-    if len(rule_args) != len(task_rule.input_selectors):
-        raise ValueError(
-            f"Rule expected to receive arguments of the form: {task_rule.input_selectors}; got: {rule_args}"
-        )
+    # Perform additional validation on `@rule` that the correct args are provided. We don't have
+    # an easy way to do this for `@rule_helper` yet.
+    if task_rule:
+        if len(rule_args) != len(task_rule.input_selectors):
+            raise ValueError(
+                f"Rule expected to receive arguments of the form: {task_rule.input_selectors}; got: {rule_args}"
+            )
 
-    if len(mock_gets) != len(task_rule.input_gets):
-        raise ValueError(
-            f"Rule expected to receive Get providers for:\n"
-            f"{pformat(task_rule.input_gets)}\ngot:\n"
-            f"{pformat(mock_gets)}"
-        )
+        if len(mock_gets) != len(task_rule.input_gets):
+            raise ValueError(
+                f"Rule expected to receive Get providers for:\n"
+                f"{pformat(task_rule.input_gets)}\ngot:\n"
+                f"{pformat(mock_gets)}"
+            )
 
     res = rule(*(rule_args or ()))
     if not isinstance(res, (CoroutineType, GeneratorType)):

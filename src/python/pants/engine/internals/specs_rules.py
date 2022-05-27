@@ -231,9 +231,13 @@ async def resolve_addresses_from_raw_specs(specs: RawSpecs) -> Addresses:
 
 @rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
 async def resolve_addresses_from_specs(specs: Specs) -> Addresses:
-    # TODO(#15539): handle ignores.
-    includes = await Get(Addresses, RawSpecs, specs.includes)
-    return includes
+    includes, ignores = await MultiGet(
+        Get(Addresses, RawSpecs, specs.includes),
+        Get(Addresses, RawSpecs, specs.ignores),
+    )
+    # No matter what, ignores win out over includes. This avoids "specificity wars" and keeps our
+    # semantics simple/predictable.
+    return Addresses(FrozenOrderedSet(includes) - FrozenOrderedSet(ignores))
 
 
 @rule
@@ -267,41 +271,58 @@ async def resolve_specs_paths(specs: Specs) -> SpecsPaths:
     All matched targets will use their `sources` field. Certain specs like FileLiteralSpec will
     also match against all their files, regardless of if a target owns them.
 
-    If a file is owned by a target that gets filtered out (e.g. via `--tag`), then we make sure
-    the file is not added back via filesystem specs, per
-    https://github.com/pantsbuild/pants/issues/15478.
+    Ignores win out over includes, with these edge cases:
+
+    * Ignored paths: the resolved paths should be excluded.
+    * Ignored targets: their `sources` should be excluded.
+    * File owned by a target that gets filtered out, e.g. via `--tag`. See
+      https://github.com/pantsbuild/pants/issues/15478.
     """
 
-    # TODO(#15539): switch this whole rule to consider ignores.
-    unfiltered_targets = await Get(
-        Targets, RawSpecs, dataclasses.replace(specs.includes, filter_by_global_options=False)
+    unfiltered_include_targets, ignore_targets, include_paths, ignore_paths = await MultiGet(
+        Get(Targets, RawSpecs, dataclasses.replace(specs.includes, filter_by_global_options=False)),
+        Get(Targets, RawSpecs, specs.ignores),
+        Get(Paths, PathGlobs, specs.includes.to_specs_paths_path_globs()),
+        Get(Paths, PathGlobs, specs.ignores.to_specs_paths_path_globs()),
     )
-    filtered_targets = await Get(FilteredTargets, Targets, unfiltered_targets)
-    all_sources_paths = await MultiGet(
+
+    filtered_include_targets = await Get(FilteredTargets, Targets, unfiltered_include_targets)
+    include_targets_sources_paths = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
-        for tgt in filtered_targets
+        for tgt in filtered_include_targets
+        if tgt.has_field(SourcesField)
+    )
+
+    ignore_targets_sources_paths = await MultiGet(
+        Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
+        for tgt in ignore_targets
         if tgt.has_field(SourcesField)
     )
 
     result_paths = OrderedSet(
-        itertools.chain.from_iterable(paths.files for paths in all_sources_paths)
+        itertools.chain.from_iterable(paths.files for paths in include_targets_sources_paths),
     )
+    result_paths.update(include_paths.files)
+    result_paths.difference_update(
+        itertools.chain.from_iterable(paths.files for paths in ignore_targets_sources_paths)
+    )
+    result_paths.difference_update(ignore_paths.files)
 
-    specs_snapshot_path_globs = specs.includes.to_specs_snapshot_path_globs()
-    if specs_snapshot_path_globs.globs:
-        target_less_paths = await Get(Paths, PathGlobs, specs_snapshot_path_globs)
-        result_paths.update(target_less_paths.files)
-
-        filtered_out_targets = FrozenOrderedSet(unfiltered_targets).difference(
-            FrozenOrderedSet(filtered_targets)
+    # If include paths were given, we need to also remove any paths from filtered out targets
+    # (e.g. via `--tag`), per https://github.com/pantsbuild/pants/issues/15478.
+    if include_paths.files:
+        filtered_out_include_targets = FrozenOrderedSet(unfiltered_include_targets).difference(
+            FrozenOrderedSet(filtered_include_targets)
         )
-        filtered_sources_paths = await MultiGet(
+        filtered_include_targets_sources_paths = await MultiGet(
             Get(SourcesPaths, SourcesPathsRequest(tgt[SourcesField]))
-            for tgt in filtered_out_targets
+            for tgt in filtered_out_include_targets
             if tgt.has_field(SourcesField)
         )
         result_paths.difference_update(
-            itertools.chain.from_iterable(paths.files for paths in filtered_sources_paths)
+            itertools.chain.from_iterable(
+                paths.files for paths in filtered_include_targets_sources_paths
+            )
         )
 
     dirs = OrderedSet(

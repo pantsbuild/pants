@@ -94,7 +94,7 @@ async def find_putative_targets(
 
     if python_setup.tailor_source_targets:
         # Find library/test/test_util targets.
-        all_py_files_globs: PathGlobs = req.path_globs("*.py")
+        all_py_files_globs: PathGlobs = req.path_globs("*.py", "*.pyi")
         all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
         unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
         classified_unowned_py_files = classify_source_files(unowned_py_files)
