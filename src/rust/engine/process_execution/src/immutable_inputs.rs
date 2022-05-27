@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use async_oncecell::OnceCell;
 use fs::{DirectoryDigest, Permissions, RelativePath};
-use futures::TryFutureExt;
 use hashing::Digest;
 use parking_lot::Mutex;
 use store::Store;
@@ -12,53 +11,12 @@ use tempfile::TempDir;
 
 use crate::WorkdirSymlink;
 
-async fn rename_readonly_directory(
-  src: impl AsRef<Path>,
-  dest: impl AsRef<Path>,
-  map_rename_err: impl Fn(std::io::Error) -> String,
-) -> Result<(), String> {
-  // If you try to rename a read-only directory (mode 0o555) under masOS you get permission
-  // denied; so we temporarily make the directory writeable by the current process in order to be
-  // able to rename it without error.
-  #[cfg(target_os = "macos")]
-  {
-    use std::os::unix::fs::PermissionsExt;
-    tokio::fs::set_permissions(&src, std::fs::Permissions::from_mode(0o755))
-      .map_err(|e| {
-        format!(
-          "Failed to prepare {src:?} perms for a rename to {dest:?}: {err}",
-          src = src.as_ref(),
-          dest = dest.as_ref(),
-          err = e
-        )
-      })
-      .await?;
-  }
-  tokio::fs::rename(&src, &dest)
-    .map_err(map_rename_err)
-    .await?;
-  #[cfg(target_os = "macos")]
-  {
-    use std::os::unix::fs::PermissionsExt;
-    tokio::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o555))
-      .map_err(|e| {
-        format!(
-          "Failed to seal {dest:?} as read-only: {err}",
-          dest = dest.as_ref(),
-          err = e
-        )
-      })
-      .await?;
-  }
-  Ok(())
-}
-
 /// Holds Digests materialized into a temporary directory, for symlinking into local sandboxes.
 pub struct ImmutableInputs {
   store: Store,
   // The TempDir that digests are materialized in.
   workdir: TempDir,
-  // A map from Digest to the location it has been materialized at. The DoubleCheckedCell allows
+  // A map from Digest to the location it has been materialized at. The OnceCell allows
   // for cooperation between threads attempting to create Digests.
   contents: Mutex<HashMap<Digest, Arc<OnceCell<PathBuf>>>>,
 }
@@ -85,6 +43,36 @@ impl ImmutableInputs {
   async fn path(&self, directory_digest: DirectoryDigest) -> Result<PathBuf, String> {
     let digest = directory_digest.as_digest();
     let cell = self.contents.lock().entry(digest).or_default().clone();
+
+    // We (might) need to initialize the value.
+    //
+    // Because this code executes a side-effect which could be observed elsewhere within this
+    // process (other threads can observe the contents of the temporary directory), we need to
+    // ensure that if this method is cancelled (via async Drop), whether the cell has been
+    // initialized or not stays in sync with whether the side-effect is visible.
+    //
+    // Making the initialization "cancellation safe", involves either:
+    //
+    //   1. Adding a Drop guard to "undo" the side-effect if we're dropped before we fully
+    //      initialize the cell.
+    //       * This is challenging to do correctly in this case, because the `Drop` guard cannot
+    //         be created until after initialization begins, but cannot be cleared until after the
+    //         cell has been initialized (i.e., after `get_or_try_init` returns).
+    //   2. Shielding ourselves from cancellation by `spawn`ing a new Task to guarantee that the
+    //      cell initialization always runs to completion.
+    //       * This would work, but would mean that we would finish initializing cells even when
+    //         work was cancelled. Cancellation usually means that the work is no longer necessary,
+    //         and so that could result in a lot of spurious IO (in e.g. warm cache cases which
+    //         never end up actually needing any inputs).
+    //       * An advanced variant of this approach would be to _pause_ work on materializing a
+    //         Digest when demand for it disappeared, and resume the work if another caller
+    //         requested that Digest.
+    //   3. Using anonymous destination paths, such that multiple attempts to initialize cannot
+    //      collide.
+    //       * This means that although the side-effect is visible, it can never collide.
+    //
+    // We take the final approach here currently (for simplicity's sake), but the advanced variant
+    // of approach 2 might eventually be worthwhile.
     let value = cell
       .get_or_try_init(async {
         let chroot = TempDir::new_in(self.workdir.path()).map_err(|e| {
@@ -94,55 +82,19 @@ impl ImmutableInputs {
             digest, e
           )
         })?;
+
+        let dest = chroot.path().join(digest.hash.to_hex());
         self
           .store
-          .materialize_directory(
-            chroot.path().to_path_buf(),
-            directory_digest,
-            Permissions::ReadOnly,
-          )
+          .materialize_directory(dest.clone(), directory_digest, Permissions::ReadOnly)
           .await?;
-        let src = chroot.into_path();
-        let dest = self.workdir.path().join(digest.hash.to_hex());
-        rename_readonly_directory(&src, &dest, |e| {
-          // TODO(John Sirois): This diagnostic is over the top and should be trimmed down once
-          //  we have confidence in the fix. We've had issues with permission denied errors in
-          //  the past though; so all this information is in here to root-cause the issue should
-          //  it persist.
-          let maybe_collision_metadata = std::fs::metadata(&dest);
-          let maybe_unwriteable_parent_metadata = dest
-            .parent()
-            .ok_or(format!(
-              "The destination directory for digest {:?} of {:?} has no parent dir.",
-              &digest, &dest
-            ))
-            .map(|p| std::fs::metadata(&p));
-          format!(
-            "Failed to move materialized immutable input for {digest:?} from {src:?} to \
-              {dest:?}: {err}\n\
-              Parent directory (un-writeable parent dir?) metadata: {parent_metadata:?}\n\
-              Destination directory (collision?) metadata: {existing_metadata:?}\n\
-              Current immutable check outs (~dup fingerprints / differing sizes?): {contents:?}
-              ",
-            digest = digest,
-            src = src,
-            dest = &dest,
-            // If the parent dir is un-writeable, which is unexpected, we will get permission
-            // denied on the rename.
-            parent_metadata = maybe_unwriteable_parent_metadata,
-            // If the destination directory already exists then we have a leaky locking regime or
-            // broken materialization failure cleanup.
-            existing_metadata = maybe_collision_metadata,
-            // Two digests that have different size_bytes but the same fingerprint is a bug in its
-            // own right, but would lead to making the same `digest_str` accessible via two
-            // different Digest keys here; so display all the keys and values to be able to spot
-            // this should it occur.
-            contents = self.contents.lock(),
-            err = e
-          )
-        })
-        .await?;
-        Ok::<_, String>(dest)
+
+        // Now that we've successfully initialized the destination, forget the TempDir so that it
+        // is not cleaned up.
+        let _ = chroot.into_path();
+
+        let res: Result<_, String> = Ok(dest);
+        res
       })
       .await?;
     Ok(value.clone())
