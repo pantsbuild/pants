@@ -54,7 +54,7 @@ class Target:
 
     @classmethod
     def from_data(cls, data: TargetData) -> Target:
-        json = data.to_json()
+        json = data.to_dict()
         address = json.pop("address")
         target_type = json.pop("target_type")
         fields = json
