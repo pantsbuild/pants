@@ -6,31 +6,16 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import json
-from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from itertools import chain
-from operator import attrgetter
-from typing import (
-    Any,
-    Callable,
-    DefaultDict,
-    Iterator,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
-    cast,
-    get_type_hints,
-)
+from typing import Any, Callable, Optional, Tuple, Type, Union, cast, get_type_hints
 
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
-from pants.engine.rules import Rule, TaskRule
+from pants.engine.rules import TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
-from pants.engine.unions import UnionMembership, UnionRule, is_union
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
@@ -297,88 +282,6 @@ class RuleInfo:
 
 
 @dataclass(frozen=True)
-class PluginAPITypeInfo:
-    """A container for help information for a plugin API type.
-
-    Plugin API types are used as input parameters and output results for rules.
-    """
-
-    name: str
-    module: str
-    documentation: str | None
-    provider: str
-    is_union: bool
-    union_type: str | None
-    union_members: tuple[str, ...]
-    dependencies: tuple[str, ...]
-    dependees: tuple[str, ...]
-    returned_by_rules: tuple[str, ...]
-    consumed_by_rules: tuple[str, ...]
-    used_in_rules: tuple[str, ...]
-
-    @classmethod
-    def create(
-        cls, api_type: type, rules: Sequence[Rule | UnionRule], **kwargs
-    ) -> PluginAPITypeInfo:
-        union_type: str | None = None
-        for rule in filter(cls._member_type_for(api_type), rules):
-            # All filtered rules out of `_member_type_for` will be `UnionRule`s.
-            union_type = cast(UnionRule, rule).union_base.__name__
-            break
-
-        task_rules = [rule for rule in rules if isinstance(rule, TaskRule)]
-
-        return cls(
-            name=api_type.__name__,
-            module=api_type.__module__,
-            documentation=maybe_cleandoc(api_type.__doc__),
-            is_union=is_union(api_type),
-            union_type=union_type,
-            consumed_by_rules=cls._all_rules(cls._rule_consumes(api_type), task_rules),
-            returned_by_rules=cls._all_rules(cls._rule_returns(api_type), task_rules),
-            used_in_rules=cls._all_rules(cls._rule_uses(api_type), task_rules),
-            **kwargs,
-        )
-
-    @staticmethod
-    def _all_rules(
-        satisfies: Callable[[TaskRule], bool], rules: Sequence[TaskRule]
-    ) -> tuple[str, ...]:
-        return tuple(sorted(rule.canonical_name for rule in filter(satisfies, rules)))
-
-    @staticmethod
-    def _rule_consumes(api_type: type) -> Callable[[TaskRule], bool]:
-        def satisfies(rule: TaskRule) -> bool:
-            return api_type in rule.input_selectors
-
-        return satisfies
-
-    @staticmethod
-    def _rule_returns(api_type: type) -> Callable[[TaskRule], bool]:
-        def satisfies(rule: TaskRule) -> bool:
-            return rule.output_type is api_type
-
-        return satisfies
-
-    @staticmethod
-    def _rule_uses(api_type: type) -> Callable[[TaskRule], bool]:
-        def satisfies(rule: TaskRule) -> bool:
-            return any(
-                api_type in (constraint.input_type, constraint.output_type)
-                for constraint in rule.input_gets
-            )
-
-        return satisfies
-
-    @staticmethod
-    def _member_type_for(api_type: type) -> Callable[[Rule | UnionRule], bool]:
-        def satisfies(rule: Rule | UnionRule) -> bool:
-            return isinstance(rule, UnionRule) and rule.union_member is api_type
-
-        return satisfies
-
-
-@dataclass(frozen=True)
 class AllHelpInfo:
     """All available help info."""
 
@@ -386,7 +289,6 @@ class AllHelpInfo:
     name_to_goal_info: LazyFrozenDict[str, GoalHelpInfo]
     name_to_target_type_info: LazyFrozenDict[str, TargetTypeHelpInfo]
     name_to_rule_info: LazyFrozenDict[str, RuleInfo]
-    name_to_api_type_info: LazyFrozenDict[str, PluginAPITypeInfo]
 
     def non_deprecated_option_scope_help_infos(self):
         for oshi in self.scope_to_help_info.values():
@@ -520,7 +422,6 @@ class HelpInfoExtracter:
             name_to_goal_info=name_to_goal_info,
             name_to_target_type_info=name_to_target_type_info,
             name_to_rule_info=cls.get_rule_infos(build_configuration),
-            name_to_api_type_info=cls.get_api_type_infos(build_configuration, union_membership),
         )
 
     @staticmethod
@@ -618,157 +519,6 @@ class HelpInfoExtracter:
                 rule.canonical_name: rule_info_loader(rule, cls.get_provider(providers))
                 for rule, providers in build_configuration.rule_to_providers.items()
                 if isinstance(rule, TaskRule)
-            }
-        )
-
-    @classmethod
-    def get_api_type_infos(
-        cls, build_configuration: BuildConfiguration | None, union_membership: UnionMembership
-    ) -> LazyFrozenDict[str, PluginAPITypeInfo]:
-        if build_configuration is None:
-            return LazyFrozenDict({})
-
-        # The type narrowing achieved with the above `if` does not extend to the created closures of
-        # the nested functions in this body, so instead we capture it in a new variable.
-        bc = build_configuration
-
-        known_providers = cast(
-            "set[str]",
-            set(
-                chain.from_iterable(
-                    chain.from_iterable(cast(dict, providers).values())
-                    for providers in (
-                        bc.subsystem_to_providers,
-                        bc.target_type_to_providers,
-                        bc.rule_to_providers,
-                        bc.union_rule_to_providers,
-                    )
-                )
-            ),
-        )
-
-        def _find_provider(api_type: type) -> str:
-            provider = api_type.__module__
-            while provider:
-                if provider in known_providers:
-                    return provider
-                if "." not in provider:
-                    break
-                provider = provider.rsplit(".", 1)[0]
-            # Unknown provider, depend directly on the type's module.
-            return api_type.__module__
-
-        def _rule_dependencies(rule: TaskRule) -> Iterator[type]:
-            yield from rule.input_selectors
-            for constraint in rule.input_gets:
-                yield constraint.output_type
-
-        def _extract_api_types() -> Iterator[tuple[type, str, tuple[type, ...]]]:
-            """Return all possible types we encounter in all known rules with provider and
-            dependencies."""
-            for rule, providers in bc.rule_to_providers.items():
-                if not isinstance(rule, TaskRule):
-                    continue
-                provider = cls.get_provider(providers)
-                yield rule.output_type, provider, tuple(_rule_dependencies(rule))
-
-                for constraint in rule.input_gets:
-                    yield constraint.input_type, _find_provider(constraint.input_type), ()
-
-            union_bases: set[type] = set()
-            for union_rule, providers in bc.union_rule_to_providers.items():
-                provider = cls.get_provider(providers)
-                union_bases.add(union_rule.union_base)
-                yield union_rule.union_member, provider, (union_rule.union_base,)
-
-            for union_base in union_bases:
-                yield union_base, _find_provider(union_base), ()
-
-        all_types_with_dependencies = list(_extract_api_types())
-        all_types = {api_type for api_type, _, _ in all_types_with_dependencies}
-        type_graph: DefaultDict[type, dict[str, tuple[str, ...]]] = defaultdict(dict)
-
-        # Calculate type graph.
-        for api_type in all_types:
-            # Collect all providers first, as we need them up-front for the dependencies/dependees.
-            type_graph[api_type]["providers"] = tuple(
-                sorted(
-                    {
-                        provider
-                        for a_type, provider, _ in all_types_with_dependencies
-                        if provider and a_type is api_type
-                    }
-                )
-            )
-
-        for api_type in all_types:
-            # Resolve type dependencies to providers.
-            type_graph[api_type]["dependencies"] = tuple(
-                sorted(
-                    set(
-                        chain.from_iterable(
-                            type_graph[dependency].setdefault(
-                                "providers", (_find_provider(dependency),)
-                            )
-                            for a_type, _, dependencies in all_types_with_dependencies
-                            if a_type is api_type
-                            for dependency in dependencies
-                        )
-                    )
-                    - set(
-                        # Exclude providers from list of dependencies.
-                        type_graph[api_type]["providers"]
-                    )
-                )
-            )
-
-        # Add a dependee on the target type for each dependency.
-        type_dependees: DefaultDict[type, set[str]] = defaultdict(set)
-        for _, provider, dependencies in all_types_with_dependencies:
-            if not provider:
-                continue
-            for target_type in dependencies:
-                type_dependees[target_type].add(provider)
-        for api_type, dependees in type_dependees.items():
-            type_graph[api_type]["dependees"] = tuple(
-                sorted(
-                    dependees
-                    - set(
-                        # Exclude providers from list of dependees.
-                        type_graph[api_type]["providers"][0]
-                    )
-                )
-            )
-
-        rules = cast(
-            "tuple[Rule | UnionRule]",
-            tuple(
-                chain(
-                    bc.rule_to_providers.keys(),
-                    bc.union_rule_to_providers.keys(),
-                )
-            ),
-        )
-
-        def get_api_type_info_loader(api_type: type) -> Callable[[], PluginAPITypeInfo]:
-            def load() -> PluginAPITypeInfo:
-                return PluginAPITypeInfo.create(
-                    api_type,
-                    rules,
-                    provider=", ".join(type_graph[api_type]["providers"]),
-                    dependencies=type_graph[api_type]["dependencies"],
-                    dependees=type_graph[api_type].get("dependees", ()),
-                    union_members=tuple(
-                        sorted(member.__name__ for member in union_membership.get(api_type))
-                    ),
-                )
-
-            return load
-
-        return LazyFrozenDict(
-            {
-                f"{api_type.__module__}.{api_type.__name__}": get_api_type_info_loader(api_type)
-                for api_type in sorted(all_types, key=attrgetter("__name__"))
             }
         )
 

@@ -470,60 +470,6 @@ def test_get_all_help_info():
                 "provider": "help_info_extracter_test",
             },
         },
-        "name_to_api_type_info": {
-            "pants.help.help_info_extracter_test.Foo": {
-                "consumed_by_rules": (
-                    "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
-                ),
-                "dependees": ("help_info_extracter_test",),
-                "dependencies": ("pants.option.scope",),
-                "documentation": None,
-                "is_union": False,
-                "module": "pants.help.help_info_extracter_test",
-                "name": "Foo",
-                "provider": "help_info_extracter_test",
-                "returned_by_rules": ("construct_scope_foo",),
-                "union_members": (),
-                "union_type": None,
-                "used_in_rules": (),
-            },
-            "pants.engine.target.Target": {
-                "consumed_by_rules": (),
-                "dependees": (),
-                "dependencies": (),
-                "documentation": (
-                    "A Target represents an addressable set of metadata.\n\n    Set the `help` "
-                    "class property with a description, which will be used in `./pants help`. For "
-                    "the\n    best rendering, use soft wrapping (e.g. implicit string concatenation"
-                    ") within paragraphs, but\n    hard wrapping (`\n`) to separate distinct "
-                    "paragraphs and/or lists.\n    "
-                ),
-                "is_union": False,
-                "module": "pants.engine.target",
-                "name": "Target",
-                "provider": "help_info_extracter_test",
-                "returned_by_rules": (
-                    "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
-                ),
-                "union_members": (),
-                "union_type": None,
-                "used_in_rules": (),
-            },
-            "pants.option.scope.Scope": {
-                "consumed_by_rules": (),
-                "dependees": (),
-                "dependencies": (),
-                "documentation": "An options scope.",
-                "is_union": False,
-                "module": "pants.option.scope",
-                "name": "Scope",
-                "provider": "pants.option.scope",
-                "returned_by_rules": (),
-                "union_members": (),
-                "union_type": None,
-                "used_in_rules": ("construct_scope_foo",),
-            },
-        },
     }
 
     # Break down this colossal structure into pieces so it is easier to spot where the issue is.
