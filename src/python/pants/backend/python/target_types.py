@@ -548,6 +548,25 @@ class PexIncludeToolsField(BoolField):
     )
 
 
+class RunInlineField(BoolField):
+    alias = "run_inline"
+    default = False
+    help = softwrap(
+        """
+        If true, runs of this target with the `run` goal will use the in-repo sources directly.
+        If false, the necessary first-party sources will be copied into a temporary chroot and
+        used from there.
+
+        The latter mode is more hermetic, and is closer to building and running a standalone binary.
+
+        The former mode may be necessary if the binary being run writes files into the repo and
+        computes their location relative to the executed files. Django's makemigrations command
+        is an example of such a process.  It may also have lower latency, since no files need
+        to be copied into a chroot.
+        """
+    )
+
+
 _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
@@ -564,6 +583,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexExecutionModeField,
     PexIncludeRequirementsField,
     PexIncludeToolsField,
+    RunInlineField,
     RestartableField,
 )
 

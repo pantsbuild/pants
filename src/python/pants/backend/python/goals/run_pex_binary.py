@@ -33,6 +33,7 @@ from pants.util.logging import LogLevel
 async def create_pex_binary_run_request(
     field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults, pex_env: PexEnvironment
 ) -> RunRequest:
+    run_inline = field_set.run_inline.value
     entry_point, transitive_targets = await MultiGet(
         Get(
             ResolvedPexEntryPoint,
@@ -85,16 +86,14 @@ async def create_pex_binary_run_request(
         ),
     )
 
-    merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                pex.digest,
-                local_dists.pex.digest,
-                local_dists.remaining_sources.source_files.snapshot.digest,
-            ]
-        ),
-    )
+    input_digests = [
+        pex.digest,
+        local_dists.pex.digest,
+    ]
+
+    if not run_inline:
+        input_digests.append(local_dists.remaining_sources.source_files.snapshot.digest)
+    merged_digest = await Get(Digest, MergeDigests(input_digests))
 
     def in_chroot(relpath: str) -> str:
         return os.path.join("{chroot}", relpath)
@@ -102,11 +101,13 @@ async def create_pex_binary_run_request(
     complete_pex_env = pex_env.in_workspace()
     args = complete_pex_env.create_argv(in_chroot(pex.name), python=pex.python)
 
-    chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
+    source_roots = (
+        sources.source_roots if run_inline else [in_chroot(sr) for sr in sources.source_roots]
+    )
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=pex.python is not None),
         "PEX_PATH": in_chroot(local_dists.pex.name),
-        "PEX_EXTRA_SYS_PATH": os.pathsep.join(chrooted_source_roots),
+        "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
 
     return RunRequest(digest=merged_digest, args=args, extra_env=extra_env)
