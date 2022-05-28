@@ -89,10 +89,14 @@ async def create_pex_binary_run_request(
     input_digests = [
         pex.digest,
         local_dists.pex.digest,
+        # Note regarding inline mode: You might think that the sources don't need to be copied
+        # into the chroot when using inline sources. But they do, because some of them might be
+        # codegenned, and those won't exist in the inline source tree. Rather than incurring the
+        # complexity of figuring out here which sources were codegenned, we copy everything.
+        # The inline source roots precede the chrooted ones in PEX_EXTRA_SYS_PATH, so the inline
+        # sources will take precedence and their copies in the chroot will be ignored.
+        local_dists.remaining_sources.source_files.snapshot.digest,
     ]
-
-    if not run_inline:
-        input_digests.append(local_dists.remaining_sources.source_files.snapshot.digest)
     merged_digest = await Get(Digest, MergeDigests(input_digests))
 
     def in_chroot(relpath: str) -> str:
@@ -101,9 +105,13 @@ async def create_pex_binary_run_request(
     complete_pex_env = pex_env.in_workspace()
     args = complete_pex_env.create_argv(in_chroot(pex.name), python=pex.python)
 
-    source_roots = (
-        sources.source_roots if run_inline else [in_chroot(sr) for sr in sources.source_roots]
-    )
+    chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
+    # The order here is important: we want the inline sources to take precedence over their
+    # copies in the chroot (see above for why those copies exist in inline mode).
+    source_roots = [
+        *(sources.source_roots if run_inline else []),
+        *chrooted_source_roots,
+    ]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=pex.python is not None),
         "PEX_PATH": in_chroot(local_dists.pex.name),

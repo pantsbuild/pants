@@ -41,7 +41,7 @@ def test_run_sample_script(
             """\
             import sys
             from utils.strutil import my_file
-
+            from codegen.hello_pb2 import Hi
 
             def main():
                 print("Hola, mundo.", file=sys.stderr)
@@ -70,12 +70,20 @@ def test_run_sample_script(
             """
         ),
         "src_root2/utils/BUILD": "python_sources()",
+        "src_root2/codegen/hello.proto": 'syntax = "proto3";\nmessage Hi {{}}',
+        "src_root2/codegen/BUILD": dedent(
+            """\
+            protobuf_sources()
+            python_requirement(name='protobuf', requirements=['protobuf'])
+            """
+        ),
     }
 
     def run(*extra_args: str, **extra_env: str) -> Tuple[PantsResult, str]:
         with setup_tmpdir(sources) as tmpdir:
             args = [
                 "--backend-packages=pants.backend.python",
+                "--backend-packages=pants.backend.codegen.protobuf.python",
                 f"--source-root-patterns=['/{tmpdir}/src_root1', '/{tmpdir}/src_root2']",
                 "--pants-ignore=__pycache__",
                 "--pants-ignore=/src/python",
