@@ -28,7 +28,6 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidFieldTypeException,
     InvalidGeneratedTargetException,
-    InvalidSequenceFieldChoiceException,
     InvalidTargetException,
     MultipleSourcesField,
     NestedDictStringToStringField,
@@ -795,9 +794,9 @@ def test_string_sequence_field_valid_choices() -> None:
     assert GivenStrings(None, addr).value is None
     assert GivenEnum(None, addr).value == ("kale",)
 
-    with pytest.raises(InvalidSequenceFieldChoiceException):
+    with pytest.raises(InvalidFieldChoiceException):
         GivenStrings(["carrot"], addr)
-    with pytest.raises(InvalidSequenceFieldChoiceException):
+    with pytest.raises(InvalidFieldChoiceException):
         GivenEnum(["carrot"], addr)
 
 

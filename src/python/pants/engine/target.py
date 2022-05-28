@@ -1502,23 +1502,8 @@ class InvalidFieldChoiceException(InvalidFieldException):
         valid_choices: Iterable[Any],
     ) -> None:
         super().__init__(
-            f"The {repr(field_alias)} field in target {address} must be one of "
-            f"{sorted(valid_choices)}, but was {repr(raw_value)}."
-        )
-
-
-class InvalidSequenceFieldChoiceException(InvalidFieldException):
-    def __init__(
-        self,
-        address: Address,
-        field_alias: str,
-        raw_value: Optional[Any],
-        *,
-        valid_choices: Iterable[Any],
-    ) -> None:
-        super().__init__(
-            f"Each item in the {repr(field_alias)} field in target {address} must be "
-            f"one of {sorted(valid_choices)}, but one item was {repr(raw_value)}."
+            f"Values for the {repr(field_alias)} field in target {address} must be one of "
+            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided."
         )
 
 
@@ -1750,7 +1735,7 @@ class StringSequenceField(SequenceField[str]):
             )
             for choice in value_or_default:
                 if choice not in valid_choices:
-                    raise InvalidSequenceFieldChoiceException(
+                    raise InvalidFieldChoiceException(
                         address, cls.alias, choice, valid_choices=valid_choices
                     )
         return value_or_default
