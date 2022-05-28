@@ -48,8 +48,8 @@ export default () => {
     <>
       <Stack direction="row" justifyContent="space-between">
         {!loading && !error && <Typography>Showing {show_targets.length} of {targets.length} targets</Typography>}
-        {loading && <Loading title="Loading targets data..." />}
-        {error && <Error title="Failed to load target data" error={error.toString()} />}
+        {loading && <Loading title="Loading targets..." />}
+        {error && <Error title="Failed to load targets" error={error.toString()} />}
         {!loading && <RefetchButton onClick={refetch} />}
       </Stack>
       <Masonry columns={masonry_columns} spacing={3}>

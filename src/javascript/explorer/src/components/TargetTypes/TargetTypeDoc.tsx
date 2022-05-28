@@ -5,7 +5,7 @@ import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
-import { TargetInfo, TargetFieldInfo } from "../../../lib/target-data/docs";
+import { TargetInfo, TargetFieldInfo } from "lib/target-data/docs";
 
 export const target_types_fields = [
   "alias",
@@ -20,11 +20,11 @@ export const target_types_fields = [
   "fields.default",
 ];
 
-type TargetFieldDocProps = CardProps & {
+type TargetTypeFieldDocProps = CardProps & {
   info: TargetFieldInfo;
 };
 
-export const TargetFieldDoc = ({ info, sx, ...props }: TargetFieldDocProps) => (
+export const TargetTypeFieldDoc = ({ info, sx, ...props }: TargetTypeFieldDocProps) => (
   <Card sx={{ mt: 2, mx: 3, ...sx }} {...props}>
     <CardContent>
       <Typography variant="h6"><code>{info.alias}</code>{info.required && " *"}</Typography>
@@ -35,11 +35,11 @@ export const TargetFieldDoc = ({ info, sx, ...props }: TargetFieldDocProps) => (
   </Card>
 );
 
-type TargetDocProps = {
+type TargetTypeDocProps = {
   info?: TargetInfo;
 };
 
-export const TargetDoc = ({ info }: TargetDocProps) => info ? (
+export const TargetTypeDoc = ({ info }: TargetTypeDocProps) => info ? (
   <>
     <Card>
       <CardContent>
@@ -50,9 +50,7 @@ export const TargetDoc = ({ info }: TargetDocProps) => info ? (
       </CardContent>
     </Card>
     {info.fields.map((field, index) => (
-      <TargetFieldDoc key={index} info={field} />
+      <TargetTypeFieldDoc key={index} info={field} />
     ))}
   </>
 ) : null;
-
-export default TargetDoc;

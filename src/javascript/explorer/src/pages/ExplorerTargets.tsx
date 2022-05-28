@@ -1,7 +1,7 @@
 import { Box, Grid, Typography } from '@mui/material';
 
-import Page from '../components/Page';
-import Targets from '../components/Targets';
+import Page from 'components/Page';
+import Targets from 'components/Targets';
 
 // ----------------------------------------------------------------------
 

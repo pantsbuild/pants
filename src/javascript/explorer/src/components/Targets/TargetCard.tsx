@@ -16,7 +16,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import IconButton, { IconButtonProps } from '@mui/material/IconButton';
 
 import ContextHelp from "components/ContextHelp";
-import { TargetTypeDocs } from "components/docs/Targets";
+import { TargetTypeDoc } from "components/TargetTypes";
 import { TargetData, getTargetFieldValue } from "lib/target-data";
 import TargetAddress from "components/TargetAddress";
 
@@ -98,7 +98,7 @@ export default ({target, ...props}: TargetProps) => {
                 <code>{target.targetType}</code> reference documenation
               </div>
             )}
-            help={<TargetTypeDocs alias={target.targetType} />}
+            help={<TargetTypeDoc alias={target.targetType} />}
           >
             <Typography color="text.secondary">
               {target.targetType}

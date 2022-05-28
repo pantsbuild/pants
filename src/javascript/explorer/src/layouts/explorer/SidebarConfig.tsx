@@ -1,7 +1,7 @@
 import HelpCenterIcon from '@mui/icons-material/HelpCenter';
 import HomeIcon from "@mui/icons-material/Home";
 import TargetIcon from '@mui/icons-material/LocationSearching';
-import { NavConfig } from "../../components/NavSection";
+import { NavConfig } from "components/NavSection";
 
 // ----------------------------------------------------------------------
 

@@ -1,8 +1,8 @@
 import { act, default as renderer, ReactTestRenderer } from 'react-test-renderer';
-import { TargetDoc } from './TargetDoc';
+import { TargetTypeDoc } from './TargetTypeDoc';
 
 
-test('TargetDoc renders help card.', async () => {
+test('TargetTypeDoc renders help card.', async () => {
   const info = {
     alias: 'target-type',
     provider: 'test',
@@ -31,7 +31,7 @@ test('TargetDoc renders help card.', async () => {
   let component
   await act(async () => {
     component = renderer.create(
-      <TargetDoc info={info} />
+      <TargetTypeDoc info={info} />
     );
   });
 

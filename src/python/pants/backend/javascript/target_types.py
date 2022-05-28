@@ -17,10 +17,12 @@ JS_FILE_EXTENSIONS = (".js",)
 
 class JSSourceField(SingleSourceField):
     expected_file_extensions = JS_FILE_EXTENSIONS
+    help = "dummy"
 
 
 class JSGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = JS_FILE_EXTENSIONS
+    help = "dummy"
 
 
 # -----------------------------------------------------------------------------------------------

@@ -5,7 +5,7 @@ import IconButton from '@mui/material/IconButton';
 import MuiDrawer, { DrawerProps as MuiDrawerProps } from '@mui/material/Drawer';
 import Toolbar from '@mui/material/Toolbar';
 
-import NavSection from '../../components/NavSection';
+import NavSection from 'components/NavSection';
 import sidebarConfig from './SidebarConfig';
 
 // ----------------------------------------------------------------------

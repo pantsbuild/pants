@@ -20,18 +20,18 @@ import ListItemText from '@mui/material/ListItemText';
 import ListSubheader from '@mui/material/ListSubheader';
 import Skeleton from '@mui/material/Skeleton';
 
-import { useTargetTypes } from "../../../lib/target-data/docs";
-import Loading from "../../Loading";
-import Error from "../../Error";
-
-import { TargetDoc, target_types_fields } from './TargetDoc';
+import Error from "components/Error";
+import Loading from "components/Loading";
+import { useTargetTypes } from "lib/target-data/docs";
+import { TargetTypeDoc as DocCard, target_types_fields } from './TargetTypeDoc';
 
 
 type TargetTypeDocsProps = {
   alias: string;
 };
 
-export const TargetTypeDocs = ({ alias }: TargetTypeDocsProps) => {
+/// Render documentation card for a target type.
+export const TargetTypeDoc = ({ alias }: TargetTypeDocsProps) => {
   const query = {alias, limit: 1};
   const [targetTypes, loading, error] = useTargetTypes({ query: {query}, fields: target_types_fields });
   if (loading) {
@@ -43,15 +43,15 @@ export const TargetTypeDocs = ({ alias }: TargetTypeDocsProps) => {
 
   if (targetTypes.length > 0) {
     return (
-      <TargetDoc info={targetTypes[0]} />
+      <DocCard info={targetTypes[0]} />
     );
   }
 
   return <Error title="Documentation not found" error={`Searched for "${alias}" but came up empty.`} />;
 };
 
-
-export const TargetTypes = () => {
+/// Render a list of all target types, show documentation card for selected list item.
+export const TargetTypeDocsList = () => {
   const [selected, setSelected] = useState(-1);
   const [targetTypes, loading, error] = useTargetTypes({ fields: target_types_fields });
 
@@ -86,13 +86,10 @@ export const TargetTypes = () => {
         </Grid>
         <Grid item xs={12} sm={6} lg={10}>
           <List sx={scrollStyle}>
-            {selected >= 0 && selected < targetTypes.length && <TargetDoc info={targetTypes[selected]} />}
+            {selected >= 0 && selected < targetTypes.length && <DocCard info={targetTypes[selected]} />}
           </List>
         </Grid>
       </Grid>
     </>
   );
 };
-
-
-export default TargetTypes;
