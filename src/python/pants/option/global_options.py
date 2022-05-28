@@ -505,6 +505,25 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
 
 
+class LogLevelOption(EnumOption[LogLevel, LogLevel]):
+    """The `--level` option.
+
+    This is a dedicated class because it's the only option where we allow both the short flag `-l`
+    and the long flag `--level`.
+    """
+
+    def __new__(cls) -> LogLevelOption:
+        self = super().__new__(
+            cls,  # type: ignore[arg-type]
+            "--level",
+            default=LogLevel.INFO,
+            daemon=True,
+            help="Set the logging level.",
+        )
+        self._flag_names = ("-l", "--level")
+        return self  # type: ignore[return-value]
+
+
 class BootstrapOptions:
     """The set of options necessary to create a Scheduler.
 
@@ -548,13 +567,7 @@ class BootstrapOptions:
         default=False,
         help="Re-resolve plugins, even if previously resolved.",
     )
-    level = EnumOption(
-        "-l",
-        "--level",
-        default=LogLevel.INFO,
-        daemon=True,
-        help="Set the logging level.",
-    )
+    level = LogLevelOption()
     show_log_target = BoolOption(
         "--show-log-target",
         default=False,
@@ -611,6 +624,7 @@ class BootstrapOptions:
         "--pants-version",
         advanced=True,
         default=pants_version(),
+        default_help_repr="<pants_version>",
         daemon=True,
         help=softwrap(
             f"""
@@ -777,7 +791,6 @@ class BootstrapOptions:
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
     logdir = StrOption(
-        "-d",
         "--logdir",
         advanced=True,
         default=None,
@@ -1035,6 +1048,7 @@ class BootstrapOptions:
             """
         ),
         default=tempfile.gettempdir(),
+        default_help_repr="<tmp_dir>",
     )
     local_cache = BoolOption(
         "--local-cache",
@@ -1287,6 +1301,9 @@ class BootstrapOptions:
             See `--remote-execution-headers` as well.
             """
         ),
+        default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_store_headers).replace(
+            VERSION, "<pants_version>"
+        ),
     )
     remote_store_chunk_bytes = IntOption(
         "--remote-store-chunk-bytes",
@@ -1394,6 +1411,9 @@ class BootstrapOptions:
 
             See `--remote-store-headers` as well.
             """
+        ),
+        default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_execution_headers).replace(
+            VERSION, "<pants_version>"
         ),
     )
     remote_execution_overall_deadline_secs = IntOption(
@@ -1633,6 +1653,30 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
         advanced=True,
+    )
+
+    use_deprecated_directory_cli_args_semantics = BoolOption(
+        "--use-deprecated-directory-cli-args-semantics",
+        default=True,
+        help=softwrap(
+            f"""
+            If true, Pants will use the old, deprecated semantics for directory arguments like
+            `{bin_name()} test dir`: directories are shorthand for the target `dir:dir`, i.e. the
+            target that leaves off `name=`.
+
+            If false, Pants will use the new semantics: directory arguments will match all files
+            and targets in the directory, e.g. `{bin_name()} test dir` will run all tests in `dir`.
+
+            The new semantics will become the default in Pants 2.14, and the old semantics will be
+            removed in 2.15.
+
+            This also impacts the behavior of the `tailor` goal. If this option is true,
+            `{bin_name()} tailor` without additional arguments will run over the whole project, and
+            `{bin_name()} tailor dir` will run over `dir` and all recursive sub-directories. If
+            false, you must specify arguments, like `{bin_name()} tailor ::` to run over the
+            whole project; specifying a directory will only add targets for that directory.
+            """
+        ),
     )
 
     @classmethod

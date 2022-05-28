@@ -11,6 +11,14 @@ import pytest
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
+from pants.backend.python.util_rules.pex_requirements import (
+    LoadedLockfile,
+    LoadedLockfileRequest,
+    Lockfile,
+)
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.goals.update_build_files import (
     FormatWithBlackRequest,
     FormatWithYapfRequest,
@@ -22,6 +30,7 @@ from pants.core.goals.update_build_files import (
     RewrittenBuildFileRequest,
     UpdateBuildFilesGoal,
     UpdateBuildFilesSubsystem,
+    _find_python_interpreter_constraints_from_lockfile,
     determine_renamed_field_types,
     format_build_file_with_black,
     format_build_file_with_yapf,
@@ -29,11 +38,15 @@ from pants.core.goals.update_build_files import (
     maybe_rename_deprecated_targets,
     update_build_files,
 )
+from pants.core.target_types import GenericTarget
 from pants.core.util_rules import config_files
+from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
+from pants.option.ranked_value import Rank, RankedValue
+from pants.testutil.option_util import create_subsystem
+from pants.testutil.rule_runner import GoalRuleResult, MockGet, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
 # ------------------------------------------------------------------------------------------
@@ -52,7 +65,7 @@ class MockRewriteReverseLines(RewrittenBuildFileRequest):
 @rule
 def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
     return RewrittenBuildFile(
-        request.path, (*request.lines, "added line"), change_descriptions=("Add a new line",)
+        request.path, (*request.lines, "# added line"), change_descriptions=("Add a new line",)
     )
 
 
@@ -79,8 +92,8 @@ def generic_goal_rule_runner() -> RuleRunner:
 
 def test_goal_rewrite_mode(generic_goal_rule_runner: RuleRunner) -> None:
     """Checks that we correctly write the changes and pipe fixers to each other."""
-    generic_goal_rule_runner.write_files({"BUILD": "line\n", "dir/BUILD": "line 1\nline 2\n"})
-    result = generic_goal_rule_runner.run_goal_rule(UpdateBuildFilesGoal)
+    generic_goal_rule_runner.write_files({"BUILD": "# line\n", "dir/BUILD": "# line 1\n# line 2\n"})
+    result = generic_goal_rule_runner.run_goal_rule(UpdateBuildFilesGoal, args=["::"])
     assert result.exit_code == 0
     assert result.stdout == dedent(
         """\
@@ -92,18 +105,22 @@ def test_goal_rewrite_mode(generic_goal_rule_runner: RuleRunner) -> None:
           - Reverse lines
         """
     )
-    assert Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "added line\nline\n"
+    assert (
+        Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "# added line\n# line\n"
+    )
     assert (
         Path(generic_goal_rule_runner.build_root, "dir/BUILD").read_text()
-        == "added line\nline 2\nline 1\n"
+        == "# added line\n# line 2\n# line 1\n"
     )
 
 
 def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
     """Checks that we correctly set the exit code and pipe fixers to each other."""
-    generic_goal_rule_runner.write_files({"BUILD": "line\n", "dir/BUILD": "line 1\nline 2\n"})
+    generic_goal_rule_runner.write_files({"BUILD": "# line\n", "dir/BUILD": "# line 1\n# line 2\n"})
     result = generic_goal_rule_runner.run_goal_rule(
-        UpdateBuildFilesGoal, global_args=["--pants-bin-name=./custom_pants"], args=["--check"]
+        UpdateBuildFilesGoal,
+        global_args=["--pants-bin-name=./custom_pants"],
+        args=["--check", "::"],
     )
     assert result.exit_code == 1
     assert result.stdout == dedent(
@@ -118,8 +135,61 @@ def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
         To fix `update-build-files` failures, run `./custom_pants update-build-files`.
         """
     )
-    assert Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "line\n"
-    assert Path(generic_goal_rule_runner.build_root, "dir/BUILD").read_text() == "line 1\nline 2\n"
+    assert Path(generic_goal_rule_runner.build_root, "BUILD").read_text() == "# line\n"
+    assert (
+        Path(generic_goal_rule_runner.build_root, "dir/BUILD").read_text() == "# line 1\n# line 2\n"
+    )
+
+
+def test_find_python_interpreter_constraints_from_lockfile() -> None:
+    def assert_ics(
+        lockfile: str,
+        expected: list[str],
+        *,
+        ics: RankedValue = RankedValue(Rank.HARDCODED, Black.default_interpreter_constraints),
+        metadata: PythonLockfileMetadata
+        | None = PythonLockfileMetadata.new(InterpreterConstraints(["==2.7.*"]), set()),
+    ) -> None:
+        black = create_subsystem(
+            Black,
+            lockfile=lockfile,
+            interpreter_constraints=ics,
+            version="v",
+            extra_requirements=[],
+        )
+        loaded_lock = LoadedLockfile(
+            EMPTY_DIGEST,
+            "black.lock",
+            metadata=metadata,
+            requirement_estimate=1,
+            is_pex_native=True,
+            constraints_strings=None,
+            original_lockfile=Lockfile(
+                "black.lock", file_path_description_of_origin="foo", resolve_name="black"
+            ),
+        )
+        result = run_rule_with_mocks(
+            _find_python_interpreter_constraints_from_lockfile,
+            rule_args=[black],
+            mock_gets=[
+                MockGet(
+                    output_type=LoadedLockfile,
+                    input_type=LoadedLockfileRequest,
+                    mock=lambda _: loaded_lock,
+                )
+            ],
+        )
+        assert result == InterpreterConstraints(expected)
+
+    # If ICs are set by user, always use those.
+    for lockfile in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE, "black.lock"):
+        assert_ics(lockfile, ["==3.8.*"], ics=RankedValue(Rank.CONFIG, ["==3.8.*"]))
+
+    assert_ics(NO_TOOL_LOCKFILE, Black.default_interpreter_constraints)
+    assert_ics(DEFAULT_TOOL_LOCKFILE, Black.default_interpreter_constraints)
+
+    assert_ics("black.lock", ["==2.7.*"])
+    assert_ics("black.lock", Black.default_interpreter_constraints, metadata=None)
 
 
 # ------------------------------------------------------------------------------------------
@@ -141,13 +211,16 @@ def black_rule_runner() -> RuleRunner:
             SubsystemRule(Black),
             SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, FormatWithBlackRequest),
-        )
+        ),
+        target_types=[GenericTarget],
     )
 
 
 def test_black_fixer_fixes(black_rule_runner: RuleRunner) -> None:
-    black_rule_runner.write_files({"BUILD": "tgt( name =  't' )"})
-    result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+    black_rule_runner.write_files({"BUILD": "target( name =  't' )"})
+    result = black_rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal, args=["::"], env_inherit=BLACK_ENV_INHERIT
+    )
     assert result.exit_code == 0
     assert result.stdout == dedent(
         """\
@@ -155,37 +228,42 @@ def test_black_fixer_fixes(black_rule_runner: RuleRunner) -> None:
           - Format with Black
         """
     )
-    assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
+    assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'target(name="t")\n'
 
 
 def test_black_fixer_noops(black_rule_runner: RuleRunner) -> None:
-    black_rule_runner.write_files({"BUILD": 'tgt(name="t")\n'})
-    result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+    black_rule_runner.write_files({"BUILD": 'target(name="t")\n'})
+    result = black_rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal, args=["::"], env_inherit=BLACK_ENV_INHERIT
+    )
     assert result.exit_code == 0
-    assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'tgt(name="t")\n'
+    assert Path(black_rule_runner.build_root, "BUILD").read_text() == 'target(name="t")\n'
 
 
 def test_black_fixer_args(black_rule_runner: RuleRunner) -> None:
-    black_rule_runner.write_files({"BUILD": "tgt(name='t')\n"})
+    black_rule_runner.write_files({"BUILD": "target(name='t')\n"})
     result = black_rule_runner.run_goal_rule(
         UpdateBuildFilesGoal,
         global_args=["--black-args='--skip-string-normalization'"],
+        args=["::"],
         env_inherit=BLACK_ENV_INHERIT,
     )
     assert result.exit_code == 0
-    assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
+    assert Path(black_rule_runner.build_root, "BUILD").read_text() == "target(name='t')\n"
 
 
 def test_black_config(black_rule_runner: RuleRunner) -> None:
     black_rule_runner.write_files(
         {
             "pyproject.toml": "[tool.black]\nskip-string-normalization = 'true'\n",
-            "BUILD": "tgt(name='t')\n",
+            "BUILD": "target(name='t')\n",
         },
     )
-    result = black_rule_runner.run_goal_rule(UpdateBuildFilesGoal, env_inherit=BLACK_ENV_INHERIT)
+    result = black_rule_runner.run_goal_rule(
+        UpdateBuildFilesGoal, args=["::"], env_inherit=BLACK_ENV_INHERIT
+    )
     assert result.exit_code == 0
-    assert Path(black_rule_runner.build_root, "BUILD").read_text() == "tgt(name='t')\n"
+    assert Path(black_rule_runner.build_root, "BUILD").read_text() == "target(name='t')\n"
 
 
 # ------------------------------------------------------------------------------------------
@@ -206,12 +284,13 @@ def run_yapf(
             SubsystemRule(Yapf),
             SubsystemRule(UpdateBuildFilesSubsystem),
             UnionRule(RewrittenBuildFileRequest, FormatWithYapfRequest),
-        )
+        ),
+        target_types=[GenericTarget],
     )
     rule_runner.write_files({"BUILD": build_content})
     goal_result = rule_runner.run_goal_rule(
         UpdateBuildFilesGoal,
-        args=["--update-build-files-formatter=yapf"],
+        args=["--update-build-files-formatter=yapf", "::"],
         global_args=extra_args or (),
         env_inherit=BLACK_ENV_INHERIT,
     )
@@ -220,7 +299,7 @@ def run_yapf(
 
 
 def test_yapf_fixer_fixes() -> None:
-    result, build = run_yapf("tgt( name =  't' )")
+    result, build = run_yapf("target( name =  't' )")
     assert result.exit_code == 0
     assert result.stdout == dedent(
         """\
@@ -228,14 +307,14 @@ def test_yapf_fixer_fixes() -> None:
           - Format with Yapf
         """
     )
-    assert build == "tgt(name='t')\n"
+    assert build == "target(name='t')\n"
 
 
 def test_yapf_fixer_noops() -> None:
-    result, build = run_yapf('tgt(name="t")\n')
+    result, build = run_yapf('target(name="t")\n')
     assert result.exit_code == 0
     assert not result.stdout
-    assert build == 'tgt(name="t")\n'
+    assert build == 'target(name="t")\n'
 
 
 # ------------------------------------------------------------------------------------------

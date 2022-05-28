@@ -22,6 +22,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     Targets,
     TriBoolField,
+    generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
@@ -66,12 +67,23 @@ class HelmRegistriesField(StringSequenceField):
     )
 
 
+class HelmSkipLintField(BoolField):
+    alias = "skip_lint"
+    default = False
+    help = softwrap(
+        f"""
+        If set to true, do not run any linting in this Helm chart when running `{bin_name()}
+        lint`.
+        """
+    )
+
+
 class HelmSkipPushField(BoolField):
     alias = "skip_push"
     default = False
     help = softwrap(
         f"""
-        If set to true, do not push this helm chart to registries when running `{bin_name()}
+        If set to true, do not push this Helm chart to registries when running `{bin_name()}
         publish`.
         """
     )
@@ -94,8 +106,19 @@ class HelmChartMetaSourceField(SingleSourceField):
 
 
 class HelmChartSourcesField(MultipleSourcesField):
-    default = ("values.yaml", "templates/*.yaml", "templates/*.tpl")
+    default = (
+        "values.yaml",
+        "values.yml",
+        "templates/*.yaml",
+        "templates/*.yml",
+        "templates/*.tpl",
+        "crds/*.yaml",
+        "crds/*.yml",
+    )
     expected_file_extensions = (".yaml", ".yml", ".tpl")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['values.yaml', 'templates/*.yaml', '!values_ignore.yaml']`"
+    )
 
 
 class HelmChartDependenciesField(Dependencies):
@@ -155,6 +178,7 @@ class HelmChartTarget(Target):
         HelmChartRepositoryField,
         HelmRegistriesField,
         HelmSkipPushField,
+        HelmSkipLintField,
     )
     help = "A Helm chart."
 
@@ -227,6 +251,9 @@ class HelmUnitTestGeneratingSourcesField(MultipleSourcesField):
     expected_file_extensions = (
         ".yaml",
         ".yml",
+    )
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*_test.yaml', '!ignore_test.yaml']`"
     )
 
 

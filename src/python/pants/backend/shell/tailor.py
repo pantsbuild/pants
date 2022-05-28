@@ -52,7 +52,7 @@ async def find_putative_targets(
     if not shell_setup.tailor:
         return PutativeTargets()
 
-    all_shell_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.sh"))
+    all_shell_files = await Get(Paths, PathGlobs, req.path_globs("*.sh"))
     unowned_shell_files = set(all_shell_files.files) - set(all_owned_sources)
     classified_unowned_shell_files = classify_source_files(unowned_shell_files)
     pts = []

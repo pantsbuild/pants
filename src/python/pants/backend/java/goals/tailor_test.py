@@ -6,12 +6,7 @@ import pytest
 from pants.backend.java.goals import tailor
 from pants.backend.java.goals.tailor import PutativeJavaTargetsRequest, classify_source_files
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget, JunitTestsGeneratorTarget
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -51,7 +46,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeJavaTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeJavaTargetsRequest(("src/java", "src/java/unowned")),
             AllOwnedSources(["src/java/owned/OwnedFile.java"]),
         ],
     )

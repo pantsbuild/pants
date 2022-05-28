@@ -23,7 +23,7 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaFieldSet, ScalaSourceField
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
-from pants.bsp.spec.base import BuildTarget, BuildTargetIdentifier
+from pants.bsp.spec.base import BuildTargetIdentifier
 from pants.bsp.spec.targets import DependencyModule
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.targets import (
@@ -40,20 +40,12 @@ from pants.bsp.util_rules.targets import (
 )
 from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary, ReadlinkBinaryRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    FileContent,
-    FileEntry,
-    MergeDigests,
-    Workspace,
-)
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule
-from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Target, Targets
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule, rule_helper
+from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
 from pants.jvm.bsp.compile import rules as jvm_compile_rules
@@ -105,30 +97,61 @@ class ScalaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
 
 
 @dataclass(frozen=True)
-class ResolveScalaBSPBuildTargetRequest:
-    target: Target
+class ThirdpartyModulesRequest:
+    addresses: Addresses
 
 
 @dataclass(frozen=True)
-class ResolveScalaBSPBuildTargetResult:
-    build_target: BuildTarget
-    scala_runtime: Snapshot
-
-
-@dataclass(frozen=True)
-class MaterializeScalaRuntimeJarsRequest:
-    scala_version: str
-
-
-@dataclass(frozen=True)
-class MaterializeScalaRuntimeJarsResult:
-    content: Snapshot
+class ThirdpartyModules:
+    resolve: CoursierResolveKey
+    entries: dict[CoursierLockfileEntry, ClasspathEntry]
+    merged_digest: Digest
 
 
 @rule
-async def materialize_scala_runtime_jars(
-    request: MaterializeScalaRuntimeJarsRequest,
-) -> MaterializeScalaRuntimeJarsResult:
+async def collect_thirdparty_modules(
+    request: ThirdpartyModulesRequest,
+    classpath_entry_request: ClasspathEntryRequestFactory,
+) -> ThirdpartyModules:
+    coarsened_targets = await Get(CoarsenedTargets, Addresses, request.addresses)
+    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
+    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)
+
+    applicable_lockfile_entries: dict[CoursierLockfileEntry, CoarsenedTarget] = {}
+    for ct in coarsened_targets.coarsened_closure():
+        for tgt in ct.members:
+            if not JvmArtifactFieldSet.is_applicable(tgt):
+                continue
+
+            artifact_requirement = ArtifactRequirement.from_jvm_artifact_target(tgt)
+            entry = get_entry_for_coord(lockfile, artifact_requirement.coordinate)
+            if not entry:
+                _logger.warning(
+                    f"No lockfile entry for {artifact_requirement.coordinate} in resolve {resolve.name}."
+                )
+                continue
+            applicable_lockfile_entries[entry] = ct
+
+    classpath_entries = await MultiGet(
+        Get(
+            ClasspathEntry,
+            ClasspathEntryRequest,
+            classpath_entry_request.for_targets(component=target, resolve=resolve),
+        )
+        for target in applicable_lockfile_entries.values()
+    )
+
+    resolve_digest = await Get(Digest, MergeDigests(cpe.digest for cpe in classpath_entries))
+
+    return ThirdpartyModules(
+        resolve,
+        dict(zip(applicable_lockfile_entries, classpath_entries)),
+        resolve_digest,
+    )
+
+
+@rule_helper
+async def _materialize_scala_runtime_jars(scala_version: str) -> Snapshot:
     tool_classpath = await Get(
         ToolClasspath,
         ToolClasspathRequest(
@@ -137,24 +160,22 @@ async def materialize_scala_runtime_jars(
                     Coordinate(
                         group="org.scala-lang",
                         artifact="scala-compiler",
-                        version=request.scala_version,
+                        version=scala_version,
                     ),
                     Coordinate(
                         group="org.scala-lang",
                         artifact="scala-library",
-                        version=request.scala_version,
+                        version=scala_version,
                     ),
                 ]
             ),
         ),
     )
 
-    materialized_classpath_digest = await Get(
-        Digest,
-        AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{request.scala_version}"),
+    return await Get(
+        Snapshot,
+        AddPrefix(tool_classpath.content.digest, f"jvm/scala-runtime/{scala_version}"),
     )
-    materialized_classpath = await Get(Snapshot, Digest, materialized_classpath_digest)
-    return MaterializeScalaRuntimeJarsResult(materialized_classpath)
 
 
 @rule
@@ -186,9 +207,7 @@ async def bsp_resolve_scala_metadata(
     (resolve,) = resolves
 
     scala_version = scala.version_for_resolve(resolve)
-    scala_runtime = await Get(
-        MaterializeScalaRuntimeJarsResult, MaterializeScalaRuntimeJarsRequest(scala_version)
-    )
+    scala_runtime = await _materialize_scala_runtime_jars(scala_version)
 
     #
     # Extract the JDK paths from an lawful-evil process so we can supply it to the IDE.
@@ -268,7 +287,7 @@ async def bsp_resolve_scala_metadata(
 
     scala_jar_uris = tuple(
         build_root.pathlib_path.joinpath(".pants.d/bsp").joinpath(p).as_uri()
-        for p in scala_runtime.content.files
+        for p in scala_runtime.files
     )
 
     jvm_build_target = JvmBuildTarget(
@@ -285,7 +304,7 @@ async def bsp_resolve_scala_metadata(
             jars=scala_jar_uris,
             jvm_build_target=jvm_build_target,
         ),
-        digest=scala_runtime.content.digest,
+        digest=scala_runtime.digest,
     )
 
 
@@ -333,33 +352,30 @@ async def handle_bsp_scalac_options_request(
     workspace: Workspace,
 ) -> HandleScalacOptionsResult:
     targets = await Get(Targets, BuildTargetIdentifier, request.bsp_target_id)
-    coarsened_targets = await Get(CoarsenedTargets, Addresses(tgt.address for tgt in targets))
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
-    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)
-
-    resolve_digest = await Get(
-        Digest,
-        CreateDigest([FileEntry(entry.file_name, entry.file_digest) for entry in lockfile.entries]),
+    thirdparty_modules = await Get(
+        ThirdpartyModules, ThirdpartyModulesRequest(Addresses(tgt.address for tgt in targets))
     )
+    resolve = thirdparty_modules.resolve
 
     resolve_digest = await Get(
-        Digest, AddPrefix(resolve_digest, f"jvm/resolves/{resolve.name}/lib")
+        Digest, AddPrefix(thirdparty_modules.merged_digest, f"jvm/resolves/{resolve.name}/lib")
     )
 
     workspace.write_digest(resolve_digest, path_prefix=".pants.d/bsp")
 
-    classpath = [
+    classpath = tuple(
         build_root.pathlib_path.joinpath(
-            f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{entry.file_name}"
+            f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{filename}"
         ).as_uri()
-        for entry in lockfile.entries
-    ]
+        for cp_entry in thirdparty_modules.entries.values()
+        for filename in cp_entry.filenames
+    )
 
     return HandleScalacOptionsResult(
         ScalacOptionsItem(
             target=request.bsp_target_id,
             options=(),
-            classpath=tuple(classpath),
+            classpath=classpath,
             class_directory=build_root.pathlib_path.joinpath(
                 f".pants.d/bsp/{jvm_classes_directory(request.bsp_target_id)}"
             ).as_uri(),
@@ -440,41 +456,15 @@ def get_entry_for_coord(
 async def scala_bsp_dependency_modules(
     request: ScalaBSPDependencyModulesRequest,
     build_root: BuildRoot,
-    classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> BSPDependencyModulesResult:
-    coarsened_targets = await Get(
-        CoarsenedTargets, Addresses([fs.address for fs in request.field_sets])
+    thirdparty_modules = await Get(
+        ThirdpartyModules,
+        ThirdpartyModulesRequest(Addresses(fs.address for fs in request.field_sets)),
     )
-    resolve = await Get(CoursierResolveKey, CoarsenedTargets, coarsened_targets)
-    lockfile = await Get(CoursierResolvedLockfile, CoursierResolveKey, resolve)
+    resolve = thirdparty_modules.resolve
 
-    applicable_lockfile_entries: dict[CoursierLockfileEntry, CoarsenedTarget] = {}
-    for ct in coarsened_targets.coarsened_closure():
-        for tgt in ct.members:
-            if not JvmArtifactFieldSet.is_applicable(tgt):
-                continue
-
-            artifact_requirement = ArtifactRequirement.from_jvm_artifact_target(tgt)
-            entry = get_entry_for_coord(lockfile, artifact_requirement.coordinate)
-            if not entry:
-                _logger.warning(
-                    f"No lockfile entry for {artifact_requirement.coordinate} in resolve {resolve.name}."
-                )
-                continue
-            applicable_lockfile_entries[entry] = ct
-
-    classpath_entries = await MultiGet(
-        Get(
-            ClasspathEntry,
-            ClasspathEntryRequest,
-            classpath_entry_request.for_targets(component=target, resolve=resolve),
-        )
-        for target in applicable_lockfile_entries.values()
-    )
-
-    resolve_digest = await Get(Digest, MergeDigests(cpe.digest for cpe in classpath_entries))
     resolve_digest = await Get(
-        Digest, AddPrefix(resolve_digest, f"jvm/resolves/{resolve.name}/lib")
+        Digest, AddPrefix(thirdparty_modules.merged_digest, f"jvm/resolves/{resolve.name}/lib")
     )
 
     modules = [
@@ -496,7 +486,7 @@ async def scala_bsp_dependency_modules(
                 ),
             ),
         )
-        for entry, cp_entry in zip(applicable_lockfile_entries, classpath_entries)
+        for entry, cp_entry in thirdparty_modules.entries.items()
     ]
 
     return BSPDependencyModulesResult(

@@ -78,7 +78,7 @@ async def find_changed_owners(
         ),
     )
     result = FrozenOrderedSet(owners) | (dependees - owner_target_generators)
-    if specs_filter:
+    if specs_filter.is_specified:
         # Finally, we must now filter out the result to only include what matches our tags, as the
         # last step of https://github.com/pantsbuild/pants/issues/15544.
         #

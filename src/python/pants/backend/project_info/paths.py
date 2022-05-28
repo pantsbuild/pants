@@ -20,6 +20,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.option.global_options import GlobalOptions
 from pants.option.option_types import StrOption
 
 
@@ -81,7 +82,9 @@ def find_paths_breadth_first(
 
 
 @goal_rule
-async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
+async def paths(
+    console: Console, paths_subsystem: PathsSubsystem, global_options: GlobalOptions
+) -> PathsGoal:
 
     path_from = paths_subsystem.path_from
     path_to = paths_subsystem.path_to
@@ -94,11 +97,22 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
 
     specs_parser = SpecsParser()
 
+    convert_dir_literals = global_options.use_deprecated_directory_cli_args_semantics
     from_tgts, to_tgts = await MultiGet(
-        [
-            Get(Targets, Specs, specs_parser.parse_specs([path_from])),
-            Get(Targets, Specs, specs_parser.parse_specs([path_to])),
-        ]
+        Get(
+            Targets,
+            Specs,
+            specs_parser.parse_specs(
+                [path_from], convert_dir_literal_to_address_literal=convert_dir_literals
+            ),
+        ),
+        Get(
+            Targets,
+            Specs,
+            specs_parser.parse_specs(
+                [path_to], convert_dir_literal_to_address_literal=convert_dir_literals
+            ),
+        ),
     )
     root = from_tgts.expect_single()
     destination = to_tgts.expect_single()

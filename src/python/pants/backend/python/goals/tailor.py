@@ -22,7 +22,7 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.base.specs import AncestorGlobSpec, Specs
+from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -94,7 +94,7 @@ async def find_putative_targets(
 
     if python_setup.tailor_source_targets:
         # Find library/test/test_util targets.
-        all_py_files_globs: PathGlobs = req.search_paths.path_globs("*.py")
+        all_py_files_globs: PathGlobs = req.path_globs("*.py", "*.pyi")
         all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
         unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
         classified_unowned_py_files = classify_source_files(unowned_py_files)
@@ -126,9 +126,9 @@ async def find_putative_targets(
             all_pipenv_lockfile_files,
             all_pyproject_toml_contents,
         ) = await MultiGet(
-            Get(Paths, PathGlobs, req.search_paths.path_globs("*requirements*.txt")),
-            Get(Paths, PathGlobs, req.search_paths.path_globs("Pipfile.lock")),
-            Get(DigestContents, PathGlobs, req.search_paths.path_globs("pyproject.toml")),
+            Get(Paths, PathGlobs, req.path_globs("*requirements*.txt")),
+            Get(Paths, PathGlobs, req.path_globs("Pipfile.lock")),
+            Get(DigestContents, PathGlobs, req.path_globs("pyproject.toml")),
         )
 
         def add_req_targets(files: Iterable[str], alias: str, target_name: str) -> None:
@@ -161,13 +161,14 @@ async def find_putative_targets(
     if python_setup.tailor_pex_binary_targets:
         # Find binary targets.
 
-        # Get all files whose content indicates that they are entry points.
+        # Get all files whose content indicates that they are entry points or are __main__.py files.
         digest_contents = await Get(DigestContents, PathGlobs, all_py_files_globs)
+        all_main_py = await Get(Paths, PathGlobs, req.path_globs("__main__.py"))
         entry_points = [
             file_content.path
             for file_content in digest_contents
             if is_entry_point(file_content.content)
-        ]
+        ] + list(all_main_py.files)
 
         # Get the modules for these entry points.
         src_roots = await Get(
@@ -185,7 +186,7 @@ async def find_putative_targets(
         entry_point_dirs = {os.path.dirname(entry_point) for entry_point in entry_points}
         possible_existing_binary_targets = await Get(
             UnexpandedTargets,
-            Specs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs)),
+            RawSpecs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs)),
         )
         possible_existing_binary_entry_points = await MultiGet(
             Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(t[PexEntryPointField]))

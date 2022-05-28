@@ -35,7 +35,7 @@ async def find_putative_terrform_module_targets(
     if not terraform.tailor:
         return PutativeTargets()
 
-    all_terraform_files = await Get(Paths, PathGlobs, request.search_paths.path_globs("*.tf"))
+    all_terraform_files = await Get(Paths, PathGlobs, request.path_globs("*.tf"))
     unowned_terraform_files = set(all_terraform_files.files) - set(all_owned_sources)
 
     putative_targets = [

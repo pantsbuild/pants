@@ -304,7 +304,7 @@ class TestOptionsBootstrapper:
         assert vals.logdir is None
         assert LogLevel.INFO == vals.level
 
-        vals = parse_options("-d/tmp/logs", "-ldebug")
+        vals = parse_options("--logdir=/tmp/logs", "-ldebug")
         assert "/tmp/logs" == vals.logdir
         assert LogLevel.DEBUG == vals.level
 
@@ -317,11 +317,11 @@ class TestOptionsBootstrapper:
                 .for_global_scope()
             )
 
-        vals = parse_options("main", "args", "-d/tmp/frogs", "--", "-d/tmp/logs")
-        assert "/tmp/frogs" == vals.logdir
+        vals = parse_options("main", "args", "-lwarn", "--", "-lerror")
+        assert LogLevel.WARN == vals.level
 
-        vals = parse_options("main", "args", "--", "-d/tmp/logs")
-        assert vals.logdir is None
+        vals = parse_options("main", "args", "--", "-lerror")
+        assert LogLevel.INFO == vals.level
 
     def test_bootstrap_options_explicit_config_path(self) -> None:
         def config_path(*args, **env):

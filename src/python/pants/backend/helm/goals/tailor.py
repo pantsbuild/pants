@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from itertools import chain
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import HelmChartTarget
@@ -17,7 +16,7 @@ from pants.core.goals.tailor import (
     PutativeTargetsRequest,
 )
 from pants.engine.fs import PathGlobs, Paths
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -36,12 +35,10 @@ async def find_putative_helm_targets(
     if not helm_subsystem.tailor:
         return PutativeTargets()
 
-    found_chart_paths = await MultiGet(
-        Get(Paths, PathGlobs, request.search_paths.path_globs(filename))
-        for filename in HELM_CHART_METADATA_FILENAMES
+    all_chart_files = await Get(
+        Paths, PathGlobs, request.path_globs(*HELM_CHART_METADATA_FILENAMES)
     )
-    all_chart_files = chain.from_iterable([p.files for p in found_chart_paths])
-    unowned_chart_files = set(all_chart_files) - set(all_owned_sources)
+    unowned_chart_files = set(all_chart_files.files) - set(all_owned_sources)
 
     putative_targets = []
     for chart_file in sorted(unowned_chart_files):

@@ -1,5 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import itertools
 import logging
 from itertools import chain
@@ -25,6 +26,7 @@ from pants.jvm.compile import (
     FallibleClasspathEntries,
     FallibleClasspathEntry,
 )
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +82,10 @@ async def assemble_resources_jar(
                 output_filename,
                 *source_files.snapshot.files,
             ],
-            description="Build partial JAR containing resources files",
+            description="Build resources JAR for {request.component}",
             input_digest=resources_jar_input_digest,
             output_files=output_files,
+            level=LogLevel.DEBUG,
         ),
     )
 

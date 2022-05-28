@@ -20,12 +20,7 @@ from pants.backend.python.target_types import (
     PythonTestsGeneratorTarget,
     PythonTestUtilsGeneratorTarget,
 )
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -95,7 +90,9 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(
+                ("3rdparty", "already_owned", "no_match", "src/python/foo", "src/python/foo/bar")
+            ),
             AllOwnedSources(
                 [
                     "already_owned/requirements.txt",
@@ -174,9 +171,7 @@ def test_find_putative_targets_subset(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(
-                PutativeTargetsSearchPaths(("src/python/foo/bar", "src/python/foo/qux"))
-            ),
+            PutativePythonTargetsRequest(("src/python/foo/bar", "src/python/foo/qux")),
             AllOwnedSources(["src/python/foo/bar/__init__.py", "src/python/foo/bar/bar.py"]),
         ],
     )
@@ -217,13 +212,16 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                 "pex_binary(name='main1', entry_point='main1.py')\n"
                 "pex_binary(name='main2', entry_point='foo.main2')\n"
             ),
+            "src/python/foo/__main__.py": "",
         }
     )
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
-            AllOwnedSources([f"src/python/foo/{name}" for name in mains]),
+            PutativePythonTargetsRequest(("src/python/foo",)),
+            AllOwnedSources(
+                [f"src/python/foo/{name}" for name in mains] + ["src/python/foo/__main__.py"]
+            ),
         ],
     )
     assert (
@@ -235,6 +233,13 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
                     "main3",
                     [],
                     kwargs={"entry_point": "main3.py"},
+                ),
+                PutativeTarget.for_target_type(
+                    PexBinary,
+                    "src/python/foo",
+                    "__main__",
+                    [],
+                    kwargs={"entry_point": "__main__.py"},
                 ),
             ]
         )
@@ -258,7 +263,9 @@ def test_ignore_solitary_init(rule_runner: RuleRunner) -> None:
     pts = rule_runner.request(
         PutativeTargets,
         [
-            PutativePythonTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativePythonTargetsRequest(
+                ("src/python/foo", "src/python/foo/bar", "src/python/foo/baz", "src/python/foo/qux")
+            ),
             AllOwnedSources([]),
         ],
     )

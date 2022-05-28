@@ -52,7 +52,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.base.specs import AncestorGlobSpec, Specs
+from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
@@ -903,7 +903,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     """
     target = owned_dependency.target
     ancestor_addrs = AncestorGlobSpec(target.address.spec_path)
-    ancestor_tgts = await Get(Targets, Specs(ancestor_globs=(ancestor_addrs,)))
+    ancestor_tgts = await Get(Targets, RawSpecs(ancestor_globs=(ancestor_addrs,)))
     # Note that addresses sort by (spec_path, target_name), and all these targets are
     # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
     # address will effectively sort by closeness of ancestry to the given target.

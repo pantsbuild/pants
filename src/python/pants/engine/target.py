@@ -657,7 +657,7 @@ class Targets(Collection[Target]):
 # This distinct type is necessary because of https://github.com/pantsbuild/pants/issues/14977.
 #
 # NB: We still proactively apply filtering inside `AddressSpecs` and `FilesystemSpecs`, which is
-# earlier in the rule pipeline of `Specs -> Addresses -> UnexpandedTargets -> Targets ->
+# earlier in the rule pipeline of `RawSpecs -> Addresses -> UnexpandedTargets -> Targets ->
 # FilteredTargets`. That is necessary so that project-introspection goals like `list` which don't
 # use `FilteredTargets` still have filtering applied.
 class FilteredTargets(Collection[Target]):
@@ -1991,16 +1991,6 @@ class MultipleSourcesField(SourcesField, StringSequenceField):
     """
 
     alias = "sources"
-    help = softwrap(
-        """
-        A list of files and globs that belong to this target.
-
-        Paths are relative to the BUILD file's directory. You can ignore files/globs by
-        prefixing them with `!`.
-
-        Example: `sources=['example.ext', 'test_*.ext', '!test_ignore.ext']`.
-        """
-    )
 
     ban_subdirectories: ClassVar[bool] = False
 
@@ -2777,6 +2767,19 @@ class OverridesField(AsyncFieldMixin, Field):
                         f"but another sets to `{repr(value)}`.)"
                     )
         return result
+
+
+def generate_multiple_sources_field_help_message(files_example: str) -> str:
+    return softwrap(
+        """
+        A list of files and globs that belong to this target.
+
+        Paths are relative to the BUILD file's directory. You can ignore files/globs by
+        prefixing them with `!`.
+
+        """
+        + files_example
+    )
 
 
 def generate_file_based_overrides_field_help_message(

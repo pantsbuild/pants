@@ -225,6 +225,7 @@ async def build_docker_image(
     docker: DockerBinary,
     process_cleanup: ProcessCleanupOption,
 ) -> BuiltPackage:
+    """Build a Docker image using `docker build`."""
     context, wrapped_target = await MultiGet(
         Get(
             DockerBuildContext,
