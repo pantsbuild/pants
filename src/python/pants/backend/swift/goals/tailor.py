@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -39,14 +38,9 @@ async def find_putative_targets(
     req: PutativeSwiftTargetsRequest,
     all_owned_sources: AllOwnedSources,
 ) -> PutativeTargets:
-    all_swift_files_globs = PathGlobs(
-        [
-            os.path.join(d, "**", f"*{ext}")
-            for d in req.search_paths.dirs
-            for ext in SWIFT_FILE_EXTENSIONS
-        ]
+    all_swift_files = await Get(
+        Paths, PathGlobs, req.path_globs(*(f"*{ext}" for ext in SWIFT_FILE_EXTENSIONS))
     )
-    all_swift_files = await Get(Paths, PathGlobs, all_swift_files_globs)
     unowned_swift_files = set(all_swift_files.files) - set(all_owned_sources)
     classified_unowned_swift_files = classify_source_files(unowned_swift_files)
 

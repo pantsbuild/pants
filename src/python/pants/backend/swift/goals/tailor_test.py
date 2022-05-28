@@ -6,12 +6,7 @@ import pytest
 from pants.backend.swift.goals import tailor
 from pants.backend.swift.goals.tailor import PutativeSwiftTargetsRequest
 from pants.backend.swift.target_types import SwiftSourcesGeneratorTarget
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsSearchPaths,
-)
+from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -39,7 +34,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
-            PutativeSwiftTargetsRequest(PutativeTargetsSearchPaths(("",))),
+            PutativeSwiftTargetsRequest(("src/owned", "src/unowned")),
             AllOwnedSources(["src/owned/OwnedFile.swift"]),
         ],
     )
