@@ -42,6 +42,7 @@ from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
+from pants.testutil.skip_utils import requires_go
 
 
 @pytest.fixture
@@ -114,6 +115,7 @@ def test_extracts_go_package() -> None:
 
 
 @logging
+@requires_go
 def test_generates_go(rule_runner: RuleRunner) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
@@ -291,6 +293,7 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
     assert "PASS: TestProtoGen" in result.stdout
 
 
+@requires_go
 def test_generates_go_grpc(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
