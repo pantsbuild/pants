@@ -9,10 +9,15 @@ import pytest
 
 @lru_cache()
 def skip_if_error(*args: str):
+    def empty_decorator(func):
+        return func
+
     try:
         subprocess.run(list(args), check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
         return pytest.mark.skip(reason="command failed")
+
+    return empty_decorator
 
 
 requires_go = skip_if_error("go", "version")
