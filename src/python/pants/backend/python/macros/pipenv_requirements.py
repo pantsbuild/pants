@@ -39,6 +39,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class PipenvSourceField(SingleSourceField):
@@ -140,8 +141,12 @@ async def generate_from_pipenv_requirement(
 
     if overrides:
         raise InvalidFieldException(
-            f"Unused key in the `overrides` field for {request.template_address}: "
-            f"{sorted(overrides)}"
+            softwrap(
+                f"""
+                Unused key in the `overrides` field for {request.template_address}:
+                {sorted(overrides)}
+            """
+            )
         )
 
     return GeneratedTargets(generator, result)

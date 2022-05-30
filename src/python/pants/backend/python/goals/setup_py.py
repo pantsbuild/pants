@@ -118,8 +118,12 @@ class OwnershipError(SetupPyError):
 
     def __init__(self, msg: str):
         super().__init__(
-            f"{msg} See {doc_url('python-distributions')} for "
-            f"how python_sources targets are mapped to distributions."
+            softwrap(
+                f"""
+            {msg} See {doc_url('python-distributions')} for
+            how python_sources targets are mapped to distributions.
+            """
+            )
         )
 
 
@@ -238,8 +242,12 @@ class SetupKwargs:
             }:
                 if arg in kwargs:
                     raise ValueError(
-                        f"{arg} cannot be set in the `provides` field for {address}, but it was "
-                        f"set to {kwargs[arg]}. Pants will dynamically set the value for you."
+                        softwrap(
+                            f"""
+                            {arg} cannot be set in the `provides` field for {address}, but it was
+                            set to {kwargs[arg]}. Pants will dynamically set the value for you.
+                            """
+                        )
                     )
 
         # We serialize with `pickle` so that is hashable. We don't use `FrozenDict` because it
@@ -359,8 +367,12 @@ def validate_commands(commands: tuple[str, ...]):
     # We rely on the dist dir being the default, so we know where to find the created dists.
     if "--dist-dir" in commands or "-d" in commands:
         raise InvalidSetupPyArgs(
-            "Cannot set --dist-dir/-d in setup.py args. To change where dists "
-            "are written, use the global --pants-distdir option."
+            softwrap(
+                """
+                Cannot set --dist-dir/-d in setup.py args. To change where dists
+                are written, use the global --pants-distdir option.
+                """
+            )
         )
     # We don't allow publishing via setup.py, as we don't want the setup.py running rule,
     # which is not a @goal_rule, to side-effect (plus, we'd need to ensure that publishing
@@ -409,8 +421,12 @@ async def package_python_dist(
     sdist = dist_tgt.get(SDistField).value
     if not wheel and not sdist:
         raise NoDistTypeSelected(
-            f"In order to package {dist_tgt.address.spec} at least one of {WheelField.alias!r} or "
-            f"{SDistField.alias!r} must be `True`."
+            softwrap(
+                f"""
+                In order to package {dist_tgt.address.spec} at least one of {WheelField.alias!r} or
+                {SDistField.alias!r} must be `True`.
+                """
+            )
         )
 
     wheel_config_settings = dist_tgt.get(WheelConfigSettingsField).value or FrozenDict()
@@ -530,10 +546,15 @@ async def determine_explicitly_provided_setup_kwargs(
     if len(applicable_setup_kwargs_requests) > 1:
         possible_requests = sorted(plugin.__name__ for plugin in applicable_setup_kwargs_requests)
         raise ValueError(
-            f"Multiple of the registered `SetupKwargsRequest`s can work on the target "
-            f"{target.address}, and it's ambiguous which to use: {possible_requests}\n\nPlease "
-            "activate fewer implementations, or make the classmethod `is_applicable()` more "
-            "precise so that only one implementation is applicable for this target."
+            softwrap(
+                f"""
+                Multiple of the registered `SetupKwargsRequest`s can work on the target
+                {target.address}, and it's ambiguous which to use: {possible_requests}
+
+                Please activate fewer implementations, or make the classmethod `is_applicable()`
+                more precise so that only one implementation is applicable for this target.
+                """
+            )
         )
     setup_kwargs_request = tuple(applicable_setup_kwargs_requests)[0]
     return await Get(SetupKwargs, SetupKwargsRequest, setup_kwargs_request(target))  # type: ignore[abstract]
@@ -668,11 +689,15 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
 
     if "long_description" in setup_kwargs and long_description_path:
         raise InvalidFieldException(
-            f"The {repr(LongDescriptionPathField.alias)} field of the "
-            f"target {exported_target.target.address} is set, but "
-            f"'long_description' is already provided explicitly in "
-            f"the provides=setup_py() field. You may only set one "
-            f"of these two values."
+            softwrap(
+                f"""
+                The {repr(LongDescriptionPathField.alias)} field of the
+                target {exported_target.target.address} is set, but
+                'long_description' is already provided explicitly in
+                the provides=setup_py() field. You may only set one
+                of these two values.
+                """
+            )
         )
 
     if long_description_path:
@@ -680,9 +705,11 @@ async def determine_finalized_setup_kwargs(request: GenerateSetupPyRequest) -> F
             DigestContents,
             PathGlobs(
                 [long_description_path],
-                description_of_origin=(
-                    f"the {LongDescriptionPathField.alias} "
-                    f"field of {exported_target.target.address}"
+                description_of_origin=softwrap(
+                    f"""
+                    the {LongDescriptionPathField.alias}
+                    field of {exported_target.target.address}
+                    """
                 ),
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
             ),
@@ -933,16 +960,24 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
             if sibling_owners:
                 all_owners = [exported_ancestor] + sibling_owners
                 raise AmbiguousOwnerError(
-                    f"Found multiple sibling python_distribution targets that are the closest "
-                    f"ancestor dependees of {target.address} and are therefore candidates to "
-                    f"own it: {', '.join(o.address.spec for o in all_owners)}. Only a "
-                    f"single such owner is allowed, to avoid ambiguity."
+                    softwrap(
+                        f"""
+                        Found multiple sibling python_distribution targets that are the closest
+                        ancestor dependees of {target.address} and are therefore candidates to
+                        own it: {', '.join(o.address.spec for o in all_owners)}. Only a
+                        single such owner is allowed, to avoid ambiguity.
+                        """
+                    )
                 )
             return ExportedTarget(owner)
     raise NoOwnerError(
-        f"No python_distribution target found to own {target.address}. Note that "
-        f"the owner must be in or above the owned target's directory, and must "
-        f"depend on it (directly or indirectly)."
+        softwrap(
+            f"""
+            No python_distribution target found to own {target.address}. Note that
+            the owner must be in or above the owned target's directory, and must
+            depend on it (directly or indirectly).
+            """
+        )
     )
 
 
@@ -1099,8 +1134,12 @@ def merge_entry_points(
     ) -> tuple[str, str]:
         if len(entry_points_with_source) > 1:
             raise ValueError(
-                f"Multiple entry_points registered for {category} {name} in: "
-                f"{', '.join(ep_source for ep_source, _ in entry_points_with_source)}"
+                softwrap(
+                    f"""
+                    Multiple entry_points registered for {category} {name} in:
+                    {', '.join(ep_source for ep_source, _ in entry_points_with_source)}
+                    """
+                )
             )
         _, entry_point = entry_points_with_source[0]
         return name, entry_point

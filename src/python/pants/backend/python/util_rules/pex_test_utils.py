@@ -26,6 +26,7 @@ from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Pex
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -36,14 +37,18 @@ class ExactRequirement:
     @classmethod
     def parse(cls, requirement: str) -> ExactRequirement:
         req = PipRequirement.parse(requirement)
-        assert len(req.specs) == 1, (
-            f"Expected an exact requirement with only 1 specifier, given {requirement} with "
-            f"{len(req.specs)} specifiers"
+        assert len(req.specs) == 1, softwrap(
+            f"""
+            Expected an exact requirement with only 1 specifier, given {requirement} with
+            {len(req.specs)} specifiers
+            """
         )
         operator, version = req.specs[0]
-        assert operator == "==", (
-            f"Expected an exact requirement using only the '==' specifier, given {requirement} "
-            f"using the {operator!r} operator"
+        assert operator == "==", softwrap(
+            f"""
+            Expected an exact requirement using only the '==' specifier, given {requirement}
+            using the {operator!r} operator
+            """
         )
         return cls(project_name=req.project_name, version=version)
 

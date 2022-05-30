@@ -36,6 +36,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import AllTargets, GeneratedSources, GenerateSourcesRequest, Targets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
 
 
@@ -60,8 +61,12 @@ async def generate_python_from_setuptools_scm(
     maybe_git_worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
     if not maybe_git_worktree.git_worktree:
         raise VCSVersioningError(
-            f"Trying to determine the version for the {request.protocol_target.address} target at "
-            f"{request.protocol_target.address}, but you are not running in a git worktree."
+            softwrap(
+                f"""
+                Trying to determine the version for the {request.protocol_target.address} target at
+                {request.protocol_target.address}, but you are not running in a git worktree.
+                """
+            )
         )
 
     # Generate the setuptools_scm config. We don't use any existing pyproject.toml config,

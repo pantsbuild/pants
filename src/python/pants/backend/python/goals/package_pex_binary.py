@@ -45,6 +45,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -114,13 +115,19 @@ async def package_pex_binary(
     if file_tgts:
         files_addresses = sorted(tgt.address.spec for tgt in file_tgts)
         logger.warning(
-            f"The `pex_binary` target {field_set.address} transitively depends on the below `files` "
-            "targets, but Pants will not include them in the PEX. Filesystem APIs like `open()` "
-            "are not able to load files within the binary itself; instead, they read from the "
-            "current working directory."
-            "\n\nInstead, use `resources` targets or wrap this `pex_binary` in an `archive`. "
-            f"See {doc_url('resources')}."
-            f"\n\nFiles targets dependencies: {files_addresses}"
+            softwrap(
+                f"""
+                The `pex_binary` target {field_set.address} transitively depends on the below `files`
+                targets, but Pants will not include them in the PEX. Filesystem APIs like `open()`
+                are not able to load files within the binary itself; instead, they read from the
+                current working directory.
+
+                Instead, use `resources` targets or wrap this `pex_binary` in an `archive`.
+                See {doc_url('resources')}.
+
+                Files targets dependencies: {files_addresses}
+            """
+            )
         )
 
     output_filename = field_set.output_path.value_or_default(file_ending="pex")

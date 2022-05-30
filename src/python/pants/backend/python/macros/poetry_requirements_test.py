@@ -29,6 +29,7 @@ from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.strutil import softwrap
 
 # ---------------------------------------------------------------------------------
 # pyproject.toml parsing
@@ -130,9 +131,11 @@ def test_add_markers() -> None:
     attr_adv_py_both = PyprojectAttr(
         {"python": "^3.6", "markers": "platform_python_implementation == 'CPython'"}
     )
-    assert add_markers("foo==1.0.0", attr_adv_py_both, "somepath") == (
-        "foo==1.0.0;(platform_python_implementation == 'CPython') and "
-        "(python_version >= '3.6' and python_version< '4.0')"
+    assert add_markers("foo==1.0.0", attr_adv_py_both, "somepath") == softwrap(
+        """
+        foo==1.0.0;(platform_python_implementation == 'CPython') and
+        (python_version >= '3.6' and python_version< '4.0')
+        """
     )
 
     attr_adv_both = PyprojectAttr(
@@ -141,9 +144,11 @@ def test_add_markers() -> None:
             "markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'",
         }
     )
-    assert add_markers("foo==1.0.0", attr_adv_both, "somepath") == (
-        "foo==1.0.0;(platform_python_implementation == 'CPython' or "
-        "sys_platform == 'win32') and (python_version >= '3.6' and python_version< '4.0')"
+    assert add_markers("foo==1.0.0", attr_adv_both, "somepath") == softwrap(
+        """
+        foo==1.0.0;(platform_python_implementation == 'CPython' or
+        sys_platform == 'win32') and (python_version >= '3.6' and python_version< '4.0')
+        """
     )
 
 
@@ -320,9 +325,11 @@ def test_py_constraints(empty_pyproject_toml: PyProjectToml) -> None:
     )
     assert_py_constraints(
         "~3.6 || ^3.7",
-        (
-            "((python_version >= '3.6' and python_version< '3.7') or "
-            "(python_version >= '3.7' and python_version< '4.0'))"
+        softwrap(
+            """
+            ((python_version >= '3.6' and python_version< '3.7') or
+            (python_version >= '3.7' and python_version< '4.0'))
+            """
         ),
     )
 
@@ -350,8 +357,12 @@ def test_extended_form() -> None:
     retval = parse_pyproject_toml(pyproject_toml_black)
     actual_req = {
         PipRequirement.parse(
-            "black==19.10b0; "
-            'platform_python_implementation == "CPython" and python_version == "3.6"'
+            softwrap(
+                """
+                black==19.10b0;
+                platform_python_implementation == "CPython" and python_version == "3.6"
+                """
+            )
         )
     }
     assert retval == actual_req
@@ -406,8 +417,12 @@ def test_parse_multi_reqs() -> None:
         PipRequirement.parse('foo>=1.9; python_version >= "2.7" and python_version < "3.0"'),
         PipRequirement.parse('foo<3.0.0,>=2.0; python_version == "3.4" or python_version == "3.5"'),
         PipRequirement.parse(
-            "black==19.10b0; "
-            'platform_python_implementation == "CPython" and python_version == "3.6"'
+            softwrap(
+                """
+                black==19.10b0;
+                platform_python_implementation == "CPython" and python_version == "3.6"
+                """
+            )
         ),
         PipRequirement.parse("isort<5.6,>=5.5.1"),
     }

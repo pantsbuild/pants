@@ -70,8 +70,12 @@ async def py_constraints(
     if py_constraints_subsystem.summary:
         if addresses:
             console.print_stderr(
-                "The `py-constraints --summary` goal does not take file/target arguments. Run "
-                "`help py-constraints` for more details."
+                softwrap(
+                    """
+                The `py-constraints --summary` goal does not take file/target arguments. Run
+                `help py-constraints` for more details.
+                """
+                )
             )
             return PyConstraintsGoal(exit_code=1)
 
@@ -145,8 +149,12 @@ async def py_constraints(
             if tgt_type.class_has_field(InterpreterConstraintsField, union_membership)
         )
         logger.warning(
-            "No Python files/targets matched for the `py-constraints` goal. All target types with "
-            f"Python interpreter constraints: {', '.join(target_types_with_constraints)}"
+            softwrap(
+                f"""
+            No Python files/targets matched for the `py-constraints` goal. All target types with
+            Python interpreter constraints: {', '.join(target_types_with_constraints)}
+            """
+            )
         )
         return PyConstraintsGoal(exit_code=0)
 
@@ -160,11 +168,13 @@ async def py_constraints(
     with py_constraints_subsystem.output(console) as output_stdout:
         output_stdout(f"Final merged constraints: {final_constraints}\n")
         if len(addresses) > 1:
-            merged_constraints_warning = (
-                "(These are the constraints used if you were to depend on all of the input "
-                "files/targets together, even though they may end up never being used together in "
-                "the real world. Consider using a more precise query or running "
-                f"`{bin_name()} py-constraints --summary`.)\n"
+            merged_constraints_warning = softwrap(
+                f"""
+                (These are the constraints used if you were to depend on all of the input
+                files/targets together, even though they may end up never being used together in
+                the real world. Consider using a more precise query or running
+                `{bin_name()} py-constraints --summary`.)\n
+                """
             )
             output_stdout(indent(fill(merged_constraints_warning, 80), "  "))
 

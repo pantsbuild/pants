@@ -52,7 +52,7 @@ from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequ
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import path_safe
+from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -414,9 +414,13 @@ async def create_pex_from_targets(
             if should_return_entire_lockfile:
                 if repository_pex_request.maybe_pex_request is None:
                     raise ValueError(
-                        "[python].run_against_entire_lockfile was set, but could not find a "
-                        "lockfile or constraints file for this target set. See "
-                        f"{doc_url('python-third-party-dependencies')} for details."
+                        softwrap(
+                            f"""
+                        [python].run_against_entire_lockfile was set, but could not find a
+                        lockfile or constraints file for this target set. See
+                        {doc_url('python-third-party-dependencies')} for details.
+                        """
+                        )
                     )
                 return repository_pex_request.maybe_pex_request
 
@@ -524,17 +528,23 @@ async def get_repository_pex(
         and python_setup.resolve_all_constraints_was_set_explicitly()
     ):
         raise ValueError(
-            "`[python].resolve_all_constraints` is enabled, so "
-            "`[python].requirement_constraints` must also be set."
+            softwrap(
+                """
+                `[python].resolve_all_constraints` is enabled, so
+                `[python].requirement_constraints` must also be set.
+                """
+            )
         )
     elif python_setup.enable_resolves:
         chosen_resolve = await Get(
             ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
         )
         repository_pex_request = PexRequest(
-            description=(
-                f"Installing {chosen_resolve.lockfile.file_path} "
-                f"for the resolve `{chosen_resolve.name}`"
+            description=softwrap(
+                f"""
+                Installing {chosen_resolve.lockfile.file_path}
+                for the resolve `{chosen_resolve.name}`
+                """
             ),
             output_filename=f"{path_safe(chosen_resolve.name)}_lockfile.pex",
             internal_only=request.internal_only,
@@ -596,9 +606,14 @@ async def _setup_constraints_repository_pex(
     unconstrained_projects = name_req_projects - constraint_file_projects
     if unconstrained_projects:
         logger.warning(
-            f"The constraints file {constraints_path} does not contain "
-            f"entries for the following requirements: {', '.join(unconstrained_projects)}.\n\n"
-            f"Ignoring `[python_setup].resolve_all_constraints` option."
+            softwrap(
+                f"""
+                The constraints file {constraints_path} does not contain
+                entries for the following requirements: {', '.join(unconstrained_projects)}.
+
+                Ignoring `[python_setup].resolve_all_constraints` option.
+                """
+            )
         )
         return OptionalPexRequest(None)
 

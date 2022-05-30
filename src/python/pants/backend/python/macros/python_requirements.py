@@ -152,8 +152,12 @@ async def generate_from_python_requirement(
 
     if overrides:
         raise InvalidFieldException(
-            f"Unused key in the `overrides` field for {request.template_address}: "
-            f"{sorted(overrides)}"
+            softwrap(
+                f"""
+                Unused key in the `overrides` field for {request.template_address}:
+                {sorted(overrides)}
+                """
+            )
         )
 
     return GeneratedTargets(generator, result)

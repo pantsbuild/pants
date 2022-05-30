@@ -199,18 +199,20 @@ def test_find_putative_targets_for_entry_points(rule_runner: RuleRunner) -> None
         {
             f"src/python/foo/{name}": textwrap.dedent(
                 """
-            if __name__ == "__main__":
-                main()
-            """
+                if __name__ == "__main__":
+                    main()
+                """
             )
             for name in mains
         }
     )
     rule_runner.write_files(
         {
-            "src/python/foo/BUILD": (
-                "pex_binary(name='main1', entry_point='main1.py')\n"
-                "pex_binary(name='main2', entry_point='foo.main2')\n"
+            "src/python/foo/BUILD": textwrap.dedent(
+                """\
+                pex_binary(name='main1', entry_point='main1.py')
+                pex_binary(name='main2', entry_point='foo.main2')
+                """
             ),
             "src/python/foo/__main__.py": "",
         }
@@ -291,60 +293,60 @@ def test_is_entry_point_true() -> None:
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note single quotes.
-    if __name__ == '__main__':
-        main()
-    """
+            # Note single quotes.
+            if __name__ == '__main__':
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note double quotes.
-    if __name__ == "__main__":
-        main()
-    """
+            # Note double quotes.
+            if __name__ == "__main__":
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note weird extra spaces.
-    if __name__  ==    "__main__":
-        main()
-    """
+            # Note weird extra spaces.
+            if __name__  ==    "__main__":
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note trailing comment.
-    if __name__ == "__main__": # Trailing comment.
-        main()
-    """
+            # Note trailing comment.
+            if __name__ == "__main__": # Trailing comment.
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note trailing comment.
-    if __name__ == "__main__":# Trailing comment.
-        main()
-    """
+            # Note trailing comment.
+            if __name__ == "__main__":# Trailing comment.
+                main()
+            """
         ).encode()
     )
 
     assert is_entry_point(
         textwrap.dedent(
             """
-    # Note trailing comment.
-    if __name__ == "__main__":        # Trailing comment.
-        main()
-    """
+            # Note trailing comment.
+            if __name__ == "__main__":        # Trailing comment.
+                main()
+            """
         ).encode()
     )
 
@@ -353,28 +355,28 @@ def test_is_entry_point_false() -> None:
     assert not is_entry_point(
         textwrap.dedent(
             """
-    # Note commented out.
-    # if __name__ == "__main__":
-    #    main()
-    """
+            # Note commented out.
+            # if __name__ == "__main__":
+            #    main()
+            """
         ).encode()
     )
 
     assert not is_entry_point(
         textwrap.dedent(
             """
-    # Note weird indent.
-     if __name__ == "__main__":
-         main()
-    """
+            # Note weird indent.
+             if __name__ == "__main__":
+                 main()
+            """
         ).encode()
     )
 
     assert not is_entry_point(
         textwrap.dedent(
             """
-    # Note some nonsense, as a soundness check.
-     print(__name__)
-    """
+            # Note some nonsense, as a soundness check.
+            print(__name__)
+            """
         ).encode()
     )

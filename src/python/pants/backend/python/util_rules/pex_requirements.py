@@ -29,6 +29,7 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.util.docutil import bin_name, doc_url
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
     from pants.backend.python.util_rules.pex import Pex
@@ -246,8 +247,12 @@ class PexRequirements:
         self.constraints_strings = FrozenOrderedSet(sorted(constraints_strings))
         if isinstance(from_superset, LoadedLockfile) and not from_superset.is_pex_native:
             raise ValueError(
-                f"The lockfile {from_superset.original_lockfile} was not in PEX's "
-                "native format, and so cannot be directly used as a superset."
+                softwrap(
+                    f"""
+                    The lockfile {from_superset.original_lockfile} was not in PEX's
+                    native format, and so cannot be directly used as a superset.
+                    """
+                )
             )
         self.from_superset = from_superset
 
@@ -328,11 +333,12 @@ def _invalid_tool_lockfile_error(
     yield "the `<default>` lockfile provided by Pants " if isinstance(
         lockfile, ToolDefaultLockfile
     ) else f"the lockfile at {lockfile.file_path} "
-    yield (
-        f"to install the tool `{tool_name}`, but it is not compatible with your "
-        "configuration: "
-        "\n\n"
-    )
+    yield softwrap(
+        f"""
+        to install the tool `{tool_name}`, but it is not compatible with your
+        configuration:
+        """
+    ) + "\n\n"
 
     if any(
         i
@@ -342,9 +348,11 @@ def _invalid_tool_lockfile_error(
         )
         for i in validation.failure_reasons
     ):
-        yield (
-            "- You have set different requirements than those used to generate the lockfile. "
-            f"You can fix this by updating `[{tool_name}].version`"
+        yield softwrap(
+            f"""
+            - You have set different requirements than those used to generate the lockfile.
+            You can fix this by updating `[{tool_name}].version`
+            """
         )
         if lockfile.uses_source_plugins:
             yield f", `[{tool_name}].source_plugins`,"
@@ -353,41 +361,55 @@ def _invalid_tool_lockfile_error(
             not_in_user_reqs = metadata.requirements - user_requirements
             not_in_lock = user_requirements - metadata.requirements
             if not_in_lock:
-                yield (
-                    "In the input requirements, but not in the lockfile: "
-                    f"{sorted(str(r) for r in not_in_lock)}\n"
-                )
+                yield softwrap(
+                    f"""
+                    In the input requirements, but not in the lockfile:
+                    {sorted(str(r) for r in not_in_lock)}
+                    """
+                ) + "\n"
             if not_in_user_reqs:
-                yield (
-                    "In the lockfile, but not in the input requirements: "
-                    f"{sorted(str(r) for r in not_in_user_reqs)}\n"
-                )
+                yield softwrap(
+                    f"""
+                    In the lockfile, but not in the input requirements:
+                    {sorted(str(r) for r in not_in_user_reqs)}
+                    """
+                ) + "\n"
             yield "\n"
 
     if InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
-        yield (
-            f"- You have set interpreter constraints (`{user_interpreter_constraints}`) that "
-            "are not compatible with those used to generate the lockfile "
-            f"(`{metadata.valid_for_interpreter_constraints}`). "
+        yield softwrap(
+            f"""
+            - You have set interpreter constraints (`{user_interpreter_constraints}`) that
+            are not compatible with those used to generate the lockfile
+            (`{metadata.valid_for_interpreter_constraints}`).
+            """
         )
-        yield (
-            f"You can fix this by not setting `[{tool_name}].interpreter_constraints`, "
-            "or by using a new custom lockfile. "
-        ) if not lockfile.uses_project_interpreter_constraints else (
-            f"`{tool_name}` determines its interpreter constraints based on your code's own "
-            "constraints. To fix this error, you can either change your code's constraints "
-            f"(see {doc_url('python-interpreter-compatibility')}) or generate a new "
-            "custom lockfile. "
+        yield softwrap(
+            f"""
+            You can fix this by not setting `[{tool_name}].interpreter_constraints`,
+            or by using a new custom lockfile.
+            """
+        ) if not lockfile.uses_project_interpreter_constraints else softwrap(
+            f"""
+            `{tool_name}` determines its interpreter constraints based on your code's own
+            constraints. To fix this error, you can either change your code's constraints
+            (see {doc_url('python-interpreter-compatibility')}) or generate a new
+            custom lockfile.
+            """
         )
         yield "\n\n"
 
-    yield (
-        "To regenerate your lockfile based on your current configuration, run "
-        f"`{bin_name()} generate-lockfiles --resolve={tool_name}`. "
-    ) if isinstance(lockfile, ToolCustomLockfile) else (
-        "To generate a custom lockfile based on your current configuration, set "
-        f"`[{tool_name}].lockfile` to where you want to create the lockfile, then run "
-        f"`{bin_name()} generate-lockfiles --resolve={tool_name}`. "
+    yield softwrap(
+        f"""
+        To regenerate your lockfile based on your current configuration, run
+        `{bin_name()} generate-lockfiles --resolve={tool_name}`.
+        """
+    ) if isinstance(lockfile, ToolCustomLockfile) else softwrap(
+        f"""
+        To generate a custom lockfile based on your current configuration, set
+        `[{tool_name}].lockfile` to where you want to create the lockfile, then run
+        `{bin_name()} generate-lockfiles --resolve={tool_name}`.
+        """
     )
 
 
@@ -403,10 +425,12 @@ def _invalid_user_lockfile_error(
     yield f"at {lockfile.file_path}" if isinstance(
         lockfile, Lockfile
     ) else f"synthetically created at {lockfile.file_content.path}"
-    yield (
-        f" to install the resolve `{lockfile.resolve_name}` (from `[python].resolves`). However, "
-        "it is not compatible with the current targets because:\n\n"
-    )
+    yield softwrap(
+        f"""
+        to install the resolve `{lockfile.resolve_name}` (from `[python].resolves`). However,
+        it is not compatible with the current targets because:
+        """
+    ) + "\n\n"
 
     if InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH in validation.failure_reasons:
         # Note that for user lockfiles, we only care that user requirements are a subset of the
@@ -418,29 +442,37 @@ def _invalid_user_lockfile_error(
         # pex_from_targets.py. This implies that we don't need to worry about users depending on
         # python_requirement targets that aren't in that code's resolve.
         not_in_lock = sorted(str(r) for r in user_requirements - metadata.requirements)
-        yield (
-            f"- The targets depend on requirements that are not in the lockfile: {not_in_lock}\n"
-            f"This most often happens when adding a new requirement to your project, or bumping "
-            f"requirement versions. You can fix this by regenerating the lockfile with "
-            f"`generate-lockfiles`.\n\n"
-        )
+        yield softwrap(
+            f"""
+            - The targets depend on requirements that are not in the lockfile: {not_in_lock}
+
+            This most often happens when adding a new requirement to your project, or bumping
+            requirement versions. You can fix this by regenerating the lockfile with
+            `generate-lockfiles`.
+            """
+        ) + "\n\n"
 
     if InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
-        yield (
-            f"- The targets use interpreter constraints (`{user_interpreter_constraints}`) that "
-            "are not a subset of those used to generate the lockfile "
-            f"(`{metadata.valid_for_interpreter_constraints}`).\nThe lockfile's interpreter "
-            f"constraints are set by the option `[python].resolves_to_interpreter_constraints`, "
-            f"which determines how the lockfile is generated. Note that that option only changes "
-            f"how the lockfile is generated; you must still set interpreter constraints for "
-            f"targets via `[python].interpreter_constraints` and the `interpreter_constraints` "
-            f"field ({doc_url('python-interpreter-compatibility')}). All targets must have "
-            f"interpreter constraints that are a subset of their resolve's constraints.\n"
-            f"To fix this, you can either adjust the interpreter constraints of the targets "
-            f"which use the resolve '{lockfile.resolve_name}', or adjust "
-            f"`[python].resolves_to_interpreter_constraints` "
-            f"then run `generate-lockfiles`.\n\n"
-        )
+        yield softwrap(
+            f"""
+            - The targets use interpreter constraints (`{user_interpreter_constraints}`) that
+            are not a subset of those used to generate the lockfile
+            (`{metadata.valid_for_interpreter_constraints}`).
+
+            The lockfile's interpreter constraints are set by the option
+            `[python].resolves_to_interpreter_constraints`, which determines how the lockfile is
+            generated. Note that that option only changes how the lockfile is generated; you must
+            still set interpreter constraints for targets via `[python].interpreter_constraints` and
+            the `interpreter_constraints` field ({doc_url('python-interpreter-compatibility')}).
+            All targets must have interpreter constraints that are a subset of their resolve's
+            constraints.
+
+            To fix this, you can either adjust the interpreter constraints of the targets
+            which use the resolve '{lockfile.resolve_name}', or adjust
+            `[python].resolves_to_interpreter_constraints`
+            then run `generate-lockfiles`.
+            """
+        ) + "\n\n"
 
     yield "To regenerate your lockfile, "
     yield f"run `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}`." if isinstance(
