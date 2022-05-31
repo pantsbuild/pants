@@ -7,11 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
-    HelmChartLicenseField,
     HelmChartMetaSourceField,
-    HelmChartNotesField,
-    HelmChartReadmeField,
-    HelmChartSchemaField,
     HelmChartSourcesField,
 )
 from pants.core.target_types import FileSourceField, ResourceSourceField
@@ -63,26 +59,14 @@ class HelmChartSourceFilesRequest:
 
     @property
     def sources_fields(self) -> tuple[SourcesField, ...]:
-        fields: list[SourcesField] = [
-            self.field_set.sources,
-            self.field_set.readme,
-            self.field_set.license,
-            self.field_set.schema,
-            self.field_set.notes,
-        ]
+        fields: list[SourcesField] = [self.field_set.sources]
         if self.include_metadata:
             fields.append(self.field_set.chart)
         return tuple(fields)
 
     @property
     def valid_sources_types(self) -> tuple[type[SourcesField], ...]:
-        types: list[type[SourcesField]] = [
-            HelmChartSourcesField,
-            HelmChartReadmeField,
-            HelmChartSchemaField,
-            HelmChartLicenseField,
-            HelmChartNotesField,
-        ]
+        types: list[type[SourcesField]] = [HelmChartSourcesField]
         if self.include_metadata:
             types.append(HelmChartMetaSourceField)
         if self.include_resources:

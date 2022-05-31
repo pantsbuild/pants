@@ -15,7 +15,6 @@ from pants.engine.target import (
     Dependencies,
     FieldSet,
     MultipleSourcesField,
-    OptionalSingleSourceField,
     SingleSourceField,
     StringField,
     StringSequenceField,
@@ -108,46 +107,23 @@ class HelmChartMetaSourceField(SingleSourceField):
 
 class HelmChartSourcesField(MultipleSourcesField):
     default = (
+        ".helmignore",
+        "README.md",
+        "LICENSE",
         "values.yaml",
         "values.yml",
+        "values.schema.json",
         "templates/*.yaml",
         "templates/*.yml",
         "templates/*.tpl",
+        "templates/NOTES.txt",
         "crds/*.yaml",
         "crds/*.yml",
     )
-    expected_file_extensions = (".yaml", ".yml", ".tpl")
+    expected_file_extensions = (".helmignore", ".yaml", ".yml", ".tpl", ".json", ".md", ".txt", "")
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['values.yaml', 'templates/*.yaml', '!values_ignore.yaml']`"
     )
-
-
-class HelmChartReadmeField(OptionalSingleSourceField):
-    alias = "readme"
-    default = "README.md"
-    help = "Main documentation for the Helm chart"
-    expected_file_extensions = (".md",)
-
-
-class HelmChartLicenseField(OptionalSingleSourceField):
-    alias = "license"
-    default = "LICENSE"
-    help = "A plain text file containing the license for the chart"
-    expected_file_extensions = ("",)
-
-
-class HelmChartSchemaField(OptionalSingleSourceField):
-    alias = "schema"
-    default = "values.schema.json"
-    help = "A JSON Schema for imposing a structure on the `values.yaml` file"
-    expected_file_extensions = (".json",)
-
-
-class HelmChartNotesField(OptionalSingleSourceField):
-    alias = "notes"
-    default = "templates/NOTES.txt"
-    help = "A plain text file containing short usage notes"
-    expected_file_extensions = (".txt",)
 
 
 class HelmChartDependenciesField(Dependencies):
@@ -205,10 +181,6 @@ class HelmChartTarget(Target):
         HelmChartOutputPathField,
         HelmChartLintStrictField,
         HelmChartRepositoryField,
-        HelmChartReadmeField,
-        HelmChartLicenseField,
-        HelmChartSchemaField,
-        HelmChartNotesField,
         HelmRegistriesField,
         HelmSkipPushField,
         HelmSkipLintField,
@@ -226,10 +198,6 @@ class HelmChartFieldSet(FieldSet):
     chart: HelmChartMetaSourceField
     sources: HelmChartSourcesField
     dependencies: HelmChartDependenciesField
-    readme: HelmChartReadmeField
-    license: HelmChartLicenseField
-    schema: HelmChartSchemaField
-    notes: HelmChartNotesField
 
 
 class AllHelmChartTargets(Targets):
