@@ -27,6 +27,7 @@ from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, Wra
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +59,17 @@ async def isolate_local_dist_wheels(
     if not wheels:
         tgt = await Get(WrappedTarget, Address, dist_field_set.address)
         logger.warning(
-            f"Encountered a dependency on the {tgt.target.alias} target at {dist_field_set.address}, "
-            "but this target does not produce a Python wheel artifact. Therefore this target's "
-            "code will be used directly from sources, without a distribution being built, "
-            "and any native extensions in it will not be built.\n\n"
-            f"See {doc_url('python-distributions')} for details on how to set up a "
-            f"{tgt.target.alias} target to produce a wheel."
+            softwrap(
+                f"""
+                Encountered a dependency on the {tgt.target.alias} target at {dist_field_set.address},
+                but this target does not produce a Python wheel artifact. Therefore this target's
+                code will be used directly from sources, without a distribution being built,
+                and any native extensions in it will not be built.
+
+                See {doc_url('python-distributions')} for details on how to set up a
+                {tgt.target.alias} target to produce a wheel.
+                """
+            )
         )
 
     wheels_listing_result = await Get(

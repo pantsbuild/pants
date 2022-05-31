@@ -35,7 +35,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.osutil import is_macos_big_sur
-from pants.util.strutil import ensure_text
+from pants.util.strutil import ensure_text, softwrap
 
 
 class BuildBackendError(Exception):
@@ -250,8 +250,12 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
     for dist_type, path in paths.items():
         if path not in output_snapshot.files:
             raise BuildBackendError(
-                f"Build backend {request.build_system.build_backend} did not create "
-                f"expected {dist_type} file {path}"
+                softwrap(
+                    f"""
+                    Build backend {request.build_system.build_backend} did not create
+                    expected {dist_type} file {path}
+                    """
+                )
             )
     return DistBuildResult(
         output_digest, wheel_path=paths.get("wheel"), sdist_path=paths.get("sdist")

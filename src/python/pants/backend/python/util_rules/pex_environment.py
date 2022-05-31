@@ -121,10 +121,12 @@ class PexEnvironment(EngineAwareReturnType):
 
     def message(self) -> str:
         if not self.bootstrap_python:
-            return (
-                "No bootstrap Python executable could be found from the option "
-                "`interpreter_search_paths` in the `[python]` scope. Will attempt to run "
-                "PEXes directly."
+            return softwrap(
+                """
+                No bootstrap Python executable could be found from the option
+                `interpreter_search_paths` in the `[python]` scope. Will attempt to run
+                PEXes directly.
+                """
             )
         return f"Selected {self.bootstrap_python.path} to bootstrap PEXes with."
 
