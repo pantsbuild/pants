@@ -141,7 +141,7 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     """
     if isinstance(v, bytes):
         v = v.decode()
-    return re.sub(r"/.*/pants-sandbox[a-zA-Z0-9]+/", "", v)
+    return re.sub(r"/.*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
 
 
 def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> list[str]:
