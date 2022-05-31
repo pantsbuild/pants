@@ -56,9 +56,11 @@ def rule_runner() -> RuleRunner:
         {
             "src/python/foo.proto": 'syntax = "proto3";message Foo {}',
             "src/python/lib.py": "from foo import Foo\nclass SomeClass:\n  pass\n",
-            "src/python/BUILD": (
-                "protobuf_source(name='proto', source='foo.proto')\n"
-                "python_sources(dependencies=[':proto'])"
+            "src/python/BUILD": dedent(
+                """\
+                protobuf_source(name='proto', source='foo.proto')
+                python_sources(dependencies=[':proto'])
+                """
             ),
         }
     )

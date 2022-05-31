@@ -20,6 +20,7 @@ from pants.backend.python.target_types import (
 )
 from pants.core.target_types import FileTarget
 from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
+from pants.util.strutil import softwrap
 
 
 @pytest.fixture
@@ -74,9 +75,14 @@ def test_no_matches(rule_runner: RuleRunner, caplog) -> None:
     print(caplog.records)
     assert len(caplog.records) == 1
     assert (
-        "No Python files/targets matched for the `py-constraints` goal. All target types with "
-        "Python interpreter constraints: python_source, python_test"
-    ) in caplog.text
+        softwrap(
+            """
+            No Python files/targets matched for the `py-constraints` goal. All target types with
+            Python interpreter constraints: python_source, python_test
+            """
+        )
+        in caplog.text
+    )
 
 
 def test_render_constraints(rule_runner: RuleRunner) -> None:

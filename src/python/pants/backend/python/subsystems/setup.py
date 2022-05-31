@@ -482,10 +482,14 @@ class PythonSetup(Subsystem):
         for resolve, ics in self._resolves_to_interpreter_constraints.items():
             if resolve not in self.resolves:
                 raise KeyError(
-                    "Unrecognized resolve name in the option "
-                    f"`[python].resolves_to_interpreter_constraints`: {resolve}. Each "
-                    "key must be one of the keys in `[python].resolves`: "
-                    f"{sorted(self.resolves.keys())}"
+                    softwrap(
+                        f"""
+                        Unrecognized resolve name in the option
+                        `[python].resolves_to_interpreter_constraints`: {resolve}. Each
+                        key must be one of the keys in `[python].resolves`:
+                        {sorted(self.resolves.keys())}
+                        """
+                    )
                 )
             result[resolve] = tuple(ics)
         return result

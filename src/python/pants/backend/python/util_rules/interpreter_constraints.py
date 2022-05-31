@@ -20,6 +20,7 @@ from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
 
 
 # This protocol allows us to work with any arbitrary FieldSet. See
@@ -158,8 +159,12 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             # There are no possible combinations.
             attempted_str = " AND ".join(f"({' OR '.join(cs)})" for cs in constraint_sets)
             raise ValueError(
-                "These interpreter constraints cannot be merged, as they require "
-                f"conflicting interpreter types: {attempted_str}"
+                softwrap(
+                    f"""
+                    These interpreter constraints cannot be merged, as they require
+                    conflicting interpreter types: {attempted_str}
+                    """
+                )
             )
         return ret
 
@@ -348,20 +353,28 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             if major == 2:
                 if minor != 7:
                     raise AssertionError(
-                        "Unexpected value in `[python].interpreter_versions_universe`: "
-                        f"{major_minor}. Expected the only Python 2 value to be '2.7', given that "
-                        f"all other versions are unmaintained or do not exist."
+                        softwrap(
+                            f"""
+                            Unexpected value in `[python].interpreter_versions_universe`:
+                            {major_minor}. Expected the only Python 2 value to be '2.7', given that
+                            all other versions are unmaintained or do not exist.
+                            """
+                        )
                     )
                 minors.append((2, minor))
             elif major == 3:
                 minors.append((3, minor))
             else:
                 raise AssertionError(
-                    "Unexpected value in `[python].interpreter_versions_universe`: "
-                    f"{major_minor}. Expected to only include '2.7' and/or Python 3 versions, "
-                    "given that Python 3 will be the last major Python version. Please open an "
-                    "issue at https://github.com/pantsbuild/pants/issues/new if this is no longer "
-                    "true."
+                    softwrap(
+                        f"""
+                        Unexpected value in `[python].interpreter_versions_universe`:
+                        {major_minor}. Expected to only include '2.7' and/or Python 3 versions,
+                        given that Python 3 will be the last major Python version. Please open an
+                        issue at https://github.com/pantsbuild/pants/issues/new if this is no longer
+                        true.
+                        """
+                    )
                 )
 
         valid_patches = FrozenOrderedSet(
@@ -372,12 +385,17 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
 
         if not valid_patches:
             raise ValueError(
-                f"The interpreter constraints `{self}` are not compatible with any of the "
-                "interpreter versions from `[python].interpreter_versions_universe`.\n\n"
-                "Please either change these interpreter constraints or update the "
-                "`interpreter_versions_universe` to include the interpreters set in these "
-                f"constraints. Run `{bin_name()} help-advanced python` for more information on the "
-                "`interpreter_versions_universe` option."
+                softwrap(
+                    f"""
+                    The interpreter constraints `{self}` are not compatible with any of the
+                    interpreter versions from `[python].interpreter_versions_universe`.
+
+                    Please either change these interpreter constraints or update the
+                    `interpreter_versions_universe` to include the interpreters set in these
+                    constraints. Run `{bin_name()} help-advanced python` for more information on the
+                    `interpreter_versions_universe` option.
+                    """
+                )
             )
 
         return valid_patches

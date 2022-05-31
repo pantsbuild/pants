@@ -179,8 +179,12 @@ class MyPy(PythonToolBase):
         configured = []
         if config and b"python_version" in config.content:
             configured.append(
-                f"`python_version` in {config.path} (which is used because of either config "
-                "discovery or the `[mypy].config` option)"
+                softwrap(
+                    f"""
+                    `python_version` in {config.path} (which is used because of either config
+                    discovery or the `[mypy].config` option)
+                    """
+                )
             )
         if "--py2" in self.args:
             configured.append("`--py2` in the `--mypy-args` option")
@@ -189,13 +193,18 @@ class MyPy(PythonToolBase):
         if configured:
             formatted_configured = " and you set ".join(configured)
             logger.warning(
-                f"You set {formatted_configured}. Normally, Pants would automatically set this "
-                "for you based on your code's interpreter constraints "
-                f"({doc_url('python-interpreter-compatibility')}). Instead, it will "
-                "use what you set.\n\n"
-                "(Automatically setting the option allows Pants to partition your targets by their "
-                "constraints, so that, for example, you can run MyPy on Python 2-only code and "
-                "Python 3-only code at the same time. This feature may no longer work.)"
+                softwrap(
+                    f"""
+                    You set {formatted_configured}. Normally, Pants would automatically set this
+                    for you based on your code's interpreter constraints
+                    ({doc_url('python-interpreter-compatibility')}). Instead, it will
+                    use what you set.
+
+                    (Automatically setting the option allows Pants to partition your targets by their
+                    constraints, so that, for example, you can run MyPy on Python 2-only code and
+                    Python 3-only code at the same time. This feature may no longer work.)
+                    """
+                )
             )
         return bool(configured)
 

@@ -102,18 +102,26 @@ class PythonToolRequirementsBase(Subsystem):
     def __init__(self, *args, **kwargs):
         if self.default_interpreter_constraints and not self.register_interpreter_constraints:
             raise ValueError(
-                f"`default_interpreter_constraints` are configured for `{self.options_scope}`, but "
-                "`register_interpreter_constraints` is not set to `True`, so the "
-                "`--interpreter-constraints` option will not be registered. Did you mean to set "
-                "this?"
+                softwrap(
+                    f"""
+                    `default_interpreter_constraints` are configured for `{self.options_scope}`, but
+                    `register_interpreter_constraints` is not set to `True`, so the
+                    `--interpreter-constraints` option will not be registered. Did you mean to set
+                    this?
+                    """
+                )
             )
 
         if self.register_lockfile and (
             not self.default_lockfile_resource or not self.default_lockfile_url
         ):
             raise ValueError(
-                "The class property `default_lockfile_resource` and `default_lockfile_url` "
-                f"must be set if `register_lockfile` is set. See `{self.options_scope}`."
+                softwrap(
+                    f"""
+                    The class property `default_lockfile_resource` and `default_lockfile_url`
+                    must be set if `register_lockfile` is set. See `{self.options_scope}`.
+                    """
+                )
             )
 
         super().__init__(*args, **kwargs)
@@ -260,9 +268,13 @@ class PythonToolBase(PythonToolRequirementsBase):
         is_default_entry_point = self.options.is_default("entry_point")
         if not is_default_console_script and not is_default_entry_point:
             raise OptionsError(
-                f"Both [{self.options_scope}].console-script={self.console_script} and "
-                f"[{self.options_scope}].entry-point={self.entry_point} are configured "
-                f"but these options are mutually exclusive. Please pick one."
+                softwrap(
+                    f"""
+                    Both [{self.options_scope}].console-script={self.console_script} and
+                    [{self.options_scope}].entry-point={self.entry_point} are configured
+                    but these options are mutually exclusive. Please pick one.
+                    """
+                )
             )
         if not is_default_console_script:
             assert self.console_script is not None
