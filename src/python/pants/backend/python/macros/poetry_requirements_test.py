@@ -422,7 +422,7 @@ def test_parse_multi_reqs() -> None:
                 black==19.10b0;
                 platform_python_implementation == "CPython" and python_version == "3.6"
                 """
-            )
+            ).strip()
         ),
         PipRequirement.parse("isort<5.6,>=5.5.1"),
     }

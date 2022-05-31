@@ -422,9 +422,9 @@ def _invalid_user_lockfile_error(
     user_interpreter_constraints: InterpreterConstraints,
 ) -> Iterator[str]:
     yield "You are using the lockfile "
-    yield f"at {lockfile.file_path}" if isinstance(
+    yield f"at {lockfile.file_path} " if isinstance(
         lockfile, Lockfile
-    ) else f"synthetically created at {lockfile.file_content.path}"
+    ) else f"synthetically created at {lockfile.file_content.path} "
     yield softwrap(
         f"""
         to install the resolve `{lockfile.resolve_name}` (from `[python].resolves`). However,

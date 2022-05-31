@@ -138,7 +138,7 @@ def parse_str_version(attributes: str, **kwargs: str) -> str:
                         If you believe this requirement is valid, consider opening an issue at
                         https://github.com/pantsbuild/pants/issues so that we can update Pants'
                         Poetry macro to support this.
-                    """
+                        """
                     )
                 )
 
@@ -189,12 +189,9 @@ def parse_python_constraint(constr: str | None, fp: str) -> str:
         return list(itertools.chain(*[i.split(",") for i in lst]))
 
     def prepend(version: str) -> str:
-        return softwrap(
-            f"""
-            python_version{''.join(i for i in version if i in valid_specifiers)} '
-            {''.join(i for i in version if i not in valid_specifiers)}'
-            """
-        )
+        valid_versions = "".join(i for i in version if i in valid_specifiers)
+        invalid_versions = "".join(i for i in version if i not in valid_specifiers)
+        return f"python_version{valid_versions} '{invalid_versions}'"
 
     prepend_and_clean = [
         [prepend(".".join(j.split(".")[:2])) for j in conv_and(i)] for i in ver_parsed
@@ -414,7 +411,7 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
                 and tool.poetry.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded
                 by Pants from a poetry_requirements macro. Did you mean to populate these
                 with requirements?
-            """
+                """
             )
         )
 
@@ -527,9 +524,9 @@ async def generate_from_python_requirement(
         raise InvalidFieldException(
             softwrap(
                 f"""
-            Unused key in the `overrides` field for {request.template_address}:
-            {sorted(overrides)}
-            """
+                Unused key in the `overrides` field for {request.template_address}:
+                {sorted(overrides)}
+                """
             )
         )
 

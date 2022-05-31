@@ -126,7 +126,7 @@ async def package_pex_binary(
                 See {doc_url('resources')}.
 
                 Files targets dependencies: {files_addresses}
-            """
+                """
             )
         )
 

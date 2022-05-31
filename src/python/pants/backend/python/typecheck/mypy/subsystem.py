@@ -203,7 +203,7 @@ class MyPy(PythonToolBase):
                     (Automatically setting the option allows Pants to partition your targets by their
                     constraints, so that, for example, you can run MyPy on Python 2-only code and
                     Python 3-only code at the same time. This feature may no longer work.)
-                """
+                    """
                 )
             )
         return bool(configured)

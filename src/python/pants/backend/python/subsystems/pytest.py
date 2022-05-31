@@ -183,15 +183,15 @@ class PyTest(PythonToolBase):
         raise ValueError(
             softwrap(
                 f"""
-            You set `[test].use_coverage`, but `[pytest].extra_requirements` is missing
-            `pytest-cov`, which is needed to collect coverage data.
+                You set `[test].use_coverage`, but `[pytest].extra_requirements` is missing
+                `pytest-cov`, which is needed to collect coverage data.
 
-            This happens when overriding the `extra_requirements` option. Please either explicitly
-            add back `pytest-cov` or use `extra_requirements.add` to keep Pants's default, rather than
-            overriding it. Run `{bin_name()} help-advanced pytest` to see the default version of
-            `pytest-cov` and see {doc_url('options#list-values')} for more on adding vs.
-            overriding list options.
-            """
+                This happens when overriding the `extra_requirements` option. Please either explicitly
+                add back `pytest-cov` or use `extra_requirements.add` to keep Pants's default, rather than
+                overriding it. Run `{bin_name()} help-advanced pytest` to see the default version of
+                `pytest-cov` and see {doc_url('options#list-values')} for more on adding vs.
+                overriding list options.
+                """
             )
         )
 

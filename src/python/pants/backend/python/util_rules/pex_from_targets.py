@@ -416,10 +416,10 @@ async def create_pex_from_targets(
                     raise ValueError(
                         softwrap(
                             f"""
-                        [python].run_against_entire_lockfile was set, but could not find a
-                        lockfile or constraints file for this target set. See
-                        {doc_url('python-third-party-dependencies')} for details.
-                        """
+                            [python].run_against_entire_lockfile was set, but could not find a
+                            lockfile or constraints file for this target set. See
+                            {doc_url('python-third-party-dependencies')} for details.
+                            """
                         )
                     )
                 return repository_pex_request.maybe_pex_request

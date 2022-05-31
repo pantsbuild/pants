@@ -488,7 +488,7 @@ class PythonSetup(Subsystem):
                         `[python].resolves_to_interpreter_constraints`: {resolve}. Each
                         key must be one of the keys in `[python].resolves`:
                         {sorted(self.resolves.keys())}
-                    """
+                        """
                     )
                 )
             result[resolve] = tuple(ics)

@@ -72,9 +72,9 @@ async def py_constraints(
             console.print_stderr(
                 softwrap(
                     """
-                The `py-constraints --summary` goal does not take file/target arguments. Run
-                `help py-constraints` for more details.
-                """
+                    The `py-constraints --summary` goal does not take file/target arguments. Run
+                    `help py-constraints` for more details.
+                    """
                 )
             )
             return PyConstraintsGoal(exit_code=1)
@@ -151,9 +151,9 @@ async def py_constraints(
         logger.warning(
             softwrap(
                 f"""
-            No Python files/targets matched for the `py-constraints` goal. All target types with
-            Python interpreter constraints: {', '.join(target_types_with_constraints)}
-            """
+                No Python files/targets matched for the `py-constraints` goal. All target types with
+                Python interpreter constraints: {', '.join(target_types_with_constraints)}
+                """
             )
         )
         return PyConstraintsGoal(exit_code=0)

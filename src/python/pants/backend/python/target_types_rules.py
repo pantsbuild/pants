@@ -333,7 +333,7 @@ async def resolve_python_distribution_entry_points(
 
                     Alternatively, you can use a module like "project.app:main".
                     See {doc_url('python-distributions')}.
-                """
+                    """
                 )
             )
 

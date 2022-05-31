@@ -145,7 +145,7 @@ async def generate_from_pipenv_requirement(
                 f"""
                 Unused key in the `overrides` field for {request.template_address}:
                 {sorted(overrides)}
-            """
+                """
             )
         )
 

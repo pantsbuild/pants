@@ -120,9 +120,9 @@ class OwnershipError(SetupPyError):
         super().__init__(
             softwrap(
                 f"""
-            {msg} See {doc_url('python-distributions')} for
-            how python_sources targets are mapped to distributions.
-            """
+                {msg} See {doc_url('python-distributions')} for
+                how python_sources targets are mapped to distributions.
+                """
             )
         )
 
