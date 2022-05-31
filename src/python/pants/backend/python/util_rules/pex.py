@@ -448,18 +448,19 @@ async def build_pex(
             loaded_lockfile = request.requirements.from_superset
             # NB: This is also validated in the constructor.
             assert loaded_lockfile.is_pex_native
-            requirements_digests.append(loaded_lockfile.lockfile_digest)
-            argv.extend(["--lock", loaded_lockfile.lockfile_path])
-            argv.extend(pex_lock_resolver_args)
+            if request.requirements.req_strings:
+                requirements_digests.append(loaded_lockfile.lockfile_digest)
+                argv.extend(["--lock", loaded_lockfile.lockfile_path])
+                argv.extend(pex_lock_resolver_args)
 
-            if loaded_lockfile.metadata:
-                validate_metadata(
-                    loaded_lockfile.metadata,
-                    request.interpreter_constraints,
-                    loaded_lockfile.original_lockfile,
-                    request.requirements.req_strings,
-                    python_setup,
-                )
+                if loaded_lockfile.metadata:
+                    validate_metadata(
+                        loaded_lockfile.metadata,
+                        request.interpreter_constraints,
+                        loaded_lockfile.original_lockfile,
+                        request.requirements.req_strings,
+                        python_setup,
+                    )
         else:
             assert request.requirements.from_superset is None
 
