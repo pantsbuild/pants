@@ -25,7 +25,7 @@ from pants.backend.python.target_types import (
     PexStripEnvField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
-    RunInlineField,
+    RunInSandboxField,
 )
 from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatforms
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
@@ -71,7 +71,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     execution_mode: PexExecutionModeField
     include_requirements: PexIncludeRequirementsField
     include_tools: PexIncludeToolsField
-    run_inline: RunInlineField
+    run_in_sandbox: RunInSandboxField
 
     @property
     def _execution_mode(self) -> PexExecutionMode:

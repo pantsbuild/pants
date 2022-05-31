@@ -13,27 +13,27 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 
 
 @pytest.mark.parametrize(
-    ("entry_point", "execution_mode", "include_tools", "run_inline"),
+    ("entry_point", "execution_mode", "include_tools", "run_in_sandbox"),
     [
-        ("app.py", None, True, False),
         ("app.py", None, True, True),
-        ("app.py", PexExecutionMode.VENV, False, False),
-        ("app.py:main", PexExecutionMode.ZIPAPP, True, False),
-        ("app.py:main", None, False, False),
+        ("app.py", None, True, False),
+        ("app.py", PexExecutionMode.VENV, False, True),
+        ("app.py:main", PexExecutionMode.ZIPAPP, True, True),
+        ("app.py:main", None, False, True),
     ],
 )
 def test_run_sample_script(
     entry_point: str,
     execution_mode: Optional[PexExecutionMode],
     include_tools: bool,
-    run_inline: bool,
+    run_in_sandbox: bool,
 ) -> None:
     """Test that we properly run a `pex_binary` target.
 
     This checks a few things:
     - We can handle source roots.
     - We properly load third party requirements.
-    - We run inline when requested.
+    - We run in-repo when requested, and handle codegen correctly.
     - We propagate the error code.
     """
     sources = {
@@ -59,7 +59,7 @@ def test_run_sample_script(
               entry_point={entry_point!r},
               execution_mode={execution_mode.value if execution_mode is not None else None!r},
               include_tools={include_tools!r},
-              run_inline={run_inline!r},
+              run_in_sandbox={run_in_sandbox!r},
             )
             """
         ),
@@ -96,11 +96,11 @@ def test_run_sample_script(
     result, test_repo_root = run()
     assert "Hola, mundo.\n" in result.stderr
     file = result.stdout.strip()
-    if run_inline:
-        assert file == os.path.join(test_repo_root, "src_root2/utils/strutil.py")
-    else:
+    if run_in_sandbox:
         assert file.endswith("src_root2/utils/strutil.py")
         assert ".pants.d/tmp" in file
+    else:
+        assert file == os.path.join(test_repo_root, "src_root2/utils/strutil.py")
     assert result.exit_code == 23
 
     if include_tools:

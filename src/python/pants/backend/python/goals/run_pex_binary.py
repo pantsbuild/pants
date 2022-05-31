@@ -33,7 +33,7 @@ from pants.util.logging import LogLevel
 async def create_pex_binary_run_request(
     field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults, pex_env: PexEnvironment
 ) -> RunRequest:
-    run_inline = field_set.run_inline.value
+    run_in_sandbox = field_set.run_in_sandbox.value
     entry_point, transitive_targets = await MultiGet(
         Get(
             ResolvedPexEntryPoint,
@@ -106,10 +106,10 @@ async def create_pex_binary_run_request(
     args = complete_pex_env.create_argv(in_chroot(pex.name), python=pex.python)
 
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
-    # The order here is important: we want the inline sources to take precedence over their
-    # copies in the chroot (see above for why those copies exist in inline mode).
+    # The order here is important: we want the in-repo sources to take precedence over their
+    # copies in the sandbox (see above for why those copies exist even in non-sandboxed mode).
     source_roots = [
-        *(sources.source_roots if run_inline else []),
+        *([] if run_in_sandbox else sources.source_roots),
         *chrooted_source_roots,
     ]
     extra_env = {
