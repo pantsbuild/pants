@@ -33,6 +33,7 @@ from pants.util.logging import LogLevel
 async def create_pex_binary_run_request(
     field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults, pex_env: PexEnvironment
 ) -> RunRequest:
+    run_in_sandbox = field_set.run_in_sandbox.value
     entry_point, transitive_targets = await MultiGet(
         Get(
             ResolvedPexEntryPoint,
@@ -85,16 +86,18 @@ async def create_pex_binary_run_request(
         ),
     )
 
-    merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                pex.digest,
-                local_dists.pex.digest,
-                local_dists.remaining_sources.source_files.snapshot.digest,
-            ]
-        ),
-    )
+    input_digests = [
+        pex.digest,
+        local_dists.pex.digest,
+        # Note regarding inline mode: You might think that the sources don't need to be copied
+        # into the chroot when using inline sources. But they do, because some of them might be
+        # codegenned, and those won't exist in the inline source tree. Rather than incurring the
+        # complexity of figuring out here which sources were codegenned, we copy everything.
+        # The inline source roots precede the chrooted ones in PEX_EXTRA_SYS_PATH, so the inline
+        # sources will take precedence and their copies in the chroot will be ignored.
+        local_dists.remaining_sources.source_files.snapshot.digest,
+    ]
+    merged_digest = await Get(Digest, MergeDigests(input_digests))
 
     def in_chroot(relpath: str) -> str:
         return os.path.join("{chroot}", relpath)
@@ -103,10 +106,16 @@ async def create_pex_binary_run_request(
     args = complete_pex_env.create_argv(in_chroot(pex.name), python=pex.python)
 
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
+    # The order here is important: we want the in-repo sources to take precedence over their
+    # copies in the sandbox (see above for why those copies exist even in non-sandboxed mode).
+    source_roots = [
+        *([] if run_in_sandbox else sources.source_roots),
+        *chrooted_source_roots,
+    ]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=pex.python is not None),
         "PEX_PATH": in_chroot(local_dists.pex.name),
-        "PEX_EXTRA_SYS_PATH": os.pathsep.join(chrooted_source_roots),
+        "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
 
     return RunRequest(digest=merged_digest, args=args, extra_env=extra_env)

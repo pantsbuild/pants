@@ -4,7 +4,7 @@
 import json
 import os
 from textwrap import dedent
-from typing import Optional
+from typing import Optional, Tuple
 
 import pytest
 
@@ -13,34 +13,39 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 
 
 @pytest.mark.parametrize(
-    ("entry_point", "execution_mode", "include_tools"),
+    ("entry_point", "execution_mode", "include_tools", "run_in_sandbox"),
     [
-        ("app.py", None, True),
-        ("app.py", PexExecutionMode.VENV, False),
-        ("app.py:main", PexExecutionMode.ZIPAPP, True),
-        ("app.py:main", None, False),
+        ("app.py", None, True, True),
+        ("app.py", None, True, False),
+        ("app.py", PexExecutionMode.VENV, False, True),
+        ("app.py:main", PexExecutionMode.ZIPAPP, True, True),
+        ("app.py:main", None, False, True),
     ],
 )
 def test_run_sample_script(
-    entry_point: str, execution_mode: Optional[PexExecutionMode], include_tools: bool
+    entry_point: str,
+    execution_mode: Optional[PexExecutionMode],
+    include_tools: bool,
+    run_in_sandbox: bool,
 ) -> None:
     """Test that we properly run a `pex_binary` target.
 
     This checks a few things:
     - We can handle source roots.
     - We properly load third party requirements.
+    - We run in-repo when requested, and handle codegen correctly.
     - We propagate the error code.
     """
     sources = {
         "src_root1/project/app.py": dedent(
             """\
             import sys
-            from utils.strutil import upper_case
-
+            from utils.strutil import my_file
+            from codegen.hello_pb2 import Hi
 
             def main():
-                print(upper_case("Hello world."))
                 print("Hola, mundo.", file=sys.stderr)
+                print(my_file())
                 sys.exit(23)
 
             if __name__ == "__main__":
@@ -54,22 +59,31 @@ def test_run_sample_script(
               entry_point={entry_point!r},
               execution_mode={execution_mode.value if execution_mode is not None else None!r},
               include_tools={include_tools!r},
+              run_in_sandbox={run_in_sandbox!r},
             )
             """
         ),
         "src_root2/utils/strutil.py": dedent(
             """\
-            def upper_case(s):
-                return s.upper()
+            def my_file():
+                return __file__
             """
         ),
         "src_root2/utils/BUILD": "python_sources()",
+        "src_root2/codegen/hello.proto": 'syntax = "proto3";\nmessage Hi {{}}',
+        "src_root2/codegen/BUILD": dedent(
+            """\
+            protobuf_sources()
+            python_requirement(name='protobuf', requirements=['protobuf'])
+            """
+        ),
     }
 
-    def run(*extra_args: str, **extra_env: str) -> PantsResult:
+    def run(*extra_args: str, **extra_env: str) -> Tuple[PantsResult, str]:
         with setup_tmpdir(sources) as tmpdir:
             args = [
                 "--backend-packages=pants.backend.python",
+                "--backend-packages=pants.backend.codegen.protobuf.python",
                 f"--source-root-patterns=['/{tmpdir}/src_root1', '/{tmpdir}/src_root2']",
                 "--pants-ignore=__pycache__",
                 "--pants-ignore=/src/python",
@@ -77,15 +91,20 @@ def test_run_sample_script(
                 f"{tmpdir}/src_root1/project/app.py",
                 *extra_args,
             ]
-            return run_pants(args, extra_env=extra_env)
+            return run_pants(args, extra_env=extra_env), tmpdir
 
-    result = run()
+    result, test_repo_root = run()
     assert "Hola, mundo.\n" in result.stderr
-    assert result.stdout == "HELLO WORLD.\n"
+    file = result.stdout.strip()
+    if run_in_sandbox:
+        assert file.endswith("src_root2/utils/strutil.py")
+        assert ".pants.d/tmp" in file
+    else:
+        assert file == os.path.join(test_repo_root, "src_root2/utils/strutil.py")
     assert result.exit_code == 23
 
     if include_tools:
-        result = run("--", "info", PEX_TOOLS="1")
+        result, _ = run("--", "info", PEX_TOOLS="1")
         assert result.exit_code == 0
         pex_info = json.loads(result.stdout)
         assert (execution_mode is PexExecutionMode.VENV) == pex_info["venv"]
