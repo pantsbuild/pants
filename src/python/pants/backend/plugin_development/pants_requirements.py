@@ -99,7 +99,6 @@ def generate_from_pants_requirements(
                 **request.template,
             },
             request.template_address.create_generated(dist),
-            name_explicitly_set=request.generator_name_explicitly_set,
             union_membership=union_membership,
         )
 

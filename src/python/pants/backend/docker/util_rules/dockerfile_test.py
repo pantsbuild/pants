@@ -125,11 +125,8 @@ def setup_target_generator(rule_runner_args: dict) -> None:
             request.generator,
             [
                 DockerImageTarget(
-                    {
-                        "instructions": DOCKERFILE.strip().split("\n"),
-                    },
+                    {"instructions": DOCKERFILE.strip().split("\n")},
                     request.template_address.create_generated("generated-image"),
-                    name_explicitly_set=request.generator_name_explicitly_set,
                     union_membership=union_membership,
                 )
             ],

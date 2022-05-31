@@ -1027,8 +1027,6 @@ class GenerateTargetsRequest(Generic[_TargetGenerator]):
     # applied within overrides.
     overrides: dict[str, dict[Address, dict[str, Any]]] = dataclasses.field(hash=False)
 
-    generator_name_explicitly_set: bool
-
     def require_unparametrized_overrides(self) -> dict[str, dict[str, Any]]:
         """Flattens overrides for `GenerateTargetsRequest` impls which don't support `parametrize`.
 
@@ -1105,7 +1103,6 @@ def _generate_file_level_targets(
     # NB: Should only ever be set to `None` in tests.
     union_membership: UnionMembership | None,
     *,
-    generator_name_explicitly_set: bool,
     add_dependencies_on_all_siblings: bool,
 ) -> GeneratedTargets:
     """Generate one new target for each path, using the same fields as the generator target except
@@ -1182,7 +1179,6 @@ def _generate_file_level_targets(
         return generated_target_cls(
             generated_target_fields,
             address,
-            name_explicitly_set=generator_name_explicitly_set,
             union_membership=union_membership,
             residence_dir=os.path.dirname(full_fp),
         )

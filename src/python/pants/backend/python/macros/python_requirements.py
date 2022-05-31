@@ -99,7 +99,6 @@ async def generate_from_python_requirement(
             target_name=request.template_address.target_name,
             relative_file_path=requirements_rel_path,
         ),
-        name_explicitly_set=request.generator_name_explicitly_set,
         union_membership=union_membership,
     )
 
@@ -145,7 +144,6 @@ async def generate_from_python_requirement(
                 **tgt_overrides,
             },
             request.template_address.create_generated(project_name),
-            name_explicitly_set=request.generator_name_explicitly_set,
             union_membership=union_membership,
         )
 

@@ -249,7 +249,6 @@ async def resolve_target_parametrizations(
                         name: dict(Parametrize.expand(generator.address, override))
                         for name, override in overrides.items()
                     },
-                    generator_name_explicitly_set=target_adaptor.name_explicitly_set,
                 ),
             )
             for generator, template in generators
@@ -1172,7 +1171,6 @@ async def generate_file_targets(
         request.template,
         request.overrides,
         union_membership,
-        generator_name_explicitly_set=request.generator_name_explicitly_set,
         add_dependencies_on_all_siblings=add_dependencies_on_all_siblings,
     )
 
