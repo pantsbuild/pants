@@ -35,6 +35,8 @@ restricted_token_matches =  """{
 
 [buildsense]
 enable = true
+log_final_upload_latency = true
+collect_platform_data = true
 
 [subprocess-environment]
 env_vars.add = [
