@@ -13,7 +13,6 @@ from pants.backend.python.macros.common_fields import (
     TypeStubsModuleMappingField,
 )
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementResolveField,
@@ -37,7 +36,7 @@ from pants.engine.target import (
     SingleSourceField,
     TargetGenerator,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -71,7 +70,7 @@ class GenerateFromPipenvRequirementsRequest(GenerateTargetsRequest):
 # TODO(#10655): differentiate between Pipfile vs. Pipfile.lock.
 @rule(desc="Generate `python_requirement` targets from Pipfile.lock", level=LogLevel.DEBUG)
 async def generate_from_pipenv_requirement(
-    request: GenerateFromPipenvRequirementsRequest, python_setup: PythonSetup
+    request: GenerateFromPipenvRequirementsRequest, union_membership: UnionMembership
 ) -> GeneratedTargets:
     generator = request.generator
     lock_rel_path = generator[PipenvSourceField].value
@@ -88,6 +87,7 @@ async def generate_from_pipenv_requirement(
             target_name=request.template_address.target_name,
             relative_file_path=lock_rel_path,
         ),
+        union_membership,
     )
 
     digest_contents = await Get(
@@ -132,6 +132,7 @@ async def generate_from_pipenv_requirement(
                 **tgt_overrides,
             },
             request.template_address.create_generated(parsed_req.project_name),
+            union_membership,
         )
 
     result = tuple(

@@ -225,6 +225,7 @@ async def generate_targets_from_go_mod(
         return TargetGeneratorSourcesHelperTarget(
             {TargetGeneratorSourcesHelperSourcesField.alias: fp},
             generator_addr.create_file(fp),
+            union_membership,
         )
 
     file_tgts = [gen_file_tgt("go.mod")]

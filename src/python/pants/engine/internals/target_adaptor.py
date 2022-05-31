@@ -13,7 +13,7 @@ class TargetAdaptor:
     """A light-weight object to store target information before being converted into the Target
     API."""
 
-    def __init__(self, type_alias: str, name: str, **kwargs: Any) -> None:
+    def __init__(self, type_alias: str, name: str | None, **kwargs: Any) -> None:
         self.type_alias = type_alias
         self.name = name
         self.kwargs = kwargs
@@ -29,3 +29,7 @@ class TargetAdaptor:
             and self.name == other.name
             and self.kwargs == other.kwargs
         )
+
+    @property
+    def name_explicitly_set(self) -> bool:
+        return self.name is not None

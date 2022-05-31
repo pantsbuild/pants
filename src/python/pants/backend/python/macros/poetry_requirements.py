@@ -21,7 +21,6 @@ from pants.backend.python.macros.common_fields import (
     TypeStubsModuleMappingField,
 )
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementResolveField,
@@ -46,7 +45,7 @@ from pants.engine.target import (
     SingleSourceField,
     TargetGenerator,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -455,7 +454,9 @@ class GenerateFromPoetryRequirementsRequest(GenerateTargetsRequest):
 
 @rule(desc="Generate `python_requirement` targets from Poetry pyproject.toml", level=LogLevel.DEBUG)
 async def generate_from_python_requirement(
-    request: GenerateFromPoetryRequirementsRequest, build_root: BuildRoot, python_setup: PythonSetup
+    request: GenerateFromPoetryRequirementsRequest,
+    build_root: BuildRoot,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator = request.generator
     pyproject_rel_path = generator[PoetryRequirementsSourceField].value
@@ -472,6 +473,7 @@ async def generate_from_python_requirement(
             target_name=request.template_address.target_name,
             relative_file_path=pyproject_rel_path,
         ),
+        union_membership,
     )
 
     digest_contents = await Get(
@@ -516,6 +518,7 @@ async def generate_from_python_requirement(
                 **tgt_overrides,
             },
             request.template_address.create_generated(parsed_req.project_name),
+            union_membership,
         )
 
     result = tuple(generate_tgt(requirement) for requirement in requirements) + (file_tgt,)
