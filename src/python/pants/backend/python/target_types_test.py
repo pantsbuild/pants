@@ -60,6 +60,7 @@ from pants.engine.target import (
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 def test_pex_binary_validation() -> None:
@@ -285,9 +286,14 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     assert_injected(Address("project", target_name="ambiguous"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python "
-        "module `project.ambiguous`"
-    ) in caplog.text
+        softwrap(
+            """
+            project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python
+            module `project.ambiguous`
+            """
+        )
+        in caplog.text
+    )
     assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
 
     # Test that ignores can disambiguate an otherwise ambiguous entry point. Ensure we don't log a
@@ -314,9 +320,14 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     assert_injected(Address("project", target_name="another_root__module_used"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/"
-        "ambiguous_in_another_root.py']"
-    ) in caplog.text
+        softwrap(
+            """
+            ['project/ambiguous_in_another_root.py:ambiguous_in_another_root',
+            'src/py/project/ambiguous_in_another_root.py']
+            """
+        )
+        in caplog.text
+    )
 
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
@@ -346,9 +357,14 @@ def test_requirements_field() -> None:
     with pytest.raises(InvalidFieldException) as exc:
         PythonRequirementsField(["not valid! === 3.1"], Address("demo"))
     assert (
-        f"Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}' "
-        f"field for the target demo:"
-    ) in str(exc.value)
+        softwrap(
+            f"""
+            Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}'
+            field for the target demo:
+            """
+        )
+        in str(exc.value)
+    )
 
 
 def test_parse_requirements_file() -> None:
@@ -531,9 +547,14 @@ def test_unrecognized_resolve_names_error(
             unrecognized, ["valid1", "valid2", "valid3"], description_of_origin="foo"
         )
     assert (
-        f"Unrecognized resolve {name_str} from foo: "
-        f"{bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']"
-    ) in str(exc.value)
+        softwrap(
+            f"""
+            Unrecognized resolve {name_str} from foo:
+            {bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']
+            """
+        )
+        in str(exc.value)
+    )
 
 
 @pytest.mark.parametrize(

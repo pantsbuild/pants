@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import sys
 from typing import cast
 
 import pytest
@@ -64,7 +65,9 @@ def single_target_run(
             run,
             rule_args=[
                 create_goal_subsystem(RunSubsystem, args=[], cleanup=True),
-                create_subsystem(GlobalOptions, pants_workdir=rule_runner.pants_workdir),
+                create_subsystem(
+                    GlobalOptions, pants_workdir=rule_runner.pants_workdir, process_cleanup=True
+                ),
                 workspace,
                 BuildRoot(),
                 rule_runner.environment,
@@ -96,7 +99,7 @@ def single_target_run(
 
 
 def test_normal_run(rule_runner: RuleRunner) -> None:
-    program_text = b'#!/usr/bin/python\nprint("hello")'
+    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     res = single_target_run(
         rule_runner,
         Address("some/addr"),
@@ -106,7 +109,7 @@ def test_normal_run(rule_runner: RuleRunner) -> None:
 
 
 def test_materialize_input_files(rule_runner: RuleRunner) -> None:
-    program_text = b'#!/usr/bin/python\nprint("hello")'
+    program_text = f'#!{sys.executable}\nprint("hello")'.encode()
     binary = create_mock_run_request(rule_runner, program_text)
     with mock_console(rule_runner.options_bootstrapper):
         result = rule_runner.run_interactive_process(
@@ -120,6 +123,6 @@ def test_materialize_input_files(rule_runner: RuleRunner) -> None:
 
 
 def test_failed_run(rule_runner: RuleRunner) -> None:
-    program_text = b'#!/usr/bin/python\nraise RuntimeError("foo")'
+    program_text = f'#!{sys.executable}\nraise RuntimeError("foo")'.encode()
     res = single_target_run(rule_runner, Address("some/addr"), program_text=program_text)
     assert res.exit_code == 1

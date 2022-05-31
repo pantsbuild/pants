@@ -273,9 +273,11 @@ class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc=(
-        "Determine all Python interpreter versions used by Flake8 in your project (for lockfile "
-        "generation)"
+    desc=softwrap(
+        """
+        Determine all Python interpreter versions used by Flake8 in your project
+        (for lockfile generation)
+        """
     ),
     level=LogLevel.DEBUG,
 )
@@ -309,9 +311,11 @@ class Flake8ExportSentinel(ExportPythonToolSentinel):
 
 
 @rule(
-    desc=(
-        "Determine all Python interpreter versions used by Flake8 in your project (for "
-        "`export` goal)"
+    desc=softwrap(
+        """
+        Determine all Python interpreter versions used by Flake8 in your project
+        (for `export` goal)
+        """
     ),
     level=LogLevel.DEBUG,
 )

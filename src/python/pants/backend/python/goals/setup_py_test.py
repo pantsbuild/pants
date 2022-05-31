@@ -65,6 +65,7 @@ from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import InvalidFieldException
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.strutil import softwrap
 
 _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
@@ -335,10 +336,12 @@ def test_merge_entry_points() -> None:
         "src/python/foo:foo-dist `provides.entry_points`": {"console_scripts": {"my-tool": "ep2"}},
     }
 
-    err_msg = (
-        "Multiple entry_points registered for console_scripts my-tool in: "
-        "src/python/foo:foo-dist `entry_points`, "
-        "src/python/foo:foo-dist `provides.entry_points`"
+    err_msg = softwrap(
+        """
+        Multiple entry_points registered for console_scripts my-tool in:
+        src/python/foo:foo-dist `entry_points`,
+        src/python/foo:foo-dist `provides.entry_points`
+        """
     )
     with pytest.raises(ValueError, match=err_msg):
         merge_entry_points(*list(conflicting_sources.items()))
@@ -1421,9 +1424,11 @@ def test_too_many_interpreter_constraints(chroot_rule_runner: RuleRunner) -> Non
 
     addr = Address("src/python/foo", target_name="foo-dist")
     tgt = chroot_rule_runner.get_target(addr)
-    err = (
-        "Expected a single interpreter constraint for src/python/foo:foo-dist, "
-        "got: CPython<3,>=2.7 OR CPython<3.10,>=3.8."
+    err = softwrap(
+        """
+        Expected a single interpreter constraint for src/python/foo:foo-dist,
+        got: CPython<3,>=2.7 OR CPython<3.10,>=3.8.
+        """
     )
 
     with engine_error(SetupPyError, contains=err):

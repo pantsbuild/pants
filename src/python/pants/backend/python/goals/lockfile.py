@@ -47,6 +47,7 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -117,18 +118,24 @@ def maybe_warn_python_repos(
 ) -> MaybeWarnPythonRepos:
     def warn_python_repos(option: str) -> None:
         logger.warning(
-            f"The option `[python-repos].{option}` is configured, but it does not work when using "
-            "Poetry for lockfile generation. Lockfile generation will fail if the relevant "
-            "requirements cannot be located on PyPI.\n\n"
-            "Instead, you can use Pex to generate lockfiles by setting "
-            "`[python].lockfile_generator = 'pex'.\n\n"
-            "Alternatively, you can disable lockfiles by setting "
-            "`[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually "
-            "generate a lockfile, such as by using pip-compile or `pip freeze`. Set the "
-            "`[tool].lockfile` option to the path you manually generated. When manually "
-            "maintaining lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'. For user "
-            "lockfiles from `[python].resolves`, set "
-            "`[python].resolves_generate_lockfiles = false`."
+            softwrap(
+                f"""
+                The option `[python-repos].{option}` is configured, but it does not work when using
+                Poetry for lockfile generation. Lockfile generation will fail if the relevant
+                requirements cannot be located on PyPI.
+
+                Instead, you can use Pex to generate lockfiles by setting
+                `[python].lockfile_generator = 'pex'.
+
+                Alternatively, you can disable lockfiles by setting
+                `[tool].lockfile = '<none>'`, e.g. setting `[black].lockfile`. You can also manually
+                generate a lockfile, such as by using pip-compile or `pip freeze`. Set the
+                `[tool].lockfile` option to the path you manually generated. When manually
+                maintaining lockfiles, set `[python].invalid_lockfile_behavior = 'ignore'. For user
+                lockfiles from `[python].resolves`, set
+                `[python].resolves_generate_lockfiles = false`.
+                """
+            )
         )
 
     if python_repos.repos:
