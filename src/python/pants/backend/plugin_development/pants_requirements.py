@@ -99,7 +99,7 @@ def generate_from_pants_requirements(
                 **request.template,
             },
             request.template_address.create_generated(dist),
-            union_membership=union_membership,
+            union_membership,
         )
 
     result = [create_tgt("pantsbuild.pants", "pants")]

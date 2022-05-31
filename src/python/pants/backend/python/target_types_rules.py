@@ -113,7 +113,7 @@ async def generate_targets_from_pex_binaries(
             },
             # ":" is a forbidden character in target names
             generator_addr.create_generated(entry_point_spec.replace(":", "-")),
-            union_membership=union_membership,
+            union_membership,
             residence_dir=generator_addr.spec_path,
         )
 

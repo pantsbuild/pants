@@ -473,7 +473,7 @@ async def generate_from_python_requirement(
             target_name=request.template_address.target_name,
             relative_file_path=pyproject_rel_path,
         ),
-        union_membership=union_membership,
+        union_membership,
     )
 
     digest_contents = await Get(
@@ -518,7 +518,7 @@ async def generate_from_python_requirement(
                 **tgt_overrides,
             },
             request.template_address.create_generated(parsed_req.project_name),
-            union_membership=union_membership,
+            union_membership,
         )
 
     result = tuple(generate_tgt(requirement) for requirement in requirements) + (file_tgt,)

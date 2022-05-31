@@ -305,12 +305,12 @@ class Target:
         self,
         unhydrated_values: dict[str, Any],
         address: Address,
-        name_explicitly_set: bool = True,
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
         *,
+        name_explicitly_set: bool = True,
         residence_dir: str | None = None,
     ) -> None:
         """Create a target.
