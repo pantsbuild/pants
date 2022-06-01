@@ -20,12 +20,21 @@ class UvicornServerRequest(ExplorerServerRequest):
 
 
 class UvicornServer:
-    def __init__(self, request_state: RequestState):
-        self.request_state = request_state
+    def __init__(self, host: str, port: int, request_state: RequestState):
         self.app = FastAPI()
         self.config = Config(
-            self.app, callback_notify=self.on_tick, timeout_notify=0.25, log_config=None
+            self.app,
+            host=host,
+            port=port,
+            callback_notify=self.on_tick,
+            timeout_notify=0.25,
+            log_config=None,
         )
+        self.request_state = request_state
+
+    @classmethod
+    def from_request(cls, request: UvicornServerRequest) -> UvicornServer:
+        return cls(host=request.address, port=request.port, request_state=request.request_state)
 
     def create_server(self) -> ExplorerServer:
         self.server = Server(config=self.config)
@@ -59,7 +68,7 @@ class UvicornServerSetup:
 async def create_server(
     request: UvicornServerRequest, union_membership: UnionMembership
 ) -> ExplorerServer:
-    uvicorn = UvicornServer(request.request_state)
+    uvicorn = UvicornServer.from_request(request)
     setups = await MultiGet(
         Get(UvicornServerSetup, UvicornServerSetupRequest, request_type())
         for request_type in union_membership.get(UvicornServerSetupRequest)
