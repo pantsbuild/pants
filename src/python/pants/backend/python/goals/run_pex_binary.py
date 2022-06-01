@@ -1,11 +1,14 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 import os
 
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.backend.python.target_types import (
     PexBinaryDefaults,
+    PexEntryPointField,
+    PythonSourceField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
@@ -29,14 +32,23 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
+@dataclass(frozen=True)
+class PythonSourceFieldSet(RunFieldSet):
+    required_fields = (PythonSourceField,)
+
+    source: PythonSourceField
+
+
 @rule(level=LogLevel.DEBUG)
-async def create_pex_binary_run_request(
-    field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults, pex_env: PexEnvironment
+async def create_python_source_run_request(
+    field_set: PythonSourceFieldSet, pex_env: PexEnvironment
 ) -> RunRequest:
     entry_point, transitive_targets = await MultiGet(
         Get(
             ResolvedPexEntryPoint,
-            ResolvePexEntryPointRequest(field_set.entry_point),
+            ResolvePexEntryPointRequest(
+                PexEntryPointField(field_set.source.value, field_set.address)
+            ),
         ),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
@@ -62,7 +74,7 @@ async def create_pex_binary_run_request(
             # case, it's loaded by setting `PEX_EXTRA_SYS_PATH`.
             main=entry_point.val or field_set.script.value,
             additional_args=(
-                *field_set.generate_additional_args(pex_binary_defaults),
+                # *field_set.generate_additional_args(pex_binary_defaults),
                 # N.B.: Since we cobble together the runtime environment via PEX_EXTRA_SYS_PATH
                 # below, it's important for any app that re-executes itself that these environment
                 # variables are not stripped.
