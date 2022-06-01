@@ -100,6 +100,7 @@ def _run_pants_goal(
         [
             *(extra_args or ()),
             "--changed-since=HEAD",
+            "--print-stacktrace",
             f"--changed-dependees={dependees.value}",
             goal,
         ],
@@ -280,3 +281,11 @@ def test_tag_filtering(repo: str) -> None:
 
     assert_list_stdout(repo, ["//app.sh:lib"], DependeesOption.TRANSITIVE, extra_args=["--tag=a"])
     assert_count_loc(repo, DependeesOption.TRANSITIVE, expected_num_files=1, extra_args=["--tag=a"])
+
+
+def test_pants_ignored_file(repo: str) -> None:
+    """Regression test for
+    https://github.com/pantsbuild/pants/issues/15655#issuecomment-1140081185."""
+    create_file(".ignored/f.txt", "")
+    assert_list_stdout(repo, [], DependeesOption.NONE)
+    assert_count_loc(repo, DependeesOption.NONE, expected_num_files=0)

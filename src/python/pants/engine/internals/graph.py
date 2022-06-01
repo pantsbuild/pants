@@ -22,7 +22,7 @@ from pants.engine.addresses import (
     UnparsedAddressInputs,
 )
 from pants.engine.collection import Collection
-from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Paths, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
@@ -685,13 +685,17 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         live_get = Get(
             FilteredTargets,
             RawSpecsWithoutFileOwners(
-                ancestor_globs=live_candidate_specs, filter_by_global_options=True
+                ancestor_globs=live_candidate_specs,
+                filter_by_global_options=True,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
             ),
         )
         deleted_get = Get(
             UnexpandedTargets,
             RawSpecsWithoutFileOwners(
-                ancestor_globs=deleted_candidate_specs, filter_by_global_options=True
+                ancestor_globs=deleted_candidate_specs,
+                filter_by_global_options=True,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
             ),
         )
     else:
