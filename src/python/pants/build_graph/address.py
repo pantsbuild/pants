@@ -333,14 +333,6 @@ class Address(EngineAwareParameter):
         return self._relative_file_path is not None
 
     @property
-    def is_default_target(self) -> bool:
-        """True if this is address refers to the "default" target in the spec_path.
-
-        The default target has a target name equal to the directory name.
-        """
-        return self._target_name is None
-
-    @property
     def is_parametrized(self) -> bool:
         return bool(self.parameters)
 

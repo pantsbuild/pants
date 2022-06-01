@@ -342,7 +342,7 @@ impl NailgunProcess {
     nailgun_server_fingerprint: NailgunProcessFingerprint,
   ) -> Result<NailgunProcess, String> {
     let workdir = tempfile::Builder::new()
-      .prefix("process-execution")
+      .prefix("pants-sandbox-")
       .tempdir_in(workdir_base)
       .map_err(|err| format!("Error making tempdir for nailgun server: {:?}", err))?;
 
@@ -492,7 +492,7 @@ async fn clear_workdir(
 ) -> Result<(), String> {
   // Move all content into a temporary directory.
   let garbage_dir = tempfile::Builder::new()
-    .prefix("process-execution")
+    .prefix("pants-sandbox-")
     .tempdir_in(workdir.parent().unwrap())
     .map_err(|err| {
       format!(

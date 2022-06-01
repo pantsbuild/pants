@@ -44,6 +44,7 @@ from pants.engine.addresses import Addresses
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.contextutil import pushd
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import softwrap
 
 
 @pytest.fixture
@@ -341,9 +342,11 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
 
     with engine_error(
         ValueError,
-        contains=(
-            "`[python].resolve_all_constraints` is enabled, so "
-            "`[python].requirement_constraints` must also be set."
+        contains=softwrap(
+            """
+            `[python].resolve_all_constraints` is enabled, so
+            `[python].requirement_constraints` must also be set.
+            """
         ),
     ):
         get_pex_request(None, resolve_all_constraints=True)

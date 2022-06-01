@@ -19,7 +19,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize
+from pants.util.strutil import pluralize, softwrap
 
 
 @dataclass(frozen=True)
@@ -58,9 +58,15 @@ async def black_fmt(request: BlackRequest, black: Black, python_setup: PythonSet
             )
         except ValueError:
             raise ValueError(
-                "Could not compute an interpreter to run Black on, due to conflicting requirements "
-                "in the repo.\nPlease set `[black].interpreter_constraints` explicitly in "
-                "pants.toml to a suitable interpreter."
+                softwrap(
+                    """
+                    Could not compute an interpreter to run Black on, due to conflicting requirements
+                    in the repo.
+
+                    Please set `[black].interpreter_constraints` explicitly in pants.toml to a
+                    suitable interpreter.
+                    """
+                )
             )
         if all_interpreter_constraints.requires_python38_or_newer(
             python_setup.interpreter_universe

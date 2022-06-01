@@ -141,7 +141,7 @@ def strip_v2_chroot_path(v: bytes | str) -> str:
     """
     if isinstance(v, bytes):
         v = v.decode()
-    return re.sub(r"/.*/process-execution[a-zA-Z0-9]+/", "", v)
+    return re.sub(r"/.*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
 
 
 def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> list[str]:
@@ -238,7 +238,9 @@ def softwrap(text: str) -> str:
             width, use trailing backlashes to line-continue the line. Because we squash multiple
             spaces, this will "just work".)
     """
-    # If callers didnt use a leading "\" thats OK.
+    if not text:
+        return text
+    # If callers didn't use a leading "\" thats OK.
     if text[0] == "\n":
         text = text[1:]
 

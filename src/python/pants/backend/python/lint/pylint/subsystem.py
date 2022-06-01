@@ -275,9 +275,11 @@ class PylintLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc=(
-        "Determine all Python interpreter versions used by Pylint in your project (for "
-        "lockfile generation)"
+    desc=softwrap(
+        """
+        Determine all Python interpreter versions used by Pylint in your project
+        (for lockfile generation)
+        """
     ),
     level=LogLevel.DEBUG,
 )
@@ -311,9 +313,11 @@ class PylintExportSentinel(ExportPythonToolSentinel):
 
 
 @rule(
-    desc=(
-        "Determine all Python interpreter versions used by Pylint in your project (for "
-        "`export` goal)"
+    desc=softwrap(
+        """
+        Determine all Python interpreter versions used by Pylint in your project
+        (for `export` goal)
+        """
     ),
     level=LogLevel.DEBUG,
 )

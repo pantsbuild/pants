@@ -154,13 +154,14 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
                     ],
                     build_file_dir=f"build file's dir is: {build_file_dir()}"
                 )
+
+                mock_tgt(name='t2')
                 """
             )
         }
     )
-    addr = Address("helloworld/dir")
-    target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [addr])
-    assert target_adaptor.name == "dir"
+    target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld/dir")])
+    assert target_adaptor.name is None
     assert target_adaptor.type_alias == "mock_tgt"
     assert target_adaptor.kwargs["dependencies"] == [
         ":dir",
@@ -172,6 +173,12 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     # when encountering this, but it's fine at this stage.
     assert target_adaptor.kwargs["fake_field"] == 42
     assert target_adaptor.kwargs["build_file_dir"] == "build file's dir is: helloworld/dir"
+
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor, [Address("helloworld/dir", target_name="t2")]
+    )
+    assert target_adaptor.name == "t2"
+    assert target_adaptor.type_alias == "mock_tgt"
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:

@@ -22,7 +22,7 @@ from pants.engine.addresses import (
     UnparsedAddressInputs,
 )
 from pants.engine.collection import Collection
-from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Paths, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
@@ -200,7 +200,12 @@ async def resolve_target_parametrizations(
                 f"parametrize the {generator_fields_parametrized} {noun}."
             )
 
-        base_generator = target_type(generator_fields, address, union_membership)
+        base_generator = target_type(
+            generator_fields,
+            address,
+            name_explicitly_set=target_adaptor.name_explicitly_set,
+            union_membership=union_membership,
+        )
 
         overrides = {}
         if base_generator.has_field(OverridesField):
@@ -221,7 +226,15 @@ async def resolve_target_parametrizations(
                 overrides = overrides_field.flatten()
 
         generators = [
-            (target_type(generator_fields, address, union_membership), template)
+            (
+                target_type(
+                    generator_fields,
+                    address,
+                    name_explicitly_set=target_adaptor.name is not None,
+                    union_membership=union_membership,
+                ),
+                template,
+            )
             for address, template in Parametrize.expand(address, template_fields)
         ]
         all_generated = await MultiGet(
@@ -251,14 +264,24 @@ async def resolve_target_parametrizations(
             generated = FrozenDict(
                 (
                     parameterized_address,
-                    target_type(parameterized_fields, parameterized_address, union_membership),
+                    target_type(
+                        parameterized_fields,
+                        parameterized_address,
+                        name_explicitly_set=target_adaptor.name_explicitly_set,
+                        union_membership=union_membership,
+                    ),
                 )
                 for parameterized_address, parameterized_fields in (first, *rest)
             )
             parametrizations.append(_TargetParametrization(None, generated))
         else:
             # The target was not parametrized.
-            target = target_type(target_adaptor.kwargs, address, union_membership)
+            target = target_type(
+                target_adaptor.kwargs,
+                address,
+                name_explicitly_set=target_adaptor.name_explicitly_set,
+                union_membership=union_membership,
+            )
             parametrizations.append(_TargetParametrization(target, FrozenDict()))
 
     # TODO: Move to Target constructor.
@@ -662,13 +685,17 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         live_get = Get(
             FilteredTargets,
             RawSpecsWithoutFileOwners(
-                ancestor_globs=live_candidate_specs, filter_by_global_options=True
+                ancestor_globs=live_candidate_specs,
+                filter_by_global_options=True,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
             ),
         )
         deleted_get = Get(
             UnexpandedTargets,
             RawSpecsWithoutFileOwners(
-                ancestor_globs=deleted_candidate_specs, filter_by_global_options=True
+                ancestor_globs=deleted_candidate_specs,
+                filter_by_global_options=True,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
             ),
         )
     else:

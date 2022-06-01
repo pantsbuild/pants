@@ -298,6 +298,7 @@ class Target:
     plugin_fields: tuple[type[Field], ...]
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
+    name_explicitly_set: bool
 
     @final
     def __init__(
@@ -309,6 +310,7 @@ class Target:
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
         *,
+        name_explicitly_set: bool = True,
         residence_dir: str | None = None,
     ) -> None:
         """Create a target.
@@ -341,6 +343,7 @@ class Target:
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
         self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
+        self.name_explicitly_set = name_explicitly_set
         self.field_values = self._calculate_field_values(unhydrated_values, address)
         self.validate()
 
@@ -1176,7 +1179,7 @@ def _generate_file_level_targets(
         return generated_target_cls(
             generated_target_fields,
             address,
-            union_membership,
+            union_membership=union_membership,
             residence_dir=os.path.dirname(full_fp),
         )
 

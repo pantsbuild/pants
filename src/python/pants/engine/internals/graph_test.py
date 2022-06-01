@@ -80,6 +80,10 @@ class SpecialCasedDeps2(SpecialCasedDependencies):
     alias = "special_cased_deps2"
 
 
+class ResolveField(StringField):
+    alias = "resolve"
+
+
 class MockTarget(Target):
     alias = "target"
     core_fields = (
@@ -87,14 +91,11 @@ class MockTarget(Target):
         MultipleSourcesField,
         SpecialCasedDeps1,
         SpecialCasedDeps2,
+        ResolveField,
         Tags,
     )
     deprecated_alias = "deprecated_target"
     deprecated_alias_removal_version = "9.9.9.dev0"
-
-
-class ResolveField(StringField):
-    alias = "resolve"
 
 
 class MockGeneratedTarget(Target):
@@ -121,6 +122,7 @@ def transitive_targets_rule_runner() -> RuleRunner:
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
         target_types=[MockTarget, MockTargetGenerator, MockGeneratedTarget],
+        objects={"parametrize": Parametrize},
     )
 
 
@@ -517,6 +519,54 @@ def test_dep_no_cycle_indirect(transitive_targets_rule_runner: RuleRunner) -> No
         Address("", relative_file_path="t1.txt", target_name="t1"),
         Address("", relative_file_path="t2.txt", target_name="t2"),
     }
+
+
+def test_name_explicitly_set(transitive_targets_rule_runner: RuleRunner) -> None:
+    transitive_targets_rule_runner.write_files(
+        {
+            "dir1/f.txt": "",
+            "dir1/BUILD": dedent(
+                """\
+                generator(sources=['f.txt'])
+                generator(name='nombre', sources=['f.txt'])
+                """
+            ),
+            "dir2/BUILD": dedent(
+                """\
+                target()
+                target(name='nombre')
+                """
+            ),
+            "dir3/BUILD": dedent(
+                """\
+                target(resolve=parametrize('r1', 'r2'))
+                target(name='nombre', resolve=parametrize('r1', 'r2'))
+                """
+            ),
+            "same_name/BUILD": "target(name='same_name')",
+        }
+    )
+
+    def assert_is_set(addr: Address, expected: bool) -> None:
+        tgt = transitive_targets_rule_runner.get_target(addr)
+        assert tgt.name_explicitly_set is expected
+
+    assert_is_set(Address("dir1"), False)
+    assert_is_set(Address("dir1", target_name="nombre"), True)
+
+    # We don't bother with generated targets.
+    assert_is_set(Address("dir1", relative_file_path="f.txt"), True)
+    assert_is_set(Address("dir1", target_name="nombre", relative_file_path="f.txt"), True)
+
+    assert_is_set(Address("dir2"), False)
+    assert_is_set(Address("dir2", target_name="nombre"), True)
+
+    for r in ("r1", "r2"):
+        assert_is_set(Address("dir3", parameters={"resolve": r}), False)
+        assert_is_set(Address("dir3", target_name="nombre", parameters={"resolve": r}), True)
+
+    # Even if the name is the same as the default, we should recognize when it's explicitly set.
+    assert_is_set(Address("same_name"), True)
 
 
 def test_deprecated_field_name(transitive_targets_rule_runner: RuleRunner, caplog) -> None:
