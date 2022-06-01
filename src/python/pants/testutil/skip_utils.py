@@ -8,7 +8,7 @@ import pytest
 
 
 @lru_cache()
-def skip_if_error(*args: str):
+def skip_if_command_errors(*args: str):
     def empty_decorator(func):
         return func
 
@@ -20,5 +20,5 @@ def skip_if_error(*args: str):
     return empty_decorator
 
 
-requires_go = skip_if_error("go", "version")
-requires_thrift = skip_if_error("thrift", "-version")
+requires_go = skip_if_command_errors("go", "version")
+requires_thrift = skip_if_command_errors("thrift", "-version")
