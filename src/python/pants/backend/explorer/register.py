@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 from pants.backend.explorer.graphql.rules import rules as graphql_rules
+from pants.backend.explorer.rules import rules as explorer_rules
 from pants.backend.explorer.server import uvicorn
 
 
 def rules():
     return (
+        *explorer_rules(),
         *graphql_rules(),
         *uvicorn.rules(),
     )
