@@ -699,9 +699,19 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             ),
         )
     else:
-        live_get = Get(Targets, RawSpecsWithoutFileOwners(ancestor_globs=live_candidate_specs))
+        live_get = Get(
+            Targets,
+            RawSpecsWithoutFileOwners(
+                ancestor_globs=live_candidate_specs,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            ),
+        )
         deleted_get = Get(
-            UnexpandedTargets, RawSpecsWithoutFileOwners(ancestor_globs=deleted_candidate_specs)
+            UnexpandedTargets,
+            RawSpecsWithoutFileOwners(
+                ancestor_globs=deleted_candidate_specs,
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            ),
         )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
