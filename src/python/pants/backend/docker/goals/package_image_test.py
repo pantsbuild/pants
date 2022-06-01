@@ -98,7 +98,7 @@ def assert_build(
                 request.address,
                 digest=EMPTY_DIGEST,
                 source=os.path.join(address.spec_path, "Dockerfile"),
-                copy_sources=copy_sources,
+                copy_source_paths=copy_sources,
                 version_tags=version_tags,
             ),
             build_args=rule_runner.request(DockerBuildArgs, [DockerBuildArgsRequest(tgt)]),
