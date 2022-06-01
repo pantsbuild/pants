@@ -72,7 +72,7 @@ async def create_python_source_run_request(
             include_source_files=False,
             # Note that the file for first-party entry points is not in the PEX itself. In that
             # case, it's loaded by setting `PEX_EXTRA_SYS_PATH`.
-            main=entry_point.val or field_set.script.value,
+            main=entry_point.val,
             additional_args=(
                 # *field_set.generate_additional_args(pex_binary_defaults),
                 # N.B.: Since we cobble together the runtime environment via PEX_EXTRA_SYS_PATH
