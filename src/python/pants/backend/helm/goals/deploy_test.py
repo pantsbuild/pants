@@ -113,5 +113,7 @@ def test_raises_error_when_using_invalid_passthrough_args(rule_runner: RuleRunne
     target = rule_runner.get_target(Address("src/deployment", target_name="bar"))
     field_set = DeployHelmDeploymentFieldSet.create(target)
 
-    with pytest.raises(ExecutionError, match="The following command line arguments are not valid: --namespace foo."):
+    with pytest.raises(
+        ExecutionError, match="The following command line arguments are not valid: --namespace foo."
+    ):
         rule_runner.request(DeployProcesses, [field_set])

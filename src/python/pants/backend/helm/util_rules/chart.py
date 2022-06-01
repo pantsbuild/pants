@@ -16,7 +16,11 @@ from pants.backend.helm.resolve.fetch import (
     FetchHelmArfifactsRequest,
 )
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartMetaSourceField
+from pants.backend.helm.target_types import (
+    HelmChartFieldSet,
+    HelmChartMetaSourceField,
+    HelmChartTarget,
+)
 from pants.backend.helm.util_rules import chart_metadata, sources
 from pants.backend.helm.util_rules.chart_metadata import (
     HELM_CHART_METADATA_FILENAMES,
@@ -44,6 +48,11 @@ from pants.util.strutil import pluralize
 logger = logging.getLogger(__name__)
 
 
+class InvalidHelmChartTarget(ValueError):
+    def __init__(self, target: Target) -> None:
+        super().__init__(f"The target {target.address} is not a `{HelmChartTarget.alias}`.")
+
+
 @dataclass(frozen=True)
 class HelmChart:
     address: Address
@@ -62,6 +71,8 @@ class HelmChartRequest:
 
     @classmethod
     def from_target(cls, target: Target) -> HelmChartRequest:
+        if not HelmChartFieldSet.is_applicable(target):
+            raise InvalidHelmChartTarget(target)
         return cls(HelmChartFieldSet.create(target))
 
 

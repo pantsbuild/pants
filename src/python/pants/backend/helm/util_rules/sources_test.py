@@ -14,7 +14,6 @@ from pants.backend.helm.testutil import (
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
     K8S_CRD_FILE,
-    K8S_SERVICE_FILE,
     K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import sources

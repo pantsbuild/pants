@@ -196,7 +196,7 @@ def test_skip_lint(rule_runner: RuleRunner) -> None:
             "src/chart/Chart.yaml": gen_chart_file("chart", version="0.1.0"),
             "src/chart/values.yaml": HELM_VALUES_FILE,
             "src/chart/templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
-            "src/chart/templates/service.yaml": K8S_SERVICE_FILE,
+            "src/chart/templates/service.yaml": K8S_SERVICE_TEMPLATE,
         }
     )
 
