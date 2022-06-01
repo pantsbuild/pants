@@ -7,6 +7,7 @@ backend_packages.add = [
   "pants.backend.python",
   "pants.backend.experimental.python.docs.sphinx",
   "pants.backend.experimental.python.lint.autoflake",
+  "pants.backend.explorer",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
@@ -29,11 +30,6 @@ backend_packages.add = [
   "pants.backend.experimental.scala.debug_goals",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
-
-  # Load explorer backend from source in development. It is published as Python distribution
-  # `pantsbuild.pants.explorer-server` to not impose additional install-requires on the
-  # `pantsbuild.pants` distribution.
-  "pants.backend.explorer",
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
