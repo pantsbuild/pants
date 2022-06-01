@@ -38,6 +38,7 @@ from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
+    skip_unless_all_pythons_present,
     skip_unless_python27_and_python3_present,
     skip_unless_python27_present,
     skip_unless_python38_present,
@@ -703,6 +704,7 @@ def test_protobuf_mypy(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == 1
 
 
+@skip_unless_all_pythons_present("3.8", "3.9")
 def test_partition_targets(rule_runner: RuleRunner) -> None:
     def create_folder(folder: str, resolve: str, interpreter: str) -> dict[str, str]:
         return {

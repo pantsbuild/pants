@@ -36,6 +36,7 @@ from pants.engine.target import (
 )
 from pants.source import source_root
 from pants.testutil.rule_runner import RuleRunner, engine_error
+from pants.testutil.skip_utils import requires_thrift
 
 
 @pytest.fixture
@@ -82,6 +83,7 @@ def assert_files_generated(
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
+@requires_thrift
 def test_generates_python(rule_runner: RuleRunner) -> None:
     # This tests a few things:
     #  * We generate the correct file names, keeping into account `namespace`. Note that if
@@ -145,6 +147,7 @@ def test_generates_python(rule_runner: RuleRunner) -> None:
     )
 
 
+@requires_thrift
 def test_top_level_source_root(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

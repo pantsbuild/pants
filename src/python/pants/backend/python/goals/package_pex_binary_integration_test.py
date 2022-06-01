@@ -30,6 +30,7 @@ from pants.core.target_types import (
     ResourcesGeneratorTarget,
 )
 from pants.core.target_types import rules as core_target_types_rules
+from pants.testutil.python_interpreter_selection import skip_unless_python36_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -198,6 +199,7 @@ def test_resolve_local_platforms(pex_executable: str, rule_runner: RuleRunner) -
     subprocess.run([executable], check=True)
 
 
+@skip_unless_python36_present
 def test_complete_platforms(rule_runner: RuleRunner) -> None:
     linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py36.json")
     assert linux_complete_platform is not None
