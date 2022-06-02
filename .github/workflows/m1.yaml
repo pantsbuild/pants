@@ -1,0 +1,16 @@
+# Hand-edited for now, while we experiment with self-hosted M1 runners.
+# TODO: Integrate into workflow yaml generator.
+
+name: M1 Wheel Build
+'on':
+  pull_request: {}
+  push:
+    branches-ignore:
+      - dependabot/**
+jobs:
+  dummy:
+    if: ${{ github.repository_owner == '_no_such_owner_' }}
+      name: Dummy (macOS ARM64) - Ignore
+      runs-on: [ macOS, ARM64 ]
+      steps:
+        run: echo "Job was triggered on a ${{ runner.os }} ${{ runner.arch }} runner."
