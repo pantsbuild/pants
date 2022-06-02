@@ -108,7 +108,7 @@ async def run_helm_deploy(
                 chart.path,
                 "--install",
                 *(
-                    ("--description", field_set.description.value)
+                    ("--description", f'"{field_set.description.value}"')
                     if field_set.description.value
                     else ()
                 ),
@@ -118,7 +118,7 @@ async def run_helm_deploy(
                 *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),
                 *chain.from_iterable(
                     [
-                        ["--set", f"{key}={value}"]
+                        ("--set", f"{key}={value}")
                         for key, value in (field_set.values.value or {}).items()
                     ]
                 ),

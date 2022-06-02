@@ -13,8 +13,8 @@ from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.target_types import rules as docker_target_types_rules
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.dependency_inference.deployment import (
-    AnalyseDeploymentRequest,
-    DeploymentDependenciesReport,
+    AnalyseHelmDeploymentRequest,
+    HelmDeploymentReport,
     InjectHelmDeploymentDependenciesRequest,
 )
 from pants.backend.helm.target_types import (
@@ -30,7 +30,7 @@ from pants.backend.helm.testutil import (
     K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import chart, tool
-from pants.backend.helm.util_rules.k8s_manifest import ContainerRef
+from pants.backend.helm.util_rules.k8s import ImageRef
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine import process
@@ -58,7 +58,7 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *tool.rules(),
             SubsystemRule(DockerOptions),
-            QueryRule(DeploymentDependenciesReport, (AnalyseDeploymentRequest,)),
+            QueryRule(HelmDeploymentReport, (AnalyseHelmDeploymentRequest,)),
             QueryRule(InjectedDependencies, (InjectHelmDeploymentDependenciesRequest,)),
         ],
     )
@@ -102,13 +102,13 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
     field_set = HelmDeploymentFieldSet.create(target)
 
     dependencies_report = rule_runner.request(
-        DeploymentDependenciesReport, [AnalyseDeploymentRequest(field_set)]
+        HelmDeploymentReport, [AnalyseHelmDeploymentRequest(field_set)]
     )
 
     expected_container_refs = [
-        ContainerRef(registry=None, repository="busybox", tag="1.28"),
-        ContainerRef(registry=None, repository="busybox", tag="1.29"),
-        ContainerRef(registry="example.com", repository="containers/busybox", tag="1.28"),
+        ImageRef(registry=None, repository="busybox", tag="1.28"),
+        ImageRef(registry=None, repository="busybox", tag="1.29"),
+        ImageRef(registry="example.com", repository="containers/busybox", tag="1.28"),
     ]
 
     assert len(dependencies_report.container_images) == 3

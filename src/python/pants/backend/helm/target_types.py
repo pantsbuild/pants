@@ -382,7 +382,7 @@ def all_helm_artifact_targets(all_targets: AllTargets) -> AllHelmArtifactTargets
 
 class HelmDeploymentReleaseNameField(StringField):
     alias = "release_name"
-    help = "Name of the release used in the deployment."
+    help = "Name of the release used in the deployment. If not set, the target name will be used instead."
 
 
 class HelmDeploymentNamespaceField(StringField):
@@ -397,7 +397,7 @@ class HelmDeploymentDependenciesField(Dependencies):
 class HelmDeploymentSkipCrdsField(BoolField):
     alias = "skip_crds"
     default = False
-    help = "If true, then does not install the Custom Resource Definitions that are defined in the chart."
+    help = "If true, then does not deploy the Custom Resource Definitions that are defined in the chart."
 
 
 class HelmDeploymentSourcesField(MultipleSourcesField):

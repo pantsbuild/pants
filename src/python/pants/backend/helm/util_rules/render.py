@@ -33,18 +33,30 @@ logger = logging.getLogger(__name__)
 @dataclass(unsafe_hash=True)
 class RenderHelmChartRequest:
     chart: HelmChart
-    value_files: Snapshot
+    values_snapshot: Snapshot
     values: FrozenDict[str, str]
+    skip_crds: bool
+    namespace: str | None
+    api_versions: tuple[str, ...]
+    kube_version: str | None
 
     def __init__(
         self,
         chart: HelmChart,
         *,
-        value_files: Snapshot = EMPTY_SNAPSHOT,
+        namespace: str | None = None,
+        api_versions: Iterable[str] | None = None,
+        kube_version: str | None = None,
+        skip_crds: bool = False,
+        values_snapshot: Snapshot = EMPTY_SNAPSHOT,
         values: Mapping[str, str] | None = None,
     ) -> None:
         self.chart = chart
-        self.value_files = value_files
+        self.namespace = namespace
+        self.api_versions = tuple(api_versions or ())
+        self.kube_version = kube_version
+        self.skip_crds = skip_crds
+        self.values_snapshot = values_snapshot
         self.values = FrozenDict(values or {})
 
 
@@ -86,13 +98,12 @@ async def render_helm_chart(request: RenderHelmChartRequest) -> RenderedHelmChar
     empty_output_dir = await Get(Digest, CreateDigest([Directory(output_dir)]))
     input_digest = await Get(
         Digest,
-        MergeDigests([request.chart.snapshot.digest, request.value_files.digest, empty_output_dir]),
+        MergeDigests(
+            [request.chart.snapshot.digest, request.values_snapshot.digest, empty_output_dir]
+        ),
     )
 
-    sorted_value_files = sort_value_file_names_for_rendering(request.value_files.files)
-    inline_values: list[str] = list(
-        chain.from_iterable([["--set", f"{key}={value}"] for key, value in request.values.items()])
-    )
+    sorted_value_files = sort_value_file_names_for_rendering(request.values_snapshot.files)
 
     result = await Get(
         ProcessResult,
@@ -101,8 +112,16 @@ async def render_helm_chart(request: RenderHelmChartRequest) -> RenderedHelmChar
                 "template",
                 request.chart.metadata.name,
                 request.chart.path,
+                *(("--namespace", request.namespace) if request.namespace else ()),
+                *(("--kube-version", request.kube_version) if request.kube_version else ()),
+                *chain.from_iterable(
+                    [("--api-versions", api_version) for api_version in request.api_versions]
+                ),
+                *(("--skip-crds",) if request.skip_crds else ()),
                 *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),
-                *inline_values,
+                *chain.from_iterable(
+                    [("--set", f"{key}={value}") for key, value in request.values.items()]
+                ),
                 "--output-dir",
                 output_dir,
             ],

@@ -21,13 +21,9 @@ from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContextRequest,
 )
 from pants.backend.helm.target_types import HelmDeploymentDependenciesField, HelmDeploymentFieldSet
-from pants.backend.helm.util_rules import deployment, k8s_manifest, render
+from pants.backend.helm.util_rules import deployment, k8s, render
 from pants.backend.helm.util_rules.chart import HelmChart
-from pants.backend.helm.util_rules.k8s_manifest import (
-    ContainerRef,
-    ParseKubernetesManifests,
-    ResourceManifests,
-)
+from pants.backend.helm.util_rules.k8s import ImageRef, KubeManifests, ParseKubeManifests
 from pants.backend.helm.util_rules.render import RenderedHelmChart, RenderHelmChartRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -44,17 +40,17 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class AnalyseDeploymentRequest:
+class AnalyseHelmDeploymentRequest:
     field_set: HelmDeploymentFieldSet
 
 
 @dataclass(frozen=True)
-class DeploymentDependenciesReport:
-    container_images: OrderedSet[ContainerRef]
+class HelmDeploymentReport:
+    container_images: OrderedSet[ImageRef]
 
 
 @rule
-async def analyse_deployment(request: AnalyseDeploymentRequest) -> DeploymentDependenciesReport:
+async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeploymentReport:
     chart, value_files = await MultiGet(
         Get(HelmChart, HelmDeploymentFieldSet, request.field_set),
         Get(StrippedSourceFiles, SourceFilesRequest([request.field_set.sources])),
@@ -63,16 +59,19 @@ async def analyse_deployment(request: AnalyseDeploymentRequest) -> DeploymentDep
     rendered_chart = await Get(
         RenderedHelmChart,
         RenderHelmChartRequest(
-            chart, value_files=value_files.snapshot, values=request.field_set.values.value
+            chart,
+            skip_crds=request.field_set.skip_crds.value,
+            values_snapshot=value_files.snapshot,
+            values=request.field_set.values.value,
         ),
     )
 
     manifests = await Get(
-        ResourceManifests,
-        ParseKubernetesManifests(rendered_chart.snapshot.digest, request.field_set.address.spec),
+        KubeManifests,
+        ParseKubeManifests(rendered_chart.snapshot.digest, request.field_set.address.spec),
     )
 
-    return DeploymentDependenciesReport(
+    return HelmDeploymentReport(
         container_images=OrderedSet(
             chain.from_iterable([manifest.container_images for manifest in manifests])
         )
@@ -81,7 +80,7 @@ async def analyse_deployment(request: AnalyseDeploymentRequest) -> DeploymentDep
 
 @dataclass(frozen=True)
 class HelmDeploymentContainerMapping:
-    containers: FrozenDict[ContainerRef, Address]
+    containers: FrozenDict[ImageRef, Address]
 
 
 @rule
@@ -102,13 +101,13 @@ async def build_helm_deployment_mapping(
 
     def parse_container_ref(
         field_set: DockerFieldSet, context: DockerBuildContext
-    ) -> list[ContainerRef]:
+    ) -> list[ImageRef]:
         image_refs = field_set.image_refs(
             default_repository=docker_options.default_repository,
             registries=docker_options.registries(),
             interpolation_context=context.interpolation_context,
         )
-        return [ContainerRef.parse(ref) for ref in image_refs]
+        return [ImageRef.parse(ref) for ref in image_refs]
 
     docker_image_refs = {
         container_ref: field_set.address
@@ -128,7 +127,7 @@ async def inject_deployment_dependencies(
 ) -> InjectedDependencies:
     wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
     field_set = HelmDeploymentFieldSet.create(wrapped_target.target)
-    report = await Get(DeploymentDependenciesReport, AnalyseDeploymentRequest(field_set))
+    report = await Get(HelmDeploymentReport, AnalyseHelmDeploymentRequest(field_set))
 
     logging.debug(
         f"Target {request.dependencies_field.address} references {pluralize(len(report.container_images), 'image')}."
@@ -151,7 +150,7 @@ def rules():
     return [
         *collect_rules(),
         *deployment.rules(),
-        *k8s_manifest.rules(),
+        *k8s.rules(),
         *render.rules(),
         *docker_build_context.rules(),
         *docker_build_args.rules(),

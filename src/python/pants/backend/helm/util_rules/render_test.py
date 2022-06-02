@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import random
 from textwrap import dedent
 
 import pytest
@@ -13,6 +14,7 @@ from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
+    K8S_CRD_FILE,
     K8S_SERVICE_TEMPLATE,
 )
 from pants.backend.helm.util_rules import chart, render, tool
@@ -50,7 +52,24 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_template_rendering(rule_runner: RuleRunner) -> None:
+def _read_rendered_resource(
+    rule_runner: RuleRunner, render_request: RenderHelmChartRequest, path: str
+):
+    rendered = rule_runner.request(RenderedHelmChart, [render_request])
+
+    assert rendered.snapshot
+    assert path in rendered.snapshot.files
+
+    rendered_template_digest = rule_runner.request(
+        Digest, [DigestSubset(rendered.snapshot.digest, PathGlobs([path]))]
+    )
+    rendered_template_contents = rule_runner.request(DigestContents, [rendered_template_digest])
+
+    assert len(rendered_template_contents) == 1
+    return yaml.safe_load(rendered_template_contents[0].content.decode())
+
+
+def test_template_rendering_values(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "helm_chart(name='foo')",
@@ -61,39 +80,140 @@ def test_template_rendering(rule_runner: RuleRunner) -> None:
         }
     )
 
-    values_files_override = dedent(
+    default_values_file = dedent(
+        """\
+        service:
+          externalPort: 1111
+        """
+    )
+    override_values_file = dedent(
         """\
         service:
           externalPort: 1234
         """
     )
+    additional_values_file = dedent(
+        """\
+        service:
+          internalPort: 4321
+        """
+    )
     value_files_snapshot = rule_runner.request(
-        Snapshot, [CreateDigest([FileContent("values.yaml", values_files_override.encode())])]
+        Snapshot,
+        [
+            CreateDigest(
+                [
+                    FileContent("values.yaml", default_values_file.encode()),
+                    FileContent("additional_values.yaml", additional_values_file.encode()),
+                    FileContent("values_override.yaml", override_values_file.encode()),
+                ]
+            )
+        ],
     )
 
     values = {"service.name": "bar"}
 
     target = rule_runner.get_target(Address("", target_name="foo"))
     chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
-    rendered = rule_runner.request(
-        RenderedHelmChart,
-        [RenderHelmChartRequest(chart, value_files=value_files_snapshot, values=values)],
+
+    parsed_service = _read_rendered_resource(
+        rule_runner,
+        RenderHelmChartRequest(chart, values_snapshot=value_files_snapshot, values=values),
+        f"{chart.path}/templates/service.yaml",
     )
-
-    assert rendered.snapshot
-    assert rendered.snapshot.files == (f"{chart.path}/templates/service.yaml",)
-
-    rendered_service_digest = rule_runner.request(
-        Digest,
-        [
-            DigestSubset(
-                rendered.snapshot.digest, PathGlobs([f"{chart.path}/templates/service.yaml"])
-            )
-        ],
-    )
-    rendered_service_contents = rule_runner.request(DigestContents, [rendered_service_digest])
-
-    assert len(rendered_service_contents) == 1
-    parsed_service = yaml.safe_load(rendered_service_contents[0].content.decode())
     assert parsed_service["spec"]["ports"][0]["name"] == "bar"
     assert parsed_service["spec"]["ports"][0]["port"] == 1234
+    assert parsed_service["spec"]["ports"][0]["targetPort"] == 4321
+
+
+def test_render_skip_crds(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "helm_chart(name='foo')",
+            "Chart.yaml": HELM_CHART_FILE,
+            "values.yaml": HELM_VALUES_FILE,
+            "crds/foo.yaml": K8S_CRD_FILE,
+            "templates/_helpers.tpl": HELM_TEMPLATE_HELPERS_FILE,
+            "templates/service.yaml": K8S_SERVICE_TEMPLATE,
+        }
+    )
+
+    target = rule_runner.get_target(Address("", target_name="foo"))
+    chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
+
+    rendered = rule_runner.request(
+        RenderedHelmChart, [RenderHelmChartRequest(chart, skip_crds=True)]
+    )
+    assert "crds/foo.yaml" not in rendered.snapshot.files
+
+
+def test_template_render_kube_version(rule_runner: RuleRunner) -> None:
+    config_map_template = dedent(
+        """\
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+        name: kube_configmap
+        data:
+          kube_version: {{ .Capabilities.KubeVersion }}
+          kube_version_major: {{ .Capabilities.KubeVersion.Major | quote }}
+          kube_version_minor: {{ .Capabilities.KubeVersion.Minor | quote }}
+        """
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": "helm_chart(name='foo')",
+            "Chart.yaml": HELM_CHART_FILE,
+            "templates/configmap.yaml": config_map_template,
+        }
+    )
+
+    target = rule_runner.get_target(Address("", target_name="foo"))
+    chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
+
+    kube_version_major = random.randint(1, 1000)
+    kube_version_minor = random.randint(1, 1000)
+    render_request = RenderHelmChartRequest(
+        chart, kube_version=f"{kube_version_major}.{kube_version_minor}"
+    )
+
+    parsed_configmap = _read_rendered_resource(
+        rule_runner, render_request, f"{chart.path}/templates/configmap.yaml"
+    )
+    assert (
+        parsed_configmap["data"]["kube_version"] == f"v{kube_version_major}.{kube_version_minor}.0"
+    )
+    assert parsed_configmap["data"]["kube_version_major"] == f"{kube_version_major}"
+    assert parsed_configmap["data"]["kube_version_minor"] == f"{kube_version_minor}"
+
+
+def test_template_render_api_versions(rule_runner: RuleRunner) -> None:
+    config_map_template = dedent(
+        """\
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+        name: apiversions_configmap
+        data:
+          api_versions: {{ .Capabilities.APIVersions | toJson }}
+        """
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": "helm_chart(name='foo')",
+            "Chart.yaml": HELM_CHART_FILE,
+            "templates/configmap.yaml": config_map_template,
+        }
+    )
+
+    target = rule_runner.get_target(Address("", target_name="foo"))
+    chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
+
+    render_request = RenderHelmChartRequest(chart, api_versions=["foo/v1beta1", "bar/v1"])
+
+    parsed_configmap = _read_rendered_resource(
+        rule_runner, render_request, f"{chart.path}/templates/configmap.yaml"
+    )
+    api_versions = parsed_configmap["data"]["api_versions"]
+    assert "foo/v1beta1" in api_versions
+    assert "bar/v1" in api_versions

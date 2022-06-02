@@ -47,9 +47,15 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                 """\
               helm_deployment(
                 name="foo",
+                description="Foo deployment",
                 namespace="uat",
+                create_namespace=True,
+                skip_crds=True,
                 dependencies=["//src/chart"],
-                sources=["*.yaml", "subdir/*.yml"]
+                sources=["*.yaml", "subdir/*.yml"],
+                values={
+                    "key": "foo"
+                }
               )
               """
             ),
@@ -76,10 +82,16 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "foo",
         "mychart",
         "--install",
+        "--description",
+        '"Foo deployment"',
         "--namespace",
         "uat",
+        "--create-namespace",
+        "--skip-crds",
         "--values",
         "values.yaml,subdir/values.yml,override-values.yaml",
+        "--set",
+        "key=foo"
     )
 
 
