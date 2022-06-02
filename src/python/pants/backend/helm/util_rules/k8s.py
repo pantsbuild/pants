@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @unique
-class ResourceKind(Enum):
+class StandardKind(Enum):
     """The kind of Kubernetes resource."""
 
     CONFIG_MAP = "ConfigMap"
@@ -46,13 +46,13 @@ class CustomResourceKind:
 
 
 @dataclass(frozen=True)
-class ContainerRef:
+class ImageRef:
     registry: str | None
     repository: str
     tag: str = _DEFAULT_CONTAINER_TAG
 
     @classmethod
-    def parse(cls, image_ref: str) -> ContainerRef:
+    def parse(cls, image_ref: str) -> ImageRef:
         registry = None
         tag = _DEFAULT_CONTAINER_TAG
 
@@ -74,22 +74,22 @@ class ContainerRef:
 
 
 @dataclass(frozen=True)
-class ResourceManifest:
+class KubeManifest:
     api_version: str
-    kind: ResourceKind | CustomResourceKind
-    container_images: tuple[ContainerRef, ...]
+    kind: StandardKind | CustomResourceKind
+    container_images: tuple[ImageRef, ...]
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> ResourceManifest:
-        std_kind: ResourceKind | None = None
+    def from_dict(cls, d: dict[str, Any]) -> KubeManifest:
+        std_kind: StandardKind | None = None
         try:
-            std_kind = ResourceKind(d["kind"])
+            std_kind = StandardKind(d["kind"])
         except ValueError:
             custom_kind = CustomResourceKind(d["kind"])
 
-        container_images: list[ContainerRef] = []
+        container_images: list[ImageRef] = []
         if std_kind:
-            container_images = cls._extract_container_images(std_kind, d["spec"])
+            container_images = KubeManifest._extract_container_images(std_kind, d["spec"])
 
         return cls(
             api_version=d["apiVersion"],
@@ -97,10 +97,8 @@ class ResourceManifest:
             container_images=tuple(container_images),
         )
 
-    @classmethod
-    def _extract_container_images(
-        cls, kind: ResourceKind, spec: dict[str, Any]
-    ) -> list[ContainerRef]:
+    @staticmethod
+    def _extract_container_images(kind: StandardKind, spec: dict[str, Any]) -> list[ImageRef]:
         def safe_get(path: list[str]) -> Any | None:
             lookup_from = spec
             result = None
@@ -117,43 +115,43 @@ class ResourceManifest:
             return cs
 
         containers = []
-        if kind == ResourceKind.CRON_JOB:
+        if kind == StandardKind.CRON_JOB:
             containers = get_containers(["jobTemplate", "spec", "template", "spec"])
-        elif kind == ResourceKind.DAEMON_SET:
+        elif kind == StandardKind.DAEMON_SET:
             containers = get_containers(["template", "spec"])
-        elif kind == ResourceKind.DEPLOYMENT:
+        elif kind == StandardKind.DEPLOYMENT:
             containers = get_containers(["template", "spec"])
-        elif kind == ResourceKind.JOB:
+        elif kind == StandardKind.JOB:
             containers = get_containers(["template", "spec"])
-        elif kind == ResourceKind.POD:
+        elif kind == StandardKind.POD:
             containers = get_containers([])
-        elif kind == ResourceKind.REPLICA_SET:
+        elif kind == StandardKind.REPLICA_SET:
             containers = get_containers(["template", "spec"])
-        elif kind == ResourceKind.STATEFUL_SET:
+        elif kind == StandardKind.STATEFUL_SET:
             containers = get_containers(["template", "spec"])
 
-        return [ContainerRef.parse(cast(str, container["image"])) for container in containers]
+        return [ImageRef.parse(cast(str, container["image"])) for container in containers]
 
 
-class ResourceManifests(Collection[ResourceManifest]):
+class KubeManifests(Collection[KubeManifest]):
     pass
 
 
 @dataclass(frozen=True)
-class ParseKubernetesManifests:
+class ParseKubeManifests:
     digest: Digest
     description_of_origin: str
 
 
 @rule
-async def parse_kubernetes_manifests(request: ParseKubernetesManifests) -> ResourceManifests:
+async def parse_kubernetes_manifests(request: ParseKubeManifests) -> KubeManifests:
     yaml_subset = await Get(
         Digest, DigestSubset(request.digest, PathGlobs(["**/*.yaml", "**/*.yml"]))
     )
     digest_contents = await Get(DigestContents, Digest, yaml_subset)
 
     manifests = [
-        ResourceManifest.from_dict(parsed_yaml)
+        KubeManifest.from_dict(parsed_yaml)
         for file in digest_contents
         for parsed_yaml in yaml.safe_load_all(file.content)
     ]
@@ -161,7 +159,7 @@ async def parse_kubernetes_manifests(request: ParseKubernetesManifests) -> Resou
     logger.debug(
         f"Found {pluralize(len(manifests), 'manifest')} in {request.description_of_origin}"
     )
-    return ResourceManifests(manifests)
+    return KubeManifests(manifests)
 
 
 def rules():
