@@ -14,29 +14,34 @@ from pants.backend.explorer.graphql.context import GraphQLContext
 from pants.backend.explorer.graphql.field_types import JSONScalar
 from pants.backend.project_info.peek import TargetData, TargetDatas
 from pants.base.specs_parser import SpecsParser
-from pants.engine.target import AllTargets, Targets, UnexpandedTargets
+from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
 from pants.help.help_info_extracter import TargetTypeHelpInfo
+from pants.util.strutil import softwrap
 
 specs_parser = SpecsParser()
 
 
-@strawberry.type
+@strawberry.type(description="Describes a target field type.")
 class TargetTypeField:
-    alias: str
-    provider: str
-    description: str
-    type_hint: str
-    required: bool
-    default: Optional[str]
+    alias: str = strawberry.field(
+        description="The field name, as used in a target definition in a BUILD file."
+    )
+    provider: str = strawberry.field(description="Backend that registered the field type.")
+    description: str = strawberry.field(description="Field documentation.")
+    type_hint: str = strawberry.field(description="Field type hint.")
+    required: bool = strawberry.field(description="Field required flag.")
+    default: Optional[str] = strawberry.field(description="Field default value.")
 
 
-@strawberry.type
+@strawberry.type(description="Describes a target type.")
 class TargetType:
-    alias: str
-    provider: str
-    summary: str
-    description: str
-    fields: List[TargetTypeField]
+    alias: str = strawberry.field(
+        description="The target alias, as used in the BUILD files, e.g. `python_sources`."
+    )
+    provider: str = strawberry.field(description="Backend that registered the target type.")
+    summary: str = strawberry.field(description="Target type documentation summary.")
+    description: str = strawberry.field(description="Target type documentation.")
+    fields: List[TargetTypeField] = strawberry.field(description="All valid fields for the target.")
 
     @classmethod
     def from_help(cls, info: TargetTypeHelpInfo) -> TargetType:
@@ -45,11 +50,20 @@ class TargetType:
         return cls(**data)
 
 
-@strawberry.type
+@strawberry.type(description="Describes a target defined in a project BUILD file.")
 class Target:
-    address: str
-    target_type: str
-    fields: JSONScalar
+    address: str = strawberry.field(description="The target address.")
+    target_type: str = strawberry.field(
+        description="The target type, such as `python_sources` or `pex_binary` etc."
+    )
+    fields: JSONScalar = strawberry.field(
+        description=softwrap(
+            """
+            The targets field values. This has the same structure as the JSON output from the `peek`
+            goal, i.e. some fields may be both on a `_raw` form as well as on a parsed/populated form.
+            """
+        )
+    )
 
     @classmethod
     def from_data(cls, data: TargetData) -> Target:
@@ -60,13 +74,19 @@ class Target:
         return cls(address=address, target_type=target_type, fields=fields)
 
 
-@strawberry.input
+@strawberry.input(
+    description="Filter target types based on type (alias) and/or limit the number of entries to return."
+)
 class TargetTypesQuery:
-    alias: Optional[str] = None
-    limit: Optional[int] = None
+    alias_re: Optional[str] = strawberry.field(
+        default=None, description="Select targets types matching a regexp."
+    )
+    limit: Optional[int] = strawberry.field(
+        default=None, description="Limit the number of entries returned."
+    )
 
     def __bool__(self) -> bool:
-        return not (self.alias is None and self.limit is None)
+        return not (self.alias_re is None and self.limit is None)
 
     @staticmethod
     def filter(
@@ -76,7 +96,7 @@ class TargetTypesQuery:
             yield from target_types
             return
 
-        alias_pattern = query.alias and re.compile(query.alias)
+        alias_pattern = query.alias_re and re.compile(query.alias_re)
         count = 0
         for info in target_types:
             if alias_pattern and not re.match(alias_pattern, info.alias):
@@ -87,11 +107,20 @@ class TargetTypesQuery:
                 return
 
 
-@strawberry.input
+@strawberry.input(description="Filter targets based on the supplied query.")
 class TargetsQuery:
-    specs: Optional[List[str]] = None
-    target_type: Optional[str] = None
-    limit: Optional[int] = None
+    specs: Optional[List[str]] = strawberry.field(
+        default=None,
+        description=(
+            "Select targets matching the address specs. (Same syntax as supported on the command line.)"
+        ),
+    )
+    target_type: Optional[str] = strawberry.field(
+        default=None, description="Select targets of a certain type only."
+    )
+    limit: Optional[int] = strawberry.field(
+        default=None, description="Limit the number of entries returned."
+    )
 
     def __bool__(self) -> bool:
         # The `specs` field is not used in the `filter` method.
@@ -113,15 +142,14 @@ class TargetsQuery:
                 return
 
 
-@strawberry.type
+@strawberry.type(description="Get targets related info.")
 class QueryTargetsMixin:
-    """Get targets related info."""
-
-    @strawberry.field
+    @strawberry.field(
+        description="Get all registered target types that may be used in BUILD files."
+    )
     def target_types(
         self, info: Info, query: Optional[TargetTypesQuery] = None
     ) -> List[TargetType]:
-        """Get all registered target types that may be used in BUILD files."""
         request_state = GraphQLContext.request_state_from_info(info)
         return list(
             TargetTypesQuery.filter(
@@ -133,23 +161,17 @@ class QueryTargetsMixin:
             )
         )
 
-    @strawberry.field
+    @strawberry.field(description="Get all targets defined in BUILD files.")
     async def targets(self, info: Info, query: Optional[TargetsQuery] = None) -> List[Target]:
-        """Get all targets defined in BUILD files."""
         req = GraphQLContext.request_state_from_info(info).product_request
         specs = (
             specs_parser.parse_specs(query.specs, convert_dir_literal_to_address_literal=False)
             if query is not None and query.specs
             else None
         )
-        targets: AllTargets | Targets
         if specs:
-            targets = req(Targets, (specs,))
+            targets = req(UnexpandedTargets, (specs,))
         else:
-            targets = req(AllTargets)
-
-        # Peek expects to work with unexpanded targets, but we want to present the expanded set of
-        # targets, so we pretend our targets are unexpanded.
-        all_data = req(TargetDatas, (UnexpandedTargets(targets),))
-
+            targets = UnexpandedTargets(req(AllUnexpandedTargets))
+        all_data = req(TargetDatas, (targets,))
         return [Target.from_data(data) for data in TargetsQuery.filter(query, all_data)]

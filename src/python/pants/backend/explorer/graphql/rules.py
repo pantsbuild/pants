@@ -9,7 +9,7 @@ from pants.backend.explorer.server.uvicorn import UvicornServerSetup, UvicornSer
 from pants.backend.project_info.peek import TargetDatas
 from pants.base.specs import Specs
 from pants.engine.rules import Get, QueryRule, collect_rules, rule
-from pants.engine.target import AllTargets, AllUnexpandedTargets, Targets, UnexpandedTargets
+from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
 from pants.engine.unions import UnionRule
 
 
@@ -30,8 +30,7 @@ def rules():
         *collect_rules(),
         UnionRule(UvicornServerSetupRequest, GraphQLUvicornServerSetupRequest),
         # Root query data rules for graphql.
-        QueryRule(AllTargets, ()),
         QueryRule(AllUnexpandedTargets, ()),
         QueryRule(TargetDatas, (UnexpandedTargets,)),
-        QueryRule(Targets, (Specs,)),
+        QueryRule(UnexpandedTargets, (Specs,)),
     )
