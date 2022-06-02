@@ -44,7 +44,11 @@ class OwningGoMod:
 async def find_nearest_go_mod(request: OwningGoModRequest) -> OwningGoMod:
     # We don't expect `go_mod` targets to be generated, so we can use UnexpandedTargets.
     candidate_targets = await Get(
-        UnexpandedTargets, RawSpecs(ancestor_globs=(AncestorGlobSpec(request.address.spec_path),))
+        UnexpandedTargets,
+        RawSpecs(
+            ancestor_globs=(AncestorGlobSpec(request.address.spec_path),),
+            description_of_origin="the `OwningGoMod` rule",
+        ),
     )
 
     # Sort by address.spec_path in descending order so the nearest go_mod target is sorted first.

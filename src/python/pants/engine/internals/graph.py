@@ -357,14 +357,22 @@ async def resolve_targets(
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
-    tgts = await Get(Targets, RawSpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),)))
+    tgts = await Get(
+        Targets,
+        RawSpecsWithoutFileOwners(
+            recursive_globs=(RecursiveGlobSpec(""),), description_of_origin="the `AllTargets` rule"
+        ),
+    )
     return AllTargets(tgts)
 
 
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG)
 async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTargets:
     tgts = await Get(
-        UnexpandedTargets, RawSpecsWithoutFileOwners(recursive_globs=(RecursiveGlobSpec(""),))
+        UnexpandedTargets,
+        RawSpecsWithoutFileOwners(
+            recursive_globs=(RecursiveGlobSpec(""),), description_of_origin="the `AllTargets` rule"
+        ),
     )
     return AllUnexpandedTargets(tgts)
 
@@ -674,45 +682,45 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
     deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
 
-    # Walk up the buildroot looking for targets that would conceivably claim changed sources.
-    # For live files, we use Targets, which causes more precise, often file-level, targets
-    # to be created. For deleted files we use UnexpandedTargets, which have the original declared
-    # glob.
-    live_candidate_specs = tuple(AncestorGlobSpec(directory=d) for d in live_dirs)
-    deleted_candidate_specs = tuple(AncestorGlobSpec(directory=d) for d in deleted_dirs)
-    live_get: Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners]
-    if owners_request.filter_by_global_options:
-        live_get = Get(
-            FilteredTargets,
-            RawSpecsWithoutFileOwners(
-                ancestor_globs=live_candidate_specs,
-                filter_by_global_options=True,
-                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-            ),
+    def create_live_and_deleted_gets(
+        *, filter_by_global_options: bool
+    ) -> tuple[
+        Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners],
+        Get[UnexpandedTargets, RawSpecsWithoutFileOwners],
+    ]:
+        """Walk up the buildroot looking for targets that would conceivably claim changed sources.
+
+        For live files, we use Targets, which causes generated targets to be used rather than their
+        target generators. For deleted files we use UnexpandedTargets, which have the original
+        declared `sources` globs from target generators.
+
+        We ignore unrecognized files, which can happen e.g. when finding owners for deleted files.
+        """
+        live_raw_specs = RawSpecsWithoutFileOwners(
+            ancestor_globs=tuple(AncestorGlobSpec(directory=d) for d in live_dirs),
+            filter_by_global_options=filter_by_global_options,
+            description_of_origin="<owners rule - unused>",
+            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+        )
+        live_get: Get[FilteredTargets | Targets, RawSpecsWithoutFileOwners] = (
+            Get(FilteredTargets, RawSpecsWithoutFileOwners, live_raw_specs)
+            if filter_by_global_options
+            else Get(Targets, RawSpecsWithoutFileOwners, live_raw_specs)
         )
         deleted_get = Get(
             UnexpandedTargets,
             RawSpecsWithoutFileOwners(
-                ancestor_globs=deleted_candidate_specs,
-                filter_by_global_options=True,
+                ancestor_globs=tuple(AncestorGlobSpec(directory=d) for d in deleted_dirs),
+                filter_by_global_options=filter_by_global_options,
+                description_of_origin="<owners rule - unused>",
                 unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
             ),
         )
-    else:
-        live_get = Get(
-            Targets,
-            RawSpecsWithoutFileOwners(
-                ancestor_globs=live_candidate_specs,
-                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-            ),
-        )
-        deleted_get = Get(
-            UnexpandedTargets,
-            RawSpecsWithoutFileOwners(
-                ancestor_globs=deleted_candidate_specs,
-                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-            ),
-        )
+        return live_get, deleted_get
+
+    live_get, deleted_get = create_live_and_deleted_gets(
+        filter_by_global_options=owners_request.filter_by_global_options
+    )
     live_candidate_tgts, deleted_candidate_tgts = await MultiGet(live_get, deleted_get)
 
     matching_addresses: OrderedSet[Address] = OrderedSet()

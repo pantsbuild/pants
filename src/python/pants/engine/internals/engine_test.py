@@ -316,7 +316,7 @@ class TestStreamingWorkunit(SchedulerTestBase):
             callbacks=[tracker],
             report_interval_seconds=0.01,
             max_workunit_verbosity=max_workunit_verbosity,
-            specs=Specs(),
+            specs=Specs.empty(),
             options_bootstrapper=create_options_bootstrapper([]),
             allow_async_completion=False,
         )
@@ -702,7 +702,7 @@ def test_counters(rule_runner: RuleRunner, run_tracker: RunTracker) -> None:
         callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -743,7 +743,7 @@ def test_more_complicated_engine_aware(rule_runner: RuleRunner, run_tracker: Run
         callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.TRACE,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -803,7 +803,7 @@ def test_process_digests_on_streaming_workunits(
         callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.DEBUG,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -834,7 +834,7 @@ def test_process_digests_on_streaming_workunits(
         callbacks=[tracker],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.DEBUG,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -897,7 +897,7 @@ def test_context_object_on_streaming_workunits(
         callbacks=[Callback()],
         report_interval_seconds=0.01,
         max_workunit_verbosity=LogLevel.INFO,
-        specs=Specs(),
+        specs=Specs.empty(),
         options_bootstrapper=create_options_bootstrapper([]),
         allow_async_completion=False,
     )
@@ -929,6 +929,7 @@ def test_streaming_workunits_expanded_specs(run_tracker: RunTracker) -> None:
     specs = SpecsParser().parse_specs(
         ["src/python/somefiles::", "src/python/others/b.py"],
         convert_dir_literal_to_address_literal=False,
+        description_of_origin="tests",
     )
 
     class Callback(WorkunitsCallback):

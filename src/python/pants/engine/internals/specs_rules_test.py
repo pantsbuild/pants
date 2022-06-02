@@ -145,6 +145,7 @@ def resolve_raw_specs_without_file_owners(
         unmatched_glob_behavior=(
             GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
         ),
+        description_of_origin="tests",
     )
     result = rule_runner.request(Addresses, [RawSpecsWithoutFileOwners.from_raw_specs(specs_obj)])
     return sorted(result)
@@ -566,6 +567,7 @@ def resolve_raw_specs_with_only_file_owners(
         unmatched_glob_behavior=(
             GlobMatchErrorBehavior.ignore if ignore_nonexistent else GlobMatchErrorBehavior.error
         ),
+        description_of_origin="tests",
     )
     result = rule_runner.request(Addresses, [RawSpecsWithOnlyFileOwners.from_raw_specs(specs_obj)])
     return sorted(result)
@@ -683,7 +685,9 @@ def test_resolve_addresses_from_raw_specs(rule_runner: RuleRunner) -> None:
     ]
     multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
     specs = SpecsParser(rule_runner.build_root).parse_specs(
-        [*no_interaction_specs, *multiple_files_specs], convert_dir_literal_to_address_literal=False
+        [*no_interaction_specs, *multiple_files_specs],
+        convert_dir_literal_to_address_literal=False,
+        description_of_origin="tests",
     )
 
     result = rule_runner.request(Addresses, [specs])
@@ -713,7 +717,9 @@ def test_resolve_addresses_from_specs(rule_runner: RuleRunner) -> None:
     )
 
     def assert_resolved(specs: Iterable[str], expected: set[str]) -> None:
-        specs_obj = SpecsParser().parse_specs(specs, convert_dir_literal_to_address_literal=False)
+        specs_obj = SpecsParser().parse_specs(
+            specs, convert_dir_literal_to_address_literal=False, description_of_origin="tests"
+        )
         result = rule_runner.request(Addresses, [specs_obj])
         assert {addr.spec for addr in result} == expected
 
@@ -775,6 +781,7 @@ def test_filtered_targets(rule_runner: RuleRunner) -> None:
         recursive_globs=(RecursiveGlobSpec("addr_specs"),),
         file_globs=(FileGlobSpec("fs_specs/*.txt"),),
         filter_by_global_options=True,
+        description_of_origin="tests",
     )
 
     def check(tags_option: str | None, expected: set[Address]) -> None:
@@ -843,7 +850,9 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
     def assert_paths(
         specs: Iterable[str], expected_files: set[str], expected_dirs: set[str]
     ) -> None:
-        specs_obj = SpecsParser().parse_specs(specs, convert_dir_literal_to_address_literal=False)
+        specs_obj = SpecsParser().parse_specs(
+            specs, convert_dir_literal_to_address_literal=False, description_of_origin="tests"
+        )
         result = rule_runner.request(SpecsPaths, [specs_obj])
         assert set(result.files) == expected_files
         assert set(result.dirs) == expected_dirs
@@ -949,7 +958,14 @@ def test_find_valid_field_sets(caplog) -> None:
             TargetRootsToFieldSets,
             [
                 request,
-                Specs(includes=RawSpecs.create(specs, convert_dir_literal_to_address_literal=True)),
+                Specs(
+                    includes=RawSpecs.create(
+                        specs,
+                        convert_dir_literal_to_address_literal=True,
+                        description_of_origin="tests",
+                    ),
+                    ignores=RawSpecs(description_of_origin="tests"),
+                ),
             ],
         )
 
@@ -1012,7 +1028,7 @@ def test_no_applicable_targets_exception() -> None:
     # not give the filedeps command.
     exc = NoApplicableTargetsException(
         [],
-        Specs(),
+        Specs.empty(),
         UnionMembership({}),
         applicable_target_types=[Tgt1],
         goal_description="the `foo` goal",
@@ -1036,7 +1052,12 @@ def test_no_applicable_targets_exception() -> None:
     invalid_tgt = Tgt3({}, Address("blah"))
     exc = NoApplicableTargetsException(
         [invalid_tgt],
-        Specs(includes=RawSpecs(file_literals=(FileLiteralSpec("foo.ext"),))),
+        Specs(
+            includes=RawSpecs(
+                file_literals=(FileLiteralSpec("foo.ext"),), description_of_origin="tests"
+            ),
+            ignores=RawSpecs(description_of_origin="tests"),
+        ),
         UnionMembership({}),
         applicable_target_types=[Tgt1, Tgt2],
         goal_description="the `foo` goal",
@@ -1067,7 +1088,12 @@ def test_no_applicable_targets_exception() -> None:
     # Test handling of `Specs`.
     exc = NoApplicableTargetsException(
         [invalid_tgt],
-        Specs(includes=RawSpecs(address_literals=(AddressLiteralSpec("foo", "bar"),))),
+        Specs(
+            includes=RawSpecs(
+                address_literals=(AddressLiteralSpec("foo", "bar"),), description_of_origin="tests"
+            ),
+            ignores=RawSpecs(description_of_origin="tests"),
+        ),
         UnionMembership({}),
         applicable_target_types=[Tgt1],
         goal_description="the `foo` goal",
@@ -1079,7 +1105,9 @@ def test_no_applicable_targets_exception() -> None:
             includes=RawSpecs(
                 address_literals=(AddressLiteralSpec("foo", "bar"),),
                 file_literals=(FileLiteralSpec("foo.ext"),),
-            )
+                description_of_origin="tests",
+            ),
+            ignores=RawSpecs(description_of_origin="tests"),
         ),
         UnionMembership({}),
         applicable_target_types=[Tgt1],

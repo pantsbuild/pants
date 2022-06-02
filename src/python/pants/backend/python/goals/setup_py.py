@@ -930,7 +930,13 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     """
     target = owned_dependency.target
     ancestor_addrs = AncestorGlobSpec(target.address.spec_path)
-    ancestor_tgts = await Get(Targets, RawSpecs(ancestor_globs=(ancestor_addrs,)))
+    ancestor_tgts = await Get(
+        Targets,
+        RawSpecs(
+            ancestor_globs=(ancestor_addrs,),
+            description_of_origin="the `python_distribution` `package` rules",
+        ),
+    )
     # Note that addresses sort by (spec_path, target_name), and all these targets are
     # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
     # address will effectively sort by closeness of ancestry to the given target.
