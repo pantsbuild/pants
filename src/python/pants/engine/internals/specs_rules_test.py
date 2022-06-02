@@ -392,27 +392,19 @@ def test_raw_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> 
     assert_resolve_error(AddressLiteralSpec("real", "fake_tgt"), expected=str(did_you_mean))
     assert_resolve_error(AddressLiteralSpec("real/f.txt", "fake_tgt"), expected=str(did_you_mean))
 
-    assert_resolve_error(
-        DirGlobSpec("fake"), expected='Unmatched glob from CLI arguments: "fake/*"'
-    )
+    assert_resolve_error(DirGlobSpec("fake"), expected='Unmatched glob from tests: "fake/*"')
     assert_does_not_error(DirGlobSpec("empty"))
     assert_does_not_error(DirGlobSpec("fake"), ignore_nonexistent=True)
 
-    assert_resolve_error(
-        DirLiteralSpec("fake"), expected='Unmatched glob from CLI arguments: "fake/*"'
-    )
+    assert_resolve_error(DirLiteralSpec("fake"), expected='Unmatched glob from tests: "fake/*"')
     assert_does_not_error(DirLiteralSpec("empty"))
     assert_does_not_error(DirLiteralSpec("fake"), ignore_nonexistent=True)
 
-    assert_resolve_error(
-        RecursiveGlobSpec("fake"), expected='Unmatched glob from CLI arguments: "fake/**"'
-    )
+    assert_resolve_error(RecursiveGlobSpec("fake"), expected='Unmatched glob from tests: "fake/**"')
     assert_does_not_error(RecursiveGlobSpec("empty"))
     assert_does_not_error(RecursiveGlobSpec("fake"), ignore_nonexistent=True)
 
-    assert_resolve_error(
-        AncestorGlobSpec("fake"), expected='Unmatched glob from CLI arguments: "fake/*"'
-    )
+    assert_resolve_error(AncestorGlobSpec("fake"), expected='Unmatched glob from tests: "fake/*"')
     assert_does_not_error(AncestorGlobSpec("empty"))
     assert_does_not_error(AncestorGlobSpec("fake"), ignore_nonexistent=True)
 
@@ -634,7 +626,7 @@ def test_raw_specs_with_only_file_owners_glob(rule_runner: RuleRunner) -> None:
 
 def test_raw_specs_with_only_file_owners_nonexistent_file(rule_runner: RuleRunner) -> None:
     spec = FileLiteralSpec("demo/fake.txt")
-    with engine_error(contains='Unmatched glob from CLI arguments: "demo/fake.txt"'):
+    with engine_error(contains='Unmatched glob from tests: "demo/fake.txt"'):
         resolve_raw_specs_with_only_file_owners(rule_runner, [spec])
 
     assert not resolve_raw_specs_with_only_file_owners(rule_runner, [spec], ignore_nonexistent=True)

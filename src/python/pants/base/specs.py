@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -233,7 +234,7 @@ class RawSpecs:
     either `Specs` or `RawSpecs` in rules, e.g. to find what targets exist in a directory.
     """
 
-    description_of_origin: str
+    description_of_origin: str = dataclasses.field(compare=False, hash=False)
 
     address_literals: tuple[AddressLiteralSpec, ...] = ()
     file_literals: tuple[FileLiteralSpec, ...] = ()
@@ -345,7 +346,7 @@ class RawSpecsWithoutFileOwners:
     `Get(Addresses, RawSpecs)`, which will result in this rule being used.
     """
 
-    description_of_origin: str
+    description_of_origin: str = dataclasses.field(compare=False, hash=False)
 
     address_literals: tuple[AddressLiteralSpec, ...] = ()
     dir_literals: tuple[DirLiteralSpec, ...] = ()
@@ -432,7 +433,7 @@ class RawSpecsWithOnlyFileOwners:
     `Get(Addresses, RawSpecs)`, which will result in this rule being used.
     """
 
-    description_of_origin: str
+    description_of_origin: str = dataclasses.field(compare=False, hash=False)
 
     file_literals: tuple[FileLiteralSpec, ...] = ()
     file_globs: tuple[FileGlobSpec, ...] = ()
