@@ -1490,6 +1490,16 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         "--exclude-target-regexp",
         help="Exclude targets that match these regexes. This does not impact file arguments.",
         metavar="<regexp>",
+        removal_version="2.14.0.dev0",
+        removal_hint=softwrap(
+            """
+            Use the option `--filter-address-regex` instead, with `-` in front of the regex. For
+            example, `--exclude-target-regexp=dir/` should become `--filter-address-regex=-dir/`.
+
+            The `--filter` options can now be used with any goal, not only the `filter` goal,
+            so there is no need for this option anymore.
+            """
+        ),
     )
 
     files_not_found_behavior = EnumOption(
