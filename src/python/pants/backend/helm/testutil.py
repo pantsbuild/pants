@@ -296,3 +296,37 @@ HELM_VALUES_FILE = dedent(
     internalPort: 1223
   """
 )
+
+HELM_BATCH_HOOK_TEMPLATE = dedent(
+    """\
+  apiVersion: batch/v1
+  kind: Job
+  metadata:
+    name: "{{ .Release.Name }}"
+    labels:
+      app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/version: {{ .Chart.AppVersion }}
+      helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    annotations:
+      # This is what defines this resource as a hook. Without this line, the
+      # job is considered part of the release.
+      "helm.sh/hook": post-install
+      "helm.sh/hook-weight": "-5"
+      "helm.sh/hook-delete-policy": hook-succeeded
+  spec:
+    template:
+      metadata:
+        name: "{{ .Release.Name }}"
+        labels:
+          app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+          app.kubernetes.io/instance: {{ .Release.Name | quote }}
+          helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+      spec:
+        restartPolicy: Never
+        containers:
+        - name: post-install-job
+          image: "alpine:3.3"
+          command: ["/bin/sleep","{{ default "10" .Values.sleepyTime }}"]
+  """
+)

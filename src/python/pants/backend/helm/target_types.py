@@ -418,6 +418,12 @@ class HelmDeploymentCreateNamespaceField(BoolField):
     help = "If true, the namespace will created if it doesn't exist."
 
 
+class HelmDeploymentNoHooksField(BoolField):
+    alias = "no_hooks"
+    default = False
+    help = "If true, none of the lifecycle hooks of the given chart will be included in the deployment."
+
+
 class HelmDeploymentTarget(Target):
     alias = "helm_deployment"
     core_fields = (
@@ -429,6 +435,7 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentSkipCrdsField,
         HelmDeploymentValuesField,
         HelmDeploymentCreateNamespaceField,
+        HelmDeploymentNoHooksField,
     )
     help = "A Helm chart deployment."
 
@@ -446,6 +453,7 @@ class HelmDeploymentFieldSet(FieldSet):
     create_namespace: HelmDeploymentCreateNamespaceField
     sources: HelmDeploymentSourcesField
     skip_crds: HelmDeploymentSkipCrdsField
+    no_hooks: HelmDeploymentNoHooksField
     dependencies: HelmDeploymentDependenciesField
     values: HelmDeploymentValuesField
 

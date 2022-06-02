@@ -22,11 +22,8 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.helm.target_types import HelmDeploymentDependenciesField, HelmDeploymentFieldSet
 from pants.backend.helm.util_rules import deployment, k8s, render
-from pants.backend.helm.util_rules.chart import HelmChart
+from pants.backend.helm.util_rules.deployment import RenderedDeployment, RenderHelmDeploymentRequest
 from pants.backend.helm.util_rules.k8s import ImageRef, KubeManifests, ParseKubeManifests
-from pants.backend.helm.util_rules.render import RenderedHelmChart, RenderHelmChartRequest
-from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, WrappedTarget
@@ -51,24 +48,14 @@ class HelmDeploymentReport:
 
 @rule
 async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeploymentReport:
-    chart, value_files = await MultiGet(
-        Get(HelmChart, HelmDeploymentFieldSet, request.field_set),
-        Get(StrippedSourceFiles, SourceFilesRequest([request.field_set.sources])),
-    )
-
-    rendered_chart = await Get(
-        RenderedHelmChart,
-        RenderHelmChartRequest(
-            chart,
-            skip_crds=request.field_set.skip_crds.value,
-            values_snapshot=value_files.snapshot,
-            values=request.field_set.values.value,
-        ),
+    rendered_deployment = await Get(
+        RenderedDeployment,
+        RenderHelmDeploymentRequest(request.field_set),
     )
 
     manifests = await Get(
         KubeManifests,
-        ParseKubeManifests(rendered_chart.snapshot.digest, request.field_set.address.spec),
+        ParseKubeManifests(rendered_deployment.snapshot.digest, request.field_set.address.spec),
     )
 
     return HelmDeploymentReport(

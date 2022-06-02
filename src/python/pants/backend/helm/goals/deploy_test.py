@@ -51,6 +51,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                 namespace="uat",
                 create_namespace=True,
                 skip_crds=True,
+                no_hooks=True,
                 dependencies=["//src/chart"],
                 sources=["*.yaml", "subdir/*.yml"],
                 values={
@@ -62,11 +63,18 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
             "src/deployment/values.yaml": "",
             "src/deployment/override-values.yaml": "",
             "src/deployment/subdir/values.yml": "",
+            "src/deployment/subdir/override-values.yml": "",
         }
     )
 
     source_root_patterns = ["/src/*"]
-    rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
+    deploy_args = ["--kubeconfig", "./kubeconfig"]
+    rule_runner.set_options(
+        [
+            f"--source-root-patterns={repr(source_root_patterns)}",
+            f"--experimental-deploy-args={repr(deploy_args)}",
+        ]
+    )
 
     target = rule_runner.get_target(Address("src/deployment", target_name="foo"))
     field_set = DeployHelmDeploymentFieldSet.create(target)
@@ -88,10 +96,13 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "uat",
         "--create-namespace",
         "--skip-crds",
+        "--no-hooks",
         "--values",
-        "values.yaml,subdir/values.yml,override-values.yaml",
+        "values.yaml,subdir/values.yml,override-values.yaml,subdir/override-values.yml",
         "--set",
-        "key=foo"
+        "key=foo",
+        "--kubeconfig",
+        "./kubeconfig",
     )
 
 

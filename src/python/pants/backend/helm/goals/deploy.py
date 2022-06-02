@@ -115,6 +115,7 @@ async def run_helm_deploy(
                 *(("--namespace", field_set.namespace.value) if field_set.namespace.value else ()),
                 *(("--create-namespace",) if field_set.create_namespace.value else ()),
                 *(("--skip-crds",) if field_set.skip_crds.value else ()),
+                *(("--no-hooks",) if field_set.no_hooks.value else ()),
                 *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),
                 *chain.from_iterable(
                     [
