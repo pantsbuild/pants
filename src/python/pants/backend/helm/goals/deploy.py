@@ -56,6 +56,25 @@ _VALID_PASSTHROUGH_OPTS = [
     "--set-string",
 ]
 
+class InvalidDeploymentArgs(Exception):
+    def __init__(self, args: Iterable[str]) -> None:
+        super().__init__(
+            softwrap(
+                f"""
+                The following command line arguments are not valid: {' '.join(args)}.
+
+                Only the following passthrough arguments are allowed:
+
+                {bullet_list([+_VALID_PASSTHROUGH_FLAGS, *_VALID_PASSTHROUGH_OPTS])}
+
+                Most invalid arguments have equivalent fields in the `{HelmDeploymentTarget.alias}` target.
+                Usage of fields is encourage over passthrough arguments as that enables repeatable deployments.
+
+                Please run `{bin_name()} help {HelmDeploymentTarget.alias}` for more information.
+                """
+            )
+        )
+
 
 class InvalidDeploymentArgs(Exception):
     def __init__(self, args: Iterable[str]) -> None:
