@@ -25,7 +25,7 @@ from pants.backend.go.util_rules import (
 )
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.test import TestResult
-from pants.core.target_types import FileTarget, ResourceTarget
+from pants.core.target_types import FileTarget
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.process import ProcessResult
@@ -51,7 +51,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(TestResult, [GoTestFieldSet]),
             QueryRule(ProcessResult, [GoSdkProcess]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, FileTarget, ResourceTarget],
+        target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
@@ -617,7 +617,7 @@ def test_compilation_error(rule_runner: RuleRunner) -> None:
     assert "failed to parse" in result.stderr
 
 
-def test_resource_dependencies(rule_runner: RuleRunner) -> None:
+def test_file_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.txt": "",
@@ -626,7 +626,7 @@ def test_resource_dependencies(rule_runner: RuleRunner) -> None:
                 """
                 go_mod(name='mod')
                 go_package(dependencies=[":testdata", "//:root"])
-                resource(name="testdata", source="testdata/f.txt")
+                file(name="testdata", source="testdata/f.txt")
                 """
             ),
             "foo/go.mod": "module foo",
