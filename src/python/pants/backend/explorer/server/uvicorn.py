@@ -3,38 +3,50 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
 from fastapi import FastAPI
 from uvicorn import Config, Server  # type: ignore
 
+from pants.backend.explorer.browser import BrowserRequest
 from pants.base.exiter import ExitCode
 from pants.engine.explorer import ExplorerServer, ExplorerServerRequest, RequestState
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
+
+logger = logging.getLogger(__name__)
 
 
 class UvicornServerRequest(ExplorerServerRequest):
     pass
 
 
+@dataclass
 class UvicornServer:
-    def __init__(self, host: str, port: int, request_state: RequestState):
-        self.app = FastAPI()
-        self.config = Config(
-            self.app,
-            host=host,
-            port=port,
-            callback_notify=self.on_tick,
-            timeout_notify=0.25,
-            log_config=None,
-        )
-        self.request_state = request_state
+    app: FastAPI
+    config: Config
+    request_state: RequestState
+    prerun_tasks: list[Callable[[], Any]] = field(default_factory=list)
+
+    def __post_init__(self):
+        self.config.callback_notify = self.on_tick
 
     @classmethod
     def from_request(cls, request: UvicornServerRequest) -> UvicornServer:
-        return cls(host=request.address, port=request.port, request_state=request.request_state)
+        app = FastAPI()
+        return cls(
+            app=app,
+            config=Config(
+                app,
+                host=request.address,
+                port=request.port,
+                timeout_notify=0.25,
+                log_config=None,
+            ),
+            request_state=request.request_state,
+        )
 
     def create_server(self) -> ExplorerServer:
         self.server = Server(config=self.config)
@@ -42,18 +54,28 @@ class UvicornServer:
 
     async def on_tick(self) -> None:
         if self.request_state.scheduler_session.is_cancelled:
-            print(" => Exiting...")
+            print()  # Linebreak after the echoed ^C on the terminal.
+            logger.info(" => Exiting...")
             self.server.should_exit = True
 
     def run(self) -> ExitCode:
-        print("Starting the Explorer Web UI server...")
+        logging.info("Starting the Explorer Web UI server...")
+
+        for task in self.prerun_tasks:
+            task()
+
         self.server.run()
         return 0
 
 
 @union
+@dataclass(frozen=True)
 class UvicornServerSetupRequest:
-    pass
+    server: UvicornServerRequest
+
+    def browser_request(self, protocol: str = "http") -> BrowserRequest:
+        server = ":".join((self.server.address, str(self.server.port)))
+        return BrowserRequest(protocol, server)
 
 
 @dataclass(frozen=True)
@@ -70,7 +92,7 @@ async def create_server(
 ) -> ExplorerServer:
     uvicorn = UvicornServer.from_request(request)
     setups = await MultiGet(
-        Get(UvicornServerSetup, UvicornServerSetupRequest, request_type())
+        Get(UvicornServerSetup, UvicornServerSetupRequest, request_type(request))
         for request_type in union_membership.get(UvicornServerSetupRequest)
     )
     for setup in setups:

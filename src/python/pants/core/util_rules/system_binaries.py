@@ -327,6 +327,10 @@ class DiffBinary(BinaryPath):
     pass
 
 
+class OpenBinary(BinaryPath):
+    pass
+
+
 class ReadlinkBinary(BinaryPath):
     pass
 
@@ -692,6 +696,14 @@ async def find_diff() -> DiffBinary:
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="compare files line by line")
     return DiffBinary(first_path.path, first_path.fingerprint)
+
+
+@rule(desc="Finding the `open` binary", level=LogLevel.DEBUG)
+async def find_open() -> OpenBinary:
+    request = BinaryPathRequest(binary_name="open", search_path=SEARCH_PATHS)
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="open URLs with default browser")
+    return OpenBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `readlink` binary", level=LogLevel.DEBUG)

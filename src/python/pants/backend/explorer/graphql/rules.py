@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
+from pants.backend.explorer.browser import Browser, BrowserRequest
 from pants.backend.explorer.graphql.setup import graphql_uvicorn_setup
 from pants.backend.explorer.server.uvicorn import UvicornServerSetup, UvicornServerSetupRequest
 from pants.backend.project_info.peek import TargetDatas
 from pants.base.specs import Specs
-from pants.engine.rules import QueryRule, collect_rules, rule
+from pants.engine.rules import Get, QueryRule, collect_rules, rule
 from pants.engine.target import AllTargets, AllUnexpandedTargets, Targets, UnexpandedTargets
 from pants.engine.unions import UnionRule
 
@@ -20,7 +21,8 @@ class GraphQLUvicornServerSetupRequest(UvicornServerSetupRequest):
 async def get_graphql_uvicorn_setup(
     request: GraphQLUvicornServerSetupRequest,
 ) -> UvicornServerSetup:
-    return UvicornServerSetup(graphql_uvicorn_setup)
+    browser = await Get(Browser, BrowserRequest, request.browser_request())
+    return UvicornServerSetup(graphql_uvicorn_setup(browser))
 
 
 def rules():
