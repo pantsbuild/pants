@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from itertools import chain
 from pathlib import PurePath
 from typing import Iterable, Mapping
@@ -36,6 +37,8 @@ class RenderHelmChartRequest:
     values_snapshot: Snapshot
     values: FrozenDict[str, str]
     skip_crds: bool
+    no_hooks: bool
+    description: str | None = field(compare=False)
     namespace: str | None
     api_versions: tuple[str, ...]
     kube_version: str | None
@@ -44,18 +47,22 @@ class RenderHelmChartRequest:
         self,
         chart: HelmChart,
         *,
+        description: str | None = None,
         namespace: str | None = None,
         api_versions: Iterable[str] | None = None,
         kube_version: str | None = None,
         skip_crds: bool = False,
+        no_hooks: bool = False,
         values_snapshot: Snapshot = EMPTY_SNAPSHOT,
         values: Mapping[str, str] | None = None,
     ) -> None:
         self.chart = chart
+        self.description = description
         self.namespace = namespace
         self.api_versions = tuple(api_versions or ())
         self.kube_version = kube_version
         self.skip_crds = skip_crds
+        self.no_hooks = no_hooks
         self.values_snapshot = values_snapshot
         self.values = FrozenDict(values or {})
 
@@ -112,12 +119,14 @@ async def render_helm_chart(request: RenderHelmChartRequest) -> RenderedHelmChar
                 "template",
                 request.chart.metadata.name,
                 request.chart.path,
+                *(("--description", f'"{request.description}"') if request.description else ()),
                 *(("--namespace", request.namespace) if request.namespace else ()),
                 *(("--kube-version", request.kube_version) if request.kube_version else ()),
                 *chain.from_iterable(
                     [("--api-versions", api_version) for api_version in request.api_versions]
                 ),
                 *(("--skip-crds",) if request.skip_crds else ()),
+                *(("--no-hooks",) if request.no_hooks else ()),
                 *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),
                 *chain.from_iterable(
                     [("--set", f"{key}={value}") for key, value in request.values.items()]
@@ -132,7 +141,9 @@ async def render_helm_chart(request: RenderHelmChartRequest) -> RenderedHelmChar
         ),
     )
 
-    output_snapshot = await Get(Snapshot, RemovePrefix(result.output_digest, output_dir))
+    output_snapshot = await Get(
+        Snapshot, RemovePrefix(result.output_digest, os.path.join(output_dir, request.chart.path))
+    )
     return RenderedHelmChart(snapshot=output_snapshot)
 
 

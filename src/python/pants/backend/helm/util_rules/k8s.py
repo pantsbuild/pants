@@ -49,12 +49,12 @@ class CustomResourceKind:
 class ImageRef:
     registry: str | None
     repository: str
-    tag: str = _DEFAULT_CONTAINER_TAG
+    tag: str | None
 
     @classmethod
     def parse(cls, image_ref: str) -> ImageRef:
         registry = None
-        tag = _DEFAULT_CONTAINER_TAG
+        tag = None
 
         addr_and_tag = image_ref.split(":")
         if len(addr_and_tag) > 1:
@@ -70,7 +70,13 @@ class ImageRef:
         return cls(registry=registry, repository=repo, tag=tag)
 
     def __str__(self) -> str:
-        return f"{self.registry}/{self.repository}:{self.tag}"
+        result = ""
+        if self.registry:
+            result += f"{self.registry}/"
+        result += self.repository
+        if self.tag:
+            result += f":{self.tag}"
+        return result
 
 
 @dataclass(frozen=True)

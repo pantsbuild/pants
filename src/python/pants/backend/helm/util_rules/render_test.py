@@ -11,6 +11,7 @@ import yaml
 
 from pants.backend.helm.target_types import HelmChartTarget
 from pants.backend.helm.testutil import (
+    HELM_BATCH_HOOK_TEMPLATE,
     HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
@@ -119,7 +120,7 @@ def test_template_rendering_values(rule_runner: RuleRunner) -> None:
     parsed_service = _read_rendered_resource(
         rule_runner,
         RenderHelmChartRequest(chart, values_snapshot=value_files_snapshot, values=values),
-        f"{chart.path}/templates/service.yaml",
+        "templates/service.yaml",
     )
     assert parsed_service["spec"]["ports"][0]["name"] == "bar"
     assert parsed_service["spec"]["ports"][0]["port"] == 1234
@@ -156,8 +157,8 @@ def test_template_render_kube_version(rule_runner: RuleRunner) -> None:
         name: kube_configmap
         data:
           kube_version: {{ .Capabilities.KubeVersion }}
-          kube_version_major: {{ .Capabilities.KubeVersion.Major | quote }}
-          kube_version_minor: {{ .Capabilities.KubeVersion.Minor | quote }}
+          kube_version_major: {{ .Capabilities.KubeVersion.Major }}
+          kube_version_minor: {{ .Capabilities.KubeVersion.Minor }}
         """
     )
     rule_runner.write_files(
@@ -178,13 +179,13 @@ def test_template_render_kube_version(rule_runner: RuleRunner) -> None:
     )
 
     parsed_configmap = _read_rendered_resource(
-        rule_runner, render_request, f"{chart.path}/templates/configmap.yaml"
+        rule_runner, render_request, "templates/configmap.yaml"
     )
     assert (
         parsed_configmap["data"]["kube_version"] == f"v{kube_version_major}.{kube_version_minor}.0"
     )
-    assert parsed_configmap["data"]["kube_version_major"] == f"{kube_version_major}"
-    assert parsed_configmap["data"]["kube_version_minor"] == f"{kube_version_minor}"
+    assert parsed_configmap["data"]["kube_version_major"] == kube_version_major
+    assert parsed_configmap["data"]["kube_version_minor"] == kube_version_minor
 
 
 def test_template_render_api_versions(rule_runner: RuleRunner) -> None:
@@ -212,8 +213,29 @@ def test_template_render_api_versions(rule_runner: RuleRunner) -> None:
     render_request = RenderHelmChartRequest(chart, api_versions=["foo/v1beta1", "bar/v1"])
 
     parsed_configmap = _read_rendered_resource(
-        rule_runner, render_request, f"{chart.path}/templates/configmap.yaml"
+        rule_runner, render_request, "templates/configmap.yaml"
     )
     api_versions = parsed_configmap["data"]["api_versions"]
     assert "foo/v1beta1" in api_versions
     assert "bar/v1" in api_versions
+
+
+def test_template_render_hooks(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "helm_chart(name='foo')",
+            "Chart.yaml": HELM_CHART_FILE,
+            "templates/post-install-job.yaml": HELM_BATCH_HOOK_TEMPLATE,
+        }
+    )
+
+    target = rule_runner.get_target(Address("", target_name="foo"))
+    chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
+
+    rendered_chart = rule_runner.request(RenderedHelmChart, [RenderHelmChartRequest(chart)])
+    assert "templates/post-install-job.yaml" in rendered_chart.snapshot.files
+
+    nohook_rendered_chart = rule_runner.request(
+        RenderedHelmChart, [RenderHelmChartRequest(chart, no_hooks=True)]
+    )
+    assert "templates/post-install-job.yaml" not in nohook_rendered_chart.snapshot.files
