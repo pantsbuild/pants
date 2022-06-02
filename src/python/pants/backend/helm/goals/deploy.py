@@ -24,23 +24,9 @@ from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import softwrap, bullet_list
 
 logger = logging.getLogger(__name__)
-
-
-class InvalidDeploymentArgs(Exception):
-    def __init__(self, args: Iterable[str]) -> None:
-        super().__init__(
-            softwrap(
-                f"""
-                The following command line arguments are not valid: {' '.join(args)}.
-
-                Those arguments would have equivalent fields in the `{HelmDeploymentTarget.alias}` target.
-                Please run `{bin_name()} help {HelmDeploymentTarget.alias}` for more information.
-                """
-            )
-        )
 
 
 @dataclass(frozen=True)
@@ -53,8 +39,7 @@ _VALID_PASSTHROUGH_FLAGS = [
     "--dry-run",
     "--debug",
     "--force",
-    "--reset-values",
-    "--reuse-values",
+    "--replace",
     "--wait",
     "--wait-for-jobs",
 ]
@@ -70,6 +55,25 @@ _VALID_PASSTHROUGH_OPTS = [
     "--set",
     "--set-string",
 ]
+
+class InvalidDeploymentArgs(Exception):
+    def __init__(self, args: Iterable[str]) -> None:
+        super().__init__(
+            softwrap(
+                f"""
+                The following command line arguments are not valid: {' '.join(args)}.
+
+                Only the following passthrough arguments are allowed:
+
+                {bullet_list([+_VALID_PASSTHROUGH_FLAGS, *_VALID_PASSTHROUGH_OPTS])}
+
+                Most invalid arguments have equivalent fields in the `{HelmDeploymentTarget.alias}` target.
+                Usage of fields is encourage over passthrough arguments as that enables repeatable deployments.
+
+                Please run `{bin_name()} help {HelmDeploymentTarget.alias}` for more information.
+                """
+            )
+        )
 
 
 @rule(desc="Run Helm deploy process", level=LogLevel.DEBUG)
