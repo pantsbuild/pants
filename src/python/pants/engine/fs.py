@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
@@ -133,7 +134,7 @@ class PathGlobs:
     globs: Tuple[str, ...]
     glob_match_error_behavior: GlobMatchErrorBehavior
     conjunction: GlobExpansionConjunction
-    description_of_origin: str | None
+    description_of_origin: str | None = dataclasses.field(compare=False, hash=False)
 
     def __init__(
         self,
