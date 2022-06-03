@@ -320,7 +320,7 @@ async def resolve_python_distribution_entry_points(
         UnparsedAddressInputs(
             target_refs,
             owning_address=address,
-            description_of_origin=f"TODO(#14468)",
+            description_of_origin="TODO(#14468)",
         ),
     )
     address_by_ref = dict(zip(target_refs, target_addresses))

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     Dependencies,
     FieldSet,
     MultipleSourcesField,
@@ -18,7 +19,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
-    generate_multiple_sources_field_help_message, AsyncFieldMixin,
+    generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.target_types import (

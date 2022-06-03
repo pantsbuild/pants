@@ -134,7 +134,7 @@ async def resolve_kotlinc_plugins_for_target(
             relative_to=target.address.spec_path,
             description_of_origin=(
                 f"the `{artifact_field.alias}` field from the target {artifact_field.address}"
-            )
+            ),
         )
         artifact_address_gets.append(Get(Address, AddressInput, address_input))
 
