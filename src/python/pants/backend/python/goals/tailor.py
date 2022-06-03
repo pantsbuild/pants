@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
@@ -30,7 +32,7 @@ from pants.core.goals.tailor import (
     PutativeTargetsRequest,
     group_by_dir,
 )
-from pants.engine.fs import DigestContents, PathGlobs, Paths
+from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
@@ -38,6 +40,8 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec, matches_filespec
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -126,15 +130,21 @@ async def find_putative_targets(
             all_pipenv_lockfile_files,
             all_pyproject_toml_contents,
         ) = await MultiGet(
-            Get(Paths, PathGlobs, req.path_globs("*requirements*.txt")),
-            Get(Paths, PathGlobs, req.path_globs("Pipfile.lock")),
+            Get(DigestContents, PathGlobs, req.path_globs("*requirements*.txt")),
+            Get(DigestContents, PathGlobs, req.path_globs("Pipfile.lock")),
             Get(DigestContents, PathGlobs, req.path_globs("pyproject.toml")),
         )
 
-        def add_req_targets(files: Iterable[str], alias: str, target_name: str) -> None:
-            unowned_files = set(files) - set(all_owned_sources)
+        def add_req_targets(files: Iterable[FileContent], alias: str, target_name: str) -> None:
+            contents = {i.path: i.content for i in files}
+            unowned_files = set(contents) - set(all_owned_sources)
+            logger.warning(f"{files=}")
             for fp in unowned_files:
                 path, name = os.path.split(fp)
+
+                if not validate(fp, contents[fp], alias):
+                    continue
+
                 pts.append(
                     PutativeTarget(
                         path=path,
@@ -150,10 +160,38 @@ async def find_putative_targets(
                     )
                 )
 
-        add_req_targets(all_requirements_files.files, "python_requirements", "reqs")
-        add_req_targets(all_pipenv_lockfile_files.files, "pipenv_requirements", "pipenv")
+        def validate(path: str, contents: bytes, alias: str) -> bool:
+            logger.warning(f"{path=} {contents=}")
+            if alias == "python_requirements":
+                return validate_python_requirements(path, contents)
+            return True
+
+        def validate_python_requirements(path: str, contents: bytes) -> bool:
+            for number, line in enumerate(contents.splitlines(), start=1):
+                logger.warning(f"{number=} {line=}")
+                # Blank lines and comments do not parse cleanly.
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                if stripped.startswith(b"#"):
+                    continue
+
+                try:
+                    PipRequirement.parse(line.decode(), f"line {number} of `{path}`")
+                except Exception as e:
+                    logger.warning(f"{e}")
+                    logger.warning(
+                        f"No target generated for `{path}`. You'll need to create "
+                        "targets for its contents manually."
+                    )
+                    logger.warning("")
+                    return False
+            return True
+
+        add_req_targets(all_requirements_files, "python_requirements", "reqs")
+        add_req_targets(all_pipenv_lockfile_files, "pipenv_requirements", "pipenv")
         add_req_targets(
-            {fc.path for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content},
+            {fc for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content},
             "poetry_requirements",
             "poetry",
         )
