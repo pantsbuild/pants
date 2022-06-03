@@ -122,7 +122,9 @@ async def gather_coordinates_for_jvm_lockfile(
                 pass
 
         try:
-            address_input = AddressInput.parse(artifact_input)
+            address_input = AddressInput.parse(
+                artifact_input, description_of_origin=f"the option `{request.option_name}`"
+            )
             candidate_address_inputs.add(address_input)
         except Exception:
             bad_artifact_inputs.append(artifact_input)

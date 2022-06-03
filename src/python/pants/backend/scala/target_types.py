@@ -18,7 +18,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
-    generate_multiple_sources_field_help_message,
+    generate_multiple_sources_field_help_message, AsyncFieldMixin,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.target_types import (
@@ -245,7 +245,7 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalacPluginArtifactField(StringField):
+class ScalacPluginArtifactField(StringField, AsyncFieldMixin):
     alias = "artifact"
     required = True
     value: str

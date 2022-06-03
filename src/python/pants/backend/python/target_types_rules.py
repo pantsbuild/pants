@@ -316,7 +316,12 @@ async def resolve_python_distribution_entry_points(
     # Intermediate step, as Get(Targets) returns a deduplicated set.. which breaks in case of
     # multiple input refs that maps to the same target.
     target_addresses = await Get(
-        Addresses, UnparsedAddressInputs(target_refs, owning_address=address)
+        Addresses,
+        UnparsedAddressInputs(
+            target_refs,
+            owning_address=address,
+            description_of_origin=f"TODO(#14468)",
+        ),
     )
     address_by_ref = dict(zip(target_refs, target_addresses))
     targets = await Get(Targets, Addresses, target_addresses)

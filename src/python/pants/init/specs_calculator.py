@@ -98,7 +98,7 @@ def calculate_specs(
 
     address_literal_specs = []
     for address in cast(ChangedAddresses, changed_addresses):
-        address_input = AddressInput.parse(address.spec)
+        address_input = AddressInput.parse(address.spec, description_of_origin="`--changed-since`")
         address_literal_specs.append(
             AddressLiteralSpec(
                 path_component=address_input.path_component,

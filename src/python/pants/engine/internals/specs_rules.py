@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 @rule_helper
 async def _determine_literal_addresses_from_raw_specs(
-    literal_specs: tuple[AddressLiteralSpec, ...]
+    literal_specs: tuple[AddressLiteralSpec, ...], *, description_of_origin: str
 ) -> tuple[WrappedTarget, ...]:
     literal_addresses = await MultiGet(
         Get(
@@ -77,6 +77,7 @@ async def _determine_literal_addresses_from_raw_specs(
                 spec.target_component,
                 generated_component=spec.generated_component,
                 parameters=spec.parameters,
+                description_of_origin=description_of_origin,
             ),
         )
         for spec in literal_specs
@@ -114,7 +115,7 @@ async def addresses_from_raw_specs_without_file_owners(
     filtering_disabled = specs.filter_by_global_options is False
 
     literal_wrapped_targets = await _determine_literal_addresses_from_raw_specs(
-        specs.address_literals
+        specs.address_literals, description_of_origin=specs.description_of_origin
     )
     matched_addresses.update(
         wrapped_tgt.target.address

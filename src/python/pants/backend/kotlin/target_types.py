@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     Dependencies,
     FieldSet,
     MultipleSourcesField,
@@ -171,7 +172,7 @@ class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
 # -----------------------------------------------------------------------------------------------
 
 
-class KotlincPluginArtifactField(StringField):
+class KotlincPluginArtifactField(StringField, AsyncFieldMixin):
     alias = "artifact"
     required = True
     value: str
