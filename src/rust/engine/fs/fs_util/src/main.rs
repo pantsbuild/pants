@@ -47,7 +47,9 @@ use parking_lot::Mutex;
 use protos::require_digest;
 use serde_derive::Serialize;
 use std::collections::BTreeMap;
-use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest, SubsetParams, UploadSummary};
+use store::{
+  Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams, UploadSummary,
+};
 
 #[derive(Debug)]
 enum ExitCode {
@@ -57,6 +59,15 @@ enum ExitCode {
 
 #[derive(Debug)]
 struct ExitError(String, ExitCode);
+
+impl From<StoreError> for ExitError {
+  fn from(s: StoreError) -> Self {
+    match s {
+      md @ StoreError::MissingDigest { .. } => ExitError(md.to_string(), ExitCode::NotFound),
+      StoreError::Unclassified(s) => ExitError(s, ExitCode::UnknownError),
+    }
+  }
+}
 
 impl From<String> for ExitError {
   fn from(s: String) -> Self {
@@ -523,16 +534,11 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .expect("protocol error");
         let output_digest =
           output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?;
-        store
-          .materialize_directory(destination, output_digest, Permissions::Writable)
-          .await
-          .map_err(|err| {
-            if err.contains("not found") {
-              ExitError(err, ExitCode::NotFound)
-            } else {
-              err.into()
-            }
-          })
+        Ok(
+          store
+            .materialize_directory(destination, output_digest, Permissions::Writable)
+            .await?,
+        )
       }
       (_, _) => unimplemented!(),
     },
@@ -546,16 +552,11 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
         let digest = DirectoryDigest::from_persisted_digest(Digest::new(fingerprint, size_bytes));
-        store
-          .materialize_directory(destination, digest, Permissions::Writable)
-          .await
-          .map_err(|err| {
-            if err.contains("not found") {
-              ExitError(err, ExitCode::NotFound)
-            } else {
-              err.into()
-            }
-          })
+        Ok(
+          store
+            .materialize_directory(destination, digest, Permissions::Writable)
+            .await?,
+        )
       }
       ("save", args) => {
         let posix_fs = Arc::new(make_posix_fs(
@@ -741,7 +742,7 @@ fn expect_subcommand(matches: &clap::ArgMatches) -> (&str, &clap::ArgMatches) {
 async fn expand_files(
   store: Store,
   digest: Digest,
-) -> Result<Option<Vec<(String, Digest)>>, String> {
+) -> Result<Option<Vec<(String, Digest)>>, StoreError> {
   let files = Arc::new(Mutex::new(Vec::new()));
   let vec_opt = expand_files_helper(store, digest, String::new(), files.clone()).await?;
   Ok(vec_opt.map(|_| {
@@ -756,7 +757,7 @@ fn expand_files_helper(
   digest: Digest,
   prefix: String,
   files: Arc<Mutex<Vec<(String, Digest)>>>,
-) -> BoxFuture<'static, Result<Option<()>, String>> {
+) -> BoxFuture<'static, Result<Option<()>, StoreError>> {
   async move {
     let maybe_dir = store.load_directory(digest).await?;
     match maybe_dir {
@@ -812,7 +813,7 @@ async fn ensure_uploaded_to_remote(
   store: &Store,
   store_has_remote: bool,
   digest: Digest,
-) -> Result<SummaryWithDigest, String> {
+) -> Result<SummaryWithDigest, StoreError> {
   let summary = if store_has_remote {
     store
       .ensure_remote_has_recursive(vec![digest])

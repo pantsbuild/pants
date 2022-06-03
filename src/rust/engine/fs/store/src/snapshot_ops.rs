@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::convert::From;
+use std::fmt::{Debug, Display};
 use std::iter::Iterator;
 
 use async_trait::async_trait;
@@ -15,7 +16,6 @@ use futures::future::{self, FutureExt};
 use hashing::Digest;
 use itertools::Itertools;
 use log::log_enabled;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 ///
 /// Parameters used to determine which files and directories to operate on within a parent snapshot.
@@ -35,7 +35,7 @@ pub struct SubsetParams {
 async fn merge_directories<T: SnapshotOps + 'static>(
   store: T,
   dir_digests: Vec<DirectoryDigest>,
-) -> Result<DirectoryDigest, String> {
+) -> Result<DirectoryDigest, T::Error> {
   let trees = future::try_join_all(
     dir_digests
       .into_iter()
@@ -52,7 +52,7 @@ async fn merge_directories<T: SnapshotOps + 'static>(
       let err_string = match render_merge_error(&store, merge_error).await {
         Ok(e) | Err(e) => e,
       };
-      return Err(err_string);
+      return Err(err_string.into());
     }
   };
 
@@ -98,7 +98,8 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
           }
           String::from_utf8_lossy(bytes.to_vec().as_slice()).to_string()
         })
-        .await?
+        .await
+        .map_err(|e| e.to_string())?
         .unwrap_or_else(|| "<could not load contents>".to_string());
       let detail = format!("{}{}", header, contents);
       let res: Result<_, String> = Ok((file.name().to_owned(), detail));
@@ -140,7 +141,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
       }))
       .collect();
 
-    let res: Result<Vec<String>, String> = Ok(enumerated_details);
+    let res: Result<Vec<String>, T::Error> = Ok(enumerated_details);
     res
   }
   .await
@@ -163,23 +164,20 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
 ///
 #[async_trait]
 pub trait SnapshotOps: Clone + Send + Sync + 'static {
+  type Error: Debug + Display + From<String>;
+
   async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     digest: Digest,
     f: F,
-  ) -> Result<Option<T>, String>;
+  ) -> Result<Option<T>, Self::Error>;
 
-  async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, String>;
-  async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String>;
-  async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String>;
-
-  async fn record_digest_trie(&self, tree: DigestTrie) -> Result<DirectoryDigest, String>;
-  async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String>;
+  async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, Self::Error>;
 
   ///
   /// Given N Snapshots, returns a new Snapshot that merges them.
   ///
-  async fn merge(&self, digests: Vec<DirectoryDigest>) -> Result<DirectoryDigest, String> {
+  async fn merge(&self, digests: Vec<DirectoryDigest>) -> Result<DirectoryDigest, Self::Error> {
     merge_directories(self.clone(), digests).await
   }
 
@@ -187,7 +185,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     &self,
     digest: DirectoryDigest,
     prefix: &RelativePath,
-  ) -> Result<DirectoryDigest, String> {
+  ) -> Result<DirectoryDigest, Self::Error> {
     Ok(
       self
         .load_digest_trie(digest)
@@ -201,7 +199,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     &self,
     digest: DirectoryDigest,
     prefix: &RelativePath,
-  ) -> Result<DirectoryDigest, String> {
+  ) -> Result<DirectoryDigest, Self::Error> {
     Ok(
       self
         .load_digest_trie(digest)
@@ -215,7 +213,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     &self,
     directory_digest: DirectoryDigest,
     params: SubsetParams,
-  ) -> Result<DirectoryDigest, String> {
+  ) -> Result<DirectoryDigest, Self::Error> {
     let input_tree = self.load_digest_trie(directory_digest.clone()).await?;
     let path_stats = input_tree
       .expand_globs(params.globs, None)
@@ -233,7 +231,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     Ok(DigestTrie::from_path_stats(path_stats, &files)?.into())
   }
 
-  async fn create_empty_dir(&self, path: &RelativePath) -> Result<DirectoryDigest, String> {
+  async fn create_empty_dir(&self, path: &RelativePath) -> Result<DirectoryDigest, Self::Error> {
     self.add_prefix(EMPTY_DIRECTORY_DIGEST.clone(), path).await
   }
 }

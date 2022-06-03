@@ -428,8 +428,7 @@ impl WrappedNode for ExecuteProcess {
 
     let res = command_runner
       .run(execution_context, workunit, request.clone())
-      .await
-      .map_err(throw)?;
+      .await?;
 
     let definition = serde_json::to_string(&request)
       .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
@@ -932,11 +931,12 @@ impl DownloadedFile {
     // If we hit the ObservedUrls cache, then we have successfully fetched this Digest from
     // this URL before. If we still have the bytes, then we skip fetching the content again.
     let usable_in_store = have_observed_url
-      && core
+      && (core
         .store()
         .load_file_bytes_with(digest, |_| ())
-        .await?
-        .is_some();
+        .await
+        .unwrap_or(None)
+        == Some(()));
 
     if !usable_in_store {
       downloads::download(core.clone(), url, file_name, digest).await?;

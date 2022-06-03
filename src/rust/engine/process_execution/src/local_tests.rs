@@ -18,7 +18,7 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 use crate::{
   local, CacheName, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
-  RelativePath,
+  ProcessError, RelativePath,
 };
 
 #[derive(PartialEq, Debug)]
@@ -127,8 +127,8 @@ async fn binary_not_found() {
   let err_string = run_command_locally(Process::new(owned_string_vec(&["echo", "-n", "foo"])))
     .await
     .expect_err("Want Err");
-  assert!(err_string.contains("Failed to execute"));
-  assert!(err_string.contains("echo"));
+  assert!(err_string.to_string().contains("Failed to execute"));
+  assert!(err_string.to_string().contains("echo"));
 }
 
 #[tokio::test]
@@ -766,7 +766,7 @@ fn named_caches_and_immutable_inputs(store: Store) -> (TempDir, NamedCaches, Imm
   )
 }
 
-async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
+async fn run_command_locally(req: Process) -> Result<LocalTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
   let work_dir_path = work_dir.path().to_owned();
@@ -780,7 +780,7 @@ async fn run_command_locally_in_dir(
   workunit: &mut RunningWorkunit,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
-) -> Result<LocalTestResult, String> {
+) -> Result<LocalTestResult, ProcessError> {
   let store_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
   let store =

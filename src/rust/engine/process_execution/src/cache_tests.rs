@@ -12,12 +12,12 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, ImmutableInputs,
-  NamedCaches, Process, ProcessMetadata,
+  NamedCaches, Process, ProcessError, ProcessMetadata,
 };
 
 struct RoundtripResults {
-  uncached: Result<FallibleProcessResultWithPlatform, String>,
-  maybe_cached: Result<FallibleProcessResultWithPlatform, String>,
+  uncached: Result<FallibleProcessResultWithPlatform, ProcessError>,
+  maybe_cached: Result<FallibleProcessResultWithPlatform, ProcessError>,
 }
 
 fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {

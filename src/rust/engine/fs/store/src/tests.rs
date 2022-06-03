@@ -16,7 +16,7 @@ use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use workunit_store::WorkunitStore;
 
-use crate::{EntryType, FileContent, Store, UploadSummary, MEGABYTES};
+use crate::{EntryType, FileContent, Store, StoreError, UploadSummary, MEGABYTES};
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 
@@ -55,7 +55,7 @@ pub fn extra_big_file_bytes() -> Bytes {
   bytes.freeze()
 }
 
-pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
+pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, StoreError> {
   store
     .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
     .await
@@ -299,7 +299,9 @@ async fn load_file_remote_error_is_error() {
     cas.read_request_count()
   );
   assert!(
-    error.contains("StubCAS is configured to always fail"),
+    error
+      .to_string()
+      .contains("StubCAS is configured to always fail"),
     "Bad error message"
   );
 }
@@ -320,7 +322,9 @@ async fn load_directory_remote_error_is_error() {
     cas.read_request_count()
   );
   assert!(
-    error.contains("StubCAS is configured to always fail"),
+    error
+      .to_string()
+      .contains("StubCAS is configured to always fail"),
     "Bad error message"
   );
 }
@@ -523,8 +527,8 @@ async fn expand_missing_directory() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains(&format!("{:?}", digest)),
-    "Bad error message: {}",
+    matches!(error, StoreError::MissingDigest { .. }),
+    "Bad error: {}",
     error
   );
 }
@@ -545,10 +549,7 @@ async fn expand_directory_missing_subdir() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains(&format!(
-      "{}",
-      TestDirectory::containing_roland().fingerprint()
-    )),
+    matches!(error, StoreError::MissingDigest { .. }),
     "Bad error message: {}",
     error
   );
@@ -752,9 +753,10 @@ async fn upload_missing_files() {
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect_err("Want error");
-  assert_eq!(
-    error,
-    format!("Failed to expand digest {:?}: Not found", testdata.digest())
+  assert!(
+    matches!(error, StoreError::MissingDigest { .. }),
+    "Bad error: {}",
+    error
   );
 }
 
@@ -777,13 +779,10 @@ async fn upload_missing_file_in_directory() {
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect_err("Want error");
-  assert_eq!(
-    error,
-    format!(
-      "Failed to upload File {:?}: Not found in local store.",
-      TestData::roland().digest()
-    ),
-    "Bad error message"
+  assert!(
+    matches!(error, StoreError::MissingDigest { .. }),
+    "Bad error: {}",
+    error
   );
 }
 

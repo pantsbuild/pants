@@ -225,7 +225,7 @@ impl BuildResultFS {
             }))
           }
           Ok(None) => Ok(None),
-          Err(err) => Err(err),
+          Err(err) => Err(err.to_string()),
         }
       }
     }
@@ -257,7 +257,7 @@ impl BuildResultFS {
             Ok(Some(inode))
           }
           Ok(None) => Ok(None),
-          Err(err) => Err(err),
+          Err(err) => Err(err.to_string()),
         }
       }
     }
