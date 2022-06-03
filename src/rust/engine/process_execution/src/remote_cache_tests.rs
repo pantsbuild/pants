@@ -153,8 +153,7 @@ fn create_cached_runner(
 
 async fn create_process(store: &Store) -> (Process, Digest) {
   let process = Process::new(vec![
-    testutil::path::find_bash(),
-    "echo -n hello world".to_string(),
+    "this process will not execute: see MockLocalCommandRunner".to_string(),
   ]);
   let (action, command, _exec_request) =
     make_execute_request(&process, ProcessMetadata::default()).unwrap();
@@ -208,7 +207,7 @@ async fn cache_read_success() {
 async fn cache_read_skipped_on_action_cache_errors() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
-  let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
+  let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
   let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
 
   let (process, action_digest) = create_process(&store_setup.store).await;
@@ -238,7 +237,7 @@ async fn cache_read_skipped_on_action_cache_errors() {
 async fn cache_read_skipped_on_store_errors() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
-  let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
+  let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
   let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, true);
 
   // Claim that the process has a non-empty and not-persisted stdout digest.
