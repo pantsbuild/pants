@@ -14,6 +14,7 @@ from pants.backend.shell.builtin import BASH_BUILTIN_COMMANDS
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
+    ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
     ShellCommandOutputsField,
     ShellCommandRunWorkdirField,
@@ -115,6 +116,7 @@ async def prepare_shell_command_process(
     timeout = shell_command.get(ShellCommandTimeoutField).value
     tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value
     outputs = shell_command.get(ShellCommandOutputsField).value or ()
+    extra_env_vars = shell_command.get(ShellCommandExtraEnvVarsField).value or ()
 
     if not command:
         raise ValueError(
@@ -161,6 +163,9 @@ async def prepare_shell_command_process(
                     tool_request,
                     rationale=f"execute `{shell_command.alias}` {shell_command.address}",
                 )
+
+    extra_env = await Get(Environment, EnvironmentRequest(extra_env_vars))
+    command_env.update(extra_env)
 
     transitive_targets = await Get(
         TransitiveTargets,
