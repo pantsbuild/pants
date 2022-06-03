@@ -15,7 +15,8 @@ from pants.engine.internals.native_engine import (  # noqa: F401
 )
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import strip_prefix
+from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap, strip_prefix
 
 # `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
 BANNED_CHARS_IN_TARGET_NAME = frozenset(r":#!@?/\=")
@@ -43,7 +44,8 @@ class UnsupportedWildcard(InvalidAddress):
     """Indicate that an address wildcard was used."""
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class AddressInput:
     """A string that has been parsed and normalized using the Address syntax.
 
@@ -52,15 +54,41 @@ class AddressInput:
     """
 
     path_component: str
-    target_component: str | None = None
-    generated_component: str | None = None
-    parameters: FrozenDict[str, str] = FrozenDict()
+    target_component: str | None
+    generated_component: str | None
+    parameters: FrozenDict[str, str]
 
-    def __post_init__(self):
-        if self.target_component is not None or self.path_component == "":
-            if not self.target_component:
+    def __init__(
+        self,
+        path_component: str,
+        target_component: str | None = None,
+        *,
+        generated_component: str | None = None,
+        parameters: Mapping[str, str] = FrozenDict(),
+    ) -> None:
+        self.path_component = path_component
+        self.target_component = target_component
+        self.generated_component = generated_component
+        self.parameters = FrozenDict(parameters)
+
+        if not self.target_component:
+            if self.target_component is not None:
                 raise InvalidTargetName(
-                    f"Address spec {self.path_component}:{self.target_component} has no name part."
+                    softwrap(
+                        f"""
+                        Address spec `{self.path_component}` sets the name component to the empty
+                        string, which is not legal.
+                        """
+                    )
+                )
+            if self.path_component == "":
+                raise InvalidTargetName(
+                    softwrap(
+                        f"""
+                        Address spec has no name part, but it's necessary because the path is the
+                        build root (`{self.path_component}`).
+                        """
+                    )
                 )
 
         if self.path_component != "":
@@ -91,6 +119,7 @@ class AddressInput:
     def parse(
         cls,
         spec: str,
+        *,
         relative_to: str | None = None,
         subproject_roots: Sequence[str] | None = None,
     ) -> AddressInput:
@@ -180,7 +209,10 @@ class AddressInput:
         path_component = prefix_subproject(strip_prefix(path_component, "//"))
 
         return cls(
-            path_component, target_component, generated_component, FrozenDict(sorted(parameters))
+            path_component,
+            target_component,
+            generated_component=generated_component,
+            parameters=FrozenDict(sorted(parameters)),
         )
 
     def file_to_address(self) -> Address:

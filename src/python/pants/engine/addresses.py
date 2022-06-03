@@ -1,8 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Iterable, Sequence
 
 from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address as Address
@@ -51,9 +53,14 @@ class UnparsedAddressInputs:
     Unlike the `dependencies` field, this type does not work with `!` and `!!` ignores.
     """
 
-    values: Tuple[str, ...]
-    relative_to: Optional[str]
+    values: tuple[str, ...]
+    relative_to: str | None
 
-    def __init__(self, values: Iterable[str], *, owning_address: Optional[Address]) -> None:
+    def __init__(
+        self,
+        values: Iterable[str],
+        *,
+        owning_address: Address | None,
+    ) -> None:
         self.values = tuple(values)
         self.relative_to = owning_address.spec_path if owning_address else None
