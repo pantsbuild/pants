@@ -51,16 +51,22 @@ class UnparsedAddressInputs:
     references like `:sibling` work properly.
 
     Unlike the `dependencies` field, this type does not work with `!` and `!!` ignores.
+
+    Set `description_of_origin` to a value like "CLI arguments" or "the `dependencies` field
+    from {tgt.address}". It is used for better error messages.
     """
 
     values: tuple[str, ...]
     relative_to: str | None
+    description_of_origin: str
 
     def __init__(
         self,
         values: Iterable[str],
         *,
         owning_address: Address | None,
+        description_of_origin: str,
     ) -> None:
         self.values = tuple(values)
         self.relative_to = owning_address.spec_path if owning_address else None
+        self.description_of_origin = description_of_origin

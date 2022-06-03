@@ -283,6 +283,7 @@ async def create_docker_build_context(
             UnparsedAddressInputs(
                 dockerfile_build_args.values(),
                 owning_address=dockerfile_info.address,
+                description_of_origin="TODO(#14468)",
             ),
         )
         # Map those addresses to the corresponding built image ref (tag).

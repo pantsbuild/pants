@@ -265,7 +265,13 @@ async def determine_main_pkg_for_go_binary(
         wrapped_specified_tgt = await Get(
             WrappedTarget,
             AddressInput,
-            AddressInput.parse(request.field.value, relative_to=addr.spec_path),
+            AddressInput.parse(
+                request.field.value,
+                relative_to=addr.spec_path,
+                description_of_origin=(
+                    f"the `{request.field.alias}` field from the target {request.field.address}"
+                ),
+            ),
         )
         if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
             raise InvalidFieldException(

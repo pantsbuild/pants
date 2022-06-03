@@ -162,7 +162,11 @@ class Pylint(PythonToolBase):
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self._source_plugins, owning_address=None)
+        return UnparsedAddressInputs(
+            self._source_plugins,
+            owning_address=None,
+            description_of_origin=f"the option `[{self.options_scope}].source_plugins`",
+        )
 
 
 # --------------------------------------------------------------------------------------

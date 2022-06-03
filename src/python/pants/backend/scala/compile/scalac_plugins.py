@@ -121,7 +121,11 @@ async def resolve_scala_plugins_for_target(
         candidate_plugins.append(plugin)
         artifact_field = plugin[ScalacPluginArtifactField]
         address_input = AddressInput.parse(
-            artifact_field.value, relative_to=target.address.spec_path
+            artifact_field.value,
+            relative_to=target.address.spec_path,
+            description_of_origin=(
+                f"the `{artifact_field.alias}` field from the target {artifact_field.address}"
+            ),
         )
         artifact_address_gets.append(Get(Address, AddressInput, address_input))
 

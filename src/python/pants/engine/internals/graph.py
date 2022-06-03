@@ -970,6 +970,9 @@ async def determine_explicitly_provided_dependencies(
         AddressInput.parse,
         relative_to=request.field.address.spec_path,
         subproject_roots=subproject_roots,
+        description_of_origin=(
+            f"the `{request.field.alias}` field from the target {request.field.address}"
+        ),
     )
 
     addresses: list[AddressInput] = []
@@ -1090,6 +1093,9 @@ async def resolve_dependencies(
                     addr,
                     relative_to=tgt.address.spec_path,
                     subproject_roots=subproject_roots,
+                    description_of_origin=(
+                        f"the `{special_cased_field.alias}` field from the target {tgt.address}"
+                    ),
                 ),
             )
             for special_cased_field in special_cased_fields
@@ -1135,7 +1141,10 @@ async def resolve_unparsed_address_inputs(
             Address,
             AddressInput,
             AddressInput.parse(
-                v, relative_to=request.relative_to, subproject_roots=subproject_roots
+                v,
+                relative_to=request.relative_to,
+                subproject_roots=subproject_roots,
+                description_of_origin=request.description_of_origin,
             ),
         )
         for v in request.values

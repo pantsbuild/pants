@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
     Dependencies,
     FieldSet,
     MultipleSourcesField,
@@ -245,7 +246,7 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
 # -----------------------------------------------------------------------------------------------
 
 
-class ScalacPluginArtifactField(StringField):
+class ScalacPluginArtifactField(StringField, AsyncFieldMixin):
     alias = "artifact"
     required = True
     value: str

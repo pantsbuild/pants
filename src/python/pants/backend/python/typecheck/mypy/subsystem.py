@@ -172,7 +172,11 @@ class MyPy(PythonToolBase):
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self._source_plugins, owning_address=None)
+        return UnparsedAddressInputs(
+            self._source_plugins,
+            owning_address=None,
+            description_of_origin=f"the option `[{self.options_scope}].source_plugins`",
+        )
 
     def check_and_warn_if_python_version_configured(self, config: FileContent | None) -> bool:
         """Determine if we can dynamically set `--python-version` and warn if not."""

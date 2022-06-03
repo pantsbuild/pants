@@ -1640,7 +1640,8 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
         file_content.content.decode().splitlines() for file_content in digest_contents
     )
     resolved = await MultiGet(
-        Get(Address, AddressInput, AddressInput.parse(line)) for line in all_lines
+        Get(Address, AddressInput, AddressInput.parse(line, description_of_origin="smalltalk rule"))
+        for line in all_lines
     )
     return InferredDependencies(resolved)
 
@@ -1926,7 +1927,9 @@ def test_resolve_unparsed_address_inputs() -> None:
         Addresses,
         [
             UnparsedAddressInputs(
-                ["project:t1", ":t2"], owning_address=Address("project", target_name="t3")
+                ["project:t1", ":t2"],
+                owning_address=Address("project", target_name="t3"),
+                description_of_origin="tests",
             )
         ],
     )
