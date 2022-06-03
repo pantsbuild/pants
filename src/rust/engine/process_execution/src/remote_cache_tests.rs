@@ -215,14 +215,20 @@ async fn cache_read_skipped_on_action_cache_errors() {
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
   action_cache.always_errors.store(true, Ordering::SeqCst);
 
-  assert_eq!(workunit_store.get_metrics().get("remote_cache_read_errors"), None);
+  assert_eq!(
+    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    None
+  );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
     .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
-  assert_eq!(workunit_store.get_metrics().get("remote_cache_read_errors"), Some(&1));
+  assert_eq!(
+    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    Some(&1)
+  );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 }
 
@@ -245,14 +251,20 @@ async fn cache_read_skipped_on_store_errors() {
     EMPTY_DIGEST,
   );
 
-  assert_eq!(workunit_store.get_metrics().get("remote_cache_read_errors"), None);
+  assert_eq!(
+    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    None
+  );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
     .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
-  assert_eq!(workunit_store.get_metrics().get("remote_cache_read_errors"), Some(&1));
+  assert_eq!(
+    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    Some(&1)
+  );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 }
 
