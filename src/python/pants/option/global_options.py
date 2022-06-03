@@ -492,7 +492,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_batch_api_size_limit=4194304,
     # Remote cache setup.
     remote_cache_eager_fetch=True,
-    remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
+    remote_cache_warnings=RemoteCacheWarningsBehavior.backoff,
     remote_cache_rpc_concurrency=128,
     remote_cache_read_timeout_millis=1500,
     # Remote execution setup.
@@ -1349,7 +1349,7 @@ class BootstrapOptions:
         advanced=True,
         help=softwrap(
             """
-            Whether to log remote cache failures at the `warn` log level.
+            How frequently to log remote cache failures at the `warn` log level.
 
             All errors not logged at the `warn` level will instead be logged at the
             `debug` level.
