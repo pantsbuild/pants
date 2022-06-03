@@ -1,16 +1,27 @@
 # Hand-edited for now, while we experiment with self-hosted M1 runners.
+#
 # TODO: Integrate into workflow yaml generator.
+#
+# NB: The runner is an X86_64 binary, and runs under Rosetta.
+#  Therefore, its subprocesses default to X86_64 as well. To force subprocesses,
+#  such wheel building, to run as ARM64, they must be invoked via `arch -arm64e`.
+#  This also means that ${{runner.arch }} reports "X64" rather than "ARM64", and so
+#  cannot be usefully used in jobs to disambiguate cache keys.
 
 name: M1 Wheel Build
 'on':
-  pull_request: {}
   push:
-    branches-ignore:
-      - dependabot/**
+    # TODO: Once we're satisfied with the job, change m1_test* to release_*, so we
+    #   only build M1 wheels on release tags.
+    tags:
+      - m1test_*
 jobs:
   dummy:
-    if: ${{ github.repository_owner == '_no_such_owner_' }}
-      name: Dummy (macOS ARM64) - Ignore
-      runs-on: [ macOS, ARM64 ]
-      steps:
-        run: echo "Job was triggered on a ${{ runner.os }} ${{ runner.arch }} runner."
+    if: ${{ github.repository_owner == 'pantsbuild' }}
+    name: "Dummy (macOS ARM64)"
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+    - name: Echo something
+      run: |
+        arch -arm64e echo "Job was triggered on a runner that thinks it is "\
+          "${{ runner.os }} ${{ runner.arch }}, but can actually be $(arch -arm64e uname -p)."
