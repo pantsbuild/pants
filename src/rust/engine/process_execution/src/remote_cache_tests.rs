@@ -202,9 +202,10 @@ async fn cache_read_success() {
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
 }
 
-/// If the cache has any issues during reads, we should gracefully fallback to the local runner.
+/// If the cache has any issues during reads from the action cache, we should gracefully fallback
+/// to the local runner.
 #[tokio::test]
-async fn cache_read_skipped_on_errors() {
+async fn cache_read_skipped_on_action_cache_errors() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
@@ -213,6 +214,34 @@ async fn cache_read_skipped_on_errors() {
   let (process, action_digest) = create_process(&store_setup.store).await;
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
   action_cache.always_errors.store(true, Ordering::SeqCst);
+
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
+  let remote_result = cache_runner
+    .run(Context::default(), &mut workunit, process.clone().into())
+    .await
+    .unwrap();
+  assert_eq!(remote_result.exit_code, 1);
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
+}
+
+/// If the cache has any issues during reads from the store during eager_fetch, we should gracefully
+/// fallback to the local runner.
+#[tokio::test]
+async fn cache_read_skipped_on_store_errors() {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  let store_setup = StoreSetup::new();
+  let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
+  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, true);
+
+  // Claim that the process has a non-empty and not-persisted stdout digest.
+  let (process, action_digest) = create_process(&store_setup.store).await;
+  insert_into_action_cache(
+    &action_cache,
+    &action_digest,
+    0,
+    Digest::of_bytes("pigs flying".as_bytes()),
+    EMPTY_DIGEST,
+  );
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
