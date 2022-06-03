@@ -277,7 +277,13 @@ async def determine_main_pkg_for_go_binary(
             )
         return GoBinaryMainPackage(wrapped_specified_tgt.target.address)
 
-    candidate_targets = await Get(Targets, RawSpecs(dir_globs=(DirGlobSpec(addr.spec_path),)))
+    candidate_targets = await Get(
+        Targets,
+        RawSpecs(
+            dir_globs=(DirGlobSpec(addr.spec_path),),
+            description_of_origin="the `go_binary` dependency inference rule",
+        ),
+    )
     relevant_pkg_targets = [
         tgt
         for tgt in candidate_targets

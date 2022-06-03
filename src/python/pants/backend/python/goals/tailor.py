@@ -186,7 +186,10 @@ async def find_putative_targets(
         entry_point_dirs = {os.path.dirname(entry_point) for entry_point in entry_points}
         possible_existing_binary_targets = await Get(
             UnexpandedTargets,
-            RawSpecs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs)),
+            RawSpecs(
+                ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs),
+                description_of_origin="the `pex_binary` tailor rule",
+            ),
         )
         possible_existing_binary_entry_points = await MultiGet(
             Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(t[PexEntryPointField]))

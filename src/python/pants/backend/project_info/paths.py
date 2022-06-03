@@ -103,14 +103,18 @@ async def paths(
             Targets,
             Specs,
             specs_parser.parse_specs(
-                [path_from], convert_dir_literal_to_address_literal=convert_dir_literals
+                [path_from],
+                description_of_origin="the option `--paths-from`",
+                convert_dir_literal_to_address_literal=convert_dir_literals,
             ),
         ),
         Get(
             Targets,
             Specs,
             specs_parser.parse_specs(
-                [path_to], convert_dir_literal_to_address_literal=convert_dir_literals
+                [path_to],
+                description_of_origin="the option `--paths-to`",
+                convert_dir_literal_to_address_literal=convert_dir_literals,
             ),
         ),
     )

@@ -434,27 +434,39 @@ def test_group_by_dir() -> None:
 
 
 def test_specs_to_dirs() -> None:
-    assert specs_to_dirs(RawSpecs()) == ("",)
-    assert specs_to_dirs(RawSpecs(address_literals=(AddressLiteralSpec("src/python/foo"),))) == (
-        "src/python/foo",
-    )
-    assert specs_to_dirs(RawSpecs(dir_literals=(DirLiteralSpec("src/python/foo"),))) == (
-        "src/python/foo",
-    )
+    assert specs_to_dirs(RawSpecs(description_of_origin="tests")) == ("",)
+    assert specs_to_dirs(
+        RawSpecs(
+            address_literals=(AddressLiteralSpec("src/python/foo"),), description_of_origin="tests"
+        )
+    ) == ("src/python/foo",)
+    assert specs_to_dirs(
+        RawSpecs(dir_literals=(DirLiteralSpec("src/python/foo"),), description_of_origin="tests")
+    ) == ("src/python/foo",)
     assert specs_to_dirs(
         RawSpecs(
             address_literals=(
                 AddressLiteralSpec("src/python/foo"),
                 AddressLiteralSpec("src/python/bar"),
-            )
+            ),
+            description_of_origin="tests",
         )
     ) == ("src/python/foo", "src/python/bar")
 
     with pytest.raises(ValueError):
-        specs_to_dirs(RawSpecs(file_literals=(FileLiteralSpec("src/python/foo.py"),)))
+        specs_to_dirs(
+            RawSpecs(
+                file_literals=(FileLiteralSpec("src/python/foo.py"),), description_of_origin="tests"
+            )
+        )
 
     with pytest.raises(ValueError):
-        specs_to_dirs(RawSpecs(address_literals=(AddressLiteralSpec("src/python/bar", "tgt"),)))
+        specs_to_dirs(
+            RawSpecs(
+                address_literals=(AddressLiteralSpec("src/python/bar", "tgt"),),
+                description_of_origin="tests",
+            )
+        )
 
     with pytest.raises(ValueError):
         specs_to_dirs(
@@ -463,7 +475,8 @@ def test_specs_to_dirs() -> None:
                     AddressLiteralSpec(
                         "src/python/bar", target_component=None, generated_component="gen"
                     ),
-                )
+                ),
+                description_of_origin="tests",
             )
         )
 

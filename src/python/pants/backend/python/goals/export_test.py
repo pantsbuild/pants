@@ -63,7 +63,12 @@ def test_export_venvs(rule_runner: RuleRunner) -> None:
             env_inherit={"PATH", "PYENV_ROOT"},
         )
         targets = rule_runner.request(
-            Targets, [RawSpecs(recursive_globs=(RecursiveGlobSpec("src/foo"),))]
+            Targets,
+            [
+                RawSpecs(
+                    recursive_globs=(RecursiveGlobSpec("src/foo"),), description_of_origin="tests"
+                )
+            ],
         )
         all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets)])
 

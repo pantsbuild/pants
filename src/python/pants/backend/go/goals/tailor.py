@@ -95,7 +95,10 @@ async def find_putative_go_targets(
         ]
         existing_targets = await Get(
             UnexpandedTargets,
-            RawSpecs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in main_package_dirs)),
+            RawSpecs(
+                ancestor_globs=tuple(AncestorGlobSpec(d) for d in main_package_dirs),
+                description_of_origin="the `go_binary` tailor rule",
+            ),
         )
         owned_main_packages = await MultiGet(
             Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(t[GoBinaryMainPackageField]))
