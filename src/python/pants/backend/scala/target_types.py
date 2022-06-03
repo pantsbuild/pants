@@ -248,6 +248,7 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
 class ScalacPluginArtifactField(StringField):
     alias = "artifact"
     required = True
+    value: str
     help = "The address of a `jvm_artifact` that defines a plugin for `scalac`."
 
 

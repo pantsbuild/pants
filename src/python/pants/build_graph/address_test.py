@@ -475,19 +475,19 @@ def test_address_create_generated() -> None:
         ),
         (
             Address("", target_name="t", parameters={"k": "v"}),
-            AddressInput("", "t", parameters=FrozenDict({"k": "v"})),
+            AddressInput("", "t", parameters={"k": "v"}),
         ),
         (
             Address("", target_name="t", parameters={"k": "v"}, generated_name="gen"),
-            AddressInput("", "t", parameters=FrozenDict({"k": "v"}), generated_component="gen"),
+            AddressInput("", "t", parameters={"k": "v"}, generated_component="gen"),
         ),
         (
             Address("", target_name="t", parameters={"k": ""}),
-            AddressInput("", "t", parameters=FrozenDict({"k": ""})),
+            AddressInput("", "t", parameters={"k": ""}),
         ),
         (
             Address("", target_name="t", parameters={"k1": "v1", "k2": "v2"}),
-            AddressInput("", "t", parameters=FrozenDict({"k1": "v1", "k2": "v2"})),
+            AddressInput("", "t", parameters={"k1": "v1", "k2": "v2"}),
         ),
     ],
 )

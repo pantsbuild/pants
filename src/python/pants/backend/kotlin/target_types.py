@@ -174,6 +174,7 @@ class KotlinJunitTestsGeneratorTarget(TargetFilesGenerator):
 class KotlincPluginArtifactField(StringField):
     alias = "artifact"
     required = True
+    value: str
     help = "The address of a `jvm_artifact` that defines a plugin for `kotlinc`."
 
 
