@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pants.backend.explorer.browser import Browser, BrowserRequest
 from pants.backend.explorer.graphql.setup import graphql_uvicorn_setup
+from pants.backend.explorer.graphql.subsystem import GraphQLSubsystem
 from pants.backend.explorer.server.uvicorn import UvicornServerSetup, UvicornServerSetupRequest
 from pants.backend.project_info.peek import TargetDatas
 from pants.base.specs import Specs
@@ -19,10 +20,10 @@ class GraphQLUvicornServerSetupRequest(UvicornServerSetupRequest):
 
 @rule
 async def get_graphql_uvicorn_setup(
-    request: GraphQLUvicornServerSetupRequest,
+    request: GraphQLUvicornServerSetupRequest, graphql: GraphQLSubsystem
 ) -> UvicornServerSetup:
     browser = await Get(Browser, BrowserRequest, request.browser_request())
-    return UvicornServerSetup(graphql_uvicorn_setup(browser))
+    return UvicornServerSetup(graphql_uvicorn_setup(browser, graphql=graphql))
 
 
 def rules():

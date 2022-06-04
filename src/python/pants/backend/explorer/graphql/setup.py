@@ -13,6 +13,7 @@ from strawberry.fastapi import GraphQLRouter
 from pants.backend.explorer.browser import Browser
 from pants.backend.explorer.graphql.context import GraphQLContext
 from pants.backend.explorer.graphql.query.root import Query
+from pants.backend.explorer.graphql.subsystem import GraphQLSubsystem
 from pants.backend.explorer.server.uvicorn import UvicornServer
 from pants.backend.project_info.peek import _PeekJsonEncoder
 
@@ -30,7 +31,9 @@ class ExplorerJSONResponse(JSONResponse):
 
 
 def graphql_uvicorn_setup(
-    browser: Browser, route: str = "/graphql"
+    browser: Browser,
+    graphql: GraphQLSubsystem,
+    route: str = "/graphql",
 ) -> Callable[[UvicornServer], None]:
     def setup(uvicorn: UvicornServer) -> None:
         # Monkey patch, due to limitations in configurability.
@@ -42,10 +45,11 @@ def graphql_uvicorn_setup(
         )
 
         uvicorn.app.include_router(graphql_app, prefix=route)
-        uvicorn.prerun_tasks.append(
-            # Browser.open() needs an unlocked scheduler, so we need to defer that call to a
-            # callstack that is not executing a rule.
-            lambda: browser.open(uvicorn.request_state, route)
-        )
+        if graphql.open_graphiql:
+            uvicorn.prerun_tasks.append(
+                # Browser.open() needs an unlocked scheduler, so we need to defer that call to a
+                # callstack that is not executing a rule.
+                lambda: browser.open(uvicorn.request_state, route)
+            )
 
     return setup
