@@ -195,7 +195,10 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             "foo/b.txt": "",
         }
     )
-    tds = rule_runner.request(TargetDatas, [RawSpecs(recursive_globs=(RecursiveGlobSpec("foo"),))])
+    tds = rule_runner.request(
+        TargetDatas,
+        [RawSpecs(recursive_globs=(RecursiveGlobSpec("foo"),), description_of_origin="tests")],
+    )
     assert list(tds) == [
         TargetData(
             GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),

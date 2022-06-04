@@ -287,5 +287,6 @@ def test_pants_ignored_file(repo: str) -> None:
     """Regression test for
     https://github.com/pantsbuild/pants/issues/15655#issuecomment-1140081185."""
     create_file(".ignored/f.txt", "")
-    assert_list_stdout(repo, [], DependeesOption.NONE)
-    assert_count_loc(repo, DependeesOption.NONE, expected_num_files=0)
+    for dependees in (DependeesOption.NONE, DependeesOption.DIRECT):
+        assert_list_stdout(repo, [], dependees)
+        assert_count_loc(repo, dependees, expected_num_files=0)

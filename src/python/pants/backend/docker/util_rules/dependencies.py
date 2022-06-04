@@ -33,6 +33,7 @@ async def inject_docker_dependencies(
             UnparsedAddressInputs(
                 (v for v in dockerfile_info.from_image_build_args.to_dict().values() if v),
                 owning_address=dockerfile_info.address,
+                description_of_origin="TODO(#14468)",
             ),
         )
     )

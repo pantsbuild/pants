@@ -297,9 +297,9 @@ async def lint(
     _get_targets = Get(
         FilteredTargets,
         Specs,
-        specs if lint_target_request_types or fmt_target_request_types else Specs(),
+        specs if lint_target_request_types or fmt_target_request_types else Specs.empty(),
     )
-    _get_specs_paths = Get(SpecsPaths, Specs, specs if file_request_types else Specs())
+    _get_specs_paths = Get(SpecsPaths, Specs, specs if file_request_types else Specs.empty())
     targets, specs_paths = await MultiGet(_get_targets, _get_specs_paths)
 
     def batch(field_sets: Iterable[FieldSet]) -> Iterator[list[FieldSet]]:

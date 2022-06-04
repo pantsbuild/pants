@@ -2332,11 +2332,15 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 
     @memoized_property
     def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
-        if not self.supports_transitive_excludes or not self.value:
-            return UnparsedAddressInputs((), owning_address=self.address)
+        val = (
+            (v[2:] for v in self.value if v.startswith("!!"))
+            if self.supports_transitive_excludes and self.value
+            else ()
+        )
         return UnparsedAddressInputs(
-            (v[2:] for v in self.value if v.startswith("!!")),
+            val,
             owning_address=self.address,
+            description_of_origin=f"the `{self.alias}` field from the target {self.address}",
         )
 
 
@@ -2607,7 +2611,11 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.value or (), owning_address=self.address)
+        return UnparsedAddressInputs(
+            self.value or (),
+            owning_address=self.address,
+            description_of_origin=f"the `{self.alias}` from the target {self.address}",
+        )
 
 
 # -----------------------------------------------------------------------------------------------

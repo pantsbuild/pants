@@ -113,22 +113,23 @@ async def resolve_scala_plugins_for_target(
         plugin_names_by_resolve = scalac.parsed_default_plugins()
         plugin_names = tuple(plugin_names_by_resolve.get(resolve, ()))
 
-    candidate_plugins: list[Target] = []
+    candidate_plugins = []
+    artifact_address_gets = []
     for plugin in all_scala_plugins:
-        if _plugin_name(plugin) in plugin_names:
-            candidate_plugins.append(plugin)
+        if _plugin_name(plugin) not in plugin_names:
+            continue
+        candidate_plugins.append(plugin)
+        artifact_field = plugin[ScalacPluginArtifactField]
+        address_input = AddressInput.parse(
+            artifact_field.value,
+            relative_to=target.address.spec_path,
+            description_of_origin=(
+                f"the `{artifact_field.alias}` field from the target {artifact_field.address}"
+            ),
+        )
+        artifact_address_gets.append(Get(Address, AddressInput, address_input))
 
-    artifact_address_inputs = (
-        plugin[ScalacPluginArtifactField].value for plugin in candidate_plugins
-    )
-
-    artifact_addresses = await MultiGet(
-        # `is not None` is solely to satiate mypy. artifact field is required.
-        Get(Address, AddressInput, AddressInput.parse(ai, relative_to=target.address.spec_path))
-        for ai in artifact_address_inputs
-        if ai is not None
-    )
-
+    artifact_addresses = await MultiGet(artifact_address_gets)
     candidate_artifacts = await Get(Targets, Addresses(artifact_addresses))
 
     plugins: dict[str, tuple[Target, Target]] = {}  # Maps plugin name to relevant JVM artifact

@@ -404,3 +404,32 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     assert sorted(res.env["TOOLS"].split()) == tools
     for tool in tools:
         assert res.env[tool].endswith(f"/{tool.replace('_', '.')}")
+
+
+def test_shell_command_extra_env_vars(caplog, rule_runner: RuleRunner) -> None:
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+    rule_runner.set_options([], env={"FOO": "foo"}, env_inherit={"PATH"})
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="extra-env-test",
+                  tools=["echo"],
+                  extra_env_vars=["FOO", "HELLO=world", "BAR"],
+                  command='echo FOO="$FOO" HELLO="$HELLO" BAR="$BAR"',
+                  log_output=True,
+                )
+                """
+            )
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="extra-env-test"),
+        expected_contents={},
+    )
+
+    assert_logged(caplog, [(logging.INFO, "FOO=foo HELLO=world BAR=\n")])
