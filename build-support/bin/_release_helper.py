@@ -783,6 +783,7 @@ def build_fs_util() -> None:
 def build_pex(fetch: bool) -> None:
     stable = os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE"
     if fetch:
+        # TODO: Support macOS on ARM64.
         extra_pex_args = [
             "--python-shebang",
             "/usr/bin/env python",
@@ -797,6 +798,7 @@ def build_pex(fetch: bool) -> None:
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
         banner(f"Building {pex_name} by fetching wheels.")
     else:
+        # TODO: Support macOS on ARM64. Will require qualifying the pex name with the arch.
         major, minor = sys.version_info[:2]
         extra_pex_args = [
             f"--interpreter-constraint=CPython=={major}.{minor}.*",
