@@ -39,7 +39,6 @@ target(
         "src/python/pants/backend/experimental/kotlin/debug_goals",
         "src/python/pants/backend/experimental/kotlin/lint/ktlint",
         "src/python/pants/backend/experimental/python",
-        "src/python/pants/backend/experimental/python/docs/sphinx",
         "src/python/pants/backend/experimental/python/lint/autoflake",
         "src/python/pants/backend/experimental/python/lint/pyupgrade",
         "src/python/pants/backend/experimental/python/packaging/pyoxidizer",
