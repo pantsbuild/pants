@@ -12,6 +12,7 @@ from typing import Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
 from pants.backend.python.macros.pipenv_requirements import parse_pipenv_requirements
+from pants.backend.python.macros.poetry_requirements import PyProjectToml, parse_pyproject_toml
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -172,6 +173,8 @@ async def find_putative_targets(
                 return validate_python_requirements(path, contents)
             elif alias == "pipenv_requirements":
                 return validate_pipenv_requirements(contents)
+            elif alias == "poetry_requirements":
+                return validate_poetry_requirements(contents)
             return True
 
         def validate_python_requirements(path: str, contents: bytes) -> bool:
@@ -194,6 +197,16 @@ async def find_putative_targets(
         def validate_pipenv_requirements(contents: bytes) -> bool:
             try:
                 parse_pipenv_requirements(contents)
+                return True
+            except Exception as e:
+                logger.warning(f"{e}")
+                return False
+
+        def validate_poetry_requirements(contents: bytes) -> bool:
+
+            p = PyProjectToml(PurePath(), PurePath(), contents.decode())
+            try:
+                parse_pyproject_toml(p)
                 return True
             except Exception as e:
                 logger.warning(f"{e}")
