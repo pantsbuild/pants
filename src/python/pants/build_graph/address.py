@@ -228,7 +228,7 @@ class AddressInput:
             raise UnsupportedWildcard(
                 softwrap(
                     f"""
-                    The address `{spec}` from {description_of_origin} included a wildcard
+                    The address `{spec}` from {description_of_origin} ended in a wildcard
                     (`{wildcard}`), which is not supported.
                     """
                 )
