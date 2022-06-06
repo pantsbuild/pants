@@ -30,7 +30,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.19.0",
+  "toolchain.pants.plugin==0.20.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -57,11 +57,6 @@ pants_ignore.add = [
 build_ignore.add = [
   # Disable Go targets by default so Pants developers do not need Go installed.
   "testprojects/src/go/**",
-]
-
-ignore_warnings.add = [
-  # TODO: `toolchain.pants.plugin==0.18.0` must still use the old `get_git` implementation.
-  "DEPRECATED: pants.base.build_environment.get_git"
 ]
 
 files_not_found_behavior = "error"
