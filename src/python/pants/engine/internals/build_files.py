@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.base.exceptions import ResolveError
+from pants.build_graph.address import BuildFileAddressRequest
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
@@ -134,7 +135,8 @@ async def parse_address_family(
 
 
 @rule
-async def find_build_file(address: Address) -> BuildFileAddress:
+async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
+    address = request.address
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
     owning_address = address.maybe_convert_to_target_generator()
     if address_family.get_target_adaptor(owning_address) is None:

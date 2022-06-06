@@ -6,7 +6,8 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.base.build_root import BuildRoot
-from pants.engine.addresses import Address, Addresses, BuildFileAddress
+from pants.build_graph.address import BuildFileAddressRequest
+from pants.engine.addresses import Addresses, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
@@ -81,7 +82,11 @@ async def file_deps(
         targets = await Get(UnexpandedTargets, Addresses, addresses)
 
     build_file_addresses = await MultiGet(
-        Get(BuildFileAddress, Address, tgt.address) for tgt in targets
+        Get(
+            BuildFileAddress,
+            BuildFileAddressRequest(tgt.address, description_of_origin="CLI arguments"),
+        )
+        for tgt in targets
     )
     unique_rel_paths = {bfa.rel_path for bfa in build_file_addresses}
 
