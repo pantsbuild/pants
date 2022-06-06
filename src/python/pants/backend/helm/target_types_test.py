@@ -18,7 +18,7 @@ from pants.backend.helm.testutil import (
     K8S_SERVICE_FILE,
 )
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.target import SingleSourceField, Tags
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -27,7 +27,7 @@ def test_generate_source_targets() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_types.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
         target_types=[HelmUnitTestTestsGeneratorTarget, HelmChartTarget],
     )
@@ -56,7 +56,13 @@ def test_generate_source_targets() -> None:
         )
 
     generated = rule_runner.request(
-        _TargetParametrizations, [Address(f"{source_root}/tests", target_name="foo_tests")]
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address(f"{source_root}/tests", target_name="foo_tests"),
+                description_of_origin="tests",
+            )
+        ],
     ).parametrizations
     assert set(generated.values()) == {
         gen_tgt("service_test.yaml"),

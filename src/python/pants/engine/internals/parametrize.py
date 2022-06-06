@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 from dataclasses import dataclass
 from typing import Any, Iterator
@@ -10,10 +11,11 @@ from typing import Any, Iterator
 from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import Target
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 
 
 def _named_args_explanation(arg: str) -> str:
@@ -137,6 +139,28 @@ class _TargetParametrization:
 # TODO: This is not the right name for this class, nor the best place for it to live. But it is
 # consumed by both `pants.engine.internals.graph` and `pants.engine.internals.build_files`, and
 # shouldn't live in `pants.engine.target` (yet? needs more stabilization).
+@dataclass(frozen=True)
+class _TargetParametrizationsRequest(EngineAwareParameter):
+    address: Address
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self.address.is_parametrized or self.address.is_generated_target:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Cannot create {self.__class__.__name__} on a generated or parametrized target.
+
+                    Self: {self}
+                    """
+                )
+            )
+
+    def debug_hint(self) -> str:
+        return self.address.spec
+
+
+# TODO: See TODO on _TargetParametrizationsRequest about naming this.
 class _TargetParametrizations(Collection[_TargetParametrization]):
     """All parametrizations and generated targets for a single input Address.
 

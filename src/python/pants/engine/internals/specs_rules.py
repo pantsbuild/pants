@@ -29,7 +29,10 @@ from pants.engine.fs import PathGlobs, Paths, SpecsPaths
 from pants.engine.internals.build_files import AddressFamilyDir, BuildFileOptions
 from pants.engine.internals.graph import Owners, OwnersRequest, _log_or_raise_unmatched_owners
 from pants.engine.internals.mapper import AddressFamily, SpecsFilter
-from pants.engine.internals.parametrize import _TargetParametrizations
+from pants.engine.internals.parametrize import (
+    _TargetParametrizations,
+    _TargetParametrizationsRequest,
+)
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import (
@@ -89,7 +92,13 @@ async def _determine_literal_addresses_from_raw_specs(
     #  - dir:tgt@k=v -> (dir:tgt@k=v,another=a, dir:tgt@k=v,another=b), but not anything
     #       where @k=v is not true.
     literal_parametrizations = await MultiGet(
-        Get(_TargetParametrizations, Address, address.maybe_convert_to_target_generator())
+        Get(
+            _TargetParametrizations,
+            _TargetParametrizationsRequest(
+                address.maybe_convert_to_target_generator(),
+                description_of_origin=description_of_origin,
+            ),
+        )
         for address in literal_addresses
     )
 
@@ -144,7 +153,13 @@ async def addresses_from_raw_specs_without_file_owners(
     )
 
     target_parametrizations_list = await MultiGet(
-        Get(_TargetParametrizations, Address, base_address) for base_address in base_addresses
+        Get(
+            _TargetParametrizations,
+            _TargetParametrizationsRequest(
+                base_address, description_of_origin=specs.description_of_origin
+            ),
+        )
+        for base_address in base_addresses
     )
     residence_dir_to_targets = defaultdict(list)
     for target_parametrizations in target_parametrizations_list:
