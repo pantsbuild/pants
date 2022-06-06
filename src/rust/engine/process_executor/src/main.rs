@@ -342,13 +342,11 @@ async fn main() {
   let stdout: Vec<u8> = store
     .load_file_bytes_with(result.stdout_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   let stderr: Vec<u8> = store
     .load_file_bytes_with(result.stderr_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   print!("{}", String::from_utf8(stdout).unwrap());
@@ -459,8 +457,7 @@ async fn extract_request_from_action_digest(
   let action = store
     .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
     .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("Could not find action proto in CAS: {:?}", action_digest))?
+    .map_err(|e| e.enrich("Could not load action proto from CAS").to_string())?
     .map_err(|err| {
       format!(
         "Error deserializing action proto {:?}: {:?}",
@@ -473,8 +470,10 @@ async fn extract_request_from_action_digest(
   let command = store
     .load_file_bytes_with(command_digest, |bytes| Command::decode(bytes))
     .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("Could not find command proto in CAS: {:?}", command_digest))?
+    .map_err(|e| {
+      e.enrich("Could not load command proto from CAS")
+        .to_string()
+    })?
     .map_err(|err| {
       format!(
         "Error deserializing command proto {:?}: {:?}",
@@ -588,8 +587,7 @@ async fn extract_request_from_buildbarn_url(
           UncachedActionResult::decode(bytes)
         })
         .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Couldn't fetch action result proto".to_owned())?
+        .map_err(|e| e.enrich("Could not load action result proto").to_string())?
         .map_err(|err| format!("Error deserializing action result proto: {:?}", err))?;
 
       require_digest(&action_result.action_digest)?

@@ -935,8 +935,7 @@ impl DownloadedFile {
         .store()
         .load_file_bytes_with(digest, |_| ())
         .await
-        .unwrap_or(None)
-        == Some(()));
+        .is_ok());
 
     if !usable_in_store {
       downloads::download(core.clone(), url, file_name, digest).await?;

@@ -19,18 +19,20 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
+use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
+use futures::try_join;
+use indexmap::IndexMap;
+use pyo3::{PyRef, Python};
+use tempfile::TempDir;
+use tokio::process;
+
 use fs::{
   safe_create_dir_all_ioerror, DirectoryDigest, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
 };
-use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hashing::Digest;
-use indexmap::IndexMap;
 use process_execution::{CacheName, ManagedChild, NamedCaches};
-use pyo3::{PyRef, Python};
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
-use tempfile::TempDir;
-use tokio::process;
 
 type IntrinsicFn =
   Box<dyn Fn(Context, Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> + Send + Sync>;
@@ -179,31 +181,15 @@ fn process_request_to_process_result(
 
     let result = context.get(process_request).await?.0;
 
-    let maybe_stdout = context
-      .core
-      .store()
-      .load_file_bytes_with(result.stdout_digest, |bytes: &[u8]| bytes.to_owned())
-      .await?;
-
-    let maybe_stderr = context
-      .core
-      .store()
-      .load_file_bytes_with(result.stderr_digest, |bytes: &[u8]| bytes.to_owned())
-      .await?;
-
-    let stdout_bytes = maybe_stdout.ok_or_else(|| {
-      throw(format!(
-        "Bytes from stdout Digest {:?} not found in store",
-        result.stdout_digest
-      ))
-    })?;
-
-    let stderr_bytes = maybe_stderr.ok_or_else(|| {
-      throw(format!(
-        "Bytes from stderr Digest {:?} not found in store",
-        result.stderr_digest
-      ))
-    })?;
+    let store = context.core.store();
+    let (stdout_bytes, stderr_bytes) = try_join!(
+      store
+        .load_file_bytes_with(result.stdout_digest, |bytes: &[u8]| bytes.to_owned())
+        .map_err(|e| e.enrich("Bytes from stdout")),
+      store
+        .load_file_bytes_with(result.stderr_digest, |bytes: &[u8]| bytes.to_owned())
+        .map_err(|e| e.enrich("Bytes from stderr"))
+    )?;
 
     let platform_name: String = result.platform.into();
     let gil = Python::acquire_gil();

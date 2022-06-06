@@ -158,7 +158,6 @@ async fn recover_from_missing_store_contents() {
     let output_dir = store
       .load_directory(output_dir_digest.as_digest())
       .await
-      .unwrap()
       .unwrap();
     let output_child_digest = output_dir
       .files

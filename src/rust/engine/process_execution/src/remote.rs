@@ -698,7 +698,7 @@ impl CommandRunner {
         Err(err) => match err {
           ExecutionError::Fatal(e) => {
             workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
-            return Err(e.into());
+            return Err(e);
           }
           ExecutionError::Retryable(e) => {
             // Check if the number of request attempts sent thus far have exceeded the number
@@ -1294,7 +1294,6 @@ pub fn extract_output_files(
             "Error when storing the output file directory info in the remote CAS: {:?}",
             error
           )
-          .into()
         },
       );
 

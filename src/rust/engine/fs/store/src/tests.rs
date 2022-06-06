@@ -55,7 +55,7 @@ pub fn extra_big_file_bytes() -> Bytes {
   bytes.freeze()
 }
 
-pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, StoreError> {
+pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Bytes, StoreError> {
   store
     .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
     .await
@@ -120,7 +120,7 @@ async fn load_file_prefers_local() {
   let cas = new_cas(1024);
   assert_eq!(
     load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
-    Ok(Some(testdata.bytes()))
+    Ok(testdata.bytes())
   );
   assert_eq!(0, cas.read_request_count());
 }
@@ -141,7 +141,6 @@ async fn load_directory_prefers_local() {
     new_store(dir.path(), &cas.address())
       .load_directory(testdir.digest(),)
       .await
-      .unwrap()
       .unwrap(),
     testdir.directory()
   );
@@ -157,7 +156,7 @@ async fn load_file_falls_back_and_backfills() {
   let cas = new_cas(1024);
   assert_eq!(
     load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
-    Ok(Some(testdata.bytes())),
+    Ok(testdata.bytes()),
     "Read from CAS"
   );
   assert_eq!(1, cas.read_request_count());
@@ -184,7 +183,6 @@ async fn load_directory_falls_back_and_backfills() {
     new_store(dir.path(), &cas.address())
       .load_directory(testdir.digest(),)
       .await
-      .unwrap()
       .unwrap(),
     testdir.directory()
   );
@@ -227,17 +225,16 @@ async fn load_recursive_directory() {
 
   assert_eq!(
     load_file_bytes(&new_local_store(dir.path()), roland.digest()).await,
-    Ok(Some(roland.bytes()))
+    Ok(roland.bytes())
   );
   assert_eq!(
     load_file_bytes(&new_local_store(dir.path()), catnip.digest()).await,
-    Ok(Some(catnip.bytes()))
+    Ok(catnip.bytes())
   );
   assert_eq!(
     new_local_store(dir.path())
       .load_directory(testdir_digest,)
       .await
-      .unwrap()
       .unwrap(),
     testdir_directory
   );
@@ -245,7 +242,6 @@ async fn load_recursive_directory() {
     new_local_store(dir.path())
       .load_directory(recursive_testdir_digest.as_digest())
       .await
-      .unwrap()
       .unwrap(),
     recursive_testdir_directory
   );
@@ -256,28 +252,24 @@ async fn load_file_missing_is_none() {
   let dir = TempDir::new().unwrap();
 
   let cas = new_empty_cas();
-  assert_eq!(
-    load_file_bytes(
-      &new_store(dir.path(), &cas.address()),
-      TestData::roland().digest()
-    )
-    .await,
-    Ok(None)
-  );
+  let result = load_file_bytes(
+    &new_store(dir.path(), &cas.address()),
+    TestData::roland().digest(),
+  )
+  .await;
+  assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
   assert_eq!(1, cas.read_request_count());
 }
 
 #[tokio::test]
-async fn load_directory_missing_is_none() {
+async fn load_directory_missing_errors() {
   let dir = TempDir::new().unwrap();
 
   let cas = new_empty_cas();
-  assert_eq!(
-    new_store(dir.path(), &cas.address())
-      .load_directory(TestDirectory::containing_roland().digest(),)
-      .await,
-    Ok(None)
-  );
+  let result = new_store(dir.path(), &cas.address())
+    .load_directory(TestDirectory::containing_roland().digest())
+    .await;
+  assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
   assert_eq!(1, cas.read_request_count());
 }
 
@@ -885,7 +877,6 @@ async fn instance_name_download() {
     store_with_remote
       .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
-      .unwrap()
       .unwrap(),
     TestData::roland().bytes()
   )
@@ -970,7 +961,6 @@ async fn auth_download() {
     store_with_remote
       .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
-      .unwrap()
       .unwrap(),
     TestData::roland().bytes()
   )

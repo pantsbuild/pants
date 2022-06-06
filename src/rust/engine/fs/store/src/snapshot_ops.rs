@@ -99,8 +99,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
           String::from_utf8_lossy(bytes.to_vec().as_slice()).to_string()
         })
         .await
-        .map_err(|e| e.to_string())?
-        .unwrap_or_else(|| "<could not load contents>".to_string());
+        .unwrap_or_else(|_| "<could not load contents>".to_string());
       let detail = format!("{}{}", header, contents);
       let res: Result<_, String> = Ok((file.name().to_owned(), detail));
       res
@@ -170,7 +169,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
     &self,
     digest: Digest,
     f: F,
-  ) -> Result<Option<T>, Self::Error>;
+  ) -> Result<T, Self::Error>;
 
   async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, Self::Error>;
 

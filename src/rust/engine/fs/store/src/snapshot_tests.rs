@@ -8,7 +8,7 @@ use tempfile;
 use testutil::data::TestDirectory;
 use testutil::make_file;
 
-use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store};
+use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, StoreError};
 use fs::{
   Dir, DirectoryDigest, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
   PathGlobs, PathStat, PosixFS, StrictGlobMatching,
@@ -308,11 +308,7 @@ async fn snapshot_merge_two_files() {
     .ensure_directory_digest_persisted(merged.clone())
     .await
     .unwrap();
-  let merged_root_directory = store
-    .load_directory(merged.as_digest())
-    .await
-    .unwrap()
-    .unwrap();
+  let merged_root_directory = store.load_directory(merged.as_digest()).await.unwrap();
 
   assert_eq!(merged_root_directory.files.len(), 0);
   assert_eq!(merged_root_directory.directories.len(), 1);
@@ -325,7 +321,6 @@ async fn snapshot_merge_two_files() {
   let merged_child_directory = store
     .load_directory(merged_child_dirnode_digest.unwrap())
     .await
-    .unwrap()
     .unwrap();
 
   assert_eq!(merged_child_dirnode.name, common_dir_name);
@@ -448,16 +443,7 @@ async fn strip_dir_not_in_store() {
   let digest = TestDirectory::nested().directory_digest();
   let prefix = RelativePath::new(PathBuf::from("cats")).unwrap();
   let result = store.strip_prefix(digest.clone(), &prefix).await;
-  assert_eq!(
-    result,
-    Err(
-      format!(
-        "Could not walk unknown directory at \"\": {:?}",
-        digest.as_digest()
-      )
-      .into()
-    )
-  );
+  assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
 }
 
 #[tokio::test]

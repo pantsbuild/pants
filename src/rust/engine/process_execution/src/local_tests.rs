@@ -798,12 +798,10 @@ async fn run_command_locally_in_dir(
   let original = runner.run(Context::default(), workunit, req.into()).await?;
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   let stderr_bytes = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   Ok(LocalTestResult {
     original,
     stdout_bytes,

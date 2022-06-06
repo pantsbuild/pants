@@ -1530,11 +1530,6 @@ fn single_file_digests_to_bytes<'py>(
             externs::store_bytes(py, bytes)
           })
           .await
-          .and_then(|maybe_bytes| {
-            maybe_bytes.ok_or_else(|| {
-              format!("Error loading bytes from digest: {:?}", py_file_digest.0).into()
-            })
-          })
       }
     });
 

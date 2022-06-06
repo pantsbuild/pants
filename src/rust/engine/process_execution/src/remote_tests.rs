@@ -1221,7 +1221,6 @@ async fn ensure_inline_stdio_is_stored() {
       local_store
         .load_file_bytes_with(test_stdout.digest(), |v| Bytes::copy_from_slice(v))
         .await
-        .unwrap()
         .unwrap(),
       test_stdout.bytes()
     );
@@ -1229,7 +1228,6 @@ async fn ensure_inline_stdio_is_stored() {
       local_store
         .load_file_bytes_with(test_stderr.digest(), |v| Bytes::copy_from_slice(v))
         .await
-        .unwrap()
         .unwrap(),
       test_stderr.bytes()
     );
@@ -2303,12 +2301,10 @@ pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
     .await?;
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   let stderr_bytes = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2360,12 +2356,10 @@ async fn run_command_remote(
 
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   let stderr_bytes = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2415,13 +2409,11 @@ async fn extract_execute_response(
   let stdout_bytes: Vec<u8> = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   let stderr_bytes: Vec<u8> = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   Ok(RemoteTestResult {
