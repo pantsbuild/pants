@@ -180,7 +180,6 @@ def test_skip_invalid_requirements(rule_runner: RuleRunner) -> None:
             AllOwnedSources([]),
         ],
     )
-    print(repr(pts))
     assert (
         PutativeTargets(
             [

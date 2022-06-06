@@ -146,9 +146,10 @@ async def find_putative_targets(
                 if not validate(fp, contents[fp], alias):
                     logger.warning(
                         f"No target generated for `{fp}`. You'll need to create "
-                        "targets for its contents manually."
+                        "targets for its contents manually.\n"
+                        "To silence this error in future, see "
+                        "https://www.pantsbuild.org/docs/reference-tailor#section-ignore-paths \n"
                     )
-                    logger.warning("")
                     continue
 
                 pts.append(
