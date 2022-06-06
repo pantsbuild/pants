@@ -13,7 +13,6 @@ from typing import Iterable
 from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
 from pants.backend.python.macros.pipenv_requirements import parse_pipenv_requirements
 from pants.backend.python.macros.poetry_requirements import PyProjectToml, parse_pyproject_toml
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
@@ -25,6 +24,7 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
+    parse_requirements_file,
 )
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.tailor import (
@@ -178,20 +178,12 @@ async def find_putative_targets(
             return True
 
         def validate_python_requirements(path: str, contents: bytes) -> bool:
-            for number, line in enumerate(contents.splitlines(), start=1):
-                logger.warning(f"{number=} {line=}")
-                # Blank lines and comments do not parse cleanly.
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                if stripped.startswith(b"#"):
-                    continue
-
-                try:
-                    PipRequirement.parse(line.decode(), f"line {number} of `{path}`")
-                except Exception as e:
-                    logger.warning(f"{e}")
-                    return False
+            try:
+                for _ in parse_requirements_file(contents, rel_path=path):
+                    pass
+            except Exception as e:
+                logger.warning(f"{e}")
+                return False
             return True
 
         def validate_pipenv_requirements(contents: bytes) -> bool:
