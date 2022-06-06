@@ -177,7 +177,7 @@ async def find_putative_targets(
 
         def validate_python_requirements(path: str, contents: bytes) -> bool:
             try:
-                for _ in parse_requirements_file(contents, rel_path=path):
+                for _ in parse_requirements_file(contents.decode(), rel_path=path):
                     pass
             except Exception as e:
                 logger.warning(f"{e}")
