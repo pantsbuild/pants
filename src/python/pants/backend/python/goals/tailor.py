@@ -143,10 +143,12 @@ async def find_putative_targets(
             for fp in unowned_files:
                 path, name = os.path.split(fp)
 
-                if not validate(fp, contents[fp], alias):
+                try:
+                    validate(fp, contents[fp], alias)
+                except Exception as e:
                     logger.warning(
-                        f"No target generated for `{fp}`. You'll need to create "
-                        "targets for its contents manually.\n"
+                        f"An error occurred when validating `{fp}`: {e}.\n\n"
+                        "You'll need to create targets for its contents manually.\n"
                         "To silence this error in future, see "
                         "https://www.pantsbuild.org/docs/reference-tailor#section-ignore-paths \n"
                     )
@@ -167,41 +169,24 @@ async def find_putative_targets(
                     )
                 )
 
-        def validate(path: str, contents: bytes, alias: str) -> bool:
+        def validate(path: str, contents: bytes, alias: str) -> None:
             if alias == "python_requirements":
                 return validate_python_requirements(path, contents)
             elif alias == "pipenv_requirements":
                 return validate_pipenv_requirements(contents)
             elif alias == "poetry_requirements":
                 return validate_poetry_requirements(contents)
-            return True
 
-        def validate_python_requirements(path: str, contents: bytes) -> bool:
-            try:
-                for _ in parse_requirements_file(contents.decode(), rel_path=path):
-                    pass
-            except Exception as e:
-                logger.warning(f"{e}")
-                return False
-            return True
+        def validate_python_requirements(path: str, contents: bytes) -> None:
+            for _ in parse_requirements_file(contents.decode(), rel_path=path):
+                pass
 
-        def validate_pipenv_requirements(contents: bytes) -> bool:
-            try:
-                parse_pipenv_requirements(contents)
-                return True
-            except Exception as e:
-                logger.warning(f"{e}")
-                return False
+        def validate_pipenv_requirements(contents: bytes) -> None:
+            parse_pipenv_requirements(contents)
 
-        def validate_poetry_requirements(contents: bytes) -> bool:
-
+        def validate_poetry_requirements(contents: bytes) -> None:
             p = PyProjectToml(PurePath(), PurePath(), contents.decode())
-            try:
-                parse_pyproject_toml(p)
-                return True
-            except Exception as e:
-                logger.warning(f"{e}")
-                return False
+            parse_pyproject_toml(p)
 
         add_req_targets(all_requirements_files, "python_requirements", "reqs")
         add_req_targets(all_pipenv_lockfile_files, "pipenv_requirements", "pipenv")
