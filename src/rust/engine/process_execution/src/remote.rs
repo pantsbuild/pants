@@ -1337,7 +1337,7 @@ pub async fn check_action_cache(
       workunit.increment_counter(Metric::RemoteCacheRequests, 1);
 
       let client = action_cache_client.as_ref().clone();
-      let action_result_response = retry_call(
+      let response = retry_call(
         client,
         move |mut client| {
           let request = remexec::GetActionResultRequest {
@@ -1356,41 +1356,47 @@ pub async fn check_action_cache(
         },
         status_is_retryable,
       )
+      .and_then(|action_result| async move {
+        let action_result = action_result.into_inner();
+        let response = populate_fallible_execution_result(
+          store.clone(),
+          context.run_id,
+          &action_result,
+          platform,
+          false,
+          ProcessResultSource::HitRemotely,
+        )
+        .await
+        .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
+
+        if eager_fetch {
+          // NB: `ensure_local_has_file` and `ensure_local_has_recursive_directory` are internally
+          // retried.
+          let response = response.clone();
+          in_workunit!(
+            "eager_fetch_action_cache",
+            Level::Trace,
+            desc = Some("eagerly fetching after action cache hit".to_owned()),
+            |_workunit| async move {
+              future::try_join_all(vec![
+                store.ensure_local_has_file(response.stdout_digest).boxed(),
+                store.ensure_local_has_file(response.stderr_digest).boxed(),
+                store
+                  .ensure_local_has_recursive_directory(response.output_directory)
+                  .boxed(),
+              ])
+              .await
+            }
+          )
+          .await
+          .map_err(|e| Status::unavailable(format!("Output content could not be loaded: {e}")))?;
+        }
+        Ok(response)
+      })
       .await;
 
-      match action_result_response {
-        Ok(action_result) => {
-          let action_result = action_result.into_inner();
-          let response = populate_fallible_execution_result(
-            store.clone(),
-            context.run_id,
-            &action_result,
-            platform,
-            false,
-            ProcessResultSource::HitRemotely,
-          )
-          .await?;
-          // TODO: This should move inside the retry_call above, both in order to be retried, and
-          // to ensure that we increment a miss if we fail to eagerly fetch.
-          if eager_fetch {
-            let response = response.clone();
-            in_workunit!(
-              "eager_fetch_action_cache",
-              Level::Trace,
-              desc = Some("eagerly fetching after action cache hit".to_owned()),
-              |_workunit| async move {
-                future::try_join_all(vec![
-                  store.ensure_local_has_file(response.stdout_digest).boxed(),
-                  store.ensure_local_has_file(response.stderr_digest).boxed(),
-                  store
-                    .ensure_local_has_recursive_directory(response.output_directory)
-                    .boxed(),
-                ])
-                .await
-              }
-            )
-            .await?;
-          }
+      match response {
+        Ok(response) => {
           workunit.increment_counter(Metric::RemoteCacheRequestsCached, 1);
           Ok(Some(response))
         }

@@ -26,6 +26,7 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, FileOption, SkipOption
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -105,9 +106,11 @@ class BanditLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc=(
-        "Determine all Python interpreter versions used by Bandit in your project (for lockfile "
-        "generation)"
+    desc=softwrap(
+        """
+        Determine all Python interpreter versions used by Bandit in your project
+        (for lockfile generation)
+        """
     ),
     level=LogLevel.DEBUG,
 )
@@ -132,9 +135,11 @@ class BanditExportSentinel(ExportPythonToolSentinel):
 
 
 @rule(
-    desc=(
-        "Determine all Python interpreter versions used by Bandit in your project (for "
-        "`export` goal)"
+    desc=softwrap(
+        """
+        Determine all Python interpreter versions used by Bandit in your project
+        (for `export` goal)
+        """
     ),
     level=LogLevel.DEBUG,
 )

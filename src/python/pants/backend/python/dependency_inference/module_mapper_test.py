@@ -333,11 +333,13 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
         stub_modules: list[str] | None = None,
         resolve: str = "default",
     ) -> str:
-        return (
-            f"python_requirement(name='{tgt_name}', requirements=['{req_str}'], "
-            f"modules={modules or []},"
-            f"type_stub_modules={stub_modules or []},"
-            f"resolve={repr(resolve)})"
+        return dedent(
+            f"""\
+            python_requirement(name='{tgt_name}', requirements=['{req_str}'],
+            modules={modules or []},
+            type_stub_modules={stub_modules or []},
+            resolve={repr(resolve)})
+            """
         )
 
     build_file = "\n\n".join(

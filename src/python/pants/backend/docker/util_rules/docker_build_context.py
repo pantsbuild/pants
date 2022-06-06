@@ -186,7 +186,7 @@ class DockerBuildContext:
                     tentative_paths=(
                         # We don't want to include the Dockerfile as a suggested rename
                         dockerfile_info.source,
-                        *dockerfile_info.copy_sources,
+                        *dockerfile_info.copy_source_paths,
                     ),
                     actual_files=snapshot.files,
                     actual_dirs=snapshot.dirs,
@@ -274,16 +274,16 @@ async def create_docker_build_context(
 
         # Get the FROM image build args with defined values in the Dockerfile.
         dockerfile_build_args = {
-            arg_name: arg_value
-            for arg_name, arg_value in dockerfile_info.build_args.to_dict().items()
-            if arg_value and arg_name in dockerfile_info.from_image_build_arg_names
+            k: v for k, v in dockerfile_info.from_image_build_args.to_dict().items() if v
         }
+
         # Parse the build args values into Address instances.
         from_image_addresses = await Get(
             Addresses,
             UnparsedAddressInputs(
                 dockerfile_build_args.values(),
                 owning_address=dockerfile_info.address,
+                description_of_origin="TODO(#14468)",
             ),
         )
         # Map those addresses to the corresponding built image ref (tag).
