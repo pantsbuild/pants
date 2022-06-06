@@ -79,7 +79,7 @@ class AddressInput:
                 raise InvalidTargetName(
                     softwrap(
                         f"""
-                        Address spec `{self.path_component}` from {self.description_of_origin} sets
+                        Address `{self.spec}` from {self.description_of_origin} sets
                         the name component to the empty string, which is not legal.
                         """
                     )
@@ -88,34 +88,61 @@ class AddressInput:
                 raise InvalidTargetName(
                     softwrap(
                         f"""
-                        Address spec from {self.description_of_origin} has no name part, but it's
-                        necessary because the path is the build root (`{self.path_component}`).
+                        Address `{self.spec}` from {self.description_of_origin} has no name part,
+                        but it's necessary because the path is the build root.
                         """
                     )
                 )
 
         if self.path_component != "":
-            components = self.path_component.split(os.sep)
-            if any(component in (".", "..", "") for component in components):
-                raise InvalidSpecPath(
-                    f"Address spec has un-normalized path part '{self.path_component}'"
-                )
             if os.path.isabs(self.path_component):
                 raise InvalidSpecPath(
-                    f"Address spec has absolute path {self.path_component}; expected a path relative "
-                    "to the build root."
+                    softwrap(
+                        f"""
+                        Invalid address {self.spec} from {self.description_of_origin}. Cannot use
+                        absolute paths.
+                        """
+                    )
+                )
+
+            invalid_component = next(
+                (
+                    component
+                    for component in self.path_component.split(os.sep)
+                    if component in (".", "..", "")
+                ),
+                None,
+            )
+            if invalid_component is not None:
+                raise InvalidSpecPath(
+                    softwrap(
+                        f"""
+                        Invalid address `{self.spec}` from {self.description_of_origin}. It has an
+                        un-normalized path part: '{os.sep}{invalid_component}'.
+                        """
+                    )
                 )
 
         for k, v in self.parameters.items():
-            key_banned = BANNED_CHARS_IN_PARAMETERS & set(k)
+            key_banned = set(BANNED_CHARS_IN_PARAMETERS & set(k))
             if key_banned:
                 raise InvalidParameters(
-                    f"Address spec has illegal characters in parameter keys: `{key_banned}` in `{k}={v}`."
+                    softwrap(
+                        f"""
+                        Invalid address `{self.spec}` from {self.description_of_origin}. It has
+                        illegal characters in parameter keys: `{key_banned}` in `{k}={v}`.
+                        """
+                    )
                 )
-            val_banned = BANNED_CHARS_IN_PARAMETERS & set(v)
+            val_banned = set(BANNED_CHARS_IN_PARAMETERS & set(v))
             if val_banned:
                 raise InvalidParameters(
-                    f"Address spec has illegal characters in parameter values: `{val_banned}` in `{k}={v}`."
+                    softwrap(
+                        f"""
+                        Invalid address `{self.spec}` from {self.description_of_origin}. It has
+                        illegal characters in parameter values: `{val_banned}` in `{k}={v}`.
+                        """
+                    )
                 )
 
     @classmethod
@@ -199,7 +226,12 @@ class AddressInput:
 
         if wildcard:
             raise UnsupportedWildcard(
-                f"The address `{spec}` included a wildcard (`{wildcard}`), which is not supported."
+                softwrap(
+                    f"""
+                    The address `{spec}` from {description_of_origin} included a wildcard
+                    (`{wildcard}`), which is not supported.
+                    """
+                )
             )
 
         normalized_relative_to = None
@@ -232,9 +264,14 @@ class AddressInput:
             # vs. a directory.
             if not spec_path:
                 raise InvalidTargetName(
-                    "Top-level file specs must include which target they come from, such as "
-                    f"`{self.path_component}:original_target`, but {self.path_component} did not "
-                    f"have an address."
+                    softwrap(
+                        f"""
+                        Addresses for generated first-party targets in the build root must include
+                        which target generator they come from, such as
+                        `{self.path_component}:original_target`. However, `{self.spec}`
+                        from {self.description_of_origin} did not have a target name.
+                        """
+                    )
                 )
             return Address(
                 spec_path=spec_path,
@@ -257,9 +294,14 @@ class AddressInput:
         expected_prefix = f"..{os.path.sep}" * parent_count
         if self.target_component[: self.target_component.rfind(os.path.sep) + 1] != expected_prefix:
             raise InvalidTargetName(
-                "A target may only be defined in a directory containing a file that it owns in "
-                f"the filesystem: `{self.target_component}` is not at-or-above the file "
-                f"`{self.path_component}`."
+                softwrap(
+                    f"""
+                    Invalid address `{self.spec}` from {self.description_of_origin}. The target
+                    name portion of the address must refer to a target defined in the same
+                    directory or a parent directory of the file path `{self.path_component}`, but
+                    the value `{self.target_component}` is a subdirectory.
+                    """
+                )
             )
 
         # Split the path_component into a spec_path and relative_file_path at the appropriate
@@ -267,9 +309,15 @@ class AddressInput:
         path_components = self.path_component.split(os.path.sep)
         if len(path_components) <= parent_count:
             raise InvalidTargetName(
-                "Targets are addressed relative to the files that they own: "
-                f"`{self.target_component}` is too far above the file `{self.path_component}` to "
-                "be valid."
+                softwrap(
+                    f"""
+                    Invalid address `{self.spec}` from {self.description_of_origin}. The target
+                    name portion of the address `{self.target_component}` has too many `../`, which
+                    means it refers to a directory above the file path `{self.path_component}`.
+                    Expected no more than {len(path_components) -1 } instances of `../` in
+                    `{self.target_component}`, but found {parent_count} instances.
+                    """
+                )
             )
         offset = -1 * (parent_count + 1)
         spec_path = os.path.join(*path_components[:offset]) if path_components[:offset] else ""
@@ -290,6 +338,18 @@ class AddressInput:
             generated_name=self.generated_component,
             parameters=self.parameters,
         )
+
+    @property
+    def spec(self) -> str:
+        rep = self.path_component or "//"
+        if self.generated_component:
+            rep += f"#{self.generated_component}"
+        if self.target_component:
+            rep += f":{self.target_component}"
+        if self.parameters:
+            params_vals = ",".join(f"{k}={v}" for k, v in self.parameters.items())
+            rep += f"@{params_vals}"
+        return rep
 
 
 class Address(EngineAwareParameter):

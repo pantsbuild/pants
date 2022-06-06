@@ -267,6 +267,31 @@ def test_address_input_from_dir() -> None:
     ).dir_to_address() == Address("a", target_name="b", generated_name="gen")
 
 
+@pytest.mark.parametrize(
+    "addr,expected",
+    [
+        (AddressInput("dir", description_of_origin="tests"), "dir"),
+        (AddressInput("dir", "tgt", description_of_origin="tests"), "dir:tgt"),
+        (AddressInput("", "tgt", description_of_origin="tests"), "//:tgt"),
+        (AddressInput("dir", generated_component="gen", description_of_origin="tests"), "dir#gen"),
+        (
+            AddressInput("dir", "tgt", generated_component="gen", description_of_origin="tests"),
+            "dir#gen:tgt",
+        ),
+        (
+            AddressInput("dir", parameters={"k1": "v", "k2": "v"}, description_of_origin="tests"),
+            "dir@k1=v,k2=v",
+        ),
+        (
+            AddressInput("dir", "tgt", parameters={"k": "v"}, description_of_origin="tests"),
+            "dir:tgt@k=v",
+        ),
+    ],
+)
+def test_address_input_spec(addr: AddressInput, expected: str) -> None:
+    assert addr.spec == expected
+
+
 def test_address_normalize_target_name() -> None:
     assert Address("a/b/c", target_name="c") == Address("a/b/c", target_name=None)
     assert Address("a/b/c", target_name="c", relative_file_path="f.txt") == Address(
