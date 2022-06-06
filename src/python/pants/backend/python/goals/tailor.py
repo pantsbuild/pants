@@ -11,6 +11,7 @@ from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
+from pants.backend.python.macros.pipenv_requirements import parse_pipenv_requirements
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -143,6 +144,11 @@ async def find_putative_targets(
                 path, name = os.path.split(fp)
 
                 if not validate(fp, contents[fp], alias):
+                    logger.warning(
+                        f"No target generated for `{fp}`. You'll need to create "
+                        "targets for its contents manually."
+                    )
+                    logger.warning("")
                     continue
 
                 pts.append(
@@ -164,6 +170,8 @@ async def find_putative_targets(
             logger.warning(f"{path=} {contents=}")
             if alias == "python_requirements":
                 return validate_python_requirements(path, contents)
+            elif alias == "pipenv_requirements":
+                return validate_pipenv_requirements(contents)
             return True
 
         def validate_python_requirements(path: str, contents: bytes) -> bool:
@@ -180,13 +188,16 @@ async def find_putative_targets(
                     PipRequirement.parse(line.decode(), f"line {number} of `{path}`")
                 except Exception as e:
                     logger.warning(f"{e}")
-                    logger.warning(
-                        f"No target generated for `{path}`. You'll need to create "
-                        "targets for its contents manually."
-                    )
-                    logger.warning("")
                     return False
             return True
+
+        def validate_pipenv_requirements(contents: bytes) -> bool:
+            try:
+                parse_pipenv_requirements(contents)
+                return True
+            except Exception as e:
+                logger.warning(f"{e}")
+                return False
 
         add_req_targets(all_requirements_files, "python_requirements", "reqs")
         add_req_targets(all_pipenv_lockfile_files, "pipenv_requirements", "pipenv")
