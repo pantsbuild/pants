@@ -167,7 +167,6 @@ async def find_putative_targets(
                 )
 
         def validate(path: str, contents: bytes, alias: str) -> bool:
-            logger.warning(f"{path=} {contents=}")
             if alias == "python_requirements":
                 return validate_python_requirements(path, contents)
             elif alias == "pipenv_requirements":
