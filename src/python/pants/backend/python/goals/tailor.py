@@ -140,7 +140,6 @@ async def find_putative_targets(
         def add_req_targets(files: Iterable[FileContent], alias: str, target_name: str) -> None:
             contents = {i.path: i.content for i in files}
             unowned_files = set(contents) - set(all_owned_sources)
-            logger.warning(f"{files=}")
             for fp in unowned_files:
                 path, name = os.path.split(fp)
 
