@@ -4,6 +4,7 @@ import hashlib
 import os
 import pkgutil
 import shutil
+import socket
 import ssl
 import tarfile
 import time
@@ -283,6 +284,22 @@ def test_path_globs_ignore_pattern(rule_runner: RuleRunner) -> None:
         ["**", "!*.ln"],
         expected_files=["4.txt", "a/3.txt", "a/b/1.txt", "a/b/2"],
         expected_dirs=["a", "a/b"],
+    )
+
+
+def test_path_globs_ignore_sock(rule_runner: RuleRunner) -> None:
+    sock_path = os.path.join(rule_runner.build_root, "sock.sock")
+    with socket.socket(socket.AF_UNIX) as sock:
+        sock.bind(sock_path)
+    assert os.path.exists(sock_path)
+    assert not os.path.isfile(sock_path)
+
+    rule_runner.write_files({"non-sock.txt": ""})
+    assert_path_globs(
+        rule_runner,
+        ["**"],
+        expected_files=["non-sock.txt"],
+        expected_dirs=[],
     )
 
 
