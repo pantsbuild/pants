@@ -147,9 +147,9 @@ class TestResult(EngineAwareReturnType):
 
     def message(self) -> str:
         if self.skipped:
-            return f"{self.address} skipped."
+            return "skipped."
         status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
-        message = f"{self.address} {status}."
+        message = f"{status}."
         if self.output_setting == ShowOutput.NONE or (
             self.output_setting == ShowOutput.FAILED and self.exit_code == 0
         ):

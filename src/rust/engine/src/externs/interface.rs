@@ -473,7 +473,7 @@ struct PyResult {
   #[pyo3(get)]
   python_traceback: Option<String>,
   #[pyo3(get)]
-  engine_traceback: Vec<String>,
+  engine_traceback: Vec<(String, Option<String>)>,
 }
 
 fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
@@ -505,7 +505,10 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
         is_throw: true,
         result: val.into(),
         python_traceback: Some(python_traceback),
-        engine_traceback,
+        engine_traceback: engine_traceback
+          .into_iter()
+          .map(|ff| (ff.name, ff.desc))
+          .collect(),
       }
     }
   }
