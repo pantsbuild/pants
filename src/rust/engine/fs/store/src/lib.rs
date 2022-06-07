@@ -103,9 +103,9 @@ impl Default for LocalOptions {
 
 #[derive(Debug, PartialEq)]
 pub enum StoreError {
-  // A Digest was not present in either of the local or remote Stores.
+  /// A Digest was not present in either of the local or remote Stores.
   MissingDigest(String, Digest),
-  // All other error types.
+  /// All other error types.
   Unclassified(String),
 }
 
@@ -610,13 +610,13 @@ impl Store {
   ) -> Result<T, StoreError> {
     let local = self.local.clone();
     let maybe_remote = self.remote.clone();
-    let maybe_local_value = self
+
+    if let Some(bytes_res) = self
       .local
       .load_bytes_with(entry_type, digest, f_local)
-      .await?;
-
-    if let Some(bytes) = maybe_local_value {
-      return Ok(bytes?);
+      .await?
+    {
+      return Ok(bytes_res?);
     }
 
     let remote = maybe_remote

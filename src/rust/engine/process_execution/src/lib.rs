@@ -83,9 +83,9 @@ pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcessError {
-  // A Digest was not present in either of the local or remote Stores.
+  /// A Digest was not present in either of the local or remote Stores.
   MissingDigest(String, Digest),
-  // All other error types.
+  /// All other error types.
   Unclassified(String),
 }
 
