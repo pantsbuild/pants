@@ -7,9 +7,6 @@ use nix::unistd::getpgid;
 use nix::unistd::Pid;
 use tokio::process::{Child, Command};
 
-// We keep this relatively low to start to encourage interactivity. If users end up needing longer graceful
-// shutdown periods, we can expose it as a per-process setting.
-const GRACEFUL_SHUTDOWN_MAX_WAIT_TIME: time::Duration = time::Duration::from_secs(3);
 const GRACEFUL_SHUTDOWN_POLL_TIME: time::Duration = time::Duration::from_millis(50);
 
 /// A child process running in its own PGID, with a drop implementation that will kill that
@@ -20,6 +17,7 @@ const GRACEFUL_SHUTDOWN_POLL_TIME: time::Duration = time::Duration::from_millis(
 /// signals in sequence for https://github.com/pantsbuild/pants/issues/13230.
 pub struct ManagedChild {
   child: Child,
+  graceful_shutdown_max_wait_time: time::Duration,
   killed: AtomicBool,
 }
 
@@ -49,6 +47,7 @@ impl ManagedChild {
       .map_err(|e| format!("Error executing interactive process: {}", e))?;
     Ok(Self {
       child,
+      graceful_shutdown_max_wait_time: time::Duration::from_secs(3),
       killed: AtomicBool::new(false),
     })
   }
@@ -115,7 +114,7 @@ impl ManagedChild {
   /// This method *will* block the current thread but will do so for a bounded amount of time.
   pub fn graceful_shutdown_sync(&mut self) -> Result<(), String> {
     self.signal_pg(signal::Signal::SIGINT)?;
-    match self.wait_for_child_exit_sync(GRACEFUL_SHUTDOWN_MAX_WAIT_TIME) {
+    match self.wait_for_child_exit_sync(self.graceful_shutdown_max_wait_time) {
       Ok(true) => {
         // process was gracefully shutdown
         self.killed.store(true, Ordering::SeqCst);

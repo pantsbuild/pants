@@ -106,6 +106,7 @@ pub struct ExecutionStrategyOptions {
   pub remote_cache_write: bool,
   pub child_max_memory: usize,
   pub child_default_memory: usize,
+  pub graceful_shutdown_max_wait_time: usize,
 }
 
 #[derive(Clone, Debug)]

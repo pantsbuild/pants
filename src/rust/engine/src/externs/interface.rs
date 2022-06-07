@@ -248,6 +248,7 @@ impl PyExecutionStrategyOptions {
     remote_cache_write: bool,
     child_default_memory: usize,
     child_max_memory: usize,
+    graceful_shutdown_max_wait_time: usize,
   ) -> Self {
     Self(ExecutionStrategyOptions {
       local_parallelism,
@@ -259,6 +260,7 @@ impl PyExecutionStrategyOptions {
       remote_cache_write,
       child_default_memory,
       child_max_memory,
+      graceful_shutdown_max_wait_time,
     })
   }
 }
