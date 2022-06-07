@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pants.backend.helm.target_types import HelmChartFieldSet, HelmChartOutputPathField
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.chart_metadata import HelmChartMetadata
-from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.backend.helm.util_rules.process import HelmProcess
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.engine.fs import (
     AddPrefix,

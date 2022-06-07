@@ -13,7 +13,6 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
-from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture

@@ -12,7 +12,7 @@ from pants.backend.helm.goals import publish
 from pants.backend.helm.goals.package import BuiltHelmArtifact
 from pants.backend.helm.goals.publish import HelmPublishFieldSet, PublishHelmChartRequest
 from pants.backend.helm.target_types import HelmChartTarget
-from pants.backend.helm.util_rules import tool
+from pants.backend.helm.util_rules import process as helm_process
 from pants.backend.helm.util_rules.chart_metadata import HelmChartMetadata
 from pants.backend.helm.util_rules.tool import HelmBinary
 from pants.core.goals.package import BuiltPackage
@@ -30,7 +30,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *external_tool.rules(),
             *publish.rules(),
-            *tool.rules(),
+            *helm_process.rules(),
             QueryRule(PublishProcesses, [PublishHelmChartRequest]),
             QueryRule(HelmBinary, []),
         ],

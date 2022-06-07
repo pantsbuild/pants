@@ -36,7 +36,6 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.native_engine import AddPrefix, MergeDigests
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.option.subsystem import Subsystem

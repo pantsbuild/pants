@@ -12,7 +12,7 @@ from pants.backend.helm.resolve.artifacts import HelmArtifact, ResolvedHelmArtif
 from pants.backend.helm.resolve.fetch import FetchedHelmArtifacts, FetchHelmArfifactsRequest
 from pants.backend.helm.target_types import AllHelmArtifactTargets, HelmArtifactTarget
 from pants.backend.helm.target_types import rules as target_types_rules
-from pants.backend.helm.util_rules import tool
+from pants.backend.helm.util_rules import process as helm_process
 from pants.core.util_rules import config_files, external_tool
 from pants.engine import process
 from pants.engine.rules import QueryRule
@@ -27,7 +27,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *external_tool.rules(),
             *fetch.rules(),
-            *tool.rules(),
+            *helm_process.rules(),
             *process.rules(),
             *target_types_rules(),
             QueryRule(AllHelmArtifactTargets, ()),

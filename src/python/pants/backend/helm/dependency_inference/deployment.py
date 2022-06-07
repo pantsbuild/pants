@@ -27,6 +27,8 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
 from pants.engine.unions import UnionRule
+from pants.k8s import manifest as k8s_manifest
+from pants.k8s.manifest import ImageRef, KubeManifests, ParseKubeManifests
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -38,6 +40,13 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class AnalyseHelmDeploymentRequest:
     field_set: HelmDeploymentFieldSet
+
+
+T = TypeVar("T")
+
+
+class HelmDeploymentPatch(Generic[T]):
+    _locations: FrozenDict[str, FrozenDict[str, T]]
 
 
 @dataclass(frozen=True)
