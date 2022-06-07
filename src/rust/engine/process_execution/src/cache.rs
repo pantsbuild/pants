@@ -10,13 +10,13 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType};
 use serde::{Deserialize, Serialize};
-use store::Store;
+use store::{Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
   ProcessMetadata, ProcessResultSource,
 };
 
@@ -58,7 +58,7 @@ impl crate::CommandRunner for CommandRunner {
     context: Context,
     workunit: &mut RunningWorkunit,
     req: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
@@ -148,7 +148,7 @@ impl CommandRunner {
     &self,
     context: &Context,
     action_key: &CacheKey,
-  ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
+  ) -> Result<Option<FallibleProcessResultWithPlatform>, StoreError> {
     use remexec::ExecuteResponse;
 
     // See whether there is a cache entry.
@@ -177,7 +177,11 @@ impl CommandRunner {
         )
         .await?
       } else {
-        return Err("action result missing from ExecuteResponse".into());
+        return Err(
+          "action result missing from ExecuteResponse"
+            .to_owned()
+            .into(),
+        );
       }
     } else {
       return Ok(None);
@@ -207,7 +211,7 @@ impl CommandRunner {
     &self,
     action_key: &CacheKey,
     result: &FallibleProcessResultWithPlatform,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     let stdout_digest = result.stdout_digest;
     let stderr_digest = result.stderr_digest;
 
@@ -255,6 +259,7 @@ impl CommandRunner {
       )
     })?;
 
-    self.cache.store(action_key, bytes_to_store).await
+    self.cache.store(action_key, bytes_to_store).await?;
+    Ok(())
   }
 }

@@ -15,7 +15,7 @@ use tokio::sync::{Notify, Semaphore, SemaphorePermit};
 use tokio::time::sleep;
 use workunit_store::{in_workunit, RunningWorkunit};
 
-use crate::{Context, FallibleProcessResultWithPlatform, Process};
+use crate::{Context, FallibleProcessResultWithPlatform, Process, ProcessError};
 
 lazy_static! {
   // TODO: Runtime formatting is unstable in Rust, so we imitate it.
@@ -60,7 +60,7 @@ impl crate::CommandRunner for CommandRunner {
     context: Context,
     workunit: &mut RunningWorkunit,
     process: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let semaphore_acquisition = self.sema.acquire(process.concurrency_available);
     let permit = in_workunit!(
       "acquire_command_runner_slot",
@@ -113,11 +113,14 @@ impl crate::CommandRunner for CommandRunner {
           )
           .collect();
         if !matched {
-          return Err(format!(
-            "Process {} set `concurrency_available={}`, but did not include \
+          return Err(
+            format!(
+              "Process {} set `concurrency_available={}`, but did not include \
                              the `{}` template variable in its arguments.",
-            process.description, process.concurrency_available, *CONCURRENCY_TEMPLATE_RE
-          ));
+              process.description, process.concurrency_available, *CONCURRENCY_TEMPLATE_RE
+            )
+            .into(),
+          );
         }
       }
 

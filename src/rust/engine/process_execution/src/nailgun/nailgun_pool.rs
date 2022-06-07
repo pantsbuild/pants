@@ -22,7 +22,7 @@ use task_executor::Executor;
 use tempfile::TempDir;
 
 use crate::local::prepare_workdir;
-use crate::{ImmutableInputs, NamedCaches, Process, ProcessMetadata};
+use crate::{ImmutableInputs, NamedCaches, Process, ProcessError, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -88,7 +88,7 @@ impl NailgunPool {
     server_process: Process,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
-  ) -> Result<BorrowedNailgunProcess, String> {
+  ) -> Result<BorrowedNailgunProcess, ProcessError> {
     let name = server_process.description.clone();
     let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), &server_process)?;
     let mut process_ref = {
@@ -340,7 +340,7 @@ impl NailgunProcess {
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
-  ) -> Result<NailgunProcess, String> {
+  ) -> Result<NailgunProcess, ProcessError> {
     let workdir = tempfile::Builder::new()
       .prefix("pants-sandbox-")
       .tempdir_in(workdir_base)

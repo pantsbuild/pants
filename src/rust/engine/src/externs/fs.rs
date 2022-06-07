@@ -36,6 +36,13 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   Ok(())
 }
 
+// TODO: This method is a marker, but in a followup PR we will need to propagate a particular
+// Exception type out of `@rule` bodies and back into `Failure::MissingDigest`, to allow for retry
+// via #11331.
+pub fn todo_possible_store_missing_digest(e: store::StoreError) -> PyErr {
+  PyException::new_err(e.to_string())
+}
+
 #[pyclass(name = "Digest")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PyDigest(pub DirectoryDigest);
