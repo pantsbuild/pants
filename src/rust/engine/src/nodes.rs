@@ -40,7 +40,7 @@ use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
-use store::{self, Store, StoreFileByDigest};
+use store::{self, Store, StoreError, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
   WorkunitMetadata,
@@ -268,7 +268,7 @@ impl ExecuteProcess {
   async fn lift_process_input_digests(
     store: &Store,
     value: &Value,
-  ) -> Result<InputDigests, String> {
+  ) -> Result<InputDigests, StoreError> {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
       let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
@@ -294,10 +294,10 @@ impl ExecuteProcess {
 
     input_digests_fut?
       .await
-      .map_err(|e| format!("Failed to merge input digests for process: {}", e))
+      .map_err(|e| e.enrich("Failed to merge input digests for process"))
   }
 
-  fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, String> {
+  fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
       None => None,
@@ -374,7 +374,7 @@ impl ExecuteProcess {
     })
   }
 
-  pub async fn lift(store: &Store, value: Value) -> Result<Self, String> {
+  pub async fn lift(store: &Store, value: Value) -> Result<Self, StoreError> {
     let input_digests = Self::lift_process_input_digests(store, &value).await?;
     let process = Python::with_gil(|py| Self::lift_process((*value).as_ref(py), input_digests))?;
     Ok(Self { process })
