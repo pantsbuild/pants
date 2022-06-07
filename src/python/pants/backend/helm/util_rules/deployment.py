@@ -3,20 +3,23 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+from itertools import chain
 
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
     HelmChartTarget,
     HelmDeploymentFieldSet,
 )
-from pants.backend.helm.util_rules import chart, render
+from pants.backend.helm.util_rules import chart, process
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
-from pants.backend.helm.util_rules.render import RenderedHelmChart, RenderHelmChartRequest
+from pants.backend.helm.util_rules.process import HelmEvaluateProcess
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import Snapshot
+from pants.engine.fs import RemovePrefix, Snapshot
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import DependenciesRequest, ExplicitlyProvidedDependencies, Targets
 from pants.util.logging import LogLevel
@@ -65,6 +68,8 @@ async def get_chart_of_deployment(field_set: HelmDeploymentFieldSet) -> HelmChar
 @dataclass(frozen=True)
 class RenderHelmDeploymentRequest:
     field_set: HelmDeploymentFieldSet
+    api_versions: tuple[str, ...] = ()
+    kube_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -75,25 +80,46 @@ class RenderedDeployment:
 
 @rule(desc="Render Helm deployment", level=LogLevel.DEBUG)
 async def render_helm_deployment(request: RenderHelmDeploymentRequest) -> RenderedDeployment:
+    output_dir = "__output"
+
     chart, value_files = await MultiGet(
         Get(HelmChart, HelmDeploymentFieldSet, request.field_set),
         Get(StrippedSourceFiles, SourceFilesRequest([request.field_set.sources])),
     )
 
-    rendered_chart = await Get(
-        RenderedHelmChart,
-        RenderHelmChartRequest(
-            chart,
+    release_name = request.field_set.release_name.value or request.field_set.address.target_name
+
+    result = await Get(
+        ProcessResult,
+        HelmEvaluateProcess(
+            cmd="template",
+            release_name=release_name,
+            chart_path=chart.path,
+            chart_digest=chart.snapshot.digest,
             description=request.field_set.description.value,
             namespace=request.field_set.namespace.value,
             skip_crds=request.field_set.skip_crds.value,
             no_hooks=request.field_set.no_hooks.value,
             values_snapshot=value_files.snapshot,
             values=request.field_set.values.value,
+            extra_argv=[
+                *(("--kube-version", request.kube_version) if request.kube_version else ()),
+                *chain.from_iterable(
+                    [("--api-versions", api_version) for api_version in request.api_versions]
+                ),
+                "--output-dir",
+                output_dir,
+            ],
+            message=f"Rendering Helm deployment {request.field_set.address}",
+            output_directories=(output_dir,),
         ),
     )
-    return RenderedDeployment(address=request.field_set.address, snapshot=rendered_chart.snapshot)
+
+    output_snapshot = await Get(
+        Snapshot, RemovePrefix(result.output_digest, os.path.join(output_dir, chart.path))
+    )
+    return RenderedDeployment(address=request.field_set.address, snapshot=output_snapshot)
 
 
 def rules():
-    return [*collect_rules(), *chart.rules(), *render.rules()]
+    return [*collect_rules(), *chart.rules(), *process.rules()]

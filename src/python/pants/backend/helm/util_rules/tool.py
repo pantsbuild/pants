@@ -4,28 +4,248 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os
+from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Any, ClassVar, Generic, Mapping, Type, TypeVar
+
+import yaml
+from typing_extensions import final
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
-from pants.backend.helm.util_rules.plugins import HelmPlugins
-from pants.backend.helm.util_rules.plugins import rules as plugins_rules
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.backend.helm.util_rules.yaml_utils import snake_case_attr_dict
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.util_rules import external_tool
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalToolRequest,
+    TemplatedExternalTool,
+)
+from pants.engine.collection import Collection
 from pants.engine.environment import Environment, EnvironmentRequest
-from pants.engine.fs import CreateDigest, Digest, DigestSubset, Directory, PathGlobs, RemovePrefix
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestContents,
+    DigestSubset,
+    Directory,
+    PathGlobs,
+    RemovePrefix,
+)
 from pants.engine.internals.native_engine import AddPrefix, MergeDigests
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.unions import UnionMembership, union
+from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import bullet_list, pluralize
+
+logger = logging.getLogger(__name__)
 
 _HELM_CACHE_NAME = "helm"
 _HELM_CACHE_DIR = "__cache"
 _HELM_CONFIG_DIR = "__config"
 _HELM_DATA_DIR = "__data"
+
+# ---------------------------------------------
+# Helm Plugins Support
+# ---------------------------------------------
+
+
+class HelmPluginMetadataFileNotFound(Exception):
+    def __init__(self, plugin_name: str) -> None:
+        super().__init__(f"Helm plugin `{plugin_name}` is missing the `plugin.yaml` metadata file.")
+
+
+class HelmPluginMissingCommand(ValueError):
+    def __init__(self, plugin_name: str) -> None:
+        super().__init__(
+            f"Helm plugin `{plugin_name}` is missing either `platformCommand` entries or a single `command` entry."
+        )
+
+
+class HelmPluginSubsystem(Subsystem, metaclass=ABCMeta):
+    """Base class for any kind of Helm plugin."""
+
+    plugin_name: ClassVar[str]
+
+
+class ExternalHelmPlugin(HelmPluginSubsystem, TemplatedExternalTool, metaclass=ABCMeta):
+    """Represents the subsystem for a Helm plugin that needs to be downloaded from an external
+    source.
+
+    For declaring an External Helm plugin, extend this class provinding a value of the
+    `plugin_name` class attribute and implement the rest of it like you would do for
+    any other `TemplatedExternalTool`.
+
+    This class is meant to be used in combination with `ExternalHelmPluginBinding`, as
+    in the following example:
+
+    class MyHelmPluginSubsystem(ExternalHelmPlugin):
+        plugin_name = "myplugin"
+        options_scope = "my_plugin"
+        help = "..."
+
+        ...
+
+
+    class MyPluginBinding(ExternalHelmPluginBinding[MyPluginSubsystem]):
+        plugin_subsystem_cls = MyHelmPluginSubsystem
+
+    With that class structure, then define a `UnionRule` so Pants can find this plugin and
+    use it in the Helm setup:
+
+    @rule
+    def download_myplugin_plugin_request(
+        _: MyPluginBinding, subsystem: MyHelmPluginSubsystem
+    ) -> ExternalHelmPluginRequest:
+        return ExternalHelmPluginRequest.from_subsystem(subsystem)
+
+
+    def rules():
+        return [
+            *collect_rules(),
+            UnionRule(ExternalHelmPluginBinding, MyPluginBinding),
+        ]
+    """
+
+
+@dataclass(frozen=True)
+class HelmPluginPlatformCommand:
+    os: str
+    arch: str
+    command: str
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> HelmPluginPlatformCommand:
+        return cls(**snake_case_attr_dict(d))
+
+
+@dataclass(frozen=True)
+class HelmPluginMetadata:
+    name: str
+    version: str
+    usage: str | None = None
+    description: str | None = None
+    ignore_flags: bool | None = None
+    command: str | None = None
+    platform_command: tuple[HelmPluginPlatformCommand, ...] = dataclasses.field(
+        default_factory=tuple
+    )
+    hooks: FrozenDict[str, str] = dataclasses.field(default_factory=FrozenDict)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> HelmPluginMetadata:
+        platform_command = [
+            HelmPluginPlatformCommand.from_dict(d) for d in d.pop("platformCommand", [])
+        ]
+        hooks = d.pop("hooks", {})
+
+        attrs = snake_case_attr_dict(d)
+        return cls(platform_command=tuple(platform_command), hooks=FrozenDict(hooks), **attrs)
+
+    @classmethod
+    def from_bytes(cls, content: bytes) -> HelmPluginMetadata:
+        return HelmPluginMetadata.from_dict(yaml.safe_load(content))
+
+
+_ExternalHelmPlugin = TypeVar("_ExternalHelmPlugin", bound=ExternalHelmPlugin)
+_EHPB = TypeVar("_EHPB", bound="ExternalHelmPluginBinding")
+
+
+@union
+@dataclass(frozen=True)
+class ExternalHelmPluginBinding(Generic[_ExternalHelmPlugin], metaclass=ABCMeta):
+    """Union type allowing Pants to discover global external Helm plugins."""
+
+    plugin_subsystem_cls: ClassVar[Type[ExternalHelmPlugin]]
+
+    name: str
+
+    @final
+    @classmethod
+    def create(cls: Type[_EHPB]) -> _EHPB:
+        return cls(name=cls.plugin_subsystem_cls.plugin_name)
+
+
+@dataclass(frozen=True)
+class ExternalHelmPluginRequest:
+    """Helper class to create a download request for an external Helm plugin."""
+
+    plugin_name: str
+    tool_request: ExternalToolRequest
+
+    @classmethod
+    def from_subsystem(cls, subsystem: ExternalHelmPlugin) -> ExternalHelmPluginRequest:
+        return cls(
+            plugin_name=subsystem.plugin_name, tool_request=subsystem.get_request(Platform.current)
+        )
+
+
+@dataclass(frozen=True)
+class HelmPlugin:
+    metadata: HelmPluginMetadata
+    digest: Digest
+
+    @property
+    def name(self) -> str:
+        return self.metadata.name
+
+    @property
+    def version(self) -> str:
+        return self.metadata.version
+
+
+class HelmPlugins(Collection[HelmPlugin]):
+    pass
+
+
+@rule
+async def all_helm_plugins(union_membership: UnionMembership) -> HelmPlugins:
+    bindings = union_membership.get(ExternalHelmPluginBinding)
+    external_plugins = await MultiGet(
+        Get(HelmPlugin, ExternalHelmPluginBinding, binding.create()) for binding in bindings
+    )
+    if logger.isEnabledFor(LogLevel.DEBUG.level):
+        plugins_desc = [f"{p.name}, version: {p.version}" for p in external_plugins]
+        logger.debug(
+            f"Downloaded {pluralize(len(external_plugins), 'external Helm plugin')}:\n{bullet_list(plugins_desc)}"
+        )
+    return HelmPlugins(external_plugins)
+
+
+@rule(desc="Download external Helm plugin", level=LogLevel.DEBUG)
+async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> HelmPlugin:
+    downloaded_tool = await Get(DownloadedExternalTool, ExternalToolRequest, request.tool_request)
+
+    metadata_file = await Get(
+        Digest,
+        DigestSubset(
+            downloaded_tool.digest,
+            PathGlobs(
+                ["plugin.yaml"],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"The Helm plugin `{request.plugin_name}`",
+            ),
+        ),
+    )
+    metadata_content = await Get(DigestContents, Digest, metadata_file)
+    if len(metadata_content) == 0:
+        raise HelmPluginMetadataFileNotFound(request.plugin_name)
+
+    metadata = HelmPluginMetadata.from_bytes(metadata_content[0].content)
+    if not metadata.command and not metadata.platform_command:
+        raise HelmPluginMissingCommand(request.plugin_name)
+
+    return HelmPlugin(metadata=metadata, digest=downloaded_tool.digest)
+
+
+# ---------------------------------------------
+# Helm Binary setup
+# ---------------------------------------------
 
 
 @frozen_after_init
@@ -199,4 +419,4 @@ def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
 
 
 def rules():
-    return [*collect_rules(), *plugins_rules()]
+    return [*collect_rules(), *external_tool.rules()]

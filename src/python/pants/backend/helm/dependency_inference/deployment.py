@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from itertools import chain
+from typing import Generic, Iterable, TypeVar
 
 from pants.backend.docker.goals.package_image import DockerFieldSet
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -20,17 +21,22 @@ from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
 )
-from pants.backend.helm.target_types import HelmDeploymentDependenciesField, HelmDeploymentFieldSet
-from pants.backend.helm.util_rules import deployment, k8s, render
+from pants.backend.helm.target_types import (
+    AllHelmDeploymentTargets,
+    HelmDeploymentDependenciesField,
+    HelmDeploymentFieldSet,
+)
+from pants.backend.helm.util_rules import deployment
 from pants.backend.helm.util_rules.deployment import RenderedDeployment, RenderHelmDeploymentRequest
-from pants.backend.helm.util_rules.k8s import ImageRef, KubeManifests, ParseKubeManifests
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, WrappedTarget
 from pants.engine.unions import UnionRule
+from pants.k8s import manifest as k8s_manifest
+from pants.k8s.manifest import ImageRef, KubeManifests, ParseKubeManifests
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
@@ -41,16 +47,27 @@ class AnalyseHelmDeploymentRequest:
     field_set: HelmDeploymentFieldSet
 
 
+T = TypeVar("T")
+
+
+class HelmDeploymentPatch(Generic[T]):
+    _locations: FrozenDict[str, FrozenDict[str, T]]
+
+
 @dataclass(frozen=True)
 class HelmDeploymentReport:
-    container_images: OrderedSet[ImageRef]
+    image_refs: FrozenDict[str, FrozenOrderedSet[ImageRef]]
+
+    @property
+    def all_image_refs(self) -> FrozenOrderedSet[ImageRef]:
+        return FrozenOrderedSet(chain.from_iterable(self.image_refs.values()))
 
 
-@rule
+@rule(desc="Analyse Helm deployment", level=LogLevel.DEBUG)
 async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeploymentReport:
     rendered_deployment = await Get(
         RenderedDeployment,
-        RenderHelmDeploymentRequest(request.field_set),
+        RenderHelmDeploymentRequest(field_set=request.field_set),
     )
 
     manifests = await Get(
@@ -59,10 +76,42 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
     )
 
     return HelmDeploymentReport(
-        container_images=OrderedSet(
-            chain.from_iterable([manifest.container_images for manifest in manifests])
+        image_refs=FrozenDict(
+            {
+                manifest.filename: FrozenOrderedSet(manifest.container_images)
+                for manifest in manifests
+                if manifest.pod_spec
+            }
         )
     )
+
+
+@dataclass(frozen=True)
+class FirstPartyHelmDeploymentMappings:
+    docker_images: FrozenDict[Address, FrozenOrderedSet[Address]]
+
+
+@rule
+async def first_party_helm_deployment_mappings(
+    deployment_targets: AllHelmDeploymentTargets, docker_targets: AllDockerImageTargets
+) -> FirstPartyHelmDeploymentMappings:
+    field_sets = [HelmDeploymentFieldSet.create(tgt) for tgt in deployment_targets]
+    all_deployments_info = await MultiGet(
+        Get(HelmDeploymentReport, AnalyseHelmDeploymentRequest(field_set))
+        for field_set in field_sets
+    )
+
+    def image_refs_to_addresses(refs: Iterable[ImageRef]) -> FrozenOrderedSet[Address]:
+        """Filters the `ImageRef`s that are in fact `docker_image` addresses and returns those."""
+        return FrozenOrderedSet(
+            [tgt.address for tgt in docker_targets for ref in refs if str(ref) == str(tgt.address)]
+        )
+
+    docker_images_mapping = {
+        fs.address: image_refs_to_addresses(info.all_image_refs)
+        for fs, info in zip(field_sets, all_deployments_info)
+    }
+    return FirstPartyHelmDeploymentMappings(docker_images=FrozenDict(docker_images_mapping))
 
 
 @dataclass(frozen=True)
@@ -117,13 +166,13 @@ async def inject_deployment_dependencies(
     report = await Get(HelmDeploymentReport, AnalyseHelmDeploymentRequest(field_set))
 
     logging.debug(
-        f"Target {request.dependencies_field.address} references {pluralize(len(report.container_images), 'image')}."
+        f"Target {request.dependencies_field.address} references {pluralize(len(report.all_image_refs), 'image')}."
     )
 
     found_docker_image_addresses = [
         address
         for container_ref, address in mapping.containers.items()
-        if container_ref in report.container_images
+        if container_ref in report.all_image_refs
     ]
 
     logging.debug(
@@ -137,8 +186,7 @@ def rules():
     return [
         *collect_rules(),
         *deployment.rules(),
-        *k8s.rules(),
-        *render.rules(),
+        *k8s_manifest.rules(),
         *docker_build_context.rules(),
         *docker_build_args.rules(),
         *docker_build_env.rules(),

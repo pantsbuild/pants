@@ -11,7 +11,8 @@ from pants.backend.helm.goals.deploy import DeployHelmDeploymentFieldSet
 from pants.backend.helm.goals.deploy import rules as helm_deploy_rules
 from pants.backend.helm.target_types import HelmChartTarget, HelmDeploymentTarget
 from pants.backend.helm.testutil import HELM_CHART_FILE
-from pants.backend.helm.util_rules import chart, tool
+from pants.backend.helm.util_rules import chart
+from pants.backend.helm.util_rules import process as helm_process
 from pants.backend.helm.util_rules.tool import HelmBinary
 from pants.core.goals.deploy import DeployProcesses
 from pants.core.util_rules import external_tool, stripped_source_files
@@ -31,7 +32,7 @@ def rule_runner() -> RuleRunner:
             *helm_deploy_rules(),
             *process.rules(),
             *stripped_source_files.rules(),
-            *tool.rules(),
+            *helm_process.rules(),
             QueryRule(HelmBinary, ()),
             QueryRule(DeployProcesses, (DeployHelmDeploymentFieldSet,)),
         ],
@@ -89,18 +90,18 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "upgrade",
         "foo",
         "mychart",
-        "--install",
         "--description",
         '"Foo deployment"',
         "--namespace",
         "uat",
-        "--create-namespace",
         "--skip-crds",
         "--no-hooks",
         "--values",
         "values.yaml,subdir/values.yml,override-values.yaml,subdir/override-values.yml",
         "--set",
         "key=foo",
+        "--install",
+        "--create-namespace",
         "--kubeconfig",
         "./kubeconfig",
     )

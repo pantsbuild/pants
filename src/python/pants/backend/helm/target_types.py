@@ -458,5 +458,16 @@ class HelmDeploymentFieldSet(FieldSet):
     values: HelmDeploymentValuesField
 
 
+class AllHelmDeploymentTargets(Targets):
+    pass
+
+
+@rule
+def all_helm_deployment_targets(targets: AllTargets) -> AllHelmDeploymentTargets:
+    return AllHelmDeploymentTargets(
+        [tgt for tgt in targets if HelmDeploymentFieldSet.is_applicable(tgt)]
+    )
+
+
 def rules():
     return collect_rules()

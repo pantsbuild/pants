@@ -11,8 +11,8 @@ from pants.backend.helm.target_types import (
     HelmUnitTestTestTarget,
 )
 from pants.backend.helm.target_types import rules as target_types_rules
-from pants.backend.helm.test.unittest import rules as test_rules
-from pants.backend.helm.util_rules import chart, sources, tool
+from pants.backend.helm.test.unittest import rules as unittest_rules
+from pants.backend.helm.util_rules import chart, sources, setup
 
 
 def target_types():
@@ -34,8 +34,8 @@ def rules():
         *package.rules(),
         *publish.rules(),
         *tailor.rules(),
-        *test_rules(),
+        *unittest_rules(),
         *sources.rules(),
-        *tool.rules(),
+        *setup.rules(),
         *target_types_rules(),
     ]

@@ -15,7 +15,7 @@ from pants.backend.helm.testutil import (
     K8S_SERVICE_TEMPLATE,
     gen_chart_file,
 )
-from pants.backend.helm.util_rules import chart, sources, tool
+from pants.backend.helm.util_rules import chart
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.chart_metadata import (
     ChartType,
@@ -24,8 +24,6 @@ from pants.backend.helm.util_rules.chart_metadata import (
     ParseHelmChartMetadataDigest,
 )
 from pants.build_graph.address import Address
-from pants.core.util_rules import config_files, external_tool, stripped_source_files
-from pants.engine import process
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -35,8 +33,6 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         target_types=[HelmChartTarget, HelmArtifactTarget],
         rules=[
-            *config_files.rules(),
-            *external_tool.rules(),
             *chart.rules(),
             *sources.rules(),
             *tool.rules(),

@@ -8,14 +8,14 @@ import pytest
 from pants.backend.helm.target_types import HelmChartTarget, HelmUnitTestTestTarget
 from pants.backend.helm.target_types import rules as target_types_rules
 from pants.backend.helm.test.unittest import HelmUnitTestFieldSet
-from pants.backend.helm.test.unittest import rules as test_rules
+from pants.backend.helm.test.unittest import rules as unittest_rules
 from pants.backend.helm.testutil import (
     HELM_CHART_FILE,
     HELM_TEMPLATE_HELPERS_FILE,
     HELM_VALUES_FILE,
     K8S_SERVICE_TEMPLATE,
 )
-from pants.backend.helm.util_rules import chart, tool
+from pants.backend.helm.util_rules import chart
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import external_tool, stripped_source_files
 from pants.engine.addresses import Address
@@ -30,9 +30,8 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmChartTarget, HelmUnitTestTestTarget],
         rules=[
             *external_tool.rules(),
-            *tool.rules(),
             *chart.rules(),
-            *test_rules(),
+            *unittest_rules(),
             *stripped_source_files.rules(),
             *source_root_rules(),
             *target_types_rules(),

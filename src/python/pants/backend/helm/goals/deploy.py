@@ -5,26 +5,23 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from itertools import chain
 from typing import Iterable
 
 from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeploymentTarget
 from pants.backend.helm.util_rules import deployment
 from pants.backend.helm.util_rules.chart import HelmChart
-from pants.backend.helm.util_rules.render import sort_value_file_names_for_rendering
-from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.backend.helm.util_rules.process import HelmEvaluateProcess
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeployProcesses, DeploySubsystem
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import InteractiveProcess, InteractiveProcessRequest, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap, bullet_list
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +53,7 @@ _VALID_PASSTHROUGH_OPTS = [
     "--set-string",
 ]
 
+
 class InvalidDeploymentArgs(Exception):
     def __init__(self, args: Iterable[str]) -> None:
         super().__init__(
@@ -65,7 +63,7 @@ class InvalidDeploymentArgs(Exception):
 
                 Only the following passthrough arguments are allowed:
 
-                {bullet_list([+_VALID_PASSTHROUGH_FLAGS, *_VALID_PASSTHROUGH_OPTS])}
+                {bullet_list([*_VALID_PASSTHROUGH_FLAGS, *_VALID_PASSTHROUGH_OPTS])}
 
                 Most invalid arguments have equivalent fields in the `{HelmDeploymentTarget.alias}` target.
                 Usage of fields is encourage over passthrough arguments as that enables repeatable deployments.
@@ -96,45 +94,34 @@ async def run_helm_deploy(
         ),
     )
 
-    input_digest = await Get(
-        Digest, MergeDigests([chart.snapshot.digest, values_files.snapshot.digest])
-    )
+    # input_digest = await Get(
+    #     Digest, MergeDigests([chart.snapshot.digest, values_files.snapshot.digest])
+    # )
 
     release_name = field_set.release_name.value or field_set.address.target_name
-    sorted_value_files = sort_value_file_names_for_rendering(values_files.snapshot.files)
 
     helm_cmd = await Get(
         Process,
-        HelmProcess(
-            argv=[
-                "upgrade",
-                release_name,
-                chart.path,
+        HelmEvaluateProcess(
+            cmd="upgrade",
+            release_name=release_name,
+            chart_path=chart.path,
+            chart_digest=chart.snapshot.digest,
+            description=field_set.description.value,
+            namespace=field_set.namespace.value,
+            skip_crds=field_set.skip_crds.value,
+            no_hooks=field_set.no_hooks.value,
+            values_snapshot=values_files.snapshot,
+            values=field_set.values.value,
+            extra_argv=[
                 "--install",
-                *(
-                    ("--description", f'"{field_set.description.value}"')
-                    if field_set.description.value
-                    else ()
-                ),
-                *(("--namespace", field_set.namespace.value) if field_set.namespace.value else ()),
                 *(("--create-namespace",) if field_set.create_namespace.value else ()),
-                *(("--skip-crds",) if field_set.skip_crds.value else ()),
-                *(("--no-hooks",) if field_set.no_hooks.value else ()),
-                *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),
-                *chain.from_iterable(
-                    [
-                        ("--set", f"{key}={value}")
-                        for key, value in (field_set.values.value or {}).items()
-                    ]
-                ),
                 *valid_args,
             ],
-            input_digest=input_digest,
-            description=(
+            message=(
                 f"Deploying release '{release_name}' using chart "
                 f"{chart.address} and values from {field_set.address}."
             ),
-            level=LogLevel.DEBUG,
         ),
     )
 

@@ -12,8 +12,9 @@ from pants.backend.helm.target_types import (
     HelmChartLintStrictField,
     HelmSkipLintField,
 )
+from pants.backend.helm.util_rules import process as helm_process
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
-from pants.backend.helm.util_rules.tool import HelmProcess
+from pants.backend.helm.util_rules.process import HelmProcess
 from pants.core.goals.lint import LintResult, LintResults, LintTargetsRequest
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -75,4 +76,4 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
 
 
 def rules():
-    return [*collect_rules(), UnionRule(LintTargetsRequest, HelmLintRequest)]
+    return [*collect_rules(), *helm_process.rules(), UnionRule(LintTargetsRequest, HelmLintRequest)]

@@ -20,7 +20,6 @@ from pants.backend.helm.util_rules import sources
 from pants.backend.helm.util_rules.sources import HelmChartSourceFiles, HelmChartSourceFilesRequest
 from pants.build_graph.address import Address
 from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
-from pants.core.util_rules import stripped_source_files
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -31,7 +30,6 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmChartTarget, ResourcesGeneratorTarget, FilesGeneratorTarget],
         rules=[
             *sources.rules(),
-            *stripped_source_files.rules(),
             QueryRule(HelmChartSourceFiles, (HelmChartSourceFilesRequest,)),
         ],
     )

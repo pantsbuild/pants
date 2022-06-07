@@ -7,8 +7,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.helm.util_rules import k8s
-from pants.backend.helm.util_rules.k8s import (
+from pants.k8s import manifest
+from pants.k8s.manifest import (
     ImageRef,
     KubeManifests,
     ParseKubeManifests,
@@ -23,7 +23,7 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         target_types=[],
-        rules=[*k8s.rules(), QueryRule(KubeManifests, (ParseKubeManifests,))],
+        rules=[*manifest.rules(), QueryRule(KubeManifests, (ParseKubeManifests,))],
     )
 
 
@@ -89,6 +89,8 @@ def test_parses_kube_resource_manifests(
         KubeManifests,
         [ParseKubeManifests(manifest_digest, "test_parses_kube_resource_manifests")],
     )
+
+    print(parsed_manifests)
 
     assert len(parsed_manifests) == 1
     assert parsed_manifests[0].api_version == api_version

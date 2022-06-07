@@ -29,8 +29,8 @@ from pants.backend.helm.testutil import (
     HELM_VALUES_FILE,
     K8S_SERVICE_TEMPLATE,
 )
-from pants.backend.helm.util_rules import chart, tool
-from pants.backend.helm.util_rules.k8s import ImageRef
+from pants.backend.helm.util_rules import chart
+from pants.backend.helm.util_rules import process as helm_process
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine import process
@@ -38,6 +38,7 @@ from pants.engine.addresses import Address
 from pants.engine.internals.graph import rules as graph_rules
 from pants.engine.rules import QueryRule, SubsystemRule
 from pants.engine.target import InjectedDependencies
+from pants.k8s.manifest import ImageRef
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -56,7 +57,7 @@ def rule_runner() -> RuleRunner:
             *pex.rules(),
             *process.rules(),
             *stripped_source_files.rules(),
-            *tool.rules(),
+            *helm_process.rules(),
             SubsystemRule(DockerOptions),
             QueryRule(HelmDeploymentReport, (AnalyseHelmDeploymentRequest,)),
             QueryRule(InjectedDependencies, (InjectHelmDeploymentDependenciesRequest,)),
@@ -111,8 +112,8 @@ def test_deployment_dependencies_report(rule_runner: RuleRunner) -> None:
         ImageRef(registry="example.com", repository="containers/busybox", tag="1.28"),
     ]
 
-    assert len(dependencies_report.container_images) == 3
-    assert set(dependencies_report.container_images) == set(expected_container_refs)
+    assert len(dependencies_report.all_image_refs) == 3
+    assert set(dependencies_report.all_image_refs) == set(expected_container_refs)
 
 
 def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:

@@ -13,7 +13,7 @@ from pants.backend.helm.target_types import (
     HelmDeploymentTarget,
 )
 from pants.backend.helm.testutil import gen_chart_file
-from pants.backend.helm.util_rules import deployment, tool
+from pants.backend.helm.util_rules import deployment
 from pants.backend.helm.util_rules.chart import HelmChart
 from pants.core.util_rules import external_tool, stripped_source_files
 from pants.engine.addresses import Address
@@ -28,9 +28,8 @@ def rule_runner() -> RuleRunner:
         target_types=[HelmChartTarget, HelmDeploymentTarget],
         rules=[
             *external_tool.rules(),
-            *deployment.rules(),
             *stripped_source_files.rules(),
-            *tool.rules(),
+            *deployment.rules(),
             QueryRule(HelmChart, (HelmDeploymentFieldSet,)),
         ],
     )

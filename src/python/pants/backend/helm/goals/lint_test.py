@@ -19,10 +19,10 @@ from pants.backend.helm.testutil import (
     K8S_SERVICE_TEMPLATE,
     gen_chart_file,
 )
-from pants.backend.helm.util_rules import chart, sources, tool
+from pants.backend.helm.util_rules import chart, sources
 from pants.build_graph.address import Address
 from pants.core.goals.lint import LintResult, LintResults
-from pants.core.util_rules import config_files, external_tool, stripped_source_files
+from pants.core.util_rules import config_files, stripped_source_files
 from pants.engine.rules import QueryRule, SubsystemRule
 from pants.engine.target import Target
 from pants.source.source_root import rules as source_root_rules
@@ -36,9 +36,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *config_files.rules(),
             *chart.rules(),
-            *external_tool.rules(),
             *helm_lint_rules(),
-            *tool.rules(),
             *stripped_source_files.rules(),
             *source_root_rules(),
             *sources.rules(),
