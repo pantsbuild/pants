@@ -417,7 +417,7 @@ async fn make_request_from_flat_args(
     store,
     DirectoryDigest::from_persisted_digest(input_files),
     BTreeMap::default(),
-    vec![],
+    BTreeSet::default(),
   )
   .await
   .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;

@@ -669,7 +669,7 @@ async fn immutable_inputs() {
       );
       map
     },
-    vec![],
+    BTreeSet::default(),
   )
   .await
   .unwrap();
@@ -734,7 +734,7 @@ async fn prepare_workdir_exclusive_relative() {
     &store,
     TestDirectory::recursive().directory_digest(),
     BTreeMap::new(),
-    vec![],
+    BTreeSet::new(),
   )
   .await
   .unwrap();

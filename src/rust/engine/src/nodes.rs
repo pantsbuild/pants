@@ -1,7 +1,7 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::Display;
@@ -302,7 +302,7 @@ impl ExecuteProcess {
         .unwrap()
         .into_iter()
         .map(RelativePath::new)
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<BTreeSet<_>, _>>()?;
 
       Ok(InputDigests::new(
         store,
