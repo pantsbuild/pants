@@ -245,7 +245,7 @@ pub struct InputDigests {
 
   /// If non-empty, use nailgun in supported runners, using the specified `immutable_inputs` keys
   /// as server inputs. All other keys (and the input_files) will be client inputs.
-  pub use_nailgun: Vec<RelativePath>,
+  pub use_nailgun: BTreeSet<RelativePath>,
 }
 
 impl InputDigests {
@@ -253,7 +253,7 @@ impl InputDigests {
     store: &Store,
     input_files: DirectoryDigest,
     immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
-    use_nailgun: Vec<RelativePath>,
+    use_nailgun: BTreeSet<RelativePath>,
   ) -> Result<Self, String> {
     // Collect all digests into `complete`.
     let mut complete_digests = try_join_all(
@@ -330,7 +330,6 @@ impl InputDigests {
           .map(|input_digests| input_digests.use_nailgun.clone()),
       )
       .into_iter()
-      .unique()
       .collect(),
     })
   }
@@ -341,7 +340,7 @@ impl InputDigests {
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
       input_files,
       immutable_inputs: BTreeMap::new(),
-      use_nailgun: Vec::new(),
+      use_nailgun: BTreeSet::new(),
     }
   }
 
@@ -365,7 +364,7 @@ impl InputDigests {
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
         input_files: self.input_files.clone(),
         immutable_inputs: client,
-        use_nailgun: vec![],
+        use_nailgun: BTreeSet::new(),
       },
       // Server.
       InputDigests {
@@ -373,7 +372,7 @@ impl InputDigests {
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
         input_files: EMPTY_DIRECTORY_DIGEST.clone(),
         immutable_inputs: server,
-        use_nailgun: vec![],
+        use_nailgun: BTreeSet::new(),
       },
     )
   }
@@ -386,7 +385,7 @@ impl Default for InputDigests {
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
       input_files: EMPTY_DIRECTORY_DIGEST.clone(),
       immutable_inputs: BTreeMap::new(),
-      use_nailgun: Vec::new(),
+      use_nailgun: BTreeSet::new(),
     }
   }
 }
