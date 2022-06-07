@@ -1296,6 +1296,18 @@ impl NodeKey {
     }
   }
 
+  async fn maybe_watch(&self, context: &Context) -> NodeResult<()> {
+    if let Some((path, watcher)) = self.fs_subject().zip(context.core.watcher.as_ref()) {
+      let abs_path = context.core.build_root.join(path);
+      watcher
+        .watch(abs_path)
+        .map_err(|e| Context::mk_error(&e))
+        .await
+    } else {
+      Ok(())
+    }
+  }
+
   ///
   /// Filters the given Params to those which are subtypes of EngineAwareParameter.
   ///
@@ -1347,20 +1359,9 @@ impl Node for NodeKey {
           .collect()
       },
       |workunit| async move {
-        // To avoid races, we must ensure that we have installed a watch for the subject before
-        // executing the node logic. But in case of failure, we wait to see if the Node itself
-        // fails, and prefer that error message if so (because we have little control over the
-        // error messages of the watch API).
-        let maybe_watch =
-          if let Some((path, watcher)) = self.fs_subject().zip(context.core.watcher.as_ref()) {
-            let abs_path = context.core.build_root.join(path);
-            watcher
-              .watch(abs_path)
-              .map_err(|e| Context::mk_error(&e))
-              .await
-          } else {
-            Ok(())
-          };
+        // Ensure that we have installed filesystem watches before Nodes which inspect the
+        // filesystem.
+        let maybe_watch = self.maybe_watch(&context).await;
 
         let mut result = match self {
           NodeKey::DigestFile(n) => n.run_node(context).await.map(NodeOutput::FileDigest),
@@ -1379,7 +1380,8 @@ impl Node for NodeKey {
           NodeKey::Task(n) => n.run_node(context, workunit).await.map(NodeOutput::Value),
         };
 
-        // If both the Node and the watch failed, prefer the Node's error message.
+        // If both the Node and the watch failed, prefer the Node's error message (we have little
+        // control over the error messages of the watch API).
         match (&result, maybe_watch) {
           (Ok(_), Ok(_)) => {}
           (Err(_), _) => {}
