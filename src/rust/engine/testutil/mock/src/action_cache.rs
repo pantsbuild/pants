@@ -8,16 +8,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::FutureExt;
-use grpc_util::hyper::AddrIncomingWithStream;
-use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use protos::require_digest;
 use remexec::action_cache_server::{ActionCache, ActionCacheServer};
 use remexec::{ActionResult, GetActionResultRequest, UpdateActionResultRequest};
 use tokio::time::sleep;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
+
+use grpc_util::hyper::AddrIncomingWithStream;
+use hashing::{Digest, Fingerprint};
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
 
 pub struct StubActionCache {
   pub action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,
@@ -158,5 +159,41 @@ impl StubActionCache {
   ///
   pub fn address(&self) -> String {
     format!("http://{}", self.local_addr)
+  }
+
+  ///
+  /// Inserts the given action digest into the cache with the given outputs.
+  ///
+  pub fn insert(
+    &self,
+    action_digest: Digest,
+    exit_code: i32,
+    stdout_digest: Digest,
+    stderr_digest: Digest,
+  ) {
+    let action_result = ActionResult {
+      exit_code,
+      stdout_digest: Some(stdout_digest.into()),
+      stderr_digest: Some(stderr_digest.into()),
+      ..ActionResult::default()
+    };
+    self
+      .action_map
+      .lock()
+      .insert(action_digest.hash, action_result);
+  }
+
+  ///
+  /// Get the result for the given action digest.
+  ///
+  pub fn get(&self, action_digest: Digest) -> Option<ActionResult> {
+    self.action_map.lock().get(&action_digest.hash).cloned()
+  }
+
+  ///
+  /// Returns the number of cache entries in the cache.
+  ///
+  pub fn len(&self) -> usize {
+    self.action_map.lock().len()
   }
 }

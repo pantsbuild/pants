@@ -228,6 +228,10 @@ impl StubCAS {
   pub fn read_request_count(&self) -> usize {
     *self.read_request_count.lock()
   }
+
+  pub fn remove(&self, fingerprint: Fingerprint) -> bool {
+    self.blobs.lock().remove(&fingerprint).is_some()
+  }
 }
 
 #[derive(Clone, Debug)]

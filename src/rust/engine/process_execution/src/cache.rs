@@ -197,6 +197,7 @@ impl CommandRunner {
     };
 
     // Ensure that all digests in the result are loadable, erroring if any are not.
+    // TODO: Make conditional on `eager_fetch`, since backtracking makes this unnecessary as well.
     let _ = future::try_join_all(vec![
       self
         .file_store

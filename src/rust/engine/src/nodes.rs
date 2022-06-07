@@ -261,7 +261,7 @@ pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
 ///
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct ExecuteProcess {
-  process: Process,
+  pub process: Process,
 }
 
 impl ExecuteProcess {
@@ -297,7 +297,7 @@ impl ExecuteProcess {
       .map_err(|e| e.enrich("Failed to merge input digests for process"))
   }
 
-  fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, StoreError> {
+  pub fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
       None => None,
@@ -384,10 +384,18 @@ impl ExecuteProcess {
     self,
     context: Context,
     workunit: &mut RunningWorkunit,
+    attempt: usize,
   ) -> NodeResult<ProcessResult> {
     let request = self.process;
 
-    let command_runner = &context.core.command_runners[0];
+    let command_runner = context.core.command_runners.get(attempt).ok_or_else(|| {
+      // NB: We only backtrack for a Process if it produces a Digest which cannot be consumed
+      // from disk: if we've fallen all the way back to local execution, and even that
+      // produces an unreadable Digest, then there is a fundamental implementation issue.
+      throw(format!(
+        "Process {request:?} produced an invalid result on all configured command runners."
+      ))
+    })?;
 
     let execution_context = process_execution::Context::new(
       context.session.workunit_store(),
@@ -1366,10 +1374,12 @@ impl Node for NodeKey {
         let mut result = match self {
           NodeKey::DigestFile(n) => n.run_node(context).await.map(NodeOutput::FileDigest),
           NodeKey::DownloadedFile(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
-          NodeKey::ExecuteProcess(n) => n
-            .run_node(context, workunit)
-            .await
-            .map(|r| NodeOutput::ProcessResult(Box::new(r))),
+          NodeKey::ExecuteProcess(n) => {
+            let attempt = context.maybe_start_backtracking(&n);
+            n.run_node(context, workunit, attempt)
+              .await
+              .map(|r| NodeOutput::ProcessResult(Box::new(r)))
+          }
           NodeKey::ReadLink(n) => n.run_node(context).await.map(NodeOutput::LinkDest),
           NodeKey::Scandir(n) => n.run_node(context).await.map(NodeOutput::DirectoryListing),
           NodeKey::Select(n) => n.run_node(context).await.map(NodeOutput::Value),
@@ -1379,6 +1389,9 @@ impl Node for NodeKey {
           NodeKey::RunId(n) => n.run_node(context).await.map(NodeOutput::Value),
           NodeKey::Task(n) => n.run_node(context, workunit).await.map(NodeOutput::Value),
         };
+
+        // If the Node failed with MissingDigest, attempt to invalidate the source of the Digest.
+        result = context2.maybe_backtrack(result, workunit);
 
         // If both the Node and the watch failed, prefer the Node's error message (we have little
         // control over the error messages of the watch API).
