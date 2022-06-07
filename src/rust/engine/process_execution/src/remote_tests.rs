@@ -571,7 +571,7 @@ async fn make_execute_request_using_immutable_inputs() {
       map.insert(prefix.clone(), input_directory.directory_digest());
       map
     },
-    vec![],
+    BTreeMap::new(),
   )
   .await
   .unwrap();
