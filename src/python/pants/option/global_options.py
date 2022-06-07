@@ -1648,7 +1648,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
     loop_max = IntOption(
         "--loop-max",
-        default=2 ** 32,
+        default=2**32,
         help=f"The maximum number of times to loop when `{_loop_flag}` is specified.",
         advanced=True,
     )
