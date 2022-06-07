@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -571,7 +571,11 @@ async fn make_execute_request_using_immutable_inputs() {
       map.insert(prefix.clone(), input_directory.directory_digest());
       map
     },
+<<<<<<< Updated upstream
     BTreeMap::new(),
+=======
+    BTreeSet::new(),
+>>>>>>> Stashed changes
   )
   .await
   .unwrap();

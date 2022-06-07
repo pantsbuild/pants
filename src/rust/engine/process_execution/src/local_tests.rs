@@ -734,7 +734,11 @@ async fn prepare_workdir_exclusive_relative() {
     &store,
     TestDirectory::recursive().directory_digest(),
     BTreeMap::new(),
+<<<<<<< Updated upstream
     BTreeMap::new(),
+=======
+    BTreeSet::new(),
+>>>>>>> Stashed changes
   )
   .await
   .unwrap();
