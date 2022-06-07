@@ -501,12 +501,12 @@ class SchedulerSession:
         if self._scheduler.include_trace_on_error:
             throw = throws[0]
             etb = throw.engine_traceback
-            python_traceback_str = throw.python_traceback or ""
+            python_traceback_str = f"{type(throw.exc).__name__}: {str(throw.exc)}"
             engine_traceback_str = ""
             others_msg = f"\n(and {len(throws) - 1} more)" if len(throws) > 1 else ""
             if etb:
                 sep = "\n  in "
-                engine_traceback_str = "Engine traceback:" + sep + sep.join(reversed(etb)) + "\n"
+                engine_traceback_str = "Engine traceback:" + sep + sep.join(reversed(etb)) + "\n\n"
             raise ExecutionError(
                 f"{exception_noun} encountered:\n\n"
                 f"{engine_traceback_str}"

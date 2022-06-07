@@ -23,6 +23,7 @@ python_tests(
         "testprojects/src/python:coordinated_runs_directory",
         "testprojects/src/python:hello_directory",
         "testprojects:pants_plugins_directory",
+        "/testprojects:pants_plugins_directory",
     ],
     tags=["platform_specific_behavior"],
     # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See

@@ -1391,10 +1391,14 @@ impl Node for NodeKey {
     };
     let context2 = context.clone();
 
+    // TODO: We're computing this regardless of success or failure, because the Node moves below
+    // when we `run` it.
+    let maybe_desc = self.user_facing_name();
+
     in_workunit!(
       workunit_name,
       self.workunit_level(),
-      desc = self.user_facing_name(),
+      desc = maybe_desc.clone(),
       user_metadata = {
         let gil = Python::acquire_gil();
         let py = gil.python();
@@ -1487,31 +1491,33 @@ impl Node for NodeKey {
 
         // If the node failed, expand the Failure with a new frame.
         result = result.map_err(|failure| {
-          let name = workunit_name;
-          let displayable_param_names: Vec<_> = {
-            let gil = Python::acquire_gil();
-            let py = gil.python();
-            Self::engine_aware_params(context2, py, &params)
-              .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
-              .collect()
-          };
-          let failure_name = if displayable_param_names.is_empty() {
-            name.to_owned()
-          } else if displayable_param_names.len() == 1 {
-            format!(
-              "{} ({})",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          } else {
-            format!(
-              "{} {}",
-              name,
-              display_sorted_in_parens(displayable_param_names.iter())
-            )
-          };
+          if let Some(desc) = maybe_desc {
+            // TODO: This information should likely be included in `fn user_facing_name` in all
+            // cases, rather than only for failure. It is currently only used in `impl Display for
+            // NodeKey`.
+            let displayable_param_names: Vec<_> = {
+              let gil = Python::acquire_gil();
+              let py = gil.python();
+              Self::engine_aware_params(context2, py, &params)
+                .filter_map(|val| EngineAwareParameter::debug_hint((*val).as_ref(py)))
+                .collect()
+            };
 
-          failure.with_pushed_frame(&failure_name)
+            let failure_name = if displayable_param_names.is_empty() {
+              desc
+            } else {
+              format!(
+                "{} - {}",
+                desc,
+                display_sorted_in_parens(displayable_param_names.iter())
+              )
+            };
+
+            failure.with_pushed_frame(&failure_name)
+          } else {
+            // Only render nodes with descriptions.
+            failure
+          }
         });
 
         result
