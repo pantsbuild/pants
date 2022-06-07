@@ -98,19 +98,11 @@ async def generate_from_pipenv_requirement(
             description_of_origin=f"{generator}'s field `{PipenvSourceField.alias}`",
         ),
     )
-    lock_info = json.loads(digest_contents[0].content)
 
     module_mapping = generator[ModuleMappingField].value
     stubs_mapping = generator[TypeStubsModuleMappingField].value
 
-    def generate_tgt(raw_req: str, info: dict) -> PythonRequirementTarget:
-        if info.get("extras"):
-            raw_req += f"[{','.join(info['extras'])}]"
-        raw_req += info.get("version", "")
-        if info.get("markers"):
-            raw_req += f";{info['markers']}"
-
-        parsed_req = PipRequirement.parse(raw_req)
+    def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:
         normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
         tgt_overrides = overrides.pop(normalized_proj_name, {})
         if Dependencies.alias in tgt_overrides:
@@ -135,10 +127,8 @@ async def generate_from_pipenv_requirement(
             union_membership,
         )
 
-    result = tuple(
-        generate_tgt(req, info)
-        for req, info in {**lock_info.get("default", {}), **lock_info.get("develop", {})}.items()
-    ) + (file_tgt,)
+    reqs = parse_pipenv_requirements(digest_contents[0].content)
+    result = tuple(generate_tgt(req) for req in reqs) + (file_tgt,)
 
     if overrides:
         raise InvalidFieldException(
@@ -151,6 +141,24 @@ async def generate_from_pipenv_requirement(
         )
 
     return GeneratedTargets(generator, result)
+
+
+def parse_pipenv_requirements(file_contents: bytes) -> tuple[PipRequirement, ...]:
+    lock_info = json.loads(file_contents)
+
+    def _parse_pipenv_requirement(raw_req: str, info: dict) -> PipRequirement:
+        if info.get("extras"):
+            raw_req += f"[{','.join(info['extras'])}]"
+        raw_req += info.get("version", "")
+        if info.get("markers"):
+            raw_req += f";{info['markers']}"
+
+        return PipRequirement.parse(raw_req)
+
+    return tuple(
+        _parse_pipenv_requirement(req, info)
+        for req, info in {**lock_info.get("default", {}), **lock_info.get("develop", {})}.items()
+    )
 
 
 def rules():

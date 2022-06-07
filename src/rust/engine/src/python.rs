@@ -12,6 +12,10 @@ use pyo3::types::{PyDict, PyType};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::SmallVec;
 
+use hashing::Digest;
+use process_execution::ProcessError;
+use store::StoreError;
+
 use crate::externs;
 
 ///
@@ -371,7 +375,10 @@ pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.
   Invalidated,
-  /// An error was thrown.
+  /// A Digest was missing from the configured Stores. This error may be recoverable if the source
+  /// of the missing Digest can be identified and retried (such as if it was produced by a cache).
+  MissingDigest(String, Digest),
+  /// An unclassified error was thrown.
   Throw {
     // A python exception value, which might have a python-level stacktrace
     val: Value,
@@ -389,6 +396,13 @@ impl Failure {
   pub fn with_pushed_frame(self, frame: &impl fmt::Display) -> Failure {
     match self {
       Failure::Invalidated => Failure::Invalidated,
+      md @ Failure::MissingDigest { .. } => {
+        // MissingDigest errors are usually handled at the WrappedNode boundary by restarting the
+        // producer of the missing digest. So a Failure will only end up with a new frame if it
+        // traversed the node boundary for some reason, in which case it is safe to discard the
+        // type information and convert into a Throw.
+        throw(md.to_string()).with_pushed_frame(frame)
+      }
       Failure::Throw {
         val,
         python_traceback,
@@ -454,6 +468,9 @@ impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
+      Failure::MissingDigest(s, d) => {
+        write!(f, "Could not recover from missing digest: {s}: {d:?}")
+      }
       Failure::Throw { val, .. } => {
         let repr = Python::with_gil(|py| {
           let obj = (*val.0).as_ref(py);
@@ -465,6 +482,24 @@ impl fmt::Display for Failure {
   }
 }
 
+impl From<ProcessError> for Failure {
+  fn from(err: ProcessError) -> Self {
+    match err {
+      ProcessError::MissingDigest(s, d) => Self::MissingDigest(s, d),
+      ProcessError::Unclassified(s) => throw(s),
+    }
+  }
+}
+
+impl From<StoreError> for Failure {
+  fn from(err: StoreError) -> Self {
+    match err {
+      StoreError::MissingDigest(s, d) => Self::MissingDigest(s, d),
+      StoreError::Unclassified(s) => throw(s),
+    }
+  }
+}
+
 impl From<String> for Failure {
   fn from(err: String) -> Self {
     throw(err)
@@ -472,8 +507,8 @@ impl From<String> for Failure {
 }
 
 pub fn throw(msg: String) -> Failure {
-  let gil = Python::acquire_gil();
   let python_traceback = Failure::native_traceback(&msg);
+  let gil = Python::acquire_gil();
   Failure::Throw {
     val: externs::create_exception(gil.python(), msg),
     python_traceback,

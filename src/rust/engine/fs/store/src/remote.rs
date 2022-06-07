@@ -24,6 +24,8 @@ use remexec::{
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, Metric, ObservationMetric};
 
+use crate::StoreError;
+
 #[derive(Clone)]
 pub struct ByteStore {
   instance_name: Option<String>,
@@ -121,10 +123,10 @@ impl ByteStore {
     &self,
     digest: Digest,
     mut write_to_buffer: WriteToBuffer,
-  ) -> Result<(), String>
+  ) -> Result<(), StoreError>
   where
     WriteToBuffer: FnMut(std::fs::File) -> WriteResult,
-    WriteResult: Future<Output = Result<(), String>>,
+    WriteResult: Future<Output = Result<(), StoreError>>,
   {
     let write_buffer = tempfile::tempfile().map_err(|e| {
       format!(
@@ -179,8 +181,8 @@ impl ByteStore {
     )
     .await
     .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
+      ByteStoreError::Grpc(status) => status_to_str(status).into(),
+      ByteStoreError::Other(msg) => msg.into(),
     })
   }
 
