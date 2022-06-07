@@ -67,6 +67,7 @@ pub struct Core {
   pub watcher: Option<Arc<InvalidationWatcher>>,
   pub build_root: PathBuf,
   pub local_parallelism: usize,
+  pub graceful_shutdown_max_wait_time: usize,
   pub sessions: Sessions,
   pub named_caches_dir: PathBuf,
 }
@@ -498,6 +499,7 @@ impl Core {
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
+      graceful_shutdown_max_wait_time: exec_strategy_opts.graceful_shutdown_max_wait_time,
       sessions,
       named_caches_dir,
     })

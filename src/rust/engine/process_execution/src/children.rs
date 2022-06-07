@@ -22,7 +22,10 @@ pub struct ManagedChild {
 }
 
 impl ManagedChild {
-  pub fn spawn(mut command: Command) -> Result<Self, String> {
+  pub fn spawn(
+    mut command: Command,
+    graceful_shutdown_max_wait_time: usize,
+  ) -> Result<Self, String> {
     // Set `kill_on_drop` to encourage `tokio` to `wait` the process via its own "reaping"
     // mechanism:
     //   see https://docs.rs/tokio/1.14.0/tokio/process/struct.Command.html#method.kill_on_drop
@@ -47,7 +50,9 @@ impl ManagedChild {
       .map_err(|e| format!("Error executing interactive process: {}", e))?;
     Ok(Self {
       child,
-      graceful_shutdown_max_wait_time: time::Duration::from_secs(3),
+      graceful_shutdown_max_wait_time: time::Duration::from_secs(
+        graceful_shutdown_max_wait_time.try_into().unwrap(),
+      ),
       killed: AtomicBool::new(false),
     })
   }
