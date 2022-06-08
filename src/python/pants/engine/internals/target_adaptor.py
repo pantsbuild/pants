@@ -3,9 +3,23 @@
 
 from __future__ import annotations
 
+import dataclasses
+from dataclasses import dataclass
 from typing import Any
 
 from typing_extensions import final
+
+from pants.build_graph.address import Address
+from pants.engine.engine_aware import EngineAwareParameter
+
+
+@dataclass(frozen=True)
+class TargetAdaptorRequest(EngineAwareParameter):
+    address: Address
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    def debug_hint(self) -> str:
+        return self.address.spec
 
 
 @final

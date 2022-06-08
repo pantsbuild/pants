@@ -32,7 +32,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -157,7 +157,10 @@ async def resolve_target_parametrizations(
 ) -> _TargetParametrizations:
     address = request.address
 
-    target_adaptor = await Get(TargetAdaptor, Address, address)
+    target_adaptor = await Get(
+        TargetAdaptor,
+        TargetAdaptorRequest(address, description_of_origin=request.description_of_origin),
+    )
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
         raise UnrecognizedTargetTypeException(

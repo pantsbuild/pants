@@ -3,7 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
+
+from pants.util.strutil import bullet_list, softwrap
+
+if TYPE_CHECKING:
+    from pants.build_graph.address import Address
 
 
 class TargetDefinitionException(Exception):
@@ -37,10 +42,21 @@ class ResolveError(MappingError):
 
     @classmethod
     def did_you_mean(
-        cls, *, bad_name: str, known_names: Iterable[str], namespace: str
+        cls,
+        bad_address: Address,
+        *,
+        description_of_origin: str,
+        known_names: Iterable[str],
+        namespace: str,
     ) -> ResolveError:
-        possibilities = "\n  ".join(f":{target_name}" for target_name in sorted(known_names))
         return cls(
-            f"'{bad_name}' was not found in namespace '{namespace}'. Did you mean one "
-            f"of:\n  {possibilities}"
+            softwrap(
+                f"""
+                The address {bad_address} from {description_of_origin} does not exist.
+
+                The target name ':{bad_address.target_name}' is not defined in the directory
+                {namespace}. Did you mean one of these target names?\n
+                """
+                + bullet_list(f":{name}" for name in known_names)
+            )
         )

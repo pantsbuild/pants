@@ -610,11 +610,14 @@ class Address(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class BuildFileAddressRequest:
+class BuildFileAddressRequest(EngineAwareParameter):
     """A request to find the BUILD file path for an address."""
 
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    def debug_hint(self) -> str:
+        return self.address.spec
 
 
 @dataclass(frozen=True)
