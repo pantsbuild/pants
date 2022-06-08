@@ -14,6 +14,7 @@ from typing import Iterable, NamedTuple, Sequence, cast
 from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
+from pants.build_graph.address import BuildFileAddressRequest
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -735,7 +736,13 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             sources_set = deleted_files
 
         build_file_addresses = await MultiGet(
-            Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_tgts
+            Get(
+                BuildFileAddress,
+                BuildFileAddressRequest(
+                    tgt.address, description_of_origin="<owners rule - cannot trigger>"
+                ),
+            )
+            for tgt in candidate_tgts
         )
 
         for candidate_tgt, bfa in zip(candidate_tgts, build_file_addresses):

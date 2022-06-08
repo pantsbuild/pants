@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -609,12 +610,16 @@ class Address(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class BuildFileAddress:
-    """Represents the address of a type materialized from a BUILD file.
-
-    TODO: This type should likely be removed in favor of storing this information on Target.
-    """
+class BuildFileAddressRequest:
+    """A request to find the BUILD file path for an address."""
 
     address: Address
-    # The relative path of the BUILD file this Address came from.
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+
+@dataclass(frozen=True)
+class BuildFileAddress:
+    """An address, along with the relative file path of its BUILD file."""
+
+    address: Address
     rel_path: str

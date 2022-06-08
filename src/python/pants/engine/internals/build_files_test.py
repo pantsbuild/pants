@@ -9,6 +9,7 @@ from typing import cast
 
 import pytest
 
+from pants.build_graph.address import BuildFileAddressRequest
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
@@ -204,13 +205,15 @@ def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> Non
 
 def test_build_file_address() -> None:
     rule_runner = RuleRunner(
-        rules=[QueryRule(BuildFileAddress, (Address,))], target_types=[MockTgt]
+        rules=[QueryRule(BuildFileAddress, [BuildFileAddressRequest])], target_types=[MockTgt]
     )
     rule_runner.write_files({"helloworld/BUILD.ext": "mock_tgt()"})
 
     def assert_bfa_resolved(address: Address) -> None:
         expected_bfa = BuildFileAddress(address, "helloworld/BUILD.ext")
-        bfa = rule_runner.request(BuildFileAddress, [address])
+        bfa = rule_runner.request(
+            BuildFileAddress, [BuildFileAddressRequest(address, description_of_origin="tests")]
+        )
         assert bfa == expected_bfa
 
     assert_bfa_resolved(Address("helloworld"))
