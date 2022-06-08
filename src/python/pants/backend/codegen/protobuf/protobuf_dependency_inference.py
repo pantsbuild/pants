@@ -23,6 +23,7 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -93,7 +94,9 @@ async def infer_protobuf_dependencies(
         return InferredDependencies([])
 
     address = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
+    wrapped_tgt = await Get(
+        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
+    )
     explicitly_provided_deps, hydrated_sources = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
         Get(HydratedSources, HydrateSourcesRequest(request.sources_field)),

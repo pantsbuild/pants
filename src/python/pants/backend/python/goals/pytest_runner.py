@@ -54,7 +54,13 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
+from pants.engine.target import (
+    Target,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
@@ -110,7 +116,9 @@ class AllPytestPluginSetupsRequest:
 async def run_all_setup_plugins(
     request: AllPytestPluginSetupsRequest, union_membership: UnionMembership
 ) -> AllPytestPluginSetups:
-    wrapped_tgt = await Get(WrappedTarget, Address, request.address)
+    wrapped_tgt = await Get(
+        WrappedTarget, WrappedTargetRequest(request.address, description_of_origin="<infallible>")
+    )
     applicable_setup_request_types = tuple(
         request
         for request in union_membership.get(PytestPluginSetupRequest)

@@ -48,6 +48,7 @@ from pants.engine.target import (
     InferredDependencies,
     Targets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
@@ -387,7 +388,10 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    _wrapped_tgt = await Get(WrappedTarget, Address, request.sources_field.address)
+    _wrapped_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(request.sources_field.address, description_of_origin="<infallible>"),
+    )
     tgt = _wrapped_tgt.target
     interpreter_constraints = InterpreterConstraints.create_from_targets([tgt], python_setup)
     if interpreter_constraints is None:
@@ -489,7 +493,12 @@ async def infer_python_init_dependencies(
     owners = await MultiGet(Get(Owners, OwnersRequest((f,))) for f in init_files.snapshot.files)
 
     original_tgt, owner_tgts = await MultiGet(
-        Get(WrappedTarget, Address, request.sources_field.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                request.sources_field.address, description_of_origin="<infallible>"
+            ),
+        ),
         Get(Targets, Addresses(itertools.chain.from_iterable(owners))),
     )
     resolve = original_tgt.target[PythonResolveField].normalized_value(python_setup)
@@ -531,7 +540,12 @@ async def infer_python_conftest_dependencies(
     )
 
     original_tgt, owner_tgts = await MultiGet(
-        Get(WrappedTarget, Address, request.sources_field.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                request.sources_field.address, description_of_origin="<infallible>"
+            ),
+        ),
         Get(Targets, Addresses(itertools.chain.from_iterable(owners))),
     )
     resolve = original_tgt.target[PythonResolveField].normalized_value(python_setup)

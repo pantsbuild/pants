@@ -11,7 +11,6 @@ from typing import Any, Iterator, Mapping
 
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scalac import Scalac
-from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
@@ -27,7 +26,7 @@ from pants.engine.fs import (
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessExecutionFailure, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import WrappedTarget
+from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
@@ -183,8 +182,13 @@ async def create_analyze_scala_source_request(
 ) -> AnalyzeScalaSourceRequest:
     address = request.sources_fields[0].address
 
-    (wrapped_tgt, source_files) = await MultiGet(
-        Get(WrappedTarget, Address, address),
+    wrapped_tgt, source_files = await MultiGet(
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                address, description_of_origin="<the Scala analyze request setup rule>"
+            ),
+        ),
         Get(SourceFiles, SourceFilesRequest, request),
     )
 

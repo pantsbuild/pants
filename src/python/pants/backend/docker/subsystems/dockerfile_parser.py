@@ -22,7 +22,13 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, WrappedTarget
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    SourcesField,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
@@ -139,7 +145,9 @@ class DockerfileInfoRequest:
 
 @rule
 async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
-    wrapped_target = await Get(WrappedTarget, Address, request.address)
+    wrapped_target = await Get(
+        WrappedTarget, WrappedTargetRequest(request.address, description_of_origin="<infallible>")
+    )
     target = wrapped_target.target
     sources = await Get(
         HydratedSources,

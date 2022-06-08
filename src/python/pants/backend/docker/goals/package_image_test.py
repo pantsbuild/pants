@@ -48,7 +48,7 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
-from pants.engine.target import InvalidFieldException, WrappedTarget
+from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTargetRequest
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
@@ -158,7 +158,7 @@ def assert_build(
             ),
             MockGet(
                 output_type=WrappedTarget,
-                input_type=Address,
+                input_type=WrappedTargetRequest,
                 mock=lambda _: WrappedTarget(tgt),
             ),
             MockGet(
