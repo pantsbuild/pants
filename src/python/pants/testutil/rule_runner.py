@@ -33,7 +33,7 @@ from pants.engine.internals.session import SessionValues
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule as QueryRule
 from pants.engine.rules import Rule
-from pants.engine.target import AllTargets, Target, WrappedTarget
+from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
@@ -217,7 +217,7 @@ class RuleRunner:
         all_rules = (
             *(rules or ()),
             *source_root.rules(),
-            QueryRule(WrappedTarget, [Address]),
+            QueryRule(WrappedTarget, [WrappedTargetRequest]),
             QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
         )
@@ -476,7 +476,10 @@ class RuleRunner:
 
         :API: public
         """
-        return self.request(WrappedTarget, [address]).target
+        return self.request(
+            WrappedTarget,
+            [WrappedTargetRequest(address, description_of_origin="RuleRunner.get_target()")],
+        ).target
 
     def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
         """Write a digest to disk, relative to the test's build root.

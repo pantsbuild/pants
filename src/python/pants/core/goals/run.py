@@ -7,7 +7,6 @@ from pathlib import PurePath
 from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -20,6 +19,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
@@ -132,7 +132,9 @@ async def run(
     )
     field_set = targets_to_valid_field_sets.field_sets[0]
     request = await Get(RunRequest, RunFieldSet, field_set)
-    wrapped_target = await Get(WrappedTarget, Address, field_set.address)
+    wrapped_target = await Get(
+        WrappedTarget, WrappedTargetRequest(field_set.address, description_of_origin="<infallible>")
+    )
     restartable = wrapped_target.target.get(RestartableField).value
     # Cleanup is the default, so we want to preserve the chroot if either option is off.
     cleanup = run_subsystem.cleanup and global_options.process_cleanup

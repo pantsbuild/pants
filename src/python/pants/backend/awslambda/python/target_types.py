@@ -32,6 +32,7 @@ from pants.engine.target import (
     StringField,
     Target,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
@@ -156,7 +157,12 @@ async def inject_lambda_handler_dependency(
 ) -> InjectedDependencies:
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
-    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    original_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     explicitly_provided_deps, handler = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
         Get(
