@@ -81,12 +81,18 @@ impl InvalidationWatcher {
     let canonical_build_root =
       std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{:?}", e))?;
     let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
-    let mut watcher: RecommendedWatcher = Watcher::new_immediate(move |ev| {
+    let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |ev| {
       if watch_sender.send(ev).is_err() {
         // The watch thread shutting down first is ok, because it can exit when the Invalidatable
         // is dropped.
         debug!("Watch thread has shutdown, but Watcher is still running.");
       }
+    })
+    .and_then(|mut watcher| {
+      // We attempt to consume precise events to skip invalidating parent directories for
+      // data-change events, but `handle_event` should safely operate without them.
+      let _ = watcher.configure(notify::Config::PreciseEvents(true))?;
+      Ok(watcher)
     })
     .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?;
 
@@ -98,7 +104,7 @@ impl InvalidationWatcher {
     // much more efficiently so we do that instead on Linux.
     if cfg!(target_os = "macos") {
       watcher
-        .watch(canonical_build_root.clone(), RecursiveMode::Recursive)
+        .watch(&canonical_build_root, RecursiveMode::Recursive)
         .map_err(|e| {
           format!(
             "Failed to begin recursively watching files in the build root: {}",
@@ -179,6 +185,12 @@ impl InvalidationWatcher {
     })
   }
 
+  ///
+  /// Handle a single invalidation Event.
+  ///
+  /// This method must not assume that it receives PreciseEvents, because construction does not
+  /// validate that it is possible to enable them.
+  ///
   fn handle_event<I: Invalidatable>(
     invalidatable: &I,
     ignorer: &GitignoreStyleExcludes,
