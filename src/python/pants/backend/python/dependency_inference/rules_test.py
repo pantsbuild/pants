@@ -326,16 +326,21 @@ def test_infer_python_inits() -> None:
             QueryRule(InferredDependencies, (InferInitDependencies,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
+        objects={"parametrize": Parametrize},
     )
     rule_runner.set_options(
-        ["--python-infer-inits", "--source-root-patterns=src/python"],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        [
+            f"--python-infer-init-files={behavior.value}",
+            "--python-resolves={'a': '', 'b': ''}",
+            "--python-default-resolve=a",
+            "--python-enable-resolves",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-
     rule_runner.write_files(
         {
             "src/python/root/__init__.py": "",
-            "src/python/root/BUILD": "python_sources()",
+            "src/python/root/BUILD": "python_sources(resolve=parametrize('a', 'b'))",
             "src/python/root/mid/__init__.py": "",
             "src/python/root/mid/BUILD": "python_sources()",
             "src/python/root/mid/leaf/__init__.py": "",
@@ -358,7 +363,9 @@ def test_infer_python_inits() -> None:
         Address("src/python/root/mid/leaf", relative_file_path="f.py")
     ) == InferredDependencies(
         [
-            Address("src/python/root", relative_file_path="__init__.py"),
+            Address(
+                "src/python/root", relative_file_path="__init__.py", parameters={"resolve": "a"}
+            ),
             Address("src/python/root/mid", relative_file_path="__init__.py"),
             Address("src/python/root/mid/leaf", relative_file_path="__init__.py"),
         ],
@@ -379,16 +386,22 @@ def test_infer_python_conftests() -> None:
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
         target_types=[PythonTestsGeneratorTarget, PythonTestUtilsGeneratorTarget],
+        objects={"parametrize": Parametrize},
     )
     rule_runner.set_options(
-        ["--source-root-patterns=src/python"],
+        [
+            "--source-root-patterns=src/python",
+            "--python-resolves={'a': '', 'b': ''}",
+            "--python-default-resolve=a",
+            "--python-enable-resolves",
+        ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
     rule_runner.write_files(
         {
             "src/python/root/conftest.py": "",
-            "src/python/root/BUILD": "python_test_utils()",
+            "src/python/root/BUILD": "python_test_utils(resolve=parametrize('a', 'b'))",
             "src/python/root/mid/conftest.py": "",
             "src/python/root/mid/BUILD": "python_test_utils()",
             "src/python/root/mid/leaf/conftest.py": "",
@@ -410,7 +423,9 @@ def test_infer_python_conftests() -> None:
         )
     ) == InferredDependencies(
         [
-            Address("src/python/root", relative_file_path="conftest.py"),
+            Address(
+                "src/python/root", relative_file_path="conftest.py", parameters={"resolve": "a"}
+            ),
             Address("src/python/root/mid", relative_file_path="conftest.py"),
             Address("src/python/root/mid/leaf", relative_file_path="conftest.py"),
         ],
