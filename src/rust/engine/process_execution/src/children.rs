@@ -17,14 +17,14 @@ const GRACEFUL_SHUTDOWN_POLL_TIME: time::Duration = time::Duration::from_millis(
 /// signals in sequence for https://github.com/pantsbuild/pants/issues/13230.
 pub struct ManagedChild {
   child: Child,
-  graceful_shutdown_max_wait_time: time::Duration,
+  graceful_shutdown_timeout: time::Duration,
   killed: AtomicBool,
 }
 
 impl ManagedChild {
   pub fn spawn(
     mut command: Command,
-    graceful_shutdown_max_wait_time: usize,
+    graceful_shutdown_timeout: time::Duration,
   ) -> Result<Self, String> {
     // Set `kill_on_drop` to encourage `tokio` to `wait` the process via its own "reaping"
     // mechanism:
@@ -50,9 +50,7 @@ impl ManagedChild {
       .map_err(|e| format!("Error executing interactive process: {}", e))?;
     Ok(Self {
       child,
-      graceful_shutdown_max_wait_time: time::Duration::from_secs(
-        graceful_shutdown_max_wait_time.try_into().unwrap(),
-      ),
+      graceful_shutdown_timeout,
       killed: AtomicBool::new(false),
     })
   }
@@ -119,7 +117,7 @@ impl ManagedChild {
   /// This method *will* block the current thread but will do so for a bounded amount of time.
   pub fn graceful_shutdown_sync(&mut self) -> Result<(), String> {
     self.signal_pg(signal::Signal::SIGINT)?;
-    match self.wait_for_child_exit_sync(self.graceful_shutdown_max_wait_time) {
+    match self.wait_for_child_exit_sync(self.graceful_shutdown_timeout) {
       Ok(true) => {
         // process was gracefully shutdown
         self.killed.store(true, Ordering::SeqCst);
