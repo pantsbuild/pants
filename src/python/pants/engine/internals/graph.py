@@ -29,6 +29,9 @@ from pants.engine.internals.parametrize import Parametrize, _TargetParametrizati
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizations as _TargetParametrizations,
 )
+from pants.engine.internals.parametrize import (  # noqa: F401
+    _TargetParametrizationsRequest as _TargetParametrizationsRequest,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -146,13 +149,13 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
 
 @rule
 async def resolve_target_parametrizations(
-    address: Address,
+    request: _TargetParametrizationsRequest,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     unmatched_build_file_globs: UnmatchedBuildFileGlobs,
 ) -> _TargetParametrizations:
-    assert not address.is_generated_target and not address.is_parametrized
+    address = request.address
 
     target_adaptor = await Get(TargetAdaptor, Address, address)
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
@@ -302,7 +305,10 @@ async def resolve_target(
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
 ) -> WrappedTarget:
     base_address = address.maybe_convert_to_target_generator()
-    parametrizations = await Get(_TargetParametrizations, Address, base_address)
+    parametrizations = await Get(
+        _TargetParametrizations,
+        _TargetParametrizationsRequest(base_address, description_of_origin="TODO(#14468)"),
+    )
     if address.is_generated_target:
         # TODO: This is an accommodation to allow using file/generator Addresses for
         # non-generator atom targets. See https://github.com/pantsbuild/pants/issues/14419.
@@ -340,8 +346,10 @@ async def resolve_targets(
             parametrizations_gets.append(
                 Get(
                     _TargetParametrizations,
-                    Address,
-                    tgt.address.maybe_convert_to_target_generator(),
+                    _TargetParametrizationsRequest(
+                        tgt.address.maybe_convert_to_target_generator(),
+                        description_of_origin="TODO(#14468)",
+                    ),
                 )
             )
         else:
@@ -1058,7 +1066,13 @@ async def resolve_dependencies(
     generated_addresses: tuple[Address, ...] = ()
     if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_generated_target:
         parametrizations = await Get(
-            _TargetParametrizations, Address, tgt.address.maybe_convert_to_target_generator()
+            _TargetParametrizations,
+            _TargetParametrizationsRequest(
+                tgt.address.maybe_convert_to_target_generator(),
+                description_of_origin=(
+                    f"the target generator {tgt.address.maybe_convert_to_target_generator()}"
+                ),
+            ),
         )
         generated_addresses = tuple(parametrizations.generated_for(tgt.address).keys())
 
@@ -1067,7 +1081,15 @@ async def resolve_dependencies(
     explicitly_provided_includes: Iterable[Address] = explicitly_provided.includes
     if request.field.address.is_parametrized and explicitly_provided_includes:
         explicit_dependency_parametrizations = await MultiGet(
-            Get(_TargetParametrizations, Address, address.maybe_convert_to_target_generator())
+            Get(
+                _TargetParametrizations,
+                _TargetParametrizationsRequest(
+                    address.maybe_convert_to_target_generator(),
+                    description_of_origin=(
+                        f"the `{request.field.alias}` field of the target {tgt.address}"
+                    ),
+                ),
+            )
             for address in explicitly_provided_includes
         )
 

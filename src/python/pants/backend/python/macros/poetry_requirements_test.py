@@ -26,7 +26,7 @@ from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.strutil import softwrap
@@ -439,7 +439,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *poetry_requirements.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
         target_types=[PoetryRequirementsTargetGenerator],
     )
@@ -454,7 +454,14 @@ def assert_poetry_requirements(
     pyproject_toml_relpath: str = "pyproject.toml",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, pyproject_toml_relpath: pyproject_toml})
-    result = rule_runner.request(_TargetParametrizations, [Address("", target_name="reqs")])
+    result = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="reqs"), description_of_origin="tests"
+            )
+        ],
+    )
     assert set(result.parametrizations.values()) == expected_targets
 
 
