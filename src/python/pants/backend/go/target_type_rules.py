@@ -34,8 +34,8 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
 )
-from pants.base.exceptions import ResolveError
 from pants.base.specs import DirGlobSpec, RawSpecs
+from pants.build_graph.address import ResolveError
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,

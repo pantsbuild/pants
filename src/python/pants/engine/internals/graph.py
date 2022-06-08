@@ -12,9 +12,8 @@ from pathlib import PurePath
 from typing import Iterable, NamedTuple, Sequence, cast
 
 from pants.base.deprecated import resolve_conflicting_options, warn_or_error
-from pants.base.exceptions import ResolveError
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
-from pants.build_graph.address import BuildFileAddressRequest
+from pants.build_graph.address import BuildFileAddressRequest, ResolveError
 from pants.engine.addresses import (
     Address,
     Addresses,
