@@ -75,8 +75,11 @@ _expected_maintainers = {"EricArellano", "gshuflin", "illicitonion", "wisechengy
 
 # Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
 # otherwise inclusion of that plugin will fail due to its `pytest` import not being included in the pex.
+#
+# Disable the explorer backend, as that is packaged into a dedicated Python distribution and thus
+# not included in the pex either.
 DISABLED_BACKENDS_CONFIG = {
-    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures"]',
+    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants.backend.explorer"]',
 }
 
 
