@@ -301,6 +301,17 @@ class ShellCommandToolsField(StringSequenceField):
     )
 
 
+class ShellCommandExtraEnvVarsField(StringSequenceField):
+    alias = "extra_env_vars"
+    help = softwrap(
+        """
+        Additional environment variables to include in the shell process.
+        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+        `ENV_VAR` to copy the value of a variable in Pants's own environment.
+        """
+    )
+
+
 class ShellCommandLogOutputField(BoolField):
     alias = "log_output"
     default = False
@@ -324,6 +335,7 @@ class ShellCommandTarget(Target):
         ShellCommandSourcesField,
         ShellCommandTimeoutField,
         ShellCommandToolsField,
+        ShellCommandExtraEnvVarsField,
     )
     help = softwrap(
         """

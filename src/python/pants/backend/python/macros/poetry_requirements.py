@@ -21,7 +21,6 @@ from pants.backend.python.macros.common_fields import (
     TypeStubsModuleMappingField,
 )
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
     PythonRequirementResolveField,
@@ -46,8 +45,9 @@ from pants.engine.target import (
     SingleSourceField,
     TargetGenerator,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -129,10 +129,16 @@ def parse_str_version(attributes: str, **kwargs: str) -> str:
                 return Version(version_str)
             except InvalidVersion:
                 raise InvalidVersion(
-                    f'Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the '
-                    "poetry_requirements macro.\n\nIf you believe this requirement is valid, "
-                    "consider opening an issue at https://github.com/pantsbuild/pants/issues so "
-                    "that we can update Pants' Poetry macro to support this."
+                    softwrap(
+                        f"""
+                        Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the
+                        poetry_requirements macro.
+
+                        If you believe this requirement is valid, consider opening an issue at
+                        https://github.com/pantsbuild/pants/issues so that we can update Pants'
+                        Poetry macro to support this.
+                        """
+                    )
                 )
 
         if not req:
@@ -182,18 +188,17 @@ def parse_python_constraint(constr: str | None, fp: str) -> str:
         return list(itertools.chain(*[i.split(",") for i in lst]))
 
     def prepend(version: str) -> str:
-        return (
-            f"python_version{''.join(i for i in version if i in valid_specifiers)} '"
-            f"{''.join(i for i in version if i not in valid_specifiers)}'"
-        )
+        valid_versions = "".join(i for i in version if i in valid_specifiers)
+        invalid_versions = "".join(i for i in version if i not in valid_specifiers)
+        return f"python_version{valid_versions} '{invalid_versions}'"
 
     prepend_and_clean = [
         [prepend(".".join(j.split(".")[:2])) for j in conv_and(i)] for i in ver_parsed
     ]
     return (
-        f"{'(' if len(or_and_split) > 1 else ''}"
-        f"{') or ('.join([' and '.join(i) for i in prepend_and_clean])}"
-        f"{')' if len(or_and_split) > 1 else ''}"
+        ("(" if len(or_and_split) > 1 else "")
+        + (") or (".join([" and ".join(i) for i in prepend_and_clean]))
+        + (")" if len(or_and_split) > 1 else "")
     )
 
 
@@ -319,8 +324,12 @@ def handle_dict_attr(
 
     if len(base) == 0:
         raise ValueError(
-            f"{proj_name} is not formatted correctly; at minimum provide either a version, url, path "
-            "or git location for your dependency. "
+            softwrap(
+                f"""
+                {proj_name} is not formatted correctly; at minimum provide either a version, url,
+                path or git location for your dependency.
+                """
+            )
         )
 
     return add_markers(base, attributes, fp)
@@ -356,8 +365,12 @@ def parse_single_dependency(
                 yield PipRequirement.parse(req_str)
     else:
         raise AssertionError(
-            "Error: invalid Poetry requirement format. Expected type of requirement attributes to "
-            f"be string, dict, or list, but was of type {type(attributes).__name__}."
+            softwrap(
+                f"""
+                Error: invalid Poetry requirement format. Expected type of requirement attributes to
+                be string, dict, or list, but was of type {type(attributes).__name__}.
+                """
+            )
         )
 
 
@@ -367,9 +380,14 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
         poetry_vals = parsed["tool"]["poetry"]
     except KeyError:
         raise KeyError(
-            f"No section `tool.poetry` found in {pyproject_toml.toml_relpath}, which "
-            "is loaded by Pants from a `poetry_requirements` macro. "
-            "Did you mean to set up Poetry?"
+            softwrap(
+                f"""
+                No section `tool.poetry` found in {pyproject_toml.toml_relpath}, which
+                is loaded by Pants from a `poetry_requirements` macro.
+
+                Did you mean to set up Poetry?
+                """
+            )
         )
     dependencies = poetry_vals.get("dependencies", {})
     # N.B.: The "python" dependency is a special dependency required by Poetry that only serves to
@@ -386,10 +404,14 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
     dev_dependencies = poetry_vals.get("dev-dependencies", {})
     if not dependencies and not dev_dependencies and not group_deps:
         logger.warning(
-            "No requirements defined in any Poetry dependency groups, tool.poetry.dependencies and "
-            f"tool.poetry.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded "
-            "by Pants from a poetry_requirements macro. Did you mean to populate these "
-            "with requirements?"
+            softwrap(
+                f"""
+                No requirements defined in any Poetry dependency groups, tool.poetry.dependencies
+                and tool.poetry.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded
+                by Pants from a poetry_requirements macro. Did you mean to populate these
+                with requirements?
+                """
+            )
         )
 
     return set(
@@ -432,7 +454,9 @@ class GenerateFromPoetryRequirementsRequest(GenerateTargetsRequest):
 
 @rule(desc="Generate `python_requirement` targets from Poetry pyproject.toml", level=LogLevel.DEBUG)
 async def generate_from_python_requirement(
-    request: GenerateFromPoetryRequirementsRequest, build_root: BuildRoot, python_setup: PythonSetup
+    request: GenerateFromPoetryRequirementsRequest,
+    build_root: BuildRoot,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     generator = request.generator
     pyproject_rel_path = generator[PoetryRequirementsSourceField].value
@@ -449,6 +473,7 @@ async def generate_from_python_requirement(
             target_name=request.template_address.target_name,
             relative_file_path=pyproject_rel_path,
         ),
+        union_membership,
     )
 
     digest_contents = await Get(
@@ -493,14 +518,19 @@ async def generate_from_python_requirement(
                 **tgt_overrides,
             },
             request.template_address.create_generated(parsed_req.project_name),
+            union_membership,
         )
 
     result = tuple(generate_tgt(requirement) for requirement in requirements) + (file_tgt,)
 
     if overrides:
         raise InvalidFieldException(
-            f"Unused key in the `overrides` field for {request.template_address}: "
-            f"{sorted(overrides)}"
+            softwrap(
+                f"""
+                Unused key in the `overrides` field for {request.template_address}:
+                {sorted(overrides)}
+                """
+            )
         )
 
     return GeneratedTargets(generator, result)

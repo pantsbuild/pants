@@ -20,7 +20,7 @@ grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 futures = "0.3"
 hashing = { path = "../hashing" }
-libc = "0.2.125"
+libc = "0.2.126"
 log = "0.4"
 nails = "0.12"
 nix = "0.24"
@@ -34,7 +34,7 @@ tokio = { version = "1.16", features = ["net", "process", "rt-multi-thread", "sy
 tokio-rustls = "0.23"
 tokio-util = { version = "0.7", features = ["codec"] }
 uname = "0.1.1"
-uuid = { version = "1.0", features = ["v4"] }
+uuid = { version = "1.1", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }
 regex = "1"
 lazy_static = "1"

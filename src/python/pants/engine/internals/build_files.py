@@ -17,6 +17,7 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -79,8 +80,13 @@ async def resolve_address(address_input: AddressInput) -> Address:
         if address_input.target_component:
             spec += f":{address_input.target_component}"
         raise ResolveError(
-            f"The file or directory '{address_input.path_component}' does not exist on disk in the "
-            f"workspace, so the address '{spec}' cannot be resolved."
+            softwrap(
+                f"""
+                The file or directory '{address_input.path_component}' does not exist on disk in
+                the workspace, so the address '{spec}' from {address_input.description_of_origin}
+                cannot be resolved.
+                """
+            )
         )
 
 

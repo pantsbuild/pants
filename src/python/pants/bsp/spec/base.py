@@ -46,7 +46,7 @@ class BuildTargetIdentifier:
                 f"Unknown URI scheme for BSP BuildTargetIdentifier. Expected scheme `pants`, but URI was: {self.uri}"
             )
         raw_addr = self.uri[len("pants:") :]
-        return AddressInput.parse(raw_addr)
+        return AddressInput.parse(raw_addr, description_of_origin="TODO(#14468)")
 
 
 @dataclass(frozen=True)

@@ -108,27 +108,35 @@ def test_resolve_address() -> None:
         assert rule_runner.request(Address, [address_input]) == expected
 
     assert_is_expected(
-        AddressInput("a/b/c.txt"), Address("a/b", target_name=None, relative_file_path="c.txt")
+        AddressInput("a/b/c.txt", description_of_origin="tests"),
+        Address("a/b", target_name=None, relative_file_path="c.txt"),
     )
     assert_is_expected(
-        AddressInput("a/b"), Address("a/b", target_name=None, relative_file_path=None)
+        AddressInput("a/b", description_of_origin="tests"),
+        Address("a/b", target_name=None, relative_file_path=None),
     )
 
-    assert_is_expected(AddressInput("a/b", target_component="c"), Address("a/b", target_name="c"))
     assert_is_expected(
-        AddressInput("a/b/c.txt", target_component="c"),
+        AddressInput("a/b", target_component="c", description_of_origin="tests"),
+        Address("a/b", target_name="c"),
+    )
+    assert_is_expected(
+        AddressInput("a/b/c.txt", target_component="c", description_of_origin="tests"),
         Address("a/b", relative_file_path="c.txt", target_name="c"),
     )
 
     # Top-level addresses will not have a path_component, unless they are a file address.
     assert_is_expected(
-        AddressInput("f.txt", target_component="original"),
+        AddressInput("f.txt", target_component="original", description_of_origin="tests"),
         Address("", relative_file_path="f.txt", target_name="original"),
     )
-    assert_is_expected(AddressInput("", target_component="t"), Address("", target_name="t"))
+    assert_is_expected(
+        AddressInput("", target_component="t", description_of_origin="tests"),
+        Address("", target_name="t"),
+    )
 
     with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(Address, [AddressInput("a/b/fake")])
+        rule_runner.request(Address, [AddressInput("a/b/fake", description_of_origin="tests")])
     assert "'a/b/fake' does not exist on disk" in str(exc.value)
 
 
@@ -154,13 +162,14 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
                     ],
                     build_file_dir=f"build file's dir is: {build_file_dir()}"
                 )
+
+                mock_tgt(name='t2')
                 """
             )
         }
     )
-    addr = Address("helloworld/dir")
-    target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [addr])
-    assert target_adaptor.name == "dir"
+    target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld/dir")])
+    assert target_adaptor.name is None
     assert target_adaptor.type_alias == "mock_tgt"
     assert target_adaptor.kwargs["dependencies"] == [
         ":dir",
@@ -172,6 +181,12 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     # when encountering this, but it's fine at this stage.
     assert target_adaptor.kwargs["fake_field"] == 42
     assert target_adaptor.kwargs["build_file_dir"] == "build file's dir is: helloworld/dir"
+
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor, [Address("helloworld/dir", target_name="t2")]
+    )
+    assert target_adaptor.name == "t2"
+    assert target_adaptor.type_alias == "mock_tgt"
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:

@@ -166,7 +166,6 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
     .unwrap();
   let directory = executor
     .block_on(store.load_directory(digest.as_digest()))
-    .unwrap()
     .unwrap();
   let mut all_file_nodes = directory.files.to_vec();
   let mut file_nodes_to_modify = all_file_nodes.split_off(all_file_nodes.len() / 2);

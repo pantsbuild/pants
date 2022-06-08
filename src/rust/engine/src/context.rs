@@ -67,6 +67,7 @@ pub struct Core {
   pub watcher: Option<Arc<InvalidationWatcher>>,
   pub build_root: PathBuf,
   pub local_parallelism: usize,
+  pub graceful_shutdown_timeout: Duration,
   pub sessions: Sessions,
   pub named_caches_dir: PathBuf,
 }
@@ -106,6 +107,7 @@ pub struct ExecutionStrategyOptions {
   pub remote_cache_write: bool,
   pub child_max_memory: usize,
   pub child_default_memory: usize,
+  pub graceful_shutdown_timeout: Duration,
 }
 
 #[derive(Clone, Debug)]
@@ -497,6 +499,7 @@ impl Core {
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
+      graceful_shutdown_timeout: exec_strategy_opts.graceful_shutdown_timeout,
       sessions,
       named_caches_dir,
     })

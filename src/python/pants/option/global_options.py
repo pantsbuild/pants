@@ -351,6 +351,7 @@ class ExecutionOptions:
     process_execution_local_enable_nailgun: bool
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
+    process_execution_graceful_shutdown_timeout: int
 
     process_total_child_memory_usage: int | None
     process_per_child_memory_usage: int
@@ -394,6 +395,7 @@ class ExecutionOptions:
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
+            process_execution_graceful_shutdown_timeout=bootstrap_options.process_execution_graceful_shutdown_timeout,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
@@ -460,6 +462,9 @@ class LocalStoreOptions:
         )
 
 
+_PER_CHILD_MEMORY_USAGE = "512MiB"
+
+
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # Remote execution strategy.
     remote_execution=False,
@@ -470,13 +475,14 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_ca_certs_path=None,
     # Process execution setup.
     process_total_child_memory_usage=None,
-    process_per_child_memory_usage=memory_size("512MiB"),
+    process_per_child_memory_usage=memory_size(_PER_CHILD_MEMORY_USAGE),
     process_execution_local_parallelism=CPU_COUNT,
     process_execution_remote_parallelism=128,
     process_execution_cache_namespace=None,
     process_cleanup=True,
     local_cache=True,
     process_execution_local_enable_nailgun=True,
+    process_execution_graceful_shutdown_timeout=3,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={
@@ -489,7 +495,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_batch_api_size_limit=4194304,
     # Remote cache setup.
     remote_cache_eager_fetch=True,
-    remote_cache_warnings=RemoteCacheWarningsBehavior.first_only,
+    remote_cache_warnings=RemoteCacheWarningsBehavior.backoff,
     remote_cache_rpc_concurrency=128,
     remote_cache_read_timeout_millis=1500,
     # Remote execution setup.
@@ -1083,23 +1089,28 @@ class BootstrapOptions:
             """
         ),
     )
+
+    _process_total_child_memory_usage = "--process-total-child-memory-usage"
+    _process_per_child_memory_usage_flag = "--process-per-child-memory-usage"
     process_total_child_memory_usage = MemorySizeOption(
-        "--process-total-child-memory-usage",
+        _process_total_child_memory_usage,
         advanced=True,
         default=None,
-        default_help_repr="1GiB",
         help=softwrap(
-            """
-            The maximum memory usage for all child processes.
+            f"""
+            The maximum memory usage for all "pooled" child processes.
 
-            This value participates in precomputing the pool size of child processes used by
-            `pantsd`. A high value would result in a high number of child processes spawned,
-            potentially overconsuming your resources and triggering the OS' OOM killer. A low
-            value would mean a low number of child processes launched and therefore less
-            paralellism for the tasks that need those processes.
+            When set, this value participates in precomputing the pool size of child processes
+            used by Pants (pooling is currently used only for the JVM). When not set, Pants will
+            default to spawning `2 * {_process_execution_local_parallelism_flag}` pooled processes.
 
-            If setting this value, consider also setting a value for the `process-per-child-memory-usage`
-            option too.
+            A high value would result in a high number of child processes spawned, potentially
+            overconsuming your resources and triggering the OS' OOM killer. A low value would
+            mean a low number of child processes launched and therefore less parallelism for the
+            tasks that need those processes.
+
+            If setting this value, consider also adjusting the value of the
+            `{_process_per_child_memory_usage_flag}` option.
 
             You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
             `2GiB` or `2.12GiB`. A bare number will be in bytes.
@@ -1107,15 +1118,15 @@ class BootstrapOptions:
         ),
     )
     process_per_child_memory_usage = MemorySizeOption(
-        "--process-per-child-memory-usage",
+        _process_per_child_memory_usage_flag,
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.process_per_child_memory_usage,
-        default_help_repr="512MiB",
+        default_help_repr=_PER_CHILD_MEMORY_USAGE,
         help=softwrap(
-            """
-            The default memory usage for a child process.
+            f"""
+            The default memory usage for a single "pooled" child process.
 
-            Check the documentation for the `process-total-child-memory-usage` for advice on
+            Check the documentation for the `{_process_total_child_memory_usage}` for advice on
             how to choose an appropriate value for this option.
 
             You can suffix with `GiB`, `MiB`, `KiB`, or `B` to indicate the unit, e.g.
@@ -1159,6 +1170,17 @@ class BootstrapOptions:
         "--process-execution-local-enable-nailgun",
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
         help="Whether or not to use nailgun to run JVM requests that are marked as supporting nailgun.",
+        advanced=True,
+    )
+    process_execution_graceful_shutdown_timeout = IntOption(
+        "--process-execution-graceful-shutdown-timeout",
+        default=DEFAULT_EXECUTION_OPTIONS.process_execution_graceful_shutdown_timeout,
+        help=softwrap(
+            f"""
+            The time in seconds to wait when gracefully shutting down an interactive process (such
+            as one opened using `{bin_name()} run`) before killing it.
+            """
+        ),
         advanced=True,
     )
     remote_execution = BoolOption(
@@ -1341,7 +1363,7 @@ class BootstrapOptions:
         advanced=True,
         help=softwrap(
             """
-            Whether to log remote cache failures at the `warn` log level.
+            How frequently to log remote cache failures at the `warn` log level.
 
             All errors not logged at the `warn` level will instead be logged at the
             `debug` level.
@@ -1490,6 +1512,16 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         "--exclude-target-regexp",
         help="Exclude targets that match these regexes. This does not impact file arguments.",
         metavar="<regexp>",
+        removal_version="2.14.0.dev0",
+        removal_hint=softwrap(
+            """
+            Use the option `--filter-address-regex` instead, with `-` in front of the regex. For
+            example, `--exclude-target-regexp=dir/` should become `--filter-address-regex=-dir/`.
+
+            The `--filter` options can now be used with any goal, not only the `filter` goal,
+            so there is no need for this option anymore.
+            """
+        ),
     )
 
     files_not_found_behavior = EnumOption(

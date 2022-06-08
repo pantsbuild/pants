@@ -22,7 +22,7 @@ use task_executor::Executor;
 use tempfile::TempDir;
 
 use crate::local::prepare_workdir;
-use crate::{ImmutableInputs, NamedCaches, Process, ProcessMetadata};
+use crate::{ImmutableInputs, NamedCaches, Process, ProcessError, ProcessMetadata};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -88,7 +88,7 @@ impl NailgunPool {
     server_process: Process,
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
-  ) -> Result<BorrowedNailgunProcess, String> {
+  ) -> Result<BorrowedNailgunProcess, ProcessError> {
     let name = server_process.description.clone();
     let requested_fingerprint = NailgunProcessFingerprint::new(name.clone(), &server_process)?;
     let mut process_ref = {
@@ -340,9 +340,9 @@ impl NailgunProcess {
     named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
-  ) -> Result<NailgunProcess, String> {
+  ) -> Result<NailgunProcess, ProcessError> {
     let workdir = tempfile::Builder::new()
-      .prefix("process-execution")
+      .prefix("pants-sandbox-")
       .tempdir_in(workdir_base)
       .map_err(|err| format!("Error making tempdir for nailgun server: {:?}", err))?;
 
@@ -492,7 +492,7 @@ async fn clear_workdir(
 ) -> Result<(), String> {
   // Move all content into a temporary directory.
   let garbage_dir = tempfile::Builder::new()
-    .prefix("process-execution")
+    .prefix("pants-sandbox-")
     .tempdir_in(workdir.parent().unwrap())
     .map_err(|err| {
       format!(

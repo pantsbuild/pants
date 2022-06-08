@@ -271,9 +271,15 @@ def _parse_toml_config(fc: FileContent) -> MutableMapping[str, Any]:
         return toml.loads(fc.content.decode())
     except toml.TomlDecodeError as exc:
         raise InvalidCoverageConfigError(
-            f"Failed to parse the coverage.py config `{fc.path}` as TOML. Please either fix "
-            f"the config or update `[coverage-py].config` and/or "
-            f"`[coverage-py].config_discovery`.\n\nParse error: {repr(exc)}"
+            softwrap(
+                f"""
+                Failed to parse the coverage.py config `{fc.path}` as TOML. Please either fix
+                the config or update `[coverage-py].config` and/or
+                `[coverage-py].config_discovery`.
+
+                Parse error: {repr(exc)}
+                """
+            )
         )
 
 
@@ -284,9 +290,14 @@ def _parse_ini_config(fc: FileContent) -> configparser.ConfigParser:
         return cp
     except configparser.Error as exc:
         raise InvalidCoverageConfigError(
-            f"Failed to parse the coverage.py config `{fc.path}` as INI. Please either fix "
-            f"the config or update `[coverage-py].config` and/or `[coverage-py].config_discovery`."
-            f"\n\nParse error: {repr(exc)}"
+            softwrap(
+                f"""
+                Failed to parse the coverage.py config `{fc.path}` as INI. Please either fix
+                the config or update `[coverage-py].config` and/or `[coverage-py].config_discovery`.
+
+                Parse error: {repr(exc)}
+                """
+            )
         )
 
 

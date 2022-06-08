@@ -298,6 +298,7 @@ class Target:
     plugin_fields: tuple[type[Field], ...]
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
+    name_explicitly_set: bool
 
     @final
     def __init__(
@@ -309,6 +310,7 @@ class Target:
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
         *,
+        name_explicitly_set: bool = True,
         residence_dir: str | None = None,
     ) -> None:
         """Create a target.
@@ -341,6 +343,7 @@ class Target:
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
         self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
+        self.name_explicitly_set = name_explicitly_set
         self.field_values = self._calculate_field_values(unhydrated_values, address)
         self.validate()
 
@@ -1176,7 +1179,7 @@ def _generate_file_level_targets(
         return generated_target_cls(
             generated_target_fields,
             address,
-            union_membership,
+            union_membership=union_membership,
             residence_dir=os.path.dirname(full_fp),
         )
 
@@ -2329,11 +2332,15 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 
     @memoized_property
     def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
-        if not self.supports_transitive_excludes or not self.value:
-            return UnparsedAddressInputs((), owning_address=self.address)
+        val = (
+            (v[2:] for v in self.value if v.startswith("!!"))
+            if self.supports_transitive_excludes and self.value
+            else ()
+        )
         return UnparsedAddressInputs(
-            (v[2:] for v in self.value if v.startswith("!!")),
+            val,
             owning_address=self.address,
+            description_of_origin=f"the `{self.alias}` field from the target {self.address}",
         )
 
 
@@ -2604,7 +2611,11 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.value or (), owning_address=self.address)
+        return UnparsedAddressInputs(
+            self.value or (),
+            owning_address=self.address,
+            description_of_origin=f"the `{self.alias}` from the target {self.address}",
+        )
 
 
 # -----------------------------------------------------------------------------------------------

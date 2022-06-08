@@ -483,7 +483,10 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
     source_dirs = {os.path.dirname(path) for path in source_path_set}
     possible_owners = await Get(
         UnexpandedTargets,
-        RawSpecs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs)),
+        RawSpecs(
+            ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs),
+            description_of_origin="the `tailor` goal",
+        ),
     )
     possible_owners_sources = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(t.get(SourcesField))) for t in possible_owners

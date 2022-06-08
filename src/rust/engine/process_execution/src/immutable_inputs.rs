@@ -6,7 +6,7 @@ use async_oncecell::OnceCell;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::Digest;
 use parking_lot::Mutex;
-use store::Store;
+use store::{Store, StoreError};
 use tempfile::TempDir;
 
 use crate::WorkdirSymlink;
@@ -40,7 +40,7 @@ impl ImmutableInputs {
   }
 
   /// Returns an absolute Path to immutably consume the given Digest from.
-  async fn path(&self, directory_digest: DirectoryDigest) -> Result<PathBuf, String> {
+  async fn path(&self, directory_digest: DirectoryDigest) -> Result<PathBuf, StoreError> {
     let digest = directory_digest.as_digest();
     let cell = self.contents.lock().entry(digest).or_default().clone();
 
@@ -105,7 +105,7 @@ impl ImmutableInputs {
   pub(crate) async fn local_paths(
     &self,
     immutable_inputs: &BTreeMap<RelativePath, DirectoryDigest>,
-  ) -> Result<Vec<WorkdirSymlink>, String> {
+  ) -> Result<Vec<WorkdirSymlink>, StoreError> {
     let dsts = futures::future::try_join_all(
       immutable_inputs
         .values()

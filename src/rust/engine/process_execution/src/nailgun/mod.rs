@@ -13,7 +13,9 @@ use tokio::net::TcpStream;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
-use crate::{Context, FallibleProcessResultWithPlatform, InputDigests, Platform, Process};
+use crate::{
+  Context, FallibleProcessResultWithPlatform, InputDigests, Platform, Process, ProcessError,
+};
 
 #[cfg(test)]
 pub mod tests;
@@ -114,7 +116,7 @@ impl super::CommandRunner for CommandRunner {
     context: Context,
     workunit: &mut RunningWorkunit,
     req: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     if req.input_digests.use_nailgun.is_empty() {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
       return self.inner.run(context, workunit, req).await;

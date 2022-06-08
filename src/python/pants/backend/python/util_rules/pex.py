@@ -59,7 +59,7 @@ from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesF
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import pluralize
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -213,30 +213,50 @@ class PexRequest(EngineAwareParameter):
     def __post_init__(self):
         if self.internal_only and self.platforms:
             raise ValueError(
-                "Internal only PEXes can only constrain interpreters with interpreter_constraints."
-                f"Given platform constraints {self.platforms} for internal only pex request: "
-                f"{self}."
+                softwrap(
+                    f"""
+                    Internal only PEXes can only constrain interpreters with interpreter_constraints.
+                    Given platform constraints {self.platforms} for internal only pex request:
+                    {self}.
+                    """
+                )
             )
         if self.internal_only and self.complete_platforms:
             raise ValueError(
-                "Internal only PEXes can only constrain interpreters with interpreter_constraints."
-                f"Given complete_platform constraints {self.complete_platforms} for internal only "
-                f"pex request: {self}."
+                softwrap(
+                    f"""
+                    Internal only PEXes can only constrain interpreters with interpreter_constraints.
+                    Given complete_platform constraints {self.complete_platforms} for internal only
+                    pex request: {self}.
+                    """
+                )
             )
         if self.python and self.platforms:
             raise ValueError(
-                "Only one of platforms or a specific interpreter may be set. Got "
-                f"both {self.platforms} and {self.python}."
+                softwrap(
+                    f"""
+                    Only one of platforms or a specific interpreter may be set. Got
+                    both {self.platforms} and {self.python}.
+                    """
+                )
             )
         if self.python and self.complete_platforms:
             raise ValueError(
-                "Only one of complete_platforms or a specific interpreter may be set. Got "
-                f"both {self.complete_platforms} and {self.python}."
+                softwrap(
+                    f"""
+                    Only one of complete_platforms or a specific interpreter may be set. Got
+                    both {self.complete_platforms} and {self.python}.
+                    """
+                )
             )
         if self.python and self.interpreter_constraints:
             raise ValueError(
-                "Only one of interpreter_constraints or a specific interpreter may be set. Got "
-                f"both {self.interpreter_constraints} and {self.python}."
+                softwrap(
+                    f"""
+                    Only one of interpreter_constraints or a specific interpreter may be set. Got
+                    both {self.interpreter_constraints} and {self.python}.
+                    """
+                )
             )
 
     def debug_hint(self) -> str:
@@ -428,18 +448,19 @@ async def build_pex(
             loaded_lockfile = request.requirements.from_superset
             # NB: This is also validated in the constructor.
             assert loaded_lockfile.is_pex_native
-            requirements_digests.append(loaded_lockfile.lockfile_digest)
-            argv.extend(["--lock", loaded_lockfile.lockfile_path])
-            argv.extend(pex_lock_resolver_args)
+            if request.requirements.req_strings:
+                requirements_digests.append(loaded_lockfile.lockfile_digest)
+                argv.extend(["--lock", loaded_lockfile.lockfile_path])
+                argv.extend(pex_lock_resolver_args)
 
-            if loaded_lockfile.metadata:
-                validate_metadata(
-                    loaded_lockfile.metadata,
-                    request.interpreter_constraints,
-                    loaded_lockfile.original_lockfile,
-                    request.requirements.req_strings,
-                    python_setup,
-                )
+                if loaded_lockfile.metadata:
+                    validate_metadata(
+                        loaded_lockfile.metadata,
+                        request.interpreter_constraints,
+                        loaded_lockfile.original_lockfile,
+                        request.requirements.req_strings,
+                        python_setup,
+                    )
         else:
             assert request.requirements.from_superset is None
 
@@ -531,22 +552,28 @@ def _build_pex_description(request: PexRequest) -> str:
             return f"Building {request.output_filename}"
         elif isinstance(request.requirements.from_superset, Pex):
             repo_pex = request.requirements.from_superset.name
-            return (
-                f"Extracting {pluralize(len(request.requirements.req_strings), 'requirement')} "
-                f"to build {request.output_filename} from {repo_pex}: "
-                f"{', '.join(request.requirements.req_strings)}"
+            return softwrap(
+                f"""
+                Extracting {pluralize(len(request.requirements.req_strings), 'requirement')}
+                to build {request.output_filename} from {repo_pex}:
+                {', '.join(request.requirements.req_strings)}
+                """
             )
         elif isinstance(request.requirements.from_superset, LoadedLockfile):
             lockfile_path = request.requirements.from_superset.lockfile_path
-            return (
-                f"Building {pluralize(len(request.requirements.req_strings), 'requirement')} "
-                f"for {request.output_filename} from the {lockfile_path} resolve: "
-                f"{', '.join(request.requirements.req_strings)}"
+            return softwrap(
+                f"""
+                Building {pluralize(len(request.requirements.req_strings), 'requirement')}
+                for {request.output_filename} from the {lockfile_path} resolve:
+                {', '.join(request.requirements.req_strings)}
+                """
             )
         else:
-            desc_suffix = (
-                f"with {pluralize(len(request.requirements.req_strings), 'requirement')}: "
-                f"{', '.join(request.requirements.req_strings)}"
+            desc_suffix = softwrap(
+                f"""
+                with {pluralize(len(request.requirements.req_strings), 'requirement')}:
+                {', '.join(request.requirements.req_strings)}
+                """
             )
     return f"Building {request.output_filename} {desc_suffix}"
 

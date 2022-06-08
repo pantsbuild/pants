@@ -24,7 +24,7 @@ use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use log::{debug, info};
 use nails::execution::ExitCode;
 use shell_quote::bash;
-use store::{OneOffStoreFileByDigest, Snapshot, Store};
+use store::{OneOffStoreFileByDigest, Snapshot, Store, StoreError};
 use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
@@ -34,7 +34,7 @@ use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
-  ProcessResultMetadata, ProcessResultSource,
+  ProcessError, ProcessResultMetadata, ProcessResultSource,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -252,7 +252,7 @@ impl super::CommandRunner for CommandRunner {
     context: Context,
     _workunit: &mut RunningWorkunit,
     req: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let req_debug_repr = format!("{:#?}", req);
     in_workunit!(
       "run_local_process",
@@ -264,7 +264,7 @@ impl super::CommandRunner for CommandRunner {
         // Set up a temporary workdir, which will optionally be preserved.
         let (workdir_path, maybe_workdir) = {
           let workdir = tempfile::Builder::new()
-            .prefix("process-execution")
+            .prefix("pants-sandbox-")
             .tempdir_in(&self.work_dir_base)
             .map_err(|err| {
               format!(
@@ -326,7 +326,7 @@ impl super::CommandRunner for CommandRunner {
             //
             // Given that this is expected to be rare, we dump the entire process definition in the
             // error.
-            format!("Failed to execute: {}\n\n{}", req_debug_repr, msg)
+            ProcessError::Unclassified(format!("Failed to execute: {}\n\n{}", req_debug_repr, msg))
           })
           .await;
 
@@ -475,7 +475,7 @@ pub trait CapturedWorkdir {
     workdir_token: Self::WorkdirToken,
     exclusive_spawn: bool,
     platform: Platform,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let start_time = Instant::now();
 
     // Spawn the process.
@@ -570,7 +570,7 @@ pub trait CapturedWorkdir {
           metadata: result_metadata,
         })
       }
-      Err(msg) => Err(msg),
+      Err(msg) => Err(msg.into()),
     }
   }
 
@@ -641,7 +641,7 @@ pub async fn prepare_workdir(
   executor: task_executor::Executor,
   named_caches: &NamedCaches,
   immutable_inputs: &ImmutableInputs,
-) -> Result<bool, String> {
+) -> Result<bool, StoreError> {
   // Collect the symlinks to create for immutable inputs or named caches.
   let workdir_symlinks = immutable_inputs
     .local_paths(&req.input_digests.immutable_inputs)
@@ -677,7 +677,7 @@ pub async fn prepare_workdir(
         Permissions::Writable,
       )
       .await
-  },)
+  })
   .await?;
 
   let workdir_path2 = workdir_path.clone();

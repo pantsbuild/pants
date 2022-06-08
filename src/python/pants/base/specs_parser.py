@@ -115,6 +115,7 @@ class SpecsParser:
         self,
         specs: Iterable[str],
         *,
+        description_of_origin: str,
         convert_dir_literal_to_address_literal: bool,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
     ) -> Specs:
@@ -129,12 +130,14 @@ class SpecsParser:
 
         includes = RawSpecs.create(
             include_specs,
+            description_of_origin=description_of_origin,
             convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
             unmatched_glob_behavior=unmatched_glob_behavior,
             filter_by_global_options=True,
         )
         ignores = RawSpecs.create(
             ignore_specs,
+            description_of_origin=description_of_origin,
             convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
             unmatched_glob_behavior=unmatched_glob_behavior,
             # By setting the below to False, we will end up matching some targets

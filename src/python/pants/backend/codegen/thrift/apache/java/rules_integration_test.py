@@ -27,6 +27,7 @@ from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.source import source_root
 from pants.testutil.rule_runner import RuleRunner, logging
+from pants.testutil.skip_utils import requires_thrift
 
 LIBTHRIFT_RESOLVE = TestCoursierWrapper.new(
     entries=(
@@ -100,6 +101,7 @@ def assert_files_generated(
 
 
 @logging
+@requires_thrift
 def test_generates_python(rule_runner: RuleRunner) -> None:
     # This tests a few things:
     #  * We generate the correct file names.

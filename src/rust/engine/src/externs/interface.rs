@@ -44,7 +44,7 @@ use workunit_store::{
   ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
 };
 
-use crate::externs::fs::PyFileDigest;
+use crate::externs::fs::{todo_possible_store_missing_digest, PyFileDigest};
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -248,6 +248,7 @@ impl PyExecutionStrategyOptions {
     remote_cache_write: bool,
     child_default_memory: usize,
     child_max_memory: usize,
+    graceful_shutdown_timeout: usize,
   ) -> Self {
     Self(ExecutionStrategyOptions {
       local_parallelism,
@@ -259,6 +260,7 @@ impl PyExecutionStrategyOptions {
       remote_cache_write,
       child_default_memory,
       child_max_memory,
+      graceful_shutdown_timeout: Duration::from_secs(graceful_shutdown_timeout.try_into().unwrap()),
     })
   }
 }
@@ -473,7 +475,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
     },
     Err(f) => {
       let (val, python_traceback, engine_traceback) = match f {
-        f @ Failure::Invalidated => {
+        f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
           let msg = format!("{}", f);
           let python_traceback = Failure::native_traceback(&msg);
           (
@@ -782,7 +784,7 @@ async fn workunit_to_py_value(
           })?;
         let snapshot = store::Snapshot::from_digest(store, digest.clone())
           .await
-          .map_err(PyException::new_err)?;
+          .map_err(todo_possible_store_missing_digest)?;
         let gil = Python::acquire_gil();
         let py = gil.python();
         crate::nodes::Snapshot::store_snapshot(py, snapshot).map_err(PyException::new_err)?
@@ -1400,7 +1402,7 @@ fn lease_files_in_graph(
         .executor
         .block_on(core.store().lease_all_recursively(digests.iter()))
     })
-    .map_err(PyException::new_err)
+    .map_err(todo_possible_store_missing_digest)
   })
 }
 
@@ -1487,7 +1489,7 @@ fn ensure_remote_has_recursive(
         .executor
         .block_on(core.store().ensure_remote_has_recursive(digests))
     })
-    .map_err(PyException::new_err)?;
+    .map_err(todo_possible_store_missing_digest)?;
     Ok(())
   })
 }
@@ -1507,7 +1509,7 @@ fn ensure_directory_digest_persisted(
         .executor
         .block_on(core.store().ensure_directory_digest_persisted(digest))
     })
-    .map_err(PyException::new_err)?;
+    .map_err(todo_possible_store_missing_digest)?;
     Ok(())
   })
 }
@@ -1530,17 +1532,13 @@ fn single_file_digests_to_bytes<'py>(
             externs::store_bytes(py, bytes)
           })
           .await
-          .and_then(|maybe_bytes| {
-            maybe_bytes
-              .ok_or_else(|| format!("Error loading bytes from digest: {:?}", py_file_digest.0))
-          })
       }
     });
 
     let bytes_values: Vec<PyObject> = py
       .allow_threads(|| core.executor.block_on(future::try_join_all(digest_futures)))
       .map(|values| values.into_iter().map(|val| val.into()).collect())
-      .map_err(PyException::new_err)?;
+      .map_err(todo_possible_store_missing_digest)?;
 
     let output_list = PyList::new(py, &bytes_values);
     Ok(output_list)
@@ -1577,7 +1575,7 @@ fn write_digest(
         )
         .await
     })
-    .map_err(PyValueError::new_err)
+    .map_err(todo_possible_store_missing_digest)
   })
 }
 

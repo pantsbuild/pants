@@ -112,16 +112,20 @@ def test_pex_lockfile_generation(no_binary: bool, only_binary: bool) -> None:
     wheel = {
         "algorithm": "sha256",
         "hash": "00d2dde5a675579325902536738dd27e4fac1fd68f773fe36c21044eb559e187",
-        "url": "https://files.pythonhosted.org/packages/53/18/"
-        "a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/"
-        "ansicolors-1.1.8-py2.py3-none-any.whl",
+        "url": (
+            "https://files.pythonhosted.org/packages/53/18/"
+            + "a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/"
+            + "ansicolors-1.1.8-py2.py3-none-any.whl"
+        ),
     }
     sdist = {
         "algorithm": "sha256",
         "hash": "99f94f5e3348a0bcd43c82e5fc4414013ccc19d70bd939ad71e0133ce9c372e0",
-        "url": "https://files.pythonhosted.org/packages/76/31/"
-        "7faed52088732704523c259e24c26ce6f2f33fbeff2ff59274560c27628e/"
-        "ansicolors-1.1.8.zip",
+        "url": (
+            "https://files.pythonhosted.org/packages/76/31/"
+            + "7faed52088732704523c259e24c26ce6f2f33fbeff2ff59274560c27628e/"
+            + "ansicolors-1.1.8.zip"
+        ),
     }
 
     artifacts = reqs[0]["artifacts"]

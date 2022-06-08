@@ -209,6 +209,7 @@ class Scheduler:
             remote_parallelism=execution_options.process_execution_remote_parallelism,
             child_max_memory=execution_options.process_total_child_memory_usage or 0,
             child_default_memory=execution_options.process_per_child_memory_usage,
+            graceful_shutdown_timeout=execution_options.process_execution_graceful_shutdown_timeout,
         )
 
         self._py_scheduler = native_engine.scheduler_create(

@@ -17,14 +17,15 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, Tree};
-use store::Store;
+use store::{Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
 
 use crate::remote::make_execute_request;
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
+  ProcessMetadata,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
@@ -183,7 +184,7 @@ impl CommandRunner {
     command: &Command,
     result: &FallibleProcessResultWithPlatform,
     store: &Store,
-  ) -> Result<(ActionResult, Vec<Digest>), String> {
+  ) -> Result<(ActionResult, Vec<Digest>), StoreError> {
     let output_trie = store
       .load_digest_trie(result.output_directory.clone())
       .await?;
@@ -248,8 +249,11 @@ impl CommandRunner {
     cache_lookup_start: Instant,
     action_digest: Digest,
     request: &Process,
-    mut local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, String>>,
-  ) -> Result<(FallibleProcessResultWithPlatform, bool), String> {
+    mut local_execution_future: BoxFuture<
+      '_,
+      Result<FallibleProcessResultWithPlatform, ProcessError>,
+    >,
+  ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
     // A future to read from the cache and log the results accordingly.
     let cache_read_future = async {
       let response = crate::remote::check_action_cache(
@@ -274,7 +278,7 @@ impl CommandRunner {
           cached_response_opt
         }
         Err(err) => {
-          self.log_cache_error(err, CacheErrorType::ReadError);
+          self.log_cache_error(err.to_string(), CacheErrorType::ReadError);
           None
         }
       }
@@ -333,7 +337,7 @@ impl CommandRunner {
     command: &Command,
     action_digest: Digest,
     command_digest: Digest,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     // Upload the Action and Command, but not the input files. See #12432.
     // Assumption: The Action and Command have already been stored locally.
     crate::remote::ensure_action_uploaded(&self.store, command_digest, action_digest, None).await?;
@@ -422,7 +426,7 @@ impl crate::CommandRunner for CommandRunner {
     context: Context,
     workunit: &mut RunningWorkunit,
     request: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let (action, command, _execute_request) =
@@ -473,7 +477,7 @@ impl crate::CommandRunner for CommandRunner {
           match write_result {
             Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
             Err(err) => {
-              command_runner.log_cache_error(err, CacheErrorType::WriteError);
+              command_runner.log_cache_error(err.to_string(), CacheErrorType::WriteError);
               workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
             }
           };

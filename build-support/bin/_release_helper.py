@@ -75,8 +75,11 @@ _expected_maintainers = {"EricArellano", "gshuflin", "illicitonion", "wisechengy
 
 # Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
 # otherwise inclusion of that plugin will fail due to its `pytest` import not being included in the pex.
+#
+# Disable the explorer backend, as that is packaged into a dedicated Python distribution and thus
+# not included in the pex either.
 DISABLED_BACKENDS_CONFIG = {
-    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures"]',
+    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants.backend.explorer"]',
 }
 
 
@@ -783,6 +786,7 @@ def build_fs_util() -> None:
 def build_pex(fetch: bool) -> None:
     stable = os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE"
     if fetch:
+        # TODO: Support macOS on ARM64.
         extra_pex_args = [
             "--python-shebang",
             "/usr/bin/env python",
@@ -797,6 +801,7 @@ def build_pex(fetch: bool) -> None:
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
         banner(f"Building {pex_name} by fetching wheels.")
     else:
+        # TODO: Support macOS on ARM64. Will require qualifying the pex name with the arch.
         major, minor = sys.version_info[:2]
         extra_pex_args = [
             f"--interpreter-constraint=CPython=={major}.{minor}.*",
@@ -1237,13 +1242,14 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
         if not local_files:
             missing_packages.append(package.name)
             continue
-        if is_cross_platform(local_files) and len(local_files) != 6:
-            formatted_local_files = ", ".join(f.name for f in local_files)
+        if is_cross_platform(local_files) and len(local_files) != 7:
+            formatted_local_files = "\n    ".join(sorted(f.name for f in local_files))
             missing_packages.append(
                 softwrap(
                     f"""
-                    {package.name} (expected 6 wheels, {{macosx, linux}} x {{cp37m, cp38, cp39}},
-                    but found {formatted_local_files})
+                    {package.name}. Expected 7 wheels ({{cp37m, cp38, cp39}} x
+                    {{macosx-x86_64, linux-x86_64}} + cp39-macosx),
+                    but found {len(local_files)}:\n    {formatted_local_files}
                     """
                 )
             )
