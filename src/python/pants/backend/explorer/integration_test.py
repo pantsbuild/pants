@@ -66,6 +66,8 @@ def test_explorer_graphql_query(query: dict, expected_result: dict) -> None:
             assert rsp.json() == expected_result
             print("GRAPHQL query passed!")
         else:
+            # This is unexpected and wrong, but seems to be the case when run during CI.
+            # TODO: figure out why, and fix, but allow for now to unblock.
             print("GRAPHQL query skipped, backend api did not startup properly.")
 
         handle.process.terminate()
