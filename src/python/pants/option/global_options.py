@@ -340,6 +340,7 @@ class ExecutionOptions:
     process_execution_local_enable_nailgun: bool
     process_execution_remote_parallelism: int
     process_execution_cache_namespace: str | None
+    process_execution_graceful_shutdown_timeout: int
 
     process_total_child_memory_usage: int | None
     process_per_child_memory_usage: int
@@ -383,6 +384,7 @@ class ExecutionOptions:
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
+            process_execution_graceful_shutdown_timeout=bootstrap_options.process_execution_graceful_shutdown_timeout,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
@@ -469,6 +471,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_cleanup=True,
     local_cache=True,
     process_execution_local_enable_nailgun=True,
+    process_execution_graceful_shutdown_timeout=3,
     # Remote store setup.
     remote_store_address=None,
     remote_store_headers={
@@ -1142,6 +1145,17 @@ class BootstrapOptions:
         "--process-execution-local-enable-nailgun",
         default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
         help="Whether or not to use nailgun to run JVM requests that are marked as supporting nailgun.",
+        advanced=True,
+    )
+    process_execution_graceful_shutdown_timeout = IntOption(
+        "--process-execution-graceful-shutdown-timeout",
+        default=DEFAULT_EXECUTION_OPTIONS.process_execution_graceful_shutdown_timeout,
+        help=softwrap(
+            f"""
+            The time in seconds to wait when gracefully shutting down an interactive process (such
+            as one opened using `{bin_name()} run`) before killing it.
+            """
+        ),
         advanced=True,
     )
     remote_execution = BoolOption(

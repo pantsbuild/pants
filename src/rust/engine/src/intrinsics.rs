@@ -707,7 +707,7 @@ fn interactive_process(
               .try_clone_as_file()
               .map_err(|e| format!("Couldn't clone stderr: {}", e))?,
           ));
-        let mut subprocess = ManagedChild::spawn(command)?;
+        let mut subprocess = ManagedChild::spawn(command, context.core.graceful_shutdown_timeout)?;
         tokio::select! {
           _ = session.cancelled() => {
             // The Session was cancelled: attempt to kill the process group / process, and
