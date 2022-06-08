@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -15,7 +15,7 @@ use protos::gen::google::longrunning::Operation;
 use remexec::ExecutedActionMetadata;
 use spectral::prelude::*;
 use spectral::{assert_that, string::StrAssertions};
-use store::{SnapshotOps, Store};
+use store::{SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
@@ -24,7 +24,7 @@ use workunit_store::{RunId, WorkunitStore};
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
-  Platform, Process, ProcessCacheScope, ProcessMetadata,
+  Platform, Process, ProcessCacheScope, ProcessError, ProcessMetadata,
 };
 use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
@@ -571,7 +571,7 @@ async fn make_execute_request_using_immutable_inputs() {
       map.insert(prefix.clone(), input_directory.directory_digest());
       map
     },
-    vec![],
+    BTreeSet::new(),
   )
   .await
   .unwrap();
@@ -886,8 +886,8 @@ async fn server_rejecting_execute_request_gives_error() {
   let error = run_command_remote(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
-  assert_that(&error).contains("InvalidArgument");
-  assert_that(&error).contains("Did not expect this request");
+  assert_that(&error.to_string()).contains("InvalidArgument");
+  assert_that(&error.to_string()).contains("Did not expect this request");
 }
 
 #[tokio::test]
@@ -1221,7 +1221,6 @@ async fn ensure_inline_stdio_is_stored() {
       local_store
         .load_file_bytes_with(test_stdout.digest(), |v| Bytes::copy_from_slice(v))
         .await
-        .unwrap()
         .unwrap(),
       test_stdout.bytes()
     );
@@ -1229,7 +1228,6 @@ async fn ensure_inline_stdio_is_stored() {
       local_store
         .load_file_bytes_with(test_stderr.digest(), |v| Bytes::copy_from_slice(v))
         .await
-        .unwrap()
         .unwrap(),
       test_stderr.bytes()
     );
@@ -1325,7 +1323,7 @@ async fn initial_response_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(result, "Internal: Something went wrong");
+  assert_eq!(result.to_string(), "Internal: Something went wrong");
 }
 
 #[tokio::test]
@@ -1368,7 +1366,10 @@ async fn initial_response_missing_response_and_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(result, "Operation finished but no response supplied");
+  assert_eq!(
+    result.to_string(),
+    "Operation finished but no response supplied"
+  );
 }
 
 #[tokio::test]
@@ -1425,7 +1426,7 @@ async fn fails_after_retry_limit_exceeded() {
     .expect_err("Expected error");
 
   assert_eq!(
-    result,
+    result.to_string(),
     "Too many failures from server. The last error was: the bot running the task appears to be lost"
   );
 }
@@ -1485,7 +1486,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
     .expect_err("Expected error");
 
   assert_eq!(
-    result,
+    result.to_string(),
     "Too many failures from server. The last event was the server disconnecting with no error given."
   );
 }
@@ -1665,7 +1666,7 @@ async fn execute_missing_file_errors_if_unknown() {
     .run(Context::default(), &mut workunit, cat_roland_request())
     .await
     .expect_err("Want error");
-  assert_contains(&error, &format!("{}", missing_digest.hash));
+  assert_contains(&error.to_string(), &format!("{}", missing_digest.hash));
 }
 
 #[tokio::test]
@@ -1759,7 +1760,7 @@ async fn extract_execute_response_missing_digests() {
 
   assert_eq!(
     extract_execute_response(operation, Platform::Linux_x86_64).await,
-    Err(ExecutionError::MissingDigests(missing_files))
+    Err(ExecutionError::MissingRemoteDigests(missing_files))
   );
 }
 
@@ -1780,7 +1781,7 @@ async fn extract_execute_response_missing_other_things() {
     .unwrap();
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "monkeys"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -1798,7 +1799,7 @@ async fn extract_execute_response_other_failed_precondition() {
     .unwrap();
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "OUT_OF_CAPACITY"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -1813,7 +1814,9 @@ async fn extract_execute_response_missing_without_list() {
     .unwrap();
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
+    Err(ExecutionError::Fatal(err)) => {
+      assert_contains(&err.to_string().to_lowercase(), "precondition")
+    }
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -1839,7 +1842,7 @@ async fn extract_execute_response_other_status() {
   };
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PermissionDenied"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "PermissionDenied"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -2291,19 +2294,17 @@ pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
   request: Process,
   command_runner: R,
   store: Store,
-) -> Result<RemoteTestResult, String> {
+) -> Result<RemoteTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let original = command_runner
     .run(Context::default(), &mut workunit, request)
     .await?;
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   let stderr_bytes = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2338,7 +2339,10 @@ fn create_command_runner(
   (command_runner, store)
 }
 
-async fn run_command_remote(address: String, request: Process) -> Result<RemoteTestResult, String> {
+async fn run_command_remote(
+  address: String,
+  request: Process,
+) -> Result<RemoteTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
@@ -2352,12 +2356,10 @@ async fn run_command_remote(address: String, request: Process) -> Result<RemoteT
 
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   let stderr_bytes = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
-    .await?
-    .unwrap();
+    .await?;
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2407,13 +2409,11 @@ async fn extract_execute_response(
   let stdout_bytes: Vec<u8> = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   let stderr_bytes: Vec<u8> = store
     .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   Ok(RemoteTestResult {
@@ -2425,7 +2425,7 @@ async fn extract_execute_response(
 
 async fn extract_output_files_from_response(
   execute_response: &remexec::ExecuteResponse,
-) -> Result<Digest, String> {
+) -> Result<Digest, StoreError> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())

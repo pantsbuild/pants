@@ -21,7 +21,7 @@ use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
-  Process, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
+  Process, ProcessError, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
   RemoteCacheWarningsBehavior,
 };
 
@@ -30,7 +30,7 @@ const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 /// A mock of the local runner used for better hermeticity of the tests.
 #[derive(Clone)]
 struct MockLocalCommandRunner {
-  result: Result<FallibleProcessResultWithPlatform, String>,
+  result: Result<FallibleProcessResultWithPlatform, ProcessError>,
   call_counter: Arc<AtomicUsize>,
   delay: Duration,
 }
@@ -63,7 +63,7 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     _context: Context,
     _workunit: &mut RunningWorkunit,
     _req: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     sleep(self.delay).await;
     self.call_counter.fetch_add(1, Ordering::SeqCst);
     self.result.clone()
@@ -562,7 +562,7 @@ async fn make_action_result_basic() {
       _context: Context,
       _workunit: &mut RunningWorkunit,
       _req: Process,
-    ) -> Result<FallibleProcessResultWithPlatform, String> {
+    ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
       unimplemented!()
     }
   }

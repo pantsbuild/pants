@@ -41,7 +41,7 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
-use store::{SnapshotOps, Store};
+use store::Store;
 use structopt::StructOpt;
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
@@ -342,13 +342,11 @@ async fn main() {
   let stdout: Vec<u8> = store
     .load_file_bytes_with(result.stdout_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   let stderr: Vec<u8> = store
     .load_file_bytes_with(result.stderr_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
     .unwrap();
 
   print!("{}", String::from_utf8(stdout).unwrap());
@@ -419,7 +417,7 @@ async fn make_request_from_flat_args(
     store,
     DirectoryDigest::from_persisted_digest(input_files),
     BTreeMap::default(),
-    vec![],
+    BTreeSet::default(),
   )
   .await
   .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
@@ -458,8 +456,8 @@ async fn extract_request_from_action_digest(
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let action = store
     .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
-    .await?
-    .ok_or_else(|| format!("Could not find action proto in CAS: {:?}", action_digest))?
+    .await
+    .map_err(|e| e.enrich("Could not load action proto from CAS").to_string())?
     .map_err(|err| {
       format!(
         "Error deserializing action proto {:?}: {:?}",
@@ -471,8 +469,11 @@ async fn extract_request_from_action_digest(
     .map_err(|err| format!("Bad Command digest: {:?}", err))?;
   let command = store
     .load_file_bytes_with(command_digest, |bytes| Command::decode(bytes))
-    .await?
-    .ok_or_else(|| format!("Could not find command proto in CAS: {:?}", command_digest))?
+    .await
+    .map_err(|e| {
+      e.enrich("Could not load command proto from CAS")
+        .to_string()
+    })?
     .map_err(|err| {
       format!(
         "Error deserializing command proto {:?}: {:?}",
@@ -496,8 +497,9 @@ async fn extract_request_from_action_digest(
   // In case the local Store doesn't have the input root Directory,
   // have it fetch it and identify it as a Directory, so that it doesn't get confused about the unknown metadata.
   store
-    .load_directory_or_err(input_digests.complete.as_digest())
-    .await?;
+    .load_directory(input_digests.complete.as_digest())
+    .await
+    .map_err(|e| e.to_string())?;
 
   let process = process_execution::Process {
     argv: command.arguments,
@@ -584,8 +586,8 @@ async fn extract_request_from_buildbarn_url(
         .load_file_bytes_with(action_result_digest, |bytes| {
           UncachedActionResult::decode(bytes)
         })
-        .await?
-        .ok_or_else(|| "Couldn't fetch action result proto".to_owned())?
+        .await
+        .map_err(|e| e.enrich("Could not load action result proto").to_string())?
         .map_err(|err| format!("Error deserializing action result proto: {:?}", err))?;
 
       require_digest(&action_result.action_digest)?

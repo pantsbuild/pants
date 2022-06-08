@@ -504,14 +504,14 @@ impl PosixFS {
           compute_metadata,
         )
       })
-      .filter(|s| match s {
-        Ok(ref s) =>
-        // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
-        // git-style ignore patterns, we need to know whether a path represents a directory.
-        {
-          !self.ignore.is_ignored(s)
+      .filter_map(|s| match s {
+        Ok(Some(s)) if !self.ignore.is_ignored(&s) => {
+          // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
+          // git-style ignore patterns, we need to know whether a path represents a directory.
+          Some(Ok(s))
         }
-        Err(_) => true,
+        Ok(_) => None,
+        Err(e) => Some(Err(e)),
       })
       .collect::<Result<Vec<_>, io::Error>>()
       .map_err(|e| {
@@ -520,7 +520,6 @@ impl PosixFS {
           format!("Failed to scan directory {:?}: {}", dir_abs, e),
         )
       })?;
-    #[allow(clippy::unnecessary_sort_by)]
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(DirectoryListing(stats))
   }
@@ -581,7 +580,7 @@ impl PosixFS {
     path_for_stat: PathBuf,
     file_type: std::fs::FileType,
     compute_metadata: F,
-  ) -> Result<Stat, io::Error>
+  ) -> Result<Option<Stat>, io::Error>
   where
     F: FnOnce() -> Result<std::fs::Metadata, io::Error>,
   {
@@ -605,23 +604,17 @@ impl PosixFS {
       ));
     }
     if file_type.is_symlink() {
-      Ok(Stat::Link(Link(path_for_stat)))
+      Ok(Some(Stat::Link(Link(path_for_stat))))
     } else if file_type.is_file() {
       let is_executable = compute_metadata()?.permissions().mode() & 0o100 == 0o100;
-      Ok(Stat::File(File {
+      Ok(Some(Stat::File(File {
         path: path_for_stat,
         is_executable: is_executable,
-      }))
+      })))
     } else if file_type.is_dir() {
-      Ok(Stat::Dir(Dir(path_for_stat)))
+      Ok(Some(Stat::Dir(Dir(path_for_stat))))
     } else {
-      Err(io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!(
-          "Expected File, Dir or Link, but {:?} (relative to {:?}) was a {:?}",
-          path_for_stat, absolute_path_to_root, file_type
-        ),
-      ))
+      Ok(None)
     }
   }
 
@@ -631,18 +624,16 @@ impl PosixFS {
       SymlinkBehavior::Aware => fs::symlink_metadata(abs_path),
       SymlinkBehavior::Oblivious => fs::metadata(abs_path),
     };
-    let stat_result = metadata.and_then(|metadata| {
-      PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
-        Ok(metadata)
+    metadata
+      .and_then(|metadata| {
+        PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
+          Ok(metadata)
+        })
       })
-    });
-    match stat_result {
-      Ok(v) => Ok(Some(v)),
-      Err(err) => match err.kind() {
+      .or_else(|err| match err.kind() {
         io::ErrorKind::NotFound => Ok(None),
         _ => Err(err),
-      },
-    }
+      })
   }
 }
 
