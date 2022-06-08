@@ -503,7 +503,9 @@ async def validate_python_dependencies(
     dependencies = await MultiGet(
         Get(
             WrappedTarget,
-            WrappedTargetRequest(d, description_of_origin=f"the dependencies of {request.address}"),
+            WrappedTargetRequest(
+                d, description_of_origin=f"the dependencies of {request.field_set.address}"
+            ),
         )
         for d in request.dependencies
     )
