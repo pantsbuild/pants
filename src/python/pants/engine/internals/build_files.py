@@ -7,8 +7,7 @@ import os.path
 from dataclasses import dataclass
 from typing import Any
 
-from pants.base.exceptions import ResolveError
-from pants.build_graph.address import BuildFileAddressRequest
+from pants.build_graph.address import BuildFileAddressRequest, ResolveError
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths

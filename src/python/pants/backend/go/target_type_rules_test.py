@@ -29,8 +29,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
-from pants.base.exceptions import ResolveError
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, ResolveError
 from pants.core.target_types import (
     GenericTarget,
     TargetGeneratorSourcesHelperSourcesField,
