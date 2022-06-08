@@ -387,7 +387,10 @@ def test_raw_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> 
         expected="'fake/f.txt' does not exist on disk",
     )
     did_you_mean = ResolveError.did_you_mean(
-        bad_name="fake_tgt", known_names=["real"], namespace="real"
+        Address("real", target_name="fake_tgt"),
+        description_of_origin="tests",
+        known_names=["real"],
+        namespace="real"
     )
     assert_resolve_error(AddressLiteralSpec("real", "fake_tgt"), expected=str(did_you_mean))
     assert_resolve_error(AddressLiteralSpec("real/f.txt", "fake_tgt"), expected=str(did_you_mean))
