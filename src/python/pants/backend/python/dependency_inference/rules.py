@@ -463,7 +463,9 @@ class InferInitDependencies(InferDependenciesRequest):
 
 @rule(desc="Inferring dependencies on `__init__.py` files")
 async def infer_python_init_dependencies(
-    request: InferInitDependencies, python_infer_subsystem: PythonInferSubsystem
+    request: InferInitDependencies,
+    python_infer_subsystem: PythonInferSubsystem,
+    python_setup: PythonSetup,
 ) -> InferredDependencies:
     if (
         not python_infer_subsystem.options.is_default("inits") and not python_infer_subsystem.inits
@@ -485,8 +487,20 @@ async def infer_python_init_dependencies(
         ),
     )
     owners = await MultiGet(Get(Owners, OwnersRequest((f,))) for f in init_files.snapshot.files)
-    owner_tgts = await Get(Targets, Addresses(itertools.chain.from_iterable(owners)))
-    python_owners = [tgt.address for tgt in owner_tgts if tgt.has_field(PythonSourceField)]
+
+    original_tgt, owner_tgts = await MultiGet(
+        Get(WrappedTarget, Address, request.sources_field.address),
+        Get(Targets, Addresses(itertools.chain.from_iterable(owners))),
+    )
+    resolve = original_tgt.target[PythonResolveField].normalized_value(python_setup)
+    python_owners = [
+        tgt.address
+        for tgt in owner_tgts
+        if (
+            tgt.has_field(PythonSourceField)
+            and tgt[PythonResolveField].normalized_value(python_setup) == resolve
+        )
+    ]
     return InferredDependencies(python_owners)
 
 
@@ -498,6 +512,7 @@ class InferConftestDependencies(InferDependenciesRequest):
 async def infer_python_conftest_dependencies(
     request: InferConftestDependencies,
     python_infer_subsystem: PythonInferSubsystem,
+    python_setup: PythonSetup,
 ) -> InferredDependencies:
     if not python_infer_subsystem.conftests:
         return InferredDependencies([])
@@ -514,7 +529,21 @@ async def infer_python_conftest_dependencies(
         Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
         for f in conftest_files.snapshot.files
     )
-    return InferredDependencies(itertools.chain.from_iterable(owners))
+
+    original_tgt, owner_tgts = await MultiGet(
+        Get(WrappedTarget, Address, request.sources_field.address),
+        Get(Targets, Addresses(itertools.chain.from_iterable(owners))),
+    )
+    resolve = original_tgt.target[PythonResolveField].normalized_value(python_setup)
+    python_owners = [
+        tgt.address
+        for tgt in owner_tgts
+        if (
+            tgt.has_field(PythonSourceField)
+            and tgt[PythonResolveField].normalized_value(python_setup) == resolve
+        )
+    ]
+    return InferredDependencies(python_owners)
 
 
 # This is a separate function to facilitate tests registering import inference.
