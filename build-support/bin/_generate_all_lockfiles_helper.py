@@ -29,6 +29,7 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.lint.yapf.subsystem import Yapf
+from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
@@ -104,6 +105,7 @@ AllTools = (
     DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),
     DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),
     DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
+    DefaultTool.python(DebugPy),
     DefaultTool.python(IPython),
     DefaultTool.python(Setuptools),
     DefaultTool.python(SetuptoolsSCM),

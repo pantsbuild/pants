@@ -28,7 +28,7 @@ from pants.engine.process import (
     InteractiveProcessResult,
     ProcessResultMetadata,
 )
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -182,6 +182,18 @@ class TestDebugRequest:
     __test__ = False
 
 
+@dataclass(frozen=True)
+class TestDebugAdaptorRequest:
+    """Like TestDebugRequest, but launches the test process using the relevant Debug Adaptor server.
+
+    The process should be launched waiting for the client to connect.
+    """
+
+    process: InteractiveProcess | None
+
+    __test__ = False
+
+
 @union
 @dataclass(frozen=True)
 class TestFieldSet(FieldSet, metaclass=ABCMeta):
@@ -311,6 +323,21 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
+    use_debug_adaptor = BoolOption(
+        "--use-debug-adaptor",
+        default=False,
+        help=softwrap(
+            """
+            Run tests sequentially in an interactive process, using a Debug Adaptor
+            (https://microsoft.github.io/debug-adapter-protocol/) for the language if supported.
+
+            The interactive process used will be immediately blocked waiting for a client before
+            continuing.
+
+            This option implies --debug.
+            """
+        ),
+    )
     force = BoolOption(
         "--force",
         default=False,
@@ -388,6 +415,42 @@ class Test(Goal):
     __test__ = False
 
 
+@rule_helper
+async def _run_debug_tests(
+    test_subsystem: TestSubsystem,
+) -> Test:
+    targets_to_valid_field_sets = await Get(
+        TargetRootsToFieldSets,
+        TargetRootsToFieldSetsRequest(
+            TestFieldSet,
+            goal_description="`test --debug`",
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
+        ),
+    )
+    debug_requests = await MultiGet(
+        (
+            Get(TestDebugAdaptorRequest, TestFieldSet, field_set)
+            # if test_subsystem.use_debug_adaptor
+            # else Get(TestDebugRequest, TestFieldSet, field_set)
+            # Get(TestDebugRequest, TestFieldSet, field_set)
+        )
+        for field_set in targets_to_valid_field_sets.field_sets
+    )
+    exit_code = 0
+    for debug_request, field_set in zip(debug_requests, targets_to_valid_field_sets.field_sets):
+        if debug_request.process is None:
+            if test_subsystem.use_debug_adaptor:
+                logger.info(f"Couldn't find a supported DAP server for {field_set.address}")
+            logger.debug(f"Skipping tests for {field_set.address}")
+            continue
+        debug_result = await Effect(
+            InteractiveProcessResult, InteractiveProcess, debug_request.process
+        )
+        if debug_result.exit_code != 0:
+            exit_code = debug_result.exit_code
+    return Test(exit_code)
+
+
 @goal_rule
 async def run_tests(
     console: Console,
@@ -397,30 +460,8 @@ async def run_tests(
     distdir: DistDir,
     run_id: RunId,
 ) -> Test:
-    if test_subsystem.debug:
-        targets_to_valid_field_sets = await Get(
-            TargetRootsToFieldSets,
-            TargetRootsToFieldSetsRequest(
-                TestFieldSet,
-                goal_description="`test --debug`",
-                no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-            ),
-        )
-        debug_requests = await MultiGet(
-            Get(TestDebugRequest, TestFieldSet, field_set)
-            for field_set in targets_to_valid_field_sets.field_sets
-        )
-        exit_code = 0
-        for debug_request, field_set in zip(debug_requests, targets_to_valid_field_sets.field_sets):
-            if debug_request.process is None:
-                logger.debug(f"Skipping tests for {field_set.address}")
-                continue
-            debug_result = await Effect(
-                InteractiveProcessResult, InteractiveProcess, debug_request.process
-            )
-            if debug_result.exit_code != 0:
-                exit_code = debug_result.exit_code
-        return Test(exit_code)
+    if test_subsystem.debug or test_subsystem.use_debug_adaptor:
+        return await _run_debug_tests(test_subsystem)
 
     shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
     targets_to_valid_field_sets = await Get(
