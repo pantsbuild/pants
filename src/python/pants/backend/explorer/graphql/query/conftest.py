@@ -63,9 +63,7 @@ def queries() -> str:
     return dedent(
         """\
         query TestRulesQuery($name: String, $limit: Int) {
-          rules(query:{nameRe: $name, limit: $limit}) {
-            name
-          }
+          rules(query:{nameRe: $name, limit: $limit}) { name }
         }
 
         query TestTargetsQuery($specs: [String!], $targetType: String, $limit: Int) {
