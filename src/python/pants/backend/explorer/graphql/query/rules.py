@@ -56,10 +56,10 @@ class RulesQuery:
             print(f"= {name_pattern} ~~ {info.name} ...")
             if name_pattern and not re.search(name_pattern, info.name):
                 continue
+            if query.limit is not None and count >= query.limit:
+                return
             yield info
             count += 1
-            if query.limit and count >= query.limit:
-                return
 
 
 @strawberry.type

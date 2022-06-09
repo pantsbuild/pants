@@ -101,10 +101,10 @@ class TargetTypesQuery:
         for info in target_types:
             if alias_pattern and not re.match(alias_pattern, info.alias):
                 continue
+            if query.limit is not None and count >= query.limit:
+                return
             yield info
             count += 1
-            if query.limit and count >= query.limit:
-                return
 
 
 @strawberry.input(description="Filter targets based on the supplied query.")
@@ -136,10 +136,10 @@ class TargetsQuery:
         for data in targets:
             if query.target_type and data.target.alias != query.target_type:
                 continue
+            if query.limit is not None and count >= query.limit:
+                return
             yield data
             count += 1
-            if query.limit and count >= query.limit:
-                return
 
 
 @strawberry.type(description="Get targets related info.")
