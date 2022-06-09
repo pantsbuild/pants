@@ -330,7 +330,6 @@ def test_infer_python_inits() -> None:
     )
     rule_runner.set_options(
         [
-            f"--python-infer-init-files={behavior.value}",
             "--python-resolves={'a': '', 'b': ''}",
             "--python-default-resolve=a",
             "--python-enable-resolves",
