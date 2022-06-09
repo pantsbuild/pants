@@ -8,7 +8,13 @@ from dataclasses import dataclass
 
 from pants.backend.java.subsystems.junit import JUnit
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.goals.test import (
+    TestDebugAdaptorRequest,
+    TestDebugRequest,
+    TestFieldSet,
+    TestResult,
+    TestSubsystem,
+)
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -175,6 +181,13 @@ async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRe
         InteractiveProcessRequest(process, forward_signals_to_process=False, restartable=True),
     )
     return TestDebugRequest(interactive_process)
+
+
+@rule
+async def setup_junit_debug_adaptor_request(
+    field_set: JunitTestFieldSet,
+) -> TestDebugAdaptorRequest:
+    raise NotImplementedError("Debugging Java using a debug adaptor has not yet been implemented.")
 
 
 @rule

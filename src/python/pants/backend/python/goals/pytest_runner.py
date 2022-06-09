@@ -27,8 +27,8 @@ from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
     RuntimePackageDependenciesField,
-    TestDebugRequest,
     TestDebugAdaptorRequest,
+    TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
     TestResult,
@@ -400,7 +400,7 @@ async def debugpy_python_test(
     pytest: PyTest,
 ) -> TestDebugAdaptorRequest:
     debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
-    if pytest.spec != "pytest":
+    if pytest.main.spec != "pytest":
         logger.warn(
             softwrap(
                 """

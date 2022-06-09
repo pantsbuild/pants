@@ -28,7 +28,7 @@ from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTa
 from pants.backend.python.macros.poetry_requirements import PoetryRequirementsTargetGenerator
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
-from pants.backend.python.subsystems import ipython, pytest, python_native_code, setuptools, debugpy
+from pants.backend.python.subsystems import debugpy, ipython, pytest, python_native_code, setuptools
 from pants.backend.python.target_types import (
     PexBinariesGeneratorTarget,
     PexBinary,

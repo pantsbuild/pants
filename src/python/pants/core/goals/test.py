@@ -182,16 +182,11 @@ class TestDebugRequest:
     __test__ = False
 
 
-@dataclass(frozen=True)
-class TestDebugAdaptorRequest:
+class TestDebugAdaptorRequest(TestDebugRequest):
     """Like TestDebugRequest, but launches the test process using the relevant Debug Adaptor server.
 
     The process should be launched waiting for the client to connect.
     """
-
-    process: InteractiveProcess | None
-
-    __test__ = False
 
 
 @union
@@ -429,9 +424,9 @@ async def _run_debug_tests(
     )
     debug_requests = await MultiGet(
         (
-            Get(TestDebugAdaptorRequest, TestFieldSet, field_set)
-            if test_subsystem.use_debug_adaptor
-            else Get(TestDebugRequest, TestFieldSet, field_set)
+            Get(TestDebugRequest, TestFieldSet, field_set)
+            if not test_subsystem.use_debug_adaptor
+            else Get(TestDebugAdaptorRequest, TestFieldSet, field_set)
         )
         for field_set in targets_to_valid_field_sets.field_sets
     )
