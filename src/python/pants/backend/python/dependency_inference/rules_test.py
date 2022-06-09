@@ -330,6 +330,7 @@ def test_infer_python_inits() -> None:
     )
     rule_runner.set_options(
         [
+            "--python-infer-inits",
             "--python-resolves={'a': '', 'b': ''}",
             "--python-default-resolve=a",
             "--python-enable-resolves",
