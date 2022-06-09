@@ -439,7 +439,7 @@ async def _run_debug_tests(
     for debug_request, field_set in zip(debug_requests, targets_to_valid_field_sets.field_sets):
         if debug_request.process is None:
             if test_subsystem.use_debug_adaptor:
-                logger.info(f"Couldn't find a supported DAP server for {field_set.address}")
+                logger.info(f"Pants doesnt have an adaptor for {field_set.address}. Skipping test.")
             logger.debug(f"Skipping tests for {field_set.address}")
             continue
         debug_result = await Effect(
