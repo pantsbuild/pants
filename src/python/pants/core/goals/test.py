@@ -318,8 +318,8 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
-    use_debug_adaptor = BoolOption(
-        "--use-debug-adaptor",
+    debug_adaptor = BoolOption(
+        "--debug-adaptor",
         default=False,
         help=softwrap(
             """
@@ -425,7 +425,7 @@ async def _run_debug_tests(
     debug_requests = await MultiGet(
         (
             Get(TestDebugRequest, TestFieldSet, field_set)
-            if not test_subsystem.use_debug_adaptor
+            if not test_subsystem.debug_adaptor
             else Get(TestDebugAdaptorRequest, TestFieldSet, field_set)
         )
         for field_set in targets_to_valid_field_sets.field_sets
@@ -433,10 +433,14 @@ async def _run_debug_tests(
     exit_code = 0
     for debug_request, field_set in zip(debug_requests, targets_to_valid_field_sets.field_sets):
         if debug_request.process is None:
-            if test_subsystem.use_debug_adaptor:
+            if test_subsystem.debug_adaptor:
                 logger.info(f"Pants doesnt have an adaptor for {field_set.address}. Skipping test.")
             logger.debug(f"Skipping tests for {field_set.address}")
             continue
+
+        if test_subsystem.debug_adaptor:
+            logger.info("Launching debug adaptor. Waiting for client connection...")
+
         debug_result = await Effect(
             InteractiveProcessResult, InteractiveProcess, debug_request.process
         )
@@ -454,7 +458,7 @@ async def run_tests(
     distdir: DistDir,
     run_id: RunId,
 ) -> Test:
-    if test_subsystem.debug or test_subsystem.use_debug_adaptor:
+    if test_subsystem.debug or test_subsystem.debug_adaptor:
         return await _run_debug_tests(test_subsystem)
 
     shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")

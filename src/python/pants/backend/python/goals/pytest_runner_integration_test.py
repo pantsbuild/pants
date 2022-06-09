@@ -29,6 +29,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.core.goals.test import (
+    TestDebugAdaptorRequest,
     TestDebugRequest,
     TestResult,
     build_runtime_package_dependencies,
@@ -67,6 +68,7 @@ def rule_runner() -> RuleRunner:
             *setuptools_rules(),
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
+            QueryRule(TestDebugAdaptorRequest, (PythonTestFieldSet,)),
         ],
         target_types=[
             PexBinary,
@@ -578,3 +580,37 @@ def test_skip_tests(rule_runner: RuleRunner) -> None:
 
     assert not is_applicable("t1", "test_skip_me.py")
     assert is_applicable("t2", "test_foo.py")
+
+
+def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/test_foo.py": "",
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_tests(name='tests')
+                """
+            ),
+        }
+    )
+
+    args = [
+        "--backend-packages=pants.backend.python",
+        f"--source-root-patterns={SOURCE_ROOT}",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="tests", relative_file_path="test_foo.py")
+    )
+    inputs = [PythonTestFieldSet.create(tgt)]
+    request = rule_runner.request(TestDebugAdaptorRequest, inputs)
+    assert request.process is not None
+    assert request.process.argv == (
+        "./pytest_runner.pex_pex_shim.sh",
+        "--listen",
+        "127.0.0.1:5678",
+        "--wait-for-client",
+        "-m",
+        "pytest",
+        "tests/python/pants_test/test_foo.py",
+    )

@@ -404,7 +404,7 @@ async def debugpy_python_test(
         logger.warn(
             softwrap(
                 """
-                Ignoring custom [pytest].main when using --use-debug-adaptor.
+                Ignoring custom [pytest].console_script/entry_point when using --use-debug-adaptor.
                 `debugpy` (Python's Debug Adaptor) doesn't support this use-case yet.
                 """
             )
