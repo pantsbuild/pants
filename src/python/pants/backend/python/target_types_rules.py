@@ -62,6 +62,7 @@ from pants.engine.target import (
     ValidatedDependencies,
     ValidateDependenciesRequest,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -209,7 +210,12 @@ async def inject_pex_binary_entry_point_dependency(
 ) -> InjectedDependencies:
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
-    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    original_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     entry_point_field = original_tgt.target.get(PexEntryPointField)
     if entry_point_field.value is None:
         return InjectedDependencies()
@@ -408,7 +414,12 @@ async def inject_python_distribution_dependencies(
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
 
-    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    original_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     explicitly_provided_deps, distribution_entry_points, provides_entry_points = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
         Get(
@@ -489,7 +500,15 @@ async def validate_python_dependencies(
     request: PythonValidateDependenciesRequest,
     python_setup: PythonSetup,
 ) -> ValidatedDependencies:
-    dependencies = await MultiGet(Get(WrappedTarget, Address, d) for d in request.dependencies)
+    dependencies = await MultiGet(
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                d, description_of_origin=f"the dependencies of {request.field_set.address}"
+            ),
+        )
+        for d in request.dependencies
+    )
 
     # Validate that the ICs for dependencies are all compatible with our own.
     target_ics = request.field_set.interpreter_constraints.value_or_global_default(python_setup)

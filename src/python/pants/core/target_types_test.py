@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 import tarfile
 import textwrap
 import zipfile
@@ -27,7 +26,6 @@ from pants.core.target_types import (
     HTTPSource,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
-    ResourcesGeneratorTarget,
     ResourceTarget,
 )
 from pants.core.target_types import rules as target_type_rules
@@ -35,12 +33,9 @@ from pants.core.util_rules import archive, source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
-from pants.engine.internals.graph import _TargetParametrizations
 from pants.engine.target import (
     GeneratedSources,
-    SingleSourceField,
     SourcesField,
-    Tags,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -309,72 +304,6 @@ def test_archive() -> None:
         assert get_file("data/d1.json") == b"{'k': 1}"
         assert get_file("data/d2.json") == b"{'k': 2}"
         assert_archive1_is_valid(get_file("archive1.zip"))
-
-
-def test_generate_file_and_resource_targets() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            QueryRule(_TargetParametrizations, [Address]),
-        ],
-        target_types=[FilesGeneratorTarget, ResourcesGeneratorTarget],
-    )
-    rule_runner.write_files(
-        {
-            "assets/BUILD": dedent(
-                """\
-                files(
-                    name='files',
-                    sources=['**/*.ext'],
-                    overrides={'f1.ext': {'tags': ['overridden']}},
-                )
-
-                resources(
-                    name='resources',
-                    sources=['**/*.ext'],
-                    overrides={'f1.ext': {'tags': ['overridden']}},
-                )
-                """
-            ),
-            "assets/f1.ext": "",
-            "assets/f2.ext": "",
-            "assets/f[3].ext": "",
-            "assets/subdir/f.ext": "",
-        }
-    )
-
-    def gen_file_tgt(rel_fp: str, tags: list[str] | None = None) -> FileTarget:
-        return FileTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("assets", target_name="files", relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("assets", rel_fp)),
-        )
-
-    def gen_resource_tgt(rel_fp: str, tags: list[str] | None = None) -> ResourceTarget:
-        return ResourceTarget(
-            {SingleSourceField.alias: rel_fp, Tags.alias: tags},
-            Address("assets", target_name="resources", relative_file_path=rel_fp),
-            residence_dir=os.path.dirname(os.path.join("assets", rel_fp)),
-        )
-
-    generated_files = rule_runner.request(
-        _TargetParametrizations, [Address("assets", target_name="files")]
-    ).parametrizations
-    generated_resources = rule_runner.request(
-        _TargetParametrizations, [Address("assets", target_name="resources")]
-    ).parametrizations
-
-    assert set(generated_files.values()) == {
-        gen_file_tgt("f1.ext", tags=["overridden"]),
-        gen_file_tgt("f2.ext"),
-        gen_file_tgt("f[[]3].ext"),
-        gen_file_tgt("subdir/f.ext"),
-    }
-    assert set(generated_resources.values()) == {
-        gen_resource_tgt("f1.ext", tags=["overridden"]),
-        gen_resource_tgt("f2.ext"),
-        gen_resource_tgt("f[[]3].ext"),
-        gen_resource_tgt("subdir/f.ext"),
-    }
 
 
 @pytest.mark.parametrize("asset_type", ("file", "resource"))

@@ -252,8 +252,8 @@ async def setup_coursier(
     coursier_wrapper_script = COURSIER_FETCH_WRAPPER_SCRIPT.format(
         repos_args=repos_args,
         coursier_working_directory=Coursier.working_directory_placeholder,
-        python_path=python.path,
-        coursier_bin_dir=Coursier.bin_dir,
+        python_path=shlex.quote(python.path),
+        coursier_bin_dir=shlex.quote(Coursier.bin_dir),
     )
 
     post_process_stderr = POST_PROCESS_COURSIER_STDERR_SCRIPT.format(python_path=python.path)

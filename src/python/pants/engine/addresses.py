@@ -6,10 +6,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
-from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address as Address
 from pants.build_graph.address import AddressInput as AddressInput  # noqa: F401: rexport.
 from pants.build_graph.address import BuildFileAddress as BuildFileAddress  # noqa: F401: rexport.
+from pants.build_graph.address import (  # noqa: F401: rexport.
+    BuildFileAddressRequest as BuildFileAddressRequest,
+)
+from pants.build_graph.address import ResolveError
 from pants.engine.collection import Collection
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list

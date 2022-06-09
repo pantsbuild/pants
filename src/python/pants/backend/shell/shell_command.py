@@ -32,7 +32,6 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathRequest,
     BinaryPaths,
 )
-from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -55,6 +54,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -236,7 +236,10 @@ async def prepare_shell_command_process(
 
 @rule
 async def run_shell_command_request(shell_command: RunShellCommand) -> RunRequest:
-    wrapped_tgt = await Get(WrappedTarget, Address, shell_command.address)
+    wrapped_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(shell_command.address, description_of_origin="<infallible>"),
+    )
     process = await Get(Process, ShellCommandProcessRequest(wrapped_tgt.target))
     return RunRequest(
         digest=process.input_digest,

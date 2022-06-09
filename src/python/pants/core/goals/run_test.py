@@ -17,6 +17,7 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
@@ -80,7 +81,7 @@ def single_target_run(
                 ),
                 MockGet(
                     output_type=WrappedTarget,
-                    input_type=Address,
+                    input_type=WrappedTargetRequest,
                     mock=lambda _: WrappedTarget(target),
                 ),
                 MockGet(

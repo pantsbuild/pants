@@ -21,6 +21,7 @@ from pants.engine.target import (
     InvalidTargetException,
     UnexpandedTargets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.util.docutil import bin_name
 
@@ -92,7 +93,10 @@ async def determine_go_mod_info(
     request: GoModInfoRequest,
 ) -> GoModInfo:
     if isinstance(request.source, Address):
-        wrapped_target = await Get(WrappedTarget, Address, request.source)
+        wrapped_target = await Get(
+            WrappedTarget,
+            WrappedTargetRequest(request.source, description_of_origin="<go mod info rule>"),
+        )
         sources_field = wrapped_target.target[GoModSourcesField]
     else:
         sources_field = request.source

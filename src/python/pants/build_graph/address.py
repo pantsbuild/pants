@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
+from pants.base.exceptions import MappingError
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import (  # noqa: F401
@@ -609,12 +611,30 @@ class Address(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class BuildFileAddress:
-    """Represents the address of a type materialized from a BUILD file.
-
-    TODO: This type should likely be removed in favor of storing this information on Target.
-    """
+class BuildFileAddressRequest:
+    """A request to find the BUILD file path for an address."""
 
     address: Address
-    # The relative path of the BUILD file this Address came from.
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+
+@dataclass(frozen=True)
+class BuildFileAddress:
+    """An address, along with the relative file path of its BUILD file."""
+
+    address: Address
     rel_path: str
+
+
+class ResolveError(MappingError):
+    """Indicates an error resolving target addresses."""
+
+    @classmethod
+    def did_you_mean(
+        cls, *, bad_name: str, known_names: Iterable[str], namespace: str
+    ) -> ResolveError:
+        possibilities = "\n  ".join(f":{target_name}" for target_name in sorted(known_names))
+        return cls(
+            f"'{bad_name}' was not found in namespace '{namespace}'. Did you mean one "
+            f"of:\n  {possibilities}"
+        )

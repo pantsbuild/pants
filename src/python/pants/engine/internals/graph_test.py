@@ -25,7 +25,7 @@ from pants.engine.internals.graph import (
     _DependencyMappingRequest,
     _TargetParametrizations,
 )
-from pants.engine.internals.parametrize import Parametrize
+from pants.engine.internals.parametrize import Parametrize, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
@@ -818,7 +818,7 @@ def generated_targets_rule_runner() -> RuleRunner:
         rules=[
             QueryRule(Addresses, [Specs]),
             QueryRule(_DependencyMapping, [_DependencyMappingRequest]),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
         target_types=[MockTargetGenerator, MockGeneratedTarget],
         objects={"parametrize": Parametrize},
@@ -840,7 +840,10 @@ def assert_generated(
             **{os.path.join(address.spec_path, f): "" for f in files},
         }
     )
-    parametrizations = rule_runner.request(_TargetParametrizations, [address])
+    parametrizations = rule_runner.request(
+        _TargetParametrizations,
+        [_TargetParametrizationsRequest(address, description_of_origin="tests")],
+    )
     assert expected == {
         t for parametrization in parametrizations for t in parametrization.parametrization.values()
     }

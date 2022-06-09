@@ -9,7 +9,6 @@ from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
-from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
@@ -36,6 +35,7 @@ from pants.engine.target import (
     SourcesField,
     Targets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.util.dirutil import fast_relpath
 from pants.util.logging import LogLevel
@@ -234,12 +234,15 @@ async def compute_first_party_package_import_path(
 
 @rule
 async def analyze_first_party_package(
-    request: FirstPartyPkgAnalysisRequest,
-    analyzer: PackageAnalyzerSetup,
-    golang_subsystem: GolangSubsystem,
+    request: FirstPartyPkgAnalysisRequest, analyzer: PackageAnalyzerSetup
 ) -> FallibleFirstPartyPkgAnalysis:
     wrapped_target, import_path_info, owning_go_mod = await MultiGet(
-        Get(WrappedTarget, Address, request.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                request.address, description_of_origin="<first party pkg analysis>"
+            ),
+        ),
         Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
         Get(OwningGoMod, OwningGoModRequest(request.address)),
     )
@@ -276,7 +279,12 @@ async def setup_first_party_pkg_digest(
 ) -> FallibleFirstPartyPkgDigest:
     embedder, wrapped_target, maybe_analysis = await MultiGet(
         Get(LoadedGoBinary, LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder")),
-        Get(WrappedTarget, Address, request.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                request.address, description_of_origin="<first party digest setup>"
+            ),
+        ),
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(request.address)),
     )
     if maybe_analysis.analysis is None:
