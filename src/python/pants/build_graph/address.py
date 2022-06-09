@@ -18,7 +18,7 @@ from pants.engine.internals.native_engine import (  # noqa: F401
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap, strip_prefix
+from pants.util.strutil import bullet_list, softwrap, strip_prefix
 
 # `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
 BANNED_CHARS_IN_TARGET_NAME = frozenset(r":#!@?/\=")
@@ -611,11 +611,14 @@ class Address(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class BuildFileAddressRequest:
+class BuildFileAddressRequest(EngineAwareParameter):
     """A request to find the BUILD file path for an address."""
 
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    def debug_hint(self) -> str:
+        return self.address.spec
 
 
 @dataclass(frozen=True)
@@ -627,14 +630,25 @@ class BuildFileAddress:
 
 
 class ResolveError(MappingError):
-    """Indicates an error resolving target addresses."""
+    """Indicates an error resolving targets."""
 
     @classmethod
     def did_you_mean(
-        cls, *, bad_name: str, known_names: Iterable[str], namespace: str
+        cls,
+        bad_address: Address,
+        *,
+        description_of_origin: str,
+        known_names: Iterable[str],
+        namespace: str,
     ) -> ResolveError:
-        possibilities = "\n  ".join(f":{target_name}" for target_name in sorted(known_names))
         return cls(
-            f"'{bad_name}' was not found in namespace '{namespace}'. Did you mean one "
-            f"of:\n  {possibilities}"
+            softwrap(
+                f"""
+                The address {bad_address} from {description_of_origin} does not exist.
+
+                The target name ':{bad_address.target_name}' is not defined in the directory
+                {namespace}. Did you mean one of these target names?\n
+                """
+                + bullet_list(f":{name}" for name in known_names)
+            )
         )

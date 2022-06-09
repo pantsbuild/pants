@@ -13,7 +13,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
@@ -140,7 +140,8 @@ async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
     owning_address = address.maybe_convert_to_target_generator()
     if address_family.get_target_adaptor(owning_address) is None:
         raise ResolveError.did_you_mean(
-            bad_name=owning_address.target_name,
+            owning_address,
+            description_of_origin=request.description_of_origin,
             known_names=address_family.target_names,
             namespace=address_family.namespace,
         )
@@ -153,18 +154,20 @@ async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
 
 
 @rule
-async def find_target_adaptor(address: Address) -> TargetAdaptor:
+async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
+    address = request.address
     if address.is_generated_target:
         raise AssertionError(
             "Generated targets are not defined in BUILD files, and so do not have "
-            f"TargetAdaptors: {address}"
+            f"TargetAdaptors: {request}"
         )
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
     target_adaptor = address_family.get_target_adaptor(address)
     if target_adaptor is None:
         raise ResolveError.did_you_mean(
-            bad_name=address.target_name,
+            address,
+            description_of_origin=request.description_of_origin,
             known_names=address_family.target_names,
             namespace=address_family.namespace,
         )
