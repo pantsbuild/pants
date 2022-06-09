@@ -6,12 +6,13 @@ from dataclasses import dataclass
 
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
-    ShellSources,
+    ShellSourceField,
     Shunit2Shell,
     Shunit2ShellField,
-    Shunit2Tests,
-    Shunit2TestsSources,
-    Shunit2TestsTimeout,
+    Shunit2TestsGeneratorTarget,
+    Shunit2TestSourceField,
+    Shunit2TestTimeoutField,
+    SkipShunit2TestsField,
 )
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
@@ -23,8 +24,14 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
-from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.system_binaries import (
+    BinaryNotFoundError,
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+)
 from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
@@ -37,31 +44,32 @@ from pants.engine.fs import (
     MergeDigests,
 )
 from pants.engine.process import (
-    BinaryNotFoundError,
-    BinaryPath,
-    BinaryPathRequest,
-    BinaryPaths,
     FallibleProcessResult,
     InteractiveProcess,
     Process,
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Sources, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.strutil import create_path_env_var
 
 
 @dataclass(frozen=True)
 class Shunit2FieldSet(TestFieldSet):
-    required_fields = (Shunit2TestsSources,)
+    required_fields = (Shunit2TestSourceField,)
 
-    sources: Shunit2TestsSources
-    timeout: Shunit2TestsTimeout
+    sources: Shunit2TestSourceField
+    timeout: Shunit2TestTimeoutField
     shell: Shunit2ShellField
     runtime_package_dependencies: RuntimePackageDependenciesField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipShunit2TestsField).value
 
 
 @dataclass(frozen=True)
@@ -127,7 +135,7 @@ async def determine_shunit2_shell(
                 f"Please either specify the `{Shunit2ShellField.alias}` field or add a "
                 f"shebang to {request.test_file_content.path} with one of the supported shells in "
                 f"the format `!#/path/to/shell` or `!#/path/to/env shell`"
-                f"(run `./pants help {Shunit2Tests.alias}` for valid shells)."
+                f"(run `{bin_name()} help {Shunit2TestsGeneratorTarget.alias}` for valid shells)."
             )
         tgt_shell = parse_result
 
@@ -140,7 +148,9 @@ async def determine_shunit2_shell(
     paths = await Get(BinaryPaths, BinaryPathRequest, path_request)
     first_path = paths.first_path
     if not first_path:
-        raise BinaryNotFoundError(path_request, rationale=f"run shunit2 on {request.address}")
+        raise BinaryNotFoundError.from_request(
+            path_request, rationale=f"run shunit2 on {request.address}"
+        )
     return Shunit2Runner(tgt_shell, first_path)
 
 
@@ -169,8 +179,8 @@ async def setup_shunit2_for_target(
     dependencies_source_files_request = Get(
         SourceFiles,
         SourceFilesRequest(
-            (tgt.get(Sources) for tgt in transitive_targets.dependencies),
-            for_sources_types=(ShellSources, FilesSources, ResourcesSources),
+            (tgt.get(SourcesField) for tgt in transitive_targets.dependencies),
+            for_sources_types=(ShellSourceField, FileSourceField, ResourceSourceField),
             enable_codegen=True,
         ),
     )
@@ -180,24 +190,16 @@ async def setup_shunit2_for_target(
     )
 
     field_set_digest_content = await Get(DigestContents, Digest, field_set_sources.snapshot.digest)
-    # Because a FieldSet corresponds to a file address, there should be exactly 1 file in the
-    # sources. This assumption allows us to simplify determining which shell to use via inspecting
-    # the shebang.
-    if len(field_set_digest_content) != 1:
-        raise AssertionError(
-            f"The file address {request.field_set.address} had sources != 1, which is unexpected: "
-            f"{field_set_sources.snapshot.files}. Please file a bug at "
-            "https://github.com/pantsbuild/pants/issues/new with this error message copied."
-        )
-    original_test_file_content = field_set_digest_content[0]
-    updated_test_file_content = add_source_shunit2(original_test_file_content)
+    # `ShellTestSourceField` validates that there's exactly one file.
+    test_file_content = field_set_digest_content[0]
+    updated_test_file_content = add_source_shunit2(test_file_content)
 
     updated_test_digest, runner = await MultiGet(
         Get(Digest, CreateDigest([updated_test_file_content])),
         Get(
             Shunit2Runner,
             Shunit2RunnerRequest(
-                request.field_set.address, original_test_file_content, request.field_set.shell
+                request.field_set.address, test_file_content, request.field_set.shell
             ),
         ),
     )
@@ -216,7 +218,7 @@ async def setup_shunit2_for_target(
 
     env_dict = {
         "PATH": create_path_env_var(shell_setup.executable_search_path(env)),
-        "SHUNIT_COLOR": "always" if global_options.options.colors else "none",
+        "SHUNIT_COLOR": "always" if global_options.colors else "none",
         **test_extra_env.env,
     }
     argv = (
@@ -241,17 +243,25 @@ async def setup_shunit2_for_target(
 
 
 @rule(desc="Run tests with Shunit2", level=LogLevel.DEBUG)
-async def run_tests_with_shunit2(field_set: Shunit2FieldSet) -> TestResult:
+async def run_tests_with_shunit2(
+    field_set: Shunit2FieldSet, test_subsystem: TestSubsystem
+) -> TestResult:
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     result = await Get(FallibleProcessResult, Process, setup.process)
-    return TestResult.from_fallible_process_result(result, address=field_set.address)
+    return TestResult.from_fallible_process_result(
+        result,
+        address=field_set.address,
+        output_setting=test_subsystem.output,
+    )
 
 
 @rule(desc="Setup Shunit2 to run interactively", level=LogLevel.DEBUG)
 async def setup_shunit2_debug_test(field_set: Shunit2FieldSet) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(field_set))
     return TestDebugRequest(
-        InteractiveProcess.from_process(setup.process, forward_signals_to_process=False)
+        InteractiveProcess.from_process(
+            setup.process, forward_signals_to_process=False, restartable=True
+        )
     )
 
 

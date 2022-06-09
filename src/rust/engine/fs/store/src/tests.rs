@@ -7,30 +7,18 @@ use std::time::Duration;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::{Bytes, BytesMut};
-use fs::RelativePath;
+use fs::{DigestEntry, FileEntry, Permissions, EMPTY_DIRECTORY_DIGEST};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
-use maplit::btreemap;
 use mock::StubCAS;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use workunit_store::WorkunitStore;
 
-use crate::{
-  DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store, UploadSummary,
-  MEGABYTES,
-};
+use crate::{EntryType, FileContent, Store, StoreError, UploadSummary, MEGABYTES};
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
-
-impl LoadMetadata {
-  fn is_remote(&self) -> bool {
-    match self {
-      LoadMetadata::Local => false,
-      LoadMetadata::Remote(_) => true,
-    }
-  }
-}
 
 pub fn big_file_fingerprint() -> Fingerprint {
   Fingerprint::from_hex_string("8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f")
@@ -67,22 +55,27 @@ pub fn extra_big_file_bytes() -> Bytes {
   bytes.freeze()
 }
 
-pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
-  let option = store
+pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Bytes, StoreError> {
+  store
     .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
-    .await?;
-  Ok(option.map(|(bytes, _metadata)| bytes))
+    .await
 }
 
 ///
 /// Create a StubCas with a file and a directory inside.
 ///
 pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
+  let _ = WorkunitStore::setup_for_tests();
   StubCAS::builder()
     .chunk_size_bytes(chunk_size_bytes)
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build()
+}
+
+pub fn new_empty_cas() -> StubCAS {
+  let _ = WorkunitStore::setup_for_tests();
+  StubCAS::empty()
 }
 
 ///
@@ -120,14 +113,14 @@ async fn load_file_prefers_local() {
   let testdata = TestData::roland();
 
   crate::local_tests::new_store(dir.path())
-    .store_bytes(EntryType::File, testdata.bytes(), false)
+    .store_bytes(EntryType::File, None, testdata.bytes(), false)
     .await
     .expect("Store failed");
 
   let cas = new_cas(1024);
   assert_eq!(
     load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
-    Ok(Some(testdata.bytes()))
+    Ok(testdata.bytes())
   );
   assert_eq!(0, cas.read_request_count());
 }
@@ -139,7 +132,7 @@ async fn load_directory_prefers_local() {
   let testdir = TestDirectory::containing_roland();
 
   crate::local_tests::new_store(dir.path())
-    .store_bytes(EntryType::Directory, testdir.bytes(), false)
+    .store_bytes(EntryType::Directory, None, testdir.bytes(), false)
     .await
     .expect("Store failed");
 
@@ -148,9 +141,7 @@ async fn load_directory_prefers_local() {
     new_store(dir.path(), &cas.address())
       .load_directory(testdir.digest(),)
       .await
-      .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     testdir.directory()
   );
   assert_eq!(0, cas.read_request_count());
@@ -165,7 +156,7 @@ async fn load_file_falls_back_and_backfills() {
   let cas = new_cas(1024);
   assert_eq!(
     load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await,
-    Ok(Some(testdata.bytes())),
+    Ok(testdata.bytes()),
     "Read from CAS"
   );
   assert_eq!(1, cas.read_request_count());
@@ -192,9 +183,7 @@ async fn load_directory_falls_back_and_backfills() {
     new_store(dir.path(), &cas.address())
       .load_directory(testdir.digest(),)
       .await
-      .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     testdir.directory()
   );
   assert_eq!(1, cas.read_request_count());
@@ -219,8 +208,9 @@ async fn load_recursive_directory() {
   let testdir_directory = testdir.directory();
   let recursive_testdir = TestDirectory::recursive();
   let recursive_testdir_directory = recursive_testdir.directory();
-  let recursive_testdir_digest = recursive_testdir.digest();
+  let recursive_testdir_digest = recursive_testdir.directory_digest();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .file(&roland)
     .file(&catnip)
@@ -229,34 +219,30 @@ async fn load_recursive_directory() {
     .build();
 
   new_store(dir.path(), &cas.address())
-    .ensure_local_has_recursive_directory(recursive_testdir_digest)
+    .ensure_local_has_recursive_directory(recursive_testdir_digest.clone())
     .await
     .expect("Downloading recursive directory should have succeeded.");
 
   assert_eq!(
     load_file_bytes(&new_local_store(dir.path()), roland.digest()).await,
-    Ok(Some(roland.bytes()))
+    Ok(roland.bytes())
   );
   assert_eq!(
     load_file_bytes(&new_local_store(dir.path()), catnip.digest()).await,
-    Ok(Some(catnip.bytes()))
+    Ok(catnip.bytes())
   );
   assert_eq!(
     new_local_store(dir.path())
       .load_directory(testdir_digest,)
       .await
-      .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     testdir_directory
   );
   assert_eq!(
     new_local_store(dir.path())
-      .load_directory(recursive_testdir_digest,)
+      .load_directory(recursive_testdir_digest.as_digest())
       .await
-      .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     recursive_testdir_directory
   );
 }
@@ -265,29 +251,25 @@ async fn load_recursive_directory() {
 async fn load_file_missing_is_none() {
   let dir = TempDir::new().unwrap();
 
-  let cas = StubCAS::empty();
-  assert_eq!(
-    load_file_bytes(
-      &new_store(dir.path(), &cas.address()),
-      TestData::roland().digest()
-    )
-    .await,
-    Ok(None)
-  );
+  let cas = new_empty_cas();
+  let result = load_file_bytes(
+    &new_store(dir.path(), &cas.address()),
+    TestData::roland().digest(),
+  )
+  .await;
+  assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
   assert_eq!(1, cas.read_request_count());
 }
 
 #[tokio::test]
-async fn load_directory_missing_is_none() {
+async fn load_directory_missing_errors() {
   let dir = TempDir::new().unwrap();
 
-  let cas = StubCAS::empty();
-  assert_eq!(
-    new_store(dir.path(), &cas.address())
-      .load_directory(TestDirectory::containing_roland().digest(),)
-      .await,
-    Ok(None)
-  );
+  let cas = new_empty_cas();
+  let result = new_store(dir.path(), &cas.address())
+    .load_directory(TestDirectory::containing_roland().digest())
+    .await;
+  assert!(matches!(result, Err(StoreError::MissingDigest { .. })),);
   assert_eq!(1, cas.read_request_count());
 }
 
@@ -295,6 +277,7 @@ async fn load_directory_missing_is_none() {
 async fn load_file_remote_error_is_error() {
   let dir = TempDir::new().unwrap();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::always_errors();
   let error = load_file_bytes(
     &new_store(dir.path(), &cas.address()),
@@ -308,7 +291,9 @@ async fn load_file_remote_error_is_error() {
     cas.read_request_count()
   );
   assert!(
-    error.contains("StubCAS is configured to always fail"),
+    error
+      .to_string()
+      .contains("StubCAS is configured to always fail"),
     "Bad error message"
   );
 }
@@ -317,6 +302,7 @@ async fn load_file_remote_error_is_error() {
 async fn load_directory_remote_error_is_error() {
   let dir = TempDir::new().unwrap();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::always_errors();
   let error = new_store(dir.path(), &cas.address())
     .load_directory(TestData::roland().digest())
@@ -328,7 +314,9 @@ async fn load_directory_remote_error_is_error() {
     cas.read_request_count()
   );
   assert!(
-    error.contains("StubCAS is configured to always fail"),
+    error
+      .to_string()
+      .contains("StubCAS is configured to always fail"),
     "Bad error message"
   );
 }
@@ -372,6 +360,7 @@ async fn non_canonical_remote_directory_is_error() {
 
   let dir = TempDir::new().unwrap();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .unverified_content(
       non_canonical_directory_fingerprint.clone(),
@@ -399,6 +388,7 @@ async fn wrong_remote_file_bytes_is_error() {
 
   let testdata = TestData::roland();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .unverified_content(
       testdata.fingerprint(),
@@ -425,6 +415,7 @@ async fn wrong_remote_directory_bytes_is_error() {
 
   let testdir = TestDirectory::containing_dnalor();
 
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .unverified_content(
       testdir.fingerprint(),
@@ -528,8 +519,8 @@ async fn expand_missing_directory() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains(&format!("{:?}", digest)),
-    "Bad error message: {}",
+    matches!(error, StoreError::MissingDigest { .. }),
+    "Bad error: {}",
     error
   );
 }
@@ -550,10 +541,7 @@ async fn expand_directory_missing_subdir() {
     .await
     .expect_err("Want error");
   assert!(
-    error.contains(&format!(
-      "{}",
-      TestDirectory::containing_roland().fingerprint()
-    )),
+    matches!(error, StoreError::MissingDigest { .. }),
     "Bad error message: {}",
     error
   );
@@ -562,7 +550,7 @@ async fn expand_directory_missing_subdir() {
 #[tokio::test]
 async fn uploads_files() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
 
@@ -587,7 +575,7 @@ async fn uploads_files() {
 #[tokio::test]
 async fn uploads_directories_recursively() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
   let testdir = TestDirectory::containing_roland();
@@ -622,7 +610,7 @@ async fn uploads_directories_recursively() {
 #[tokio::test]
 async fn uploads_files_recursively_when_under_three_digests_ignoring_items_already_in_cas() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
   let testdir = TestDirectory::containing_roland();
@@ -663,7 +651,7 @@ async fn uploads_files_recursively_when_under_three_digests_ignoring_items_alrea
 #[tokio::test]
 async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_digests() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let catnip = TestData::catnip();
   let roland = TestData::roland();
@@ -714,7 +702,7 @@ async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_d
 #[tokio::test]
 async fn does_not_reupload_big_file_already_in_cas() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   new_local_store(dir.path())
     .store_file_bytes(extra_big_file_bytes(), false)
@@ -747,7 +735,7 @@ async fn does_not_reupload_big_file_already_in_cas() {
 #[tokio::test]
 async fn upload_missing_files() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
 
@@ -757,16 +745,17 @@ async fn upload_missing_files() {
     .ensure_remote_has_recursive(vec![testdata.digest()])
     .await
     .expect_err("Want error");
-  assert_eq!(
-    error,
-    format!("Failed to expand digest {:?}: Not found", testdata.digest())
+  assert!(
+    matches!(error, StoreError::MissingDigest { .. }),
+    "Bad error: {}",
+    error
   );
 }
 
 #[tokio::test]
 async fn upload_missing_file_in_directory() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdir = TestDirectory::containing_roland();
 
@@ -782,20 +771,17 @@ async fn upload_missing_file_in_directory() {
     .ensure_remote_has_recursive(vec![testdir.digest()])
     .await
     .expect_err("Want error");
-  assert_eq!(
-    error,
-    format!(
-      "Failed to upload File {:?}: Not found in local store.",
-      TestData::roland().digest()
-    ),
-    "Bad error message"
+  assert!(
+    matches!(error, StoreError::MissingDigest { .. }),
+    "Bad error: {}",
+    error
   );
 }
 
 #[tokio::test]
 async fn uploading_digest_with_wrong_size_is_error() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testdata = TestData::roland();
 
@@ -819,6 +805,7 @@ async fn uploading_digest_with_wrong_size_is_error() {
 #[tokio::test]
 async fn instance_name_upload() {
   let dir = TempDir::new().unwrap();
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .instance_name("dark-tower".to_owned())
     .build();
@@ -864,6 +851,7 @@ async fn instance_name_upload() {
 #[tokio::test]
 async fn instance_name_download() {
   let dir = TempDir::new().unwrap();
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .instance_name("dark-tower".to_owned())
     .file(&TestData::roland())
@@ -889,9 +877,7 @@ async fn instance_name_download() {
     store_with_remote
       .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
-      .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     TestData::roland().bytes()
   )
 }
@@ -899,6 +885,7 @@ async fn instance_name_download() {
 #[tokio::test]
 async fn auth_upload() {
   let dir = TempDir::new().unwrap();
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .required_auth_token("Armory.Key".to_owned())
     .build();
@@ -946,6 +933,7 @@ async fn auth_upload() {
 #[tokio::test]
 async fn auth_download() {
   let dir = TempDir::new().unwrap();
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .required_auth_token("Armory.Key".to_owned())
     .file(&TestData::roland())
@@ -973,9 +961,7 @@ async fn auth_download() {
     store_with_remote
       .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
       .await
-      .unwrap()
-      .unwrap()
-      .0,
+      .unwrap(),
     TestData::roland().bytes()
   )
 }
@@ -988,7 +974,7 @@ async fn materialize_missing_file() {
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
   store
-    .materialize_file(file.clone(), TestData::roland().digest(), false)
+    .materialize_file(file.clone(), TestData::roland().digest(), 0o644)
     .await
     .expect_err("Want unknown digest error");
 }
@@ -1007,32 +993,11 @@ async fn materialize_file() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), false)
+    .materialize_file(file.clone(), testdata.digest(), 0o644)
     .await
     .expect("Error materializing file");
   assert_eq!(file_contents(&file), testdata.bytes());
   assert!(!is_executable(&file));
-}
-
-#[tokio::test]
-async fn materialize_file_executable() {
-  let materialize_dir = TempDir::new().unwrap();
-  let file = materialize_dir.path().join("file");
-
-  let testdata = TestData::roland();
-
-  let store_dir = TempDir::new().unwrap();
-  let store = new_local_store(store_dir.path());
-  store
-    .store_file_bytes(testdata.bytes(), false)
-    .await
-    .expect("Error saving bytes");
-  store
-    .materialize_file(file.clone(), testdata.digest(), true)
-    .await
-    .expect("Error materializing file");
-  assert_eq!(file_contents(&file), testdata.bytes());
-  assert!(is_executable(&file));
 }
 
 #[tokio::test]
@@ -1044,20 +1009,19 @@ async fn materialize_missing_directory() {
   store
     .materialize_directory(
       materialize_dir.path().to_owned(),
-      TestDirectory::recursive().digest(),
+      TestDirectory::recursive().directory_digest(),
+      Permissions::Writable,
     )
     .await
     .expect_err("Want unknown digest error");
 }
 
-#[tokio::test]
-async fn materialize_directory() {
+async fn materialize_directory(perms: Permissions, executable_file: bool) {
   let materialize_dir = TempDir::new().unwrap();
 
-  let roland = TestData::roland();
   let catnip = TestData::catnip();
-  let testdir = TestDirectory::containing_roland();
-  let recursive_testdir = TestDirectory::recursive();
+  let testdir = TestDirectory::with_maybe_executable_files(executable_file);
+  let recursive_testdir = TestDirectory::recursive_with(testdir.clone());
 
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
@@ -1070,22 +1034,20 @@ async fn materialize_directory() {
     .await
     .expect("Error saving Directory");
   store
-    .store_file_bytes(roland.bytes(), false)
-    .await
-    .expect("Error saving file bytes");
-  store
     .store_file_bytes(catnip.bytes(), false)
     .await
-    .expect("Error saving catnip file bytes");
+    .expect("Error saving file bytes");
 
   store
     .materialize_directory(
       materialize_dir.path().to_owned(),
-      recursive_testdir.digest(),
+      recursive_testdir.directory_digest(),
+      perms,
     )
     .await
     .expect("Error materializing");
 
+  // Validate contents.
   assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats.ext"]);
   assert_eq!(
     file_contents(&materialize_dir.path().join("treats.ext")),
@@ -1093,51 +1055,50 @@ async fn materialize_directory() {
   );
   assert_eq!(
     list_dir(&materialize_dir.path().join("cats")),
-    vec!["roland.ext"]
-  );
-  assert_eq!(
-    file_contents(&materialize_dir.path().join("cats").join("roland.ext")),
-    roland.bytes()
-  );
-}
-
-#[tokio::test]
-async fn materialize_directory_executable() {
-  let materialize_dir = TempDir::new().unwrap();
-
-  let catnip = TestData::catnip();
-  let testdir = TestDirectory::with_mixed_executable_files();
-
-  let store_dir = TempDir::new().unwrap();
-  let store = new_local_store(store_dir.path());
-  store
-    .record_directory(&testdir.directory(), false)
-    .await
-    .expect("Error saving Directory");
-  store
-    .store_file_bytes(catnip.bytes(), false)
-    .await
-    .expect("Error saving catnip file bytes");
-
-  store
-    .materialize_directory(materialize_dir.path().to_owned(), testdir.digest())
-    .await
-    .expect("Error materializing");
-
-  assert_eq!(
-    list_dir(materialize_dir.path()),
     vec!["feed.ext", "food.ext"]
   );
   assert_eq!(
-    file_contents(&materialize_dir.path().join("feed.ext")),
+    file_contents(&materialize_dir.path().join("cats").join("feed.ext")),
     catnip.bytes()
   );
+
+  // Validate executability.
   assert_eq!(
-    file_contents(&materialize_dir.path().join("food.ext")),
-    catnip.bytes()
+    executable_file,
+    is_executable(&materialize_dir.path().join("cats").join("feed.ext"))
   );
-  assert!(is_executable(&materialize_dir.path().join("feed.ext")));
-  assert!(!is_executable(&materialize_dir.path().join("food.ext")));
+  assert!(!is_executable(
+    &materialize_dir.path().join("cats").join("food.ext")
+  ));
+
+  // Validate read/write permissions for a file, a nested directory, and the root.
+  let readonly = perms == Permissions::ReadOnly;
+  assert_eq!(
+    readonly,
+    is_readonly(&materialize_dir.path().join("cats").join("feed.ext"))
+  );
+  assert_eq!(readonly, is_readonly(&materialize_dir.path().join("cats")));
+  assert_eq!(readonly, is_readonly(&materialize_dir.path()));
+}
+
+#[tokio::test]
+async fn materialize_directory_writable() {
+  materialize_directory(Permissions::Writable, false).await
+}
+
+#[tokio::test]
+async fn materialize_directory_writable_executable() {
+  materialize_directory(Permissions::Writable, true).await
+}
+
+#[tokio::test]
+async fn materialize_directory_readonly() {
+  materialize_directory(Permissions::ReadOnly, false).await
+}
+
+#[tokio::test]
+async fn materialize_directory_readonly_executable() {
+  materialize_directory(Permissions::Writable, true).await
 }
 
 #[tokio::test]
@@ -1146,7 +1107,7 @@ async fn contents_for_directory_empty() {
   let store = new_local_store(store_dir.path());
 
   let file_contents = store
-    .contents_for_directory(TestDirectory::empty().digest())
+    .contents_for_directory(TestDirectory::empty().directory_digest())
     .await
     .expect("Getting FileContents");
 
@@ -1180,7 +1141,7 @@ async fn contents_for_directory() {
     .expect("Error saving catnip file bytes");
 
   let file_contents = store
-    .contents_for_directory(recursive_testdir.digest())
+    .contents_for_directory(recursive_testdir.directory_digest())
     .await
     .expect("Getting FileContents");
 
@@ -1241,6 +1202,118 @@ fn assert_same_filecontents(left: Vec<FileContent>, right: Vec<FileContent>) {
   );
 }
 
+#[tokio::test]
+async fn entries_for_directory() {
+  let roland = TestData::roland();
+  let catnip = TestData::catnip();
+  let testdir = TestDirectory::containing_roland();
+  let recursive_testdir = TestDirectory::recursive();
+
+  let store_dir = TempDir::new().unwrap();
+  let store = new_local_store(store_dir.path());
+  store
+    .record_directory(&recursive_testdir.directory(), false)
+    .await
+    .expect("Error saving recursive Directory");
+  store
+    .record_directory(&testdir.directory(), false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .store_file_bytes(roland.bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .store_file_bytes(catnip.bytes(), false)
+    .await
+    .expect("Error saving catnip file bytes");
+
+  let digest_entries = store
+    .entries_for_directory(recursive_testdir.directory_digest())
+    .await
+    .expect("Getting FileContents");
+
+  assert_same_digest_entries(
+    digest_entries,
+    vec![
+      DigestEntry::File(FileEntry {
+        path: PathBuf::from("cats").join("roland.ext"),
+        digest: roland.digest(),
+        is_executable: false,
+      }),
+      DigestEntry::File(FileEntry {
+        path: PathBuf::from("treats.ext"),
+        digest: catnip.digest(),
+        is_executable: false,
+      }),
+    ],
+  );
+
+  let empty_digest_entries = store
+    .entries_for_directory(EMPTY_DIRECTORY_DIGEST.clone())
+    .await
+    .expect("Getting EMTPY_DIGEST");
+
+  assert_same_digest_entries(empty_digest_entries, vec![]);
+}
+
+fn assert_same_digest_entries(left: Vec<DigestEntry>, right: Vec<DigestEntry>) {
+  assert_eq!(
+    left.len(),
+    right.len(),
+    "DigestEntry vectors did not match, different lengths: left: {:?} right: {:?}",
+    left,
+    right
+  );
+
+  let mut success = true;
+  for (index, (l, r)) in left.iter().zip(right.iter()).enumerate() {
+    match (l, r) {
+      (DigestEntry::File(l), DigestEntry::File(r)) => {
+        if l.path != r.path {
+          success = false;
+          eprintln!(
+            "Paths did not match for index {}: {:?}, {:?}",
+            index, l.path, r.path
+          );
+        }
+        if l.digest != r.digest {
+          success = false;
+          eprintln!(
+            "Digest did not match for index {}: {:?}, {:?}",
+            index, l.digest, r.digest
+          );
+        }
+        if l.is_executable != r.is_executable {
+          success = false;
+          eprintln!(
+            "Executable bit did not match for index {}: {:?}, {:?}",
+            index, l.is_executable, r.is_executable
+          );
+        }
+      }
+      (DigestEntry::EmptyDirectory(path_left), DigestEntry::EmptyDirectory(path_right)) => {
+        if path_left != path_right {
+          success = false;
+          eprintln!(
+            "Paths did not match for empty directory at index {}: {:?}, {:?}",
+            index, path_left, path_right
+          );
+        }
+      }
+      (l, r) => {
+        success = false;
+        eprintln!("Differing types at index {}: {:?}, {:?}", index, l, r)
+      }
+    }
+  }
+  assert!(
+    success,
+    "FileEntry vectors did not match: Left: {:?}, Right: {:?}",
+    left, right
+  );
+}
+
 fn list_dir(path: &Path) -> Vec<String> {
   let mut v: Vec<_> = std::fs::read_dir(path)
     .expect("Listing dir")
@@ -1265,18 +1338,32 @@ fn file_contents(path: &Path) -> Bytes {
 }
 
 fn is_executable(path: &Path) -> bool {
+  let mode = std::fs::metadata(path)
+    .expect("Getting metadata")
+    .permissions()
+    .mode();
+
+  // NB: macOS's default umask is applied when we create files, and removes the executable bit
+  // for "all". There probably isn't a good reason to try to override that.
+  let executable_mask = if cfg!(target_os = "macos") {
+    0o110
+  } else {
+    0o111
+  };
+  mode & executable_mask == executable_mask
+}
+
+fn is_readonly(path: &Path) -> bool {
   std::fs::metadata(path)
     .expect("Getting metadata")
     .permissions()
-    .mode()
-    & 0o100
-    == 0o100
+    .readonly()
 }
 
 #[tokio::test]
 async fn returns_upload_summary_on_empty_cas() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testroland = TestData::roland();
   let testcatnip = TestData::catnip();
@@ -1323,7 +1410,7 @@ async fn returns_upload_summary_on_empty_cas() {
 #[tokio::test]
 async fn summary_does_not_count_things_in_cas() {
   let dir = TempDir::new().unwrap();
-  let cas = StubCAS::empty();
+  let cas = new_empty_cas();
 
   let testroland = TestData::roland();
   let testcatnip = TestData::catnip();
@@ -1387,114 +1474,6 @@ async fn summary_does_not_count_things_in_cas() {
 }
 
 #[tokio::test]
-async fn materialize_directory_metadata_all_local() {
-  let outer_dir = TestDirectory::double_nested();
-  let nested_dir = TestDirectory::nested();
-  let inner_dir = TestDirectory::containing_roland();
-  let file = TestData::roland();
-
-  let dir = tempfile::tempdir().unwrap();
-  let store = new_local_store(dir.path());
-  store
-    .record_directory(&outer_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .record_directory(&nested_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .record_directory(&inner_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .store_file_bytes(file.bytes(), false)
-    .await
-    .expect("Error storing file locally");
-
-  let mat_dir = tempfile::tempdir().unwrap();
-  let metadata = store
-    .materialize_directory(mat_dir.path().to_owned(), outer_dir.digest())
-    .await
-    .unwrap();
-
-  let local = LoadMetadata::Local;
-
-  let want = DirectoryMaterializeMetadata {
-    metadata: local.clone(),
-    child_directories: btreemap! {
-      "pets".to_owned() => DirectoryMaterializeMetadata {
-        metadata: local.clone(),
-        child_directories: btreemap!{
-          "cats".to_owned() => DirectoryMaterializeMetadata {
-            metadata: local.clone(),
-            child_directories: btreemap!{},
-            child_files: btreemap!{
-              "roland.ext".to_owned() => local.clone(),
-            },
-          }
-        },
-        child_files: btreemap!{},
-      }
-    },
-    child_files: btreemap! {},
-  };
-
-  assert_eq!(want, metadata);
-}
-
-#[tokio::test]
-async fn materialize_directory_metadata_mixed() {
-  let outer_dir = TestDirectory::double_nested(); // /pets/cats/roland
-  let nested_dir = TestDirectory::nested(); // /cats/roland
-  let inner_dir = TestDirectory::containing_roland();
-  let file = TestData::roland();
-
-  let cas = StubCAS::builder().directory(&nested_dir).build();
-
-  let dir = tempfile::tempdir().unwrap();
-  let store = new_store(dir.path(), &cas.address());
-  store
-    .record_directory(&outer_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .record_directory(&inner_dir.directory(), false)
-    .await
-    .expect("Error storing directory locally");
-  store
-    .store_file_bytes(file.bytes(), false)
-    .await
-    .expect("Error storing file locally");
-
-  let mat_dir = tempfile::tempdir().unwrap();
-  let metadata = store
-    .materialize_directory(mat_dir.path().to_owned(), outer_dir.digest())
-    .await
-    .unwrap();
-
-  assert!(metadata
-    .child_directories
-    .get("pets")
-    .unwrap()
-    .metadata
-    .is_remote());
-  assert_eq!(
-    LoadMetadata::Local,
-    *metadata
-      .child_directories
-      .get("pets")
-      .unwrap()
-      .child_directories
-      .get("cats")
-      .unwrap()
-      .child_files
-      .get("roland.ext")
-      .unwrap()
-  );
-}
-
-#[tokio::test]
 async fn explicitly_overwrites_already_existing_file() {
   fn test_file_with_arbitrary_content(filename: &str, content: &TestData) -> TestDirectory {
     let digest = content.digest();
@@ -1522,6 +1501,7 @@ async fn explicitly_overwrites_already_existing_file() {
 
   let cas_file = TestData::new("abc123");
   let contents_dir = test_file_with_arbitrary_content("some_filename.ext", &cas_file);
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .directory(&contents_dir)
     .file(&cas_file)
@@ -1529,96 +1509,14 @@ async fn explicitly_overwrites_already_existing_file() {
   let store = new_store(tempfile::tempdir().unwrap(), &cas.address());
 
   let _ = store
-    .materialize_directory(dir_to_write_to.path().to_owned(), contents_dir.digest())
+    .materialize_directory(
+      dir_to_write_to.path().to_owned(),
+      contents_dir.directory_digest(),
+      Permissions::Writable,
+    )
     .await
     .unwrap();
 
   let file_contents = std::fs::read(&file_path).unwrap();
   assert_eq!(file_contents, b"abc123".to_vec());
-}
-
-fn create_empty_directory_materialize_metadata() -> DirectoryMaterializeMetadata {
-  crate::DirectoryMaterializeMetadata {
-    metadata: LoadMetadata::Local,
-    child_directories: Default::default(),
-    child_files: Default::default(),
-  }
-}
-
-fn create_files_directory_materialize_metadata<S: AsRef<str>, F: IntoIterator<Item = S>>(
-  child_files: F,
-) -> DirectoryMaterializeMetadata {
-  crate::DirectoryMaterializeMetadata {
-    child_files: child_files
-      .into_iter()
-      .map(|c| (c.as_ref().to_string(), LoadMetadata::Local))
-      .collect(),
-    ..create_empty_directory_materialize_metadata()
-  }
-}
-
-fn create_directories_directory_materialize_metadata<
-  S: AsRef<str>,
-  F: IntoIterator<Item = (S, DirectoryMaterializeMetadata)>,
->(
-  child_dirs: F,
-) -> DirectoryMaterializeMetadata {
-  crate::DirectoryMaterializeMetadata {
-    child_directories: child_dirs
-      .into_iter()
-      .map(|(c, d)| (c.as_ref().to_string(), d))
-      .collect(),
-    ..create_empty_directory_materialize_metadata()
-  }
-}
-
-#[test]
-fn directory_materialize_metadata_empty_contains_file_empty() {
-  let md = create_empty_directory_materialize_metadata();
-  assert!(!md.contains_file(&RelativePath::new("").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_empty_contains_file() {
-  let md = create_empty_directory_materialize_metadata();
-  assert!(!md.contains_file(&RelativePath::new("./script.sh").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_contains_file() {
-  let md = create_files_directory_materialize_metadata(vec!["script.sh"]);
-  assert!(md.contains_file(&RelativePath::new("./script.sh").unwrap()));
-  assert!(md.contains_file(&RelativePath::new("script.sh").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_un_normalized_contains_file() {
-  let md = create_files_directory_materialize_metadata(vec!["./script.sh"]);
-  assert!(md.contains_file(&RelativePath::new("./script.sh").unwrap()));
-  assert!(md.contains_file(&RelativePath::new("script.sh").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_contains_subdir_file() {
-  let subdir_md = create_files_directory_materialize_metadata(vec!["script.sh"]);
-  let md = create_directories_directory_materialize_metadata(vec![
-    ("subdir", subdir_md),
-    ("script", create_empty_directory_materialize_metadata()),
-  ]);
-
-  assert!(!md.contains_file(&RelativePath::new("./script.sh").unwrap()));
-  assert!(!md.contains_file(&RelativePath::new("script.sh").unwrap()));
-  assert!(md.contains_file(&RelativePath::new("./subdir/script.sh").unwrap()));
-  assert!(md.contains_file(&RelativePath::new("subdir/script.sh").unwrap()));
-}
-
-#[test]
-fn directory_materialize_metadata_empty_dir() {
-  let md = create_directories_directory_materialize_metadata(vec![(
-    "script",
-    create_empty_directory_materialize_metadata(),
-  )]);
-
-  assert!(!md.contains_file(&RelativePath::new("./script").unwrap()));
-  assert!(!md.contains_file(&RelativePath::new("script").unwrap()));
 }

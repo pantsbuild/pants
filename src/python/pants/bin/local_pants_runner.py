@@ -6,10 +6,7 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
-from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
@@ -24,20 +21,18 @@ from pants.engine.streaming_workunit_handler import (
     WorkunitsCallback,
     WorkunitsCallbackFactories,
 )
-from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
+from pants.goal.builtin_goal import BuiltinGoal
 from pants.goal.run_tracker import RunTracker
-from pants.help.help_info_extracter import HelpInfoExtracter
-from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
 from pants.init.logging import stdio_destination_use_color
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
-from pants.option.arg_splitter import HelpRequest
-from pants.option.global_options import DynamicRemoteOptions
+from pants.option.global_options import DynamicRemoteOptions, DynamicUIRenderer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +56,7 @@ class LocalPantsRunner:
     specs: Specs
     graph_session: GraphSession
     union_membership: UnionMembership
-    profile_path: Optional[str]
+    profile_path: str | None
 
     @classmethod
     def _init_graph_session(
@@ -72,8 +67,8 @@ class LocalPantsRunner:
         env: CompleteEnvironment,
         run_id: str,
         options: Options,
-        scheduler: Optional[GraphScheduler] = None,
-        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+        scheduler: GraphScheduler | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> GraphSession:
         native_engine.maybe_set_panic_handler()
         if scheduler is None:
@@ -88,7 +83,17 @@ class LocalPantsRunner:
         return scheduler.new_session(
             run_id,
             dynamic_ui=global_options.dynamic_ui,
+            ui_use_prodash=global_options.dynamic_ui_renderer
+            == DynamicUIRenderer.experimental_prodash,
             use_colors=global_options.get("colors", True),
+            max_workunit_level=max(
+                global_options.streaming_workunits_level,
+                global_options.level,
+                *(
+                    LogLevel[level.upper()]
+                    for level in global_options.log_levels_by_target.values()
+                ),
+            ),
             session_values=SessionValues(
                 {
                     OptionsBootstrapper: options_bootstrapper,
@@ -103,9 +108,9 @@ class LocalPantsRunner:
         cls,
         env: CompleteEnvironment,
         options_bootstrapper: OptionsBootstrapper,
-        options_initializer: Optional[OptionsInitializer] = None,
-        scheduler: Optional[GraphScheduler] = None,
-        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+        options_initializer: OptionsInitializer | None = None,
+        scheduler: GraphScheduler | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> LocalPantsRunner:
         """Creates a new LocalPantsRunner instance by parsing options.
 
@@ -128,8 +133,10 @@ class LocalPantsRunner:
         # Option values are usually computed lazily on demand, but command line options are
         # eagerly computed for validation.
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
-            for scope in options.scope_to_flags.keys():
-                options.for_scope(scope)
+            for scope, values in options.scope_to_flags.items():
+                if values:
+                    # Only compute values if there were any command line options presented.
+                    options.for_scope(scope)
 
         # Verify configs.
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
@@ -152,7 +159,6 @@ class LocalPantsRunner:
         specs = calculate_specs(
             options_bootstrapper=options_bootstrapper,
             options=options,
-            build_root=get_buildroot(),
             session=graph_session.scheduler_session,
         )
 
@@ -169,7 +175,7 @@ class LocalPantsRunner:
             profile_path=profile_path,
         )
 
-    def _perform_run(self, goals: Tuple[str, ...]) -> ExitCode:
+    def _perform_run(self, goals: tuple[str, ...]) -> ExitCode:
         global_options = self.options.for_global_scope()
         if not global_options.get("loop", False):
             return self._perform_run_body(goals, poll=False)
@@ -183,12 +189,12 @@ class LocalPantsRunner:
             try:
                 exit_code = self._perform_run_body(goals, poll=True)
             except ExecutionError as e:
-                logger.warning(e)
+                logger.error(e)
             iterations -= 1
 
         return exit_code
 
-    def _perform_run_body(self, goals: Tuple[str, ...], poll: bool) -> ExitCode:
+    def _perform_run_body(self, goals: tuple[str, ...], poll: bool) -> ExitCode:
         return self.graph_session.run_goal_rules(
             union_membership=self.union_membership,
             goals=goals,
@@ -200,42 +206,40 @@ class LocalPantsRunner:
     def _finish_run(self, code: ExitCode) -> None:
         """Cleans up the run tracker."""
 
-    def _print_help(self, request: HelpRequest) -> ExitCode:
-        global_options = self.options.for_global_scope()
-
-        all_help_info = HelpInfoExtracter.get_all_help_info(
-            self.options,
-            self.union_membership,
-            self.graph_session.goal_consumed_subsystem_scopes,
-            RegisteredTargetTypes.create(self.build_config.target_types),
-        )
-        help_printer = HelpPrinter(
-            bin_name=global_options.pants_bin_name,
-            help_request=request,
-            all_help_info=all_help_info,
-            color=global_options.colors,
-        )
-        return help_printer.print_help()
-
-    def _get_workunits_callbacks(self) -> Tuple[WorkunitsCallback, ...]:
+    def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
         # a per-run instance of each WorkunitsCallback.
         (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(
             WorkunitsCallbackFactories, [self.union_membership]
         )
-        return tuple(wcf.callback_factory() for wcf in workunits_callback_factories)
+        return tuple(filter(bool, (wcf.callback_factory() for wcf in workunits_callback_factories)))
+
+    def _run_builtin_goal(self, builtin_goal: str) -> ExitCode:
+        scope_info = self.options.known_scope_to_info[builtin_goal]
+        assert scope_info.subsystem_cls
+        scoped_options = self.options.for_scope(builtin_goal)
+        goal = scope_info.subsystem_cls(scoped_options)
+        assert isinstance(goal, BuiltinGoal)
+        return goal.run(
+            build_config=self.build_config,
+            graph_session=self.graph_session,
+            options=self.options,
+            specs=self.specs,
+            union_membership=self.union_membership,
+        )
 
     def _run_inner(self) -> ExitCode:
+        if self.options.builtin_goal:
+            return self._run_builtin_goal(self.options.builtin_goal)
+
         goals = tuple(self.options.goals)
-        if self.options.help_request:
-            return self._print_help(self.options.help_request)
         if not goals:
             return PANTS_SUCCEEDED_EXIT_CODE
 
         try:
             return self._perform_run(goals)
         except Exception as e:
-            ExceptionSink.log_exception(e)
+            logger.error(e)
             return PANTS_FAILED_EXIT_CODE
         except KeyboardInterrupt:
             print("Interrupted by user.\n", file=sys.stderr)
@@ -243,8 +247,12 @@ class LocalPantsRunner:
 
     def run(self, start_time: float) -> ExitCode:
         with maybe_profiled(self.profile_path):
-            spec_parser = SpecsParser(get_buildroot())
-            specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
+            spec_parser = SpecsParser()
+            specs = []
+            for spec_str in self.options.specs:
+                spec, is_ignore = spec_parser.parse_spec(spec_str)
+                specs.append(f"-{spec}" if is_ignore else str(spec))
+
             self.run_tracker.start(run_start_time=start_time, specs=specs)
             global_options = self.options.for_global_scope()
 
@@ -258,6 +266,7 @@ class LocalPantsRunner:
                 allow_async_completion=(
                     global_options.pantsd and global_options.streaming_workunits_complete_async
                 ),
+                max_workunit_verbosity=global_options.streaming_workunits_level,
             )
             with streaming_reporter:
                 engine_result = PANTS_FAILED_EXIT_CODE

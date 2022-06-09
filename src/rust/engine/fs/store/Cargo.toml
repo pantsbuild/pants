@@ -2,50 +2,53 @@
 name = "store"
 version = "0.1.0"
 authors = ["Daniel Wagner-Hall <dwagnerhall@twitter.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 async-stream = "0.3"
-async-trait = "0.1"
-bazel_protos = { path = "../../bazel_protos" }
+# Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
+async-trait = "=0.1.42"
+protos = { path = "../../protos" }
 bytes = "1.0"
 concrete_time = { path = "../../concrete_time" }
-double-checked-cell-async = "2.0"
-grpc_util = { path = "../../grpc_util" }
+async-oncecell = "0.2"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
 fs = { path = ".." }
 futures = "0.3"
-glob = "0.2.11"
+glob = "0.3.0"
+grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
 http = "0.2"
 http-body = "0.4"
-indexmap = "1.4"
+indexmap = "1.8"
 itertools = "0.10"
-lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
+lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
 log = "0.4"
 madvise = "0.1"
 memmap = "0.7"
-parking_lot = "0.11"
-prost = "0.8"
-prost-types = "0.8"
+parking_lot = "0.12"
+prost = "0.9"
+prost-types = "0.9"
 serde = "1.0"
 serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
 task_executor = { path = "../../task_executor" }
 tempfile = "3"
-tokio-rustls = "0.22"
-tonic = { version = "0.5", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tokio-rustls = "0.23"
+tokio = { version = "1.16", features = ["fs"] }
+tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tower-service = "0.3"
 tryfuture = { path = "../../tryfuture" }
-uuid = { version = "0.7.1", features = ["v4"] }
+uuid = { version = "1.1.1", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
 
 [dev-dependencies]
 criterion = "0.3"
-maplit = "*"
 mock = { path = "../../testutil/mock" }
 num_cpus = "1"
 testutil = { path = "../../testutil" }
-tokio = { version = "1.4", features = ["rt", "macros"] }
+tokio = { version = "1.16", features = ["rt", "macros"] }
 walkdir = "2"
 
 [[bench]]

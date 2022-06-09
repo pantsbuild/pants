@@ -44,6 +44,10 @@ class DefaultMemberValueType(DefaultValueType):
     """
 
 
+class HelpType(RegistrationError):
+    """The `help=` argument must be a string, but was of type `{help_type}`."""
+
+
 class ImplicitValIsNone(RegistrationError):
     """Implicit value cannot be None."""
 
@@ -75,12 +79,8 @@ class OptionAlreadyRegistered(RegistrationError):
     """An option with this name was already registered on this scope."""
 
 
-class OptionNameDash(RegistrationError):
-    """Option name must begin with a dash."""
-
-
 class OptionNameDoubleDash(RegistrationError):
-    """Long option name must begin with a double-dash."""
+    """Option name must begin with a double-dash."""
 
 
 class PassthroughType(RegistrationError):
@@ -117,3 +117,25 @@ class UnknownFlagsError(ParseError):
         scope = f"scope {self.arg_scope}" if self.arg_scope else "global scope"
         msg = f"Unknown flags {', '.join(self.flags)} on {scope}"
         super().__init__(msg)
+
+
+# -----------------------------------------------------------------------
+# Config parsing errors
+# -----------------------------------------------------------------------
+
+
+class ConfigError(OptionsError):
+    """An error encountered while parsing a config file."""
+
+
+class ConfigValidationError(ConfigError):
+    """A config file is invalid."""
+
+
+class InterpolationMissingOptionError(ConfigError):
+    def __init__(self, option, section, rawval, reference):
+        super().__init__(
+            self,
+            f"Bad value substitution: option {option} in section {section} contains an "
+            f"interpolation key {reference} which is not a valid option name. Raw value: {rawval}",
+        )

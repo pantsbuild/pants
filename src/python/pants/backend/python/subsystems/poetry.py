@@ -24,10 +24,10 @@ class PoetrySubsystem(PythonToolRequirementsBase):
     options_scope = "poetry"
     help = "Used to generate lockfiles for third-party Python dependencies."
 
-    default_version = "poetry==1.1.7"
+    default_version = "poetry==1.1.8"
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
 
 # We must monkeypatch Poetry to include `setuptools` and `wheel` in the lockfile. This was fixed

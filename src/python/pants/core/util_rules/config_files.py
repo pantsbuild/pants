@@ -7,13 +7,8 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from pants.engine.fs import (
-    EMPTY_SNAPSHOT,
-    DigestContents,
-    GlobMatchErrorBehavior,
-    PathGlobs,
-    Snapshot,
-)
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, PathGlobs, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict

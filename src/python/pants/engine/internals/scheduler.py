@@ -9,26 +9,26 @@ import time
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
-from typing import Any, Dict, Iterable, List, NoReturn, Optional, Sequence, Tuple, Type, cast
+from typing import Any, Dict, Iterable, NoReturn, Sequence, cast
 
 from typing_extensions import TypedDict
 
 from pants.engine.collection import Collection
-from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType, SideEffecting
 from pants.engine.fs import (
-    AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
+    DigestEntries,
     DigestSubset,
+    Directory,
     DownloadFile,
     FileContent,
     FileDigest,
-    MergeDigests,
+    FileEntry,
     PathGlobs,
     PathGlobsAndRoot,
     Paths,
-    RemovePrefix,
     Snapshot,
 )
 from pants.engine.goal import Goal
@@ -47,13 +47,14 @@ from pants.engine.internals.native_engine import (
 )
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
-from pants.engine.internals.session import SessionValues
+from pants.engine.internals.session import RunId, SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import (
-    FallibleProcessResultWithPlatform,
+    FallibleProcessResult,
     InteractiveProcess,
     InteractiveProcessResult,
-    MultiPlatformProcess,
+    Process,
+    ProcessResultMetadata,
 )
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, is_union
@@ -73,8 +74,8 @@ Workunit = Dict[str, Any]
 
 
 class PolledWorkunits(TypedDict):
-    started: Tuple[Workunit, ...]
-    completed: Tuple[Workunit, ...]
+    started: tuple[Workunit, ...]
+    completed: tuple[Workunit, ...]
 
 
 @dataclass(frozen=True)
@@ -102,19 +103,19 @@ class Scheduler:
     def __init__(
         self,
         *,
-        ignore_patterns: List[str],
+        ignore_patterns: list[str],
         use_gitignore: bool,
         build_root: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
-        ca_certs_path: Optional[str],
+        ca_certs_path: str | None,
         rules: Iterable[Rule],
         union_membership: UnionMembership,
         execution_options: ExecutionOptions,
         local_store_options: LocalStoreOptions,
         executor: PyExecutor,
         include_trace_on_error: bool = True,
-        visualize_to_dir: Optional[str] = None,
+        visualize_to_dir: str | None = None,
         validate_reachability: bool = True,
         watch_filesystem: bool = True,
     ) -> None:
@@ -144,23 +145,24 @@ class Scheduler:
 
         # Create the native Scheduler and Session.
         types = PyTypes(
-            file_digest=FileDigest,
-            snapshot=Snapshot,
             paths=Paths,
             file_content=FileContent,
+            file_entry=FileEntry,
+            directory=Directory,
             digest_contents=DigestContents,
+            digest_entries=DigestEntries,
             path_globs=PathGlobs,
-            merge_digests=MergeDigests,
-            add_prefix=AddPrefix,
-            remove_prefix=RemovePrefix,
             create_digest=CreateDigest,
             digest_subset=DigestSubset,
             download_file=DownloadFile,
             platform=Platform,
-            multi_platform_process=MultiPlatformProcess,
-            process_result=FallibleProcessResultWithPlatform,
+            process=Process,
+            process_result=FallibleProcessResult,
+            process_result_metadata=ProcessResultMetadata,
             coroutine=CoroutineType,
             session_values=SessionValues,
+            run_id=RunId,
+            interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
             engine_aware_parameter=EngineAwareParameter,
         )
@@ -171,7 +173,7 @@ class Scheduler:
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,
-            store_headers=tuple(execution_options.remote_store_headers.items()),
+            store_headers=execution_options.remote_store_headers,
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
@@ -180,11 +182,12 @@ class Scheduler:
             cache_warnings_behavior=execution_options.remote_cache_warnings.value,
             cache_eager_fetch=execution_options.remote_cache_eager_fetch,
             cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,
+            cache_read_timeout_millis=execution_options.remote_cache_read_timeout_millis,
             execution_extra_platform_properties=tuple(
                 tuple(pair.split("=", 1))
                 for pair in execution_options.remote_execution_extra_platform_properties
             ),
-            execution_headers=tuple(execution_options.remote_execution_headers.items()),
+            execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
         )
@@ -197,13 +200,16 @@ class Scheduler:
             shard_count=local_store_options.shard_count,
         )
         exec_stategy_opts = PyExecutionStrategyOptions(
-            local_cache=execution_options.process_execution_local_cache,
+            local_cache=execution_options.local_cache,
             remote_cache_read=execution_options.remote_cache_read,
             remote_cache_write=execution_options.remote_cache_write,
-            local_cleanup=execution_options.process_execution_local_cleanup,
+            local_cleanup=execution_options.process_cleanup,
             local_parallelism=execution_options.process_execution_local_parallelism,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
+            child_max_memory=execution_options.process_total_child_memory_usage or 0,
+            child_default_memory=execution_options.process_per_child_memory_usage,
+            graceful_shutdown_timeout=execution_options.process_execution_graceful_shutdown_timeout,
         )
 
         self._py_scheduler = native_engine.scheduler_create(
@@ -259,25 +265,25 @@ class Scheduler:
     def rule_subgraph_visualization(self, root_subject_types: list[type], product_type: type):
         with temporary_file_path() as path:
             self.visualize_rule_subgraph_to_file(path, root_subject_types, product_type)
-            with open(path, "r") as fd:
+            with open(path) as fd:
                 for line in fd.readlines():
                     yield line.rstrip()
 
     def rule_graph_consumed_types(
-        self, root_subject_types: Sequence[Type], product_type: Type
+        self, root_subject_types: Sequence[type], product_type: type
     ) -> Sequence[type]:
         return native_engine.rule_graph_consumed_types(
             self.py_scheduler, root_subject_types, product_type
         )
 
-    def invalidate_files(self, direct_filenames: Iterable[str]) -> int:
-        filenames = set(direct_filenames)
-        # TODO(#11707): Evaluate removing the invalidation of parent directories.
-        filenames.update(os.path.dirname(f) for f in direct_filenames)
-        return native_engine.graph_invalidate(self.py_scheduler, tuple(filenames))
+    def invalidate_files(self, filenames: Iterable[str]) -> int:
+        return native_engine.graph_invalidate_paths(self.py_scheduler, filenames)
 
     def invalidate_all_files(self) -> int:
         return native_engine.graph_invalidate_all_paths(self.py_scheduler)
+
+    def invalidate_all(self) -> None:
+        native_engine.graph_invalidate_all(self.py_scheduler)
 
     def check_invalidation_watcher_liveness(self) -> None:
         native_engine.check_invalidation_watcher_liveness(self.py_scheduler)
@@ -304,6 +310,8 @@ class Scheduler:
         self,
         build_id: str,
         dynamic_ui: bool = False,
+        ui_use_prodash: bool = False,
+        max_workunit_level: LogLevel = LogLevel.DEBUG,
         session_values: SessionValues | None = None,
         cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> SchedulerSession:
@@ -312,7 +320,9 @@ class Scheduler:
             self,
             PySession(
                 scheduler=self.py_scheduler,
-                should_render_ui=dynamic_ui,
+                dynamic_ui=dynamic_ui,
+                ui_use_prodash=ui_use_prodash,
+                max_workunit_level=max_workunit_level.level,
                 build_id=build_id,
                 session_values=session_values or SessionValues(),
                 cancellation_latch=cancellation_latch or PySessionCancellationLatch(),
@@ -430,6 +440,10 @@ class SchedulerSession:
         """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
         return native_engine.scheduler_metrics(self.py_scheduler, self.py_session)
 
+    def live_items(self) -> tuple[list[Any], dict[str, tuple[int, int]]]:
+        """Return all Python objects held by the Scheduler."""
+        return native_engine.scheduler_live_items(self.py_scheduler, self.py_session)
+
     def _maybe_visualize(self) -> None:
         if self._scheduler.visualize_to_dir is not None:
             # TODO: This increment-and-get is racey.
@@ -459,12 +473,12 @@ class SchedulerSession:
 
         states = [
             Throw(
-                raw_root.result(),
-                python_traceback=raw_root.python_traceback(),
-                engine_traceback=raw_root.engine_traceback(),
+                raw_root.result,
+                python_traceback=raw_root.python_traceback,
+                engine_traceback=raw_root.engine_traceback,
             )
-            if raw_root.is_throw()
-            else Return(raw_root.result())
+            if raw_root.is_throw
+            else Return(raw_root.result)
             for raw_root in raw_roots
         ]
 
@@ -504,7 +518,7 @@ class SchedulerSession:
         else:
             exception_strs = "\n  ".join(f"{type(t.exc).__name__}: {str(t.exc)}" for t in throws)
             raise ExecutionError(
-                f"{exception_noun} encountered:\n\n" f"  {exception_strs}\n",
+                f"{exception_noun} encountered:\n\n  {exception_strs}\n",
                 wrapped_exceptions=tuple(t.exc for t in throws),
             )
 
@@ -565,9 +579,7 @@ class SchedulerSession:
         # order in output lists.
         return [ret.value for _, ret in returns]
 
-    def capture_snapshots(
-        self, path_globs_and_roots: Iterable[PathGlobsAndRoot]
-    ) -> tuple[Snapshot, ...]:
+    def capture_snapshots(self, path_globs_and_roots: Iterable[PathGlobsAndRoot]) -> list[Snapshot]:
         """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root
         directory.
 
@@ -579,8 +591,8 @@ class SchedulerSession:
             _PathGlobsAndRootCollection(path_globs_and_roots),
         )
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> tuple[bytes, ...]:
-        return tuple(native_engine.single_file_digests_to_bytes(self.py_scheduler, list(digests)))
+    def single_file_digests_to_bytes(self, digests: Sequence[FileDigest]) -> list[bytes]:
+        return native_engine.single_file_digests_to_bytes(self.py_scheduler, list(digests))
 
     def snapshots_to_file_contents(
         self, snapshots: Sequence[Snapshot]
@@ -595,17 +607,13 @@ class SchedulerSession:
             self.product_request(DigestContents, [snapshot.digest])[0] for snapshot in snapshots
         )
 
-    def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
+    def ensure_remote_has_recursive(self, digests: Sequence[Digest | FileDigest]) -> None:
         native_engine.ensure_remote_has_recursive(self.py_scheduler, list(digests))
 
-    def run_local_interactive_process(
-        self, request: InteractiveProcess
-    ) -> InteractiveProcessResult:
-        return native_engine.run_local_interactive_process(
-            self.py_scheduler, self.py_session, request
-        )
+    def ensure_directory_digest_persisted(self, digest: Digest) -> None:
+        native_engine.ensure_directory_digest_persisted(self.py_scheduler, digest)
 
-    def write_digest(self, digest: Digest, *, path_prefix: Optional[str] = None) -> None:
+    def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
         """Write a digest to disk, relative to the build root."""
         if path_prefix and PurePath(path_prefix).is_absolute():
             raise ValueError(
@@ -620,7 +628,10 @@ class SchedulerSession:
     def garbage_collect_store(self, target_size_bytes: int) -> None:
         self._scheduler.garbage_collect_store(target_size_bytes)
 
-    def get_observation_histograms(self) -> dict:
+    def get_metrics(self) -> dict[str, int]:
+        return native_engine.session_get_metrics(self.py_session)
+
+    def get_observation_histograms(self) -> dict[str, Any]:
         return native_engine.session_get_observation_histograms(self.py_scheduler, self.py_session)
 
     def record_test_observation(self, value: int) -> None:
@@ -643,28 +654,26 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             tasks,
             rule.func,
             rule.output_type,
-            issubclass(rule.output_type, EngineAwareReturnType),
-            rule.cacheable,
-            rule.canonical_name,
-            rule.desc or "",
-            rule.level.level,
+            side_effecting=any(issubclass(t, SideEffecting) for t in rule.input_selectors),
+            engine_aware_return_type=issubclass(rule.output_type, EngineAwareReturnType),
+            cacheable=rule.cacheable,
+            name=rule.canonical_name,
+            desc=rule.desc or "",
+            level=rule.level.level,
         )
 
         for selector in rule.input_selectors:
             native_engine.tasks_add_select(tasks, selector)
 
-        def add_get_edge(product: type, subject: type) -> None:
-            native_engine.tasks_add_get(tasks, product, subject)
-
         for the_get in rule.input_gets:
             if is_union(the_get.input_type):
-                # If the registered subject type is a union, add Get edges to all registered
-                # union members.
+                # Register a union. TODO: See #12934: this should involve an explicit interface
+                # soon, rather than one being implicitly created with only the provided Param.
                 for union_member in union_membership.get(the_get.input_type):
-                    add_get_edge(the_get.output_type, union_member)
+                    native_engine.tasks_add_union(tasks, the_get.output_type, (union_member,))
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                add_get_edge(the_get.output_type, the_get.input_type)
+                native_engine.tasks_add_get(tasks, the_get.output_type, the_get.input_type)
 
         native_engine.tasks_task_end(tasks)
 

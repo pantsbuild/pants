@@ -9,9 +9,14 @@ from pants.backend.python.target_types import (
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
+from pants.backend.python.util_rules.pex import Pex
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import (
+    InterpreterConstraintsRequest,
+    PexFromTargetsRequest,
+)
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -26,10 +31,9 @@ from pants.util.logging import LogLevel
 
 @rule(level=LogLevel.DEBUG)
 async def create_pex_binary_run_request(
-    field_set: PexBinaryFieldSet,
-    pex_binary_defaults: PexBinaryDefaults,
-    pex_env: PexEnvironment,
+    field_set: PexBinaryFieldSet, pex_binary_defaults: PexBinaryDefaults, pex_env: PexEnvironment
 ) -> RunRequest:
+    run_in_sandbox = field_set.run_in_sandbox.value
     entry_point, transitive_targets = await MultiGet(
         Get(
             ResolvedPexEntryPoint,
@@ -38,64 +42,80 @@ async def create_pex_binary_run_request(
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
 
-    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
-    # so that we can get the interpreter constraints for use in runner_pex_request.
-    requirements_pex_request = await Get(
-        PexRequest,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements([field_set.address], internal_only=True),
+    addresses = [field_set.address]
+    interpreter_constraints = await Get(
+        InterpreterConstraints, InterpreterConstraintsRequest(addresses)
     )
 
-    requirements_request = Get(Pex, PexRequest, requirements_pex_request)
-
-    sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
+    pex_filename = (
+        field_set.address.generated_name.replace(".", "_")
+        if field_set.address.generated_name
+        else field_set.address.target_name
     )
-
-    output_filename = f"{field_set.address.target_name}.pex"
-    runner_pex_request = Get(
+    pex_get = Get(
         Pex,
-        PexRequest(
-            output_filename=output_filename,
-            interpreter_constraints=requirements_pex_request.interpreter_constraints,
+        PexFromTargetsRequest(
+            [field_set.address],
+            output_filename=f"{pex_filename}.pex",
+            internal_only=True,
+            include_source_files=False,
+            # Note that the file for first-party entry points is not in the PEX itself. In that
+            # case, it's loaded by setting `PEX_EXTRA_SYS_PATH`.
+            main=entry_point.val or field_set.script.value,
             additional_args=(
                 *field_set.generate_additional_args(pex_binary_defaults),
-                # N.B.: Since we cobble together the runtime environment via PEX_PATH and
-                # PEX_EXTRA_SYS_PATH below, it's important for any app that re-executes itself that
-                # these environment variables are not stripped.
+                # N.B.: Since we cobble together the runtime environment via PEX_EXTRA_SYS_PATH
+                # below, it's important for any app that re-executes itself that these environment
+                # variables are not stripped.
                 "--no-strip-pex-env",
             ),
+        ),
+    )
+    sources_get = Get(
+        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
+    )
+    pex, sources = await MultiGet(pex_get, sources_get)
+
+    local_dists = await Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            [field_set.address],
             internal_only=True,
-            # Note that the entry point file is not in the PEX itself. It's loaded by setting
-            # `PEX_EXTRA_SYS_PATH`.
-            # TODO(John Sirois): Support ConsoleScript in PexBinary targets:
-            #  https://github.com/pantsbuild/pants/issues/11619
-            main=entry_point.val,
+            interpreter_constraints=interpreter_constraints,
+            sources=sources,
         ),
     )
 
-    requirements, sources, runner_pex = await MultiGet(
-        requirements_request, sources_request, runner_pex_request
-    )
-
-    merged_digest = await Get(
-        Digest,
-        MergeDigests(
-            [requirements.digest, sources.source_files.snapshot.digest, runner_pex.digest]
-        ),
-    )
+    input_digests = [
+        pex.digest,
+        local_dists.pex.digest,
+        # Note regarding inline mode: You might think that the sources don't need to be copied
+        # into the chroot when using inline sources. But they do, because some of them might be
+        # codegenned, and those won't exist in the inline source tree. Rather than incurring the
+        # complexity of figuring out here which sources were codegenned, we copy everything.
+        # The inline source roots precede the chrooted ones in PEX_EXTRA_SYS_PATH, so the inline
+        # sources will take precedence and their copies in the chroot will be ignored.
+        local_dists.remaining_sources.source_files.snapshot.digest,
+    ]
+    merged_digest = await Get(Digest, MergeDigests(input_digests))
 
     def in_chroot(relpath: str) -> str:
         return os.path.join("{chroot}", relpath)
 
     complete_pex_env = pex_env.in_workspace()
-    args = complete_pex_env.create_argv(in_chroot(runner_pex.name), python=runner_pex.python)
+    args = complete_pex_env.create_argv(in_chroot(pex.name), python=pex.python)
 
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
+    # The order here is important: we want the in-repo sources to take precedence over their
+    # copies in the sandbox (see above for why those copies exist even in non-sandboxed mode).
+    source_roots = [
+        *([] if run_in_sandbox else sources.source_roots),
+        *chrooted_source_roots,
+    ]
     extra_env = {
-        **complete_pex_env.environment_dict(python_configured=runner_pex.python is not None),
-        "PEX_PATH": in_chroot(requirements_pex_request.output_filename),
-        "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
+        **complete_pex_env.environment_dict(python_configured=pex.python is not None),
+        "PEX_PATH": in_chroot(local_dists.pex.name),
+        "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
 
     return RunRequest(digest=merged_digest, args=args, extra_env=extra_env)

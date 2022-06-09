@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# NB: pre-commit runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
+set -e
 
+# NB: pre-commit runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
 source build-support/common.sh
 
 # Commit hooks set $GIT_DIR by default to .git
@@ -13,37 +14,26 @@ if [[ -n "${GIT_DIR}" && "${GIT_DIR}" != /* ]]; then
   export GIT_DIR
 fi
 
-set -e
-
 MERGE_BASE="$(git_merge_base)"
 
-# When travis builds a tag, it does so in a shallow clone without main fetched, which
-# fails in pants changed.
-if git rev-parse --verify "${MERGE_BASE}" &> /dev/null; then
-  if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
-    ./build-support/bin/check_rust_pre_commit.sh || exit 1
-  fi
+if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
+  ./build-support/bin/check_rust_pre_commit.sh
+fi
 
-  echo "* Checking MyPy"
-  ./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive --tag='-nolint' typecheck || exit 1
+echo "* Typechecking"
+./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive check
 
-  echo "* Checking linters and formatters"
-  ./pants --changed-since="${MERGE_BASE}" --tag='-nolint' lint ||
-    die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
+echo "* Checking linters, formatters, and headers"
+./pants --changed-since="${MERGE_BASE}" lint ||
+  die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
-  if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
-    echo "* Checking GitHub workflows generation"
-    ./pants run build-support/bin/generate_github_workflows.py -- --check
-  fi
-else
-  echo "* Skipping import/lint checks in partial working copy."
+if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
+  echo "* Checking GitHub workflows generation"
+  ./pants run build-support/bin/generate_github_workflows.py -- --check
 fi
 
 echo "* Checking __init__.py files"
-./build-support/bin/check_inits.py || exit 1
-
-echo "* Checking headers"
-./pants validate '**' || exit 1
+./pants run build-support/bin/check_inits.py
 
 echo "* Checking for banned imports"
-./build-support/bin/check_banned_imports.py || exit 1
+./pants run build-support/bin/check_banned_imports.py

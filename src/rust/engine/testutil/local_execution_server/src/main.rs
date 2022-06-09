@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,11 +25,11 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bazel_protos::{
+use mock::execution_server::{ExpectedAPICall, MockExecution, MockOperation, TestServer};
+use protos::{
   gen::build::bazel::remote::execution::v2::{Digest, ExecuteRequest},
   gen::google::longrunning::Operation,
 };
-use mock::execution_server::{ExpectedAPICall, MockExecution, MockOperation, TestServer};
 use std::io::Read;
 
 use structopt::StructOpt;

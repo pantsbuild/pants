@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -28,18 +26,9 @@
 #![allow(clippy::mutex_atomic)]
 
 fn main() {
+  pyo3_build_config::add_extension_module_link_args();
+
   // NB: The native extension only works with the Python interpreter version it was built with
   // (e.g. Python 3.7 vs 3.8).
   println!("cargo:rerun-if-env-changed=PY");
-
-  if cfg!(target_os = "macos") {
-    // N.B. On OSX, we force weak linking by passing the param `-undefined dynamic_lookup` to
-    // the underlying linker. This avoids "missing symbol" errors for Python symbols
-    // (e.g. `_PyImport_ImportModule`) at build time when bundling the cpython sources.
-    // The missing symbols will instead by dynamically resolved in the address space of the parent
-    // binary (e.g. `python`) at runtime. We do this to avoid needing to link to libpython
-    // (which would constrain us to specific versions of Python).
-    println!("cargo:rustc-cdylib-link-arg=-undefined");
-    println!("cargo:rustc-cdylib-link-arg=dynamic_lookup");
-  }
 }

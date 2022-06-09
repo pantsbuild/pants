@@ -1,5 +1,5 @@
 name: "Support Pants - list my company on pantsbuild.org"
-description: Add a company or organization to the public list of Pants Users
+description: Add a company or organization to the Who Uses Pants page
 title: "Please add XXXXXX to the public list of Pants Users"
 labels: [user-registration]
 assignees:

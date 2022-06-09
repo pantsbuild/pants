@@ -4,18 +4,18 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::gen::build::bazel::semver::SemVer;
-use bazel_protos::gen::google::bytestream::{
-  byte_stream_server::ByteStream, byte_stream_server::ByteStreamServer, QueryWriteStatusRequest,
-  QueryWriteStatusResponse, ReadRequest, ReadResponse, WriteRequest, WriteResponse,
-};
 use bytes::{Bytes, BytesMut};
 use futures::stream::StreamExt;
 use futures::{FutureExt, Stream};
 use grpc_util::hyper::AddrIncomingWithStream;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::gen::build::bazel::semver::SemVer;
+use protos::gen::google::bytestream::{
+  byte_stream_server::ByteStream, byte_stream_server::ByteStreamServer, QueryWriteStatusRequest,
+  QueryWriteStatusResponse, ReadRequest, ReadResponse, WriteRequest, WriteResponse,
+};
 use remexec::capabilities_server::{Capabilities, CapabilitiesServer};
 use remexec::content_addressable_storage_server::{
   ContentAddressableStorage, ContentAddressableStorageServer,
@@ -637,10 +637,10 @@ impl ContentAddressableStorage for StubCASResponder {
       let status = write_blob(blob_request, &mut blobs);
       responses.push(remexec::batch_update_blobs_response::Response {
         digest,
-        status: Some(bazel_protos::gen::google::rpc::Status {
+        status: Some(protos::gen::google::rpc::Status {
           code: status.code() as i32,
           message: status.message().to_string(),
-          ..bazel_protos::gen::google::rpc::Status::default()
+          ..protos::gen::google::rpc::Status::default()
         }),
       })
     }
@@ -705,10 +705,10 @@ impl ContentAddressableStorage for StubCASResponder {
       responses.push(remexec::batch_read_blobs_response::Response {
         digest: Some(digest),
         data: data_opt.unwrap_or_else(Bytes::new),
-        status: Some(bazel_protos::gen::google::rpc::Status {
+        status: Some(protos::gen::google::rpc::Status {
           code: status.code() as i32,
           message: status.message().to_string(),
-          ..bazel_protos::gen::google::rpc::Status::default()
+          ..protos::gen::google::rpc::Status::default()
         }),
       });
     }

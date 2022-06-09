@@ -1,15 +1,15 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "testutil"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
 async-stream = "0.3"
-bazel_protos = { path = "../bazel_protos" }
+protos = { path = "../protos" }
 bytes = "1.0"
 grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
 hashing = { path = "../hashing" }
-prost = "0.8" 
+prost = "0.9" 

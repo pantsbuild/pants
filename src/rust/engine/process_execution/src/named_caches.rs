@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use deepsize::DeepSizeOf;
 use serde::Serialize;
 
-use crate::RelativePath;
-use fs::default_cache_path;
+use crate::WorkdirSymlink;
+use fs::{default_cache_path, RelativePath};
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
 pub struct CacheName(String);
 
 impl CacheName {
@@ -23,24 +24,6 @@ impl CacheName {
       ))
     }
   }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize)]
-pub struct CacheDest(String);
-
-impl CacheDest {
-  pub fn new(dest: String) -> Result<CacheDest, String> {
-    // We validate as RelativePath, but store as a String to avoid needing to assert later that
-    // path is valid unicode.
-    let _ = RelativePath::new(&dest)?;
-    Ok(CacheDest(dest))
-  }
-}
-
-#[derive(Debug)]
-pub struct NamedCacheSymlink {
-  pub src: PathBuf,
-  pub dst: PathBuf,
 }
 
 #[derive(Clone)]
@@ -67,13 +50,13 @@ impl NamedCaches {
   ///
   pub fn local_paths<'a>(
     &'a self,
-    caches: &'a BTreeMap<CacheName, CacheDest>,
-  ) -> impl Iterator<Item = NamedCacheSymlink> + 'a {
+    caches: &'a BTreeMap<CacheName, RelativePath>,
+  ) -> impl Iterator<Item = WorkdirSymlink> + 'a {
     caches
       .iter()
-      .map(move |(cache_name, cache_dest)| NamedCacheSymlink {
-        src: self.local_base.join(&cache_name.0),
-        dst: PathBuf::from(&cache_dest.0),
+      .map(move |(cache_name, workdir_rel_path)| WorkdirSymlink {
+        src: workdir_rel_path.clone(),
+        dst: self.local_base.join(&cache_name.0),
       })
   }
 
@@ -84,7 +67,7 @@ impl NamedCaches {
   /// See https://docs.google.com/document/d/1n_MVVGjrkTKTPKHqRPlyfFzQyx2QioclMG_Q3DMUgYk/edit#.
   ///
   pub fn platform_properties<'a>(
-    caches: &'a BTreeMap<CacheName, CacheDest>,
+    caches: &'a BTreeMap<CacheName, RelativePath>,
     namespace: &'a Option<String>,
   ) -> impl Iterator<Item = (String, String)> + 'a {
     namespace
@@ -93,7 +76,7 @@ impl NamedCaches {
       .chain(caches.iter().map(move |(cache_name, cache_dest)| {
         (
           format!("x_append_only_cache:{}", cache_name.0),
-          cache_dest.0.clone(),
+          cache_dest.display().to_string(),
         )
       }))
   }

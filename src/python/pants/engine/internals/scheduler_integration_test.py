@@ -36,5 +36,5 @@ def test_graceful_termination(use_pantsd: bool) -> None:
         use_pantsd=use_pantsd,
     )
     result.assert_failure()
-    assert result.stdout == "testprojects/src/python/hello/greet\n"
+    assert result.stdout == "testprojects/src/python/hello/greet:greet\n"
     assert result.exit_code == 42

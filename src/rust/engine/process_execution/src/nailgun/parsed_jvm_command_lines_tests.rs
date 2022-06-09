@@ -140,22 +140,6 @@ fn parses_cli_without_jvm_args() {
 }
 
 #[test]
-fn fails_to_parse_cli_without_jdk() {
-  let cli_without_jdk = CLIBuilder::empty()
-    .with_nailgun_args()
-    .with_main_class()
-    .build();
-
-  let parse_result =
-    ParsedJVMCommandLines::parse_command_lines(&cli_without_jdk.render_to_full_cli());
-
-  assert_eq!(
-    parse_result,
-    Err("Every command line must start with a call to the jdk.".to_string())
-  )
-}
-
-#[test]
 fn fails_to_parse_cli_without_main_class() {
   let cli_without_main_class = CLIBuilder::empty()
     .with_jdk()

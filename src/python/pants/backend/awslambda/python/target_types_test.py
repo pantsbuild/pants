@@ -1,6 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import re
 from textwrap import dedent
 from typing import List, Optional
 
@@ -16,11 +16,18 @@ from pants.backend.awslambda.python.target_types import (
     ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.awslambda.python.target_types import rules as target_type_rules
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import (
+    PexCompletePlatformsField,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+)
+from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.build_graph.address import Address
+from pants.core.target_types import FileTarget
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import InjectedDependencies, InvalidFieldException
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.strutil import softwrap
 
 
 @pytest.fixture
@@ -28,10 +35,16 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *target_type_rules(),
+            *python_target_types_rules(),
             QueryRule(ResolvedPythonAwsHandler, [ResolvePythonAwsHandlerRequest]),
             QueryRule(InjectedDependencies, [InjectPythonLambdaHandlerDependency]),
         ],
-        target_types=[PythonAWSLambda, PythonRequirementLibrary, PythonLibrary],
+        target_types=[
+            FileTarget,
+            PythonAWSLambda,
+            PythonRequirementTarget,
+            PythonSourcesGeneratorTarget,
+        ],
     )
 
 
@@ -89,10 +102,10 @@ def test_resolve_handler(rule_runner: RuleRunner) -> None:
     assert_resolved("path.to.lambda:func", expected="path.to.lambda:func", is_file=False)
     assert_resolved("lambda.py:func", expected="project.lambda:func", is_file=True)
 
-    with pytest.raises(ExecutionError):
+    with engine_error(contains="Unmatched glob"):
         assert_resolved("doesnt_exist.py:func", expected="doesnt matter", is_file=True)
     # Resolving >1 file is an error.
-    with pytest.raises(ExecutionError):
+    with engine_error(InvalidFieldException):
         assert_resolved("*.py:func", expected="doesnt matter", is_file=True)
 
 
@@ -101,10 +114,10 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(
+                python_requirement(
                     name='ansicolors',
                     requirements=['ansicolors'],
-                    module_mapping={'ansicolors': ['colors']},
+                    modules=['colors'],
                 )
                 """
             ),
@@ -113,14 +126,14 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
             "project/ambiguous_in_another_root.py": "",
             "project/BUILD": dedent(
                 """\
-                python_library(sources=['app.py'])
+                python_sources(sources=['app.py'])
                 python_awslambda(name='first_party', handler='project.app:func', runtime='python3.7')
                 python_awslambda(name='first_party_shorthand', handler='app.py:func', runtime='python3.7')
                 python_awslambda(name='third_party', handler='colors:func', runtime='python3.7')
                 python_awslambda(name='unrecognized', handler='who_knows.module:func', runtime='python3.7')
 
-                python_library(name="dep1", sources=["ambiguous.py"])
-                python_library(name="dep2", sources=["ambiguous.py"])
+                python_sources(name="dep1", sources=["ambiguous.py"])
+                python_sources(name="dep2", sources=["ambiguous.py"])
                 python_awslambda(
                     name="ambiguous",
                     handler='ambiguous.py:func',
@@ -133,7 +146,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
                     dependencies=["!./ambiguous.py:dep2"],
                 )
 
-                python_library(
+                python_sources(
                     name="ambiguous_in_another_root", sources=["ambiguous_in_another_root.py"]
                 )
                 python_awslambda(
@@ -149,7 +162,7 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
                 """
             ),
             "src/py/project/ambiguous_in_another_root.py": "",
-            "src/py/project/BUILD.py": "python_library()",
+            "src/py/project/BUILD.py": "python_sources()",
         }
     )
 
@@ -180,9 +193,14 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     assert_injected(Address("project", target_name="ambiguous"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "project:ambiguous has the field `handler='ambiguous.py:func'`, which maps to the Python "
-        "module `project.ambiguous`"
-    ) in caplog.text
+        softwrap(
+            """
+            project:ambiguous has the field `handler='ambiguous.py:func'`, which maps to the Python
+            module `project.ambiguous`
+            """
+        )
+        in caplog.text
+    )
     assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
 
     # Test that ignores can disambiguate an otherwise ambiguous handler. Ensure we don't log a
@@ -209,10 +227,78 @@ def test_inject_handler_dependency(rule_runner: RuleRunner, caplog) -> None:
     assert_injected(Address("project", target_name="another_root__module_used"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/"
-        "ambiguous_in_another_root.py']"
-    ) in caplog.text
+        softwrap(
+            """
+            ['project/ambiguous_in_another_root.py:ambiguous_in_another_root',
+            'src/py/project/ambiguous_in_another_root.py']
+            """
+        )
+        in caplog.text
+    )
 
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
     assert_injected(Address("project", target_name="first_party"), expected=None)
+
+
+def test_at_least_one_target_platform(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "project/app.py": "",
+            "project/platform-py37.json": "",
+            "project/BUILD": dedent(
+                """\
+                python_awslambda(
+                    name='runtime',
+                    handler='project.app:func',
+                    runtime='python3.7',
+                )
+                file(name="python37", source="platform-py37.json")
+                python_awslambda(
+                    name='complete_platforms',
+                    handler='project.app:func',
+                    complete_platforms=[':python37'],
+                )
+                python_awslambda(
+                    name='both',
+                    handler='project.app:func',
+                    runtime='python3.7',
+                    complete_platforms=[':python37'],
+                )
+                python_awslambda(
+                    name='neither',
+                    handler='project.app:func',
+                )
+                """
+            ),
+        }
+    )
+
+    runtime = rule_runner.get_target(Address("project", target_name="runtime"))
+    assert "python3.7" == runtime[PythonAwsLambdaRuntime].value
+    assert runtime[PexCompletePlatformsField].value is None
+
+    complete_platforms = rule_runner.get_target(
+        Address("project", target_name="complete_platforms")
+    )
+    assert complete_platforms[PythonAwsLambdaRuntime].value is None
+    assert (":python37",) == complete_platforms[PexCompletePlatformsField].value
+
+    both = rule_runner.get_target(Address("project", target_name="both"))
+    assert "python3.7" == both[PythonAwsLambdaRuntime].value
+    assert (":python37",) == both[PexCompletePlatformsField].value
+
+    with pytest.raises(
+        ExecutionError,
+        match=r".*{}.*".format(
+            re.escape(
+                softwrap(
+                    """
+                    InvalidTargetException: The `python_awslambda` target project:neither must
+                    specify either a `runtime` or `complete_platforms` or both.
+                    """
+                )
+            )
+        ),
+    ):
+        rule_runner.get_target(Address("project", target_name="neither"))

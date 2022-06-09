@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from queue import Queue
 from socketserver import TCPServer
-from typing import IO, Any, Callable, Iterator, Mapping, Tuple, Type
+from typing import IO, Any, Callable, Iterator, Mapping
 
 from colors import green
 
@@ -84,7 +84,7 @@ def hermetic_environment_as(**kwargs: str | None) -> Iterator[None]:
 
 
 @contextmanager
-def argv_as(args: Tuple[str, ...]) -> Iterator[None]:
+def argv_as(args: tuple[str, ...]) -> Iterator[None]:
     """Temporarily set `sys.argv` to the supplied value."""
     old_args = sys.argv
     try:
@@ -109,7 +109,10 @@ def temporary_dir(
     You may specify the following keyword args:
     :param root_dir: The parent directory to create the temporary directory.
     :param cleanup: Whether or not to clean up the temporary directory.
+    :param suffix: If not None the directory name will end with this suffix.
     :param permissions: If provided, sets the directory permissions to this mode.
+    :param prefix: If not None, the directory name will begin with this prefix,
+                   otherwise a default prefix is used.
     """
     path = tempfile.mkdtemp(dir=root_dir, suffix=suffix, prefix=prefix)
 
@@ -274,8 +277,8 @@ def maybe_profiled(profile_path: str | None) -> Iterator[None]:
 
 
 @contextmanager
-def http_server(handler_class: Type, ssl_context: ssl.SSLContext | None = None) -> Iterator[int]:
-    def serve(port_queue: "Queue[int]", shutdown_queue: "Queue[bool]") -> None:
+def http_server(handler_class: type, ssl_context: ssl.SSLContext | None = None) -> Iterator[int]:
+    def serve(port_queue: Queue[int], shutdown_queue: Queue[bool]) -> None:
         httpd = TCPServer(("", 0), handler_class)
         httpd.timeout = 0.1
         if ssl_context:
@@ -285,8 +288,8 @@ def http_server(handler_class: Type, ssl_context: ssl.SSLContext | None = None) 
         while shutdown_queue.empty():
             httpd.handle_request()
 
-    port_queue: "Queue[int]" = Queue()
-    shutdown_queue: "Queue[bool]" = Queue()
+    port_queue: Queue[int] = Queue()
+    shutdown_queue: Queue[bool] = Queue()
     t = threading.Thread(target=lambda: serve(port_queue, shutdown_queue))
     t.daemon = True
     t.start()

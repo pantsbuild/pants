@@ -8,22 +8,34 @@ from typing import Iterable
 
 import pytest
 
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
-    LockfileMetadata,
-    calculate_invalidation_digest,
+    InvalidPythonLockfileReason,
+    PythonLockfileMetadata,
+    PythonLockfileMetadataV1,
+    PythonLockfileMetadataV2,
 )
+from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
+
+INTERPRETER_UNIVERSE = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+
+
+def reqset(*a) -> set[PipRequirement]:
+    return {PipRequirement.parse(i) for i in a}
 
 
 def test_metadata_header_round_trip() -> None:
-    input_metadata = LockfileMetadata(
-        "cab0c0c0c0c0dadacafec0c0c0c0cafedadabeefc0c0c0c0feedbeeffeedbeef",
+    input_metadata = PythonLockfileMetadata.new(
         InterpreterConstraints(["CPython==2.7.*", "PyPy", "CPython>=3.6,<4,!=3.7.*"]),
+        reqset("ansicolors==0.1.0"),
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
-        b"req1==1.0", regenerate_command="./pants lock"
+        b"req1==1.0", regenerate_command="./pants lock", delimeter="#"
     )
-    output_metadata = LockfileMetadata.from_lockfile(serialized_lockfile)
+    output_metadata = PythonLockfileMetadata.from_lockfile(
+        serialized_lockfile, resolve_name="a", delimeter="#"
+    )
     assert input_metadata == output_metadata
 
 
@@ -39,9 +51,12 @@ def test_add_header_to_lockfile() -> None:
 #
 # --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 # {
-#   "requirements_invalidation_digest": "000faaafcacacaca",
+#   "version": 2,
 #   "valid_for_interpreter_constraints": [
 #     "CPython>=3.7"
+#   ],
+#   "generated_with_requirements": [
+#     "ansicolors==0.1.0"
 #   ]
 # }
 # --- END PANTS LOCKFILE METADATA ---
@@ -52,8 +67,12 @@ dave==3.1.4 \\
     def line_by_line(b: bytes) -> list[bytes]:
         return [i for i in (j.strip() for j in b.splitlines()) if i]
 
-    metadata = LockfileMetadata("000faaafcacacaca", InterpreterConstraints([">=3.7"]))
-    result = metadata.add_header_to_lockfile(input_lockfile, regenerate_command="./pants lock")
+    metadata = PythonLockfileMetadata.new(
+        InterpreterConstraints([">=3.7"]), reqset("ansicolors==0.1.0")
+    )
+    result = metadata.add_header_to_lockfile(
+        input_lockfile, regenerate_command="./pants lock", delimeter="#"
+    )
     assert line_by_line(result) == line_by_line(expected)
 
 
@@ -86,7 +105,7 @@ def test_invalidation_digest() -> None:
             [">=3.5.5"],
             [">=3.5, <=3.6"],
             False,
-        ),  # User ICs contain versions in the 3.6 range
+        ),  # User ICs contain versions in the 3.7 range
         ("yes", "yes", [">=3.5.5, <=3.5.10"], [">=3.5, <=3.6"], True),
         ("yes", "no", [">=3.5.5, <=3.5.10"], [">=3.5, <=3.6"], False),  # Digests do not match
         (
@@ -121,15 +140,92 @@ def test_invalidation_digest() -> None:
         ),  # Excluded version from expected ICs is not in a range specified
     ],
 )
-def test_is_valid_for(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
-    m = LockfileMetadata(expected_digest, InterpreterConstraints(expected_ic))
+def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, matches) -> None:
+    m: PythonLockfileMetadata
+    m = PythonLockfileMetadataV1(InterpreterConstraints(expected_ic), expected_digest)
     assert (
         bool(
             m.is_valid_for(
-                user_digest,
-                InterpreterConstraints(user_ic),
-                ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"],
+                is_tool=True,
+                expected_invalidation_digest=user_digest,
+                user_interpreter_constraints=InterpreterConstraints(user_ic),
+                interpreter_universe=INTERPRETER_UNIVERSE,
+                user_requirements=set(),
             )
         )
         == matches
     )
+
+
+_VALID_ICS = [">=3.5"]
+_VALID_REQS = ["ansicolors==0.1.0", "requests==1.0.0"]
+
+# Different scenarios that are the same for both tool lockfiles and user lockfiles.
+_LockfileConditions = (
+    [_VALID_ICS, _VALID_ICS, _VALID_REQS, _VALID_REQS, []],
+    [_VALID_ICS, _VALID_ICS, _VALID_REQS, list(reversed(_VALID_REQS)), []],
+    [
+        _VALID_ICS,
+        _VALID_ICS,
+        _VALID_REQS,
+        [_VALID_REQS[0], "requests==2.0.0"],
+        [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
+    ],
+    [
+        _VALID_ICS,
+        _VALID_ICS,
+        _VALID_REQS,
+        [_VALID_REQS[0], "different"],
+        [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
+    ],
+    [
+        _VALID_ICS,
+        _VALID_ICS,
+        _VALID_REQS,
+        [*_VALID_REQS, "a-third-req"],
+        [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
+    ],
+    [
+        _VALID_ICS,
+        ["==2.7.*"],
+        _VALID_REQS,
+        _VALID_REQS,
+        [InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH],
+    ],
+)
+
+
+@pytest.mark.parametrize(
+    "is_tool, lock_ics, user_ics, lock_reqs, user_reqs, expected",
+    [
+        *([True, *conditions] for conditions in _LockfileConditions),
+        *([False, *conditions] for conditions in _LockfileConditions),
+        # Tools require exact matches, whereas user lockfiles only need to subset.
+        [False, _VALID_ICS, _VALID_ICS, _VALID_REQS, [_VALID_REQS[0]], []],
+        [
+            True,
+            _VALID_ICS,
+            _VALID_ICS,
+            _VALID_REQS,
+            [_VALID_REQS[0]],
+            [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
+        ],
+    ],
+)
+def test_is_valid_for_v2(
+    is_tool: bool,
+    user_ics: list[str],
+    lock_ics: list[str],
+    user_reqs: list[str],
+    lock_reqs: list[str],
+    expected: list[InvalidPythonLockfileReason],
+) -> None:
+    m = PythonLockfileMetadataV2(InterpreterConstraints(lock_ics), reqset(*lock_reqs))
+    result = m.is_valid_for(
+        is_tool=is_tool,
+        expected_invalidation_digest="",
+        user_interpreter_constraints=InterpreterConstraints(user_ics),
+        interpreter_universe=INTERPRETER_UNIVERSE,
+        user_requirements=reqset(*user_reqs),
+    )
+    assert result.failure_reasons == set(expected)

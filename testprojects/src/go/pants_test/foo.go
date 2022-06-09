@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/pantsbuild/pants/testprojects/src/go/pants_test/bar"
 	"os"
-
-	"github.com/toolchainlabs/toolchain/src/go/src/toolchain/pants_test/bar"
 )
 
 func main() {

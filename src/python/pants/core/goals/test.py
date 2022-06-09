@@ -9,67 +9,91 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, ClassVar, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.filter_empty_sources import (
-    FieldSetsWithSources,
-    FieldSetsWithSourcesRequest,
-)
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.environment import CompleteEnvironment
-from pants.engine.fs import Digest, FileDigest, MergeDigests, Snapshot, Workspace
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.fs import EMPTY_FILE_DIGEST, Digest, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, _uncacheable_rule, collect_rules, goal_rule, rule
+from pants.engine.internals.session import RunId
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    InteractiveProcessResult,
+    ProcessResultMetadata,
+)
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
-    Sources,
+    SourcesField,
     SpecialCasedDependencies,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
     Targets,
+    parse_shard_spec,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.util.frozendict import FrozenDict
+from pants.option.option_types import BoolOption, EnumOption, StrListOption, StrOption
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class TestResult:
-    exit_code: int
+class TestResult(EngineAwareReturnType):
+    exit_code: int | None
     stdout: str
     stdout_digest: FileDigest
     stderr: str
     stderr_digest: FileDigest
     address: Address
-    coverage_data: Optional[CoverageData] = None
-    xml_results: Optional[Snapshot] = None
+    output_setting: ShowOutput
+    result_metadata: ProcessResultMetadata | None
+
+    coverage_data: CoverageData | None = None
+    # TODO: Rename this to `reports`. There is no guarantee that every language will produce
+    #  XML reports, or only XML reports.
+    xml_results: Snapshot | None = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
-    extra_output: Optional[Snapshot] = None
+    extra_output: Snapshot | None = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
+
+    @classmethod
+    def skip(cls, address: Address, output_setting: ShowOutput) -> TestResult:
+        return cls(
+            exit_code=None,
+            stdout="",
+            stderr="",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            address=address,
+            output_setting=output_setting,
+            result_metadata=None,
+        )
 
     @classmethod
     def from_fallible_process_result(
         cls,
         process_result: FallibleProcessResult,
         address: Address,
+        output_setting: ShowOutput,
         *,
-        coverage_data: Optional[CoverageData] = None,
-        xml_results: Optional[Snapshot] = None,
-        extra_output: Optional[Snapshot] = None,
+        coverage_data: CoverageData | None = None,
+        xml_results: Snapshot | None = None,
+        extra_output: Snapshot | None = None,
     ) -> TestResult:
         return cls(
             exit_code=process_result.exit_code,
@@ -78,41 +102,32 @@ class TestResult:
             stderr=process_result.stderr.decode(),
             stderr_digest=process_result.stderr_digest,
             address=address,
+            output_setting=output_setting,
+            result_metadata=process_result.metadata,
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
         )
 
-    def __lt__(self, other: Union[Any, EnrichedTestResult]) -> bool:
-        """We sort first by status (failed vs succeeded), then alphanumerically within each
-        group."""
-        if not isinstance(other, EnrichedTestResult):
+    @property
+    def skipped(self) -> bool:
+        return self.exit_code is None or self.result_metadata is None
+
+    def __lt__(self, other: Any) -> bool:
+        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
+        each group."""
+        if not isinstance(other, TestResult):
             return NotImplemented
         if self.exit_code == other.exit_code:
             return self.address.spec < other.address.spec
+        if self.skipped or self.exit_code is None:
+            return True
+        if other.skipped or other.exit_code is None:
+            return False
         return abs(self.exit_code) < abs(other.exit_code)
 
-
-class ShowOutput(Enum):
-    """Which tests to emit detailed output for."""
-
-    ALL = "all"
-    FAILED = "failed"
-    NONE = "none"
-
-
-@dataclass(frozen=True)
-class EnrichedTestResult(TestResult, EngineAwareReturnType):
-    """A `TestResult` that is enriched for the sake of logging results as they come in.
-
-    Plugin authors only need to return `TestResult`, and a rule will upcast those into
-    `EnrichedTestResult`.
-    """
-
-    output_setting: ShowOutput = ShowOutput.ALL
-
-    def artifacts(self) -> Optional[Dict[str, Union[FileDigest, Snapshot]]]:
-        output: Dict[str, Union[FileDigest, Snapshot]] = {
+    def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
+        output: dict[str, FileDigest | Snapshot] = {
             "stdout": self.stdout_digest,
             "stderr": self.stderr_digest,
         }
@@ -121,9 +136,13 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
         return output
 
     def level(self) -> LogLevel:
+        if self.skipped:
+            return LogLevel.DEBUG
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
+        if self.skipped:
+            return f"{self.address} skipped."
         status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
         message = f"{self.address} {status}."
         if self.output_setting == ShowOutput.NONE or (
@@ -139,13 +158,25 @@ class EnrichedTestResult(TestResult, EngineAwareReturnType):
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
 
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         return {"address": self.address.spec}
+
+    def cacheable(self) -> bool:
+        """Is marked uncacheable to ensure that it always renders."""
+        return False
+
+
+class ShowOutput(Enum):
+    """Which tests to emit detailed output for."""
+
+    ALL = "all"
+    FAILED = "failed"
+    NONE = "none"
 
 
 @dataclass(frozen=True)
 class TestDebugRequest:
-    process: InteractiveProcess
+    process: InteractiveProcess | None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -156,7 +187,7 @@ class TestDebugRequest:
 class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
-    sources: Sources
+    sources: SourcesField
 
     __test__ = False
 
@@ -174,13 +205,18 @@ _CD = TypeVar("_CD", bound=CoverageData)
 
 @union
 class CoverageDataCollection(Collection[_CD]):
-    element_type: ClassVar[type[_CD]]
+    element_type: ClassVar[type[_CD]]  # type: ignore[misc]
 
 
+@dataclass(frozen=True)
 class CoverageReport(ABC):
     """Represents a code coverage report that can be materialized to the terminal or disk."""
 
-    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
+    # Some coverage systems can determine, based on a configurable threshold, whether coverage
+    # was sufficient or not. The test goal will fail the build if coverage was deemed insufficient.
+    coverage_insufficient: bool
+
+    def materialize(self, console: Console, workspace: Workspace) -> PurePath | None:
         """Materialize this code coverage report to the terminal or disk.
 
         :param console: A handle to the terminal.
@@ -190,7 +226,7 @@ class CoverageReport(ABC):
         """
         ...
 
-    def get_artifact(self) -> Optional[Tuple[str, Snapshot]]:
+    def get_artifact(self) -> tuple[str, Snapshot] | None:
         return None
 
 
@@ -211,10 +247,10 @@ class FilesystemCoverageReport(CoverageReport):
 
     result_snapshot: Snapshot
     directory_to_materialize_to: PurePath
-    report_file: Optional[PurePath]
+    report_file: PurePath | None
     report_type: str
 
-    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
+    def materialize(self, console: Console, workspace: Workspace) -> PurePath | None:
         workspace.write_digest(
             self.result_snapshot.digest, path_prefix=str(self.directory_to_materialize_to)
         )
@@ -223,15 +259,20 @@ class FilesystemCoverageReport(CoverageReport):
         )
         return self.report_file
 
-    def get_artifact(self) -> Optional[Tuple[str, Snapshot]]:
+    def get_artifact(self) -> tuple[str, Snapshot] | None:
         return f"coverage_{self.report_type}", self.result_snapshot
 
 
 @dataclass(frozen=True)
 class CoverageReports(EngineAwareReturnType):
-    reports: Tuple[CoverageReport, ...]
+    reports: tuple[CoverageReport, ...]
 
-    def materialize(self, console: Console, workspace: Workspace) -> Tuple[PurePath, ...]:
+    @property
+    def coverage_insufficient(self) -> bool:
+        """Whether to fail the build due to insufficient coverage."""
+        return any(report.coverage_insufficient for report in self.reports)
+
+    def materialize(self, console: Console, workspace: Workspace) -> tuple[PurePath, ...]:
         report_paths = []
         for report in self.reports:
             report_path = report.materialize(console, workspace)
@@ -239,8 +280,8 @@ class CoverageReports(EngineAwareReturnType):
                 report_paths.append(report_path)
         return tuple(report_paths)
 
-    def artifacts(self) -> Optional[Dict[str, Union[Snapshot, FileDigest]]]:
-        artifacts: Dict[str, Union[Snapshot, FileDigest]] = {}
+    def artifacts(self) -> dict[str, Snapshot | FileDigest] | None:
+        artifacts: dict[str, Snapshot | FileDigest] = {}
         for report in self.reports:
             artifact = report.get_artifact()
             if not artifact:
@@ -253,85 +294,92 @@ class TestSubsystem(GoalSubsystem):
     name = "test"
     help = "Run tests."
 
-    required_union_implementations = (TestFieldSet,)
-
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
     @classmethod
-    def register_options(cls, register) -> None:
-        super().register_options(register)
-        register(
-            "--debug",
-            type=bool,
-            default=False,
-            help=(
-                "Run tests sequentially in an interactive process. This is necessary, for "
-                "example, when you add breakpoints to your code."
-            ),
-        )
-        register(
-            "--force",
-            type=bool,
-            default=False,
-            help="Force the tests to run, even if they could be satisfied from cache.",
-        )
-        register(
-            "--output",
-            type=ShowOutput,
-            default=ShowOutput.FAILED,
-            help="Show stdout/stderr for these tests.",
-        )
-        register(
-            "--use-coverage",
-            type=bool,
-            default=False,
-            help="Generate a coverage report if the test runner supports it.",
-        )
-        register(
-            "--open-coverage",
-            type=bool,
-            default=False,
-            help=(
-                "If a coverage report file is generated, open it on the local system if the "
-                "system supports this."
-            ),
-        )
-        register(
-            "--extra-env-vars",
-            type=list,
-            member_type=str,
-            default=[],
-            help=(
-                "Additional environment variables to include in test processes. "
-                "Entries are strings in the form `ENV_VAR=value` to use explicitly; or just "
-                "`ENV_VAR` to copy the value of a variable in Pants's own environment."
-            ),
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return TestFieldSet in union_membership
 
-    @property
-    def extra_env_vars(self) -> List[str]:
-        return cast(List[str], self.options.extra_env_vars)
+    debug = BoolOption(
+        "--debug",
+        default=False,
+        help=softwrap(
+            """
+            Run tests sequentially in an interactive process. This is necessary, for
+            example, when you add breakpoints to your code.
+            """
+        ),
+    )
+    force = BoolOption(
+        "--force",
+        default=False,
+        help="Force the tests to run, even if they could be satisfied from cache.",
+    )
+    output = EnumOption(
+        "--output",
+        default=ShowOutput.FAILED,
+        help="Show stdout/stderr for these tests.",
+    )
+    use_coverage = BoolOption(
+        "--use-coverage",
+        default=False,
+        help="Generate a coverage report if the test runner supports it.",
+    )
+    open_coverage = BoolOption(
+        "--open-coverage",
+        default=False,
+        help=softwrap(
+            """
+            If a coverage report file is generated, open it on the local system if the
+            system supports this.
+            """
+        ),
+    )
+    report = BoolOption(
+        "--report", default=False, advanced=True, help="Write test reports to --report-dir."
+    )
+    default_report_path = str(PurePath("{distdir}", "test", "reports"))
+    _report_dir = StrOption(
+        "--report-dir",
+        default=default_report_path,
+        advanced=True,
+        help="Path to write test reports to. Must be relative to the build root.",
+    )
+    extra_env_vars = StrListOption(
+        "--extra-env-vars",
+        help=softwrap(
+            """
+            Additional environment variables to include in test processes.
+            Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+            `ENV_VAR` to copy the value of a variable in Pants's own environment.
+            """
+        ),
+    )
+    shard = StrOption(
+        "--shard",
+        default="",
+        help=softwrap(
+            """
+            A shard specification of the form "k/N", where N is a positive integer and k is a
+            non-negative integer less than N.
 
-    @property
-    def debug(self) -> bool:
-        return cast(bool, self.options.debug)
+            If set, the request input targets will be deterministically partitioned into N disjoint
+            subsets of roughly equal size, and only the k'th subset will be used, with all others
+            discarded.
 
-    @property
-    def force(self) -> bool:
-        return cast(bool, self.options.force)
+            Useful for splitting large numbers of test files across multiple machines in CI.
+            For example, you can run three shards with --shard=0/3, --shard=1/3, --shard=2/3.
 
-    @property
-    def output(self) -> ShowOutput:
-        return cast(ShowOutput, self.options.output)
+            Note that the shards are roughly equal in size as measured by number of files.
+            No attempt is made to consider the size of different files, the time they have
+            taken to run in the past, or other such sophisticated measures.
+            """
+        ),
+    )
 
-    @property
-    def use_coverage(self) -> bool:
-        return cast(bool, self.options.use_coverage)
-
-    @property
-    def open_coverage(self) -> bool:
-        return cast(bool, self.options.open_coverage)
+    def report_dir(self, distdir: DistDir) -> PurePath:
+        return PurePath(self._report_dir.format(distdir=distdir.relpath))
 
 
 class Test(Goal):
@@ -344,10 +392,10 @@ class Test(Goal):
 async def run_tests(
     console: Console,
     test_subsystem: TestSubsystem,
-    interactive_runner: InteractiveRunner,
     workspace: Workspace,
     union_membership: UnionMembership,
-    dist_dir: DistDir,
+    distdir: DistDir,
+    run_id: RunId,
 ) -> Test:
     if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
@@ -363,26 +411,31 @@ async def run_tests(
             for field_set in targets_to_valid_field_sets.field_sets
         )
         exit_code = 0
-        for debug_request in debug_requests:
-            debug_result = interactive_runner.run(debug_request.process)
+        for debug_request, field_set in zip(debug_requests, targets_to_valid_field_sets.field_sets):
+            if debug_request.process is None:
+                logger.debug(f"Skipping tests for {field_set.address}")
+                continue
+            debug_result = await Effect(
+                InteractiveProcessResult, InteractiveProcess, debug_request.process
+            )
             if debug_result.exit_code != 0:
                 exit_code = debug_result.exit_code
         return Test(exit_code)
 
+    shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
             goal_description=f"the `{test_subsystem.name}` goal",
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
+            shard=shard,
+            num_shards=num_shards,
         ),
     )
-    field_sets_with_sources = await Get(
-        FieldSetsWithSources, FieldSetsWithSourcesRequest(targets_to_valid_field_sets.field_sets)
-    )
-
     results = await MultiGet(
-        Get(EnrichedTestResult, TestFieldSet, field_set) for field_set in field_sets_with_sources
+        Get(TestResult, TestFieldSet, field_set)
+        for field_set in targets_to_valid_field_sets.field_sets
     )
 
     # Print summary.
@@ -390,25 +443,27 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
-        if result.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "succeeded"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
-            exit_code = result.exit_code
-        console.print_stderr(f"{sigil} {result.address} {status}.")
+        if result.skipped:
+            continue
+        if result.exit_code != 0:
+            exit_code = cast(int, result.exit_code)
+
+        console.print_stderr(_format_test_summary(result, run_id, console))
+
         if result.extra_output and result.extra_output.files:
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=str(dist_dir.relpath / "test" / result.address.path_safe_spec),
+                path_prefix=str(distdir.relpath / "test" / result.address.path_safe_spec),
             )
 
-    merged_xml_results = await Get(
-        Digest,
-        MergeDigests(result.xml_results.digest for result in results if result.xml_results),
-    )
-    workspace.write_digest(merged_xml_results)
+    if test_subsystem.report:
+        report_dir = test_subsystem.report_dir(distdir)
+        merged_reports = await Get(
+            Digest,
+            MergeDigests(result.xml_results.digest for result in results if result.xml_results),
+        )
+        workspace.write_digest(merged_reports, path_prefix=str(report_dir))
+        console.print_stderr(f"\nWrote test reports to {report_dir}")
 
     if test_subsystem.use_coverage:
         # NB: We must pre-sort the data for itertools.groupby() to work properly, using the same
@@ -426,7 +481,7 @@ async def run_tests(
         for data_cls, data in itertools.groupby(all_coverage_data, lambda data: type(data)):
             collection_cls = coverage_types_to_collection_types[data_cls]
             coverage_collections.append(collection_cls(data))
-        # We can create multiple reports for each coverage data (console, xml and html)
+        # We can create multiple reports for each coverage data (e.g., console, xml, html)
         coverage_reports_collections = await MultiGet(
             Get(CoverageReports, CoverageDataCollection, coverage_collection)
             for coverage_collection in coverage_collections
@@ -442,46 +497,62 @@ async def run_tests(
                 OpenFiles, OpenFilesRequest(coverage_report_files, error_if_open_not_found=False)
             )
             for process in open_files.processes:
-                interactive_runner.run(process)
+                _ = await Effect(InteractiveProcessResult, InteractiveProcess, process)
+
+        for coverage_reports in coverage_reports_collections:
+            if coverage_reports.coverage_insufficient:
+                logger.error(
+                    "Test goal failed due to insufficient coverage. "
+                    "See coverage reports for details."
+                )
+                # coverage.py uses 2 to indicate failure due to insufficient coverage.
+                # We may as well follow suit in the general case, for all languages.
+                exit_code = 2
 
     return Test(exit_code)
 
 
+_SOURCE_MAP = {
+    ProcessResultMetadata.Source.MEMOIZED: "memoized",
+    ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
+    ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
+    ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
+}
+
+
+def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
+    """Format the test summary printed to the console."""
+    assert (
+        result.result_metadata is not None
+    ), "Skipped test results should not be outputted in the test summary"
+    if result.exit_code == 0:
+        sigil = console.sigil_succeeded()
+        status = "succeeded"
+    else:
+        sigil = console.sigil_failed()
+        status = "failed"
+
+    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
+    source_print = f" ({source})" if source else ""
+
+    elapsed_print = ""
+    total_elapsed_ms = result.result_metadata.total_elapsed_ms
+    if total_elapsed_ms is not None:
+        elapsed_secs = total_elapsed_ms / 1000
+        elapsed_print = f"in {elapsed_secs:.2f}s"
+
+    suffix = f" {elapsed_print}{source_print}"
+    return f"{sigil} {result.address} {status}{suffix}."
+
+
 @dataclass(frozen=True)
 class TestExtraEnv:
-    env: FrozenDict[str, str]
+    env: Environment
 
 
 @rule
-def get_filtered_environment(
-    test_subsystem: TestSubsystem, complete_env: CompleteEnvironment
-) -> TestExtraEnv:
-    env = (
-        complete_env.get_subset(test_subsystem.extra_env_vars)
-        if test_subsystem.extra_env_vars
-        else FrozenDict({})
-    )
-    return TestExtraEnv(env)
-
-
-# NB: We mark this uncachable to ensure that the results are always streamed, even if the
-# underlying TestResult is memoized. This rule is very cheap, so there's little performance hit.
-@_uncacheable_rule(desc="test")
-def enrich_test_result(
-    test_result: TestResult, test_subsystem: TestSubsystem
-) -> EnrichedTestResult:
-    return EnrichedTestResult(
-        exit_code=test_result.exit_code,
-        stdout=test_result.stdout,
-        stdout_digest=test_result.stdout_digest,
-        stderr=test_result.stderr,
-        stderr_digest=test_result.stderr_digest,
-        address=test_result.address,
-        coverage_data=test_result.coverage_data,
-        xml_results=test_result.xml_results,
-        extra_output=test_result.extra_output,
-        output_setting=test_subsystem.output,
-    )
+async def get_filtered_environment(test_subsystem: TestSubsystem) -> TestExtraEnv:
+    return TestExtraEnv(await Get(Environment, EnvironmentRequest(test_subsystem.extra_env_vars)))
 
 
 # -------------------------------------------------------------------------------------------
@@ -491,13 +562,18 @@ def enrich_test_result(
 
 class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
-    help = (
-        "Addresses to targets that can be built with the `./pants package` goal and whose "
-        "resulting artifacts should be included in the test run.\n\nPants will build the artifacts "
-        "as if you had run `./pants package`. It will include the results in your test's chroot, "
-        "using the same name they would normally have, but without the `--distdir` prefix (e.g. "
-        "`dist/`).\n\nYou can include anything that can be built by `./pants package`, e.g. a "
-        "`pex_binary`, `python_awslambda`, or an `archive`."
+    help = softwrap(
+        f"""
+        Addresses to targets that can be built with the `{bin_name()} package` goal and whose
+        resulting artifacts should be included in the test run.
+
+        Pants will build the artifacts as if you had run `{bin_name()} package`.
+        It will include the results in your test's chroot, using the same name they would normally
+        have, but without the `--distdir` prefix (e.g. `dist/`).
+
+        You can include anything that can be built by `{bin_name()} package`, e.g. a `pex_binary`,
+        `python_awslambda`, or an `archive`.
+        """
     )
 
 
@@ -528,4 +604,6 @@ async def build_runtime_package_dependencies(
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+    ]

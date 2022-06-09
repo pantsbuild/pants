@@ -12,9 +12,11 @@ from pants.backend.python.goals.coverage_py import (
     PytestCoverageData,
 )
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
@@ -33,10 +35,9 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
-from pants.engine.environment import CompleteEnvironment
+from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
-    AddPrefix,
     CreateDigest,
     Digest,
     DigestSubset,
@@ -53,10 +54,15 @@ from pants.engine.process import (
     ProcessCacheScope,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
+from pants.engine.target import (
+    Target,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
-from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
@@ -110,7 +116,9 @@ class AllPytestPluginSetupsRequest:
 async def run_all_setup_plugins(
     request: AllPytestPluginSetupsRequest, union_membership: UnionMembership
 ) -> AllPytestPluginSetups:
-    wrapped_tgt = await Get(WrappedTarget, Address, request.address)
+    wrapped_tgt = await Get(
+        WrappedTarget, WrappedTargetRequest(request.address, description_of_origin="<infallible>")
+    )
     applicable_setup_request_types = tuple(
         request
         for request in union_membership.get(PytestPluginSetupRequest)
@@ -159,7 +167,6 @@ async def setup_pytest_for_target(
     coverage_subsystem: CoverageSubsystem,
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
-    complete_env: CompleteEnvironment,
 ) -> TestSetup:
     transitive_targets, plugin_setups = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
@@ -167,13 +174,11 @@ async def setup_pytest_for_target(
     )
     all_targets = transitive_targets.closure
 
-    interpreter_constraints = InterpreterConstraints.create_from_targets(all_targets, python_setup)
-
-    requirements_pex_get = Get(
-        Pex,
-        PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements([request.field_set.address], internal_only=True),
+    interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
+        [request.field_set.interpreter_constraints], python_setup
     )
+
+    requirements_pex_get = Get(Pex, RequirementsPexRequest([request.field_set.address]))
     pytest_pex_get = Get(
         Pex,
         PexRequest(
@@ -193,20 +198,36 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    field_set_source_files_get = Get(SourceFiles, SourceFilesRequest([request.field_set.sources]))
+    field_set_source_files_get = Get(SourceFiles, SourceFilesRequest([request.field_set.source]))
+
+    field_set_extra_env_get = Get(
+        Environment, EnvironmentRequest(request.field_set.extra_env_vars.value or ())
+    )
 
     (
         pytest_pex,
         requirements_pex,
         prepared_sources,
         field_set_source_files,
+        field_set_extra_env,
         extra_output_directory_digest,
     ) = await MultiGet(
         pytest_pex_get,
         requirements_pex_get,
         prepared_sources_get,
         field_set_source_files_get,
+        field_set_extra_env_get,
         extra_output_directory_digest_get,
+    )
+
+    local_dists = await Get(
+        LocalDistsPex,
+        LocalDistsPexRequest(
+            [request.field_set.address],
+            internal_only=True,
+            interpreter_constraints=interpreter_constraints,
+            sources=prepared_sources,
+        ),
     )
 
     pytest_runner_pex_get = Get(
@@ -216,7 +237,7 @@ async def setup_pytest_for_target(
             interpreter_constraints=interpreter_constraints,
             main=pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, requirements_pex],
+            pex_path=[pytest_pex, requirements_pex, local_dists.pex],
         ),
     )
     config_files_get = Get(
@@ -226,27 +247,40 @@ async def setup_pytest_for_target(
     )
     pytest_runner_pex, config_files = await MultiGet(pytest_runner_pex_get, config_files_get)
 
+    # The coverage and pytest config may live in the same config file (e.g., setup.cfg, tox.ini
+    # or pyproject.toml), and wee may have rewritten those files to augment the coverage config,
+    # in which case we must ensure that the original and rewritten files don't collide.
+    pytest_config_digest = config_files.snapshot.digest
+    if coverage_config.path in config_files.snapshot.files:
+        subset_paths = list(config_files.snapshot.files)
+        # Remove the original file, and rely on the rewritten file, which contains all the
+        # pytest-related config unchanged.
+        subset_paths.remove(coverage_config.path)
+        pytest_config_digest = await Get(
+            Digest, DigestSubset(pytest_config_digest, PathGlobs(subset_paths))
+        )
+
     input_digest = await Get(
         Digest,
         MergeDigests(
             (
                 coverage_config.digest,
-                prepared_sources.source_files.snapshot.digest,
-                config_files.snapshot.digest,
+                local_dists.remaining_sources.source_files.snapshot.digest,
+                pytest_config_digest,
                 extra_output_directory_digest,
                 *(plugin_setup.digest for plugin_setup in plugin_setups),
             )
         ),
     )
 
-    add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
+    add_opts = [f"--color={'yes' if global_options.colors else 'no'}"]
     output_files = []
 
     results_file_name = None
-    if pytest.options.junit_xml_dir and not request.is_debug:
+    if not request.is_debug:
         results_file_name = f"{request.field_set.address.path_safe_spec}.xml"
         add_opts.extend(
-            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.options.junit_family}")
+            (f"--junitxml={results_file_name}", "-o", f"junit_family={pytest.junit_family}")
         )
         output_files.append(results_file_name)
 
@@ -275,9 +309,9 @@ async def setup_pytest_for_target(
         "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
         **test_extra_env.env,
-        # NOTE: `complete_env` intentionally after `test_extra_env` to allow overriding within
-        # `python_tests`
-        **complete_env.get_subset(request.field_set.extra_env_vars.value or ()),
+        # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
+        # `python_tests`.
+        **field_set_extra_env,
     }
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
@@ -288,13 +322,13 @@ async def setup_pytest_for_target(
         Process,
         VenvPexProcess(
             pytest_runner_pex,
-            argv=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
+            argv=(*pytest.args, *coverage_args, *field_set_source_files.files),
             extra_env=extra_env,
             input_digest=input_digest,
             output_directories=(_EXTRA_OUTPUT_DIR,),
             output_files=output_files,
             timeout_seconds=request.field_set.timeout.calculate_from_global_options(pytest),
-            execution_slot_variable=pytest.options.execution_slot_var,
+            execution_slot_variable=pytest.execution_slot_var,
             description=f"Run Pytest for {request.field_set.address}",
             level=LogLevel.DEBUG,
             cache_scope=cache_scope,
@@ -305,7 +339,8 @@ async def setup_pytest_for_target(
 
 @rule(desc="Run Pytest", level=LogLevel.DEBUG)
 async def run_python_test(
-    field_set: PythonTestFieldSet, test_subsystem: TestSubsystem, pytest: PyTest
+    field_set: PythonTestFieldSet,
+    test_subsystem: TestSubsystem,
 ) -> TestResult:
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=False))
     result = await Get(FallibleProcessResult, Process, setup.process)
@@ -325,12 +360,7 @@ async def run_python_test(
         xml_results_snapshot = await Get(
             Snapshot, DigestSubset(result.output_digest, PathGlobs([setup.results_file_name]))
         )
-        if xml_results_snapshot.files == (setup.results_file_name,):
-            xml_results_snapshot = await Get(
-                Snapshot,
-                AddPrefix(xml_results_snapshot.digest, pytest.options.junit_xml_dir),
-            )
-        else:
+        if xml_results_snapshot.files != (setup.results_file_name,):
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
     extra_output_snapshot = await Get(
         Snapshot, DigestSubset(result.output_digest, PathGlobs([f"{_EXTRA_OUTPUT_DIR}/**"]))
@@ -342,6 +372,7 @@ async def run_python_test(
     return TestResult.from_fallible_process_result(
         result,
         address=field_set.address,
+        output_setting=test_subsystem.output,
         coverage_data=coverage_data,
         xml_results=xml_results_snapshot,
         extra_output=extra_output_snapshot,
@@ -352,7 +383,9 @@ async def run_python_test(
 async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(
-        InteractiveProcess.from_process(setup.process, forward_signals_to_process=False)
+        InteractiveProcess.from_process(
+            setup.process, forward_signals_to_process=False, restartable=True
+        )
     )
 
 

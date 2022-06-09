@@ -5,76 +5,81 @@ from __future__ import annotations
 
 import logging
 from textwrap import dedent
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Iterable
 
 import pytest
-from _pytest.logging import LogCaptureFixture
-from pkg_resources import Requirement
 
-from pants.backend.python.dependency_inference.default_module_mapping import (
-    DEFAULT_MODULE_MAPPING,
-    DEFAULT_TYPE_STUB_MODULE_MAPPING,
-)
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
+    ConsoleScript,
     EntryPoint,
-    ModuleMappingField,
+    PexBinariesGeneratorTarget,
     PexBinary,
-    PexBinaryDependencies,
+    PexBinaryDependenciesField,
     PexEntryPointField,
+    PexScriptField,
     PythonDistribution,
-    PythonDistributionDependencies,
-    PythonLibrary,
-    PythonRequirementLibrary,
+    PythonDistributionDependenciesField,
     PythonRequirementsField,
-    PythonTestsTimeout,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+    PythonTestsTimeoutField,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
-    TypeStubsModuleMappingField,
+    normalize_module_mapping,
     parse_requirements_file,
 )
 from pants.backend.python.target_types_rules import (
     InjectPexBinaryEntryPointDependency,
     InjectPythonDistributionDependencies,
-    inject_pex_binary_entry_point_dependency,
-    inject_python_distribution_dependencies,
     resolve_pex_entry_point,
-    resolve_python_distribution_entry_points,
 )
 from pants.backend.python.util_rules import python_sources
+from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.engine.addresses import Address
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
     InjectedDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
+    InvalidTargetException,
+    Tags,
 )
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
-def test_timeout_validation() -> None:
-    with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(-100, Address("", target_name="tests"))
-    with pytest.raises(InvalidFieldException):
-        PythonTestsTimeout(0, Address("", target_name="tests"))
-    assert PythonTestsTimeout(5, Address("", target_name="tests")).value == 5
+def test_pex_binary_validation() -> None:
+    def create_tgt(*, script: str | None = None, entry_point: str | None = None) -> PexBinary:
+        return PexBinary(
+            {PexScriptField.alias: script, PexEntryPointField.alias: entry_point},
+            Address("", target_name="t"),
+        )
+
+    with pytest.raises(InvalidTargetException):
+        create_tgt(script="foo", entry_point="foo")
+    assert create_tgt(script="foo")[PexScriptField].value == ConsoleScript("foo")
+    assert create_tgt(entry_point="foo")[PexEntryPointField].value == EntryPoint("foo")
 
 
 def test_timeout_calculation() -> None:
     def assert_timeout_calculated(
         *,
-        field_value: Optional[int],
-        expected: Optional[int],
-        global_default: Optional[int] = None,
-        global_max: Optional[int] = None,
+        field_value: int | None,
+        expected: int | None,
+        global_default: int | None = None,
+        global_max: int | None = None,
         timeouts_enabled: bool = True,
     ) -> None:
-        field = PythonTestsTimeout(field_value, Address("", target_name="tests"))
+        field = PythonTestsTimeoutField(field_value, Address("", target_name="tests"))
         pytest = create_subsystem(
             PyTest,
             timeouts=timeouts_enabled,
@@ -94,19 +99,18 @@ def test_timeout_calculation() -> None:
 @pytest.mark.parametrize(
     ["entry_point", "expected"],
     (
-        ("<none>", []),
         ("path.to.module", []),
         ("path.to.module:func", []),
         ("lambda.py", ["project/dir/lambda.py"]),
         ("lambda.py:func", ["project/dir/lambda.py"]),
     ),
 )
-def test_entry_point_filespec(entry_point: Optional[str], expected: List[str]) -> None:
+def test_entry_point_filespec(entry_point: str | None, expected: list[str]) -> None:
     field = PexEntryPointField(entry_point, Address("project/dir"))
     assert field.filespec == {"includes": expected}
 
 
-def test_entry_point_validation(caplog: LogCaptureFixture) -> None:
+def test_entry_point_validation(caplog) -> None:
     addr = Address("src/python/project")
 
     with pytest.raises(InvalidFieldException):
@@ -136,11 +140,15 @@ def test_resolve_pex_binary_entry_point() -> None:
     )
 
     def assert_resolved(
-        *, entry_point: Optional[str], expected: Optional[EntryPoint], is_file: bool
+        *, entry_point: str | None, expected: EntryPoint | None, is_file: bool
     ) -> None:
         addr = Address("src/python/project")
-        rule_runner.create_file("src/python/project/app.py")
-        rule_runner.create_file("src/python/project/f2.py")
+        rule_runner.write_files(
+            {
+                "src/python/project/app.py": "",
+                "src/python/project/f2.py": "",
+            }
+        )
         ep_field = PexEntryPointField(entry_point, addr)
         result = rule_runner.request(ResolvedPexEntryPoint, [ResolvePexEntryPointRequest(ep_field)])
         assert result.val == expected
@@ -164,10 +172,6 @@ def test_resolve_pex_binary_entry_point() -> None:
         is_file=True,
     )
 
-    # We special case the strings `<none>` and `<None>`.
-    assert_resolved(entry_point="<none>", expected=None, is_file=False)
-    assert_resolved(entry_point="<None>", expected=None, is_file=False)
-
     with pytest.raises(ExecutionError):
         assert_resolved(
             entry_point="doesnt_exist.py", expected=EntryPoint("doesnt matter"), is_file=True
@@ -180,21 +184,20 @@ def test_resolve_pex_binary_entry_point() -> None:
 def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[
-            inject_pex_binary_entry_point_dependency,
-            resolve_pex_entry_point,
+            *target_types_rules.rules(),
             *import_rules(),
             QueryRule(InjectedDependencies, [InjectPexBinaryEntryPointDependency]),
         ],
-        target_types=[PexBinary, PythonRequirementLibrary, PythonLibrary],
+        target_types=[PexBinary, PythonRequirementTarget, PythonSourcesGeneratorTarget],
     )
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(
+                python_requirement(
                     name='ansicolors',
                     requirements=['ansicolors'],
-                    module_mapping={'ansicolors': ['colors']},
+                    modules=['colors'],
                 )
                 """
             ),
@@ -203,7 +206,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
             "project/ambiguous_in_another_root.py": "",
             "project/BUILD": dedent(
                 """\
-                python_library(sources=['app.py'])
+                python_sources(sources=['app.py'])
                 pex_binary(name='first_party', entry_point='project.app')
                 pex_binary(name='first_party_func', entry_point='project.app:func')
                 pex_binary(name='first_party_shorthand', entry_point='app.py')
@@ -212,8 +215,8 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
                 pex_binary(name='third_party_func', entry_point='colors:func')
                 pex_binary(name='unrecognized', entry_point='who_knows.module')
 
-                python_library(name="dep1", sources=["ambiguous.py"])
-                python_library(name="dep2", sources=["ambiguous.py"])
+                python_sources(name="dep1", sources=["ambiguous.py"])
+                python_sources(name="dep2", sources=["ambiguous.py"])
                 pex_binary(name="ambiguous", entry_point="ambiguous.py")
                 pex_binary(
                     name="disambiguated",
@@ -221,7 +224,7 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
                     dependencies=["!./ambiguous.py:dep2"],
                 )
 
-                python_library(
+                python_sources(
                     name="ambiguous_in_another_root", sources=["ambiguous_in_another_root.py"]
                 )
                 pex_binary(
@@ -234,15 +237,15 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
                 """
             ),
             "src/py/project/ambiguous_in_another_root.py": "",
-            "src/py/project/BUILD.py": "python_library()",
+            "src/py/project/BUILD.py": "python_sources()",
         }
     )
 
-    def assert_injected(address: Address, *, expected: Optional[Address]) -> None:
+    def assert_injected(address: Address, *, expected: Address | None) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
-            [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependencies])],
+            [InjectPexBinaryEntryPointDependency(tgt[PexBinaryDependenciesField])],
         )
         assert injected == InjectedDependencies([expected] if expected else [])
 
@@ -277,9 +280,14 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     assert_injected(Address("project", target_name="ambiguous"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python "
-        "module `project.ambiguous`"
-    ) in caplog.text
+        softwrap(
+            """
+            project:ambiguous has the field `entry_point='ambiguous.py'`, which maps to the Python
+            module `project.ambiguous`
+            """
+        )
+        in caplog.text
+    )
     assert "['project/ambiguous.py:dep1', 'project/ambiguous.py:dep2']" in caplog.text
 
     # Test that ignores can disambiguate an otherwise ambiguous entry point. Ensure we don't log a
@@ -306,9 +314,14 @@ def test_inject_pex_binary_entry_point_dependency(caplog) -> None:
     assert_injected(Address("project", target_name="another_root__module_used"), expected=None)
     assert len(caplog.records) == 1
     assert (
-        "['project/ambiguous_in_another_root.py:ambiguous_in_another_root', 'src/py/project/"
-        "ambiguous_in_another_root.py']"
-    ) in caplog.text
+        softwrap(
+            """
+            ['project/ambiguous_in_another_root.py:ambiguous_in_another_root',
+            'src/py/project/ambiguous_in_another_root.py']
+            """
+        )
+        in caplog.text
+    )
 
     # Test that we can turn off the injection.
     rule_runner.set_options(["--no-python-infer-entry-points"])
@@ -321,11 +334,11 @@ def test_requirements_field() -> None:
         "configparser ; python_version<'3'",
         "pip@ git+https://github.com/pypa/pip.git",
     )
-    parsed_value = tuple(Requirement.parse(v) for v in raw_value)
+    parsed_value = tuple(PipRequirement.parse(v) for v in raw_value)
 
     assert PythonRequirementsField(raw_value, Address("demo")).value == parsed_value
 
-    # Macros can pass pre-parsed Requirement objects.
+    # Macros can pass pre-parsed PipRequirement objects.
     assert PythonRequirementsField(parsed_value, Address("demo")).value == parsed_value
 
     # Reject invalid types.
@@ -338,32 +351,39 @@ def test_requirements_field() -> None:
     with pytest.raises(InvalidFieldException) as exc:
         PythonRequirementsField(["not valid! === 3.1"], Address("demo"))
     assert (
-        f"Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}' "
-        f"field for the target demo:"
-    ) in str(exc.value)
-
-    # Give a nice error message if it looks like they're trying to use pip VCS-style requirements.
-    with pytest.raises(InvalidFieldException) as exc:
-        PythonRequirementsField(["git+https://github.com/pypa/pip.git#egg=pip"], Address("demo"))
-    assert "It looks like you're trying to use a pip VCS-style requirement?" in str(exc.value)
+        softwrap(
+            f"""
+            Invalid requirement 'not valid! === 3.1' in the '{PythonRequirementsField.alias}'
+            field for the target demo:
+            """
+        )
+        in str(exc.value)
+    )
 
 
 def test_parse_requirements_file() -> None:
     content = dedent(
-        """\
+        r"""\
         # Comment.
         --find-links=https://duckduckgo.com
+        -r more_reqs.txt
         ansicolors>=1.18.0
         Django==3.2 ; python_version>'3'
         Un-Normalized-PROJECT  # Inline comment.
         pip@ git+https://github.com/pypa/pip.git
+        setuptools==54.1.2; python_version >= "3.6" \
+            --hash=sha256:dd20743f36b93cbb8724f4d2ccd970dce8b6e6e823a13aa7e5751bb4e674c20b \
+            --hash=sha256:ebd0148faf627b569c8d2a1b20f5d3b09c873f12739d71c7ee88f037d5be82ff
+        wheel==1.2.3 --hash=sha256:dd20743f36b93cbb8724f4d2ccd970dce8b6e6e823a13aa7e5751bb4e674c20b
         """
     )
     assert set(parse_requirements_file(content, rel_path="foo.txt")) == {
-        Requirement.parse("ansicolors>=1.18.0"),
-        Requirement.parse("Django==3.2 ; python_version>'3'"),
-        Requirement.parse("Un-Normalized-PROJECT"),
-        Requirement.parse("pip@ git+https://github.com/pypa/pip.git"),
+        PipRequirement.parse("ansicolors>=1.18.0"),
+        PipRequirement.parse("Django==3.2 ; python_version>'3'"),
+        PipRequirement.parse("Un-Normalized-PROJECT"),
+        PipRequirement.parse("pip@ git+https://github.com/pypa/pip.git"),
+        PipRequirement.parse("setuptools==54.1.2; python_version >= '3.6'"),
+        PipRequirement.parse("wheel==1.2.3"),
     }
 
 
@@ -376,100 +396,103 @@ def test_resolve_python_distribution_entry_points_required_fields() -> None:
 def test_inject_python_distribution_dependencies() -> None:
     rule_runner = RuleRunner(
         rules=[
-            inject_python_distribution_dependencies,
-            resolve_pex_entry_point,
-            resolve_python_distribution_entry_points,
+            *target_types_rules.rules(),
             *import_rules(),
             *python_sources.rules(),
             QueryRule(InjectedDependencies, [InjectPythonDistributionDependencies]),
         ],
-        target_types=[PythonDistribution, PythonRequirementLibrary, PythonLibrary, PexBinary],
+        target_types=[
+            PythonDistribution,
+            PythonRequirementTarget,
+            PythonSourcesGeneratorTarget,
+            PexBinary,
+        ],
         objects={"setup_py": PythonArtifact},
     )
-    rule_runner.add_to_build_file(
-        "",
-        dedent(
-            """\
-            python_requirement_library(
-                name='ansicolors',
-                requirements=['ansicolors'],
-                module_mapping={'ansicolors': ['colors']},
-            )
-            """
-        ),
-    )
-    rule_runner.create_file("project/app.py")
-    rule_runner.add_to_build_file(
-        "project",
-        dedent(
-            """\
-            pex_binary(name="my_binary", entry_point="who_knows.module:main")
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                python_requirement(
+                    name='ansicolors',
+                    requirements=['ansicolors'],
+                    modules=['colors'],
+                )
+                """
+            ),
+            "project/app.py": "",
+            "project/BUILD": dedent(
+                """\
+                pex_binary(name="my_binary", entry_point="who_knows.module:main")
 
-            python_library(name="my_library", sources=["app.py"])
+                python_sources(name="my_library", sources=["app.py"])
 
-            python_distribution(
-                name="dist-a",
-                provides=setup_py(
-                    name='my-dist-a'
-                ).with_binaries({"my_cmd": ":my_binary"})
-            )
-
-            python_distribution(
-                name="dist-b",
-                provides=setup_py(
-                    name="my-dist-b"
-                ),
-                entry_points={
-                    "console_scripts":{
-                        "b_cmd": "project.app:main",
-                        "cmd_2": "//project:my_binary",
-                    }
-                },
-            )
-
-            python_distribution(
-                name="third_dep",
-                provides=setup_py(name="my-third"),
-                entry_points={
-                    "color-plugins":{
-                        "my-ansi-colors": "colors",
-                    }
-                }
-            )
-
-            python_distribution(
-                name="third_dep2",
-                provides=setup_py(
-                    name="my-third",
+                python_distribution(
+                    name="dist-a",
+                    provides=setup_py(
+                        name='my-dist-a'
+                    ),
                     entry_points={
                         "console_scripts":{
-                            "my-cmd": ":my_binary",
-                            "main": "project.app:main",
+                            "my_cmd": ":my_binary",
                         },
+                    },
+                )
+
+                python_distribution(
+                    name="dist-b",
+                    provides=setup_py(
+                        name="my-dist-b"
+                    ),
+                    entry_points={
+                        "console_scripts":{
+                            "b_cmd": "project.app:main",
+                            "cmd_2": "//project:my_binary",
+                        }
+                    },
+                )
+
+                python_distribution(
+                    name="third_dep",
+                    provides=setup_py(name="my-third"),
+                    entry_points={
                         "color-plugins":{
                             "my-ansi-colors": "colors",
                         }
                     }
                 )
-            )
-            """
-        ),
-    )
-    rule_runner.create_file("who_knows/module.py")
-    rule_runner.add_to_build_file(
-        "who_knows",
-        dedent(
-            """\
-            python_library(name="random_lib", sources=["module.py"])
-            """
-        ),
+
+                python_distribution(
+                    name="third_dep2",
+                    provides=setup_py(
+                        name="my-third",
+                        entry_points={
+                            "console_scripts":{
+                                "my-cmd": ":my_binary",
+                                "main": "project.app:main",
+                            },
+                            "color-plugins":{
+                                "my-ansi-colors": "colors",
+                            }
+                        }
+                    )
+                )
+                """
+            ),
+            "who_knows/module.py": "",
+            "who_knows/BUILD": dedent(
+                """\
+                python_sources(name="random_lib", sources=["module.py"])
+                """
+            ),
+        }
     )
 
-    def assert_injected(address: Address, expected: List[Address]) -> None:
+    def assert_injected(address: Address, expected: list[Address]) -> None:
         tgt = rule_runner.get_target(address)
         injected = rule_runner.request(
             InjectedDependencies,
-            [InjectPythonDistributionDependencies(tgt[PythonDistributionDependencies])],
+            [InjectPythonDistributionDependencies(tgt[PythonDistributionDependenciesField])],
         )
         assert injected == InjectedDependencies(expected)
 
@@ -504,18 +527,28 @@ def test_inject_python_distribution_dependencies() -> None:
 
 
 @pytest.mark.parametrize(
-    ["raw_value", "expected"],
+    "unrecognized,bad_entry_str,name_str",
     (
-        (None, {}),
-        ({"new-dist": ["new_module"]}, {"new-dist": ("new_module",)}),
-        ({"PyYAML": ["custom_yaml"]}, {"pyyaml": ("custom_yaml",)}),
+        (["fake"], "fake", "name"),
+        (["fake1", "fake2"], "['fake1', 'fake2']", "names"),
     ),
 )
-def test_module_mapping_field(
-    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
+def test_unrecognized_resolve_names_error(
+    unrecognized: list[str], bad_entry_str: str, name_str: str
 ) -> None:
-    actual_value = ModuleMappingField(raw_value, Address("", target_name="tests")).value
-    assert actual_value == FrozenDict({**DEFAULT_MODULE_MAPPING, **expected})
+    with pytest.raises(UnrecognizedResolveNamesError) as exc:
+        raise UnrecognizedResolveNamesError(
+            unrecognized, ["valid1", "valid2", "valid3"], description_of_origin="foo"
+        )
+    assert (
+        softwrap(
+            f"""
+            Unrecognized resolve {name_str} from foo:
+            {bad_entry_str}\n\nAll valid resolve names: ['valid1', 'valid2', 'valid3']
+            """
+        )
+        in str(exc.value)
+    )
 
 
 @pytest.mark.parametrize(
@@ -523,11 +556,70 @@ def test_module_mapping_field(
     (
         (None, {}),
         ({"new-dist": ["new_module"]}, {"new-dist": ("new_module",)}),
-        ({"types-PyYAML": ["custom_yaml"]}, {"types-pyyaml": ("custom_yaml",)}),
+        ({"PyYAML": ["custom_yaml"]}, {"pyyaml": ("custom_yaml",)}),
     ),
 )
-def test_type_stub_module_mapping_field(
-    raw_value: Optional[Dict[str, Iterable[str]]], expected: Dict[str, Tuple[str, ...]]
+def test_normalize_module_mapping(
+    raw_value: dict[str, Iterable[str]] | None, expected: dict[str, tuple[str, ...]]
 ) -> None:
-    actual_value = TypeStubsModuleMappingField(raw_value, Address("", target_name="tests")).value
-    assert actual_value == FrozenDict({**DEFAULT_TYPE_STUB_MODULE_MAPPING, **expected})
+    assert normalize_module_mapping(raw_value) == FrozenDict(expected)
+
+
+# -----------------------------------------------------------------------------------------------
+# Generate targets
+# -----------------------------------------------------------------------------------------------
+
+
+def test_pex_binary_targets() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_types_rules.rules(),
+            *import_rules(),
+            *python_sources.rules(),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
+        ],
+        target_types=[PexBinariesGeneratorTarget],
+    )
+    rule_runner.write_files(
+        {
+            "src/py/BUILD": dedent(
+                """\
+                pex_binaries(
+                    name="pexes",
+                    entry_points=[
+                        "f1.py",
+                        "f2:foo",
+                        "subdir.f.py",
+                        "subdir.f:main",
+                    ],
+                    overrides={
+                        'f2:foo': {'tags': ['overridden']},
+                        'subdir.f.py': {'tags': ['overridden']},
+                    }
+                )
+                """
+            ),
+        }
+    )
+
+    def gen_pex_binary_tgt(entry_point: str, tags: list[str] | None = None) -> PexBinary:
+        return PexBinary(
+            {PexEntryPointField.alias: entry_point, Tags.alias: tags},
+            Address("src/py", target_name="pexes", generated_name=entry_point.replace(":", "-")),
+            residence_dir="src/py",
+        )
+
+    result = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("src/py", target_name="pexes"), description_of_origin="tests"
+            )
+        ],
+    ).parametrizations.values()
+    assert set(result) == {
+        gen_pex_binary_tgt("f1.py"),
+        gen_pex_binary_tgt("f2:foo", tags=["overridden"]),
+        gen_pex_binary_tgt("subdir.f.py", tags=["overridden"]),
+        gen_pex_binary_tgt("subdir.f:main"),
+    }

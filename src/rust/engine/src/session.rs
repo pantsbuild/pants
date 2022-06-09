@@ -3,25 +3,24 @@
 
 use std::collections::HashMap;
 use std::future::Future;
+use std::sync::atomic::{self, AtomicU32};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use crate::context::Core;
-use crate::core::{Failure, Value};
 use crate::nodes::{NodeKey, Select};
-use crate::scheduler::Scheduler;
+use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
-use futures::future::{self, AbortHandle, Abortable};
-use futures::FutureExt;
+use futures::future::{self, AbortHandle, Abortable, FutureExt};
 use graph::LastObserved;
 use log::warn;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
+use pyo3::prelude::*;
 use task_executor::Executor;
 use tokio::signal::unix::{signal, SignalKind};
 use ui::ConsoleUI;
-use uuid::Uuid;
-use workunit_store::{format_workunit_duration, UserMetadataPyValue, WorkunitStore};
+use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
@@ -38,7 +37,7 @@ pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
 ///
 enum SessionDisplay {
   // The dynamic UI is enabled, and the ConsoleUI should interact with a TTY.
-  ConsoleUI(ConsoleUI),
+  ConsoleUI(Box<ConsoleUI>),
   // The dynamic UI is disabled, and we should use only logging.
   Logging {
     straggler_threshold: Duration,
@@ -50,10 +49,15 @@ impl SessionDisplay {
   fn new(
     workunit_store: &WorkunitStore,
     parallelism: usize,
-    should_render_ui: bool,
+    dynamic_ui: bool,
+    ui_use_prodash: bool,
   ) -> SessionDisplay {
-    if should_render_ui {
-      SessionDisplay::ConsoleUI(ConsoleUI::new(workunit_store.clone(), parallelism))
+    if dynamic_ui {
+      SessionDisplay::ConsoleUI(Box::new(ConsoleUI::new(
+        workunit_store.clone(),
+        parallelism,
+        ui_use_prodash,
+      )))
     } else {
       SessionDisplay::Logging {
         // TODO: This threshold should likely be configurable, but the interval we render at
@@ -80,16 +84,11 @@ struct SessionState {
   // A place to store info about workunits in rust part
   workunit_store: WorkunitStore,
   // Per-Session values that have been set for this session.
-  session_values: Mutex<Value>,
+  session_values: Mutex<PyObject>,
   // An id used to control the visibility of uncacheable rules. Generally this is identical for an
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
-  //
-  // TODO: Figure out how the `--loop` flag interplays with metrics. It's possible that for metrics
-  // purposes, each iteration of a loop should be considered to be a new Session, but for now the
-  // Session/build_id would be stable.
-  run_id: Mutex<Uuid>,
-  workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
+  run_id: AtomicU32,
 }
 
 ///
@@ -105,7 +104,7 @@ struct SessionHandle {
   // non-isolated Sessions).
   isolated: bool,
   // The display mechanism to use in this Session.
-  display: Mutex<SessionDisplay>,
+  display: tokio::sync::Mutex<SessionDisplay>,
 }
 
 impl SessionHandle {
@@ -142,17 +141,28 @@ pub struct Session {
 
 impl Session {
   pub fn new(
-    scheduler: &Scheduler,
-    should_render_ui: bool,
+    core: Arc<Core>,
+    dynamic_ui: bool,
+    ui_use_prodash: bool,
+    mut max_workunit_level: log::Level,
     build_id: String,
-    session_values: Value,
+    session_values: PyObject,
     cancelled: AsyncLatch,
   ) -> Result<Session, String> {
-    let workunit_store = WorkunitStore::new(!should_render_ui);
-    let display = Mutex::new(SessionDisplay::new(
+    // We record workunits with the maximum level of:
+    // 1. the given `max_workunit_verbosity`, which should be computed from:
+    //     * the log level, to ensure that workunit events are logged
+    //     * the levels required by any consumers who will call `with_latest_workunits`.
+    // 2. the level required by the ConsoleUI (if any): currently, DEBUG.
+    if dynamic_ui {
+      max_workunit_level = std::cmp::max(max_workunit_level, log::Level::Debug);
+    }
+    let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level);
+    let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &workunit_store,
-      scheduler.core.local_parallelism,
-      should_render_ui,
+      core.local_parallelism,
+      dynamic_ui,
+      ui_use_prodash,
     ));
 
     let handle = Arc::new(SessionHandle {
@@ -161,17 +171,18 @@ impl Session {
       isolated: false,
       display,
     });
-    scheduler.core.sessions.add(&handle)?;
+    core.sessions.add(&handle)?;
+    let run_id = core.sessions.generate_run_id();
+    let preceding_graph_size = core.graph.len();
     Ok(Session {
       handle,
       state: Arc::new(SessionState {
-        core: scheduler.core.clone(),
-        preceding_graph_size: scheduler.core.graph.len(),
+        core,
+        preceding_graph_size,
         roots: Mutex::new(HashMap::new()),
         workunit_store,
         session_values: Mutex::new(session_values),
-        run_id: Mutex::new(Uuid::new_v4()),
-        workunit_metadata_map: RwLock::new(HashMap::new()),
+        run_id: AtomicU32::new(run_id.0),
       }),
     })
   }
@@ -184,9 +195,10 @@ impl Session {
   /// when a client disconnects, or killed by Ctrl+C.
   ///
   pub fn isolated_shallow_clone(&self, build_id: String) -> Result<Session, String> {
-    let display = Mutex::new(SessionDisplay::new(
+    let display = tokio::sync::Mutex::new(SessionDisplay::new(
       &self.state.workunit_store,
       self.state.core.local_parallelism,
+      false,
       false,
     ));
     let handle = Arc::new(SessionHandle {
@@ -227,13 +239,6 @@ impl Session {
     self.handle.cancelled.triggered().await;
   }
 
-  pub fn with_metadata_map<F, T>(&self, f: F) -> T
-  where
-    F: Fn(&mut HashMap<UserMetadataPyValue, Value>) -> T,
-  {
-    f(&mut self.state.workunit_metadata_map.write())
-  }
-
   pub fn roots_extend(&self, new_roots: Vec<(Root, Option<LastObserved>)>) {
     let mut roots = self.state.roots.lock();
     roots.extend(new_roots);
@@ -255,7 +260,7 @@ impl Session {
     roots.keys().map(|r| r.clone().into()).collect()
   }
 
-  pub fn session_values(&self) -> Value {
+  pub fn session_values(&self) -> PyObject {
     self.state.session_values.lock().clone()
   }
 
@@ -271,25 +276,26 @@ impl Session {
     &self.handle.build_id
   }
 
-  pub fn run_id(&self) -> Uuid {
-    let run_id = self.state.run_id.lock();
-    *run_id
+  pub fn run_id(&self) -> RunId {
+    RunId(self.state.run_id.load(atomic::Ordering::SeqCst))
   }
 
   pub fn new_run_id(&self) {
-    let mut run_id = self.state.run_id.lock();
-    *run_id = Uuid::new_v4();
+    self.state.run_id.store(
+      self.state.core.sessions.generate_run_id().0,
+      atomic::Ordering::SeqCst,
+    );
   }
 
   pub async fn with_console_ui_disabled<T>(&self, f: impl Future<Output = T>) -> T {
-    match *self.handle.display.lock() {
+    match *self.handle.display.lock().await {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.with_console_ui_disabled(f).await,
       SessionDisplay::Logging { .. } => f.await,
     }
   }
 
-  pub fn maybe_display_initialize(&self, executor: &Executor) {
-    let result = match *self.handle.display.lock() {
+  pub async fn maybe_display_initialize(&self, executor: &Executor) {
+    let result = match *self.handle.display.lock().await {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.initialize(executor.clone()),
       SessionDisplay::Logging {
         ref mut straggler_deadline,
@@ -305,23 +311,29 @@ impl Session {
   }
 
   pub async fn maybe_display_teardown(&self) {
-    let teardown = match *self.handle.display.lock() {
-      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().boxed(),
+    let teardown = match *self.handle.display.lock().await {
+      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown(),
       SessionDisplay::Logging {
         ref mut straggler_deadline,
         ..
       } => {
         *straggler_deadline = None;
-        async { Ok(()) }.boxed()
+        futures::future::ready(()).boxed()
       }
     };
-    if let Err(e) = teardown.await {
-      warn!("{}", e);
-    }
+    // NB: We await teardown outside of the display lock to remove a lock interleaving. See
+    // `ConsoleUI::teardown`.
+    teardown.await;
   }
 
   pub fn maybe_display_render(&self) {
-    match *self.handle.display.lock() {
+    let mut display = if let Ok(display) = self.handle.display.try_lock() {
+      display
+    } else {
+      // Else, the UI is currently busy: skip rendering.
+      return;
+    };
+    match *display {
       SessionDisplay::ConsoleUI(ref mut ui) => ui.render(),
       SessionDisplay::Logging {
         straggler_threshold,
@@ -341,7 +353,11 @@ impl Session {
               "Long running tasks:\n  {}",
               straggling_workunits
                 .into_iter()
-                .map(|(duration, desc)| format!("{}\t{}", format_workunit_duration(duration), desc))
+                .map(|(duration, desc)| format!(
+                  "{}\t{}",
+                  format_workunit_duration_ms!(duration.as_millis()),
+                  desc
+                ))
                 .collect::<Vec<_>>()
                 .join("\n  ")
             );
@@ -367,6 +383,9 @@ pub struct Sessions {
   sessions: Arc<Mutex<Option<Vec<Weak<SessionHandle>>>>>,
   /// Handle to kill the signal monitoring task when this object is killed.
   signal_task_abort_handle: AbortHandle,
+  /// A generator for RunId values. Although this is monotonic, there is no meaning assigned to
+  /// ordering: only equality is relevant.
+  run_id_generator: AtomicU32,
 }
 
 impl Sessions {
@@ -380,6 +399,7 @@ impl Sessions {
         .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
       let (abort_handle, abort_registration) = AbortHandle::new_pair();
       let sessions = sessions.clone();
+      #[allow(clippy::let_underscore_lock)]
       let _ = executor.spawn(Abortable::new(
         async move {
           loop {
@@ -408,6 +428,7 @@ impl Sessions {
     Ok(Sessions {
       sessions,
       signal_task_abort_handle,
+      run_id_generator: AtomicU32::new(0),
     })
   }
 
@@ -422,13 +443,18 @@ impl Sessions {
     }
   }
 
+  fn generate_run_id(&self) -> RunId {
+    RunId(self.run_id_generator.fetch_add(1, atomic::Ordering::SeqCst))
+  }
+
   ///
   /// Shuts down this Sessions instance by waiting for all existing Sessions to exit.
   ///
   /// Waits at most `timeout` for Sessions to complete.
   ///
   pub async fn shutdown(&self, timeout: Duration) -> Result<(), String> {
-    if let Some(sessions) = self.sessions.lock().take() {
+    let sessions_opt = self.sessions.lock().take();
+    if let Some(sessions) = sessions_opt {
       // Collect clones of the cancellation tokens for each Session, which allows us to watch for
       // them to have been dropped.
       let (build_ids, cancellation_latches): (Vec<_>, Vec<_>) = sessions

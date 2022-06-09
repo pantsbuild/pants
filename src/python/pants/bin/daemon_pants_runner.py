@@ -67,7 +67,7 @@ class DaemonPantsRunner:
         acquired = self._run_lock.acquire(blocking=False)
         if not acquired:
             # If we don't acquire immediately, send an explanation.
-            length = "forever" if should_poll_forever else "up to {} seconds".format(timeout)
+            length = "forever" if should_poll_forever else f"up to {timeout} seconds"
             self._send_stderr(
                 stderr_fileno,
                 f"Another pants invocation is running. Will wait {length} for it to finish before giving up.\n"
@@ -113,6 +113,12 @@ class DaemonPantsRunner:
             # Capture the client's start time, which we propagate here in order to get an accurate
             # view of total time.
             env_start_time = env.get("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+            if not env_start_time:
+                # NB: We warn rather than erroring here because it eases use of non-Pants nailgun
+                # clients for testing.
+                logger.warning(
+                    "No start time was reported by the client! Metrics may be inaccurate."
+                )
             start_time = float(env_start_time) if env_start_time else time.time()
 
             options_bootstrapper = OptionsBootstrapper.create(
@@ -142,7 +148,6 @@ class DaemonPantsRunner:
         command: str,
         args: Tuple[str, ...],
         env: Dict[str, str],
-        working_directory: bytes,
         cancellation_latch: PySessionCancellationLatch,
         stdin_fileno: int,
         stdout_fileno: int,

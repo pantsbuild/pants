@@ -5,11 +5,12 @@ from __future__ import annotations
 
 from textwrap import dedent
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python import target_types_rules
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.bandit import skip_field
 from pants.backend.python.lint.bandit.subsystem import BanditLockfileSentinel
 from pants.backend.python.lint.bandit.subsystem import rules as subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.target_types import GenericTarget
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -20,36 +21,38 @@ def test_setup_lockfile_interpreter_constraints() -> None:
         rules=[
             *subsystem_rules(),
             *skip_field.rules(),
-            QueryRule(PythonLockfileRequest, [BanditLockfileSentinel]),
+            *target_types_rules.rules(),
+            QueryRule(GeneratePythonLockfile, [BanditLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, GenericTarget],
+        target_types=[PythonSourcesGeneratorTarget, GenericTarget],
     )
 
     global_constraint = "==3.9.*"
     rule_runner.set_options(
-        [], env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"}
+        ["--bandit-lockfile=lockfile.txt"],
+        env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
     )
 
     def assert_ics(build_file: str, expected: list[str]) -> None:
-        rule_runner.write_files({"project/BUILD": build_file})
-        lockfile_request = rule_runner.request(PythonLockfileRequest, [BanditLockfileSentinel()])
+        rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
+        lockfile_request = rule_runner.request(GeneratePythonLockfile, [BanditLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected)
 
-    assert_ics("python_library()", [global_constraint])
-    assert_ics("python_library(interpreter_constraints=['==2.7.*'])", ["==2.7.*"])
+    assert_ics("python_sources()", [global_constraint])
+    assert_ics("python_sources(interpreter_constraints=['==2.7.*'])", ["==2.7.*"])
     assert_ics(
-        "python_library(interpreter_constraints=['==2.7.*', '==3.5.*'])", ["==2.7.*", "==3.5.*"]
+        "python_sources(interpreter_constraints=['==2.7.*', '==3.5.*'])", ["==2.7.*", "==3.5.*"]
     )
 
-    # If no Python targets in repo, fall back to global python-setup constraints.
+    # If no Python targets in repo, fall back to global [python] constraints.
     assert_ics("target()", [global_constraint])
 
     # Ignore targets that are skipped.
     assert_ics(
         dedent(
             """\
-            python_library(name='a', interpreter_constraints=['==2.7.*'])
-            python_library(name='b', interpreter_constraints=['==3.5.*'], skip_bandit=True)
+            python_sources(name='a', interpreter_constraints=['==2.7.*'])
+            python_sources(name='b', interpreter_constraints=['==3.5.*'], skip_bandit=True)
             """
         ),
         ["==2.7.*"],
@@ -60,8 +63,8 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name='a', interpreter_constraints=['==2.7.*'])
-            python_library(name='b', interpreter_constraints=['==3.5.*'])
+            python_sources(name='a', interpreter_constraints=['==2.7.*'])
+            python_sources(name='b', interpreter_constraints=['==3.5.*'])
             """
         ),
         ["==2.7.*", "==3.5.*"],
@@ -69,8 +72,8 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name='a', interpreter_constraints=['==2.7.*', '==3.5.*'])
-            python_library(name='b', interpreter_constraints=['>=3.5'])
+            python_sources(name='a', interpreter_constraints=['==2.7.*', '==3.5.*'])
+            python_sources(name='b', interpreter_constraints=['>=3.5'])
             """
         ),
         ["==2.7.*", "==3.5.*", ">=3.5"],
@@ -78,9 +81,9 @@ def test_setup_lockfile_interpreter_constraints() -> None:
     assert_ics(
         dedent(
             """\
-            python_library(name='a')
-            python_library(name='b', interpreter_constraints=['==2.7.*'])
-            python_library(name='c', interpreter_constraints=['>=3.6'])
+            python_sources(name='a')
+            python_sources(name='b', interpreter_constraints=['==2.7.*'])
+            python_sources(name='c', interpreter_constraints=['>=3.6'])
             """
         ),
         ["==2.7.*", global_constraint, ">=3.6"],

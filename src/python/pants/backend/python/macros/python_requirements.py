@@ -1,96 +1,172 @@
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import os
-from itertools import groupby
-from pathlib import Path
-from typing import Iterable, Mapping, Optional
 
-from pants.backend.python.target_types import parse_requirements_file
-from pants.base.build_environment import get_buildroot
+from __future__ import annotations
+
+import itertools
+from typing import Iterable
+
+from packaging.utils import canonicalize_name as canonicalize_project_name
+
+from pants.backend.python.macros.common_fields import (
+    ModuleMappingField,
+    RequirementsOverrideField,
+    TypeStubsModuleMappingField,
+)
+from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.target_types import (
+    PythonRequirementModulesField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+    PythonRequirementTarget,
+    PythonRequirementTypeStubModulesField,
+    parse_requirements_file,
+)
+from pants.core.target_types import (
+    TargetGeneratorSourcesHelperSourcesField,
+    TargetGeneratorSourcesHelperTarget,
+)
+from pants.engine.addresses import Address
+from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    GeneratedTargets,
+    GenerateTargetsRequest,
+    InvalidFieldException,
+    SingleSourceField,
+    TargetGenerator,
+)
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
-class PythonRequirements:
-    """Translates a pip requirements file into an equivalent set of `python_requirement_library`
-    targets.
+class PythonRequirementsSourceField(SingleSourceField):
+    default = "requirements.txt"
+    required = False
 
-    If the `requirements.txt` file has lines `foo>=3.14` and `bar>=2.7`,
-    then this will translate to:
 
-      python_requirement_library(
-        name="foo",
-        requirements=["foo>=3.14"],
-      )
-
-      python_requirement_library(
-        name="bar",
-        requirements=["bar>=2.7"],
-      )
-
-    See the requirements file spec here:
-    https://pip.pypa.io/en/latest/reference/pip_install.html#requirements-file-format
-
-    You may also use the parameter `module_mapping` to teach Pants what modules each of your
-    requirements provide. For any requirement unspecified, Pants will default to the name of the
-    requirement. This setting is important for Pants to know how to convert your import
-    statements back into your dependencies. For example:
-
-        python_requirements(
-          module_mapping={
-            "ansicolors": ["colors"],
-            "setuptools": ["pkg_resources"],
-          }
-        )
-    """
-
-    def __init__(self, parse_context):
-        self._parse_context = parse_context
-
-    def __call__(
-        self,
-        requirements_relpath: str = "requirements.txt",
-        *,
-        module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
-        type_stubs_module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
-    ) -> None:
+class PythonRequirementsTargetGenerator(TargetGenerator):
+    alias = "python_requirements"
+    help = softwrap(
         """
-        :param requirements_relpath: The relpath from this BUILD file to the requirements file.
-            Defaults to a `requirements.txt` file sibling to the BUILD file.
-        :param module_mapping: a mapping of requirement names to a list of the modules they provide.
-            For example, `{"ansicolors": ["colors"]}`. Any unspecified requirements will use the
-            requirement name as the default module, e.g. "Django" will default to
-            `modules=["django"]`.
+        Generate a `python_requirement` for each entry in a requirements.txt-style file from the
+        `source` field.
+
+        This works with pip-style requirements files:
+        https://pip.pypa.io/en/latest/reference/requirements-file-format/. However, pip options
+        like `--hash` are (for now) ignored.
+
+        Pants will not follow `-r reqs.txt` lines. Instead, add a dedicated `python_requirements`
+        target generator for that additional requirements file.
         """
-        req_file_tgt = self._parse_context.create_object(
-            "_python_requirements_file",
-            name=requirements_relpath.replace(os.path.sep, "_"),
-            sources=[requirements_relpath],
+    )
+    generated_target_cls = PythonRequirementTarget
+    # Note that this does not have a `dependencies` field.
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ModuleMappingField,
+        TypeStubsModuleMappingField,
+        PythonRequirementsSourceField,
+        RequirementsOverrideField,
+    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (PythonRequirementResolveField,)
+
+
+class GenerateFromPythonRequirementsRequest(GenerateTargetsRequest):
+    generate_from = PythonRequirementsTargetGenerator
+
+
+@rule(desc="Generate `python_requirement` targets from requirements.txt", level=LogLevel.DEBUG)
+async def generate_from_python_requirement(
+    request: GenerateFromPythonRequirementsRequest, union_membership: UnionMembership
+) -> GeneratedTargets:
+    generator = request.generator
+    requirements_rel_path = generator[PythonRequirementsSourceField].value
+    requirements_full_path = generator[PythonRequirementsSourceField].file_path
+    overrides = {
+        canonicalize_project_name(k): v
+        for k, v in request.require_unparametrized_overrides().items()
+    }
+
+    file_tgt = TargetGeneratorSourcesHelperTarget(
+        {TargetGeneratorSourcesHelperSourcesField.alias: requirements_rel_path},
+        Address(
+            request.template_address.spec_path,
+            target_name=request.template_address.target_name,
+            relative_file_path=requirements_rel_path,
+        ),
+        union_membership,
+    )
+
+    digest_contents = await Get(
+        DigestContents,
+        PathGlobs(
+            [requirements_full_path],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"{generator}'s field `{PythonRequirementsSourceField.alias}`",
+        ),
+    )
+    requirements = parse_requirements_file(
+        digest_contents[0].content.decode(), rel_path=requirements_full_path
+    )
+    grouped_requirements = itertools.groupby(
+        requirements, lambda parsed_req: parsed_req.project_name
+    )
+
+    module_mapping = generator[ModuleMappingField].value
+    stubs_mapping = generator[TypeStubsModuleMappingField].value
+
+    def generate_tgt(
+        project_name: str, parsed_reqs: Iterable[PipRequirement]
+    ) -> PythonRequirementTarget:
+        normalized_proj_name = canonicalize_project_name(project_name)
+        tgt_overrides = overrides.pop(normalized_proj_name, {})
+        if Dependencies.alias in tgt_overrides:
+            tgt_overrides[Dependencies.alias] = list(tgt_overrides[Dependencies.alias]) + [
+                file_tgt.address.spec
+            ]
+
+        return PythonRequirementTarget(
+            {
+                **request.template,
+                PythonRequirementsField.alias: list(parsed_reqs),
+                PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
+                PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
+                    normalized_proj_name
+                ),
+                # This may get overridden by `tgt_overrides`, which will have already added in
+                # the file tgt.
+                Dependencies.alias: [file_tgt.address.spec],
+                **tgt_overrides,
+            },
+            request.template_address.create_generated(project_name),
+            union_membership,
         )
-        requirements_dep = f":{req_file_tgt.name}"
 
-        req_file = Path(get_buildroot(), self._parse_context.rel_path, requirements_relpath)
-        requirements = parse_requirements_file(
-            req_file.read_text(), rel_path=str(req_file.relative_to(get_buildroot()))
+    result = tuple(
+        generate_tgt(project_name, parsed_reqs_)
+        for project_name, parsed_reqs_ in grouped_requirements
+    ) + (file_tgt,)
+
+    if overrides:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                Unused key in the `overrides` field for {request.template_address}:
+                {sorted(overrides)}
+                """
+            )
         )
 
-        grouped_requirements = groupby(requirements, lambda parsed_req: parsed_req.project_name)
+    return GeneratedTargets(generator, result)
 
-        for project_name, parsed_reqs_ in grouped_requirements:
-            parsed_reqs = list(parsed_reqs_)
-            req_module_mapping = (
-                {project_name: module_mapping[project_name]}
-                if module_mapping and project_name in module_mapping
-                else None
-            )
-            stubs_module_mapping = (
-                {project_name: type_stubs_module_mapping[project_name]}
-                if type_stubs_module_mapping and project_name in type_stubs_module_mapping
-                else None
-            )
-            self._parse_context.create_object(
-                "python_requirement_library",
-                name=project_name,
-                requirements=parsed_reqs,
-                module_mapping=req_module_mapping,
-                type_stubs_module_mapping=stubs_module_mapping,
-                dependencies=[requirements_dep],
-            )
+
+def rules():
+    return (
+        *collect_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateFromPythonRequirementsRequest),
+    )

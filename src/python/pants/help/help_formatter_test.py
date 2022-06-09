@@ -65,7 +65,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
         parser.register(*args, **kwargs)
         # Force a parse to generate the derivation history.
         parser.parse_args(Parser.ParseArgsRequest((), OptionValueContainerBuilder(), [], False))
-        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False)
+        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False, "help.test")
         return HelpFormatter(
             show_advanced=show_advanced, show_deprecated=show_deprecated, color=False
         ).format_options(oshi)
@@ -74,16 +74,21 @@ class OptionHelpFormatterTest(unittest.TestCase):
         args = ["--foo"]
         kwargs = {"advanced": True}
         lines = self._format_for_global_scope(False, False, args, kwargs)
-        assert len(lines) == 7
+        assert len(lines) == 9
         assert not any("--foo" in line for line in lines)
         lines = self._format_for_global_scope(True, False, args, kwargs)
-        assert len(lines) == 17
+        assert len(lines) == 18
 
     def test_suppress_deprecated(self):
         args = ["--foo"]
         kwargs = {"removal_version": "33.44.55.dev0"}
         lines = self._format_for_global_scope(False, False, args, kwargs)
-        assert len(lines) == 7
+        assert len(lines) == 8
         assert not any("--foo" in line for line in lines)
         lines = self._format_for_global_scope(True, True, args, kwargs)
-        assert len(lines) == 22
+        assert len(lines) == 23
+
+    def test_provider_info(self):
+        lines = self._format_for_global_scope(False, False, ["--foo"], {})
+        assert len(lines) == 14
+        assert "Activated by help.test" in lines

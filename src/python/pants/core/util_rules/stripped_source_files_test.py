@@ -9,17 +9,22 @@ import pytest
 
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames, StrippedSourceFiles
+from pants.core.util_rules.stripped_source_files import (
+    StrippedFileName,
+    StrippedFileNameRequest,
+    StrippedSourceFileNames,
+    StrippedSourceFiles,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import Sources, SourcesPathsRequest, Target
+from pants.engine.target import MultipleSourcesField, SourcesPathsRequest, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 class TargetWithSources(Target):
     alias = "target"
-    core_fields = (Sources,)
+    core_fields = (MultipleSourcesField,)
 
 
 @pytest.fixture
@@ -30,6 +35,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(StrippedSourceFiles, [SourceFiles]),
             QueryRule(StrippedSourceFileNames, [SourcesPathsRequest]),
+            QueryRule(StrippedFileName, [StrippedFileNameRequest]),
         ],
         target_types=[TargetWithSources],
     )
@@ -60,12 +66,9 @@ def test_strip_snapshot(rule_runner: RuleRunner) -> None:
     assert get_stripped_files_for_snapshot(["src/python/project/example.py"]) == [
         "project/example.py"
     ]
-    assert (
-        get_stripped_files_for_snapshot(
-            ["src/python/project/example.py"],
-        )
-        == ["project/example.py"]
-    )
+    assert get_stripped_files_for_snapshot(
+        ["src/python/project/example.py"],
+    ) == ["project/example.py"]
 
     assert get_stripped_files_for_snapshot(["src/java/com/project/example.java"]) == [
         "com/project/example.java"
@@ -109,7 +112,9 @@ def test_strip_source_file_names(rule_runner: RuleRunner) -> None:
     ) -> None:
         rule_runner.set_options([f"--source-root-patterns=['{source_root}']"])
         tgt = rule_runner.get_target(address)
-        result = rule_runner.request(StrippedSourceFileNames, [SourcesPathsRequest(tgt[Sources])])
+        result = rule_runner.request(
+            StrippedSourceFileNames, [SourcesPathsRequest(tgt[MultipleSourcesField])]
+        )
         assert set(result) == set(expected)
 
     rule_runner.write_files(
@@ -140,3 +145,10 @@ def test_strip_source_file_names(rule_runner: RuleRunner) -> None:
     assert_stripped_source_file_names(
         Address("", target_name="empty"), source_root="/", expected=[]
     )
+
+
+@pytest.mark.parametrize("source_root,expected", [("root", "f.txt"), ("/", "root/f.txt")])
+def test_strip_file_name(rule_runner: RuleRunner, source_root: str, expected: str) -> None:
+    rule_runner.set_options([f"--source-root-patterns=['{source_root}']"])
+    result = rule_runner.request(StrippedFileName, [StrippedFileNameRequest("root/f.txt")])
+    assert result.value == expected

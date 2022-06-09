@@ -31,6 +31,7 @@ __pycache__/
 .classpath
 .factorypath
 .python
+.python-version
 .pydevproject
 .pytest_cache/
 codegen/classes/
@@ -56,5 +57,6 @@ GSYMS
 GTAGS
 .mypy_cache/
 /.pants
+/.pants.rc
 /.venv
 .tool-versions

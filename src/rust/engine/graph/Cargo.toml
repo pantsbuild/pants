@@ -1,22 +1,24 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "graph"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-async-trait = "0.1"
+# Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
+async-trait = "=0.1.42"
 async_value = { path = "../async_value" }
 fnv = "1.0.5"
 futures = "0.3"
-fixedbitset = "0.2"
+fixedbitset = "0.4"
 log = "0.4"
-parking_lot = "0.11"
-petgraph = "0.5"
-tokio = { version = "1.4", features = ["time"] }
+parking_lot = "0.12"
+petgraph = "0.6"
+task_executor = { path = "../task_executor" }
+tokio = { version = "1.16", features = ["time", "parking_lot"] }
 
 [dev-dependencies]
 rand = "0.8"
-env_logger = "0.5.4"
-tokio = { version = "1.4", features = ["macros", "rt-multi-thread", "time"] }
+env_logger = "0.9.0"
+tokio = { version = "1.16", features = ["macros", "rt-multi-thread", "time"] }

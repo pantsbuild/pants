@@ -1,89 +1,168 @@
-# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
-from pathlib import Path
-from typing import Iterable, Mapping, Optional
 
-from pkg_resources import Requirement
+from packaging.utils import canonicalize_name as canonicalize_project_name
 
-from pants.base.build_environment import get_buildroot
+from pants.backend.python.macros.common_fields import (
+    ModuleMappingField,
+    RequirementsOverrideField,
+    TypeStubsModuleMappingField,
+)
+from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.target_types import (
+    PythonRequirementModulesField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+    PythonRequirementTarget,
+    PythonRequirementTypeStubModulesField,
+)
+from pants.core.target_types import (
+    TargetGeneratorSourcesHelperSourcesField,
+    TargetGeneratorSourcesHelperTarget,
+)
+from pants.engine.addresses import Address
+from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    GeneratedTargets,
+    GenerateTargetsRequest,
+    InvalidFieldException,
+    SingleSourceField,
+    TargetGenerator,
+)
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
+
+
+class PipenvSourceField(SingleSourceField):
+    default = "Pipfile.lock"
+    required = False
+
+
+class PipenvRequirementsTargetGenerator(TargetGenerator):
+    alias = "pipenv_requirements"
+    help = "Generate a `python_requirement` for each entry in `Pipenv.lock`."
+    generated_target_cls = PythonRequirementTarget
+    # Note that this does not have a `dependencies` field.
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ModuleMappingField,
+        TypeStubsModuleMappingField,
+        PipenvSourceField,
+        RequirementsOverrideField,
+    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (PythonRequirementResolveField,)
+
+
+class GenerateFromPipenvRequirementsRequest(GenerateTargetsRequest):
+    generate_from = PipenvRequirementsTargetGenerator
 
 
 # TODO(#10655): add support for PEP 440 direct references (aka VCS style).
 # TODO(#10655): differentiate between Pipfile vs. Pipfile.lock.
-class PipenvRequirements:
-    """Translates a Pipenv.lock file into an equivalent set `python_requirement_library` targets.
+@rule(desc="Generate `python_requirement` targets from Pipfile.lock", level=LogLevel.DEBUG)
+async def generate_from_pipenv_requirement(
+    request: GenerateFromPipenvRequirementsRequest, union_membership: UnionMembership
+) -> GeneratedTargets:
+    generator = request.generator
+    lock_rel_path = generator[PipenvSourceField].value
+    lock_full_path = generator[PipenvSourceField].file_path
+    overrides = {
+        canonicalize_project_name(k): v
+        for k, v in request.require_unparametrized_overrides().items()
+    }
 
-    You may also use the parameter `module_mapping` to teach Pants what modules each of your
-    requirements provide. For any requirement unspecified, Pants will default to the name of the
-    requirement. This setting is important for Pants to know how to convert your import
-    statements back into your dependencies. For example:
+    file_tgt = TargetGeneratorSourcesHelperTarget(
+        {TargetGeneratorSourcesHelperSourcesField.alias: lock_rel_path},
+        Address(
+            request.template_address.spec_path,
+            target_name=request.template_address.target_name,
+            relative_file_path=lock_rel_path,
+        ),
+        union_membership,
+    )
 
-        pipenv_requirements(
-          module_mapping={
-            "ansicolors": ["colors"],
-            "setuptools": ["pkg_resources"],
-          }
+    digest_contents = await Get(
+        DigestContents,
+        PathGlobs(
+            [lock_full_path],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"{generator}'s field `{PipenvSourceField.alias}`",
+        ),
+    )
+
+    module_mapping = generator[ModuleMappingField].value
+    stubs_mapping = generator[TypeStubsModuleMappingField].value
+
+    def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:
+        normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
+        tgt_overrides = overrides.pop(normalized_proj_name, {})
+        if Dependencies.alias in tgt_overrides:
+            tgt_overrides[Dependencies.alias] = list(tgt_overrides[Dependencies.alias]) + [
+                file_tgt.address.spec
+            ]
+
+        return PythonRequirementTarget(
+            {
+                **request.template,
+                PythonRequirementsField.alias: [parsed_req],
+                PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
+                PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
+                    normalized_proj_name
+                ),
+                # This may get overridden by `tgt_overrides`, which will have already added in
+                # the file tgt.
+                Dependencies.alias: [file_tgt.address.spec],
+                **tgt_overrides,
+            },
+            request.template_address.create_generated(parsed_req.project_name),
+            union_membership,
         )
-    """
 
-    def __init__(self, parse_context):
-        self._parse_context = parse_context
+    reqs = parse_pipenv_requirements(digest_contents[0].content)
+    result = tuple(generate_tgt(req) for req in reqs) + (file_tgt,)
 
-    def __call__(
-        self,
-        requirements_relpath: str = "Pipfile.lock",
-        module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
-        pipfile_target: Optional[str] = None,
-    ) -> None:
-        """
-        :param requirements_relpath: The relpath from this BUILD file to the requirements file.
-            Defaults to a `Pipfile.lock` file sibling to the BUILD file.
-        :param module_mapping: a mapping of requirement names to a list of the modules they provide.
-            For example, `{"ansicolors": ["colors"]}`. Any unspecified requirements will use the
-            requirement name as the default module, e.g. "Django" will default to
-            `modules=["django"]`.
-        :param pipfile_target: a `_python_requirements_file` target to provide for cache invalidation
-        if the requirements_relpath value is not in the current rel_path
-        """
-
-        requirements_path = Path(
-            get_buildroot(), self._parse_context.rel_path, requirements_relpath
+    if overrides:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                Unused key in the `overrides` field for {request.template_address}:
+                {sorted(overrides)}
+                """
+            )
         )
-        lock_info = json.loads(requirements_path.read_text())
 
-        if pipfile_target:
-            requirements_dep = pipfile_target
-        else:
-            requirements_file_target_name = requirements_relpath
-            self._parse_context.create_object(
-                "_python_requirements_file",
-                name=requirements_file_target_name,
-                sources=[requirements_relpath],
-            )
-            requirements_dep = f":{requirements_file_target_name}"
+    return GeneratedTargets(generator, result)
 
-        requirements = {**lock_info.get("default", {}), **lock_info.get("develop", {})}
-        for req, info in requirements.items():
-            extras = [x for x in info.get("extras", [])]
-            extras_str = f"[{','.join(extras)}]" if extras else ""
-            req_str = f"{req}{extras_str}{info.get('version','')}"
-            if info.get("markers"):
-                req_str += f";{info['markers']}"
 
-            parsed_req = Requirement.parse(req_str)
+def parse_pipenv_requirements(file_contents: bytes) -> tuple[PipRequirement, ...]:
+    lock_info = json.loads(file_contents)
 
-            req_module_mapping = (
-                {parsed_req.project_name: module_mapping[parsed_req.project_name]}
-                if module_mapping and parsed_req.project_name in module_mapping
-                else None
-            )
+    def _parse_pipenv_requirement(raw_req: str, info: dict) -> PipRequirement:
+        if info.get("extras"):
+            raw_req += f"[{','.join(info['extras'])}]"
+        raw_req += info.get("version", "")
+        if info.get("markers"):
+            raw_req += f";{info['markers']}"
 
-            self._parse_context.create_object(
-                "python_requirement_library",
-                name=parsed_req.project_name,
-                requirements=[parsed_req],
-                dependencies=[requirements_dep],
-                module_mapping=req_module_mapping,
-            )
+        return PipRequirement.parse(raw_req)
+
+    return tuple(
+        _parse_pipenv_requirement(req, info)
+        for req, info in {**lock_info.get("default", {}), **lock_info.get("develop", {})}.items()
+    )
+
+
+def rules():
+    return (
+        *collect_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateFromPipenvRequirementsRequest),
+    )

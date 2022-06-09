@@ -7,25 +7,18 @@ import re
 from textwrap import dedent
 
 from pants.backend.project_info.list_targets import ListSubsystem, list_targets
-from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.engine.addresses import Address, Addresses
-from pants.engine.target import DescriptionField, ProvidesField, Target, UnexpandedTargets
+from pants.engine.target import DescriptionField, Target, UnexpandedTargets
 from pants.testutil.option_util import create_goal_subsystem, create_options_bootstrapper
 from pants.testutil.rule_runner import MockGet, mock_console, run_rule_with_mocks
 
 
 class MockTarget(Target):
     alias = "tgt"
-    core_fields = (DescriptionField, ProvidesField)
+    core_fields = (DescriptionField,)
 
 
-def run_goal(
-    targets: list[MockTarget],
-    *,
-    show_documented: bool = False,
-    show_provides: bool = False,
-    provides_columns: str | None = None,
-) -> tuple[str, str]:
+def run_goal(targets: list[MockTarget], *, show_documented: bool = False) -> tuple[str, str]:
     with mock_console(create_options_bootstrapper()) as (console, stdio_reader):
         run_rule_with_mocks(
             list_targets,
@@ -36,7 +29,6 @@ def run_goal(
                     sep="\\n",
                     output_file=None,
                     documented=show_documented,
-                    provides=show_provides,
                 ),
                 console,
             ],
@@ -52,14 +44,20 @@ def run_goal(
 
 
 def test_list_normal() -> None:
-    # Note that these are unsorted.
-    target_names = ("t3", "t2", "t1")
-    stdout, _ = run_goal([MockTarget({}, Address("", target_name=name)) for name in target_names])
+    # Note that these are unsorted and that we include generated targets.
+    addresses = (
+        Address("", target_name="t2"),
+        Address("", target_name="t1"),
+        Address("", target_name="gen", relative_file_path="f.ext"),
+        Address("", target_name="gen", generated_name="foo"),
+    )
+    stdout, _ = run_goal([MockTarget({}, addr) for addr in addresses])
     assert stdout == dedent(
         """\
+        //:gen#foo
         //:t1
         //:t2
-        //:t3
+        //f.ext:gen
         """
     )
 
@@ -87,13 +85,3 @@ def test_list_documented() -> None:
           \tThis target is the best.
         """
     )
-
-
-def test_list_provides() -> None:
-    sample_artifact = PythonArtifact(name="project.demo")
-    targets = [
-        MockTarget({ProvidesField.alias: sample_artifact}, Address("", target_name="provided")),
-        MockTarget({}, Address("", target_name="not_provided")),
-    ]
-    stdout, _ = run_goal(targets, show_provides=True)
-    assert stdout.strip() == f"//:provided {sample_artifact}"

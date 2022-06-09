@@ -1,18 +1,17 @@
-# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
 
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Any, Iterable
 
 import pytest
 from packaging.version import Version
-from pkg_resources import Requirement
 
+from pants.backend.python.macros import poetry_requirements
 from pants.backend.python.macros.poetry_requirements import (
-    PoetryRequirements,
+    PoetryRequirementsTargetGenerator,
     PyprojectAttr,
     PyProjectToml,
     add_markers,
@@ -23,12 +22,18 @@ from pants.backend.python.macros.poetry_requirements import (
     parse_single_dependency,
     parse_str_version,
 )
-from pants.backend.python.target_types import PythonRequirementLibrary, PythonRequirementsFile
-from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
+from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.target_types import PythonRequirementTarget
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
-from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import Targets
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
+from pants.engine.target import Target
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.util.strutil import softwrap
+
+# ---------------------------------------------------------------------------------
+# pyproject.toml parsing
+# ---------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -67,6 +72,21 @@ def test_caret(test, exp) -> None:
 def test_max_tilde(test, exp) -> None:
     version = Version(test)
     assert get_max_tilde(version) == exp
+
+
+@pytest.mark.parametrize(
+    "test, exp",
+    [
+        ("*", ""),
+        ("1.*", ">=1.0,<2.0.0"),
+        ("1.2.*", ">=1.2.0,<1.3.0"),
+    ],
+)
+def test_wildcard(test, exp) -> None:
+    assert (
+        parse_str_version(test, proj_name="foo", file_path="", extras_str="")
+        == f"foo {exp}".rstrip()
+    )
 
 
 @pytest.mark.parametrize(
@@ -111,9 +131,11 @@ def test_add_markers() -> None:
     attr_adv_py_both = PyprojectAttr(
         {"python": "^3.6", "markers": "platform_python_implementation == 'CPython'"}
     )
-    assert add_markers("foo==1.0.0", attr_adv_py_both, "somepath") == (
-        "foo==1.0.0;(platform_python_implementation == 'CPython') and "
-        "(python_version >= '3.6' and python_version< '4.0')"
+    assert add_markers("foo==1.0.0", attr_adv_py_both, "somepath") == softwrap(
+        """
+        foo==1.0.0;(platform_python_implementation == 'CPython') and
+        (python_version >= '3.6' and python_version< '4.0')
+        """
     )
 
     attr_adv_both = PyprojectAttr(
@@ -122,9 +144,11 @@ def test_add_markers() -> None:
             "markers": "platform_python_implementation == 'CPython' or sys_platform == 'win32'",
         }
     )
-    assert add_markers("foo==1.0.0", attr_adv_both, "somepath") == (
-        "foo==1.0.0;(platform_python_implementation == 'CPython' or "
-        "sys_platform == 'win32') and (python_version >= '3.6' and python_version< '4.0')"
+    assert add_markers("foo==1.0.0", attr_adv_both, "somepath") == softwrap(
+        """
+        foo==1.0.0;(platform_python_implementation == 'CPython' or
+        sys_platform == 'win32') and (python_version >= '3.6' and python_version< '4.0')
+        """
     )
 
 
@@ -189,6 +213,14 @@ def test_handle_git(empty_pyproject_toml: PyProjectToml) -> None:
             }
         ),
         "@main;(platform_python_implementation == 'CPython') and (python_version == '3.6')",
+    )
+
+
+def test_handle_git_ssh(empty_pyproject_toml: PyProjectToml) -> None:
+    attr = PyprojectAttr({"git": "git@github.com:requests/requests.git"})
+    assert (
+        handle_dict_attr("requests", attr, empty_pyproject_toml)
+        == "requests @ git+ssh://git@github.com/requests/requests.git"
     )
 
 
@@ -293,9 +325,11 @@ def test_py_constraints(empty_pyproject_toml: PyProjectToml) -> None:
     )
     assert_py_constraints(
         "~3.6 || ^3.7",
-        (
-            "((python_version >= '3.6' and python_version< '3.7') or "
-            "(python_version >= '3.7' and python_version< '4.0'))"
+        softwrap(
+            """
+            ((python_version >= '3.6' and python_version< '3.7') or
+            (python_version >= '3.7' and python_version< '4.0'))
+            """
         ),
     )
 
@@ -304,8 +338,8 @@ def test_multi_version_const(empty_pyproject_toml: PyProjectToml) -> None:
     lst_attr = [{"version": "1.2.3", "python": "3.6"}, {"version": "1.2.4", "python": "3.7"}]
     retval = tuple(parse_single_dependency("foo", lst_attr, empty_pyproject_toml))
     actual_reqs = (
-        Requirement.parse("foo ==1.2.3; python_version == '3.6'"),
-        Requirement.parse("foo ==1.2.4; python_version == '3.7'"),
+        PipRequirement.parse("foo ==1.2.3; python_version == '3.6'"),
+        PipRequirement.parse("foo ==1.2.4; python_version == '3.7'"),
     )
     assert retval == actual_reqs
 
@@ -322,9 +356,13 @@ def test_extended_form() -> None:
     pyproject_toml_black = create_pyproject_toml(toml_contents=toml_black_str)
     retval = parse_pyproject_toml(pyproject_toml_black)
     actual_req = {
-        Requirement.parse(
-            "black==19.10b0; "
-            'platform_python_implementation == "CPython" and python_version == "3.6"'
+        PipRequirement.parse(
+            softwrap(
+                """
+                black==19.10b0;
+                platform_python_implementation == "CPython" and python_version == "3.6"
+                """
+            )
         )
     }
     assert retval == actual_req
@@ -351,6 +389,9 @@ def test_parse_multi_reqs() -> None:
 
     [tool.poetry.group.mygroup.dependencies]
     myrequirement = "1.2.3"
+    awildcard = "6.7.*"
+    anotherwildcard = "44.*"
+    aglobalwildcard = "*"
 
     [tool.poetry.group.mygroup2.dependencies]
     myrequirement2 = "1.2.3"
@@ -365,28 +406,42 @@ def test_parse_multi_reqs() -> None:
     pyproject_toml = create_pyproject_toml(toml_contents=toml_str)
     retval = parse_pyproject_toml(pyproject_toml)
     actual_reqs = {
-        Requirement.parse("junk[security]@ https://github.com/myrepo/junk.whl"),
-        Requirement.parse("myrequirement==1.2.3"),
-        Requirement.parse("myrequirement2==1.2.3"),
-        Requirement.parse("poetry@ git+https://github.com/python-poetry/poetry.git@v1.1.1"),
-        Requirement.parse('requests[security, random]<3.0.0,>=2.25.1; python_version > "2.7"'),
-        Requirement.parse('foo>=1.9; python_version >= "2.7" and python_version < "3.0"'),
-        Requirement.parse('foo<3.0.0,>=2.0; python_version == "3.4" or python_version == "3.5"'),
-        Requirement.parse(
-            "black==19.10b0; "
-            'platform_python_implementation == "CPython" and python_version == "3.6"'
+        PipRequirement.parse("junk[security]@ https://github.com/myrepo/junk.whl"),
+        PipRequirement.parse("myrequirement==1.2.3"),
+        PipRequirement.parse("awildcard>=6.7.0,<6.8.0"),
+        PipRequirement.parse("anotherwildcard>=44.0,<45.0.0"),
+        PipRequirement.parse("aglobalwildcard"),
+        PipRequirement.parse("myrequirement2==1.2.3"),
+        PipRequirement.parse("poetry@ git+https://github.com/python-poetry/poetry.git@v1.1.1"),
+        PipRequirement.parse('requests[security, random]<3.0.0,>=2.25.1; python_version > "2.7"'),
+        PipRequirement.parse('foo>=1.9; python_version >= "2.7" and python_version < "3.0"'),
+        PipRequirement.parse('foo<3.0.0,>=2.0; python_version == "3.4" or python_version == "3.5"'),
+        PipRequirement.parse(
+            softwrap(
+                """
+                black==19.10b0;
+                platform_python_implementation == "CPython" and python_version == "3.6"
+                """
+            ).strip()
         ),
-        Requirement.parse("isort<5.6,>=5.5.1"),
+        PipRequirement.parse("isort<5.6,>=5.5.1"),
     }
     assert retval == actual_reqs
+
+
+# ---------------------------------------------------------------------------------
+# Target generator
+# ---------------------------------------------------------------------------------
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[QueryRule(Targets, (Specs,))],
-        target_types=[PythonRequirementLibrary, PythonRequirementsFile],
-        context_aware_object_factories={"poetry_requirements": PoetryRequirements},
+        rules=[
+            *poetry_requirements.rules(),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
+        ],
+        target_types=[PoetryRequirementsTargetGenerator],
     )
 
 
@@ -395,32 +450,39 @@ def assert_poetry_requirements(
     build_file_entry: str,
     pyproject_toml: str,
     *,
-    expected_file_dep: PythonRequirementsFile,
-    expected_targets: Iterable[PythonRequirementLibrary],
+    expected_targets: set[Target],
     pyproject_toml_relpath: str = "pyproject.toml",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, pyproject_toml_relpath: pyproject_toml})
-    targets = rule_runner.request(
-        Targets,
-        [Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([]))],
+    result = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="reqs"), description_of_origin="tests"
+            )
+        ],
     )
-    assert {expected_file_dep, *expected_targets} == set(targets)
+    assert set(result.parametrizations.values()) == expected_targets
 
 
 def test_pyproject_toml(rule_runner: RuleRunner) -> None:
-    """This tests that we correctly create a new python_requirement_library for each entry in a
+    """This tests that we correctly create a new python_requirement for each entry in a
     pyproject.toml file.
 
     Note that this just ensures proper targets are created; see prior tests for specific parsing
     edge cases.
     """
+    file_addr = Address("", target_name="reqs", relative_file_path="pyproject.toml")
     assert_poetry_requirements(
         rule_runner,
         dedent(
             """\
             poetry_requirements(
-                module_mapping={'ansicolors': ['colors']},
+                name="reqs",
+                # module_mapping should work regardless of capitalization.
+                module_mapping={'ansiCOLORS': ['colors']},
                 type_stubs_module_mapping={'Django-types': ['django']},
+                overrides={"Django": {"dependencies": ["#Django-types"]}},
             )
             """
         ),
@@ -434,49 +496,47 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             ansicolors = ">=1.18.0"
             """
         ),
-        expected_file_dep=PythonRequirementsFile(
-            {"sources": ["pyproject.toml"]},
-            address=Address("", target_name="pyproject.toml"),
-        ),
-        expected_targets=[
-            PythonRequirementLibrary(
+        expected_targets={
+            PythonRequirementTarget(
                 {
-                    "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
-                    "module_mapping": {"ansicolors": ["colors"]},
+                    "dependencies": [file_addr.spec],
+                    "requirements": ["ansicolors>=1.18.0"],
+                    "modules": ["colors"],
                 },
-                address=Address("", target_name="ansicolors"),
+                address=Address("", target_name="reqs", generated_name="ansicolors"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
-                    "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("Django==3.2 ; python_version == '3'")],
+                    "dependencies": ["#Django-types", file_addr.spec],
+                    "requirements": ["Django==3.2 ; python_version == '3'"],
                 },
-                address=Address("", target_name="Django"),
+                address=Address("", target_name="reqs", generated_name="Django"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
-                    "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("Django-types==2")],
-                    "type_stubs_module_mapping": {"Django-types": ["django"]},
+                    "dependencies": [file_addr.spec],
+                    "requirements": ["Django-types==2"],
+                    "type_stub_modules": ["django"],
                 },
-                address=Address("", target_name="Django-types"),
+                address=Address("", target_name="reqs", generated_name="Django-types"),
             ),
-            PythonRequirementLibrary(
+            PythonRequirementTarget(
                 {
-                    "dependencies": [":pyproject.toml"],
-                    "requirements": [Requirement.parse("Un_Normalized_PROJECT == 1.0.0")],
+                    "dependencies": [file_addr.spec],
+                    "requirements": ["Un_Normalized_PROJECT == 1.0.0"],
                 },
-                address=Address("", target_name="Un-Normalized-PROJECT"),
+                address=Address("", target_name="reqs", generated_name="Un-Normalized-PROJECT"),
             ),
-        ],
+            TargetGeneratorSourcesHelperTarget({"source": "pyproject.toml"}, file_addr),
+        },
     )
 
 
-def test_relpath_override(rule_runner: RuleRunner) -> None:
+def test_source_override(rule_runner: RuleRunner) -> None:
+    file_addr = Address("", target_name="reqs", relative_file_path="subdir/pyproject.toml")
     assert_poetry_requirements(
         rule_runner,
-        "poetry_requirements(pyproject_toml_relpath='subdir/pyproject.toml')",
+        "poetry_requirements(name='reqs', source='subdir/pyproject.toml')",
         dedent(
             """\
             [tool.poetry.dependencies]
@@ -485,108 +545,78 @@ def test_relpath_override(rule_runner: RuleRunner) -> None:
             """
         ),
         pyproject_toml_relpath="subdir/pyproject.toml",
-        expected_file_dep=PythonRequirementsFile(
-            {"sources": ["subdir/pyproject.toml"]},
-            address=Address("", target_name="subdir_pyproject.toml"),
-        ),
-        expected_targets=[
-            PythonRequirementLibrary(
-                {
-                    "dependencies": [":subdir_pyproject.toml"],
-                    "requirements": [Requirement.parse("ansicolors>=1.18.0")],
-                },
-                address=Address("", target_name="ansicolors"),
+        expected_targets={
+            PythonRequirementTarget(
+                {"dependencies": [file_addr.spec], "requirements": ["ansicolors>=1.18.0"]},
+                address=Address("", target_name="reqs", generated_name="ansicolors"),
             ),
-        ],
+            TargetGeneratorSourcesHelperTarget({"source": "subdir/pyproject.toml"}, file_addr),
+        },
     )
 
 
-def test_non_pep440_error(rule_runner: RuleRunner, caplog: Any) -> None:
-    with pytest.raises(ExecutionError) as exc:
+def test_non_pep440_error(rule_runner: RuleRunner) -> None:
+    with engine_error(contains='Failed to parse requirement foo = "~r62b" in pyproject.toml'):
         assert_poetry_requirements(
             rule_runner,
-            "poetry_requirements()",
+            "poetry_requirements(name='reqs')",
             """
             [tool.poetry.dependencies]
             foo = "~r62b"
             [tool.poetry.dev-dependencies]
             """,
-            expected_file_dep=PythonRequirementsFile(
-                {"sources": ["pyproject.toml"]},
-                address=Address("", target_name="pyproject.toml"),
-            ),
-            expected_targets=[],
+            expected_targets=set(),
         )
-    assert 'Failed to parse requirement foo = "~r62b" in pyproject.toml' in str(exc.value)
 
 
-def test_no_req_defined_warning(rule_runner: RuleRunner, caplog: Any) -> None:
+def test_no_req_defined_warning(rule_runner: RuleRunner, caplog) -> None:
     assert_poetry_requirements(
         rule_runner,
-        "poetry_requirements()",
+        "poetry_requirements(name='reqs')",
         """
         [tool.poetry.dependencies]
         [tool.poetry.dev-dependencies]
         """,
-        expected_file_dep=PythonRequirementsFile(
-            {"sources": ["pyproject.toml"]},
-            address=Address("", target_name="pyproject.toml"),
-        ),
-        expected_targets=[],
+        expected_targets={
+            TargetGeneratorSourcesHelperTarget(
+                {"source": "pyproject.toml"},
+                Address("", target_name="reqs", relative_file_path="pyproject.toml"),
+            )
+        },
     )
     assert "No requirements defined" in caplog.text
 
 
 def test_bad_dict_format(rule_runner: RuleRunner) -> None:
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains="not formatted correctly; at"):
         assert_poetry_requirements(
             rule_runner,
-            "poetry_requirements()",
+            "poetry_requirements(name='reqs')",
             """
             [tool.poetry.dependencies]
             foo = {bad_req = "test"}
             [tool.poetry.dev-dependencies]
             """,
-            expected_file_dep=PythonRequirementsFile(
-                {"sources": ["pyproject.toml"]},
-                address=Address("", target_name="pyproject.toml"),
-            ),
-            expected_targets=[],
+            expected_targets=set(),
         )
-    assert "not formatted correctly; at" in str(exc.value)
 
 
 def test_bad_req_type(rule_runner: RuleRunner) -> None:
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains="was of type int"):
         assert_poetry_requirements(
             rule_runner,
-            "poetry_requirements()",
+            "poetry_requirements(name='reqs')",
             """
             [tool.poetry.dependencies]
             foo = 4
             [tool.poetry.dev-dependencies]
             """,
-            expected_file_dep=PythonRequirementsFile(
-                {"sources": ["pyproject.toml"]},
-                address=Address("", target_name="pyproject.toml"),
-            ),
-            expected_targets=[],
+            expected_targets=set(),
         )
-    assert "was of type int" in str(exc.value)
 
 
 def test_no_tool_poetry(rule_runner: RuleRunner) -> None:
-    with pytest.raises(ExecutionError) as exc:
+    with engine_error(contains="`tool.poetry` found in pyproject.toml"):
         assert_poetry_requirements(
-            rule_runner,
-            "poetry_requirements()",
-            """
-            foo = 4
-            """,
-            expected_file_dep=PythonRequirementsFile(
-                {"sources": ["pyproject.toml"]},
-                address=Address("", target_name="pyproject.toml"),
-            ),
-            expected_targets=[],
+            rule_runner, "poetry_requirements(name='reqs')", "foo = 4", expected_targets=set()
         )
-    assert "`tool.poetry` found in pyproject.toml" in str(exc.value)

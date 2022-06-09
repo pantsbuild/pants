@@ -1,12 +1,18 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library()
+resource(name="lockfile", source="yapf.lock")
+
+python_sources(
+    overrides={"subsystem.py": {"dependencies": [":lockfile"]}},
+)
 
 python_tests(
-    name="rules_integration_test",
-    sources=["rules_integration_test.py"],
-    timeout=120,
-    # We want to make sure the default lockfile works for both macOS and Linux.
-    tags=["platform_specific_behavior"],
+    name="tests",
+    overrides={
+        "rules_integration_test.py": {
+            "timeout": 240,
+            "tags": ["platform_specific_behavior"],
+        }
+    },
 )

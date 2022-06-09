@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,6 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use deepsize::DeepSizeOf;
 use serde_derive::Serialize;
 
 /// A concrete data representation of a duration.
@@ -40,7 +39,7 @@ use serde_derive::Serialize;
 ///
 /// It can be used to represent a timestamp (as a duration since the unix epoch) or simply a
 /// duration between two arbitrary timestamps.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, DeepSizeOf, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub struct Duration {
   /// How many seconds did this `Duration` last?
   pub secs: u64,

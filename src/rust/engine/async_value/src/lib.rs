@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -44,9 +42,7 @@ use tokio::sync::{oneshot, watch};
 #[derive(Debug)]
 pub struct AsyncValue<T: Clone + Send + Sync + 'static> {
   item_receiver: Weak<watch::Receiver<Option<T>>>,
-  // NB: Stored only for drop.
-  #[allow(dead_code)]
-  abort_sender: oneshot::Sender<()>,
+  abort_sender: Option<oneshot::Sender<T>>,
 }
 
 impl<T: Clone + Send + Sync + 'static> AsyncValue<T> {
@@ -57,7 +53,7 @@ impl<T: Clone + Send + Sync + 'static> AsyncValue<T> {
     (
       AsyncValue {
         item_receiver: Arc::downgrade(&item_receiver),
-        abort_sender,
+        abort_sender: Some(abort_sender),
       },
       AsyncValueSender {
         item_sender,
@@ -77,6 +73,14 @@ impl<T: Clone + Send + Sync + 'static> AsyncValue<T> {
       .upgrade()
       .map(|item_receiver| AsyncValueReceiver { item_receiver })
   }
+
+  pub fn try_abort(&mut self, t: T) -> Result<(), T> {
+    if let Some(abort_sender) = self.abort_sender.take() {
+      abort_sender.send(t)
+    } else {
+      Ok(())
+    }
+  }
 }
 
 pub struct AsyncValueReceiver<T: Clone + Send + Sync + 'static> {
@@ -95,6 +99,9 @@ impl<T: Clone + Send + Sync + 'static> AsyncValueReceiver<T> {
         return Some(value.clone());
       }
 
+      // TODO: Remove the `allow` once https://github.com/rust-lang/rust-clippy/issues/8281
+      // is fixed upstream.
+      #[allow(clippy::question_mark)]
       if item_receiver.changed().await.is_err() {
         return None;
       }
@@ -104,7 +111,7 @@ impl<T: Clone + Send + Sync + 'static> AsyncValueReceiver<T> {
 
 pub struct AsyncValueSender<T: Clone + Send + Sync + 'static> {
   item_sender: watch::Sender<Option<T>>,
-  abort_receiver: oneshot::Receiver<()>,
+  abort_receiver: oneshot::Receiver<T>,
 }
 
 impl<T: Clone + Send + Sync + 'static> AsyncValueSender<T> {
@@ -112,10 +119,21 @@ impl<T: Clone + Send + Sync + 'static> AsyncValueSender<T> {
     let _ = self.item_sender.send(Some(item));
   }
 
-  pub async fn closed(&mut self) {
+  pub async fn aborted(&mut self) -> Option<T> {
     tokio::select! {
-      _ = &mut self.abort_receiver => {}
-      _ = self.item_sender.closed() => {}
+      res = &mut self.abort_receiver => {
+        match res {
+          Ok(res) => {
+            // Aborted with a value.
+            Some(res)
+          },
+          Err(_) => {
+            // Was dropped.
+            None
+          },
+        }
+      }
+      _ = self.item_sender.closed() => { None }
     }
   }
 }

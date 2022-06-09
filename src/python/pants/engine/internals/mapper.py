@@ -3,17 +3,19 @@
 
 from __future__ import annotations
 
+import os.path
 import re
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, Mapping, Optional, Pattern, Tuple
+from typing import Iterable, Mapping
 
+from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.util.filtering import and_filters, create_filters
+from pants.engine.target import RegisteredTargetTypes, Tags, Target
+from pants.util.filtering import TargetFilter, and_filters, create_filters
 from pants.util.memo import memoized_property
-from pants.util.meta import frozen_after_init
 
 
 class DuplicateNameError(MappingError):
@@ -25,7 +27,7 @@ class AddressMap:
     """Maps target adaptors from a byte source."""
 
     path: str
-    name_to_target_adaptor: Dict[str, TargetAdaptor]
+    name_to_target_adaptor: dict[str, TargetAdaptor]
 
     @classmethod
     def parse(
@@ -43,10 +45,10 @@ class AddressMap:
         try:
             target_adaptors = parser.parse(filepath, build_file_content, extra_symbols)
         except Exception as e:
-            raise MappingError(f"Failed to parse {filepath}:\n{e}")
-        name_to_target_adaptors: Dict[str, TargetAdaptor] = {}
+            raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
+        name_to_target_adaptors: dict[str, TargetAdaptor] = {}
         for target_adaptor in target_adaptors:
-            name = target_adaptor.name
+            name = target_adaptor.name or os.path.basename(os.path.dirname(filepath))
             if name in name_to_target_adaptors:
                 duplicate = name_to_target_adaptors[name]
                 raise DuplicateNameError(
@@ -78,7 +80,7 @@ class AddressFamily:
 
     # The directory from which the adaptors were parsed.
     namespace: str
-    name_to_target_adaptors: Dict[str, Tuple[str, TargetAdaptor]]
+    name_to_target_adaptors: dict[str, tuple[str, TargetAdaptor]]
 
     @classmethod
     def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> AddressFamily:
@@ -97,7 +99,7 @@ class AddressFamily:
                     f"but received: {address_map.path!r}"
                 )
 
-        name_to_target_adaptors: Dict[str, Tuple[str, TargetAdaptor]] = {}
+        name_to_target_adaptors: dict[str, tuple[str, TargetAdaptor]] = {}
         for address_map in address_maps:
             for name, target_adaptor in address_map.name_to_target_adaptor.items():
                 if name in name_to_target_adaptors:
@@ -121,7 +123,7 @@ class AddressFamily:
         }
 
     @memoized_property
-    def build_file_addresses(self) -> Tuple[BuildFileAddress, ...]:
+    def build_file_addresses(self) -> tuple[BuildFileAddress, ...]:
         return tuple(
             BuildFileAddress(
                 rel_path=path, address=Address(spec_path=self.namespace, target_name=name)
@@ -130,10 +132,10 @@ class AddressFamily:
         )
 
     @property
-    def target_names(self) -> Tuple[str, ...]:
+    def target_names(self) -> tuple[str, ...]:
         return tuple(addr.target_name for addr in self.addresses_to_target_adaptors)
 
-    def get_target_adaptor(self, address: Address) -> Optional[TargetAdaptor]:
+    def get_target_adaptor(self, address: Address) -> TargetAdaptor | None:
         assert address.spec_path == self.namespace
         entry = self.name_to_target_adaptors.get(address.target_name)
         if entry is None:
@@ -151,44 +153,50 @@ class AddressFamily:
         )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class AddressSpecsFilter:
-    """Filters addresses with the `--tags` and `--exclude-target-regexp` options."""
+@dataclass(frozen=True)
+class SpecsFilter:
+    """Filters targets with the `--tags`, `--exclude-target-regexp`, and `[filter]` subsystem
+    options."""
 
-    tags: Tuple[str, ...]
-    exclude_target_regexps: Tuple[str, ...]
+    is_specified: bool
+    filter_subsystem_filter: TargetFilter
+    tags_filter: TargetFilter
+    exclude_target_regexps_filter: TargetFilter
 
-    def __init__(
-        self,
+    @classmethod
+    def create(
+        cls,
+        filter_subsystem: FilterSubsystem,
+        registered_target_types: RegisteredTargetTypes,
         *,
-        tags: Optional[Iterable[str]] = None,
-        exclude_target_regexps: Optional[Iterable[str]] = None,
-    ) -> None:
-        self.tags = tuple(tags or [])
-        self.exclude_target_regexps = tuple(exclude_target_regexps or [])
+        tags: Iterable[str],
+        exclude_target_regexps: Iterable[str],
+    ) -> SpecsFilter:
+        exclude_patterns = tuple(re.compile(pattern) for pattern in exclude_target_regexps)
 
-    @memoized_property
-    def _exclude_regexps(self) -> Tuple[Pattern, ...]:
-        return tuple(re.compile(pattern) for pattern in self.exclude_target_regexps)
+        def exclude_target_regexps_filter(tgt: Target) -> bool:
+            return all(p.search(tgt.address.spec) is None for p in exclude_patterns)
 
-    def _is_excluded_by_pattern(self, address: Address) -> bool:
-        return any(p.search(address.spec) is not None for p in self._exclude_regexps)
+        def tags_outer_filter(tag: str) -> TargetFilter:
+            def tags_inner_filter(tgt: Target) -> bool:
+                return tag in (tgt.get(Tags).value or [])
 
-    @memoized_property
-    def _tag_filter(self):
-        def filter_for_tag(tag: str) -> Callable[[TargetAdaptor], bool]:
-            def filter_target(tgt: TargetAdaptor) -> bool:
-                # `tags` can sometimes be explicitly set to `None`. We convert that to an empty list
-                # with `or`.
-                tags = tgt.kwargs.get("tags", []) or []
-                return tag in [str(t_tag) for t_tag in tags]
+            return tags_inner_filter
 
-            return filter_target
+        tags_filter = and_filters(create_filters(tags, tags_outer_filter))
 
-        return and_filters(create_filters(self.tags, filter_for_tag))
+        return SpecsFilter(
+            is_specified=bool(filter_subsystem.is_specified() or tags or exclude_target_regexps),
+            filter_subsystem_filter=filter_subsystem.all_filters(registered_target_types),
+            tags_filter=tags_filter,
+            exclude_target_regexps_filter=exclude_target_regexps_filter,
+        )
 
-    def matches(self, address: Address, target: TargetAdaptor) -> bool:
-        """Check that the target matches the provided `--tags` and `--exclude-target-regexp`
+    def matches(self, target: Target) -> bool:
+        """Check that the target matches the provided `--tag` and `--exclude-target-regexp`
         options."""
-        return self._tag_filter(target) and not self._is_excluded_by_pattern(address)
+        return (
+            self.tags_filter(target)
+            and self.filter_subsystem_filter(target)
+            and self.exclude_target_regexps_filter(target)
+        )

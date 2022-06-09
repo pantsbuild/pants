@@ -5,30 +5,32 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use fs::RelativePath;
+use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
 use maplit::hashset;
 use mock::{StubActionCache, StubCAS};
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ActionResult;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use tokio::time::sleep;
-use workunit_store::{RunningWorkunit, WorkunitStore};
+use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  MultiPlatformProcess, Platform, Process, ProcessMetadata, ProcessResultMetadata,
-  ProcessResultSource, RemoteCacheWarningsBehavior,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
+  Process, ProcessError, ProcessMetadata, ProcessResultMetadata, ProcessResultSource,
+  RemoteCacheWarningsBehavior,
 };
+
+const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// A mock of the local runner used for better hermeticity of the tests.
 #[derive(Clone)]
 struct MockLocalCommandRunner {
-  result: Result<FallibleProcessResultWithPlatform, String>,
+  result: Result<FallibleProcessResultWithPlatform, ProcessError>,
   call_counter: Arc<AtomicUsize>,
   delay: Duration,
 }
@@ -44,9 +46,9 @@ impl MockLocalCommandRunner {
         stdout_digest: EMPTY_DIGEST,
         stderr_digest: EMPTY_DIGEST,
         exit_code,
-        output_directory: EMPTY_DIGEST,
+        output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
         platform: Platform::current().unwrap(),
-        metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally),
+        metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally, RunId(0)),
       }),
       call_counter,
       delay: Duration::from_millis(delay_ms),
@@ -60,15 +62,11 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
     &self,
     _context: Context,
     _workunit: &mut RunningWorkunit,
-    _req: MultiPlatformProcess,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    _req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     sleep(self.delay).await;
     self.call_counter.fetch_add(1, Ordering::SeqCst);
     self.result.clone()
-  }
-
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    Some(req.0.get(&None).unwrap().clone())
   }
 }
 
@@ -146,6 +144,7 @@ fn create_cached_runner(
       RemoteCacheWarningsBehavior::FirstOnly,
       eager_fetch,
       256,
+      CACHE_READ_TIMEOUT,
     )
     .expect("caching command runner"),
   );
@@ -154,8 +153,7 @@ fn create_cached_runner(
 
 async fn create_process(store: &Store) -> (Process, Digest) {
   let process = Process::new(vec![
-    testutil::path::find_bash(),
-    "echo -n hello world".to_string(),
+    "this process will not execute: see MockLocalCommandRunner".to_string(),
   ]);
   let (action, command, _exec_request) =
     make_execute_request(&process, ProcessMetadata::default()).unwrap();
@@ -203,24 +201,69 @@ async fn cache_read_success() {
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
 }
 
-/// If the cache has any issues during reads, we should gracefully fallback to the local runner.
+/// If the cache has any issues during reads from the action cache, we should gracefully fallback
+/// to the local runner.
 #[tokio::test]
-async fn cache_read_skipped_on_errors() {
-  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+async fn cache_read_skipped_on_action_cache_errors() {
+  let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
-  let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
+  let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
   let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
 
   let (process, action_digest) = create_process(&store_setup.store).await;
   insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
   action_cache.always_errors.store(true, Ordering::SeqCst);
 
+  assert_eq!(
+    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    None
+  );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
     .run(Context::default(), &mut workunit, process.clone().into())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
+  assert_eq!(
+    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    Some(&1)
+  );
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
+}
+
+/// If the cache has any issues during reads from the store during eager_fetch, we should gracefully
+/// fallback to the local runner.
+#[tokio::test]
+async fn cache_read_skipped_on_store_errors() {
+  let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
+  let store_setup = StoreSetup::new();
+  let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
+  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, true);
+
+  // Claim that the process has a non-empty and not-persisted stdout digest.
+  let (process, action_digest) = create_process(&store_setup.store).await;
+  insert_into_action_cache(
+    &action_cache,
+    &action_digest,
+    0,
+    Digest::of_bytes("pigs flying".as_bytes()),
+    EMPTY_DIGEST,
+  );
+
+  assert_eq!(
+    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    None
+  );
+  assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
+  let remote_result = cache_runner
+    .run(Context::default(), &mut workunit, process.clone().into())
+    .await
+    .unwrap();
+  assert_eq!(remote_result.exit_code, 1);
+  assert_eq!(
+    workunit_store.get_metrics().get("remote_cache_read_errors"),
+    Some(&1)
+  );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
 }
 
@@ -413,25 +456,12 @@ async fn make_tree_from_directory() {
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
     .expect("Error saving file bytes");
-  store
-    .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .await
-    .expect("Error saving directory");
-  store
-    .record_directory(&TestDirectory::nested().directory(), true)
-    .await
-    .expect("Error saving directory");
-  let directory_digest = store
-    .record_directory(&TestDirectory::double_nested().directory(), true)
-    .await
-    .expect("Error saving directory");
+  let input_tree = TestTree::double_nested();
 
-  let tree = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
-    directory_digest,
+  let (tree, file_digests) = crate::remote_cache::CommandRunner::make_tree_for_output_directory(
+    &input_tree.digest_trie(),
     RelativePath::new("pets").unwrap(),
-    &store,
   )
-  .await
   .unwrap()
   .unwrap();
 
@@ -453,25 +483,22 @@ async fn make_tree_from_directory() {
   assert_eq!(file_node.name, "roland.ext");
   let file_digest: Digest = file_node.digest.as_ref().unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
+  assert_eq!(file_digests, vec![TestData::roland().digest()]);
 
   // Test that extracting non-existent output directories fails gracefully.
   assert!(
     crate::remote_cache::CommandRunner::make_tree_for_output_directory(
-      directory_digest,
+      &input_tree.digest_trie(),
       RelativePath::new("animals").unwrap(),
-      &store,
     )
-    .await
     .unwrap()
     .is_none()
   );
   assert!(
     crate::remote_cache::CommandRunner::make_tree_for_output_directory(
-      directory_digest,
+      &input_tree.digest_trie(),
       RelativePath::new("pets/xyzzy").unwrap(),
-      &store,
     )
-    .await
     .unwrap()
     .is_none()
   );
@@ -487,55 +514,41 @@ async fn extract_output_file() {
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
     .expect("Error saving file bytes");
-  store
-    .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .await
-    .expect("Error saving directory");
-  let directory_digest = store
-    .record_directory(&TestDirectory::nested().directory(), true)
-    .await
-    .expect("Error saving directory");
+  let input_tree = TestTree::nested();
 
-  let file_node = crate::remote_cache::CommandRunner::extract_output_file(
-    directory_digest,
-    RelativePath::new("cats/roland.ext").unwrap(),
-    &store,
+  let output_file = crate::remote_cache::CommandRunner::extract_output_file(
+    &input_tree.digest_trie(),
+    "cats/roland.ext",
   )
-  .await
   .unwrap()
   .unwrap();
 
-  // Note that the `FileNode` only stores the file name, but we will end up storing the full path
-  // in the final ActionResult.
-  assert_eq!(file_node.name, "roland.ext");
-  let file_digest: Digest = file_node.digest.unwrap().try_into().unwrap();
+  assert_eq!(output_file.path, "cats/roland.ext");
+  let file_digest: Digest = output_file.digest.unwrap().try_into().unwrap();
   assert_eq!(file_digest, TestData::roland().digest());
 
   // Extract non-existent files to make sure that Ok(None) is returned.
   assert!(crate::remote_cache::CommandRunner::extract_output_file(
-    directory_digest,
-    RelativePath::new("animals.ext").unwrap(),
-    &store,
+    &input_tree.digest_trie(),
+    "animals.ext",
   )
-  .await
   .unwrap()
   .is_none());
   assert!(crate::remote_cache::CommandRunner::extract_output_file(
-    directory_digest,
-    RelativePath::new("cats").unwrap(),
-    &store,
+    &input_tree.digest_trie(),
+    "cats/xyzzy",
   )
-  .await
   .unwrap()
   .is_none());
-  assert!(crate::remote_cache::CommandRunner::extract_output_file(
-    directory_digest,
-    RelativePath::new("cats/xyzzy").unwrap(),
-    &store,
-  )
-  .await
-  .unwrap()
-  .is_none());
+
+  // Error if a path has been declared as a file but isn't.
+  assert_eq!(
+    crate::remote_cache::CommandRunner::extract_output_file(&input_tree.digest_trie(), "cats",),
+    Err(format!(
+      "Declared output file path \"cats\" in output digest {:?} contained a directory instead.",
+      TestDirectory::nested().digest()
+    ))
+  );
 }
 
 #[tokio::test]
@@ -548,13 +561,9 @@ async fn make_action_result_basic() {
       &self,
       _context: Context,
       _workunit: &mut RunningWorkunit,
-      _req: MultiPlatformProcess,
-    ) -> Result<FallibleProcessResultWithPlatform, String> {
+      _req: Process,
+    ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
       unimplemented!()
-    }
-
-    fn extract_compatible_request(&self, _req: &MultiPlatformProcess) -> Option<Process> {
-      None
     }
   }
 
@@ -599,6 +608,7 @@ async fn make_action_result_basic() {
     RemoteCacheWarningsBehavior::FirstOnly,
     false,
     256,
+    CACHE_READ_TIMEOUT,
   )
   .expect("caching command runner");
 
@@ -612,10 +622,10 @@ async fn make_action_result_basic() {
   let process_result = FallibleProcessResultWithPlatform {
     stdout_digest: TestData::roland().digest(),
     stderr_digest: TestData::robin().digest(),
-    output_directory: directory_digest,
+    output_directory: DirectoryDigest::from_persisted_digest(directory_digest),
     exit_code: 102,
     platform: Platform::Linux_x86_64,
-    metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally),
+    metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally, RunId(0)),
   };
 
   let (action_result, digests) = runner

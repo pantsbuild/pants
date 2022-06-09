@@ -15,18 +15,7 @@ http://code.activestate.com/recipes/576694/.
 from __future__ import annotations
 
 import itertools
-from typing import (
-    AbstractSet,
-    Any,
-    Dict,
-    Hashable,
-    Iterable,
-    Iterator,
-    MutableSet,
-    Set,
-    TypeVar,
-    cast,
-)
+from typing import AbstractSet, Any, Hashable, Iterable, Iterator, MutableSet, Set, TypeVar, cast
 
 T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
@@ -43,7 +32,7 @@ class _AbstractOrderedSet(AbstractSet[T]):
         # NB: Dictionaries are ordered in Python 3.6+. While this was not formalized until Python
         # 3.7, Python 3.6 uses this behavior; Pants requires CPython 3.6+ to run, so this
         # assumption is safe for us to rely on.
-        self._items: Dict[T, None] = {v: None for v in iterable or ()}
+        self._items: dict[T, None] = {v: None for v in iterable or ()}
 
     def __len__(self) -> int:
         """Returns the number of unique elements in the set."""
@@ -185,7 +174,7 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
 
     def difference_update(self, *others: Iterable[T]) -> None:
         """Update this OrderedSet to remove items from one or more other sets."""
-        items_to_remove: Set[T] = set()
+        items_to_remove: set[T] = set()
         for other in others:
             items_as_set = set(other)
             items_to_remove |= items_as_set
@@ -215,11 +204,11 @@ class FrozenOrderedSet(_AbstractOrderedSet[T_co], Hashable):
 
     def __init__(self, iterable: Iterable[T_co] | None = None) -> None:
         super().__init__(iterable)
-        self._hash: int | None = None
+        self.__hash: int | None = None
 
     def __hash__(self) -> int:
-        if self._hash is None:
-            self._hash = 0
+        if self.__hash is None:
+            self.__hash = 0
             for item in self._items.keys():
-                self._hash ^= hash(item)
-        return self._hash
+                self.__hash ^= hash(item)
+        return self.__hash

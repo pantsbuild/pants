@@ -53,15 +53,14 @@ SOURCES = {
     ),
     "src/python/project/BUILD": dedent(
         """\
-        python_library()
-
+        python_sources()
         python_tests(
             name="tests",
             dependencies=[":project"],
         )
         """
     ),
-    "src/python/core/BUILD": "python_library()",
+    "src/python/core/BUILD": "python_sources()",
     "src/python/core/__init__.py": "",
     "src/python/core/untested.py": "CONSTANT = 42",
     "foo/bar.py": "BAZ = True",
@@ -112,7 +111,7 @@ SOURCES = {
 }
 
 
-def run_coverage(tmpdir: str, *extra_args: str) -> PantsResult:
+def run_coverage_that_may_fail(tmpdir: str, *extra_args: str) -> PantsResult:
     command = [
         "--backend-packages=pants.backend.python",
         "test",
@@ -125,6 +124,11 @@ def run_coverage(tmpdir: str, *extra_args: str) -> PantsResult:
         *extra_args,
     ]
     result = run_pants(command)
+    return result
+
+
+def run_coverage(tmpdir: str, *extra_args: str) -> PantsResult:
+    result = run_coverage_that_may_fail(tmpdir, *extra_args)
     result.assert_success()
     # Regression test: make sure that individual tests do not complain about failing to
     # generate reports. This was showing up at test-time, even though the final merged
@@ -163,6 +167,14 @@ def test_coverage(major_minor_interpreter: str) -> None:
         )
         in result.stderr
     )
+
+
+def test_coverage_fail_under() -> None:
+    with setup_tmpdir(SOURCES) as tmpdir:
+        result = run_coverage(tmpdir, "--coverage-py-fail-under=89")
+        result.assert_success()
+        result = run_coverage_that_may_fail(tmpdir, "--coverage-py-fail-under=90")
+        result.assert_failure()
 
 
 def test_coverage_global() -> None:
@@ -268,7 +280,7 @@ def test_default_coverage_issues_12390() -> None:
             """
         ),
         "minimalcov/minimalcov/src/foo.py": 'print("In the foo module!")',
-        "minimalcov/minimalcov/src/BUILD": "python_library()",
+        "minimalcov/minimalcov/src/BUILD": "python_sources()",
         "minimalcov/minimalcov/tests/test_foo.py": dedent(
             """\
             import minimalcov.src.foo

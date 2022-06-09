@@ -3,9 +3,6 @@
 
 from __future__ import annotations
 
-import os
-import shutil
-
 import pytest
 
 from pants.engine.fs import (
@@ -15,28 +12,27 @@ from pants.engine.fs import (
     DigestContents,
     Directory,
     FileContent,
+    Snapshot,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
-    BinaryPathRequest,
-    BinaryPaths,
     FallibleProcessResult,
     InteractiveProcess,
+    InteractiveProcessRequest,
     Process,
     ProcessCacheScope,
     ProcessResult,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_mkdir, touch
+from pants.util.contextutil import environment_as
 
 
 def new_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            QueryRule(BinaryPaths, [BinaryPathRequest]),
             QueryRule(ProcessResult, [Process]),
             QueryRule(FallibleProcessResult, [Process]),
+            QueryRule(InteractiveProcess, [InteractiveProcessRequest]),
         ],
     )
 
@@ -263,39 +259,28 @@ def test_interactive_process_cannot_have_input_files_and_workspace() -> None:
         InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)
 
 
-def which_binary_path() -> str:
-    path = shutil.which("which")
-    if not path:
-        raise EnvironmentError("`which` not discoverable on your $PATH.")
-    return path
-
-
-@pytest.mark.parametrize("which_path", (None, which_binary_path()))
-def test_find_binary_non_existent(rule_runner: RuleRunner, which_path: str | None) -> None:
-    with temporary_dir() as tmpdir:
-        if which_path:
-            os.symlink(which_path, os.path.join(tmpdir, "which"))
-        binary_paths = rule_runner.request(
-            BinaryPaths, [BinaryPathRequest(binary_name="nonexistent-bin", search_path=[tmpdir])]
+def test_interactive_process_cannot_have_append_only_caches_and_workspace() -> None:
+    with pytest.raises(ValueError):
+        InteractiveProcess(
+            argv=["/bin/echo"], append_only_caches={"foo": "bar"}, run_in_workspace=True
         )
-        assert binary_paths.first_path is None
 
 
-def test_find_binary_on_path_without_bash(rule_runner: RuleRunner) -> None:
-    # Test that locating a binary on a PATH which does not include bash works (by recursing to
-    # locate bash first).
-    binary_name = "mybin"
-    binary_dir = "bin"
-    with temporary_dir() as tmpdir:
-        binary_dir_abs = os.path.join(tmpdir, binary_dir)
-        binary_path_abs = os.path.join(binary_dir_abs, binary_name)
-        safe_mkdir(binary_dir_abs)
-        touch(binary_path_abs)
-
-        search_path = [binary_dir_abs]
-        binary_paths = rule_runner.request(
-            BinaryPaths, [BinaryPathRequest(binary_name=binary_name, search_path=search_path)]
-        )
-        assert os.path.exists(os.path.join(binary_dir_abs, binary_name))
-        assert binary_paths.first_path is not None
-        assert binary_paths.first_path.path == binary_path_abs
+def test_interactive_process_immutable_input_digests(rule_runner: RuleRunner) -> None:
+    digest0 = rule_runner.request(Digest, [CreateDigest([FileContent("file0", b"")])])
+    digest1 = rule_runner.request(Digest, [CreateDigest([FileContent("file1", b"")])])
+    digest2 = rule_runner.request(
+        Digest, [CreateDigest([FileContent("file2", b""), FileContent("file3", b"")])]
+    )
+    process = Process(
+        argv=["foo", "bar"],
+        description="dummy",
+        env={"BAZ": "QUX"},
+        input_digest=digest0,
+        immutable_input_digests={"prefix1": digest1, "prefix2": digest2},
+    )
+    iproc = rule_runner.request(InteractiveProcess, [InteractiveProcessRequest(process)])
+    assert iproc.argv == process.argv
+    assert iproc.env == process.env
+    snapshot = rule_runner.request(Snapshot, [iproc.input_digest])
+    assert snapshot.files == ("file0", "prefix1/file1", "prefix2/file2", "prefix2/file3")

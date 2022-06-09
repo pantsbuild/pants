@@ -1,112 +1,213 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import os
-from typing import Sequence
 
-from pants.engine.rules import collect_rules
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from typing import Iterable, Optional, Sequence, Tuple
+
+from pants.core.goals.package import OutputPathField
+from pants.core.goals.run import RestartableField
+from pants.engine.addresses import Address
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    AsyncFieldMixin,
+    BoolField,
     Dependencies,
+    IntField,
     InvalidFieldException,
-    Sources,
+    InvalidTargetException,
+    MultipleSourcesField,
     StringField,
     Target,
+    TargetGenerator,
+    ValidNumbers,
+    generate_multiple_sources_field_help_message,
 )
+from pants.util.strutil import softwrap
+
+# -----------------------------------------------------------------------------------------------
+# `go_third_party_package` target
+# -----------------------------------------------------------------------------------------------
 
 
-class GoSources(Sources):
-    expected_file_extensions = (".go",)
-
-
-class GoPackageSources(GoSources):
-    default = ("*.go",)
-
-
-class GoImportPath(StringField):
-    # TODO: Infer the import path from the closest ancestor `go_module` target once that target is supported.
+class GoImportPathField(StringField):
     alias = "import_path"
-    help = "Import path in Go code to import this package or module."
+    help = softwrap(
+        """
+        Import path in Go code to import this package.
+
+        This field should not be overridden; use the value from target generation.
+        """
+    )
+    required = True
+    value: str
 
 
-class GoPackageDependencies(Dependencies):
+class GoThirdPartyPackageDependenciesField(Dependencies):
     pass
 
 
-class GoPackage(Target):
-    alias = "go_package"
-    core_fields = (*COMMON_TARGET_FIELDS, GoPackageDependencies, GoPackageSources, GoImportPath)
-    help = "A single Go package."
+class GoThirdPartyPackageTarget(Target):
+    alias = "go_third_party_package"
+    core_fields = (*COMMON_TARGET_FIELDS, GoThirdPartyPackageDependenciesField, GoImportPathField)
+    help = softwrap(
+        """
+        A package from a third-party Go module.
+
+        You should not explicitly create this target in BUILD files. Instead, add a `go_mod`
+        target where you have your `go.mod` file, which will generate
+        `go_third_party_package` targets for you.
+
+        Make sure that your `go.mod` and `go.sum` files include this package's module.
+        """
+    )
+
+    def validate(self) -> None:
+        if not self.address.is_generated_target:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target type should not be manually created in BUILD "
+                f"files, but it was created for {self.address}.\n\n"
+                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
+                f"generate `{self.alias}` targets for you based on the `require` directives in "
+                f"your `go.mod`."
+            )
 
 
 # -----------------------------------------------------------------------------------------------
-# `go_module` target
+# `go_mod` target generator
 # -----------------------------------------------------------------------------------------------
 
 
-class GoModuleSources(Sources):
+class GoModSourcesField(MultipleSourcesField):
     alias = "_sources"
     default = ("go.mod", "go.sum")
-    expected_num_files = range(1, 3)
+    expected_num_files = range(1, 3)  # i.e. 1 or 2.
+
+    @property
+    def go_mod_path(self) -> str:
+        return os.path.join(self.address.spec_path, "go.mod")
+
+    @property
+    def go_sum_path(self) -> str:
+        return os.path.join(self.address.spec_path, "go.sum")
 
     def validate_resolved_files(self, files: Sequence[str]) -> None:
         super().validate_resolved_files(files)
-        if "go.mod" not in [os.path.basename(f) for f in files]:
-            raise InvalidFieldException(f"""No go.mod file was found for target {self.address}.""")
+        if self.go_mod_path not in files:
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} must include "
+                f"{self.go_mod_path}, but only had: {list(files)}\n\n"
+                f"Make sure that you're declaring the `{GoModTarget.alias}` target in the same "
+                "directory as your `go.mod` file."
+            )
+        invalid_files = set(files) - {self.go_mod_path, self.go_sum_path}
+        if invalid_files:
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} must only include "
+                f"`{self.go_mod_path}` and optionally {self.go_sum_path}, but had: "
+                f"{sorted(invalid_files)}\n\n"
+                f"Make sure that you're declaring the `{GoModTarget.alias}` target in the same "
+                f"directory as your `go.mod` file and that you don't override the `{self.alias}` "
+                "field."
+            )
 
 
-class GoModule(Target):
-    alias = "go_module"
+# TODO: This field probably shouldn't be registered.
+class GoModDependenciesField(Dependencies):
+    alias = "_dependencies"
+
+
+class GoModTarget(TargetGenerator):
+    alias = "go_mod"
+    help = softwrap(
+        """
+        A first-party Go module (corresponding to a `go.mod` file).
+
+        Generates `go_third_party_package` targets based on the `require` directives in your
+        `go.mod`.
+
+        If you have third-party packages, make sure you have an up-to-date `go.sum`. Run
+        `go mod tidy` directly to update your `go.mod` and `go.sum`.
+        """
+    )
+    generated_target_cls = GoThirdPartyPackageTarget
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
-        GoModuleSources,
+        GoModDependenciesField,
+        GoModSourcesField,
     )
-    help = "First-party Go module."
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = ()
 
 
 # -----------------------------------------------------------------------------------------------
-# `go_external_module` target
+# `go_package` target
 # -----------------------------------------------------------------------------------------------
 
 
-class GoExternalModulePath(StringField):
-    alias = "path"
-    help = "Module path to a Go module"
+class GoPackageSourcesField(MultipleSourcesField):
+    default = ("*.go", "*.s")
+    expected_file_extensions = (".go", ".s")
+    ban_subdirectories = True
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.go', '*_test.go', '!test_ignore.go']`"
+    )
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        value_or_default = super().compute_value(raw_value, address)
+        if not value_or_default:
+            raise InvalidFieldException(
+                f"The {repr(cls.alias)} field in target {address} must be set to files/globs in "
+                f"the target's directory, but it was set to {repr(value_or_default)}."
+            )
+        return value_or_default
 
 
-class GoExternalModuleVersion(StringField):
-    alias = "version"
-    help = "Version of a Go module"
+class GoPackageDependenciesField(Dependencies):
+    pass
 
 
-class GoExternalModule(Target):
-    alias = "go_external_module"
+class SkipGoTestsField(BoolField):
+    alias = "skip_tests"
+    default = False
+    help = "If true, don't run this package's tests."
+
+
+class GoTestTimeoutField(IntField):
+    alias = "test_timeout"
+    help = softwrap(
+        """
+        A timeout (in seconds) when running this package's tests.
+
+        If this field is not set, the test will never time out.
+        """
+    )
+    valid_numbers = ValidNumbers.positive_and_zero
+
+
+class GoPackageTarget(Target):
+    alias = "go_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
-        GoExternalModulePath,
-        GoExternalModuleVersion,
-        GoImportPath,
+        GoPackageDependenciesField,
+        GoPackageSourcesField,
+        GoTestTimeoutField,
+        SkipGoTestsField,
     )
-    help = "External Go module."
+    help = softwrap(
+        """
+        A first-party Go package (corresponding to a directory with `.go` files).
 
-
-# -----------------------------------------------------------------------------------------------
-# `_go_ext_mod_package` target
-# -----------------------------------------------------------------------------------------------
-
-# Represents a Go package within a third-party Go package.
-# TODO: Create this target synthetically instead of relying on `./pants tailor` to create.
-class GoExtModPackage(Target):
-    alias = "_go_ext_mod_package"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-        GoExternalModulePath,  # TODO: maybe reference address of go_external_module target instead?
-        GoExternalModuleVersion,  # TODO: maybe reference address of go_external_module target instead?
-        GoImportPath,
+        Expects that there is a `go_mod` target in its directory or in an ancestor
+        directory.
+        """
     )
-    help = "Package in an external Go module."
 
 
 # -----------------------------------------------------------------------------------------------
@@ -114,24 +215,45 @@ class GoExtModPackage(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class GoBinaryName(StringField):
-    alias = "binary_name"
-    required = True
-    help = "Name of the Go binary to output."
-
-
-class GoBinaryMainAddress(StringField):
+class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     alias = "main"
-    required = True
-    help = "Address of the main Go package for this binary."
+    help = softwrap(
+        """
+        Address of the `go_package` with the `main` for this binary.
+
+        If not specified, will default to the `go_package` for the same
+        directory as this target's BUILD file. You should usually rely on this default.
+        """
+    )
+    value: str
 
 
-# TODO: This should register `OutputPathField` instead of `GoBinaryName`. (And then update build.py.)
-class GoBinary(Target):
+@dataclass(frozen=True)
+class GoBinaryMainPackage:
+    address: Address
+
+
+@dataclass(frozen=True)
+class GoBinaryMainPackageRequest(EngineAwareParameter):
+    field: GoBinaryMainPackageField
+
+    def debug_hint(self) -> str:
+        return self.field.address.spec
+
+
+class GoBinaryDependenciesField(Dependencies):
+    # This is only used to inject a dependency from the `GoBinaryMainPackageField`. Users should
+    # add any explicit dependencies to the `go_package`.
+    alias = "_dependencies"
+
+
+class GoBinaryTarget(Target):
     alias = "go_binary"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoBinaryName, GoBinaryMainAddress)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        OutputPathField,
+        GoBinaryMainPackageField,
+        GoBinaryDependenciesField,
+        RestartableField,
+    )
     help = "A Go binary."
-
-
-def rules():
-    return collect_rules()

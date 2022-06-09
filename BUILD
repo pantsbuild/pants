@@ -1,11 +1,10 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-shell_library(name="scripts", sources=["cargo", "pants"])
+shell_sources(name="scripts", sources=["cargo", "pants"])
 
-# We use this to establish the build root, rather than `./pants`, because we cannot safely use the
-# latter as the sentinel filename per https://github.com/pantsbuild/pants/pull/8105.
-files(name='build_root', sources=["BUILD_ROOT"])
+# We use `BUILD_ROOT` to establish the build root, rather than `./pants`, per
+# https://github.com/pantsbuild/pants/pull/8105.
+files(name="files", sources=["BUILD_ROOT", "pants.toml"])
 
-files(name='gitignore', sources=['.gitignore'])
-files(name='pants_toml', sources=['pants.toml'])
+python_test_utils(name="test_utils")

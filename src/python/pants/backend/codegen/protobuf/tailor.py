@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-import os.path
 from dataclasses import dataclass
 
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.protoc import Protoc
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -28,15 +28,18 @@ class PutativeProtobufTargetsRequest(PutativeTargetsRequest):
 
 @rule(level=LogLevel.DEBUG, desc="Determine candidate Protobuf targets to create")
 async def find_putative_targets(
-    req: PutativeProtobufTargetsRequest, all_owned_sources: AllOwnedSources
+    req: PutativeProtobufTargetsRequest, all_owned_sources: AllOwnedSources, protoc: Protoc
 ) -> PutativeTargets:
-    all_proto_files = await Get(Paths, PathGlobs, req.search_paths.path_globs("*.proto"))
+    if not protoc.tailor:
+        return PutativeTargets()
+
+    all_proto_files = await Get(Paths, PathGlobs, req.path_globs("*.proto"))
     unowned_proto_files = set(all_proto_files.files) - set(all_owned_sources)
     pts = [
         PutativeTarget.for_target_type(
-            ProtobufLibrary,
+            ProtobufSourcesGeneratorTarget,
             path=dirname,
-            name=os.path.basename(dirname),
+            name=None,
             triggering_sources=sorted(filenames),
         )
         for dirname, filenames in group_by_dir(unowned_proto_files).items()

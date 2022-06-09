@@ -5,13 +5,14 @@ import pytest
 
 from pants.backend.project_info import count_loc
 from pants.backend.project_info.count_loc import CountLinesOfCode
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python import target_types_rules
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.util_rules import external_tool
-from pants.engine.target import Sources, Target
+from pants.engine.target import MultipleSourcesField, Target
 from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 
 
-class ElixirSources(Sources):
+class ElixirSources(MultipleSourcesField):
     default = ("*.ex",)
 
 
@@ -23,8 +24,12 @@ class ElixirTarget(Target):
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*count_loc.rules(), *external_tool.rules()],
-        target_types=[PythonLibrary, ElixirTarget],
+        rules=[
+            *count_loc.rules(),
+            *external_tool.rules(),
+            *target_types_rules.rules(),
+        ],
+        target_types=[PythonSourcesGeneratorTarget, ElixirTarget],
     )
 
 
@@ -54,7 +59,7 @@ def test_count_loc(rule_runner: RuleRunner) -> None:
         {
             f"{py_dir}/foo.py": '# A comment.\n\nprint("some code")\n# Another comment.',
             f"{py_dir}/bar.py": '# A comment.\n\nprint("some more code")',
-            f"{py_dir}/BUILD": "python_library()",
+            f"{py_dir}/BUILD": "python_sources()",
             f"{elixir_dir}/foo.ex": 'IO.puts("Some elixir")\n# A comment',
             f"{elixir_dir}/ignored.ex": "# We do not expect this file to appear in counts.",
             f"{elixir_dir}/BUILD": "elixir(sources=['foo.ex'])",
@@ -68,7 +73,7 @@ def test_count_loc(rule_runner: RuleRunner) -> None:
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"foo.py": "print('hello world!')\n", "BUILD": "python_library(name='foo')"}
+        {"foo.py": "print('hello world!')\n", "BUILD": "python_sources(name='foo')"}
     )
     result = rule_runner.run_goal_rule(CountLinesOfCode, args=["//:foo", "--", "--no-cocomo"])
     assert result.exit_code == 0
@@ -93,6 +98,6 @@ def test_files_without_owners(rule_runner: RuleRunner) -> None:
 
 def test_no_sources_exits_gracefully(rule_runner: RuleRunner) -> None:
     py_dir = "src/py/foo"
-    rule_runner.write_files({f"{py_dir}/BUILD": "python_library(sources=[])"})
+    rule_runner.write_files({f"{py_dir}/BUILD": "python_sources()"})
     result = rule_runner.run_goal_rule(CountLinesOfCode, args=[py_dir])
     assert result == GoalRuleResult.noop()

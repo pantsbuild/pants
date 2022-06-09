@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -26,32 +24,47 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "43757804"]
 #[macro_use]
 extern crate derivative;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
+use std::fmt::{self, Display};
 use std::path::PathBuf;
-use std::sync::Arc;
 
-pub use log::Level;
-
-use async_semaphore::AsyncSemaphore;
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use hashing::{Digest, EMPTY_FINGERPRINT};
+use concrete_time::{Duration, TimeSpan};
+use deepsize::DeepSizeOf;
+use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
+use futures::future::try_join_all;
+use futures::try_join;
+use hashing::Digest;
+use itertools::Itertools;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
-use workunit_store::{RunningWorkunit, WorkunitStore};
+use store::{SnapshotOps, Store, StoreError};
+use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
+
+pub mod bounded;
+#[cfg(test)]
+mod bounded_tests;
 
 pub mod cache;
 #[cfg(test)]
 mod cache_tests;
 
+pub mod children;
+
+pub mod immutable_inputs;
+
 pub mod local;
 #[cfg(test)]
 mod local_tests;
+
+pub mod nailgun;
+
+pub mod named_caches;
 
 pub mod remote;
 #[cfg(test)]
@@ -61,22 +74,65 @@ pub mod remote_cache;
 #[cfg(test)]
 mod remote_cache_tests;
 
-pub mod nailgun;
-
-pub mod named_caches;
-
 extern crate uname;
 
-pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
-use concrete_time::{Duration, TimeSpan};
-use fs::RelativePath;
+pub use crate::children::ManagedChild;
+pub use crate::immutable_inputs::ImmutableInputs;
+pub use crate::named_caches::{CacheName, NamedCaches};
+pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
-#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProcessError {
+  /// A Digest was not present in either of the local or remote Stores.
+  MissingDigest(String, Digest),
+  /// All other error types.
+  Unclassified(String),
+}
+
+impl ProcessError {
+  pub fn enrich(self, prefix: &str) -> Self {
+    match self {
+      Self::MissingDigest(s, d) => Self::MissingDigest(format!("{prefix}: {s}"), d),
+      Self::Unclassified(s) => Self::Unclassified(format!("{prefix}: {s}")),
+    }
+  }
+}
+
+impl Display for ProcessError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::MissingDigest(s, d) => {
+        write!(f, "{s}: {d:?}")
+      }
+      Self::Unclassified(s) => write!(f, "{s}"),
+    }
+  }
+}
+
+impl From<StoreError> for ProcessError {
+  fn from(err: StoreError) -> Self {
+    match err {
+      StoreError::MissingDigest(s, d) => Self::MissingDigest(s, d),
+      StoreError::Unclassified(s) => Self::Unclassified(s),
+    }
+  }
+}
+
+impl From<String> for ProcessError {
+  fn from(err: String) -> Self {
+    Self::Unclassified(err)
+  }
+}
+
+#[derive(
+  PartialOrd, Ord, Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq, Hash, Serialize, Deserialize,
+)]
 #[allow(non_camel_case_types)]
 pub enum Platform {
   Macos_x86_64,
   Macos_arm64,
   Linux_x86_64,
+  Linux_arm64,
 }
 
 impl Platform {
@@ -90,6 +146,15 @@ impl Platform {
         ..
       } if sysname.to_lowercase() == "linux" && machine.to_lowercase() == "x86_64" => {
         Ok(Platform::Linux_x86_64)
+      }
+      uname::Info {
+        ref sysname,
+        ref machine,
+        ..
+      } if sysname.to_lowercase() == "linux"
+        && (machine.to_lowercase() == "arm64" || machine.to_lowercase() == "aarch64") =>
+      {
+        Ok(Platform::Linux_arm64)
       }
       uname::Info {
         ref sysname,
@@ -121,6 +186,7 @@ impl From<Platform> for String {
   fn from(platform: Platform) -> String {
     match platform {
       Platform::Linux_x86_64 => "linux_x86_64".to_string(),
+      Platform::Linux_arm64 => "linux_arm64".to_string(),
       Platform::Macos_arm64 => "macos_arm64".to_string(),
       Platform::Macos_x86_64 => "macos_x86_64".to_string(),
     }
@@ -134,6 +200,7 @@ impl TryFrom<String> for Platform {
       "macos_arm64" => Ok(Platform::Macos_arm64),
       "macos_x86_64" => Ok(Platform::Macos_x86_64),
       "linux_x86_64" => Ok(Platform::Linux_x86_64),
+      "linux_arm64" => Ok(Platform::Linux_arm64),
       other => Err(format!(
         "Unknown platform {:?} encountered in parsing",
         other
@@ -142,7 +209,7 @@ impl TryFrom<String> for Platform {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq, Hash, Serialize)]
 pub enum ProcessCacheScope {
   // Cached in all locations, regardless of success or failure.
   Always,
@@ -177,10 +244,206 @@ fn serialize_level<S: serde::Serializer>(level: &log::Level, s: S) -> Result<S::
   s.serialize_str(&level.to_string())
 }
 
+/// A symlink from a relative src to an absolute dst (outside of the workdir).
+#[derive(Debug)]
+pub struct WorkdirSymlink {
+  pub src: RelativePath,
+  pub dst: PathBuf,
+}
+
+/// Input Digests for a process execution.
+///
+/// The `complete` and `nailgun` Digests are the computed union of various inputs.
+///
+/// TODO: See `crate::local::prepare_workdir` regarding validation of overlapping inputs.
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq, Serialize)]
+pub struct InputDigests {
+  /// All of the input Digests, merged and relativized. Runners without the ability to consume the
+  /// Digests individually should directly consume this value.
+  pub complete: DirectoryDigest,
+
+  /// The merged Digest of any `use_nailgun`-relevant Digests.
+  pub nailgun: DirectoryDigest,
+
+  /// The input files for the process execution, which will be materialized as mutable inputs in a
+  /// sandbox for the process.
+  ///
+  /// TODO: Rename to `inputs` for symmetry with `immutable_inputs`.
+  pub input_files: DirectoryDigest,
+
+  /// Immutable input digests to make available in the input root.
+  ///
+  /// These digests are intended for inputs that will be reused between multiple Process
+  /// invocations, without being mutated. This might be useful to provide the tools being executed,
+  /// but can also be used for tool inputs such as compilation artifacts.
+  ///
+  /// The digests will be mounted at the relative path represented by the `RelativePath` keys.
+  /// The executor may choose how to make the digests available, including by just merging
+  /// the digest normally into the input root, creating a symlink to a persistent cache,
+  /// or bind mounting the directory read-only into a persistent cache. Consequently, the mount
+  /// point of each input must not overlap the `input_files`, even for directory entries.
+  ///
+  /// Assumes the build action does not modify the Digest as made available. This may be
+  /// enforced by an executor, for example by bind mounting the directory read-only.
+  pub immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
+
+  /// If non-empty, use nailgun in supported runners, using the specified `immutable_inputs` keys
+  /// as server inputs. All other keys (and the input_files) will be client inputs.
+  pub use_nailgun: BTreeSet<RelativePath>,
+}
+
+impl InputDigests {
+  pub async fn new(
+    store: &Store,
+    input_files: DirectoryDigest,
+    immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
+    use_nailgun: BTreeSet<RelativePath>,
+  ) -> Result<Self, StoreError> {
+    // Collect all digests into `complete`.
+    let mut complete_digests = try_join_all(
+      immutable_inputs
+        .iter()
+        .map(|(path, digest)| store.add_prefix(digest.clone(), path))
+        .collect::<Vec<_>>(),
+    )
+    .await?;
+    // And collect only the subset of the Digests which impact nailgun into `nailgun`.
+    let nailgun_digests = immutable_inputs
+      .keys()
+      .zip(complete_digests.iter())
+      .filter_map(|(path, digest)| {
+        if use_nailgun.contains(path) {
+          Some(digest.clone())
+        } else {
+          None
+        }
+      })
+      .collect::<Vec<_>>();
+    complete_digests.push(input_files.clone());
+
+    let (complete, nailgun) =
+      try_join!(store.merge(complete_digests), store.merge(nailgun_digests),)?;
+    Ok(Self {
+      complete: complete,
+      nailgun: nailgun,
+      input_files,
+      immutable_inputs,
+      use_nailgun,
+    })
+  }
+
+  pub async fn new_from_merged(store: &Store, from: Vec<InputDigests>) -> Result<Self, StoreError> {
+    let mut merged_immutable_inputs = BTreeMap::new();
+    for input_digests in from.iter() {
+      let size_before = merged_immutable_inputs.len();
+      let immutable_inputs = &input_digests.immutable_inputs;
+      merged_immutable_inputs.append(&mut immutable_inputs.clone());
+      if size_before + immutable_inputs.len() != merged_immutable_inputs.len() {
+        return Err(
+          format!(
+            "Tried to merge two-or-more immutable inputs at the same path with different values! \
+            The collision involved one of the entries in: {immutable_inputs:?}"
+          )
+          .into(),
+        );
+      }
+    }
+
+    let complete_digests = from
+      .iter()
+      .map(|input_digests| input_digests.complete.clone())
+      .collect();
+    let nailgun_digests = from
+      .iter()
+      .map(|input_digests| input_digests.nailgun.clone())
+      .collect();
+    let input_files_digests = from
+      .iter()
+      .map(|input_digests| input_digests.input_files.clone())
+      .collect();
+    let (complete, nailgun, input_files) = try_join!(
+      store.merge(complete_digests),
+      store.merge(nailgun_digests),
+      store.merge(input_files_digests),
+    )?;
+    Ok(Self {
+      complete: complete,
+      nailgun: nailgun,
+      input_files: input_files,
+      immutable_inputs: merged_immutable_inputs,
+      use_nailgun: Itertools::concat(
+        from
+          .iter()
+          .map(|input_digests| input_digests.use_nailgun.clone()),
+      )
+      .into_iter()
+      .collect(),
+    })
+  }
+
+  pub fn with_input_files(input_files: DirectoryDigest) -> Self {
+    Self {
+      complete: input_files.clone(),
+      nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
+      input_files,
+      immutable_inputs: BTreeMap::new(),
+      use_nailgun: BTreeSet::new(),
+    }
+  }
+
+  /// Split the InputDigests into client and server subsets.
+  ///
+  /// TODO: The server subset will have an accurate `complete` Digest, but the client will not.
+  /// This is currently safe because the nailgun client code does not consume that field, but it
+  /// would be good to find a better factoring.
+  pub fn nailgun_client_and_server(&self) -> (InputDigests, InputDigests) {
+    let (server, client) = self
+      .immutable_inputs
+      .clone()
+      .into_iter()
+      .partition(|(path, _digest)| self.use_nailgun.contains(path));
+
+    (
+      // Client.
+      InputDigests {
+        // TODO: See method doc.
+        complete: EMPTY_DIRECTORY_DIGEST.clone(),
+        nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
+        input_files: self.input_files.clone(),
+        immutable_inputs: client,
+        use_nailgun: BTreeSet::new(),
+      },
+      // Server.
+      InputDigests {
+        complete: self.nailgun.clone(),
+        nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
+        input_files: EMPTY_DIRECTORY_DIGEST.clone(),
+        immutable_inputs: server,
+        use_nailgun: BTreeSet::new(),
+      },
+    )
+  }
+}
+
+impl Default for InputDigests {
+  fn default() -> Self {
+    Self {
+      complete: EMPTY_DIRECTORY_DIGEST.clone(),
+      nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
+      input_files: EMPTY_DIRECTORY_DIGEST.clone(),
+      immutable_inputs: BTreeMap::new(),
+      use_nailgun: BTreeSet::new(),
+    }
+  }
+}
+
 ///
 /// A process to be executed.
 ///
-#[derive(Derivative, Clone, Debug, Eq, Serialize)]
+/// When executing a `Process` using the `local::CommandRunner`, any `{chroot}` placeholders in the
+/// environment variables are replaced with the temporary sandbox path.
+///
+#[derive(DeepSizeOf, Derivative, Clone, Debug, Eq, Serialize)]
 #[derivative(PartialEq, Hash)]
 pub struct Process {
   ///
@@ -206,7 +469,10 @@ pub struct Process {
   ///
   pub working_directory: Option<RelativePath>,
 
-  pub input_files: hashing::Digest,
+  ///
+  /// All of the input digests for the process.
+  ///
+  pub input_digests: InputDigests,
 
   pub output_files: BTreeSet<RelativePath>,
 
@@ -214,8 +480,20 @@ pub struct Process {
 
   pub timeout: Option<std::time::Duration>,
 
-  /// If not None, then if a BoundedCommandRunner executes this Process
+  /// If not None, then a bounded::CommandRunner executing this Process will set an environment
+  /// variable with this name containing a unique execution slot number.
   pub execution_slot_variable: Option<String>,
+
+  /// If non-zero, the amount of parallelism that this process is capable of given its inputs. This
+  /// value does not directly set the number of cores allocated to the process: that is computed
+  /// based on availability, and provided as a template value in the arguments of the process.
+  ///
+  /// When set, a `{pants_concurrency}` variable will be templated into the `argv` of the process.
+  ///
+  /// Processes which set this value may be preempted (i.e. canceled and restarted) for a short
+  /// period after starting if available resources have changed (because other processes have
+  /// started or finished).
+  pub concurrency_available: usize,
 
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
@@ -237,7 +515,7 @@ pub struct Process {
   /// These caches are globally shared and so must be concurrency safe: a consumer of the cache
   /// must never assume that it has exclusive access to the provided directory.
   ///
-  pub append_only_caches: BTreeMap<CacheName, CacheDest>,
+  pub append_only_caches: BTreeMap<CacheName, RelativePath>,
 
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
@@ -250,8 +528,6 @@ pub struct Process {
   pub jdk_home: Option<PathBuf>,
 
   pub platform_constraint: Option<Platform>,
-
-  pub is_nailgunnable: bool,
 
   pub cache_scope: ProcessCacheScope,
 }
@@ -272,7 +548,7 @@ impl Process {
       argv,
       env: BTreeMap::new(),
       working_directory: None,
-      input_files: hashing::EMPTY_DIGEST,
+      input_digests: InputDigests::default(),
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: None,
@@ -281,8 +557,8 @@ impl Process {
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
       platform_constraint: None,
-      is_nailgunnable: false,
       execution_slot_variable: None,
+      concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
     }
   }
@@ -292,6 +568,14 @@ impl Process {
   ///
   pub fn env(mut self, env: BTreeMap<String, String>) -> Process {
     self.env = env;
+    self
+  }
+
+  ///
+  /// Replaces the working_directory for this process.
+  ///
+  pub fn working_directory(mut self, working_directory: Option<RelativePath>) -> Process {
+    self.working_directory = working_directory;
     self
   }
 
@@ -316,55 +600,10 @@ impl Process {
   ///
   pub fn append_only_caches(
     mut self,
-    append_only_caches: BTreeMap<CacheName, CacheDest>,
+    append_only_caches: BTreeMap<CacheName, RelativePath>,
   ) -> Process {
     self.append_only_caches = append_only_caches;
     self
-  }
-}
-
-impl TryFrom<MultiPlatformProcess> for Process {
-  type Error = String;
-
-  fn try_from(req: MultiPlatformProcess) -> Result<Self, Self::Error> {
-    match req.0.get(&None) {
-      Some(crossplatform_req) => Ok(crossplatform_req.clone()),
-      None => Err(String::from(
-        "Cannot coerce to a simple Process, no cross platform request exists.",
-      )),
-    }
-  }
-}
-
-///
-/// A container of platform constrained processes.
-///
-#[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformProcess(pub BTreeMap<Option<Platform>, Process>);
-
-impl MultiPlatformProcess {
-  pub fn user_facing_name(&self) -> String {
-    self
-      .0
-      .iter()
-      .next()
-      .map(|(_platforms, process)| process.description.clone())
-      .unwrap_or_else(|| "<Unnamed process>".to_string())
-  }
-
-  pub fn workunit_level(&self) -> log::Level {
-    self
-      .0
-      .iter()
-      .next()
-      .map(|(_platforms, process)| process.level)
-      .unwrap_or(Level::Info)
-  }
-}
-
-impl From<Process> for MultiPlatformProcess {
-  fn from(proc: Process) -> Self {
-    MultiPlatformProcess(vec![(None, proc)].into_iter().collect())
   }
 }
 
@@ -383,13 +622,13 @@ pub struct ProcessMetadata {
 ///
 /// The result of running a process.
 ///
-#[derive(Derivative, Clone, Debug, Eq)]
+#[derive(DeepSizeOf, Derivative, Clone, Debug, Eq)]
 #[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
   pub stdout_digest: Digest,
   pub stderr_digest: Digest,
   pub exit_code: i32,
-  pub output_directory: hashing::Digest,
+  pub output_directory: DirectoryDigest,
   pub platform: Platform,
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub metadata: ProcessResultMetadata,
@@ -397,7 +636,7 @@ pub struct FallibleProcessResultWithPlatform {
 
 /// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
 /// conversion is lossy, but the interesting parts are preserved.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct ProcessResultMetadata {
   /// The time from starting to completion, including preparing the chroot and cleanup.
   /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
@@ -407,17 +646,29 @@ pub struct ProcessResultMetadata {
   pub total_elapsed: Option<Duration>,
   /// The source of the result.
   pub source: ProcessResultSource,
+  /// The RunId of the Session in which the `ProcessResultSource` was accurate. In further runs
+  /// within the same process, the source of the process implicitly becomes memoization.
+  pub source_run_id: RunId,
 }
 
 impl ProcessResultMetadata {
-  pub fn new(total_elapsed: Option<Duration>, source: ProcessResultSource) -> Self {
-    ProcessResultMetadata {
+  pub fn new(
+    total_elapsed: Option<Duration>,
+    source: ProcessResultSource,
+    source_run_id: RunId,
+  ) -> Self {
+    Self {
       total_elapsed,
       source,
+      source_run_id,
     }
   }
 
-  pub fn new_from_metadata(metadata: ExecutedActionMetadata, source: ProcessResultSource) -> Self {
+  pub fn new_from_metadata(
+    metadata: ExecutedActionMetadata,
+    source: ProcessResultSource,
+    source_run_id: RunId,
+  ) -> Self {
     let total_elapsed = match (
       metadata.worker_start_timestamp,
       metadata.worker_completed_timestamp,
@@ -430,6 +681,7 @@ impl ProcessResultMetadata {
     Self {
       total_elapsed,
       source,
+      source_run_id,
     }
   }
 
@@ -484,7 +736,7 @@ impl From<ProcessResultMetadata> for ExecutedActionMetadata {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum ProcessResultSource {
   RanLocally,
   RanRemotely,
@@ -492,26 +744,40 @@ pub enum ProcessResultSource {
   HitRemotely,
 }
 
+impl From<ProcessResultSource> for &'static str {
+  fn from(prs: ProcessResultSource) -> &'static str {
+    match prs {
+      ProcessResultSource::RanLocally => "ran_locally",
+      ProcessResultSource::RanRemotely => "ran_remotely",
+      ProcessResultSource::HitLocally => "hit_locally",
+      ProcessResultSource::HitRemotely => "hit_remotely",
+    }
+  }
+}
+
 #[derive(Clone)]
 pub struct Context {
   workunit_store: WorkunitStore,
   build_id: String,
+  run_id: RunId,
 }
 
 impl Default for Context {
   fn default() -> Self {
     Context {
-      workunit_store: WorkunitStore::new(false),
+      workunit_store: WorkunitStore::new(false, log::Level::Debug),
       build_id: String::default(),
+      run_id: RunId(0),
     }
   }
 }
 
 impl Context {
-  pub fn new(workunit_store: WorkunitStore, build_id: String) -> Context {
+  pub fn new(workunit_store: WorkunitStore, build_id: String, run_id: RunId) -> Context {
     Context {
       workunit_store,
       build_id,
+      run_id,
     }
   }
 }
@@ -526,109 +792,15 @@ pub trait CommandRunner: Send + Sync {
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
-  ) -> Result<FallibleProcessResultWithPlatform, String>;
-
-  ///
-  /// Given a multi platform request which may have some platform
-  /// constraints determine if any of the requests contained within are compatible
-  /// with the current command runners platform configuration. If so return the
-  /// first candidate that will be run if the multi platform request is submitted to
-  /// `fn run(..)`
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process>;
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError>;
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
-  let mut hashes: Vec<String> = req
-    .0
-    .values()
-    .map(|process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
-    .map(|(_a, _b, er)| {
-      er.action_digest
-        .map(|d| d.hash)
-        .unwrap_or_else(|| EMPTY_FINGERPRINT.to_hex())
-    })
-    .collect();
-  hashes.sort();
-  Digest::of_bytes(
-    hashes
-      .iter()
-      .fold(String::new(), |mut acc, hash| {
-        acc.push_str(hash);
-        acc
-      })
-      .as_bytes(),
-  )
-}
-
-///
-/// A CommandRunner wrapper that limits the number of concurrent requests.
-///
-#[derive(Clone)]
-pub struct BoundedCommandRunner {
-  inner: Arc<(Box<dyn CommandRunner>, AsyncSemaphore)>,
-}
-
-impl BoundedCommandRunner {
-  pub fn new(inner: Box<dyn CommandRunner>, bound: usize) -> BoundedCommandRunner {
-    BoundedCommandRunner {
-      inner: Arc::new((inner, AsyncSemaphore::new(bound))),
-    }
-  }
-}
-
-#[async_trait]
-impl CommandRunner for BoundedCommandRunner {
-  async fn run(
-    &self,
-    context: Context,
-    workunit: &mut RunningWorkunit,
-    mut req: MultiPlatformProcess,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let semaphore = self.inner.1.clone();
-    let inner = self.inner.clone();
-    let blocking_token = workunit.blocking();
-    semaphore
-      .with_acquired(|concurrency_id| {
-        log::debug!(
-          "Running {} under semaphore with concurrency id: {}",
-          req.user_facing_name(),
-          concurrency_id
-        );
-        std::mem::drop(blocking_token);
-
-        for (_, process) in req.0.iter_mut() {
-          if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
-            let execution_slot = format!("{}", concurrency_id);
-            process
-              .env
-              .insert(execution_slot_env_var.clone(), execution_slot);
-          }
-        }
-
-        inner.0.run(context, workunit, req)
-      })
-      .await
-  }
-
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    self.inner.0.extract_compatible_request(req)
-  }
-}
-
-impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
-  fn from(command_runner: Box<BoundedCommandRunner>) -> Arc<dyn CommandRunner> {
-    Arc::new(*command_runner)
-  }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
-#[strum(serialize_all = "snake_case")]
-pub enum RemoteCacheWarningsBehavior {
-  Ignore,
-  FirstOnly,
-  Backoff,
+pub fn digest(process: &Process, metadata: &ProcessMetadata) -> Digest {
+  let (_, _, execute_request) =
+    crate::remote::make_execute_request(process, metadata.clone()).unwrap();
+  execute_request.action_digest.unwrap().try_into().unwrap()
 }
 
 #[cfg(test)]

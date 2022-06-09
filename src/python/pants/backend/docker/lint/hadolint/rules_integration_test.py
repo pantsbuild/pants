@@ -9,7 +9,9 @@ import pytest
 
 from pants.backend.docker.lint.hadolint.rules import HadolintFieldSet, HadolintRequest
 from pants.backend.docker.lint.hadolint.rules import rules as hadolint_rules
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.rules import rules as docker_rules
+from pants.backend.docker.target_types import DockerImageTarget
+from pants.core.goals import package
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
@@ -21,13 +23,15 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *hadolint_rules(),
             *config_files.rules(),
+            *docker_rules(),
             *external_tool.rules(),
+            *hadolint_rules(),
+            package.find_all_packageable_targets,
             *source_files.rules(),
             QueryRule(LintResults, [HadolintRequest]),
         ],
-        target_types=[DockerImage],
+        target_types=[DockerImageTarget],
     )
 
 
@@ -81,8 +85,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
             "Dockerfile.bad": BAD_FILE,
             "BUILD": dedent(
                 """
-                docker_image(name="good", sources=("Dockerfile.good",))
-                docker_image(name="bad", sources=("Dockerfile.bad",))
+                docker_image(name="good", source="Dockerfile.good")
+                docker_image(name="bad", source="Dockerfile.bad")
                 """
             ),
         }
@@ -103,7 +107,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 def test_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
-            ".hadolint.yaml": "ignored: [DL3006, DL3011]",
+            ".hadolint.yaml": "ignored: [DL3006, DL3061, DL3011]",
             "a/Dockerfile": BAD_FILE,
             "a/BUILD": "docker_image()",
             "b/Dockerfile": BAD_FILE,

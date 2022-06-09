@@ -6,33 +6,35 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
+use async_oncecell::OnceCell;
 use bytes::{Bytes, BytesMut};
-use double_checked_cell_async::DoubleCheckedCell;
 use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
 use log::Level;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
 use remexec::{
   capabilities_client::CapabilitiesClient,
   content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
   ServerCapabilities,
 };
 use tonic::{Code, Request, Status};
-use workunit_store::{in_workunit, Metric, ObservationMetric, WorkunitMetadata};
+use workunit_store::{in_workunit, Metric, ObservationMetric};
+
+use crate::StoreError;
 
 #[derive(Clone)]
 pub struct ByteStore {
   instance_name: Option<String>,
   chunk_size_bytes: usize,
-  upload_timeout: Duration,
-  rpc_attempts: usize,
+  _upload_timeout: Duration,
+  _rpc_attempts: usize,
   byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
   cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
-  capabilities_cell: Arc<DoubleCheckedCell<ServerCapabilities>>,
+  capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
   capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
   batch_api_size_limit: usize,
 }
@@ -76,7 +78,7 @@ impl ByteStore {
     upload_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
-    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     batch_api_size_limit: usize,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_address.starts_with("https://") {
@@ -103,12 +105,11 @@ impl ByteStore {
     Ok(ByteStore {
       instance_name,
       chunk_size_bytes,
-      upload_timeout,
-      rpc_attempts: rpc_retries + 1,
+      _upload_timeout: upload_timeout,
+      _rpc_attempts: rpc_retries + 1,
       byte_stream_client,
       cas_client,
-      capabilities_cell: capabilities_cell_opt
-        .unwrap_or_else(|| Arc::new(DoubleCheckedCell::new())),
+      capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
       capabilities_client,
       batch_api_size_limit,
     })
@@ -122,10 +123,10 @@ impl ByteStore {
     &self,
     digest: Digest,
     mut write_to_buffer: WriteToBuffer,
-  ) -> Result<(), String>
+  ) -> Result<(), StoreError>
   where
     WriteToBuffer: FnMut(std::fs::File) -> WriteResult,
-    WriteResult: Future<Output = Result<(), String>>,
+    WriteResult: Future<Output = Result<(), StoreError>>,
   {
     let write_buffer = tempfile::tempfile().map_err(|e| {
       format!(
@@ -180,8 +181,8 @@ impl ByteStore {
     )
     .await
     .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
+      ByteStoreError::Grpc(status) => status_to_str(status).into(),
+      ByteStoreError::Other(msg) => msg.into(),
     })
   }
 
@@ -274,16 +275,11 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes,
     );
-    let workunit_name = format!("store_bytes({})", resource_name.clone());
-    let workunit_metadata = WorkunitMetadata {
-      level: Level::Debug,
-      ..WorkunitMetadata::default()
-    };
+    let workunit_desc = format!("Storing bytes at: {resource_name}");
     let store = self.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
 
-    let resource_name = resource_name.clone();
     let chunk_size_bytes = store.chunk_size_bytes;
 
     let stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
@@ -291,7 +287,7 @@ impl ByteStore {
         futures::future::ready(None)
       } else {
         let next_offset = min(offset + chunk_size_bytes, len);
-        let req = bazel_protos::gen::google::bytestream::WriteRequest {
+        let req = protos::gen::google::bytestream::WriteRequest {
           resource_name: resource_name.clone(),
           write_offset: offset as i64,
           finish_write: next_offset == len,
@@ -321,24 +317,19 @@ impl ByteStore {
       }
     });
 
-    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-      let workunit_store = workunit_store_handle.store;
-      in_workunit!(
-        workunit_store,
-        workunit_name,
-        workunit_metadata,
-        |workunit| async move {
-          let result = result_future.await;
-          if result.is_ok() {
-            workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
-          }
-          result
-        },
-      )
-      .await
-    } else {
-      result_future.await
-    }
+    in_workunit!(
+      "store_bytes",
+      Level::Trace,
+      desc = Some(workunit_desc),
+      |workunit| async move {
+        let result = result_future.await;
+        if result.is_ok() {
+          workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
+        }
+        result
+      },
+    )
+    .await
   }
 
   pub async fn load_bytes_with<
@@ -349,6 +340,7 @@ impl ByteStore {
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, ByteStoreError> {
+    let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
@@ -358,12 +350,7 @@ impl ByteStore {
       digest.hash,
       digest.size_bytes
     );
-    let workunit_name = format!("load_bytes_with({})", resource_name.clone());
-    let workunit_metadata = WorkunitMetadata {
-      level: Level::Debug,
-      ..WorkunitMetadata::default()
-    };
-    let resource_name = resource_name.clone();
+    let workunit_desc = format!("Loading bytes at: {resource_name}");
     let f = f.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
@@ -373,8 +360,8 @@ impl ByteStore {
 
       let stream_result = client
         .read({
-          bazel_protos::gen::google::bytestream::ReadRequest {
-            resource_name: resource_name.clone(),
+          protos::gen::google::bytestream::ReadRequest {
+            resource_name,
             read_offset: 0,
             // 0 means no limit.
             read_limit: 0,
@@ -437,26 +424,26 @@ impl ByteStore {
       }
     };
 
-    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-      in_workunit!(
-        workunit_store_handle.store,
-        workunit_name,
-        workunit_metadata,
-        |workunit| async move {
-          let result = result_future.await;
-          if result.is_ok() {
-            workunit.increment_counter(
-              Metric::RemoteStoreBlobBytesDownloaded,
-              digest.size_bytes as u64,
-            );
-          }
-          result
-        },
-      )
-      .await
-    } else {
-      result_future.await
-    }
+    in_workunit!(
+      "load_bytes_with",
+      Level::Trace,
+      desc = Some(workunit_desc),
+      |workunit| async move {
+        workunit.record_observation(
+          ObservationMetric::RemoteStoreReadBlobTimeMicros,
+          start.elapsed().as_micros() as u64,
+        );
+        let result = result_future.await;
+        if result.is_ok() {
+          workunit.increment_counter(
+            Metric::RemoteStoreBlobBytesDownloaded,
+            digest.size_bytes as u64,
+          );
+        }
+        result
+      },
+    )
+    .await
   }
 
   ///
@@ -468,47 +455,33 @@ impl ByteStore {
     request: remexec::FindMissingBlobsRequest,
   ) -> impl Future<Output = Result<HashSet<Digest>, String>> {
     let store = self.clone();
-    let workunit_name = format!(
-      "list_missing_digests({})",
-      store.instance_name.clone().unwrap_or_default()
-    );
-    let workunit_metadata = WorkunitMetadata {
-      level: Level::Debug,
-      ..WorkunitMetadata::default()
-    };
-    let result_future = async move {
-      let store2 = store.clone();
-      let client = store2.cas_client.as_ref().clone();
-      let response = retry_call(
-        client,
-        move |mut client| {
-          let request = request.clone();
-          async move { client.find_missing_blobs(request).await }
-        },
-        status_is_retryable,
+    async {
+      in_workunit!(
+        "list_missing_digests",
+        Level::Trace,
+        |_workunit| async move {
+          let store2 = store.clone();
+          let client = store2.cas_client.as_ref().clone();
+          let response = retry_call(
+            client,
+            move |mut client| {
+              let request = request.clone();
+              async move { client.find_missing_blobs(request).await }
+            },
+            status_is_retryable,
+          )
+          .await
+          .map_err(status_to_str)?;
+
+          response
+            .into_inner()
+            .missing_blob_digests
+            .iter()
+            .map(|digest| digest.try_into())
+            .collect::<Result<HashSet<_>, _>>()
+        }
       )
       .await
-      .map_err(status_to_str)?;
-
-      response
-        .into_inner()
-        .missing_blob_digests
-        .iter()
-        .map(|digest| digest.try_into())
-        .collect::<Result<HashSet<_>, _>>()
-    };
-    async {
-      if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-        in_workunit!(
-          workunit_store_handle.store,
-          workunit_name,
-          workunit_metadata,
-          |_workunit| result_future,
-        )
-        .await
-      } else {
-        result_future.await
-      }
     }
   }
 

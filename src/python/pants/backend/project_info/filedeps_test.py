@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import pytest
 
-from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.project_info import filedeps
-from pants.engine.target import Dependencies, Sources, Target
+from pants.engine.target import Dependencies, MultipleSourcesField, SingleSourceField, Target
 from pants.testutil.rule_runner import RuleRunner
 
 
-class MockSources(Sources):
+class MockSources(MultipleSourcesField):
     default = ("*.ext",)
 
 
@@ -20,9 +20,21 @@ class MockTarget(Target):
     core_fields = (MockSources, Dependencies)
 
 
+class MockSingleSourceField(SingleSourceField):
+    pass
+
+
+class MockSingleSourceTarget(Target):
+    alias = "single_source"
+    core_fields = (MockSingleSourceField, Dependencies)
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(rules=filedeps.rules(), target_types=[MockTarget, ProtobufLibrary])
+    return RuleRunner(
+        rules=filedeps.rules(),
+        target_types=[MockTarget, MockSingleSourceTarget, ProtobufSourceTarget],
+    )
 
 
 def assert_filedeps(
@@ -52,8 +64,16 @@ def test_one_target_no_source(rule_runner: RuleRunner) -> None:
 
 
 def test_one_target_one_source(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"a/f.ext": "", "a/BUILD": "tgt()"})
+    rule_runner.write_files(
+        {
+            "a/f.ext": "",
+            "a/BUILD": "tgt()",
+            "b/f.ext": "",
+            "b/BUILD": "single_source(source='f.ext')",
+        }
+    )
     assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD", "a/f.ext"})
+    assert_filedeps(rule_runner, targets=["b"], expected={"b/BUILD", "b/f.ext"})
 
 
 def test_one_target_multiple_source(rule_runner: RuleRunner) -> None:
@@ -174,5 +194,5 @@ def test_build_with_file_ext(rule_runner: RuleRunner) -> None:
 
 def test_codegen_targets_use_protocol_files(rule_runner: RuleRunner) -> None:
     # That is, don't output generated files.
-    rule_runner.write_files({"a/f.proto": "", "a/BUILD": "protobuf_library()"})
+    rule_runner.write_files({"a/f.proto": "", "a/BUILD": "protobuf_source(source='f.proto')"})
     assert_filedeps(rule_runner, targets=["a"], expected={"a/BUILD", "a/f.proto"})

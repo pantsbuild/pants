@@ -9,15 +9,10 @@ import os
 from abc import ABCMeta
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, Set, Tuple, Type, cast
+from typing import Iterable, Iterator, Mapping, cast
 
-from pants.base.specs import (
-    AddressSpecs,
-    AscendantAddresses,
-    MaybeEmptyDescendantAddresses,
-    Spec,
-    Specs,
-)
+from pants.base.deprecated import warn_or_error
+from pants.base.specs import AncestorGlobSpec, RawSpecs, Spec, Specs
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -28,44 +23,74 @@ from pants.engine.fs import (
     FileContent,
     PathGlobs,
     Paths,
+    SpecsPaths,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.build_files import BuildFileOptions
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import (
-    Sources,
+    AllUnexpandedTargets,
+    MultipleSourcesField,
+    OptionalSingleSourceField,
+    SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
     Target,
     UnexpandedTargets,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.util.docutil import doc_url
+from pants.option.global_options import GlobalOptions
+from pants.option.option_types import BoolOption, DictOption, StrListOption, StrOption
+from pants.source.filespec import Filespec, matches_filespec
+from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 
 @union
 @dataclass(frozen=True)
 class PutativeTargetsRequest(metaclass=ABCMeta):
-    search_paths: PutativeTargetsSearchPaths
+    dirs: tuple[str, ...]
+    deprecated_recursive_dirs: tuple[str, ...] = ()
+
+    def path_globs(self, *filename_globs: str) -> PathGlobs:
+        return PathGlobs(
+            globs=(
+                *(os.path.join(d, glob) for d in self.dirs for glob in filename_globs),
+                *(
+                    os.path.join(d, "**", glob)
+                    for d in self.deprecated_recursive_dirs
+                    for glob in filename_globs
+                ),
+            )
+        )
 
 
 @dataclass(frozen=True)
 class PutativeTargetsSearchPaths:
     dirs: tuple[str, ...]
+    deprecated_recursive_dirs: tuple[str, ...] = ()
 
     def path_globs(self, filename_glob: str) -> PathGlobs:
-        return PathGlobs([os.path.join(d, "**", filename_glob) for d in self.dirs])
+        return PathGlobs(
+            globs=(
+                *(os.path.join(d, filename_glob) for d in self.dirs),
+                *(os.path.join(d, "**", filename_glob) for d in self.deprecated_recursive_dirs),
+            )
+        )
 
 
 @memoized
-def default_sources_for_target_type(tgt_type: Type[Target]) -> Tuple[str, ...]:
+def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
     for field in tgt_type.core_fields:
-        if issubclass(field, Sources):
+        if issubclass(field, OptionalSingleSourceField):
+            return (field.default,) if field.default else tuple()
+        if issubclass(field, MultipleSourcesField):
             return field.default or tuple()
     return tuple()
 
@@ -73,7 +98,11 @@ def default_sources_for_target_type(tgt_type: Type[Target]) -> Tuple[str, ...]:
 @frozen_after_init
 @dataclass(order=True, unsafe_hash=True)
 class PutativeTarget:
-    """A potential target to add, detected by various heuristics."""
+    """A potential target to add, detected by various heuristics.
+
+    This class uses the term "target" in the loose sense. It can also represent an invocation of a
+    target-generating macro.
+    """
 
     # Note that field order is such that the dataclass order will be by address (path+name).
     path: str
@@ -84,55 +113,56 @@ class PutativeTarget:
     # The putative target will own these sources, but may also glob over other sources.
     # If the putative target does not have a `sources` field, then this value must be the
     # empty tuple.
-    triggering_sources: Tuple[str, ...]
+    triggering_sources: tuple[str, ...]
 
     # The globs of sources owned by this target.
     # If kwargs contains an explicit sources key, it should be identical to this value.
     # Otherwise, this field should contain the default globs that the target type will apply.
     # If the putative target does not have a `sources` field, then this value must be the
     # empty tuple.
-    # TODO: If target_type is a regular target (and not a macro) we can derive the default
-    #  source globs for that type from BuildConfiguration.  However that is fiddly and not
-    #  a high priority.
-    owned_sources: Tuple[str, ...]
+    # TODO: We can derive the default source globs for that type from BuildConfiguration.
+    #  However that is fiddly and not a high priority.
+    owned_sources: tuple[str, ...]
 
-    # Note that we generate the BUILD file target entry exclusively from these kwargs (plus the
-    # type_alias), not from the fields above, which are broken out for other uses.
-    # This allows the creator of instances of this class to control whether the generated
-    # target should assume default kwarg values or provide them explicitly.
-    kwargs: FrozenDict[str, str | int | bool | Tuple[str, ...]]
+    # Note that we generate the BUILD file target entry from these kwargs, the
+    # `name`, and `type_alias`.
+    kwargs: FrozenDict[str, str | int | bool | tuple[str, ...]]
 
     # Any comment lines to add above the BUILD file stanza we generate for this putative target.
     # Should include the `#` prefix, which will not be added.
-    comments: Tuple[str, ...]
-
-    # The name of the BUILD file to generate this putative target in. Typically just `BUILD`,
-    # but `BUILD.suffix` for any suffix is also valid.
-    build_file_name: str
+    comments: tuple[str, ...]
 
     @classmethod
     def for_target_type(
         cls,
-        target_type: Type[Target],
+        target_type: type[Target],
         path: str,
-        name: str,
+        name: str | None,
         triggering_sources: Iterable[str],
-        kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
+        kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
-        build_file_name: str = "BUILD",
-    ):
-        explicit_sources = (kwargs or {}).get("sources")
+    ) -> PutativeTarget:
+        if name is None:
+            name = os.path.basename(path)
+
+        kwargs = kwargs or {}
+        explicit_sources = cast(
+            "tuple[str, ...] | None",
+            (kwargs["source"],) if "source" in kwargs else kwargs.get("sources"),
+        )
         if explicit_sources is not None and not isinstance(explicit_sources, tuple):
             raise TypeError(
-                "Explicit sources passed to PutativeTarget.for_target_type must be a Tuple[str]."
+                "`source` or `sources` passed to PutativeTarget.for_target_type(kwargs=)`, but "
+                "it was not the correct type. `source` must be `str` and `sources` must be "
+                f"`tuple[str, ...]`. Was `{explicit_sources}` with type `{type(explicit_sources)}`."
             )
 
         default_sources = default_sources_for_target_type(target_type)
         if (explicit_sources or triggering_sources) and not default_sources:
-            raise ValueError(
+            raise AssertionError(
                 f"A target of type {target_type.__name__} was proposed at "
                 f"address {path}:{name} with explicit sources {', '.join(explicit_sources or triggering_sources)}, "
-                "but this target type does not have a `sources` field."
+                "but this target type does not have a `source` or `sources` field."
             )
         owned_sources = explicit_sources or default_sources or tuple()
         return cls(
@@ -143,7 +173,6 @@ class PutativeTarget:
             owned_sources,
             kwargs=kwargs,
             comments=comments,
-            build_file_name=build_file_name,
         )
 
     def __init__(
@@ -154,9 +183,8 @@ class PutativeTarget:
         triggering_sources: Iterable[str],
         owned_sources: Iterable[str],
         *,
-        kwargs: Mapping[str, str | int | bool | Tuple[str, ...]] | None = None,
+        kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
-        build_file_name: str = "BUILD",
     ) -> None:
         self.path = path
         self.name = name
@@ -165,11 +193,6 @@ class PutativeTarget:
         self.owned_sources = tuple(owned_sources)
         self.kwargs = FrozenDict(kwargs or {})
         self.comments = tuple(comments)
-        self.build_file_name = build_file_name
-
-    @property
-    def build_file_path(self) -> str:
-        return os.path.join(self.path, self.build_file_name)
 
     @property
     def address(self) -> Address:
@@ -188,9 +211,7 @@ class PutativeTarget:
 
     def rename(self, new_name: str) -> PutativeTarget:
         """A copy of this object with the name replaced to the given name."""
-        # We assume that a rename imposes an explicit "name=" kwarg, overriding any previous
-        # explicit "name=" kwarg, even if the rename happens to be to the default name.
-        return dataclasses.replace(self, name=new_name, kwargs={**self.kwargs, "name": new_name})
+        return dataclasses.replace(self, name=new_name)
 
     def restrict_sources(self) -> PutativeTarget:
         """A copy of this object with the sources explicitly set to just the triggering sources."""
@@ -214,9 +235,14 @@ class PutativeTarget:
                 return f"[{val_str}\n{indent}]"
             return repr(v)
 
-        if self.kwargs:
-            kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in self.kwargs.items()]
-            kwargs_str = ",".join(kwargs_str_parts) + ",\n"
+        has_name = self.name != os.path.basename(self.path)
+        if self.kwargs or has_name:
+            _kwargs = {
+                **({"name": self.name} if has_name else {}),
+                **self.kwargs,  # type: ignore[arg-type]
+            }
+            _kwargs_str_parts = [f"\n{indent}{k}={fmt_val(v)}" for k, v in _kwargs.items()]
+            kwargs_str = ",".join(_kwargs_str_parts) + ",\n"
         else:
             kwargs_str = ""
 
@@ -229,7 +255,7 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
     @classmethod
     def merge(cls, tgts_iters: Iterable[PutativeTargets]) -> PutativeTargets:
-        all_tgts: List[PutativeTarget] = []
+        all_tgts: list[PutativeTarget] = []
         for tgts in tgts_iters:
             all_tgts.extend(tgts)
         return cls(all_tgts)
@@ -237,41 +263,142 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
 class TailorSubsystem(GoalSubsystem):
     name = "tailor"
-    help = "Auto-generate BUILD file targets for new source files."
+    help = softwrap(
+        """
+        Auto-generate BUILD file targets for new source files.
 
-    required_union_implementations = (PutativeTargetsRequest,)
+        Each specific `tailor` implementation may be disabled through language-specific options,
+        e.g. `[python].tailor_pex_binary_targets` and `[shell-setup].tailor`.
+        """
+    )
 
     @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--build-file-indent",
-            advanced=True,
-            type=str,
-            default="    ",
-            help="The indent to use when auto-editing BUILD files.",
-        )
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PutativeTargetsRequest in union_membership
 
-        register(
-            "--alias-mapping",
-            advanced=True,
-            type=dict,
-            help="A mapping from standard target type to custom type to use instead. The custom "
-            "type can be a custom target type or a macro that offers compatible functionality "
-            f"to the one it replaces (see {doc_url('macros')}).",
-        )
+    check = BoolOption(
+        "--check",
+        default=False,
+        help=softwrap(
+            """
+            Do not write changes to disk, only write back what would change. Return code
+            0 means there would be no changes, and 1 means that there would be.
+            """
+        ),
+    )
+    build_file_name = StrOption(
+        "--build-file-name",
+        default="BUILD",
+        help=softwrap(
+            """
+            The name to use for generated BUILD files.
+
+            This must be compatible with `[GLOBAL].build_patterns`.
+            """
+        ),
+        advanced=True,
+    )
+    build_file_header = StrOption(
+        "--build-file-header",
+        default=None,
+        help="A header, e.g., a copyright notice, to add to the content of created BUILD files.",
+        advanced=True,
+    )
+    build_file_indent = StrOption(
+        "--build-file-indent",
+        default="    ",
+        help="The indent to use when auto-editing BUILD files.",
+        advanced=True,
+    )
+    _alias_mapping = DictOption[str](
+        "--alias-mapping",
+        help=softwrap(
+            f"""
+            A mapping from standard target type to custom type to use instead. The custom
+            type can be a custom target type or a macro that offers compatible functionality
+            to the one it replaces (see {doc_url('macros')}).
+            """
+        ),
+        advanced=True,
+    )
+    ignore_paths = StrListOption(
+        "--ignore-paths",
+        help=softwrap(
+            """
+            Do not edit or create BUILD files at these paths.
+
+            Can use literal file names and/or globs, e.g. `['project/BUILD, 'ignore_me/**']`.
+
+            This augments the option `[GLOBAL].build_ignore`, which tells Pants to also not
+            _read_ BUILD files at certain paths. In contrast, this option only tells Pants to
+            not edit/create BUILD files at the specified paths.
+            """
+        ),
+        advanced=True,
+    )
+    _ignore_adding_targets = StrListOption(
+        "--ignore-adding-targets",
+        help=softwrap(
+            """
+            Do not add these target definitions.
+
+            Expects a list of target addresses that would normally be added by `tailor`,
+            e.g. `['project:tgt']`. To find these names, you can run `tailor --check`, then
+            combine the BUILD file path with the target's name. For example, if `tailor`
+            would add the target `bin` to `project/BUILD`, then the address would be
+            `project:bin`. If the BUILD file is at the root of your repository, use `//` for
+            the path, e.g. `//:bin`.
+
+            Does not work with macros.
+            """
+        ),
+        advanced=True,
+    )
 
     @property
-    def build_file_indent(self) -> str:
-        return cast(str, self.options.build_file_indent)
+    def ignore_adding_targets(self) -> set[str]:
+        return set(self._ignore_adding_targets)
 
     def alias_for(self, standard_type: str) -> str | None:
         # The get() could return None, but casting to str | None errors.
         # This cast suffices to avoid typecheck errors.
-        return cast(str, self.options.alias_mapping.get(standard_type))
+        return cast(str, self._alias_mapping.get(standard_type))
+
+    def validate_build_file_name(self, build_file_patterns: tuple[str, ...]) -> None:
+        """Check that the specified BUILD file name works with the repository's BUILD file
+        patterns."""
+        filespec = Filespec(includes=list(build_file_patterns))
+        if not bool(matches_filespec(filespec, paths=[self.build_file_name])):
+            raise ValueError(
+                f"The option `[{self.options_scope}].build_file_name` is set to "
+                f"`{self.build_file_name}`, which is not compatible with "
+                f"`[GLOBAL].build_patterns`: {sorted(build_file_patterns)}. This means that "
+                "generated BUILD files would be ignored.\n\n"
+                "To fix, please update the options so that they are compatible."
+            )
+
+    def filter_by_ignores(
+        self, putative_targets: Iterable[PutativeTarget], build_file_ignores: tuple[str, ...]
+    ) -> Iterator[PutativeTarget]:
+        ignore_paths_filespec = Filespec(includes=[*self.ignore_paths, *build_file_ignores])
+        for ptgt in putative_targets:
+            is_ignored_file = bool(
+                matches_filespec(
+                    ignore_paths_filespec,
+                    paths=[os.path.join(ptgt.path, self.build_file_name)],
+                )
+            )
+            if is_ignored_file:
+                continue
+            # Note that `tailor` can only generate explicit targets, so we don't need to
+            # worry about generated address syntax (`#`) or file address syntax.
+            address = f"{ptgt.path or '//'}:{ptgt.name}"
+            if address in self.ignore_adding_targets:
+                continue
+            yield ptgt
 
 
-class Tailor(Goal):
+class TailorGoal(Goal):
     subsystem_cls = TailorSubsystem
 
 
@@ -284,10 +411,12 @@ def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
     return ret
 
 
-def group_by_build_file(ptgts: Iterable[PutativeTarget]) -> Dict[str, List[PutativeTarget]]:
+def group_by_build_file(
+    build_file_name: str, ptgts: Iterable[PutativeTarget]
+) -> dict[str, list[PutativeTarget]]:
     ret = defaultdict(list)
     for ptgt in ptgts:
-        ret[ptgt.build_file_path].append(ptgt)
+        ret[os.path.join(ptgt.path, build_file_name)].append(ptgt)
     return ret
 
 
@@ -296,10 +425,9 @@ class AllOwnedSources(DeduplicatedCollection[str]):
 
 
 @rule(desc="Determine all files already owned by targets", level=LogLevel.DEBUG)
-async def determine_all_owned_sources() -> AllOwnedSources:
-    all_tgts = await Get(UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")]))
+async def determine_all_owned_sources(all_tgts: AllUnexpandedTargets) -> AllOwnedSources:
     all_sources_paths = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(tgt.get(Sources))) for tgt in all_tgts
+        Get(SourcesPaths, SourcesPathsRequest(tgt.get(SourcesField))) for tgt in all_tgts
     )
     return AllOwnedSources(
         itertools.chain.from_iterable(sources_paths.files for sources_paths in all_sources_paths)
@@ -314,13 +442,12 @@ class UniquelyNamedPutativeTargets:
 
 
 @rule
-async def rename_conflicting_targets(ptgts: PutativeTargets) -> UniquelyNamedPutativeTargets:
+async def rename_conflicting_targets(
+    ptgts: PutativeTargets, all_existing_tgts: AllUnexpandedTargets
+) -> UniquelyNamedPutativeTargets:
     """Ensure that no target addresses collide."""
-    all_existing_tgts = await Get(
-        UnexpandedTargets, AddressSpecs([MaybeEmptyDescendantAddresses("")])
-    )
-    existing_addrs: Set[str] = {tgt.address.spec for tgt in all_existing_tgts}
-    uniquely_named_putative_targets: List[PutativeTarget] = []
+    existing_addrs: set[str] = {tgt.address.spec for tgt in all_existing_tgts}
+    uniquely_named_putative_targets: list[PutativeTarget] = []
     for ptgt in ptgts:
         idx = 0
         possibly_renamed_ptgt = ptgt
@@ -348,15 +475,21 @@ class DisjointSourcePutativeTarget:
 async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePutativeTarget:
     source_paths = await Get(
         Paths,
-        PathGlobs(Sources.prefix_glob_with_dirpath(ptgt.path, glob) for glob in ptgt.owned_sources),
+        PathGlobs(
+            SourcesField.prefix_glob_with_dirpath(ptgt.path, glob) for glob in ptgt.owned_sources
+        ),
     )
     source_path_set = set(source_paths.files)
     source_dirs = {os.path.dirname(path) for path in source_path_set}
     possible_owners = await Get(
-        UnexpandedTargets, AddressSpecs(AscendantAddresses(d) for d in source_dirs)
+        UnexpandedTargets,
+        RawSpecs(
+            ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs),
+            description_of_origin="the `tailor` goal",
+        ),
     )
     possible_owners_sources = await MultiGet(
-        Get(SourcesPaths, SourcesPathsRequest(t.get(Sources))) for t in possible_owners
+        Get(SourcesPaths, SourcesPathsRequest(t.get(SourcesField))) for t in possible_owners
     )
     conflicting_targets = []
     for tgt, sources in zip(possible_owners, possible_owners_sources):
@@ -379,14 +512,13 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
 @dataclass(frozen=True)
 class EditBuildFilesRequest:
     putative_targets: PutativeTargets
-    indent: str
 
 
 @dataclass(frozen=True)
 class EditedBuildFiles:
     digest: Digest
-    created_paths: Tuple[str, ...]
-    updated_paths: Tuple[str, ...]
+    created_paths: tuple[str, ...]
+    updated_paths: tuple[str, ...]
 
 
 def make_content_str(
@@ -400,8 +532,12 @@ def make_content_str(
 
 
 @rule(desc="Edit BUILD files with new targets", level=LogLevel.DEBUG)
-async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
-    ptgts_by_build_file = group_by_build_file(req.putative_targets)
+async def edit_build_files(
+    req: EditBuildFilesRequest, tailor_subsystem: TailorSubsystem
+) -> EditedBuildFiles:
+    ptgts_by_build_file = group_by_build_file(
+        tailor_subsystem.build_file_name, req.putative_targets
+    )
     # There may be an existing *directory* whose name collides with that of a BUILD file
     # we want to create. This is more likely on a system with case-insensitive paths,
     # such as MacOS. We detect such cases and use an alt BUILD file name to fix.
@@ -420,9 +556,13 @@ async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     def make_content(bf_path: str, pts: Iterable[PutativeTarget]) -> FileContent:
         existing_content_bytes = existing_build_files_contents_by_path.get(bf_path)
         existing_content = (
-            None if existing_content_bytes is None else existing_content_bytes.decode()
+            tailor_subsystem.build_file_header
+            if existing_content_bytes is None
+            else existing_content_bytes.decode()
         )
-        new_content_bytes = make_content_str(existing_content, req.indent, pts).encode()
+        new_content_bytes = make_content_str(
+            existing_content, tailor_subsystem.build_file_indent, pts
+        ).encode()
         return FileContent(bf_path, new_content_bytes)
 
     new_digest = await Get(
@@ -435,39 +575,49 @@ async def edit_build_files(req: EditBuildFilesRequest) -> EditedBuildFiles:
     return EditedBuildFiles(new_digest, tuple(sorted(created)), tuple(sorted(updated)))
 
 
-def specs_to_dirs(specs: Specs) -> tuple[str, ...]:
+def specs_to_dirs(specs: RawSpecs) -> tuple[str, ...]:
     """Extract cmd-line specs that look like directories.
 
     Error on all other specs.
 
-    This is a hack that allows us to emulate "directory specs", until we are able to
-    support those more intrinsically.
-
-    TODO: If other goals need "directory specs", move this logic to a rule that produces them.
+    This is a hack that allows us to emulate "directory specs" while we deprecate the shorthand of
+    `dir` being `dir:dir`.
     """
-    # Specs that look like directories are interpreted by the SpecsParser as the address
-    # of the target with the same name as the directory of the BUILD file.
-    # Note that we can't tell the difference between the user specifying foo/bar and the
-    # user specifying foo/bar:bar, so we will consider the latter a "directory spec" too.
-    dir_specs = []
+    dir_specs = [dir_spec.directory for dir_spec in specs.dir_literals]
     other_specs: list[Spec] = [
-        *specs.filesystem_specs.includes,
-        *specs.filesystem_specs.ignores,
-        *specs.address_specs.globs,
+        *specs.file_literals,
+        *specs.file_globs,
+        *specs.dir_globs,
+        *specs.recursive_globs,
+        *specs.ancestor_globs,
     ]
-    for spec in specs.address_specs.literals:
-        if spec.target_component == os.path.basename(spec.path_component):
-            dir_specs.append(spec)
+    for spec in specs.address_literals:
+        if spec.is_directory_shorthand:
+            dir_specs.append(spec.path_component)
         else:
             other_specs.append(spec)
     if other_specs:
         raise ValueError(
-            "The tailor goal only accepts literal directories as arguments, but you "
-            f"specified: {', '.join(str(spec) for spec in other_specs)}.  You can also "
-            "specify no arguments to run against the entire repository."
+            softwrap(
+                f"""
+                The global option `use_deprecated_cli_args_semantics` is set to `true`, so the
+                tailor goal is using deprecated semantics for CLI arguments. In this mode, the
+                tailor goal only accepts literal directories as arguments, which it will run
+                recursively on. You specified {', '.join(str(spec) for spec in other_specs)}
+
+                To fix, either set `use_deprecated_cli_args_semantics` to false, or rerun with
+                specifying only literal directories, e.g. `tailor dir1 dir2`. If changing
+                `use_deprecated_cli_args_semantics` to false, you should specify which directories
+                to run on when using `tailor`:
+
+                  * `::` to run on everything
+                  * `dir::` to run on `dir` and subdirs
+                  * `dir` to run on `dir`
+                """
+            )
         )
-    # No specs at all means search the entire repo (represented by ("",)).
-    return tuple(spec.path_component for spec in specs.address_specs.literals) or ("",)
+    # No specs at all means search the entire repo.
+    return tuple(dir_specs) or ("",)
 
 
 @goal_rule
@@ -477,14 +627,45 @@ async def tailor(
     workspace: Workspace,
     union_membership: UnionMembership,
     specs: Specs,
-) -> Tailor:
-    search_paths = PutativeTargetsSearchPaths(specs_to_dirs(specs))
-    putative_target_request_types: Iterable[type[PutativeTargetsRequest]] = union_membership[
-        PutativeTargetsRequest
-    ]
+    build_file_options: BuildFileOptions,
+    global_options: GlobalOptions,
+) -> TailorGoal:
+    tailor_subsystem.validate_build_file_name(build_file_options.patterns)
+
+    dir_search_paths: tuple[str, ...] = ()
+    recursive_search_paths: tuple[str, ...] = ()
+    if specs:
+        if global_options.use_deprecated_directory_cli_args_semantics:
+            recursive_search_paths = specs_to_dirs(specs.includes)
+        else:
+            specs_paths = await Get(SpecsPaths, Specs, specs)
+            dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
+    else:
+        warn_or_error(
+            "2.14.0.dev0",
+            f"running `{bin_name()} tailor` without arguments",
+            softwrap(
+                f"""
+                Currently, `{bin_name()} tailor` without arguments will run against
+                every file in the project.
+
+                In Pants 2.14, you must use CLI arguments. Use:
+
+                  * `::` to run on everything
+                  * `dir::` to run on `dir` and subdirs
+                  * `dir` to run on `dir`
+                """
+            ),
+        )
+        recursive_search_paths = ("",)
+
     putative_targets_results = await MultiGet(
-        Get(PutativeTargets, PutativeTargetsRequest, req_type(search_paths))
-        for req_type in putative_target_request_types
+        Get(
+            PutativeTargets,
+            PutativeTargetsRequest,
+            req_type(dir_search_paths, recursive_search_paths),
+        )
+        for req_type in union_membership[PutativeTargetsRequest]
     )
     putative_targets = PutativeTargets.merge(putative_targets_results)
     putative_targets = PutativeTargets(
@@ -495,25 +676,41 @@ async def tailor(
         Get(DisjointSourcePutativeTarget, PutativeTarget, ptgt)
         for ptgt in fixed_names_ptgts.putative_targets
     )
-    ptgts = [dspt.putative_target for dspt in fixed_sources_ptgts]
 
-    if ptgts:
-        edited_build_files = await Get(
-            EditedBuildFiles,
-            EditBuildFilesRequest(PutativeTargets(ptgts), tailor_subsystem.build_file_indent),
+    valid_putative_targets = list(
+        tailor_subsystem.filter_by_ignores(
+            (disjoint_source_ptgt.putative_target for disjoint_source_ptgt in fixed_sources_ptgts),
+            build_file_options.ignores,
         )
-        updated_build_files = set(edited_build_files.updated_paths)
+    )
+    if not valid_putative_targets:
+        return TailorGoal(exit_code=0)
+
+    edited_build_files = await Get(
+        EditedBuildFiles, EditBuildFilesRequest(PutativeTargets(valid_putative_targets))
+    )
+    if not tailor_subsystem.check:
         workspace.write_digest(edited_build_files.digest)
-        ptgts_by_build_file = group_by_build_file(ptgts)
-        for build_file_path, ptgts in ptgts_by_build_file.items():
-            verb = "Updated" if build_file_path in updated_build_files else "Created"
-            console.print_stdout(f"{verb} {console.blue(build_file_path)}:")
-            for ptgt in ptgts:
-                console.print_stdout(
-                    f"  - Added {console.green(ptgt.type_alias)} target "
-                    f"{console.cyan(ptgt.address.spec)}"
-                )
-    return Tailor(0)
+
+    updated_build_files = set(edited_build_files.updated_paths)
+    ptgts_by_build_file = group_by_build_file(
+        tailor_subsystem.build_file_name, valid_putative_targets
+    )
+    for build_file_path, ptgts in ptgts_by_build_file.items():
+        formatted_changes = "\n".join(
+            f"  - Add {console.green(ptgt.type_alias)} target {console.cyan(ptgt.name)}"
+            for ptgt in ptgts
+        )
+        if build_file_path in updated_build_files:
+            verb = "Would update" if tailor_subsystem.check else "Updated"
+        else:
+            verb = "Would create" if tailor_subsystem.check else "Created"
+        console.print_stdout(f"{verb} {console.blue(build_file_path)}:\n{formatted_changes}")
+
+    if tailor_subsystem.check:
+        console.print_stdout(f"\nTo fix `tailor` failures, run `{bin_name()} tailor`.")
+
+    return TailorGoal(exit_code=1 if tailor_subsystem.check else 0)
 
 
 def rules():

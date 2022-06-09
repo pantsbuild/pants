@@ -9,18 +9,18 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::gen::build::bazel::semver::SemVer;
-use bazel_protos::gen::google::longrunning::{
-  operations_server::Operations, operations_server::OperationsServer, CancelOperationRequest,
-  DeleteOperationRequest, GetOperationRequest, ListOperationsRequest, ListOperationsResponse,
-  Operation,
-};
-use bazel_protos::require_digest;
 use futures::{FutureExt, Stream};
 use grpc_util::hyper::AddrIncomingWithStream;
 use hashing::Digest;
 use parking_lot::Mutex;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::gen::build::bazel::semver::SemVer;
+use protos::gen::google::longrunning::{
+  operations_server::Operations, operations_server::OperationsServer, CancelOperationRequest,
+  DeleteOperationRequest, GetOperationRequest, ListOperationsRequest, ListOperationsResponse,
+  Operation,
+};
+use protos::require_digest;
 use remexec::{
   action_cache_server::ActionCache, action_cache_server::ActionCacheServer,
   capabilities_server::Capabilities, capabilities_server::CapabilitiesServer,

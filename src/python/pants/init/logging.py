@@ -9,9 +9,9 @@ import logging
 import sys
 from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
-from logging import Formatter, LogRecord, StreamHandler
+from logging import Formatter, Handler, LogRecord
 from pathlib import PurePath
-from typing import Dict, Iterator, cast
+from typing import Iterator
 
 import pants.util.logging as pants_logging
 from pants.engine.internals import native_engine
@@ -28,7 +28,7 @@ logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(pants_logging.TRACE, "TRACE")
 
 
-class _NativeHandler(StreamHandler):
+class _NativeHandler(Handler):
     """This class is installed as a Python logging module handler (using the logging.addHandler
     method) and proxies logs to the Rust logging infrastructure."""
 
@@ -42,11 +42,10 @@ class _NativeHandler(StreamHandler):
 class _ExceptionFormatter(Formatter):
     """Possibly render the stacktrace and possibly give debug hints, based on global options."""
 
-    def __init__(self, level: LogLevel, *, print_stacktrace: bool, local_cleanup: bool) -> None:
+    def __init__(self, level: LogLevel, *, print_stacktrace: bool) -> None:
         super().__init__(None)
         self.level = level
         self.print_stacktrace = print_stacktrace
-        self.local_cleanup = local_cleanup
 
     def formatException(self, exc_info):
         stacktrace = super().formatException(exc_info) if self.print_stacktrace else ""
@@ -54,8 +53,6 @@ class _ExceptionFormatter(Formatter):
         debug_instructions = []
         if not self.print_stacktrace:
             debug_instructions.append("--print-stacktrace for more error details")
-        if self.local_cleanup:
-            debug_instructions.append("--no-process-execution-local-cleanup to inspect chroots")
         if self.level not in {LogLevel.DEBUG, LogLevel.TRACE}:
             debug_instructions.append("-ldebug for more logs")
         debug_instructions = (
@@ -63,8 +60,8 @@ class _ExceptionFormatter(Formatter):
         )
 
         return (
-            f"{stacktrace}\n\n({debug_instructions}See {doc_url('troubleshooting')} for common issues. "
-            f"Consider reaching out for help: {doc_url('getting-help')}.)"
+            f"{stacktrace}\n\n{debug_instructions}\nSee {doc_url('troubleshooting')} for common "
+            f"issues.\nConsider reaching out for help: {doc_url('getting-help')}\n"
         )
 
 
@@ -103,7 +100,7 @@ def stdio_destination_use_color(use_color: bool) -> None:
 
 @contextmanager
 def _python_logging_setup(
-    level: LogLevel, *, print_stacktrace: bool, local_cleanup: bool
+    level: LogLevel, log_levels_by_target: dict[str, LogLevel], *, print_stacktrace: bool
 ) -> Iterator[None]:
     """Installs a root Python logger that routes all logging through a Rust logger."""
 
@@ -130,15 +127,16 @@ def _python_logging_setup(
         # This routes warnings through our loggers instead of straight to raw stderr.
         logging.captureWarnings(True)
         handler = _NativeHandler()
-        exc_formatter = _ExceptionFormatter(
-            level, print_stacktrace=print_stacktrace, local_cleanup=local_cleanup
-        )
+        exc_formatter = _ExceptionFormatter(level, print_stacktrace=print_stacktrace)
         handler.setFormatter(exc_formatter)
         logger.addHandler(handler)
         level.set_level_for(logger)
 
+        for key, level in log_levels_by_target.items():
+            level.set_level_for(logging.getLogger(key))
+
         if logger.isEnabledFor(LogLevel.TRACE.level):
-            http.client.HTTPConnection.debuglevel = 1  # type: ignore[attr-defined]
+            http.client.HTTPConnection.debuglevel = 1
             requests_logger = logging.getLogger("requests.packages.urllib3")
             LogLevel.TRACE.set_level_for(requests_logger)
             requests_logger.propagate = True
@@ -164,23 +162,38 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
     * PantsDaemon, immediately on startup. The process will then default to sending stdio to the log
       until client connections arrive, at which point `stdio_destination` is used per-connection.
     """
-    global_level = global_bootstrap_options.level
-    log_show_rust_3rdparty = global_bootstrap_options.log_show_rust_3rdparty
-    show_target = global_bootstrap_options.show_log_target
-    log_levels_by_target = _get_log_levels_by_target(global_bootstrap_options)
-    print_stacktrace = global_bootstrap_options.print_stacktrace
-    local_cleanup = global_bootstrap_options.process_execution_local_cleanup
+    with initialize_stdio_raw(
+        global_bootstrap_options.level,
+        global_bootstrap_options.log_show_rust_3rdparty,
+        global_bootstrap_options.show_log_target,
+        _get_log_levels_by_target(global_bootstrap_options),
+        global_bootstrap_options.print_stacktrace,
+        global_bootstrap_options.ignore_warnings,
+        global_bootstrap_options.pants_workdir,
+    ):
+        yield
 
+
+@contextmanager
+def initialize_stdio_raw(
+    global_level: LogLevel,
+    log_show_rust_3rdparty: bool,
+    show_target: bool,
+    log_levels_by_target: dict[str, LogLevel],
+    print_stacktrace: bool,
+    ignore_warnings: list[str],
+    pants_workdir: str,
+) -> Iterator[None]:
     literal_filters = []
     regex_filters = []
-    for filt in cast("list[str]", global_bootstrap_options.ignore_warnings):
+    for filt in ignore_warnings:
         if filt.startswith("$regex$"):
             regex_filters.append(strip_prefix(filt, "$regex$"))
         else:
             literal_filters.append(filt)
 
     # Set the pants log destination.
-    log_path = str(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
+    log_path = str(pants_log_path(PurePath(pants_workdir)))
     safe_mkdir_for(log_path)
 
     # Initialize thread-local stdio, and replace sys.std* with proxies.
@@ -203,15 +216,15 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
             encoding=locale.getpreferredencoding(False),
         )
 
-        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[assignment]
         # Install a Python logger that will route through the Rust logger.
         with _python_logging_setup(
-            global_level, print_stacktrace=print_stacktrace, local_cleanup=local_cleanup
+            global_level, log_levels_by_target, print_stacktrace=print_stacktrace
         ):
             yield
     finally:
         sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
-        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr
+        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[assignment]
 
 
 def pants_log_path(workdir: PurePath) -> PurePath:
@@ -221,17 +234,17 @@ def pants_log_path(workdir: PurePath) -> PurePath:
 
 def _get_log_levels_by_target(
     global_bootstrap_options: OptionValueContainer,
-) -> Dict[str, LogLevel]:
+) -> dict[str, LogLevel]:
     raw_levels = global_bootstrap_options.log_levels_by_target
-    levels: Dict[str, LogLevel] = {}
+    levels: dict[str, LogLevel] = {}
     for key, value in raw_levels.items():
         if not isinstance(key, str):
             raise ValueError(
-                "Keys for log_domain_levels must be strings, but was given the key: {key} with type {type(key)}."
+                f"Keys for log_domain_levels must be strings, but was given the key: {key} with type {type(key)}."
             )
         if not isinstance(value, str):
             raise ValueError(
-                "Values for log_domain_levels must be strings, but was given the value: {value} with type {type(value)}."
+                f"Values for log_domain_levels must be strings, but was given the value: {value} with type {type(value)}."
             )
         log_level = LogLevel[value.upper()]
         levels[key] = log_level

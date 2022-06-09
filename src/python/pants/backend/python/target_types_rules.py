@@ -11,26 +11,38 @@ import dataclasses
 import logging
 import os.path
 from collections import defaultdict
+from dataclasses import dataclass
 from itertools import chain
 from textwrap import dedent
 from typing import DefaultDict, Dict, Generator, Optional, Tuple, cast
 
-from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModuleOwners,
+    PythonModuleOwnersRequest,
+)
 from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
-from pants.backend.python.goals.setup_py import InvalidEntryPoint, merge_entry_points
+from pants.backend.python.goals.setup_py import InvalidEntryPoint
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
-    PexBinaryDependencies,
+    InterpreterConstraintsField,
+    PexBinariesGeneratorTarget,
+    PexBinary,
+    PexBinaryDependenciesField,
     PexEntryPointField,
-    PythonDistributionDependencies,
+    PexEntryPointsField,
+    PythonDistributionDependenciesField,
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
+    PythonFilesGeneratorSettingsRequest,
     PythonProvidesField,
+    PythonResolveField,
     ResolvedPexEntryPoint,
     ResolvedPythonDistributionEntryPoints,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
 )
+from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -38,44 +50,113 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
+    FieldSet,
+    GeneratedTargets,
+    GenerateTargetsRequest,
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldException,
+    TargetFilesGeneratorSettings,
+    TargetFilesGeneratorSettingsRequest,
     Targets,
+    ValidatedDependencies,
+    ValidateDependenciesRequest,
     WrappedTarget,
+    WrappedTargetRequest,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+@rule
+def python_files_generator_settings(
+    _: PythonFilesGeneratorSettingsRequest,
+    python_infer: PythonInferSubsystem,
+) -> TargetFilesGeneratorSettings:
+    return TargetFilesGeneratorSettings(add_dependencies_on_all_siblings=not python_infer.imports)
+
+
+# -----------------------------------------------------------------------------------------------
+# `pex_binary` target generation rules
+# -----------------------------------------------------------------------------------------------
+
+
+class GenerateTargetsFromPexBinaries(GenerateTargetsRequest):
+    # TODO: This can be deprecated in favor of `parametrize`.
+    generate_from = PexBinariesGeneratorTarget
+
+
+@rule
+async def generate_targets_from_pex_binaries(
+    request: GenerateTargetsFromPexBinaries,
+    union_membership: UnionMembership,
+) -> GeneratedTargets:
+    generator_addr = request.template_address
+    entry_points_field = request.generator[PexEntryPointsField].value or []
+    overrides = request.require_unparametrized_overrides()
+
+    # Note that we don't check for overlap because it seems unlikely to be a problem.
+    # If it does, we should add this check. (E.g. `path.to.app` and `path/to/app.py`)
+
+    def create_pex_binary(entry_point_spec: str) -> PexBinary:
+        return PexBinary(
+            {
+                PexEntryPointField.alias: entry_point_spec,
+                **request.template,
+                # Note that overrides comes last to make sure that it indeed overrides.
+                **overrides.pop(entry_point_spec, {}),
+            },
+            # ":" is a forbidden character in target names
+            generator_addr.create_generated(entry_point_spec.replace(":", "-")),
+            union_membership,
+            residence_dir=generator_addr.spec_path,
+        )
+
+    pex_binaries = [create_pex_binary(entry_point) for entry_point in entry_points_field]
+
+    if overrides:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                Unused key in the `overrides` field for {generator_addr}:
+                {sorted(overrides)}
+
+                Tip: if you'd like to override a field's value for every `{PexBinary.alias}` target
+                generated by this target, change the field directly on this target rather than using
+                the `overrides` field.
+                """
+            )
+        )
+
+    return GeneratedTargets(request.generator, pex_binaries)
+
 
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` rules
 # -----------------------------------------------------------------------------------------------
 
 
-@rule(desc="Determining the entry point for a `pex_binary` target", level=LogLevel.DEBUG)
+@rule(desc="Determining the entry point for a `pex_binary` target")
 async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> ResolvedPexEntryPoint:
     ep_val = request.entry_point_field.value
+    if ep_val is None:
+        return ResolvedPexEntryPoint(None, file_name_used=False)
     address = request.entry_point_field.address
 
     # We support several different schemes:
-    #  1) `<none>` or `<None>` => set to `None`.
-    #  2) `path.to.module` => preserve exactly.
-    #  3) `path.to.module:func` => preserve exactly.
-    #  4) `app.py` => convert into `path.to.app`.
-    #  5) `app.py:func` => convert into `path.to.app:func`.
+    #  1) `path.to.module` => preserve exactly.
+    #  2) `path.to.module:func` => preserve exactly.
+    #  3) `app.py` => convert into `path.to.app`.
+    #  4) `app.py:func` => convert into `path.to.app:func`.
 
-    # Case #1.
-    if ep_val.module in ("<none>", "<None>"):
-        return ResolvedPexEntryPoint(None, file_name_used=False)
-
-    # If it's already a module (cases #2 and #3), simply use that. Otherwise, convert the file name
-    # into a module path (cases #4 and #5).
+    # If it's already a module (cases #1 and #2), simply use that. Otherwise, convert the file name
+    # into a module path (cases #3 and #4).
     if not ep_val.module.endswith(".py"):
         return ResolvedPexEntryPoint(ep_val, file_name_used=False)
 
@@ -93,10 +174,15 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
     # we need to check if they used a file glob (`*` or `**`) that resolved to >1 file.
     if len(entry_point_paths.files) != 1:
         raise InvalidFieldException(
-            f"Multiple files matched for the `{request.entry_point_field.alias}` "
-            f"{ep_val.spec!r} for the target {address}, but only one file expected. Are you using "
-            f"a glob, rather than a file name?\n\n"
-            f"All matching files: {list(entry_point_paths.files)}."
+            softwrap(
+                f"""
+                Multiple files matched for the `{request.entry_point_field.alias}`
+                {ep_val.spec!r} for the target {address}, but only one file expected. Are you using
+                a glob, rather than a file name?
+
+                All matching files: {list(entry_point_paths.files)}.
+                """
+            )
         )
     entry_point_path = entry_point_paths.files[0]
     source_root = await Get(
@@ -113,26 +199,41 @@ async def resolve_pex_entry_point(request: ResolvePexEntryPointRequest) -> Resol
 
 
 class InjectPexBinaryEntryPointDependency(InjectDependenciesRequest):
-    inject_for = PexBinaryDependencies
+    inject_for = PexBinaryDependenciesField
 
 
 @rule(desc="Inferring dependency from the pex_binary `entry_point` field")
 async def inject_pex_binary_entry_point_dependency(
-    request: InjectPexBinaryEntryPointDependency, python_infer_subsystem: PythonInferSubsystem
+    request: InjectPexBinaryEntryPointDependency,
+    python_infer_subsystem: PythonInferSubsystem,
+    python_setup: PythonSetup,
 ) -> InjectedDependencies:
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
-    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    original_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
+    entry_point_field = original_tgt.target.get(PexEntryPointField)
+    if entry_point_field.value is None:
+        return InjectedDependencies()
+
     explicitly_provided_deps, entry_point = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
-        Get(
-            ResolvedPexEntryPoint,
-            ResolvePexEntryPointRequest(original_tgt.target[PexEntryPointField]),
-        ),
+        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(entry_point_field)),
     )
     if entry_point.val is None:
         return InjectedDependencies()
-    owners = await Get(PythonModuleOwners, PythonModule(entry_point.val.module))
+
+    owners = await Get(
+        PythonModuleOwners,
+        PythonModuleOwnersRequest(
+            entry_point.val.module,
+            resolve=original_tgt.target[PythonResolveField].normalized_value(python_setup),
+        ),
+    )
     address = original_tgt.target.address
     explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
         owners.ambiguous,
@@ -141,10 +242,12 @@ async def inject_pex_binary_entry_point_dependency(
         # live in the pex_binary's directory or subdirectory, so the owners must be ancestors.
         owners_must_be_ancestors=entry_point.file_name_used,
         import_reference="module",
-        context=(
-            f"The pex_binary target {address} has the field "
-            f"`entry_point={repr(original_tgt.target[PexEntryPointField].value.spec)}`, which "
-            f"maps to the Python module `{entry_point.val.module}`"
+        context=softwrap(
+            f"""
+            The pex_binary target {address} has the field
+            `entry_point={repr(entry_point_field.value.spec)}`, which
+            maps to the Python module `{entry_point.val.module}`
+            """
         ),
     )
     maybe_disambiguated = explicitly_provided_deps.disambiguated(
@@ -181,7 +284,7 @@ def _classify_entry_points(
             )
 
 
-@rule(desc="Determining the entry points for a `python_distribution` target", level=LogLevel.DEBUG)
+@rule(desc="Determining the entry points for a `python_distribution` target")
 async def resolve_python_distribution_entry_points(
     request: ResolvePythonDistributionEntryPointsRequest,
 ) -> ResolvedPythonDistributionEntryPoints:
@@ -197,19 +300,7 @@ async def resolve_python_distribution_entry_points(
             _EntryPointsDictType, request.provides_field.value.kwargs.get("entry_points") or {}
         )
 
-        with_binaries = request.provides_field.value.binaries
-        if with_binaries:
-            all_entry_points = merge_entry_points(
-                (
-                    f"{address}'s field `provides=setup_py(entry_points={...})`",
-                    provides_field_value,
-                ),
-                (
-                    f"{address}'s field `provides=setup_py().with_binaries(...)",
-                    {"console_scripts": with_binaries},
-                ),
-            )
-        elif provides_field_value:
+        if provides_field_value:
             all_entry_points = provides_field_value
         else:
             return ResolvedPythonDistributionEntryPoints()
@@ -229,9 +320,14 @@ async def resolve_python_distribution_entry_points(
     ]
 
     # Intermediate step, as Get(Targets) returns a deduplicated set.. which breaks in case of
-    # mulitple input refs that maps to the same target.
+    # multiple input refs that maps to the same target.
     target_addresses = await Get(
-        Addresses, UnparsedAddressInputs(target_refs, owning_address=address)
+        Addresses,
+        UnparsedAddressInputs(
+            target_refs,
+            owning_address=address,
+            description_of_origin="TODO(#14468)",
+        ),
     )
     address_by_ref = dict(zip(target_refs, target_addresses))
     targets = await Get(Targets, Addresses, target_addresses)
@@ -240,11 +336,16 @@ async def resolve_python_distribution_entry_points(
     for target in targets:
         if not target.has_field(PexEntryPointField):
             raise InvalidEntryPoint(
-                "All target addresses in the entry_points field must be for pex_binary targets, "
-                f"but the target {address} includes the value {target.address}, which has the "
-                f"target type {target.alias}.\n\n"
-                'Alternatively, you can use a module like "project.app:main". '
-                f"See {doc_url('python-distributions')}."
+                softwrap(
+                    f"""
+                    All target addresses in the entry_points field must be for pex_binary targets,
+                    but the target {address} includes the value {target.address}, which has the
+                    target type {target.alias}.
+
+                    Alternatively, you can use a module like "project.app:main".
+                    See {doc_url('python-distributions')}.
+                    """
+                )
             )
 
     binary_entry_points = await MultiGet(
@@ -268,9 +369,12 @@ async def resolve_python_distribution_entry_points(
             entry_point = binary_entry_point_by_address[owner].val
             if entry_point is None:
                 logger.warning(
-                    f"The entry point {name} in {category} references a pex binary {ref}, "
-                    "which has set its entry point to '<none>'. "
-                    "Skipping this entry because '<none>' is not valid as an entry point."
+                    softwrap(
+                        f"""
+                        The entry point {name} in {category} references a pex_binary target {ref}
+                        which does not set `entry_point`. Skipping.
+                        """
+                    )
                 )
                 continue
         else:
@@ -299,7 +403,7 @@ async def resolve_python_distribution_entry_points(
 
 
 class InjectPythonDistributionDependencies(InjectDependenciesRequest):
-    inject_for = PythonDistributionDependencies
+    inject_for = PythonDistributionDependenciesField
 
 
 @rule
@@ -310,7 +414,12 @@ async def inject_python_distribution_dependencies(
     if not python_infer_subsystem.entry_points:
         return InjectedDependencies()
 
-    original_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    original_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     explicitly_provided_deps, distribution_entry_points, provides_entry_points = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(original_tgt.target[Dependencies])),
         Get(
@@ -338,7 +447,7 @@ async def inject_python_distribution_dependencies(
     ]
     all_module_owners = iter(
         await MultiGet(
-            Get(PythonModuleOwners, PythonModule(entry_point.module))
+            Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module, resolve=None))
             for _, _, entry_point in all_module_entry_points
         )
     )
@@ -349,10 +458,12 @@ async def inject_python_distribution_dependencies(
             owners.ambiguous,
             address,
             import_reference="module",
-            context=(
-                f"The python_distribution target {address} has the field "
-                f"`entry_points={field_str}`, which maps to the Python module"
-                f"`{entry_point.module}`"
+            context=softwrap(
+                f"""
+                The python_distribution target {address} has the field
+                `entry_points={field_str}`, which maps to the Python module
+                `{entry_point.module}`
+                """
             ),
         )
         maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
@@ -368,10 +479,74 @@ async def inject_python_distribution_dependencies(
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# Dependency validation
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DependencyValidationFieldSet(FieldSet):
+    required_fields = (InterpreterConstraintsField,)
+
+    interpreter_constraints: InterpreterConstraintsField
+
+
+class PythonValidateDependenciesRequest(ValidateDependenciesRequest):
+    field_set_type = DependencyValidationFieldSet
+
+
+@rule
+async def validate_python_dependencies(
+    request: PythonValidateDependenciesRequest,
+    python_setup: PythonSetup,
+) -> ValidatedDependencies:
+    dependencies = await MultiGet(
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                d, description_of_origin=f"the dependencies of {request.field_set.address}"
+            ),
+        )
+        for d in request.dependencies
+    )
+
+    # Validate that the ICs for dependencies are all compatible with our own.
+    target_ics = request.field_set.interpreter_constraints.value_or_global_default(python_setup)
+    non_subset_items = []
+    for dep in dependencies:
+        if not dep.target.has_field(InterpreterConstraintsField):
+            continue
+        dep_ics = dep.target[InterpreterConstraintsField].value_or_global_default(python_setup)
+        if not interpreter_constraints_contains(
+            dep_ics, target_ics, python_setup.interpreter_universe
+        ):
+            non_subset_items.append(f"{dep_ics}: {dep.target.address}")
+
+    if non_subset_items:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+            The target {request.field_set.address} has the `interpreter_constraints` {target_ics},
+            which are not a subset of the `interpreter_constraints` of some of its dependencies:
+
+            {bullet_list(sorted(non_subset_items))}
+
+            To fix this, you should likely adjust {request.field_set.address}'s
+            `interpreter_constraints` to match the narrowest range in the above list.
+            """
+            )
+        )
+
+    return ValidatedDependencies()
+
+
 def rules():
     return (
         *collect_rules(),
         *import_rules(),
+        UnionRule(TargetFilesGeneratorSettingsRequest, PythonFilesGeneratorSettingsRequest),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromPexBinaries),
         UnionRule(InjectDependenciesRequest, InjectPexBinaryEntryPointDependency),
         UnionRule(InjectDependenciesRequest, InjectPythonDistributionDependencies),
+        UnionRule(ValidateDependenciesRequest, PythonValidateDependenciesRequest),
     )

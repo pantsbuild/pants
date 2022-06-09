@@ -9,7 +9,7 @@ import time
 import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterator, Mapping
 
 from colors import bold, cyan, magenta
 
@@ -56,15 +56,16 @@ def attempts(
 
 
 def launch_waiter(
-    *, workdir: str, config: Mapping | None = None
-) -> Tuple[PantsJoinHandle, int, str]:
+    *, workdir: str, config: Mapping | None = None, cleanup_wait_time: int = 0
+) -> tuple[PantsJoinHandle, int, int, str]:
     """Launch a process that will wait forever for a file to be created.
 
-    Returns the pid of the pants client, the pid of the waiting child process, and the file to
-    create to cause the waiting child to exit.
+    Returns the pants client handle, the pid of the waiting process, the pid of a child of the
+    waiting process, and the file to create to cause the waiting child to exit.
     """
     file_to_make = os.path.join(workdir, "some_magic_file")
     waiter_pid_file = os.path.join(workdir, "pid_file")
+    child_pid_file = os.path.join(workdir, "child_pid_file")
 
     argv = [
         "run",
@@ -72,15 +73,19 @@ def launch_waiter(
         "--",
         file_to_make,
         waiter_pid_file,
+        child_pid_file,
+        str(cleanup_wait_time),
     ]
     client_handle = run_pants_with_workdir_without_waiting(argv, workdir=workdir, config=config)
     waiter_pid = -1
     for _ in attempts("The waiter process should have written its pid."):
         waiter_pid_str = maybe_read_file(waiter_pid_file)
-        if waiter_pid_str:
+        child_pid_str = maybe_read_file(child_pid_file)
+        if waiter_pid_str and child_pid_str:
             waiter_pid = int(waiter_pid_str)
+            child_pid = int(child_pid_str)
             break
-    return client_handle, waiter_pid, file_to_make
+    return client_handle, waiter_pid, child_pid, file_to_make
 
 
 class PantsDaemonMonitor(ProcessManager):
@@ -140,7 +145,7 @@ class PantsdRunContext:
     runner: Callable[..., Any]
     checker: PantsDaemonMonitor
     workdir: str
-    pantsd_config: Dict[str, Any]
+    pantsd_config: dict[str, Any]
 
 
 class PantsDaemonIntegrationTestBase(unittest.TestCase):
@@ -161,8 +166,8 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
 
     @contextmanager
     def pantsd_test_context(
-        self, *, log_level: str = "info", extra_config: Optional[Dict[str, Any]] = None
-    ) -> Iterator[Tuple[str, Dict[str, Any], PantsDaemonMonitor]]:
+        self, *, log_level: str = "info", extra_config: dict[str, Any] | None = None
+    ) -> Iterator[tuple[str, dict[str, Any], PantsDaemonMonitor]]:
         with temporary_dir(root_dir=os.getcwd()) as workdir_base:
             pid_dir = os.path.join(workdir_base, ".pids")
             workdir = os.path.join(workdir_base, ".workdir.pants.d")
@@ -205,8 +210,8 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
     def pantsd_run_context(
         self,
         log_level: str = "info",
-        extra_config: Optional[Dict[str, Any]] = None,
-        extra_env: Optional[Dict[str, str]] = None,
+        extra_config: dict[str, Any] | None = None,
+        extra_env: dict[str, str] | None = None,
         success: bool = True,
     ) -> Iterator[PantsdRunContext]:
         with self.pantsd_test_context(log_level=log_level, extra_config=extra_config) as (

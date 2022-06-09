@@ -1,10 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 import hashlib
 import os
 import pkgutil
 import shutil
+import socket
 import ssl
 import tarfile
 import time
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Set
+from typing import Callable, Dict, Iterable, List, Optional, Set, Union
 
 import pytest
 
@@ -24,22 +24,23 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestEntries,
     DigestSubset,
     Directory,
     DownloadFile,
     FileContent,
     FileDigest,
+    FileEntry,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
+    SnapshotDiff,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.native_engine_pyo3 import PyDigest as DigestPyO3
-from pants.engine.internals.native_engine_pyo3 import PySnapshot as SnapshotPyO3
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -52,7 +53,10 @@ from pants.util.dirutil import relative_symlink, safe_file_dump
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            QueryRule(Digest, [CreateDigest]),
             QueryRule(DigestContents, [PathGlobs]),
+            QueryRule(DigestEntries, [Digest]),
+            QueryRule(DigestEntries, [PathGlobs]),
             QueryRule(Snapshot, [CreateDigest]),
             QueryRule(Snapshot, [DigestSubset]),
             QueryRule(Snapshot, [PathGlobs]),
@@ -61,6 +65,9 @@ def rule_runner() -> RuleRunner:
     )
 
 
+ROLAND_FILE_DIGEST = FileDigest(
+    "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16
+)
 ROLAND_DIGEST = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
 
 
@@ -75,11 +82,15 @@ def prime_store_with_roland_digest(rule_runner: RuleRunner) -> None:
     assert snapshot.files == ("roland",)
     assert snapshot.digest == ROLAND_DIGEST
 
+    # NB: Capturing a Snapshot avoids persisting directory entries to disk, so we have to ensure
+    # that independently.
+    rule_runner.scheduler.ensure_directory_digest_persisted(snapshot.digest)
+
 
 def setup_fs_test_tar(rule_runner: RuleRunner) -> None:
     """Extract fs_test.tar into the rule_runner's build root.
 
-    Note that we use a tar, rather than rule_runner.create_file(), because it has symlinks set up a
+    Note that we use a tar, rather than rule_runner.write_files(), because it has symlinks set up a
     certain way.
 
     Contents:
@@ -276,6 +287,22 @@ def test_path_globs_ignore_pattern(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_path_globs_ignore_sock(rule_runner: RuleRunner) -> None:
+    sock_path = os.path.join(rule_runner.build_root, "sock.sock")
+    with socket.socket(socket.AF_UNIX) as sock:
+        sock.bind(sock_path)
+    assert os.path.exists(sock_path)
+    assert not os.path.isfile(sock_path)
+
+    rule_runner.write_files({"non-sock.txt": ""})
+    assert_path_globs(
+        rule_runner,
+        ["**"],
+        expected_files=["non-sock.txt"],
+        expected_dirs=[],
+    )
+
+
 def test_path_globs_remove_duplicates(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
     assert_path_globs(
@@ -354,6 +381,50 @@ def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
     # Directories are empty.
     assert not get_contents(["a/b"])
     assert not get_contents(["c.ln"])
+
+
+def test_path_globs_to_digest_entries(rule_runner: RuleRunner) -> None:
+    setup_fs_test_tar(rule_runner)
+
+    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory]]:
+        return set(rule_runner.request(DigestEntries, [PathGlobs(globs)]))
+
+    assert get_entries(["4.txt", "a/4.txt.ln"]) == {
+        FileEntry(
+            "4.txt",
+            FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+        ),
+        FileEntry(
+            "a/4.txt.ln",
+            FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+        ),
+    }
+    assert get_entries(["c.ln/../3.txt"]) == {
+        FileEntry(
+            "c.ln/../3.txt",
+            FileDigest("f6936912184481f5edd4c304ce27c5a1a827804fc7f329f43d273b8621870776", 6),
+        )
+    }
+
+    # Directories are empty.
+    assert get_entries(["a/b"]) == {Directory("a/b")}
+    assert get_entries(["c.ln"]) == {Directory("c.ln")}
+
+
+def test_digest_entries_handles_empty_directory(rule_runner: RuleRunner) -> None:
+    digest = rule_runner.request(
+        Digest, [CreateDigest([Directory("a/b"), FileContent("a/foo.txt", b"four\n")])]
+    )
+    entries = rule_runner.request(DigestEntries, [digest])
+    assert entries == DigestEntries(
+        [
+            Directory("a/b"),
+            FileEntry(
+                "a/foo.txt",
+                FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+            ),
+        ]
+    )
 
 
 def test_glob_match_error_behavior(rule_runner: RuleRunner, caplog) -> None:
@@ -453,6 +524,18 @@ def test_create_empty_directory(rule_runner: RuleRunner) -> None:
     assert res.dirs == ("m", "m/n", "x", "x/y", "x/y/z")
     assert not res.files
     assert res.digest != EMPTY_DIGEST
+
+
+def test_create_digest_with_file_entries(rule_runner: RuleRunner) -> None:
+    # Retrieve some known FileEntry's from the test tar.
+    setup_fs_test_tar(rule_runner)
+    file_entries = rule_runner.request(DigestEntries, [PathGlobs(["4.txt", "a/4.txt.ln"])])
+
+    # Make a snapshot with just those files.
+    snapshot = rule_runner.request(Snapshot, [CreateDigest(file_entries)])
+    assert snapshot.dirs == ("a",)
+    assert snapshot.files == ("4.txt", "a/4.txt.ln")
+    assert snapshot.digest != EMPTY_DIGEST
 
 
 # -----------------------------------------------------------------------------------------------
@@ -767,6 +850,9 @@ DOWNLOADS_FILE_DIGEST = FileDigest(
 DOWNLOADS_EXPECTED_DIRECTORY_DIGEST = Digest(
     "4c9cf91fcd7ba1abbf7f9a0a1c8175556a82bee6a398e34db3284525ac24a3ad", 84
 )
+ROLAND_DOWNLOAD_DIGEST = Digest(
+    "9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819", 82
+)
 
 
 def test_download_valid(downloads_rule_runner: RuleRunner) -> None:
@@ -799,20 +885,34 @@ def test_download_wrong_digest(downloads_rule_runner: RuleRunner) -> None:
     assert "wrong digest" in str(exc.value).lower()
 
 
-def test_download_caches(downloads_rule_runner: RuleRunner) -> None:
-    # We would error if we hit the HTTP server with 404, but we're not going to hit the HTTP
-    # server because it's cached, so we shouldn't see an error.
-    prime_store_with_roland_digest(downloads_rule_runner)
-    with http_server(StubHandler) as port:
-        download_file = DownloadFile(
-            f"http://localhost:{port}/roland",
-            FileDigest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
+def test_download_file(downloads_rule_runner: RuleRunner) -> None:
+    with temporary_dir() as temp_dir:
+        roland = Path(temp_dir, "roland")
+        roland.write_text("European Burmese")
+        snapshot = downloads_rule_runner.request(
+            Snapshot,
+            [DownloadFile(f"file:{roland}", ROLAND_FILE_DIGEST)],
         )
-        snapshot = downloads_rule_runner.request(Snapshot, [download_file])
+
     assert snapshot.files == ("roland",)
-    assert snapshot.digest == Digest(
-        "9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819", 82
-    )
+    assert snapshot.digest == ROLAND_DOWNLOAD_DIGEST
+
+
+def test_download_caches(downloads_rule_runner: RuleRunner) -> None:
+    # We put the expected content in the store, but because we have never fetched it from this
+    # URL, we confirm the URL and attempt to refetch. Once it is cached, it does not need to be
+    # refetched.
+    prime_store_with_roland_digest(downloads_rule_runner)
+    with temporary_dir() as temp_dir:
+        roland = Path(temp_dir, "roland")
+        roland.write_text("European Burmese")
+        snapshot = downloads_rule_runner.request(
+            Snapshot,
+            [DownloadFile(f"file:{roland}", ROLAND_FILE_DIGEST)],
+        )
+
+    assert snapshot.files == ("roland",)
+    assert snapshot.digest == ROLAND_DOWNLOAD_DIGEST
 
 
 def test_download_https() -> None:
@@ -871,7 +971,7 @@ def test_write_digest_scheduler(rule_runner: RuleRunner) -> None:
 
 
 def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
-    workspace = Workspace(rule_runner.scheduler)
+    workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     digest = rule_runner.request(
         Digest,
         [CreateDigest([FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")])],
@@ -1012,51 +1112,49 @@ def test_invalidated_after_new_child(rule_runner: RuleRunner) -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("cls", [Digest, DigestPyO3])
-def test_digest_properties(cls) -> None:
-    digest = cls("a" * 64, 1000)
+@pytest.mark.parametrize("digest_cls", (Digest, FileDigest))
+def test_digest_properties(digest_cls: type) -> None:
+    digest = digest_cls("a" * 64, 1000)
     assert digest.fingerprint == "a" * 64
     assert digest.serialized_bytes_length == 1000
 
 
-@pytest.mark.parametrize("cls", [Digest, DigestPyO3])
-def test_digest_repr(cls) -> None:
-    assert str(cls("a" * 64, 1)) == f"Digest({repr('a' * 64)}, 1)"
+@pytest.mark.parametrize("digest_cls,cls_name", ((Digest, "Digest"), (FileDigest, "FileDigest")))
+def test_digest_repr(digest_cls: type, cls_name: str) -> None:
+    assert str(digest_cls("a" * 64, 1)) == f"{cls_name}({repr('a' * 64)}, 1)"
 
 
-@pytest.mark.parametrize("cls", [Digest, DigestPyO3])
-def test_digest_hash(cls) -> None:
-    assert hash(cls("a" * 64, 1)) == -6148914691236517206
-    assert hash(cls("b" * 64, 1)) == -4919131752989213765
+@pytest.mark.parametrize("digest_cls", (Digest, FileDigest))
+def test_digest_hash(digest_cls: type) -> None:
+    assert hash(digest_cls("a" * 64, 1)) == -6148914691236517206
+    assert hash(digest_cls("b" * 64, 1)) == -4919131752989213765
     # Note that the size bytes is not considered in the hash.
-    assert hash(cls("a" * 64, 1000)) == -6148914691236517206
+    assert hash(digest_cls("a" * 64, 1000)) == -6148914691236517206
 
 
-@pytest.mark.parametrize("cls", [Digest, DigestPyO3])
-def test_digest_equality(cls) -> None:
-    digest = cls("a" * 64, 1)
-    assert digest == cls("a" * 64, 1)
-    assert digest != cls("a" * 64, 1000)
-    assert digest != cls("0" * 64, 1)
+@pytest.mark.parametrize("digest_cls", (Digest, FileDigest))
+def test_digest_equality(digest_cls) -> None:
+    digest = digest_cls("a" * 64, 1)
+    assert digest == digest_cls("a" * 64, 1)
+    assert digest != digest_cls("a" * 64, 1000)
+    assert digest != digest_cls("0" * 64, 1)
     with pytest.raises(TypeError):
         digest < digest
 
 
-@pytest.mark.parametrize(
-    "snapshot_cls,digest_cls", [(Snapshot, Digest), (SnapshotPyO3, DigestPyO3)]
-)
-def test_snapshot_properties(snapshot_cls, digest_cls) -> None:
-    digest = digest_cls("a" * 64, 1000)
-    snapshot = snapshot_cls._create_for_testing(digest, ["f.ext", "dir/f.ext"], ["dir"])
+def test_digest_is_not_file_digest() -> None:
+    assert Digest("a" * 64, 1) != FileDigest("a" * 64, 1)
+
+
+def test_snapshot_properties() -> None:
+    digest = Digest("691638f4d58abaa8cfdc9af2e00682f13f07f96ad1d177f146216a7341ca4982", 154)
+    snapshot = Snapshot._unsafe_create(digest, ["f.ext", "dir/f.ext"], ["dir"])
     assert snapshot.digest == digest
-    assert snapshot.files == ("f.ext", "dir/f.ext")
+    assert snapshot.files == ("dir/f.ext", "f.ext")
     assert snapshot.dirs == ("dir",)
 
 
-@pytest.mark.parametrize(
-    "snapshot_cls,digest_cls", [(Snapshot, Digest), (SnapshotPyO3, DigestPyO3)]
-)
-def test_snapshot_hash(snapshot_cls, digest_cls) -> None:
+def test_snapshot_hash() -> None:
     def assert_hash(
         expected: int,
         *,
@@ -1064,10 +1162,8 @@ def test_snapshot_hash(snapshot_cls, digest_cls) -> None:
         files: Optional[List[str]] = None,
         dirs: Optional[List[str]] = None,
     ) -> None:
-        digest = digest_cls(digest_char * 64, 1000)
-        snapshot = snapshot_cls._create_for_testing(
-            digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"]
-        )
+        digest = Digest(digest_char * 64, 1000)
+        snapshot = Snapshot._unsafe_create(digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"])
         assert hash(snapshot) == expected
 
     # The digest's fingerprint is used for the hash, so all other properties are irrelevant.
@@ -1078,28 +1174,96 @@ def test_snapshot_hash(snapshot_cls, digest_cls) -> None:
     assert_hash(-4919131752989213765, digest_char="b")
 
 
-@pytest.mark.parametrize(
-    "snapshot_cls,digest_cls", [(Snapshot, Digest), (SnapshotPyO3, DigestPyO3)]
-)
-def test_snapshot_equality(snapshot_cls, digest_cls) -> None:
+def test_snapshot_equality() -> None:
     # Only the digest is used for equality.
-    snapshot = snapshot_cls._create_for_testing(
-        digest_cls("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+    snapshot = Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"])
+    assert snapshot == Snapshot._unsafe_create(
+        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
     )
-    assert snapshot == snapshot_cls._create_for_testing(
-        digest_cls("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+    assert snapshot == Snapshot._unsafe_create(
+        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"]
     )
-    assert snapshot == snapshot_cls._create_for_testing(
-        digest_cls("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"]
-    )
-    assert snapshot == snapshot_cls._create_for_testing(
-        digest_cls("a" * 64, 1000), ["f.ext"], ["dir"]
-    )
-    assert snapshot != snapshot_cls._create_for_testing(
-        digest_cls("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    assert snapshot != snapshot_cls._create_for_testing(
-        digest_cls("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
+    assert snapshot == Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext"], ["dir"])
+    assert snapshot != Snapshot._unsafe_create(Digest("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"])
+    assert snapshot != Snapshot._unsafe_create(
+        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
     )
     with pytest.raises(TypeError):
-        snapshot < snapshot
+        snapshot < snapshot  # type: ignore[operator]
+
+
+@pytest.mark.parametrize(
+    "before, after, expected_diff",
+    [
+        ({"pants.txt": "relaxed fit"}, {"pants.txt": "relaxed fit"}, SnapshotDiff()),
+        (
+            {"pants.txt": "relaxed fit"},
+            {"pants.txt": "slim fit"},
+            SnapshotDiff(
+                changed_files=("pants.txt",),
+            ),
+        ),
+        (
+            {
+                "levis/501.txt": "original",
+                "levis/jeans/511": "slim fit",
+                "wrangler/cowboy_cut.txt": "performance",
+            },
+            {},
+            SnapshotDiff(
+                our_unique_dirs=("levis", "wrangler"),
+            ),
+        ),
+        (
+            {
+                "levis/501.txt": "original",
+                "levis/jeans/511": "slim fit",
+                "levis/chinos/502": "taper fit",
+                "wrangler/cowboy_cut.txt": "performance",
+            },
+            {
+                "levis/501.txt": "slim",
+                "levis/jeans/511": "slim fit",
+                "wrangler/authentics.txt": "relaxed",
+            },
+            SnapshotDiff(
+                our_unique_dirs=("levis/chinos",),
+                our_unique_files=("wrangler/cowboy_cut.txt",),
+                their_unique_files=("wrangler/authentics.txt",),
+                changed_files=("levis/501.txt",),
+            ),
+        ),
+        # Same name, but one is a file and one is a dir
+        (
+            {"duluth/pants.txt": "5-Pocket"},
+            {"duluth": "DuluthFlex"},
+            SnapshotDiff(our_unique_dirs=("duluth",), their_unique_files=("duluth",)),
+        ),
+    ],
+)
+def test_snapshot_diff(
+    rule_runner: RuleRunner,
+    before: Dict[str, str],
+    after: Dict[str, str],
+    expected_diff: SnapshotDiff,
+) -> None:
+    diff = SnapshotDiff.from_snapshots(
+        rule_runner.make_snapshot(before), rule_runner.make_snapshot(after)
+    )
+
+    assert diff.our_unique_files == expected_diff.our_unique_files
+    assert diff.our_unique_dirs == expected_diff.our_unique_dirs
+    assert diff.their_unique_files == expected_diff.their_unique_files
+    assert diff.their_unique_dirs == expected_diff.their_unique_dirs
+    assert diff.changed_files == expected_diff.changed_files
+
+    # test with the arguments reversed
+    diff = SnapshotDiff.from_snapshots(
+        rule_runner.make_snapshot(after), rule_runner.make_snapshot(before)
+    )
+
+    assert diff.our_unique_files == expected_diff.their_unique_files
+    assert diff.our_unique_dirs == expected_diff.their_unique_dirs
+    assert diff.their_unique_files == expected_diff.our_unique_files
+    assert diff.their_unique_dirs == expected_diff.our_unique_dirs
+    assert diff.changed_files == expected_diff.changed_files

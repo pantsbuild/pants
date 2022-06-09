@@ -5,24 +5,11 @@ from __future__ import annotations
 
 import ast
 import itertools
-import os
+from abc import ABCMeta
 from dataclasses import dataclass
 from functools import partial
 from textwrap import dedent
-from typing import (
-    Any,
-    Generator,
-    Generic,
-    Iterable,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
+from typing import Any, Generator, Generic, Iterable, Sequence, Tuple, Type, TypeVar, cast, overload
 
 from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
@@ -64,14 +51,23 @@ class GetParseError(ValueError):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class GetConstraints:
-    output_type: Type
-    input_type: Type
+class AwaitableConstraints:
+    output_type: type
+    input_type: type
+    is_effect: bool
 
     @classmethod
-    def parse_input_and_output_types(
-        cls, get_args: Sequence[ast.expr], *, source_file_name: str
-    ) -> Tuple[str, str]:
+    def signature_from_call_node(
+        cls, call_node: ast.Call, *, source_file_name: str
+    ) -> tuple[str, str, bool] | None:
+        if not isinstance(call_node.func, ast.Name):
+            return None
+        if call_node.func.id not in ("Get", "Effect"):
+            return None
+        is_effect = call_node.func.id == "Effect"
+
+        get_args = call_node.args
+
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=source_file_name)
 
         if len(get_args) not in (2, 3):
@@ -91,72 +87,57 @@ class GetConstraints:
             input_constructor = input_args[0]
             if not isinstance(input_constructor, ast.Call):
                 raise parse_error(
-                    "Because you are using the shorthand form Get(OutputType, "
+                    f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
                     "InputType(constructor args), the second argument should be a constructor "
                     "call, like `MergeDigest(...)` or `Process(...)`."
                 )
             if not hasattr(input_constructor.func, "id"):
                 raise parse_error(
-                    "Because you are using the shorthand form Get(OutputType, "
+                    f"Because you are using the shorthand form {call_node.func.id}(OutputType, "
                     "InputType(constructor args), the second argument should be a top-level "
                     "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
                     "than a method call."
                 )
-            return output_type, input_constructor.func.id  # type: ignore[attr-defined]
+            return output_type, input_constructor.func.id, is_effect  # type: ignore[attr-defined]
 
         input_type, _ = input_args
         if not isinstance(input_type, ast.Name):
             raise parse_error(
-                "Because you are using the longhand form Get(OutputType, InputType, "
-                "input), the second argument should be a type, like `MergeDigests` or "
+                f"Because you are using the longhand form {call_node.func.id}(OutputType, "
+                "InputType, input), the second argument should be a type, like `MergeDigests` or "
                 "`Process`."
             )
-        return output_type, input_type.id
+        return output_type, input_type.id, is_effect
+
+    def __repr__(self) -> str:
+        name = "Effect" if self.is_effect else "Get"
+        return f"{name}({self.output_type.__name__}, {self.input_type.__name__}, ..)"
+
+    def __str__(self) -> str:
+        return repr(self)
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class Get(GetConstraints, Generic[_Output, _Input]):
-    """Asynchronous generator API.
-
-    A Get can be constructed in 2 ways with two variants each:
-
-    + Long form:
-        Get(<OutputType>, <InputType>, input)
-
-    + Short form
-        Get(<OutputType>, <InputType>(<constructor args for input>))
-
-    The long form supports providing type information to the rule engine that it could not otherwise
-    infer from the input variable [1]. Likewise, the short form must use inline construction of the
-    input in order to convey the input type to the engine.
-
-    [1] The engine needs to determine all rule and Get input and output types statically before
-    executing any rules. Since Gets are declared inside function bodies, the only way to extract this
-    information is through a parse of the rule function. The parse analysis is rudimentary and cannot
-    infer more than names and calls; so a variable name does not give enough information to infer its
-    type, only a constructor call unambiguously gives this information without more in-depth parsing
-    that includes following imports and more.
-    """
-
+class Awaitable(Generic[_Output, _Input], metaclass=ABCMeta):
     @overload
-    def __init__(self, output_type: Type[_Output], input_arg0: _Input) -> None:
+    def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None:
         ...
 
     @overload
     def __init__(
         self,
-        output_type: Type[_Output],
-        input_arg0: Type[_Input],
+        output_type: type[_Output],
+        input_arg0: type[_Input],
         input_arg1: _Input,
     ) -> None:
         ...
 
     def __init__(
         self,
-        output_type: Type[_Output],
-        input_arg0: Union[Type[_Input], _Input],
-        input_arg1: Optional[_Input] = None,
+        output_type: type[_Output],
+        input_arg0: type[_Input] | _Input,
+        input_arg1: _Input | None = None,
     ) -> None:
         self.output_type = self._validate_output_type(output_type)
         if input_arg1 is None:
@@ -167,7 +148,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
             self.input = self._validate_input(input_arg1, shorthand_form=False)
 
     @staticmethod
-    def _validate_output_type(output_type: Any) -> Type[_Output]:
+    def _validate_output_type(output_type: Any) -> type[_Output]:
         if not isinstance(output_type, type):
             raise TypeError(
                 "Invalid Get. The first argument (the output type) must be a type, but given "
@@ -176,7 +157,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         return cast(Type[_Output], output_type)
 
     @staticmethod
-    def _validate_explicit_input_type(input_type: Any) -> Type[_Input]:
+    def _validate_explicit_input_type(input_type: Any) -> type[_Input]:
         if not isinstance(input_type, type):
             raise TypeError(
                 "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, "
@@ -213,7 +194,7 @@ class Get(GetConstraints, Generic[_Output, _Input]):
 
     def __await__(
         self,
-    ) -> Generator[Get[_Output, _Input], None, _Output]:
+    ) -> Generator[Awaitable[_Output, _Input], None, _Output]:
         """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
         The `yield`ed value `self` is interpreted by the engine within
@@ -236,16 +217,50 @@ class Get(GetConstraints, Generic[_Output, _Input]):
         return cast(_Output, result)
 
 
+class Effect(Generic[_Output, _Input], Awaitable[_Output, _Input]):
+    """Asynchronous generator API for types which are SideEffecting.
+
+    Unlike `Get`s, `Effect`s can cause side-effects (writing files to the workspace, publishing
+    things, printing to the console), and so they may only be used in `@goal_rule`s.
+
+    See Get for more information on supported syntaxes.
+    """
+
+
+class Get(Generic[_Output, _Input], Awaitable[_Output, _Input]):
+    """Asynchronous generator API for side-effect-free types.
+
+    A Get can be constructed in 2 ways with two variants each:
+
+    + Long form:
+        Get(<OutputType>, <InputType>, input)
+
+    + Short form
+        Get(<OutputType>, <InputType>(<constructor args for input>))
+
+    The long form supports providing type information to the rule engine that it could not otherwise
+    infer from the input variable [1]. Likewise, the short form must use inline construction of the
+    input in order to convey the input type to the engine.
+
+    [1] The engine needs to determine all rule and Get input and output types statically before
+    executing any rules. Since Gets are declared inside function bodies, the only way to extract this
+    information is through a parse of the rule function. The parse analysis is rudimentary and cannot
+    infer more than names and calls; so a variable name does not give enough information to infer its
+    type, only a constructor call unambiguously gives this information without more in-depth parsing
+    that includes following imports and more.
+    """
+
+
 @dataclass(frozen=True)
 class _MultiGet:
-    gets: Tuple[Get, ...]
+    gets: tuple[Get, ...]
 
-    def __await__(self) -> Generator[Tuple[Get, ...], None, Tuple]:
+    def __await__(self) -> Generator[tuple[Get, ...], None, tuple]:
         result = yield self.gets
         return cast(Tuple, result)
 
 
-# These type variables are used to parameterize from 1 to 10 Gets when used in a tuple-style
+# These type variables are used to parametrize from 1 to 10 Gets when used in a tuple-style
 # MultiGet call.
 
 _Out0 = TypeVar("_Out0")
@@ -272,7 +287,7 @@ _In9 = TypeVar("_In9")
 
 
 @overload
-async def MultiGet(__gets: Iterable[Get[_Output, _Input]]) -> Tuple[_Output, ...]:  # noqa: F811
+async def MultiGet(__gets: Iterable[Get[_Output, _Input]]) -> tuple[_Output, ...]:  # noqa: F811
     ...
 
 
@@ -290,7 +305,7 @@ async def MultiGet(  # noqa: F811
     __get9: Get[_Output, _Input],
     __get10: Get[_Output, _Input],
     *__gets: Get[_Output, _Input],
-) -> Tuple[_Output, ...]:
+) -> tuple[_Output, ...]:
     ...
 
 
@@ -306,7 +321,7 @@ async def MultiGet(  # noqa: F811
     __get7: Get[_Out7, _In7],
     __get8: Get[_Out8, _In8],
     __get9: Get[_Out9, _In9],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]:
     ...
 
 
@@ -321,7 +336,7 @@ async def MultiGet(  # noqa: F811
     __get6: Get[_Out6, _In6],
     __get7: Get[_Out7, _In7],
     __get8: Get[_Out8, _In8],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]:
     ...
 
 
@@ -335,7 +350,7 @@ async def MultiGet(  # noqa: F811
     __get5: Get[_Out5, _In5],
     __get6: Get[_Out6, _In6],
     __get7: Get[_Out7, _In7],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]:
     ...
 
 
@@ -348,7 +363,7 @@ async def MultiGet(  # noqa: F811
     __get4: Get[_Out4, _In4],
     __get5: Get[_Out5, _In5],
     __get6: Get[_Out6, _In6],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]:
     ...
 
 
@@ -360,7 +375,7 @@ async def MultiGet(  # noqa: F811
     __get3: Get[_Out3, _In3],
     __get4: Get[_Out4, _In4],
     __get5: Get[_Out5, _In5],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]:
     ...
 
 
@@ -371,7 +386,7 @@ async def MultiGet(  # noqa: F811
     __get2: Get[_Out2, _In2],
     __get3: Get[_Out3, _In3],
     __get4: Get[_Out4, _In4],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3, _Out4]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3, _Out4]:
     ...
 
 
@@ -381,49 +396,49 @@ async def MultiGet(  # noqa: F811
     __get1: Get[_Out1, _In1],
     __get2: Get[_Out2, _In2],
     __get3: Get[_Out3, _In3],
-) -> Tuple[_Out0, _Out1, _Out2, _Out3]:
+) -> tuple[_Out0, _Out1, _Out2, _Out3]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
     __get0: Get[_Out0, _In0], __get1: Get[_Out1, _In1], __get2: Get[_Out2, _In2]
-) -> Tuple[_Out0, _Out1, _Out2]:
+) -> tuple[_Out0, _Out1, _Out2]:
     ...
 
 
 @overload
 async def MultiGet(
     __get0: Get[_Out0, _In0], __get1: Get[_Out1, _In1]
-) -> Tuple[_Out0, _Out1]:  # noqa: F811
+) -> tuple[_Out0, _Out1]:  # noqa: F811
     ...
 
 
 async def MultiGet(  # noqa: F811
-    __arg0: Union[Iterable[Get[_Output, _Input]], Get[_Out0, _In0]],
-    __arg1: Optional[Get[_Out1, _In1]] = None,
-    __arg2: Optional[Get[_Out2, _In2]] = None,
-    __arg3: Optional[Get[_Out3, _In3]] = None,
-    __arg4: Optional[Get[_Out4, _In4]] = None,
-    __arg5: Optional[Get[_Out5, _In5]] = None,
-    __arg6: Optional[Get[_Out6, _In6]] = None,
-    __arg7: Optional[Get[_Out7, _In7]] = None,
-    __arg8: Optional[Get[_Out8, _In8]] = None,
-    __arg9: Optional[Get[_Out9, _In9]] = None,
+    __arg0: Iterable[Get[_Output, _Input]] | Get[_Out0, _In0],
+    __arg1: Get[_Out1, _In1] | None = None,
+    __arg2: Get[_Out2, _In2] | None = None,
+    __arg3: Get[_Out3, _In3] | None = None,
+    __arg4: Get[_Out4, _In4] | None = None,
+    __arg5: Get[_Out5, _In5] | None = None,
+    __arg6: Get[_Out6, _In6] | None = None,
+    __arg7: Get[_Out7, _In7] | None = None,
+    __arg8: Get[_Out8, _In8] | None = None,
+    __arg9: Get[_Out9, _In9] | None = None,
     *__args: Get[_Output, _Input],
-) -> Union[
-    Tuple[_Output, ...],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5],
-    Tuple[_Out0, _Out1, _Out2, _Out3, _Out4],
-    Tuple[_Out0, _Out1, _Out2, _Out3],
-    Tuple[_Out0, _Out1, _Out2],
-    Tuple[_Out0, _Out1],
-    Tuple[_Out0],
-]:
+) -> (
+    tuple[_Output, ...]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]
+    | tuple[_Out0, _Out1, _Out2, _Out3, _Out4]
+    | tuple[_Out0, _Out1, _Out2, _Out3]
+    | tuple[_Out0, _Out1, _Out2]
+    | tuple[_Out0, _Out1]
+    | tuple[_Out0]
+):
     """Yield a tuple of Get instances all at once.
 
     The `yield`ed value `self.gets` is interpreted by the engine within
@@ -617,7 +632,7 @@ async def MultiGet(  # noqa: F811
 
     args = __arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8, __arg9, *__args
 
-    def render_arg(arg: Any) -> Optional[str]:
+    def render_arg(arg: Any) -> str | None:
         if arg is None:
             return None
         if isinstance(arg, Get):
@@ -677,23 +692,20 @@ class Params:
     Distinct types are enforced at consumption time by the rust type of the same name.
     """
 
-    params: Tuple[Any, ...]
+    params: tuple[Any, ...]
 
     def __init__(self, *args: Any) -> None:
         self.params = tuple(args)
 
 
-_RAISE_KEYBOARD_INTERRUPT = os.environ.get("_RAISE_KEYBOARD_INTERRUPT_FFI", None)
-
-
 def native_engine_generator_send(
     func, arg
 ) -> PyGeneratorResponseGet | PyGeneratorResponseGetMulti | PyGeneratorResponseBreak:
-    if _RAISE_KEYBOARD_INTERRUPT:
-        raise KeyboardInterrupt("ctrl-c interrupted execution during FFI (for testing purposes).")
     try:
         res = func.send(arg)
-        if isinstance(res, Get):
+        # TODO: It isn't currently necessary to differentiate between `Get` and `Effect` here, as
+        # the static analysis of `@rule`s has already validated usage.
+        if isinstance(res, (Get, Effect)):
             return PyGeneratorResponseGet(res.output_type, res.input_type, res.input)
         elif type(res) in (tuple, list):
             return PyGeneratorResponseGetMulti(

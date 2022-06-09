@@ -3,23 +3,23 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
-from pants.option.custom_types import file_option, shell_str
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.util.strutil import softwrap
 
 
 class Hadolint(TemplatedExternalTool):
     options_scope = "hadolint"
-    name = "hadolint"
+    name = "Hadolint"
     help = "A linter for Dockerfiles."
 
-    default_version = "v2.6.0"
+    default_version = "v2.10.0"
     default_known_versions = [
-        f"{default_version}|macos_arm64 |7d41496bf591f2b9c7daa76d4aa1db04ea97b9e11b44a24a4e404a10aab33686|2392080",
-        f"{default_version}|macos_x86_64|7d41496bf591f2b9c7daa76d4aa1db04ea97b9e11b44a24a4e404a10aab33686|2392080",
-        f"{default_version}|linux_x86_64|152e3c3375f26711650d4e11f9e382cf1bdf3f912d7379823e8fac4b1bce88d6|5812840",
+        "v2.10.0|macos_x86_64|59f0523069a857ae918b8ac0774230013f7bcc00c1ea28119c2311353120867a|2514960",
+        "v2.10.0|macos_arm64 |59f0523069a857ae918b8ac0774230013f7bcc00c1ea28119c2311353120867a|2514960",  # same as mac x86
+        "v2.10.0|linux_x86_64|8ee6ff537341681f9e91bae2d5da451b15c575691e33980893732d866d3cefc4|2301804",
+        "v2.10.0|linux_arm64 |b53d5ab10707a585c9e72375d51b7357522300b5329cfa3f91e482687176e128|27954520",
     ]
     default_url_template = (
         "https://github.com/hadolint/hadolint/releases/download/{version}/hadolint-{platform}"
@@ -27,62 +27,40 @@ class Hadolint(TemplatedExternalTool):
     default_url_platform_mapping = {
         "macos_arm64": "Darwin-x86_64",
         "macos_x86_64": "Darwin-x86_64",
+        "linux_arm64": "Linux-arm64",
         "linux_x86_64": "Linux-x86_64",
     }
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--skip",
-            type=bool,
-            default=False,
-            help="Don't use Hadolint when running `./pants lint`.",
-        )
-        register(
-            "--args",
-            type=list,
-            member_type=shell_str,
-            help=(
-                "Arguments to pass directly to Hadolint, e.g. `--hadolint-args='--format json'`.'"
-            ),
-        )
-        register(
-            "--config",
-            type=file_option,
-            default=None,
-            advanced=True,
-            help=(
-                "Path to an YAML config file understood by Hadolint "
-                "(https://github.com/hadolint/hadolint#configure).\n\n"
-                f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-                "this option if the config is located in a non-standard location."
-            ),
-        )
-        register(
-            "--config-discovery",
-            type=bool,
-            default=True,
-            advanced=True,
-            help=(
-                "If true, Pants will include all relevant config files during runs "
-                "(`.hadolint.yaml` and `.hadolint.yml`).\n\n"
-                f"Use `[{cls.options_scope}].config` instead if your config is in a "
-                "non-standard location."
-            ),
-        )
+    skip = SkipOption("lint")
+    args = ArgsListOption(example="--format json")
+    config = FileOption(
+        "--config",
+        default=None,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            Path to an YAML config file understood by Hadolint
+            (https://github.com/hadolint/hadolint#configure).
 
-    @property
-    def skip(self) -> bool:
-        return cast(bool, self.options.skip)
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
+        ),
+    )
+    config_discovery = BoolOption(
+        "--config-discovery",
+        default=True,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include all relevant config files during runs
+            (`.hadolint.yaml` and `.hadolint.yml`).
 
-    @property
-    def args(self) -> tuple[str, ...]:
-        return tuple(self.options.args)
-
-    @property
-    def config(self) -> str | None:
-        return cast("str | None", self.options.config)
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
+        ),
+    )
 
     def config_request(self) -> ConfigFilesRequest:
         # Refer to https://github.com/hadolint/hadolint#configure for how config files are
@@ -90,6 +68,6 @@ class Hadolint(TemplatedExternalTool):
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
-            discovery=cast(bool, self.options.config_discovery),
+            discovery=self.config_discovery,
             check_existence=[".hadolint.yaml", ".hadolint.yml"],
         )

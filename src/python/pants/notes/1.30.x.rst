@@ -5,6 +5,15 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.5rc1 (10/7/2021)
+---------------------
+
+* Fix a deadlock involving ``scheduler.all_digests``, and add a note. (cherrypick of #11723) (#13149)
+  `PR #13149 <https://github.com/pantsbuild/pants/pull/13149>`_
+
+* Release the GIL while creating a Session. (cherrypick of #13127) (#13143)
+  `PR #13143 <https://github.com/pantsbuild/pants/pull/13143>`_
+
 1.30.5rc0 (4/5/2021)
 --------------------
 

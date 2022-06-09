@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import dataclasses
 import os
 from dataclasses import dataclass
@@ -32,14 +34,14 @@ from pants.util.meta import classproperty, frozen_after_init
 from pants.util.strutil import create_path_env_var
 
 
-class PexBinary(TemplatedExternalTool):
-    options_scope = "download-pex-bin"
+class PexCli(TemplatedExternalTool):
+    options_scope = "pex-cli"
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.44"
+    default_version = "v2.1.90"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.42, <3.0"
+    version_constraints = ">=2.1.90,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -48,18 +50,20 @@ class PexBinary(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "41f15d08ae5f5e9e8fe25ea4a1f9ee4fc59e342accd5a9d94bdb376d2cc102e9",
-                    "3622160",
+                    "2781255baf77c2a8fdc85c5e830f7191a6048fd91d2e20b5c7a20e5a0b7beb66",
+                    "3755345",
                 )
             )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64"]
+            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
         ]
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexCliProcess:
-    argv: Tuple[str, ...]
+    subcommand: tuple[str, ...]
+    extra_args: tuple[str, ...]
+    set_resolve_args: bool
     description: str = dataclasses.field(compare=False)
     additional_input_digest: Optional[Digest]
     extra_env: Optional[FrozenDict[str, str]]
@@ -67,22 +71,28 @@ class PexCliProcess:
     output_directories: Optional[Tuple[str, ...]]
     python: Optional[PythonExecutable]
     level: LogLevel
+    concurrency_available: int
     cache_scope: ProcessCacheScope
 
     def __init__(
         self,
         *,
-        argv: Iterable[str],
+        subcommand: Iterable[str],
+        extra_args: Iterable[str],
         description: str,
+        set_resolve_args: bool = True,
         additional_input_digest: Optional[Digest] = None,
         extra_env: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
         python: Optional[PythonExecutable] = None,
         level: LogLevel = LogLevel.INFO,
+        concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
-        self.argv = tuple(argv)
+        self.subcommand = tuple(subcommand)
+        self.extra_args = tuple(extra_args)
+        self.set_resolve_args = set_resolve_args
         self.description = description
         self.additional_input_digest = additional_input_digest
         self.extra_env = FrozenDict(extra_env) if extra_env else None
@@ -90,11 +100,12 @@ class PexCliProcess:
         self.output_directories = tuple(output_directories) if output_directories else None
         self.python = python
         self.level = level
+        self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        if "--pex-root-path" in self.argv:
+        if "--pex-root-path" in self.extra_args:
             raise ValueError("`--pex-root` flag not allowed. We set its value for you.")
 
 
@@ -103,9 +114,9 @@ class PexPEX(DownloadedExternalTool):
 
 
 @rule
-async def download_pex_pex(pex_binary: PexBinary) -> PexPEX:
+async def download_pex_pex(pex_cli: PexCli) -> PexPEX:
     pex_pex = await Get(
-        DownloadedExternalTool, ExternalToolRequest, pex_binary.get_request(Platform.current)
+        DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(Platform.current)
     )
     return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
 
@@ -113,7 +124,7 @@ async def download_pex_pex(pex_binary: PexBinary) -> PexPEX:
 @rule
 async def setup_pex_cli_process(
     request: PexCliProcess,
-    pex_binary: PexPEX,
+    pex_pex: PexPEX,
     pex_env: PexEnvironment,
     python_native_code: PythonNativeCode,
     global_options: GlobalOptions,
@@ -121,13 +132,13 @@ async def setup_pex_cli_process(
 ) -> Process:
     tmpdir = ".tmp"
     gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
-    cert_args = []
 
     # The certs file will typically not be in the repo, so we can't digest it via a PathGlobs.
     # Instead we manually create a FileContent for it.
-    if global_options.options.ca_certs_path:
-        ca_certs_content = Path(global_options.options.ca_certs_path).read_bytes()
-        chrooted_ca_certs_path = os.path.basename(global_options.options.ca_certs_path)
+    cert_args = []
+    if global_options.ca_certs_path:
+        ca_certs_content = Path(global_options.ca_certs_path).read_bytes()
+        chrooted_ca_certs_path = os.path.basename(global_options.ca_certs_path)
 
         gets.append(
             Get(
@@ -137,17 +148,13 @@ async def setup_pex_cli_process(
         )
         cert_args = ["--cert", chrooted_ca_certs_path]
 
-    digests_to_merge = [pex_binary.digest]
+    digests_to_merge = [pex_pex.digest]
     digests_to_merge.extend(await MultiGet(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
     input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
-    argv = [
-        pex_binary.exe,
-        *cert_args,
-        "--python-path",
-        create_path_env_var(pex_env.interpreter_search_paths),
+    global_args = [
         # Ensure Pex and its subprocesses create temporary files in the the process execution
         # sandbox. It may make sense to do this generally for Processes, but in the short term we
         # have known use cases where /tmp is too small to hold large wheel downloads Pex is asked to
@@ -160,18 +167,37 @@ async def setup_pex_cli_process(
         "--tmpdir",
         tmpdir,
     ]
-    if pex_runtime_env.verbosity > 0:
-        argv.append(f"-{'v' * pex_runtime_env.verbosity}")
 
-    # NB: This comes at the end of the argv because the request may use `--` passthrough args,
-    # which must come at the end.
+    if request.concurrency_available > 0:
+        global_args.extend(["--jobs", "{pants_concurrency}"])
+
+    verbosity_args = (
+        [f"-{'v' * pex_runtime_env.verbosity}"] if pex_runtime_env.verbosity > 0 else []
+    )
+
+    resolve_args = (
+        [*cert_args, "--python-path", create_path_env_var(pex_env.interpreter_search_paths)]
+        if request.set_resolve_args
+        else []
+    )
+    args = [
+        *request.subcommand,
+        *global_args,
+        *verbosity_args,
+        *resolve_args,
+        # NB: This comes at the end because it may use `--` passthrough args, # which must come at
+        # the end.
+        *request.extra_args,
+    ]
+
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    argv.extend(request.argv)
-    normalized_argv = complete_pex_env.create_argv(*argv, python=request.python)
+    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args, python=request.python)
     env = {
         **complete_pex_env.environment_dict(python_configured=request.python is not None),
         **python_native_code.environment_dict,
         **(request.extra_env or {}),
+        # If a subcommand is used, we need to use the `pex3` console script.
+        **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
 
     return Process(
@@ -183,6 +209,7 @@ async def setup_pex_cli_process(
         output_directories=request.output_directories,
         append_only_caches=complete_pex_env.append_only_caches,
         level=request.level,
+        concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
     )
 

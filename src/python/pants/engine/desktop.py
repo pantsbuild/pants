@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Tuple
 
+from pants.core.util_rules.system_binaries import BinaryPathRequest, BinaryPaths
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.platform import Platform
-from pants.engine.process import BinaryPathRequest, BinaryPaths, InteractiveProcess
+from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, collect_rules, rule
 from pants.util.meta import frozen_after_init
 
@@ -57,6 +58,7 @@ async def find_open_program(
             InteractiveProcess(
                 argv=(open_program_paths.first_path.path, *(str(f) for f in request.files)),
                 run_in_workspace=True,
+                restartable=True,
             )
         ]
     else:
@@ -69,6 +71,7 @@ async def find_open_program(
                 # required. Instead of attempting to track all of these we just export the full user
                 # environment since this is not a cached process.
                 env=complete_env,
+                restartable=True,
             )
             for f in request.files
         ]

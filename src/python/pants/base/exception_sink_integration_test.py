@@ -6,7 +6,6 @@ import re
 import signal
 import time
 from pathlib import Path
-from textwrap import dedent
 from typing import List, Tuple
 
 import pytest
@@ -49,7 +48,7 @@ def get_log_file_paths(workdir: str, pid: int) -> Tuple[str, str]:
     return (pid_specific_log_file, shared_log_file)
 
 
-def assert_unhandled_exception_log_matches(pid: int, file_contents: str, namespace: str) -> None:
+def assert_unhandled_exception_log_matches(pid: int, file_contents: str) -> None:
     regex_str = f"""\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
@@ -58,9 +57,7 @@ pid: {pid}
 Exception caught: \\([^)]*\\)
 (.|\n)*
 
-Exception message:.* 1 Exception encountered:
-
-  ResolveError: 'this-target-does-not-exist' was not found in namespace '{namespace}'\\. Did you mean one of:
+Exception message:.*
 """
     assert re.match(regex_str, file_contents)
 
@@ -79,72 +76,21 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
 
 
 def test_logs_unhandled_exception(tmp_path: Path) -> None:
-    directory = "testprojects/src/python/hello/main"
-
     pants_run = run_pants_with_workdir(
-        [
-            "--no-pantsd",
-            "list",
-            f"{directory}:this-target-does-not-exist",
-            "--backend-packages=['pants.backend.python']",
-        ],
-        workdir=tmp_path.as_posix(),
         # The backtrace should be omitted when --print-stacktrace=False.
-        print_stacktrace=False,
-        hermetic=False,
+        [*lifecycle_stub_cmdline(), "--no-print-stacktrace"],
+        workdir=tmp_path.as_posix(),
+        extra_env={"_RAISE_EXCEPTION_ON_IMPORT": "True"},
     )
 
     pants_run.assert_failure()
 
-    regex = f"'this-target-does-not-exist' was not found in namespace '{directory}'\\. Did you mean one of:"
+    regex = "exception during import!"
     assert re.search(regex, pants_run.stderr)
 
     pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
-    assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(pid_specific_log_file), namespace=directory
-    )
-    assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(shared_log_file), namespace=directory
-    )
-
-
-@pytest.mark.skip(reason="Flaky: https://github.com/pantsbuild/pants/issues/12108")
-def test_fails_ctrl_c_on_import(tmp_path: Path) -> None:
-    # TODO: figure out the cwd of the pants subprocess, not just the "workdir"!
-    pants_run = run_pants_with_workdir(
-        lifecycle_stub_cmdline(),
-        workdir=tmp_path.as_posix(),
-        extra_env={"_RAISE_KEYBOARDINTERRUPT_ON_IMPORT": "True"},
-    )
-    pants_run.assert_failure()
-
-    assert (
-        dedent(
-            """\
-            Interrupted by user:
-            ctrl-c during import!
-            """
-        )
-        in pants_run.stderr
-    )
-
-    pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
-    assert "" == read_file(pid_specific_log_file)
-    assert "" == read_file(shared_log_file)
-
-
-def test_fails_ctrl_c_ffi(tmp_path: Path) -> None:
-    pants_run = run_pants_with_workdir(
-        command=lifecycle_stub_cmdline(),
-        workdir=tmp_path.as_posix(),
-        extra_env={"_RAISE_KEYBOARD_INTERRUPT_FFI": "1"},
-    )
-    pants_run.assert_failure()
-    assert "KeyboardInterrupt: ctrl-c interrupted execution during FFI" in pants_run.stderr
-
-    pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
-    assert "" == read_file(pid_specific_log_file)
-    assert "" == read_file(shared_log_file)
+    assert_unhandled_exception_log_matches(pants_run.pid, read_file(pid_specific_log_file))
+    assert_unhandled_exception_log_matches(pants_run.pid, read_file(shared_log_file))
 
 
 class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
@@ -192,4 +138,4 @@ Thread [^\n]+ \\(most recent call first\\):
             assert re.search(regex_str, read_file(pid_specific_log_file))
 
             # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
-            self.assertEqual("", read_file(shared_log_file))
+            assert "" == read_file(shared_log_file)

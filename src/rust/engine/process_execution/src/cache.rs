@@ -2,25 +2,25 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use bytes::Bytes;
+use cache::PersistentCache;
 use futures::{future, FutureExt};
-use hashing::Fingerprint;
 use log::{debug, warn};
 use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::gen::pants::cache::{CacheKey, CacheKeyType};
 use serde::{Deserialize, Serialize};
-use sharded_lmdb::ShardedLmdb;
-use store::Store;
+use store::{Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata, ProcessResultSource,
+  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
+  ProcessMetadata, ProcessResultSource,
 };
 
-#[allow(dead_code)]
+// TODO: Consider moving into protobuf as a CacheValue type.
 #[derive(Serialize, Deserialize)]
 struct PlatformAndResponseBytes {
   platform: Platform,
@@ -30,7 +30,7 @@ struct PlatformAndResponseBytes {
 #[derive(Clone)]
 pub struct CommandRunner {
   underlying: Arc<dyn crate::CommandRunner>,
-  process_execution_store: ShardedLmdb,
+  cache: PersistentCache,
   file_store: Store,
   metadata: ProcessMetadata,
 }
@@ -38,13 +38,13 @@ pub struct CommandRunner {
 impl CommandRunner {
   pub fn new(
     underlying: Arc<dyn crate::CommandRunner>,
-    process_execution_store: ShardedLmdb,
+    cache: PersistentCache,
     file_store: Store,
     metadata: ProcessMetadata,
   ) -> CommandRunner {
     CommandRunner {
       underlying,
-      process_execution_store,
+      cache,
       file_store,
       metadata,
     }
@@ -53,37 +53,29 @@ impl CommandRunner {
 
 #[async_trait]
 impl crate::CommandRunner for CommandRunner {
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    self.underlying.extract_compatible_request(req)
-  }
-
   async fn run(
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
-    let write_failures_to_cache = req
-      .0
-      .values()
-      .any(|process| process.cache_scope == ProcessCacheScope::Always);
-    let digest = crate::digest(req.clone(), &self.metadata);
-    let key = digest.hash;
+    let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
+    let key = CacheKey {
+      digest: Some(crate::digest(&req, &self.metadata).into()),
+      key_type: CacheKeyType::Process.into(),
+    };
 
     let context2 = context.clone();
+    let key2 = key.clone();
     let cache_read_result = in_workunit!(
-      context.workunit_store.clone(),
-      "local_cache_read".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("Local cache lookup: {}", req.user_facing_name())),
-        ..WorkunitMetadata::default()
-      },
+      "local_cache_read",
+      Level::Trace,
+      desc = Some(format!("Local cache lookup: {}", req.description)),
       |workunit| async move {
         workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
-        match self.lookup(key).await {
+        match self.lookup(&context2, &key2).await {
           Ok(Some(result)) if result.exit_code == 0 || write_failures_to_cache => {
             let lookup_elapsed = cache_lookup_start.elapsed();
             workunit.increment_counter(Metric::LocalCacheRequestsCached, 1);
@@ -96,10 +88,16 @@ impl crate::CommandRunner for CommandRunner {
             }
             // When we successfully use the cache, we change the description and increase the level
             // (but not so much that it will be logged by default).
-            workunit.update_metadata(|initial| WorkunitMetadata {
-              desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
-              level: Level::Debug,
-              ..initial
+            workunit.update_metadata(|initial| {
+              initial.map(|(initial, _)| {
+                (
+                  WorkunitMetadata {
+                    desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+                    ..initial
+                  },
+                  Level::Debug,
+                )
+              })
             });
             Ok(result)
           }
@@ -120,7 +118,6 @@ impl crate::CommandRunner for CommandRunner {
           }
         }
       }
-      .boxed()
     )
     .await;
 
@@ -131,23 +128,15 @@ impl crate::CommandRunner for CommandRunner {
     let result = self.underlying.run(context.clone(), workunit, req).await?;
     if result.exit_code == 0 || write_failures_to_cache {
       let result = result.clone();
-      in_workunit!(
-        context.workunit_store.clone(),
-        "local_cache_write".to_owned(),
-        WorkunitMetadata {
-          level: Level::Trace,
-          ..WorkunitMetadata::default()
-        },
-        |workunit| async move {
-          if let Err(err) = self.store(key, &result).await {
-            warn!(
-              "Error storing process execution result to local cache: {} - ignoring and continuing",
-              err
-            );
-            workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
-          }
+      in_workunit!("local_cache_write", Level::Trace, |workunit| async move {
+        if let Err(err) = self.store(&key, &result).await {
+          warn!(
+            "Error storing process execution result to local cache: {} - ignoring and continuing",
+            err
+          );
+          workunit.increment_counter(Metric::LocalCacheWriteErrors, 1);
         }
-      )
+      })
       .await;
     }
     Ok(result)
@@ -157,28 +146,30 @@ impl crate::CommandRunner for CommandRunner {
 impl CommandRunner {
   async fn lookup(
     &self,
-    fingerprint: Fingerprint,
-  ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
+    context: &Context,
+    action_key: &CacheKey,
+  ) -> Result<Option<FallibleProcessResultWithPlatform>, StoreError> {
     use remexec::ExecuteResponse;
 
     // See whether there is a cache entry.
-    let maybe_execute_response: Option<(ExecuteResponse, Platform)> = self
-      .process_execution_store
-      .load_bytes_with(fingerprint, move |bytes| {
-        let decoded: PlatformAndResponseBytes = bincode::deserialize(bytes)
-          .map_err(|err| format!("Could not deserialize platform and response: {}", err))?;
-        let platform = decoded.platform;
-        let execute_response = ExecuteResponse::decode(&decoded.response_bytes[..])
-          .map_err(|e| format!("Invalid ExecuteResponse: {:?}", e))?;
-        Ok((execute_response, platform))
-      })
-      .await?;
+    let maybe_cache_value = self.cache.load(action_key).await?;
+    let maybe_execute_response = if let Some(bytes) = maybe_cache_value {
+      let decoded: PlatformAndResponseBytes = bincode::deserialize(&bytes)
+        .map_err(|err| format!("Could not deserialize platform and response: {}", err))?;
+      let platform = decoded.platform;
+      let execute_response = ExecuteResponse::decode(&decoded.response_bytes[..])
+        .map_err(|e| format!("Invalid ExecuteResponse: {:?}", e))?;
+      Some((execute_response, platform))
+    } else {
+      return Ok(None);
+    };
 
     // Deserialize the cache entry if it existed.
     let result = if let Some((execute_response, platform)) = maybe_execute_response {
       if let Some(ref action_result) = execute_response.result {
         crate::remote::populate_fallible_execution_result(
           self.file_store.clone(),
+          context.run_id,
           action_result,
           platform,
           true,
@@ -186,7 +177,11 @@ impl CommandRunner {
         )
         .await?
       } else {
-        return Err("action result missing from ExecuteResponse".into());
+        return Err(
+          "action result missing from ExecuteResponse"
+            .to_owned()
+            .into(),
+        );
       }
     } else {
       return Ok(None);
@@ -204,7 +199,8 @@ impl CommandRunner {
         .boxed(),
       self
         .file_store
-        .ensure_local_has_recursive_directory(result.output_directory),
+        .ensure_local_has_recursive_directory(result.output_directory.clone())
+        .boxed(),
     ])
     .await?;
 
@@ -213,17 +209,23 @@ impl CommandRunner {
 
   async fn store(
     &self,
-    fingerprint: Fingerprint,
+    action_key: &CacheKey,
     result: &FallibleProcessResultWithPlatform,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     let stdout_digest = result.stdout_digest;
     let stderr_digest = result.stderr_digest;
+
+    // Ensure that the process output is persisted.
+    self
+      .file_store
+      .ensure_directory_digest_persisted(result.output_directory.clone())
+      .await?;
 
     let action_result = remexec::ActionResult {
       exit_code: result.exit_code,
       output_directories: vec![remexec::OutputDirectory {
         path: String::new(),
-        tree_digest: Some((&result.output_directory).into()),
+        tree_digest: Some((&result.output_directory.as_digest()).into()),
       }],
       stdout_digest: Some((&stdout_digest).into()),
       stderr_digest: Some((&stderr_digest).into()),
@@ -257,9 +259,7 @@ impl CommandRunner {
       )
     })?;
 
-    self
-      .process_execution_store
-      .store_bytes(fingerprint, bytes_to_store, false)
-      .await
+    self.cache.store(action_key, bytes_to_store).await?;
+    Ok(())
   }
 }

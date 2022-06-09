@@ -14,7 +14,8 @@ from pants.backend.shell.dependency_inference import (
     ParseShellImportsRequest,
     ShellMapping,
 )
-from pants.backend.shell.target_types import ShellLibrary, ShellSources
+from pants.backend.shell.target_types import ShellSourceField, ShellSourcesGeneratorTarget
+from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.util_rules import external_tool
 from pants.engine.addresses import Address
 from pants.engine.target import InferredDependencies
@@ -28,11 +29,12 @@ def rule_runner() -> RuleRunner:
         rules=[
             *dependency_inference.rules(),
             *external_tool.rules(),
+            *target_types_rules(),
             QueryRule(ShellMapping, []),
             QueryRule(ParsedShellImports, [ParseShellImportsRequest]),
             QueryRule(InferredDependencies, [InferShellDependencies]),
         ],
-        target_types=[ShellLibrary],
+        target_types=[ShellSourcesGeneratorTarget],
     )
 
 
@@ -42,10 +44,10 @@ def test_shell_mapping(rule_runner: RuleRunner) -> None:
             # Two Shell files belonging to the same target. We should use two file addresses.
             "a/f1.sh": "",
             "a/f2.sh": "",
-            "a/BUILD": "shell_library()",
+            "a/BUILD": "shell_sources()",
             # >1 target owns the same file, so it's ambiguous.
             "b/f.sh": "",
-            "b/BUILD": "shell_library(name='t1')\nshell_library(name='t2')",
+            "b/BUILD": "shell_sources(name='t1')\nshell_sources(name='t2')",
         }
     )
     result = rule_runner.request(ShellMapping, [])
@@ -99,9 +101,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
                 """
             ),
             "a/f2.sh": "source a/f1.sh",
-            "a/BUILD": "shell_library()",
+            "a/BUILD": "shell_sources()",
             "b/f.sh": "",
-            "b/BUILD": "shell_library()",
+            "b/BUILD": "shell_sources()",
             # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but
             # not warn on the disambiguated one and should infer a dep.
             "ambiguous/dep.sh": "",
@@ -114,9 +116,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
             ),
             "ambiguous/BUILD": dedent(
                 """\
-                shell_library(name='dep1', sources=['dep.sh', 'disambiguated.sh'])
-                shell_library(name='dep2', sources=['dep.sh', 'disambiguated.sh'])
-                shell_library(
+                shell_sources(name='dep1', sources=['dep.sh', 'disambiguated.sh'])
+                shell_sources(name='dep2', sources=['dep.sh', 'disambiguated.sh'])
+                shell_sources(
                     name='main',
                     sources=['main.sh'],
                     dependencies=['!./disambiguated.sh:dep2'],
@@ -129,26 +131,20 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     def run_dep_inference(address: Address) -> InferredDependencies:
         tgt = rule_runner.get_target(address)
         return rule_runner.request(
-            InferredDependencies, [InferShellDependencies(tgt[ShellSources])]
+            InferredDependencies, [InferShellDependencies(tgt[ShellSourceField])]
         )
 
-    build_address = Address("a")
-    assert run_dep_inference(build_address) == InferredDependencies(
-        [Address("b", relative_file_path="f.sh"), Address("a", relative_file_path="f1.sh")],
-        sibling_dependencies_inferrable=True,
-    )
-
-    file_address = Address("a", relative_file_path="f1.sh")
-    assert run_dep_inference(file_address) == InferredDependencies(
-        [Address("b", relative_file_path="f.sh")], sibling_dependencies_inferrable=True
+    assert run_dep_inference(Address("a", relative_file_path="f1.sh")) == InferredDependencies(
+        [Address("b", relative_file_path="f.sh")]
     )
 
     caplog.clear()
-    assert run_dep_inference(Address("ambiguous", target_name="main")) == InferredDependencies(
-        [Address("ambiguous", target_name="dep1", relative_file_path="disambiguated.sh")],
-        sibling_dependencies_inferrable=True,
+    assert run_dep_inference(
+        Address("ambiguous", target_name="main", relative_file_path="main.sh")
+    ) == InferredDependencies(
+        [Address("ambiguous", target_name="dep1", relative_file_path="disambiguated.sh")]
     )
     assert len(caplog.records) == 1
-    assert "The target ambiguous:main sources `ambiguous/dep.sh`" in caplog.text
+    assert "The target ambiguous/main.sh:main sources `ambiguous/dep.sh`" in caplog.text
     assert "['ambiguous/dep.sh:dep1', 'ambiguous/dep.sh:dep2']" in caplog.text
     assert "disambiguated.sh" not in caplog.text

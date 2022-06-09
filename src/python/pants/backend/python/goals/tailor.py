@@ -3,23 +3,30 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
 
-from pants.backend.python.dependency_inference.module_mapper import PythonModule
+from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
+from pants.backend.python.macros.pipenv_requirements import parse_pipenv_requirements
+from pants.backend.python.macros.poetry_requirements import PyProjectToml, parse_pyproject_toml
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
     PexEntryPointField,
-    PythonLibrary,
-    PythonTests,
-    PythonTestsSources,
+    PythonSourcesGeneratorTarget,
+    PythonTestsGeneratingSourcesField,
+    PythonTestsGeneratorTarget,
+    PythonTestUtilsGeneratingSourcesField,
+    PythonTestUtilsGeneratorTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
+    parse_requirements_file,
 )
-from pants.base.specs import AddressSpecs, AscendantAddresses
+from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -27,15 +34,16 @@ from pants.core.goals.tailor import (
     PutativeTargetsRequest,
     group_by_dir,
 )
-from pants.engine.fs import DigestContents, PathGlobs, Paths
+from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.source.filespec import Filespec, matches_filespec
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -45,13 +53,27 @@ class PutativePythonTargetsRequest(PutativeTargetsRequest):
 
 def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec = Filespec(includes=list(PythonTestsSources.default))
-    test_filenames = set(
-        matches_filespec(tests_filespec, paths=[os.path.basename(path) for path in paths])
+    tests_filespec = Filespec(includes=list(PythonTestsGeneratingSourcesField.default))
+    test_utils_filespec = Filespec(includes=list(PythonTestUtilsGeneratingSourcesField.default))
+
+    path_to_file_name = {path: os.path.basename(path) for path in paths}
+    test_file_names = set(matches_filespec(tests_filespec, paths=path_to_file_name.values()))
+    test_util_file_names = set(
+        matches_filespec(test_utils_filespec, paths=path_to_file_name.values())
     )
-    test_files = {path for path in paths if os.path.basename(path) in test_filenames}
-    library_files = set(paths) - test_files
-    return {PythonTests: test_files, PythonLibrary: library_files}
+
+    test_files = {
+        path for path, file_name in path_to_file_name.items() if file_name in test_file_names
+    }
+    test_util_files = {
+        path for path, file_name in path_to_file_name.items() if file_name in test_util_file_names
+    }
+    library_files = set(paths) - test_files - test_util_files
+    return {
+        PythonTestsGeneratorTarget: test_files,
+        PythonTestUtilsGeneratorTarget: test_util_files,
+        PythonSourcesGeneratorTarget: library_files,
+    }
 
 
 # The order "__main__" == __name__ would also technically work, but is very
@@ -74,39 +96,117 @@ async def find_putative_targets(
     all_owned_sources: AllOwnedSources,
     python_setup: PythonSetup,
 ) -> PutativeTargets:
-    # Find library/test targets.
-
-    all_py_files_globs: PathGlobs = req.search_paths.path_globs("*.py")
-    all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
-    unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
-    classified_unowned_py_files = classify_source_files(unowned_py_files)
     pts = []
-    for tgt_type, paths in classified_unowned_py_files.items():
-        for dirname, filenames in group_by_dir(paths).items():
-            name = "tests" if tgt_type == PythonTests else os.path.basename(dirname)
-            kwargs = {"name": name} if tgt_type == PythonTests else {}
-            if (
-                python_setup.tailor_ignore_solitary_init_files
-                and tgt_type == PythonLibrary
-                and filenames == {"__init__.py"}
-            ):
-                continue
-            pts.append(
-                PutativeTarget.for_target_type(
-                    tgt_type, dirname, name, sorted(filenames), kwargs=kwargs
+
+    if python_setup.tailor_source_targets:
+        # Find library/test/test_util targets.
+        all_py_files_globs: PathGlobs = req.path_globs("*.py", "*.pyi")
+        all_py_files = await Get(Paths, PathGlobs, all_py_files_globs)
+        unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
+        classified_unowned_py_files = classify_source_files(unowned_py_files)
+        for tgt_type, paths in classified_unowned_py_files.items():
+            for dirname, filenames in group_by_dir(paths).items():
+                name: str | None
+                if issubclass(tgt_type, PythonTestsGeneratorTarget):
+                    name = "tests"
+                elif issubclass(tgt_type, PythonTestUtilsGeneratorTarget):
+                    name = "test_utils"
+                else:
+                    name = None
+                if (
+                    python_setup.tailor_ignore_solitary_init_files
+                    and tgt_type == PythonSourcesGeneratorTarget
+                    and filenames == {"__init__.py"}
+                ):
+                    continue
+                pts.append(
+                    PutativeTarget.for_target_type(
+                        tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
+                    )
                 )
-            )
+
+    if python_setup.tailor_requirements_targets:
+        # Find requirements files.
+        (
+            all_requirements_files,
+            all_pipenv_lockfile_files,
+            all_pyproject_toml_contents,
+        ) = await MultiGet(
+            Get(DigestContents, PathGlobs, req.path_globs("*requirements*.txt")),
+            Get(DigestContents, PathGlobs, req.path_globs("Pipfile.lock")),
+            Get(DigestContents, PathGlobs, req.path_globs("pyproject.toml")),
+        )
+
+        def add_req_targets(files: Iterable[FileContent], alias: str, target_name: str) -> None:
+            contents = {i.path: i.content for i in files}
+            unowned_files = set(contents) - set(all_owned_sources)
+            for fp in unowned_files:
+                path, name = os.path.split(fp)
+
+                try:
+                    validate(fp, contents[fp], alias)
+                except Exception as e:
+                    logger.warning(
+                        f"An error occurred when validating `{fp}`: {e}.\n\n"
+                        "You'll need to create targets for its contents manually.\n"
+                        "To silence this error in future, see "
+                        "https://www.pantsbuild.org/docs/reference-tailor#section-ignore-paths \n"
+                    )
+                    continue
+
+                pts.append(
+                    PutativeTarget(
+                        path=path,
+                        name=target_name,
+                        type_alias=alias,
+                        triggering_sources=[fp],
+                        owned_sources=[name],
+                        kwargs=(
+                            {}
+                            if alias != "python_requirements" or name == "requirements.txt"
+                            else {"source": name}
+                        ),
+                    )
+                )
+
+        def validate(path: str, contents: bytes, alias: str) -> None:
+            if alias == "python_requirements":
+                return validate_python_requirements(path, contents)
+            elif alias == "pipenv_requirements":
+                return validate_pipenv_requirements(contents)
+            elif alias == "poetry_requirements":
+                return validate_poetry_requirements(contents)
+
+        def validate_python_requirements(path: str, contents: bytes) -> None:
+            for _ in parse_requirements_file(contents.decode(), rel_path=path):
+                pass
+
+        def validate_pipenv_requirements(contents: bytes) -> None:
+            parse_pipenv_requirements(contents)
+
+        def validate_poetry_requirements(contents: bytes) -> None:
+            p = PyProjectToml(PurePath(), PurePath(), contents.decode())
+            parse_pyproject_toml(p)
+
+        add_req_targets(all_requirements_files, "python_requirements", "reqs")
+        add_req_targets(all_pipenv_lockfile_files, "pipenv_requirements", "pipenv")
+        add_req_targets(
+            {fc for fc in all_pyproject_toml_contents if b"[tool.poetry" in fc.content},
+            "poetry_requirements",
+            "poetry",
+        )
 
     if python_setup.tailor_pex_binary_targets:
         # Find binary targets.
 
-        # Get all files whose content indicates that they are entry points.
+        # Get all files whose content indicates that they are entry points or are __main__.py files.
         digest_contents = await Get(DigestContents, PathGlobs, all_py_files_globs)
+        all_main_py = await Get(Paths, PathGlobs, req.path_globs("__main__.py"))
         entry_points = [
             file_content.path
             for file_content in digest_contents
             if is_entry_point(file_content.content)
-        ]
+        ] + list(all_main_py.files)
 
         # Get the modules for these entry points.
         src_roots = await Get(
@@ -117,13 +217,17 @@ async def find_putative_targets(
             entry_point_path = PurePath(entry_point)
             src_root = src_roots.path_to_root[entry_point_path]
             stripped_entry_point = entry_point_path.relative_to(src_root.path)
-            module = PythonModule.create_from_stripped_path(stripped_entry_point)
-            module_to_entry_point[module.module] = entry_point
+            module = module_from_stripped_path(stripped_entry_point)
+            module_to_entry_point[module] = entry_point
 
         # Get existing binary targets for these entry points.
         entry_point_dirs = {os.path.dirname(entry_point) for entry_point in entry_points}
         possible_existing_binary_targets = await Get(
-            UnexpandedTargets, AddressSpecs(AscendantAddresses(d) for d in entry_point_dirs)
+            UnexpandedTargets,
+            RawSpecs(
+                ancestor_globs=tuple(AncestorGlobSpec(d) for d in entry_point_dirs),
+                description_of_origin="the `pex_binary` tailor rule",
+            ),
         )
         possible_existing_binary_entry_points = await MultiGet(
             Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(t[PexEntryPointField]))
@@ -148,7 +252,7 @@ async def find_putative_targets(
                     path=path,
                     name=name,
                     triggering_sources=tuple(),
-                    kwargs={"name": name, "entry_point": fname},
+                    kwargs={"entry_point": fname},
                 )
             )
 

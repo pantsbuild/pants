@@ -11,7 +11,7 @@ from typing import Any, Callable, Iterable, Sequence, Tuple
 
 from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DigestContents, Snapshot
+from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
 from pants.engine.internals import native_engine
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
 from pants.engine.internals.selectors import Params
@@ -52,24 +52,27 @@ class StreamingWorkunitContext:
         """Returns the RunTracker for the current run of Pants."""
         return self._run_tracker
 
-    def single_file_digests_to_bytes(self, digests: Sequence[Digest]) -> tuple[bytes, ...]:
-        """Given a list of Digest objects, each representing the contents of a single file, return a
-        list of the bytes corresponding to each of those Digests in sequence."""
+    def single_file_digests_to_bytes(self, digests: Sequence[FileDigest]) -> list[bytes]:
+        """Return `bytes` for each `FileDigest`."""
         return self._scheduler.single_file_digests_to_bytes(digests)
 
     def snapshots_to_file_contents(
         self, snapshots: Sequence[Snapshot]
-    ) -> Tuple[DigestContents, ...]:
+    ) -> tuple[DigestContents, ...]:
         """Given a sequence of Snapshot objects, return a tuple of DigestContents representing the
         files contained in those `Snapshot`s in sequence."""
         return self._scheduler.snapshots_to_file_contents(snapshots)
 
-    def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
+    def ensure_remote_has_recursive(self, digests: Sequence[Digest | FileDigest]) -> None:
         """Invoke the internal ensure_remote_has_recursive function, which ensures that a remote
         ByteStore, if it exists, has a copy of the files fingerprinted by each Digest."""
         return self._scheduler.ensure_remote_has_recursive(digests)
 
-    def get_observation_histograms(self):
+    def get_metrics(self) -> dict[str, int]:
+        """Invoke the internal get_metrics function, which returns metrics for the Session."""
+        return self._scheduler.get_metrics()
+
+    def get_observation_histograms(self) -> dict[str, Any]:
         """Invoke the internal get_observation_histograms function, which serializes histograms
         generated from Pants-internal observation metrics observed during the current run of Pants.
 
@@ -139,7 +142,7 @@ class WorkunitsCallbackFactory:
     rule. See #11354 for discussion of that limitation.
     """
 
-    callback_factory: Callable[[], WorkunitsCallback]
+    callback_factory: Callable[[], WorkunitsCallback | None]
 
 
 class WorkunitsCallbackFactories(Tuple[WorkunitsCallbackFactory, ...]):
@@ -183,7 +186,7 @@ class StreamingWorkunitHandler:
         specs: Specs,
         report_interval_seconds: float,
         allow_async_completion: bool,
-        max_workunit_verbosity: LogLevel = LogLevel.TRACE,
+        max_workunit_verbosity: LogLevel,
     ) -> None:
         scheduler = scheduler.isolated_shallow_clone("streaming_workunit_handler_session")
         self.callbacks = callbacks
@@ -260,7 +263,7 @@ class _InnerHandler(threading.Thread):
     def run(self) -> None:
         # First, set the thread's logging destination to the parent thread's, meaning the console.
         native_engine.stdio_thread_set_destination(self.logging_destination)
-        while not self.stop_request.isSet():  # type: ignore[attr-defined]
+        while not self.stop_request.isSet():
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
         else:

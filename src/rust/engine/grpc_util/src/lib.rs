@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -29,7 +27,6 @@
 
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::str::FromStr;
 
@@ -97,7 +94,7 @@ pub fn create_endpoint(
 }
 
 pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<HeaderMap, String> {
-  let http_headers = headers
+  let (http_headers, errors): (Vec<(HeaderName, HeaderValue)>, Vec<String>) = headers
     .iter()
     .map(|(key, value)| {
       let header_name =
@@ -108,10 +105,6 @@ pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<
 
       Ok((header_name, header_value))
     })
-    .collect::<Vec<Result<(HeaderName, HeaderValue), String>>>();
-
-  let (http_headers, errors): (Vec<(HeaderName, HeaderValue)>, Vec<String>) = http_headers
-    .into_iter()
     .partition_map(|result| match result {
       Ok(v) => Either::Left(v),
       Err(err) => Either::Right(err),

@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.docker.target_types import DockerImage
+from pants.backend.docker.target_types import DockerImageTarget
 from pants.engine.target import BoolField
 
 
@@ -12,4 +12,4 @@ class SkipHadolintField(BoolField):
 
 
 def rules():
-    return [DockerImage.register_plugin_field(SkipHadolintField)]
+    return [DockerImageTarget.register_plugin_field(SkipHadolintField)]

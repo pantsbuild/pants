@@ -9,7 +9,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.goals import package_pex_binary
-from pants.backend.python.target_types import PexBinary, PythonLibrary
+from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.shell import shunit2_test_runner
@@ -19,11 +19,12 @@ from pants.backend.shell.shunit2_test_runner import (
     Shunit2RunnerRequest,
 )
 from pants.backend.shell.target_types import (
-    ShellLibrary,
+    ShellSourceTarget,
     Shunit2Shell,
     Shunit2ShellField,
-    Shunit2Tests,
+    Shunit2TestsGeneratorTarget,
 )
+from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.goals.test import (
     TestDebugRequest,
     TestResult,
@@ -34,7 +35,6 @@ from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import InteractiveRunner
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
@@ -48,13 +48,19 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *package_pex_binary.rules(),
             *python_target_type_rules(),
+            *target_types_rules(),
             build_runtime_package_dependencies,
             get_filtered_environment,
             QueryRule(TestResult, [Shunit2FieldSet]),
             QueryRule(TestDebugRequest, [Shunit2FieldSet]),
             QueryRule(Shunit2Runner, [Shunit2RunnerRequest]),
         ],
-        target_types=[ShellLibrary, Shunit2Tests, PythonLibrary, PexBinary],
+        target_types=[
+            ShellSourceTarget,
+            Shunit2TestsGeneratorTarget,
+            PythonSourcesGeneratorTarget,
+            PexBinary,
+        ],
     )
 
 
@@ -89,7 +95,7 @@ def run_shunit2(
     debug_request = rule_runner.request(TestDebugRequest, inputs)
     if debug_request.process is not None:
         with mock_console(rule_runner.options_bootstrapper):
-            debug_result = InteractiveRunner(rule_runner.scheduler).run(debug_request.process)
+            debug_result = rule_runner.run_interactive_process(debug_request.process)
             assert test_result.exit_code == debug_result.exit_code
     return test_result
 
@@ -157,8 +163,8 @@ def test_dependencies(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 shunit2_tests(name="t", dependencies=[':direct'])
-                shell_library(name="direct", sources=['direct.sh'], dependencies=[':transitive'])
-                shell_library(name="transitive", sources=['transitive.sh'])
+                shell_source(name="direct", source='direct.sh', dependencies=[':transitive'])
+                shell_source(name="transitive", source='transitive.sh')
                 """
             ),
         }
@@ -185,6 +191,7 @@ def test_subdirectories(rule_runner: RuleRunner) -> None:
     "The Process is not being cached, but the rule invocation is being memoized so the "
     "`--force` does not work properly."
 )
+@pytest.mark.no_error_if_skipped
 def test_force(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"tests.sh": GOOD_TEST, "BUILD": "shunit2_tests(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="tests.sh"))
@@ -236,7 +243,7 @@ def test_runtime_package_dependency(rule_runner: RuleRunner) -> None:
             "src/py/main.py": "",
             "src/py/BUILD": dedent(
                 """\
-                python_library()
+                python_sources()
                 pex_binary(name='main', entry_point='main.py')
                 """
             ),

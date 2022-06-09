@@ -1,6 +1,9 @@
+use std::fmt;
+
+use indexmap::{indexset, IndexSet};
+
 use crate::builder::combinations_of_one;
 use crate::{Palette, Query, RuleGraph};
-use std::fmt;
 
 #[test]
 fn combinations_of_one_test() {
@@ -29,8 +32,8 @@ fn combinations_of_one_test() {
 
 #[test]
 fn basic() {
-  let rules = vec![Rule("a", "a_from_b", vec![DependencyKey("b", None)])];
-  let queries = vec![Query::new("a", vec!["b"])];
+  let rules = indexset![Rule("a", "a_from_b", vec![DependencyKey("b", None)])];
+  let queries = indexset![Query::new("a", vec!["b"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -39,8 +42,8 @@ fn basic() {
 
 #[test]
 fn singleton() {
-  let rules = vec![Rule("a", "a_singleton", vec![])];
-  let queries = vec![Query::new("a", vec![])];
+  let rules = indexset![Rule("a", "a_singleton", vec![])];
+  let queries = indexset![Query::new("a", vec![])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -49,8 +52,8 @@ fn singleton() {
 
 #[test]
 fn insufficient_query() {
-  let rules = vec![Rule("a", "a_from_b", vec![DependencyKey("b", None)])];
-  let queries = vec![Query::new("a", vec![])];
+  let rules = indexset![Rule("a", "a_from_b", vec![DependencyKey("b", None)])];
+  let queries = indexset![Query::new("a", vec![])];
 
   assert!(RuleGraph::new(rules, queries)
     .err()
@@ -60,8 +63,8 @@ fn insufficient_query() {
 
 #[test]
 fn no_rules() {
-  let rules: Vec<Rule> = vec![];
-  let queries = vec![Query::new("a", vec![])];
+  let rules: IndexSet<Rule> = indexset![];
+  let queries = indexset![Query::new("a", vec![])];
 
   assert!(RuleGraph::new(rules, queries)
     .err()
@@ -71,11 +74,11 @@ fn no_rules() {
 
 #[test]
 fn ambiguity() {
-  let rules = vec![
+  let rules = indexset![
     Rule("a", "a_from_b", vec![DependencyKey("b", None)]),
     Rule("a", "a_from_c", vec![DependencyKey("c", None)]),
   ];
-  let queries = vec![Query::new("a", vec!["b", "c"])];
+  let queries = indexset![Query::new("a", vec!["b", "c"])];
 
   assert!(RuleGraph::new(rules, queries)
     .err()
@@ -85,7 +88,7 @@ fn ambiguity() {
 
 #[test]
 fn nested_single() {
-  let rules = vec![
+  let rules = indexset![
     Rule("a", "a_from_b", vec![DependencyKey("b", Some("c"))]),
     Rule(
       "b",
@@ -93,7 +96,7 @@ fn nested_single() {
       vec![DependencyKey("c", None), DependencyKey("d", None)],
     ),
   ];
-  let queries = vec![Query::new("a", vec!["d"])];
+  let queries = indexset![Query::new("a", vec!["d"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -102,7 +105,7 @@ fn nested_single() {
 
 #[test]
 fn nested_multiple() {
-  let rules = vec![
+  let rules = indexset![
     Rule("a", "a_from_b", vec![DependencyKey("b", Some("c"))]),
     Rule(
       "b",
@@ -115,7 +118,7 @@ fn nested_multiple() {
       vec![DependencyKey("d", None)],
     ),
   ];
-  let queries = vec![Query::new("a", vec!["d"])];
+  let queries = indexset![Query::new("a", vec!["d"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -124,7 +127,7 @@ fn nested_multiple() {
 
 #[test]
 fn self_cycle_simple() {
-  let rules = vec![Rule(
+  let rules = indexset![Rule(
     "Fib",
     "fib",
     vec![
@@ -132,7 +135,7 @@ fn self_cycle_simple() {
       DependencyKey("Fib", Some("int")),
     ],
   )];
-  let queries = vec![
+  let queries = indexset![
     Query::new("Fib", vec!["int"]),
     Query::new("Fib", vec!["Fib"]),
   ];
@@ -145,7 +148,7 @@ fn self_cycle_simple() {
 
 #[test]
 fn self_cycle_with_external_dep() {
-  let rules = vec![
+  let rules = indexset![
     Rule(
       "Thing",
       "transitive_thing",
@@ -163,7 +166,7 @@ fn self_cycle_with_external_dep() {
       vec![DependencyKey("ExternalDep", None)],
     ),
   ];
-  let queries = vec![Query::new("Thing", vec!["int"])];
+  let queries = indexset![Query::new("Thing", vec!["int"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -173,7 +176,7 @@ fn self_cycle_with_external_dep() {
 #[test]
 fn ambiguous_cycle() {
   let _logger = env_logger::try_init();
-  let rules = vec![
+  let rules = indexset![
     Rule(
       "Root",
       "me",
@@ -193,7 +196,7 @@ fn ambiguous_cycle() {
     Rule("FPR", "fpr_for_p", vec![DependencyKey("P", None)]),
     Rule("FPR", "fpr_for_mpp", vec![DependencyKey("MPP", None)]),
   ];
-  let queries = vec![Query::new("Root", vec![])];
+  let queries = indexset![Query::new("Root", vec![])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -202,7 +205,7 @@ fn ambiguous_cycle() {
 
 #[test]
 fn natural_loop() {
-  let rules = vec![
+  let rules = indexset![
     Rule(
       "A",
       "a",
@@ -219,7 +222,7 @@ fn natural_loop() {
       vec![DependencyKey("F", None), DependencyKey("A", Some("D"))],
     ),
   ];
-  let queries = vec![Query::new("A", vec!["D"])];
+  let queries = indexset![Query::new("A", vec!["D"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -229,7 +232,7 @@ fn natural_loop() {
 #[test]
 fn multi_path_cycle() {
   let _logger = env_logger::try_init();
-  let rules = vec![
+  let rules = indexset![
     Rule(
       "A",
       "sao",
@@ -245,7 +248,7 @@ fn multi_path_cycle() {
       vec![DependencyKey("AS", None), DependencyKey("A", None)],
     ),
   ];
-  let queries = vec![Query::new("A", vec![])];
+  let queries = indexset![Query::new("A", vec![])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -254,7 +257,7 @@ fn multi_path_cycle() {
 
 #[test]
 fn mutual_recursion() {
-  let rules = vec![
+  let rules = indexset![
     Rule(
       "IsEven",
       "is_even",
@@ -272,7 +275,7 @@ fn mutual_recursion() {
       ],
     ),
   ];
-  let queries = vec![
+  let queries = indexset![
     Query::new("IsEven", vec!["int"]),
     Query::new("IsOdd", vec!["int"]),
   ];
@@ -286,7 +289,7 @@ fn mutual_recursion() {
 #[test]
 fn wide() {
   let _logger = env_logger::try_init();
-  let rules = vec![
+  let rules = indexset![
     Rule("Output", "one", vec![DependencyKey("Output", Some("A"))]),
     Rule(
       "Output",
@@ -304,7 +307,7 @@ fn wide() {
       vec![DependencyKey("C", None), DependencyKey("D", None)],
     ),
   ];
-  let queries = vec![Query::new("Output", vec!["D"])];
+  let queries = indexset![Query::new("Output", vec!["D"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -314,7 +317,7 @@ fn wide() {
 #[test]
 fn reduced_source_roots() {
   let _logger = env_logger::try_init();
-  let rules = vec![
+  let rules = indexset![
     Rule("SourceRootConfig", "construct_scope_source", vec![]),
     Rule(
       "OptionalSourceRootsResult",
@@ -381,7 +384,7 @@ fn reduced_source_roots() {
       ],
     ),
   ];
-  let queries = vec![Query::new("StrippedSourceFiles", vec!["SourceFiles"])];
+  let queries = indexset![Query::new("StrippedSourceFiles", vec!["SourceFiles"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -390,7 +393,7 @@ fn reduced_source_roots() {
 #[test]
 fn reduced_codegen_cycle() {
   let _logger = env_logger::try_init();
-  let rules = vec![
+  let rules = indexset![
     Rule(
       "Process",
       "setup_pex_cli_process",
@@ -423,7 +426,7 @@ fn reduced_codegen_cycle() {
       vec![DependencyKey("MultiPlatformProcess", None)],
     ),
   ];
-  let queries = vec![Query::new("Process", vec!["PexCliProcess"])];
+  let queries = indexset![Query::new("Process", vec!["PexCliProcess"])];
   let graph = RuleGraph::new(rules, queries).unwrap();
 
   graph.validate_reachability().unwrap();
@@ -432,7 +435,7 @@ fn reduced_codegen_cycle() {
 #[test]
 fn full_scale_target() {
   let _logger = env_logger::try_init();
-  let rules = vec![
+  let rules = indexset![
     Rule(
       "InferredDependencies",
       "infer_python_conftest_dependencies",
@@ -797,7 +800,7 @@ fn full_scale_target() {
       ],
     ),
   ];
-  let queries = vec![
+  let queries = indexset![
     Query::new("AddressesWithOrigins", vec!["OptionsBootstrapper", "Specs"]),
     Query::new("UnexpandedTargets", vec!["OptionsBootstrapper", "Specs"]),
     Query::new("Addresses", vec!["OptionsBootstrapper", "Specs"]),

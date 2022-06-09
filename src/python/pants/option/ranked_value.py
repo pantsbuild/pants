@@ -22,7 +22,7 @@ class Rank(Enum):
     _rank: int
 
     def __new__(cls, rank: int, display: str) -> Rank:
-        member: "Rank" = object.__new__(cls)
+        member: Rank = object.__new__(cls)
         member._value_ = display
         member._rank = rank
         return member
@@ -80,7 +80,7 @@ class RankedValue:
         config_default_val: ValueAndDetails,
         hardcoded_val: ValueAndDetails,
         default: ValueAndDetails,
-    ) -> Iterator["RankedValue"]:
+    ) -> Iterator[RankedValue]:
         """Yield the non-None values from highest-ranked to lowest, as RankedValue instances."""
         if flag_val[0] is not None:
             yield RankedValue(Rank.FLAG, *flag_val)

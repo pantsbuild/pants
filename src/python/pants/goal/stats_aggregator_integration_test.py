@@ -11,7 +11,7 @@ from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 def test_counters_and_histograms() -> None:
     # To get the cache read histogram, we must ensure the cache is populated, so we run twice.
     with setup_tmpdir(
-        {"src/py/app.py": "print(0)\n", "src/py/BUILD": "python_library()"}
+        {"src/py/app.py": "print(0)\n", "src/py/BUILD": "python_sources()"}
     ) as tmpdir:
         argv = [
             "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black']",
@@ -31,6 +31,13 @@ def test_counters_and_histograms() -> None:
     assert re.search(r"min: \d", result.stderr)
     assert re.search(r"p25: \d", result.stderr)
     assert re.search(r"p99: \d", result.stderr)
+
+
+def test_memory_summary() -> None:
+    result = run_pants(["--stats-memory-summary", "--version"])
+    result.assert_success()
+    assert "Memory summary" in result.stderr
+    assert "pants.engine.unions.UnionMembership" in result.stderr
 
 
 def test_warn_if_no_histograms() -> None:

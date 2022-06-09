@@ -1,33 +1,8 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-  clippy::all,
-  clippy::default_trait_access,
-  clippy::expl_impl_clone_on_copy,
-  clippy::if_not_else,
-  clippy::needless_continue,
-  clippy::unseparated_literal_suffix,
-// TODO: Falsely triggers for async/await:
-//   see https://github.com/rust-lang/rust-clippy/issues/5360
-// clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-  clippy::len_without_is_empty,
-  clippy::redundant_field_names,
-  clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
-
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 use std::io;
 use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -304,8 +279,8 @@ impl RawFdNail {
   fn input(
     tty_path: Option<PathBuf>,
   ) -> Result<(Box<dyn AsRawFd + Send>, Option<impl sink::Sink<Bytes>>), io::Error> {
-    if let Some(tty_path) = tty_path {
-      Ok((Box::new(std::fs::File::open(tty_path)?), None))
+    if let Some(tty) = Self::try_open_tty(tty_path, OpenOptions::new().read(true)) {
+      Ok((Box::new(tty), None))
     } else {
       let (stdin_reader, stdin_writer) = os_pipe::pipe()?;
       let write_handle =
@@ -329,11 +304,7 @@ impl RawFdNail {
     ),
     io::Error,
   > {
-    if let Some(tty_path) = tty_path {
-      let tty = std::fs::OpenOptions::new()
-        .write(true)
-        .create(false)
-        .open(tty_path)?;
+    if let Some(tty) = Self::try_open_tty(tty_path, OpenOptions::new().write(true).create(false)) {
       Ok((stream::empty().boxed(), Box::new(tty)))
     } else {
       let (stdin_reader, stdin_writer) = os_pipe::pipe()?;
@@ -341,6 +312,23 @@ impl RawFdNail {
         File::from_std(unsafe { std::fs::File::from_raw_fd(stdin_reader.into_raw_fd()) });
       Ok((stream_for(read_handle).boxed(), Box::new(stdin_writer)))
     }
+  }
+
+  ///
+  /// Attempt to open the given TTY-path, logging any errors.
+  ///
+  fn try_open_tty(tty_path: Option<PathBuf>, open_options: &OpenOptions) -> Option<std::fs::File> {
+    let tty_path = tty_path?;
+    open_options
+      .open(&tty_path)
+      .map_err(|e| {
+        log::debug!(
+          "Failed to open TTY at {}: {:?}, falling back to socket access.",
+          tty_path.display(),
+          e
+        );
+      })
+      .ok()
   }
 
   ///

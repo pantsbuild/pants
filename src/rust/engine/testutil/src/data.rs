@@ -1,5 +1,5 @@
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
 use grpc_util::prost::MessageExt;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
 #[derive(Clone)]
 pub struct TestData {
@@ -57,6 +57,7 @@ impl TestData {
   }
 }
 
+#[derive(Clone)]
 pub struct TestDirectory {
   pub directory: remexec::Directory,
 }
@@ -256,10 +257,18 @@ impl TestDirectory {
   // /cats/roland.ext
   // /treats.ext
   pub fn recursive() -> TestDirectory {
+    Self::recursive_with(TestDirectory::containing_roland())
+  }
+
+  // Directory structure:
+  //
+  // /cats/(param)
+  // /treats.ext
+  pub fn recursive_with(inner: TestDirectory) -> TestDirectory {
     let directory = remexec::Directory {
       directories: vec![remexec::DirectoryNode {
         name: "cats".to_owned(),
-        digest: Some((&TestDirectory::containing_roland().digest()).into()),
+        digest: Some((&inner.digest()).into()),
       }],
       files: vec![remexec::FileNode {
         name: "treats.ext".to_owned(),
@@ -273,15 +282,15 @@ impl TestDirectory {
 
   // Directory structure:
   //
-  // /feed.ext (executable)
-  // /food.ext
-  pub fn with_mixed_executable_files() -> TestDirectory {
+  // /feed.ext (is_executable=?)
+  // /food.ext (is_executable=False)
+  pub fn with_maybe_executable_files(is_executable: bool) -> TestDirectory {
     let directory = remexec::Directory {
       files: vec![
         remexec::FileNode {
           name: "feed.ext".to_owned(),
           digest: Some((&TestData::catnip().digest()).into()),
-          is_executable: true,
+          is_executable,
           ..remexec::FileNode::default()
         },
         remexec::FileNode {
@@ -311,6 +320,10 @@ impl TestDirectory {
   pub fn digest(&self) -> hashing::Digest {
     hashing::Digest::of_bytes(&self.bytes())
   }
+
+  pub fn directory_digest(&self) -> fs::DirectoryDigest {
+    fs::DirectoryDigest::from_persisted_digest(self.digest())
+  }
 }
 
 pub struct TestTree {
@@ -325,9 +338,35 @@ impl TestTree {
   pub fn robin_at_root() -> TestTree {
     TestDirectory::containing_robin().into()
   }
+
+  pub fn nested() -> TestTree {
+    TestTree::new(
+      TestDirectory::nested().directory(),
+      vec![TestDirectory::containing_roland().directory()],
+    )
+  }
+
+  pub fn double_nested() -> TestTree {
+    TestTree::new(
+      TestDirectory::double_nested().directory(),
+      vec![
+        TestDirectory::nested().directory(),
+        TestDirectory::containing_roland().directory(),
+      ],
+    )
+  }
 }
 
 impl TestTree {
+  pub fn new(root: remexec::Directory, children: Vec<remexec::Directory>) -> Self {
+    Self {
+      tree: remexec::Tree {
+        root: Some(root),
+        children,
+      },
+    }
+  }
+
   pub fn bytes(&self) -> bytes::Bytes {
     self.tree.to_bytes()
   }
@@ -339,14 +378,14 @@ impl TestTree {
   pub fn digest(&self) -> hashing::Digest {
     hashing::Digest::of_bytes(&self.bytes())
   }
+
+  pub fn digest_trie(&self) -> fs::DigestTrie {
+    self.tree.clone().try_into().unwrap()
+  }
 }
 
 impl From<TestDirectory> for TestTree {
   fn from(dir: TestDirectory) -> Self {
-    let tree = remexec::Tree {
-      root: Some(dir.directory),
-      ..remexec::Tree::default()
-    };
-    TestTree { tree }
+    Self::new(dir.directory(), vec![])
   }
 }

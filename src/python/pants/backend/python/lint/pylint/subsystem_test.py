@@ -7,7 +7,8 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.goals.lockfile import PythonLockfileRequest
+from pants.backend.python import target_types_rules
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.lint.pylint import skip_field
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
@@ -17,13 +18,14 @@ from pants.backend.python.lint.pylint.subsystem import (
 from pants.backend.python.lint.pylint.subsystem import rules as subsystem_rules
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
-    PythonLibrary,
-    PythonRequirementLibrary,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address
+from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -35,37 +37,39 @@ def rule_runner() -> RuleRunner:
             *subsystem_rules(),
             *skip_field.rules(),
             *python_sources.rules(),
+            *target_types_rules.rules(),
             QueryRule(PylintFirstPartyPlugins, []),
-            QueryRule(PythonLockfileRequest, [PylintLockfileSentinel]),
+            QueryRule(GeneratePythonLockfile, [PylintLockfileSentinel]),
         ],
-        target_types=[PythonLibrary, GenericTarget, PythonRequirementLibrary],
+        target_types=[PythonSourcesGeneratorTarget, GenericTarget, PythonRequirementTarget],
     )
 
 
+@skip_unless_all_pythons_present("3.8", "3.9")
 def test_first_party_plugins(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
                 """\
-                python_requirement_library(name='pylint', requirements=['pylint==2.6.2'])
-                python_requirement_library(name='colors', requirements=['ansicolors'])
+                python_requirement(name='pylint', requirements=['pylint==2.11.1'])
+                python_requirement(name='colors', requirements=['ansicolors'])
                 """
             ),
             "pylint-plugins/subdir1/util.py": "",
             "pylint-plugins/subdir1/BUILD": dedent(
                 """\
-                python_library(
-                    interpreter_constraints=['==3.5.*'],
+                python_sources(
+                    interpreter_constraints=['==3.9.*'],
                     dependencies=['pylint-plugins/subdir2']
                 )
                 """
             ),
             "pylint-plugins/subdir2/another_util.py": "",
-            "pylint-plugins/subdir2/BUILD": ("python_library(interpreter_constraints=['==3.4.*'])"),
+            "pylint-plugins/subdir2/BUILD": "python_sources(interpreter_constraints=['==3.8.*'])",
             "pylint-plugins/plugin.py": "",
             "pylint-plugins/BUILD": dedent(
                 """\
-                python_library(
+                python_sources(
                     dependencies=['//:pylint', '//:colors', "pylint-plugins/subdir1"]
                 )
                 """
@@ -76,16 +80,17 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
         [
             "--source-root-patterns=pylint-plugins",
             "--pylint-source-plugins=pylint-plugins/plugin.py",
-        ]
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     first_party_plugins = rule_runner.request(PylintFirstPartyPlugins, [])
     assert first_party_plugins.requirement_strings == FrozenOrderedSet(
-        ["ansicolors", "pylint==2.6.2"]
+        ["ansicolors", "pylint==2.11.1"]
     )
     assert first_party_plugins.interpreter_constraints_fields == FrozenOrderedSet(
         [
             InterpreterConstraintsField(ic, Address("", target_name="tgt"))
-            for ic in (None, ["==3.5.*"], ["==3.4.*"])
+            for ic in (None, ["==3.9.*"], ["==3.8.*"])
         ]
     )
     assert (
@@ -108,14 +113,15 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
         expected_ics: list[str],
         *,
         extra_expected_requirements: list[str] | None = None,
-        args: list[str] | None = None,
+        extra_args: list[str] | None = None,
     ) -> None:
-        rule_runner.write_files({"project/BUILD": build_file})
+        rule_runner.write_files({"project/BUILD": build_file, "project/f.py": ""})
         rule_runner.set_options(
-            args or [],
-            env={"PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+            ["--pylint-lockfile=lockfile.txt", *(extra_args or [])],
+            env={"PANTS_PYTHON_INTERPRETER_CONSTRAINTS": f"['{global_constraint}']"},
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
         )
-        lockfile_request = rule_runner.request(PythonLockfileRequest, [PylintLockfileSentinel()])
+        lockfile_request = rule_runner.request(GeneratePythonLockfile, [PylintLockfileSentinel()])
         assert lockfile_request.interpreter_constraints == InterpreterConstraints(expected_ics)
         assert lockfile_request.requirements == FrozenOrderedSet(
             [
@@ -125,21 +131,21 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
             ]
         )
 
-    assert_lockfile_request("python_library()", [global_constraint])
-    assert_lockfile_request("python_library(interpreter_constraints=['==2.7.*'])", ["==2.7.*"])
+    assert_lockfile_request("python_sources()", [global_constraint])
+    assert_lockfile_request("python_sources(interpreter_constraints=['==2.7.*'])", ["==2.7.*"])
     assert_lockfile_request(
-        "python_library(interpreter_constraints=['==2.7.*', '==3.5.*'])", ["==2.7.*", "==3.5.*"]
+        "python_sources(interpreter_constraints=['==2.7.*', '==3.8.*'])", ["==2.7.*", "==3.8.*"]
     )
 
-    # If no Python targets in repo, fall back to global python-setup constraints.
+    # If no Python targets in repo, fall back to global [python] constraints.
     assert_lockfile_request("target()", [global_constraint])
 
     # Ignore targets that are skipped.
     assert_lockfile_request(
         dedent(
             """\
-            python_library(name='a', interpreter_constraints=['==2.7.*'])
-            python_library(name='b', interpreter_constraints=['==3.5.*'], skip_pylint=True)
+            python_sources(name='a', interpreter_constraints=['==2.7.*'])
+            python_sources(name='b', interpreter_constraints=['==3.8.*'], skip_pylint=True)
             """
         ),
         ["==2.7.*"],
@@ -150,66 +156,30 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
     assert_lockfile_request(
         dedent(
             """\
-            python_library(name='a', interpreter_constraints=['==2.7.*'])
-            python_library(name='b', interpreter_constraints=['==3.5.*'])
+            python_sources(name='a', interpreter_constraints=['==2.7.*'])
+            python_sources(name='b', interpreter_constraints=['==3.8.*'])
             """
         ),
-        ["==2.7.*", "==3.5.*"],
+        ["==2.7.*", "==3.8.*"],
     )
     assert_lockfile_request(
         dedent(
             """\
-            python_library(name='a', interpreter_constraints=['==2.7.*', '==3.5.*'])
-            python_library(name='b', interpreter_constraints=['>=3.5'])
+            python_sources(name='a', interpreter_constraints=['==2.7.*', '==3.8.*'])
+            python_sources(name='b', interpreter_constraints=['>=3.8'])
             """
         ),
-        ["==2.7.*", "==3.5.*", ">=3.5"],
+        ["==2.7.*", "==3.8.*", ">=3.8"],
     )
     assert_lockfile_request(
         dedent(
             """\
-            python_library(name='a')
-            python_library(name='b', interpreter_constraints=['==2.7.*'])
-            python_library(name='c', interpreter_constraints=['>=3.6'])
+            python_sources(name='a')
+            python_sources(name='b', interpreter_constraints=['==2.7.*'])
+            python_sources(name='c', interpreter_constraints=['>=3.8'])
             """
         ),
-        ["==2.7.*", global_constraint, ">=3.6"],
-    )
-
-    # Also consider direct deps (but not transitive). They should be ANDed within each target's
-    # closure like normal, but then ORed across each closure.
-    assert_lockfile_request(
-        dedent(
-            """\
-            python_library(
-                name='transitive_dep', interpreter_constraints=['==99'], skip_pylint=True,
-            )
-            python_library(
-                name='dep',
-                dependencies=[":transitive_dep"],
-                interpreter_constraints=['==2.7.*', '==3.6.*'],
-                skip_pylint=True,
-            )
-            python_library(name='app', dependencies=[":dep"], interpreter_constraints=['==2.7.*'])
-            """
-        ),
-        ["==2.7.*", "==2.7.*,==3.6.*"],
-    )
-    assert_lockfile_request(
-        dedent(
-            """\
-            python_library(
-                name='lib1', interpreter_constraints=['==2.7.*', '==3.6.*'], skip_pylint=True
-            )
-            python_library(name='app1', dependencies=[":lib1"], interpreter_constraints=['==2.7.*'])
-
-            python_library(
-                name='lib2', interpreter_constraints=['>=3.7'], skip_pylint=True
-            )
-            python_library(name='app2', dependencies=[":lib2"], interpreter_constraints=['==3.8.*'])
-            """
-        ),
-        ["==2.7.*", "==2.7.*,==3.6.*", ">=3.7,==3.8.*"],
+        ["==2.7.*", global_constraint, ">=3.8"],
     )
 
     # Check that source_plugins are included, even if they aren't linted directly. Plugins
@@ -217,49 +187,44 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
     assert_lockfile_request(
         dedent(
             """\
-            python_library(
+            python_sources(
                 name="lib",
-                sources=[],
-                interpreter_constraints=['==3.6.*'],
+                interpreter_constraints=['==3.8.*'],
             )
-            python_library(
+            python_sources(
                 name="plugin",
-                sources=[],
                 interpreter_constraints=['==2.7.*'],
                 skip_pylint=True,
             )
             """
         ),
-        ["==2.7.*,==3.6.*"],
-        args=["--pylint-source-plugins=project:plugin"],
+        ["==2.7.*,==3.8.*"],
+        extra_args=["--pylint-source-plugins=project:plugin"],
     )
     assert_lockfile_request(
         dedent(
             """\
-            python_library(
-                sources=[],
+            python_sources(
                 dependencies=[":direct_dep"],
-                interpreter_constraints=['==3.6.*'],
+                interpreter_constraints=['==3.8.*'],
                 skip_pylint=True,
             )
-            python_library(
+            python_sources(
                 name="direct_dep",
-                sources=[],
                 dependencies=[":transitive_dep"],
-                interpreter_constraints=['==3.6.*'],
+                interpreter_constraints=['==3.8.*'],
                 skip_pylint=True,
             )
-            python_library(
+            python_sources(
                 name="transitive_dep",
-                sources=[],
                 dependencies=[":thirdparty"],
-                interpreter_constraints=['==2.7.*', '==3.6.*'],
+                interpreter_constraints=['==2.7.*', '==3.8.*'],
                 skip_pylint=True,
             )
-            python_requirement_library(name="thirdparty", requirements=["ansicolors"])
+            python_requirement(name="thirdparty", requirements=["ansicolors"])
             """
         ),
-        ["==2.7.*,==3.6.*", "==3.6.*"],
-        args=["--pylint-source-plugins=project"],
+        ["==2.7.*,==3.8.*", "==3.8.*"],
+        extra_args=["--pylint-source-plugins=project"],
         extra_expected_requirements=["ansicolors"],
     )

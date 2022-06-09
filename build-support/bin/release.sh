@@ -31,6 +31,6 @@ fi
 # a temporary venv to build 3rdparty wheels.
 #
 # NB: This must align with $PY for the native wheel to be built correctly.
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
+export PANTS_PYTHON_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
 
 exec ./pants run build-support/bin/_release_helper.py -- "$@"

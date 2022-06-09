@@ -1,48 +1,59 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import tarfile
+import textwrap
 import zipfile
 from io import BytesIO
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.python import target_types_rules as python_target_type_rules
-from pants.backend.python.goals import package_pex_binary
-from pants.backend.python.target_types import PexBinary
+from pants.backend.python.goals import package_pex_binary, run_pex_binary
+from pants.backend.python.target_types import PexBinary, PythonSourceTarget
 from pants.backend.python.util_rules import pex_from_targets
+from pants.core.goals import run
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
     ArchiveFieldSet,
     ArchiveTarget,
-    Files,
-    FilesSources,
+    FilesGeneratorTarget,
+    FileSourceField,
+    FileTarget,
+    HTTPSource,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
+    ResourceTarget,
 )
 from pants.core.target_types import rules as target_type_rules
+from pants.core.util_rules import archive, source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
 from pants.engine.target import (
     GeneratedSources,
-    Sources,
+    SourcesField,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
 
 def test_relocated_files() -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
-            *source_files_rules(),
+            *archive.rules(),
+            *source_files.rules(),
+            *system_binaries.rules(),
             QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
         ],
-        target_types=[Files, RelocatedFiles],
+        target_types=[FilesGeneratorTarget, RelocatedFiles],
     )
 
     def assert_prefix_mapping(
@@ -87,9 +98,9 @@ def test_relocated_files() -> None:
             SourceFiles,
             [
                 SourceFilesRequest(
-                    (tgt.get(Sources) for tgt in transitive_targets.closure),
+                    (tgt.get(SourcesField) for tgt in transitive_targets.closure),
                     enable_codegen=True,
-                    for_sources_types=(FilesSources,),
+                    for_sources_types=(FileSourceField,),
                 )
             ],
         )
@@ -148,6 +159,52 @@ def test_relocated_files() -> None:
     )
 
 
+def test_relocated_relocated_files() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_type_rules(),
+            *archive.rules(),
+            *source_files.rules(),
+            *system_binaries.rules(),
+            QueryRule(GeneratedSources, [RelocateFilesViaCodegenRequest]),
+            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
+            QueryRule(SourceFiles, [SourceFilesRequest]),
+        ],
+        target_types=[FilesGeneratorTarget, RelocatedFiles],
+    )
+
+    rule_runner.write_files(
+        {
+            "original_prefix/file.txt": "",
+            "BUILD": dedent(
+                """\
+                files(name="original", sources=["original_prefix/file.txt"])
+
+                relocated_files(
+                    name="relocated",
+                    files_targets=[":original"],
+                    src="original_prefix",
+                    dest="intermediate_prefix",
+                )
+
+                relocated_files(
+                    name="double_relocated",
+                    files_targets=[":relocated"],
+                    src="intermediate_prefix",
+                    dest="final_prefix",
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="double_relocated"))
+    result = rule_runner.request(
+        GeneratedSources, [RelocateFilesViaCodegenRequest(EMPTY_SNAPSHOT, tgt)]
+    )
+    assert result.snapshot.files == ("final_prefix/file.txt",)
+
+
 def test_archive() -> None:
     """Integration test for the `archive` target type.
 
@@ -164,11 +221,9 @@ def test_archive() -> None:
             *python_target_type_rules.rules(),
             QueryRule(BuiltPackage, [ArchiveFieldSet]),
         ],
-        target_types=[ArchiveTarget, Files, RelocatedFiles, PexBinary],
+        target_types=[ArchiveTarget, FilesGeneratorTarget, RelocatedFiles, PexBinary],
     )
-    rule_runner.set_options(
-        ["--backend-packages=pants.backend.python"], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
-    )
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
     rule_runner.write_files(
         {
@@ -249,3 +304,125 @@ def test_archive() -> None:
         assert get_file("data/d1.json") == b"{'k': 1}"
         assert get_file("data/d2.json") == b"{'k': 2}"
         assert_archive1_is_valid(get_file("archive1.zip"))
+
+
+@pytest.mark.parametrize("asset_type", ("file", "resource"))
+def test_url_assets(asset_type) -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_type_rules(),
+            *pex_from_targets.rules(),
+            *package_pex_binary.rules(),
+            *run_pex_binary.rules(),
+            *python_target_type_rules.rules(),
+            *run.rules(),
+        ],
+        target_types=[FileTarget, ResourceTarget, PythonSourceTarget, PexBinary],
+        objects={"http_source": HTTPSource},
+    )
+    http_source_info = (
+        'url="https://raw.githubusercontent.com/python/cpython/7e46ae33bd522cf8331052c3c8835f9366599d8d/Lib/antigravity.py",'
+        "len=500,"
+        'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
+    )
+    rule_runner.write_files(
+        {
+            "assets/BUILD": dedent(
+                f"""\
+                {asset_type}(
+                    name='antigravity',
+                    source=http_source(
+                        {http_source_info},
+                    ),
+                )
+                {asset_type}(
+                    name='antigravity_renamed',
+                    source=http_source(
+                        {http_source_info},
+                        filename="antigravity_renamed.py",
+                    ),
+                )
+                """
+            ),
+            "app/app.py": textwrap.dedent(
+                """\
+                import pathlib
+
+                assets_path = pathlib.Path(__file__).parent.parent / "assets"
+                for path in assets_path.iterdir():
+                    print(path.name)
+                    assert "https://xkcd.com/353/" in path.read_text()
+                """
+            ),
+            "app/BUILD": textwrap.dedent(
+                """\
+                python_source(
+                    source="app.py",
+                    dependencies=[
+                        "assets:antigravity",
+                        "assets:antigravity_renamed",
+                    ]
+                )
+                pex_binary(name="app.py", entry_point='app.py')
+                """
+            ),
+        }
+    )
+    with mock_console(rule_runner.options_bootstrapper) as (console, stdout_reader):
+        rule_runner.run_goal_rule(
+            run.Run,
+            args=["app/app.py"],
+            env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        )
+        stdout = stdout_reader.get_stdout()
+        assert "antigravity.py" in stdout
+        assert "antigravity_renamed.py" in stdout
+
+
+@pytest.mark.parametrize(
+    "url, expected",
+    [
+        ("http://foo/bar", "bar"),
+        ("http://foo/bar.baz", "bar.baz"),
+        ("http://foo/bar.baz?query=yes/no", "bar.baz"),
+        ("http://foo/bar/baz/file.ext", "file.ext"),
+        ("www.foo.bar", "www.foo.bar"),
+        ("www.foo.bar?query=yes/no", "www.foo.bar"),
+    ],
+)
+def test_http_source_filename(url, expected):
+    assert HTTPSource(url, len=0, sha256="").filename == expected
+
+
+@pytest.mark.parametrize(
+    "kwargs, exc_match",
+    [
+        (
+            dict(url=None, len=0, sha256=""),
+            pytest.raises(TypeError, match=r"`url` must be a `str`"),
+        ),
+        (
+            dict(url="http://foo/bar", len="", sha256=""),
+            pytest.raises(TypeError, match=r"`len` must be a `int`"),
+        ),
+        (
+            dict(url="http://foo/bar", len=0, sha256=123),
+            pytest.raises(TypeError, match=r"`sha256` must be a `str`"),
+        ),
+        (
+            dict(url="http://foo/bar", len=0, sha256="", filename=10),
+            pytest.raises(TypeError, match=r"`filename` must be a `str`"),
+        ),
+        (
+            dict(url="http://foo/bar/", len=0, sha256=""),
+            pytest.raises(ValueError, match=r"Couldn't deduce filename"),
+        ),
+        (
+            dict(url="http://foo/bar/", len=0, sha256="", filename="../foobar.txt"),
+            pytest.raises(ValueError, match=r"`filename` cannot contain a path separator."),
+        ),
+    ],
+)
+def test_invalid_http_source(kwargs, exc_match):
+    with exc_match:
+        HTTPSource(**kwargs)

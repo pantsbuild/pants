@@ -8,6 +8,8 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Iterator
 
+import pytest
+
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.testutil.pants_integration_test import run_pants
 from pants.util.contextutil import overwrite_file_content
@@ -73,6 +75,7 @@ def setup_sources_targets() -> Iterator[None]:
 
 
 @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
+@pytest.mark.no_error_if_skipped
 def test_missing_sources_warnings():
     target_to_unmatched_globs = {
         "missing-globs": ["*.a"],
@@ -84,7 +87,7 @@ def test_missing_sources_warnings():
             target_full = f"{_SOURCES_TARGET_BASE}:{target}"
             pants_run = run_pants(
                 ["filedeps", target_full],
-                config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
+                config={GLOBAL_SCOPE_CONFIG_SECTION: {"unmatched_build_file_globs": "warn"}},
             )
             pants_run.assert_success()
             unmatched_globs = target_to_unmatched_globs[target]
@@ -104,30 +107,26 @@ def test_missing_sources_warnings():
 
 
 @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
+@pytest.mark.no_error_if_skipped
 def test_existing_sources():
     target_full = f"{_SOURCES_TARGET_BASE}:text"
     pants_run = run_pants(
         ["filedeps", target_full],
-        config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
+        config={GLOBAL_SCOPE_CONFIG_SECTION: {"unmatched_build_file_globs": "warn"}},
     )
     pants_run.assert_success()
     assert "[WARN] Unmatched glob" not in pants_run.stderr
 
 
-def test_existing_directory_with_no_build_files_fails():
-    pants_run = run_pants(["list", f"{_NO_BUILD_FILE_TARGET_BASE}::"])
-    pants_run.assert_failure()
-    assert "does not match any targets." in pants_run.stderr
-
-
 @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6787")
+@pytest.mark.no_error_if_skipped
 def test_error_message():
     with setup_sources_targets():
         for target in _ERR_TARGETS:
             expected_excerpts = _ERR_TARGETS[target]
             pants_run = run_pants(
                 ["filedeps", target],
-                config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "error"}},
+                config={GLOBAL_SCOPE_CONFIG_SECTION: {"unmatched_build_file_globs": "error"}},
             )
             pants_run.assert_failure()
             for excerpt in expected_excerpts:

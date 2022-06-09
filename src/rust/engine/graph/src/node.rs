@@ -31,8 +31,20 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   async fn run(self, context: Self::Context) -> Result<Self::Item, Self::Error>;
 
   ///
+  /// True if this Node may be restarted while running. This property is consumed at the point when
+  /// a Node might be dirtied, so it's valid for a Node to change its restartable state while running.
+  ///
+  /// Note that this property does not control whether a Node is cancellable: if all consumers of
+  /// a Node go away, it will always be cancelled.
+  ///
+  fn restartable(&self) -> bool;
+
+  ///
   /// If a node's output is cacheable based solely on properties of the node, and not the output,
   /// return true.
+  ///
+  /// This property must remain stable for the entire lifetime of a particular Node, but a Node
+  /// may change its cacheability for a particular output value using `cacheable_item`.
   ///
   fn cacheable(&self) -> bool;
 
@@ -41,6 +53,12 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   fn cacheable_item(&self, _item: &Self::Item) -> bool {
     self.cacheable()
   }
+
+  ///
+  /// Creates an error instance that represents that a Node dependency was cyclic along the given
+  /// path.
+  ///
+  fn cyclic_error(path: &[&Self]) -> Self::Error;
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send + Sync {
@@ -49,11 +67,6 @@ pub trait NodeError: Clone + Debug + Eq + Send + Sync {
   /// Graph (generally while running).
   ///
   fn invalidated() -> Self;
-
-  ///
-  /// Creates an instance that represents that a Node dependency was cyclic along the given path.
-  ///
-  fn cyclic(path: Vec<String>) -> Self;
 }
 
 ///

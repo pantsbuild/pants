@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -40,24 +38,26 @@ use std::fs::File;
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use async_value::AsyncValueSender;
 use fixedbitset::FixedBitSet;
 use fnv::FnvHasher;
 use futures::future;
-use log::{debug, info, warn};
+use log::info;
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::{EdgeRef, VisitMap, Visitable};
 use petgraph::Direction;
+use task_executor::Executor;
 use tokio::time::sleep;
 
 pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer, Stats};
 
 type Fnv = BuildHasherDefault<FnvHasher>;
 
-type PGraph<N> = DiGraph<Entry<N>, f32, u32>;
+type PGraph<N> = DiGraph<Entry<N>, (), u32>;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct InvalidationResult {
@@ -110,168 +110,97 @@ impl<N: Node> InnerGraph<N> {
   }
 
   ///
-  /// Detect whether adding an edge from src to dst would create a cycle.
+  /// Locates all* cycles in running nodes in the graph, and terminates one Node in each of them.
   ///
-  /// Returns a path which would cause the cycle if an edge were added from src to dst, or None if
-  /// no cycle would be created.
+  /// * Finding "all simple cycles" in a graph is apparently best accomplished with [Johnson's
+  /// algorithm](https://www.cs.tufts.edu/comp/150GA/homeworks/hw1/Johnson%2075.PDF), which uses
+  /// the strongly connected components, but goes a bit further. Because this method will run
+  /// multiple times, we don't worry about that, and just kill one member of each SCC.
   ///
-  /// This strongly optimizes for the case of no cycles. If cycles are detected, this is very
-  /// expensive to call.
-  ///
-  fn report_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
-    if src_id == dst_id {
-      let entry = self.entry_for_id(src_id).unwrap();
-      return Some(vec![entry.clone(), entry.clone()]);
-    }
-    if !self.detect_cycle(src_id, dst_id) {
-      return None;
-    }
-    Self::shortest_path(&self.pg, dst_id, src_id).map(|mut path| {
-      path.reverse();
-      path.push(dst_id);
-      path
-        .into_iter()
-        .map(|index| self.entry_for_id(index).unwrap().clone())
-        .collect()
-    })
-  }
-
-  ///
-  /// Detect whether adding an edge from src to dst would create a cycle.
-  ///
-  /// Uses Dijkstra's algorithm, which is significantly cheaper than the Bellman-Ford, but keeps
-  /// less context around paths on the way.
-  ///
-  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
-    // Search either forward from the dst, or backward from the src.
-    let (root, needle, direction) = {
-      let out_from_dst = self.pg.neighbors(dst_id).count();
-      let in_to_src = self
-        .pg
-        .neighbors_directed(src_id, Direction::Incoming)
-        .count();
-      if out_from_dst < in_to_src {
-        (dst_id, src_id, Direction::Outgoing)
-      } else {
-        (src_id, dst_id, Direction::Incoming)
-      }
-    };
-
-    // Search for an existing path from dst to src.
-    let mut roots = VecDeque::new();
-    roots.push_back(root);
-    self
-      .walk(roots, direction, |_| false)
-      .any(|eid| eid == needle)
-  }
-
-  ///
-  /// Compute and return one shortest path from `src` to `dst`.
-  ///
-  /// Uses Bellman-Ford, which is pretty expensive O(VE) as it has to traverse the whole graph and
-  /// keeping a lot of state on the way.
-  ///
-  fn shortest_path(graph: &PGraph<N>, src: EntryId, dst: EntryId) -> Option<Vec<EntryId>> {
-    let (_path_weights, paths) = petgraph::algo::bellman_ford(graph, src)
-      .expect("There should not be any negative edge weights");
-
-    let mut next = dst;
-    let mut path = vec![next];
-    while let Some(current) = paths[next.index()] {
-      path.push(current);
-      if current == src {
-        return Some(path);
-      }
-      next = current;
-    }
-    None
-  }
-
-  ///
-  /// Compute the critical path for this graph.
-  ///
-  /// The critical path is the longest path. For a directed acyclic graph, it is equivalent to a
-  /// shortest path algorithm.
-  ///
-  /// Modify the graph we have to fit into the expectations of the Bellman-Ford shortest graph
-  /// algorithm and use that to calculate the critical path.
-  ///
-  fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
-  where
-    F: Fn(&Entry<N>) -> Duration,
-  {
-    fn duration_into_weight(d: Duration) -> f64 {
-      -(d.as_nanos() as f64)
-    }
-
-    // First, let's map nodes to edges
-    let mut graph = self.pg.filter_map(
-      |_node_idx, node_weight| Some(Some(node_weight)),
-      |edge_idx, _edge_weight| {
-        let target_node = self.pg.raw_edges()[edge_idx.index()].target();
-        self
-          .pg
-          .node_weight(target_node)
-          .map(duration)
-          .map(duration_into_weight)
-      },
-    );
-
-    // Add a single source that's a parent to all roots
-    let srcs = roots
-      .iter()
-      .filter_map(|n| self.entry_id(n))
-      .cloned()
-      .collect::<Vec<_>>();
-    let src = graph.add_node(None);
-    for node in srcs {
-      graph.add_edge(
-        src,
-        node,
-        graph
-          .node_weight(node)
-          .map(|maybe_weight| {
-            maybe_weight
-              .map(duration)
-              .map(duration_into_weight)
-              .unwrap_or(0.)
-          })
-          .unwrap(),
-      );
-    }
-
-    let (weights, paths) =
-      petgraph::algo::bellman_ford(&graph, src).expect("The graph must be acyclic");
-    if let Some((index, total_duration)) = weights
-      .into_iter()
-      .enumerate()
-      .filter_map(|(i, weight)| {
-        // INFINITY is used for missing entries.
-        if weight == std::f64::INFINITY {
-          None
+  fn terminate_cycles(&mut self) {
+    // Build a graph of Running node indexes.
+    let running_graph = self.pg.filter_map(
+      |node_idx, node_weight| {
+        if node_weight.is_running() {
+          Some(node_idx)
         } else {
-          Some((i, Duration::from_nanos(-weight as u64)))
+          None
         }
-      })
-      .max_by(|(_, left_duration), (_, right_duration)| left_duration.cmp(right_duration))
-    {
-      let critical_path = {
-        let mut next = paths[index];
-        let mut path = vec![graph
-          .node_weight(petgraph::graph::NodeIndex::new(index))
-          .unwrap()
-          .unwrap()];
-        while next != Some(src) && next != None {
-          if let Some(entry) = graph.node_weight(next.unwrap()).unwrap() {
-            path.push(*entry);
-          }
-          next = paths[next.unwrap().index()];
-        }
-        path.into_iter().rev().cloned().collect()
+      },
+      |_edge_idx, _edge_weight| Some(()),
+    );
+    // TODO: We'd usually use `tarjan_scc` because it makes one fewer pass, but it panics (without
+    // a useful error message) for some graphs. So `kosaraju_scc` it is.
+    let running_sccs = petgraph::algo::kosaraju_scc(&running_graph);
+
+    for running_scc in running_sccs {
+      if running_scc.len() <= 1 {
+        continue;
+      }
+
+      // There is a cycle. We bias toward terminating nodes which are being cleaned, because it's
+      // possible for them to form false cycles with nodes which are running from scratch. If no
+      // nodes are being cleaned, then choose the running node with the highest node id.
+      let (running_candidate, should_terminate) = if let Some(dirty_candidate) = running_scc
+        .iter()
+        .filter(|&id| self.pg[running_graph[*id]].is_cleaning())
+        .max_by_key(|&id| running_graph[*id])
+      {
+        // Nodes are being cleaned: clear the highest id entry.
+        (dirty_candidate, false)
+      } else {
+        // There are no nodes being cleaned: terminate the Running node with the highest id.
+        (
+          running_scc
+            .iter()
+            .max_by_key(|&id| running_graph[*id])
+            .unwrap(),
+          true,
+        )
       };
-      (total_duration, critical_path)
-    } else {
-      (Duration::from_nanos(0), vec![])
+
+      test_trace_log!(
+        "Cycle {:?}",
+        running_scc
+          .iter()
+          .map(|id| {
+            let entry = &self.pg[running_graph[*id]];
+            format!("{:?}: is_cleaning: {}", entry.node(), entry.is_cleaning())
+          })
+          .collect::<Vec<_>>(),
+      );
+
+      // Calculate one path between the chosen node and itself by finding a path to its first
+      // predecessor (which as a fellow member of the SCC, must also be reachable).
+      let running_predecessor = running_graph
+        .neighbors_directed(*running_candidate, Direction::Incoming)
+        .find(|id| running_scc.contains(id))
+        .unwrap();
+      let running_path: Vec<_> = petgraph::algo::all_simple_paths(
+        &running_graph,
+        *running_candidate,
+        running_predecessor,
+        0,
+        None,
+      )
+      .next()
+      .unwrap();
+
+      // Either terminate or clear the candidate.
+      let candidate = running_graph[*running_candidate];
+      if should_terminate {
+        // Render the error, and terminate the Node with it.
+        let path = running_path
+          .into_iter()
+          .map(|rni| self.pg[running_graph[rni]].node())
+          .collect::<Vec<_>>();
+        let error = N::cyclic_error(&path);
+        self.pg[candidate].terminate(error);
+      } else {
+        // Else, clear.
+        let node = self.pg[candidate].node().clone();
+        self.invalidate_from_roots(|n| &node == n);
+      }
     }
   }
 
@@ -329,21 +258,14 @@ impl<N: Node> InnerGraph<N> {
 
     // And their transitive dependencies, which will be dirtied.
     //
-    // NB: We do not dirty "through" a running Uncacheable node and into its dependees: this is
-    // because all Uncacheable nodes are currently also implicitly "not restartable", and thus
-    // shouldn't be interrupted unless all dependees have gone away for other reasons (such as the
-    // Session having ended).
-    //
-    // TODO: As part of #9462, we'll likely want to split the "not restartable" property from the
-    // Uncacheable property, because #9462 will deal with nodes that are Uncacheable/per-Session, but
-    // also restartable.
+    // NB: We only dirty "through" a Node and into its dependees if it is Node::restartable.
     let transitive_ids: Vec<_> = self
       .walk(
         root_ids.iter().cloned().collect(),
         Direction::Incoming,
         |&entry_id| {
           let entry = self.unsafe_entry_for_id(entry_id);
-          !entry.node().cacheable() && entry.is_running()
+          !entry.node().restartable() && entry.is_running()
         },
       )
       .filter(|eid| !root_ids.contains(eid))
@@ -470,23 +392,45 @@ impl<N: Node> InnerGraph<N> {
 /// A DAG (enforced on mutation) of Entries.
 ///
 pub struct Graph<N: Node> {
-  inner: Mutex<InnerGraph<N>>,
+  inner: Arc<Mutex<InnerGraph<N>>>,
   invalidation_delay: Duration,
 }
 
 impl<N: Node> Graph<N> {
-  pub fn new() -> Graph<N> {
-    Self::new_with_invalidation_delay(Duration::from_millis(500))
+  pub fn new(executor: Executor) -> Graph<N> {
+    Self::new_with_invalidation_delay(executor, Duration::from_millis(500))
   }
 
-  pub fn new_with_invalidation_delay(invalidation_delay: Duration) -> Graph<N> {
-    let inner = InnerGraph {
+  pub fn new_with_invalidation_delay(executor: Executor, invalidation_delay: Duration) -> Graph<N> {
+    let inner = Arc::new(Mutex::new(InnerGraph {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
-    };
+    }));
+    let _join = executor.spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
+
     Graph {
-      inner: Mutex::new(inner),
+      inner,
       invalidation_delay,
+    }
+  }
+
+  ///
+  /// A task which periodically checks for cycles in Running nodes. Doing this in the background
+  /// allows for batching and laziness: nodes which don't form cycles may complete without ever
+  /// being checked.
+  ///
+  /// Uses a `Weak` reference to the Graph to detect when the sender has shut down.
+  ///
+  async fn cycle_check_task(inner: Weak<Mutex<InnerGraph<N>>>) {
+    loop {
+      sleep(Duration::from_millis(500)).await;
+
+      if let Some(inner) = Weak::upgrade(&inner) {
+        inner.lock().terminate_cycles();
+      } else {
+        // We've been shut down.
+        break;
+      };
     }
   }
 
@@ -506,32 +450,19 @@ impl<N: Node> Graph<N> {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
 
-      // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
-      // without a much more complicated algorithm.
       let dst_id = inner.ensure_entry(dst_node);
       let dst_retry = if let Some(src_id) = src_id {
-        if let Some(cycle_path) = Self::report_cycle(src_id, dst_id, &mut inner, context) {
-          // Cyclic dependency: render an error.
-          let path_strs = cycle_path
-            .into_iter()
-            .map(|e| e.node().to_string())
-            .collect();
-          return Err(N::Error::cyclic(path_strs));
-        }
-
-        // Valid dependency.
         test_trace_log!(
           "Adding dependency from {:?} to {:?}",
           inner.entry_for_id(src_id).unwrap().node(),
           inner.entry_for_id(dst_id).unwrap().node()
         );
-        // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
-        // edge as having equal weight.
-        inner.pg.add_edge(src_id, dst_id, 1.0);
+        inner.pg.add_edge(src_id, dst_id, ());
 
-        // We can retry the dst Node if the src Node is not cacheable. If the src is not cacheable,
-        // it only be allowed to run once, and so Node invalidation does not pass through it.
-        !inner.entry_for_id(src_id).unwrap().node().cacheable()
+        // We should retry the dst Node if the src Node is not restartable. If the src is not
+        // restartable, it is only allowed to run once, and so Node invalidation does not pass
+        // through it.
+        !inner.entry_for_id(src_id).unwrap().node().restartable()
       } else {
         // Otherwise, this is an external request: always retry.
         test_trace_log!(
@@ -576,11 +507,11 @@ impl<N: Node> Graph<N> {
   ///
   /// Request the given dst Node, optionally in the context of the given src Node.
   ///
-  /// If there is no src Node, or the src Node is not cacheable, this method will retry for
+  /// If there is no src Node, or the src Node is not restartable, this method will retry for
   /// invalidation until the Node completes.
   ///
-  /// Invalidation events in the graph (generally, filesystem changes) will cause cacheable Nodes
-  /// to be retried here for up to `invalidation_timeout`.
+  /// Invalidation events in the graph (generally, filesystem changes) will cause restartable
+  /// Nodes to be retried here for up to `invalidation_timeout`.
   ///
   pub async fn get(
     &self,
@@ -629,72 +560,6 @@ impl<N: Node> Graph<N> {
     Ok((res, LastObserved(generation)))
   }
 
-  fn report_cycle(
-    src_id: EntryId,
-    potential_dst_id: EntryId,
-    inner: &mut InnerGraph<N>,
-    context: &N::Context,
-  ) -> Option<Vec<Entry<N>>> {
-    let mut counter = 0;
-    loop {
-      // Find one cycle if any cycles exist.
-      if let Some(cycle_path) = inner.report_cycle(src_id, potential_dst_id) {
-        // See if the cycle contains any dirty nodes. If there are dirty nodes, we can try clearing
-        // them, and then check if there are still any cycles in the graph.
-        let dirty_nodes: HashSet<_> = cycle_path
-          .iter()
-          .filter(|n| !n.is_clean(context))
-          .map(|n| n.node().clone())
-          .collect();
-        if dirty_nodes.is_empty() {
-          // We detected a cycle with no dirty nodes - there's a cycle and there's nothing we can do
-          // to remove it. We only log at debug because the UI will render the cycle.
-          debug!(
-            "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
-            inner.entry_for_id(src_id).unwrap(),
-            inner.entry_for_id(potential_dst_id).unwrap(),
-            cycle_path
-          );
-          return Some(cycle_path);
-        }
-        counter += 1;
-        // Obsolete edges from a dirty node may cause fake cycles to be detected if there was a
-        // dirty dep from A to B, and we're trying to add a dep from B to A.
-        // If we detect a cycle that contains dirty nodes (and so potentially obsolete edges),
-        // we repeatedly cycle-detect, clearing (and re-running) and dirty nodes (and their edges)
-        // that we encounter.
-        //
-        // We do this repeatedly, because there may be multiple paths which would cause cycles,
-        // which contain dirty nodes. If we've cleared 10 separate paths which contain dirty nodes,
-        // and are still detecting cycle-causing paths containing dirty nodes, give up. 10 is a very
-        // arbitrary number, which we can increase if we find real graphs in the wild which hit this
-        // limit.
-        if counter > 10 {
-          warn!(
-            "Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}",
-            counter, cycle_path
-          );
-          return Some(cycle_path);
-        }
-        // Clear the dirty nodes, removing the edges from them, and try again.
-        inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
-      } else {
-        return None;
-      }
-    }
-  }
-
-  ///
-  /// Calculate the critical path for the subset of the graph that descends from these roots,
-  /// assuming this mapping between entries and durations.
-  ///
-  pub fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
-  where
-    F: Fn(&Entry<N>) -> Duration,
-  {
-    self.inner.lock().critical_path(roots, duration)
-  }
-
   ///
   /// Compares the generations of the dependencies of the given EntryId to their previous
   /// generation values (re-computing or cleaning them first if necessary), and returns true if any
@@ -708,6 +573,11 @@ impl<N: Node> Graph<N> {
   ) -> bool {
     let generation_matches = {
       let inner = self.inner.lock();
+      let entry = if log::log_enabled!(log::Level::Debug) {
+        Some(inner.pg[entry_id].clone())
+      } else {
+        None
+      };
       let dependency_ids = inner
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
@@ -723,12 +593,13 @@ impl<N: Node> Graph<N> {
         .into_iter()
         .zip(previous_dep_generations.into_iter())
         .map(|(dep_id, previous_dep_generation)| {
-          let mut entry = inner
+          let entry = entry.clone();
+          let mut dep_entry = inner
             .entry_for_id(dep_id)
             .unwrap_or_else(|| panic!("Dependency not present in Graph."))
             .clone();
           async move {
-            let (_, generation) = entry
+            let (_, generation) = dep_entry
               .get_node_result(context, dep_id)
               .await
               .map_err(|_| ())?;
@@ -737,6 +608,11 @@ impl<N: Node> Graph<N> {
               Ok(())
             } else {
               // Did not match. We error here to trigger fail-fast in `try_join_all`.
+              log::debug!(
+                "Dependency {} of {:?} changed.",
+                dep_entry.node(),
+                entry.map(|e| e.node().to_string())
+              );
               Err(())
             }
           }
@@ -754,24 +630,27 @@ impl<N: Node> Graph<N> {
   ///
   /// Clears the dependency edges of the given EntryId if the RunToken matches.
   ///
-  fn clear_deps(&self, entry_id: EntryId, run_token: RunToken) {
+  fn cleaning_failed(&self, entry_id: EntryId, run_token: RunToken) {
     let mut inner = self.inner.lock();
     // If the RunToken mismatches, return.
-    if let Some(entry) = inner.entry_for_id(entry_id) {
+    if let Some(entry) = inner.entry_for_id_mut(entry_id) {
       if entry.run_token() != run_token {
         return;
       }
+      entry.cleaning_failed()
     }
 
-    // Otherwise, clear the deps.
-    // NB: Because `remove_edge` changes EdgeIndex values, we remove edges one at a time.
-    while let Some(dep_edge) = inner
+    // Otherwise, clear the deps. We remove edges in reverse index order, because `remove_edge` is
+    // implemented in terms of `swap_remove`, and so affects edge ids greater than the removed edge
+    // id. See https://docs.rs/petgraph/0.5.1/petgraph/graph/struct.Graph.html#method.remove_edge
+    let mut edge_ids = inner
       .pg
       .edges_directed(entry_id, Direction::Outgoing)
-      .next()
-      .map(|edge| edge.id())
-    {
-      inner.pg.remove_edge(dep_edge);
+      .map(|e| e.id())
+      .collect::<Vec<_>>();
+    edge_ids.sort_by_key(|id| std::cmp::Reverse(id.index()));
+    for edge_id in edge_ids {
+      inner.pg.remove_edge(edge_id);
     }
   }
 
@@ -823,7 +702,7 @@ impl<N: Node> Graph<N> {
         .filter_map(|dep_id| inner.entry_for_id(dep_id))
         .map(|entry| {
           // If a dependency is itself uncacheable or has uncacheable deps, this Node should
-          // also complete as having uncacheable dpes, independent of matching Generation values.
+          // also complete as having uncacheable deps, independent of matching Generation values.
           // This is to allow for the behaviour that an uncacheable Node should always have "dirty"
           // (marked as UncacheableDependencies) dependents, transitively.
           if entry.has_uncacheable_deps() {
@@ -894,18 +773,6 @@ impl<N: Node> Graph<N> {
       f(n, v);
     }
   }
-
-  ///
-  /// Executes an operation while all access to the Graph is prevented (by acquiring the Graph's
-  /// lock).
-  ///
-  pub fn with_exclusive<F, T>(&self, f: F) -> T
-  where
-    F: FnOnce() -> T,
-  {
-    let _inner = self.inner.lock();
-    f()
-  }
 }
 
 ///
@@ -937,7 +804,7 @@ impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
       // Visit this node and it neighbors if this node has not yet be visited and we aren't
       // stopping our walk at this node, based on if it satisfies the stop_walking_predicate.
       // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
-      // like uncacheable nodes, which shouldn't be dirtied.
+      // like !restartable nodes, which shouldn't be dirtied.
       if !self.walked.visit(id) || (self.stop_walking_predicate)(&id) {
         continue;
       }

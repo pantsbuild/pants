@@ -65,3 +65,11 @@ function determine_python() {
     echo "${interpreter_path}" && return 0
   done
 }
+
+function is_macos_arm() {
+  [[ $(uname -sm) == "Darwin arm64" ]]
+}
+
+function is_macos_big_sur() {
+  [[ $(uname) == "Darwin" && $(sw_vers -productVersion) = 11\.* ]]
+}

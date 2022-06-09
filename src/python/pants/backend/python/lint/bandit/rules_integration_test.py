@@ -8,19 +8,21 @@ from typing import Sequence
 
 import pytest
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.lint.bandit.rules import BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.lint.bandit.subsystem import BanditFieldSet
 from pants.backend.python.lint.bandit.subsystem import rules as bandit_subsystem_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.target import Target
-from pants.python.python_setup import PythonSetup
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
+    has_python_version,
     skip_unless_python27_and_python3_present,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -34,9 +36,10 @@ def rule_runner() -> RuleRunner:
             *bandit_subsystem_rules(),
             *source_files.rules(),
             *config_files.rules(),
+            *target_types_rules.rules(),
             QueryRule(LintResults, (BanditRequest,)),
         ],
-        target_types=[PythonLibrary],
+        target_types=[PythonSourcesGeneratorTarget],
     )
 
 
@@ -77,17 +80,17 @@ def assert_success(
     all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
-    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(
         rule_runner,
         tgt,
-        extra_args=[f"--python-setup-interpreter-constraints=['=={major_minor_interpreter}.*']"],
+        extra_args=[f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_bandit(rule_runner, [tgt])
     assert len(result) == 1
@@ -98,7 +101,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_library(name='t')"}
+        {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
@@ -119,30 +122,33 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             "f.py": "version: str = 'Py3 > Py2'\n",
             "BUILD": dedent(
                 """\
-                python_library(name="py2", interpreter_constraints=["==2.7.*"])
-                python_library(name="py3", interpreter_constraints=[">=3.6"])
+                python_sources(name="py2", interpreter_constraints=["==2.7.*"])
+                python_sources(name="py3", interpreter_constraints=[">=3.6"])
                 """
             ),
         }
     )
-    py2_args = [
+    extra_args = [
         "--bandit-version=bandit>=1.6.2,<1.7",
+        "--bandit-extra-requirements=['setuptools']",
+        "--bandit-lockfile=<none>",
     ]
+
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
-    py2_result = run_bandit(rule_runner, [py2_tgt], extra_args=py2_args)
+    py2_result = run_bandit(rule_runner, [py2_tgt], extra_args=extra_args)
     assert len(py2_result) == 1
     assert py2_result[0].exit_code == 0
     assert "f.py (syntax error while parsing AST from file)" in py2_result[0].stdout
 
     py3_tgt = rule_runner.get_target(Address("", target_name="py3", relative_file_path="f.py"))
-    py3_result = run_bandit(rule_runner, [py3_tgt], extra_args=py2_args)
+    py3_result = run_bandit(rule_runner, [py3_tgt], extra_args=extra_args)
     assert len(py3_result) == 1
     assert py3_result[0].exit_code == 0
     assert "No issues identified." in py3_result[0].stdout
 
     # Test that we partition incompatible targets when passed in a single batch. We expect Py2
     # to still fail, but Py3 should pass.
-    combined_result = run_bandit(rule_runner, [py2_tgt, py3_tgt], extra_args=py2_args)
+    combined_result = run_bandit(rule_runner, [py2_tgt, py3_tgt], extra_args=extra_args)
     assert len(combined_result) == 2
 
     batched_py2_result, batched_py3_result = sorted(
@@ -161,7 +167,7 @@ def test_respects_config_file(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.py": BAD_FILE,
-            "BUILD": "python_library(name='t')",
+            "BUILD": "python_sources(name='t')",
             ".bandit": "skips: ['B303']",
         }
     )
@@ -170,29 +176,36 @@ def test_respects_config_file(rule_runner: RuleRunner) -> None:
 
 
 def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=["--bandit-args='--skip=B303'"])
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_bandit(rule_runner, [tgt], extra_args=["--bandit-skip"])
     assert not result
 
 
+@pytest.mark.skipif(
+    not (has_python_version("3.6") or has_python_version("3.7")), reason="Missing requisite Python"
+)
 def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.py": "aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n",
             # NB: `bandit-aws` does not currently work with Python 3.8. See
             #  https://github.com/pantsbuild/pants/issues/10545.
-            "BUILD": "python_library(name='t', interpreter_constraints=['>=3.6,<3.8'])",
+            "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.6,<3.8'])",
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    result = run_bandit(rule_runner, [tgt], extra_args=["--bandit-extra-requirements=bandit-aws"])
+    result = run_bandit(
+        rule_runner,
+        [tgt],
+        extra_args=["--bandit-extra-requirements=bandit-aws", "--bandit-lockfile=<none>"],
+    )
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "Issue: [C100:hardcoded_aws_key]" in result[0].stdout
@@ -200,7 +213,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
 
 
 def test_report_file(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_library(name='t')"})
+    rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_bandit(
         rule_runner, [tgt], extra_args=["--bandit-args='--output=reports/output.txt'"]
@@ -220,7 +233,7 @@ def test_type_stubs(rule_runner: RuleRunner) -> None:
         {
             "f.pyi": BAD_FILE,
             "f.py": GOOD_FILE,
-            "BUILD": "python_library(name='t')",
+            "BUILD": "python_sources(name='t')",
         }
     )
     tgts = [

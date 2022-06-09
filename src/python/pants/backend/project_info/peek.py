@@ -1,116 +1,91 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import collections.abc
+from __future__ import annotations
+
+import collections
 import json
-import os
-from dataclasses import asdict, is_dataclass
-from enum import Enum
-from typing import Any, Iterable, Mapping, cast
+from dataclasses import asdict, dataclass, is_dataclass
+from typing import Any, Iterable
 
-from pkg_resources import Requirement
-
-from pants.engine.addresses import Address, BuildFileAddress
+from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import Target, UnexpandedTargets
-
-
-class OutputOptions(Enum):
-    RAW = "raw"
-    JSON = "json"
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    HydratedSources,
+    HydrateSourcesRequest,
+    SourcesField,
+    Target,
+    Targets,
+    UnexpandedTargets,
+)
+from pants.option.option_types import BoolOption
 
 
 class PeekSubsystem(Outputting, GoalSubsystem):
-    """Display BUILD file info to the console.
-
-    In its most basic form, `peek` just prints the contents of a BUILD file. It can also display
-    multiple BUILD files, or render normalized target metadata as JSON for consumption by other
-    programs.
-    """
+    """Display detailed target information in JSON form."""
 
     name = "peek"
     help = "Display BUILD target info"
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--output",
-            type=OutputOptions,
-            default=OutputOptions.JSON,
-            help=(
-                "Which output style peek should use: `json` will show each target as a seperate "
-                "entry, whereas `raw` will simply show the original non-normalized BUILD files."
-            ),
-        )
-        register(
-            "--exclude-defaults",
-            type=bool,
-            default=False,
-            help=(
-                "Whether to leave off values that match the target-defined default values "
-                "when using `json` output."
-            ),
-        )
-
-    @property
-    def output_type(self) -> OutputOptions:
-        """Get the output type from options.
-
-        Must be renamed here because `output` conflicts with `Outputting` class.
-        """
-        return cast(OutputOptions, self.options.output)
-
-    @property
-    def exclude_defaults(self) -> bool:
-        return cast(bool, self.options.exclude_defaults)
+    exclude_defaults = BoolOption(
+        "--exclude-defaults",
+        default=False,
+        help="Whether to leave off values that match the target-defined default values.",
+    )
 
 
 class Peek(Goal):
     subsystem_cls = PeekSubsystem
 
 
-def _render_raw(fcs: Iterable[FileContent]) -> str:
-    sorted_fcs = sorted(fcs, key=lambda fc: fc.path)
-    rendereds = map(_render_raw_build_file, sorted_fcs)
-    return os.linesep.join(rendereds)
+def _normalize_value(val: Any) -> Any:
+    if isinstance(val, collections.abc.Mapping):
+        return {str(k): _normalize_value(v) for k, v in val.items()}
+    return val
 
 
-def _render_raw_build_file(fc: FileContent, encoding: str = "utf-8") -> str:
-    dashes = "-" * len(fc.path)
-    content = fc.content.decode(encoding)
-    parts = [dashes, fc.path, dashes, content]
-    if not content.endswith(os.linesep):
-        parts.append("")
-    return os.linesep.join(parts)
+@dataclass(frozen=True)
+class TargetData:
+    target: Target
+    # Sources may not be registered on the target, so we'll have nothing to expand.
+    expanded_sources: tuple[str, ...] | None
+    expanded_dependencies: tuple[str, ...]
 
-
-_nothing = object()
-
-
-def _render_json(ts: Iterable[Target], exclude_defaults: bool = False) -> str:
-    targets: Iterable[Mapping[str, Any]] = [
-        {
-            "address": t.address.spec,
-            "target_type": t.alias,
-            **{
-                k.alias: v.value
-                for k, v in t.field_values.items()
-                if not (exclude_defaults and getattr(k, "default", _nothing) == v.value)
-            },
+    def to_dict(self, exclude_defaults: bool = False) -> dict:
+        nothing = object()
+        fields = {
+            (
+                f"{k.alias}_raw" if issubclass(k, (SourcesField, Dependencies)) else k.alias
+            ): _normalize_value(v.value)
+            for k, v in self.target.field_values.items()
+            if not (exclude_defaults and getattr(k, "default", nothing) == v.value)
         }
-        for t in ts
-    ]
-    return f"{json.dumps(targets, indent=2, cls=_PeekJsonEncoder)}\n"
+
+        fields["dependencies"] = self.expanded_dependencies
+        if self.expanded_sources is not None:
+            fields["sources"] = self.expanded_sources
+
+        return {
+            "address": self.target.address.spec,
+            "target_type": self.target.alias,
+            **dict(sorted(fields.items())),
+        }
+
+
+class TargetDatas(Collection[TargetData]):
+    pass
+
+
+def render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> str:
+    return f"{json.dumps([td.to_dict(exclude_defaults) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
-    """Allow us to serialize some commmonly-found types in BUILD files."""
-
-    safe_to_str_types = (Requirement,)
+    """Allow us to serialize some commmonly found types in BUILD files."""
 
     def default(self, o):
         """Return a serializable object for o."""
@@ -126,27 +101,61 @@ class _PeekJsonEncoder(json.JSONEncoder):
             return str(o)
 
 
+@rule
+async def get_target_data(
+    # NB: We must preserve target generators, not replace with their generated targets.
+    targets: UnexpandedTargets,
+) -> TargetDatas:
+    sorted_targets = sorted(targets, key=lambda tgt: tgt.address)
+
+    # We "hydrate" sources fields with the engine, but not every target has them registered.
+    targets_with_sources = []
+    for tgt in sorted_targets:
+        if tgt.has_field(SourcesField):
+            targets_with_sources.append(tgt)
+
+    # NB: When determining dependencies, we replace target generators with their generated targets.
+    dependencies_per_target = await MultiGet(
+        Get(
+            Targets,
+            DependenciesRequest(tgt.get(Dependencies), include_special_cased_deps=True),
+        )
+        for tgt in sorted_targets
+    )
+    hydrated_sources_per_target = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField]))
+        for tgt in targets_with_sources
+    )
+
+    expanded_dependencies = [
+        tuple(dep.address.spec for dep in deps)
+        for tgt, deps in zip(sorted_targets, dependencies_per_target)
+    ]
+    expanded_sources_map = {
+        tgt.address: hs.snapshot.files
+        for tgt, hs in zip(targets_with_sources, hydrated_sources_per_target)
+    }
+
+    return TargetDatas(
+        TargetData(
+            tgt,
+            expanded_dependencies=expanded_deps,
+            expanded_sources=expanded_sources_map.get(tgt.address),
+        )
+        for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
+    )
+
+
 @goal_rule
 async def peek(
     console: Console,
     subsys: PeekSubsystem,
     targets: UnexpandedTargets,
 ) -> Peek:
-    if subsys.output_type == OutputOptions.RAW:
-        build_file_addresses = await MultiGet(
-            Get(BuildFileAddress, Address, t.address) for t in targets
-        )
-        build_file_paths = {a.rel_path for a in build_file_addresses}
-        digest_contents = await Get(DigestContents, PathGlobs(build_file_paths))
-        output = _render_raw(digest_contents)
-    elif subsys.output_type == OutputOptions.JSON:
-        output = _render_json(targets, subsys.exclude_defaults)
-    else:
-        raise AssertionError(f"output_type not one of {tuple(OutputOptions)}")
-
+    tds = await Get(TargetDatas, UnexpandedTargets, targets)
+    output = render_json(tds, subsys.exclude_defaults)
     with subsys.output(console) as write_stdout:
         write_stdout(output)
-
     return Peek(exit_code=0)
 
 

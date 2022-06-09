@@ -3,36 +3,136 @@
 
 from __future__ import annotations
 
-from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, Target
+from dataclasses import dataclass
+
+from pants.engine.rules import collect_rules
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    FieldSet,
+    MultipleSourcesField,
+    SingleSourceField,
+    Target,
+    TargetFilesGenerator,
+    generate_multiple_sources_field_help_message,
+)
+from pants.jvm.target_types import (
+    JunitTestSourceField,
+    JvmJdkField,
+    JvmProvidesTypesField,
+    JvmResolveField,
+)
 
 
-class JavaSources(Sources):
+class JavaSourceField(SingleSourceField):
     expected_file_extensions = (".java",)
 
 
-class JavaTestsSources(JavaSources):
+class JavaGeneratorSourcesField(MultipleSourcesField):
+    expected_file_extensions = (".java",)
+
+
+@dataclass(frozen=True)
+class JavaFieldSet(FieldSet):
+    required_fields = (JavaSourceField,)
+
+    sources: JavaSourceField
+
+
+@dataclass(frozen=True)
+class JavaGeneratorFieldSet(FieldSet):
+    required_fields = (JavaGeneratorSourcesField,)
+
+    sources: JavaGeneratorSourcesField
+
+
+# -----------------------------------------------------------------------------------------------
+# `junit_test` and `junit_tests` targets
+# -----------------------------------------------------------------------------------------------
+
+
+class JavaJunitTestSourceField(JavaSourceField, JunitTestSourceField):
+    """A JUnit test file written in Java."""
+
+
+class JunitTestTarget(Target):
+    alias = "junit_test"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JavaJunitTestSourceField,
+        Dependencies,
+        JvmResolveField,
+        JvmProvidesTypesField,
+        JvmJdkField,
+    )
+    help = "A single Java test, run with JUnit."
+
+
+class JavaTestsGeneratorSourcesField(JavaGeneratorSourcesField):
     default = ("*Test.java",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['*Test.java', '!TestIgnore.java']`"
+    )
 
 
-class JunitTests(Target):
+class JunitTestsGeneratorTarget(TargetFilesGenerator):
     alias = "junit_tests"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        Dependencies,
-        JavaTestsSources,
+        JavaTestsGeneratorSourcesField,
     )
-    help = "Java tests, run with Junit."
+    generated_target_cls = JunitTestTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        Dependencies,
+        JvmJdkField,
+        JvmProvidesTypesField,
+        JvmResolveField,
+    )
+    help = "Generate a `junit_test` target for each file in the `sources` field."
 
 
-class JavaLibrarySources(JavaSources):
-    default = ("*.java",) + tuple(f"!{pat}" for pat in JavaTestsSources.default)
+# -----------------------------------------------------------------------------------------------
+# `java_source` and `java_sources` targets
+# -----------------------------------------------------------------------------------------------
 
 
-class JavaLibrary(Target):
-    alias = "java_library"
+class JavaSourceTarget(Target):
+    alias = "java_source"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         Dependencies,
-        JavaLibrarySources,
+        JavaSourceField,
+        JvmResolveField,
+        JvmProvidesTypesField,
+        JvmJdkField,
     )
-    help = "Java source code."
+    help = "A single Java source file containing application or library code."
+
+
+class JavaSourcesGeneratorSourcesField(JavaGeneratorSourcesField):
+    default = ("*.java",) + tuple(f"!{pat}" for pat in JavaTestsGeneratorSourcesField.default)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Example.java', 'New*.java', '!OldExample.java']`"
+    )
+
+
+class JavaSourcesGeneratorTarget(TargetFilesGenerator):
+    alias = "java_sources"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JavaSourcesGeneratorSourcesField,
+    )
+    generated_target_cls = JavaSourceTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        Dependencies,
+        JvmResolveField,
+        JvmJdkField,
+        JvmProvidesTypesField,
+    )
+    help = "Generate a `java_source` target for each file in the `sources` field."
+
+
+def rules():
+    return collect_rules()

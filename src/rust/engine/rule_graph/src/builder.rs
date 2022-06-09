@@ -1,39 +1,13 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-  clippy::all,
-  clippy::default_trait_access,
-  clippy::expl_impl_clone_on_copy,
-  clippy::if_not_else,
-  clippy::needless_continue,
-  clippy::single_match_else,
-  clippy::unseparated_literal_suffix,
-// TODO: Falsely triggers for async/await:
-//   see https://github.com/rust-lang/rust-clippy/issues/5360
-// clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-  clippy::len_without_is_empty,
-  clippy::redundant_field_names,
-  clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
-
 use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
 use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, RuleGraph};
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use indexmap::IndexSet;
+use internment::Intern;
 use petgraph::graph::{DiGraph, EdgeReference, NodeIndex};
 use petgraph::visit::{DfsPostOrder, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable};
 use petgraph::Direction;
@@ -189,12 +163,12 @@ type InLabeledGraph<R> =
 ///
 pub struct Builder<R: Rule> {
   rules: BTreeMap<R::TypeId, Vec<R>>,
-  queries: Vec<Query<R>>,
+  queries: IndexSet<Query<R>>,
   params: ParamTypes<R::TypeId>,
 }
 
 impl<R: Rule> Builder<R> {
-  pub fn new(rules: Vec<R>, queries: Vec<Query<R>>) -> Builder<R> {
+  pub fn new(rules: IndexSet<R>, queries: IndexSet<Query<R>>) -> Builder<R> {
     // Group rules by product/return type.
     let mut rules_by_type = BTreeMap::new();
     for rule in rules {
@@ -525,8 +499,15 @@ impl<R: Rule> Builder<R> {
         }
       }
 
+      // TODO: This value is mostly arbitrary, but should be increased to allow for solving the
+      // largest known rulesets that we've encountered. It should really only be triggered in
+      // case of implementation bugs (as we would prefer for a solution to fail via the usual
+      // pathways if it can).
+      //
+      // See https://github.com/pantsbuild/pants/issues/11269 for plans to improve this
+      // implementation.
       iteration += 1;
-      if iteration > 100000 {
+      if iteration > 10000000 {
         looping = true;
       }
       if iteration % 1000 == 0 {
@@ -616,7 +597,7 @@ impl<R: Rule> Builder<R> {
             .collect::<Vec<_>>(),
           dependees_by_out_set
         .keys()
-        .map(|out_set| params_str(out_set))
+        .map(params_str)
         .collect::<Vec<_>>(),
         )
       } else {
@@ -1147,7 +1128,7 @@ impl<R: Rule> Builder<R> {
       .flat_map(|(_, errors)| {
         let mut errors = errors.clone();
         errors.sort();
-        errors.into_iter().map(|e| e.trim().replace("\n", "\n    "))
+        errors.into_iter().map(|e| e.trim().replace('\n', "\n    "))
       })
       .collect::<Vec<_>>();
 
@@ -1183,11 +1164,11 @@ impl<R: Rule> Builder<R> {
     let entry_for = |node_id| -> Entry<R> {
       let (node, in_set): &(Node<R>, ParamTypes<_>) = &graph[node_id];
       match node {
-        Node::Rule(rule) => Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
+        Node::Rule(rule) => Entry::WithDeps(Intern::new(EntryWithDeps::Inner(InnerEntry {
           params: in_set.clone(),
           rule: rule.clone(),
-        })),
-        Node::Query(q) => Entry::WithDeps(EntryWithDeps::Root(RootEntry(q.clone()))),
+        }))),
+        Node::Query(q) => Entry::WithDeps(Intern::new(EntryWithDeps::Root(RootEntry(q.clone())))),
         Node::Param(p) => Entry::Param(*p),
       }
     };
@@ -1209,8 +1190,13 @@ impl<R: Rule> Builder<R> {
       // there was one dependency per DependencyKey.
       let dependencies = graph
         .edges_directed(node_id, Direction::Outgoing)
-        .map(|edge_ref| (*edge_ref.weight(), vec![entry_for(edge_ref.target())]))
-        .collect::<HashMap<_, _>>();
+        .map(|edge_ref| {
+          (
+            *edge_ref.weight(),
+            Intern::new(entry_for(edge_ref.target())),
+          )
+        })
+        .collect::<HashMap<_, Intern<Entry<R>>>>();
 
       match entry {
         Entry::WithDeps(wd) => {
@@ -1228,7 +1214,7 @@ impl<R: Rule> Builder<R> {
     }
 
     Ok(RuleGraph {
-      queries: self.queries,
+      queries: self.queries.into_iter().collect(),
       rule_dependency_edges,
       // TODO
       unreachable_rules: Vec::default(),

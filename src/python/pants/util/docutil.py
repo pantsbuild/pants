@@ -1,8 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
 from __future__ import annotations
 
+import os
 import shutil
 
 from pants.version import MAJOR_MINOR, PANTS_SEMVER
@@ -21,3 +23,17 @@ def doc_url(slug: str) -> str:
 def git_url(fp: str) -> str:
     """Link to code in pantsbuild/pants."""
     return f"https://github.com/pantsbuild/pants/blob/release_{PANTS_SEMVER}/{fp}"
+
+
+def bin_name() -> str:
+    """Return the Pants binary name, e.g. './pants'."""
+    # NB: This will be called at import-time in several files to define static help strings
+    # (e.g. "help=f'run `{bin_name()} fmt`").
+    #
+    # Ideally, we'd assert this is set unconditionally before Pants imports any of the files which
+    # use it, to give us complete confidence we won't be returning "./pants" in our help strings.
+    #
+    # However, this assumption really breaks down when we go to test pants (or a plugin author goes
+    # to test their plugin). Therefore we give a fallback and have integration test(s) to assert
+    # we've set this at the right point in time.
+    return os.environ.get("PANTS_BIN_NAME", "./pants")  # noqa: PANTSBIN

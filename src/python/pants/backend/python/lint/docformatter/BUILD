@@ -1,13 +1,18 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(dependencies=[":lockfile"])
-resources(name="lockfile", sources=["lockfile.txt"])
+resource(name="lockfile", source="docformatter.lock")
+
+python_sources(
+    overrides={"subsystem.py": {"dependencies": [":lockfile"]}},
+)
 
 python_tests(
-    name="rules_integration_test",
-    sources=["rules_integration_test.py"],
-    timeout=120,
-    # We want to make sure the default lockfile works for both macOS and Linux.
-    tags=["platform_specific_behavior"],
+    name="tests",
+    overrides={
+        "rules_integration_test.py": {
+            "timeout": 240,
+            "tags": ["platform_specific_behavior"],
+        }
+    },
 )

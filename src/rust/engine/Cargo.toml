@@ -1,6 +1,6 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
@@ -13,18 +13,19 @@ debug = true
 codegen-units = 1
 
 [workspace]
+resolver = "2"
 # These are the packages which are built/tested when the --all flag is passed to cargo.
 #
 # We need to explicitly list these, because otherwise the standalone tools
 # (e.g. fs_util) won't be included when we build/test things.
 members = [
   ".",
+  "address",
   "async_latch",
-  "async_semaphore",
   "async_value",
+  "cache",
   "client",
   "concrete_time",
-  "engine_pyo3",
   "fs",
   "fs/brfs",
   "fs/fs_util",
@@ -34,6 +35,7 @@ members = [
   "stdio",
   "logging",
   "nailgun",
+  "options",
   "process_execution",
   "process_executor",
   "rule_graph",
@@ -59,12 +61,12 @@ members = [
 # On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
 default-members = [
   ".",
+  "address",
   "async_latch",
-  "async_semaphore",
-  "client",
   "async_value",
+  "cache",
+  "client",
   "concrete_time",
-  "engine_pyo3",
   "fs",
   "fs/fs_util",
   "fs/store",
@@ -73,6 +75,7 @@ default-members = [
   "stdio",
   "logging",
   "nailgun",
+  "options",
   "process_execution",
   "process_executor",
   "rule_graph",
@@ -93,25 +96,27 @@ crate-type = ["cdylib"]
 
 [features]
 # NB: To actually load this crate from python, the `extension-module` feature must be enabled. But
-# unfortunately, enabling `extension-module` causes tests linked against `cpython` to fail. We
+# unfortunately, enabling `extension-module` causes tests linked against `pyo3` to fail. We
 # define a feature to enable that, but we do not enable it by default: someone building this module
 # in order to extract `libengine.so` should pass `cargo build .. --features=extension-module`.
 #  see https://github.com/PyO3/pyo3/issues/340
-extension-module = ["cpython/extension-module"]
+extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
+address = { path = "address" }
 async_latch = { path = "async_latch" }
-async_semaphore = { path = "async_semaphore" }
-async-trait = "0.1"
-bazel_protos = { path = "bazel_protos" }
+# Pin async-trait due to https://github.com/dtolnay/async-trait/issues/144.
+async-trait = "=0.1.42"
+protos = { path = "protos" }
 bytes = "1.0"
+cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
-# TODO: Go back to upstream once https://github.com/dgrunwald/rust-cpython/pull/261 lands.
-cpython = { git = "https://github.com/pantsbuild/rust-cpython", rev = "46d7eff26a705384e41eb6f7b870cd3f5f14b3bc" }
-crossbeam-channel = "0.4"
-double-checked-cell-async = "2.0"
-either = "1.6"
+crossbeam-channel = "0.5"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
+derivative = "2.2"
+async-oncecell = "0.2"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.3"
@@ -119,44 +124,43 @@ futures-core = "^0.3.0"
 graph = { path = "graph" }
 grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
-indexmap = "1.4"
+indexmap = "1.8"
+internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
-libc = "0.2.39"
+libc = "0.2.126"
 log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
-num_enum = "0.4"
-parking_lot = "0.11"
-petgraph = "0.5"
+num_enum = "0.5"
+parking_lot = "0.12"
+petgraph = "0.6"
 process_execution = { path = "process_execution" }
+pyo3 = "0.16"
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-sharded_lmdb = { path = "sharded_lmdb" }
-smallvec = "0.6"
+smallvec = "1"
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
 serde_json = "1.0"
 task_executor = { path = "task_executor" }
 tempfile = "3"
 testutil_mock = { package = "mock", path = "testutil/mock" }
-time = "0.1.40"
-tokio = { version = "1.4", features = ["macros", "rt-multi-thread"] }
-tokio-util = { version = "0.6", features = ["io"] }
+time = "0.3"
+tokio = { version = "1.16", features = ["macros", "rt-multi-thread"] }
+tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
 url = "2.1"
-uuid = { version = "0.7", features = ["v4"] }
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 
 [dev-dependencies]
 testutil = { path = "./testutil" }
 fs = { path = "./fs" }
-env_logger = "0.5.4"
+env_logger = "0.9.0"
 
-[patch.crates-io]
-# TODO: Waiting for release after https://github.com/mitsuhiko/console/pull/93.
-console = { git = "https://github.com/mitsuhiko/console", rev = "3232775295149e6f0aace26d4cfe61013ed3e2d8" }
+[build-dependencies]
+pyo3-build-config = "0.16"

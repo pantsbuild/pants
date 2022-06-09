@@ -1,0 +1,170 @@
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from typing import Mapping
+
+from pants.backend.docker.subsystems.docker_options import DockerOptions
+from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
+from pants.core.util_rules.system_binaries import (
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryPathTest,
+    BinaryShims,
+    BinaryShimsRequest,
+)
+from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.fs import Digest
+from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.rules import Get, collect_rules, rule
+from pants.util.logging import LogLevel
+from pants.util.strutil import pluralize
+
+
+# The base class is decorated with `frozen_after_init`.
+@dataclass
+class DockerBinary(BinaryPath):
+    """The `docker` binary."""
+
+    extra_env: Mapping[str, str]
+    extra_input_digests: Mapping[str, Digest] | None
+
+    def __init__(
+        self,
+        path: str,
+        fingerprint: str | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        extra_input_digests: Mapping[str, Digest] | None = None,
+    ) -> None:
+        self.extra_env = {} if extra_env is None else extra_env
+        self.extra_input_digests = extra_input_digests
+        super().__init__(path, fingerprint)
+
+    def _get_process_environment(self, env: Mapping[str, str]) -> Mapping[str, str]:
+        if not self.extra_env:
+            return env
+
+        res = {**self.extra_env, **env}
+
+        # Merge the PATH entries, in case they are present in both `env` and `self.extra_env`.
+        res["PATH"] = os.pathsep.join(
+            p for p in (m.get("PATH") for m in (self.extra_env, env)) if p
+        )
+        return res
+
+    def build_image(
+        self,
+        tags: tuple[str, ...],
+        digest: Digest,
+        dockerfile: str,
+        build_args: DockerBuildArgs,
+        context_root: str,
+        env: Mapping[str, str],
+        extra_args: tuple[str, ...] = (),
+    ) -> Process:
+        args = [self.path, "build", *extra_args]
+
+        for tag in tags:
+            args.extend(["--tag", tag])
+
+        for build_arg in build_args:
+            args.extend(["--build-arg", build_arg])
+
+        args.extend(["--file", dockerfile])
+
+        # Docker context root.
+        args.append(context_root)
+
+        return Process(
+            argv=tuple(args),
+            description=(
+                f"Building docker image {tags[0]}"
+                + (f" +{pluralize(len(tags)-1, 'additional tag')}." if len(tags) > 1 else "")
+            ),
+            env=self._get_process_environment(env),
+            input_digest=digest,
+            immutable_input_digests=self.extra_input_digests,
+            cache_scope=ProcessCacheScope.PER_SESSION,
+        )
+
+    def push_image(self, tag: str, env: Mapping[str, str] | None = None) -> Process:
+        return Process(
+            argv=(self.path, "push", tag),
+            cache_scope=ProcessCacheScope.PER_SESSION,
+            description=f"Pushing docker image {tag}",
+            env=self._get_process_environment(env or {}),
+            immutable_input_digests=self.extra_input_digests,
+        )
+
+    def run_image(
+        self,
+        tag: str,
+        *,
+        docker_run_args: tuple[str, ...] | None = None,
+        image_args: tuple[str, ...] | None = None,
+        env: Mapping[str, str] | None = None,
+    ) -> Process:
+        return Process(
+            argv=(self.path, "run", *(docker_run_args or []), tag, *(image_args or [])),
+            cache_scope=ProcessCacheScope.PER_SESSION,
+            description=f"Running docker image {tag}",
+            env=self._get_process_environment(env or {}),
+            immutable_input_digests=self.extra_input_digests,
+        )
+
+
+@dataclass(frozen=True)
+class DockerBinaryRequest:
+    pass
+
+
+@rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
+async def find_docker(
+    docker_request: DockerBinaryRequest, docker_options: DockerOptions
+) -> DockerBinary:
+    env = await Get(Environment, EnvironmentRequest(["PATH"]))
+    search_path = docker_options.executable_search_path(env)
+    request = BinaryPathRequest(
+        binary_name="docker",
+        search_path=search_path,
+        test=BinaryPathTest(args=["-v"]),
+    )
+    paths = await Get(BinaryPaths, BinaryPathRequest, request)
+    first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
+
+    if not docker_options.tools:
+        return DockerBinary(first_path.path, first_path.fingerprint)
+
+    tools = await Get(
+        BinaryShims,
+        BinaryShimsRequest,
+        BinaryShimsRequest.for_binaries(
+            *docker_options.tools,
+            rationale="use docker",
+            output_directory="bin",
+            search_path=search_path,
+        ),
+    )
+    tools_path = ".shims"
+    extra_env = {"PATH": os.path.join("{chroot}", tools_path, tools.bin_directory)}
+    extra_input_digests = {tools_path: tools.digest}
+
+    return DockerBinary(
+        first_path.path,
+        first_path.fingerprint,
+        extra_env=extra_env,
+        extra_input_digests=extra_input_digests,
+    )
+
+
+@rule
+async def get_docker() -> DockerBinary:
+    return await Get(DockerBinary, DockerBinaryRequest())
+
+
+def rules():
+    return collect_rules()

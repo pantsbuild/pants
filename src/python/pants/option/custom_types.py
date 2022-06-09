@@ -8,7 +8,7 @@ import os
 import re
 import shlex
 from enum import Enum
-from typing import Dict, Iterable, List, Pattern, Sequence
+from typing import Iterable, Pattern, Sequence
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
@@ -26,7 +26,7 @@ class UnsetBool:
 
     def __init__(self) -> None:
         raise NotImplementedError(
-            "UnsetBool cannot be instantiated. It should only be used as a " "sentinel type."
+            "UnsetBool cannot be instantiated. It should only be used as a sentinel type."
         )
 
     @classmethod
@@ -101,6 +101,20 @@ def shell_str(s: str) -> str:
     return s
 
 
+def workspace_path(s: str) -> str:
+    """Same type as 'str', but indicates string represents a directory path that is relative to
+    either the build root, or a BUILD file if prefix with `./`.
+
+    :API: public
+    """
+    if s.startswith("/"):
+        raise ParseError(
+            f"Invalid value: `{s}`. Expected a relative path, optionally in the form "
+            "`./relative/path` to make it relative to the BUILD files rather than the build root."
+        )
+    return s
+
+
 def memory_size(s: str | int | float) -> int:
     """A string that normalizes the suffixes {GiB, MiB, KiB, B} into the number of bytes.
 
@@ -126,7 +140,7 @@ def memory_size(s: str | int | float) -> int:
 
     def convert_to_bytes(power_of_2) -> int:
         try:
-            return int(float(s[:-3]) * (2 ** power_of_2))  # type: ignore[index]
+            return int(float(s[:-3]) * (2**power_of_2))  # type: ignore[index]
         except TypeError:
             raise invalid
 
@@ -155,7 +169,10 @@ def _convert(val, acceptable_types):
     """
     if isinstance(val, acceptable_types):
         return val
-    return parse_expression(val, acceptable_types, raise_type=ParseError)
+    try:
+        return parse_expression(val, acceptable_types)
+    except ValueError as e:
+        raise ParseError(str(e)) from e
 
 
 def _convert_list(val, member_type, is_enum):
@@ -165,7 +182,7 @@ def _convert_list(val, member_type, is_enum):
     return [item if isinstance(item, member_type) else member_type(item) for item in converted]
 
 
-def _flatten_shlexed_list(shlexed_args: Sequence[str]) -> List[str]:
+def _flatten_shlexed_list(shlexed_args: Sequence[str]) -> list[str]:
     """Convert a list of shlexed args into a flattened list of individual args.
 
     For example, ['arg1 arg2=foo', '--arg3'] would be converted to ['arg1', 'arg2=foo', '--arg3'].
@@ -203,7 +220,7 @@ class ListValueComponent:
         return re.compile(r"(?<=\]|\))\s*,\s*(?=[+-](?:\[|\())")
 
     @classmethod
-    def _split_modifier_expr(cls, s: str) -> List[str]:
+    def _split_modifier_expr(cls, s: str) -> list[str]:
         # This check ensures that the first expression (before the first split point) is a modification.
         if s.startswith("+") or s.startswith("-"):
             return cls._get_modifier_expr_re().split(s)
@@ -232,13 +249,13 @@ class ListValueComponent:
                 raise ParseError(f"Unknown action for list value: {component._action}")
         return cls(action, appends, filters)
 
-    def __init__(self, action: str, appends: List, filters: List) -> None:
+    def __init__(self, action: str, appends: list, filters: list) -> None:
         self._action = action
         self._appends = appends
         self._filters = filters
 
     @property
-    def val(self) -> List:
+    def val(self) -> list:
         ret = list(self._appends)
         for x in self._filters:
             # Note: can't do ret.remove(x) because that only removes the first instance of x.
@@ -315,7 +332,7 @@ class DictValueComponent:
     EXTEND = "EXTEND"
 
     @classmethod
-    def merge(cls, components: Iterable["DictValueComponent"]) -> DictValueComponent:
+    def merge(cls, components: Iterable[DictValueComponent]) -> DictValueComponent:
         """Merges components into a single component, applying their actions appropriately.
 
         This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
@@ -334,7 +351,7 @@ class DictValueComponent:
                 raise ParseError(f"Unknown action for dict value: {component.action}")
         return cls(action, val)
 
-    def __init__(self, action: str, val: Dict) -> None:
+    def __init__(self, action: str, val: dict) -> None:
         self.action = action
         self.val = val
 

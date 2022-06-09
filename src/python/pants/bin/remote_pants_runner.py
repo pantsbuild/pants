@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
 import signal
 import sys
 import termios
@@ -10,8 +11,7 @@ from contextlib import contextmanager
 from typing import List, Mapping
 
 from pants.base.exiter import ExitCode
-from pants.engine.internals.native_engine_pyo3 import PantsdConnectionException, PyNailgunClient
-from pants.nailgun.nailgun_protocol import NailgunProtocol
+from pants.engine.internals.native_engine import PantsdConnectionException, PyNailgunClient
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
@@ -27,6 +27,25 @@ def interrupts_ignored():
         yield
     finally:
         signal.signal(signal.SIGINT, old_handler)
+
+
+def ttynames_to_env(stdin, stdout, stderr):
+    """Generate nailgun tty capability environment variables based on checking a set of fds.
+
+    TODO: There is a Rust implementation of this as well in `src/rust/engine/nailgun/src/client.rs`.
+
+    :param file stdin: The stream to check for stdin tty capabilities.
+    :param file stdout: The stream to check for stdout tty capabilities.
+    :param file stderr: The stream to check for stderr tty capabilities.
+    :returns: A dict containing the tty capability environment variables.
+    """
+
+    def gen_env_vars():
+        for fd_id, fd in ((0, stdin), (1, stdout), (2, stderr)):
+            if fd.isatty():
+                yield (f"NAILGUN_TTY_PATH_{fd_id}", os.ttyname(fd.fileno()) or b"")
+
+    return dict(gen_env_vars())
 
 
 class STTYSettings:
@@ -52,14 +71,14 @@ class STTYSettings:
         try:
             self._tty_flags = termios.tcgetattr(sys.stdin.fileno())
         except termios.error as e:
-            logger.debug("masking tcgetattr exception: {!r}".format(e))
+            logger.debug(f"masking tcgetattr exception: {e!r}")
 
     def restore_tty_flags(self):
         if self._tty_flags:
             try:
                 termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, self._tty_flags)
             except termios.error as e:
-                logger.debug("masking tcsetattr exception: {!r}".format(e))
+                logger.debug(f"masking tcsetattr exception: {e!r}")
 
 
 class RemotePantsRunner:
@@ -82,32 +101,33 @@ class RemotePantsRunner:
         :param env: The environment (e.g. os.environ) for this run.
         :param options_bootstrapper: The bootstrap options.
         """
-        self._start_time = time.time()
         self._args = args
         self._env = env
         self._options_bootstrapper = options_bootstrapper
         self._bootstrap_options = options_bootstrapper.bootstrap_options
         self._client = PantsDaemonClient(self._bootstrap_options)
 
-    def run(self) -> ExitCode:
+    def run(self, start_time: float) -> ExitCode:
         """Starts up a pantsd instance if one is not already running, then connects to it via
         nailgun."""
 
         pantsd_handle = self._client.maybe_launch()
         logger.debug(f"Connecting to pantsd on port {pantsd_handle.port}")
 
-        return self._connect_and_execute(pantsd_handle)
+        return self._connect_and_execute(pantsd_handle, start_time)
 
-    def _connect_and_execute(self, pantsd_handle: PantsDaemonClient.Handle) -> ExitCode:
+    def _connect_and_execute(
+        self, pantsd_handle: PantsDaemonClient.Handle, start_time: float
+    ) -> ExitCode:
         global_options = self._bootstrap_options.for_global_scope()
-        executor = GlobalOptions.create_py_executor_pyo3(global_options)
+        executor = GlobalOptions.create_py_executor(global_options)
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
-        ng_env = NailgunProtocol.ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
+        ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
         modified_env = {
             **self._env,
             **ng_env,
-            "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(self._start_time),
+            "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(start_time),
             "PANTSD_REQUEST_TIMEOUT_LIMIT": str(
                 global_options.pantsd_timeout_when_multiple_invocations
             ),

@@ -2,7 +2,8 @@ use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
 
-use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
+use cache::PersistentCache;
+use sharded_lmdb::DEFAULT_LEASE_TIME;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
@@ -10,13 +11,13 @@ use testutil::relative_paths;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
-  Process, ProcessMetadata,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, ImmutableInputs,
+  NamedCaches, Process, ProcessError, ProcessMetadata,
 };
 
 struct RoundtripResults {
-  uncached: Result<FallibleProcessResultWithPlatform, String>,
-  maybe_cached: Result<FallibleProcessResultWithPlatform, String>,
+  uncached: Result<FallibleProcessResultWithPlatform, ProcessError>,
+  maybe_cached: Result<FallibleProcessResultWithPlatform, ProcessError>,
 }
 
 fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
@@ -30,6 +31,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
     runtime.clone(),
     base_dir.path().to_owned(),
     NamedCaches::new(named_cache_dir),
+    ImmutableInputs::new(store.clone(), base_dir.path()).unwrap(),
     true,
   ));
   (runner, store, base_dir)
@@ -43,8 +45,8 @@ fn create_cached_runner(
   let cache_dir = TempDir::new().unwrap();
   let max_lmdb_size = 50 * 1024 * 1024; //50 MB - I didn't pick that number but it seems reasonable.
 
-  let process_execution_store = ShardedLmdb::new(
-    cache_dir.path().to_owned(),
+  let cache = PersistentCache::new(
+    cache_dir.path(),
     max_lmdb_size,
     runtime.clone(),
     DEFAULT_LEASE_TIME,
@@ -54,7 +56,7 @@ fn create_cached_runner(
 
   let runner = Box::new(crate::cache::CommandRunner::new(
     local.into(),
-    process_execution_store,
+    cache,
     store,
     ProcessMetadata::default(),
   ));
@@ -149,10 +151,13 @@ async fn recover_from_missing_store_contents() {
   // than just the root of the output is present when hitting the cache.
   {
     let output_dir_digest = first_result.output_directory;
-    let (output_dir, _) = store
-      .load_directory(output_dir_digest)
+    store
+      .ensure_directory_digest_persisted(output_dir_digest.clone())
       .await
-      .unwrap()
+      .unwrap();
+    let output_dir = store
+      .load_directory(output_dir_digest.as_digest())
+      .await
       .unwrap();
     let output_child_digest = output_dir
       .files

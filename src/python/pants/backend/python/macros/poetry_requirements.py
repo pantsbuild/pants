@@ -1,40 +1,72 @@
-# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
 
 import itertools
 import logging
-import os
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, cast
+from typing import Any, Iterator, Mapping, Sequence, cast
 
 import toml
+from packaging.utils import canonicalize_name as canonicalize_project_name
 from packaging.version import InvalidVersion, Version
-from pkg_resources import Requirement
 from typing_extensions import TypedDict
 
-from pants.base.parse_context import ParseContext
+from pants.backend.python.macros.common_fields import (
+    ModuleMappingField,
+    RequirementsOverrideField,
+    TypeStubsModuleMappingField,
+)
+from pants.backend.python.pip_requirement import PipRequirement
+from pants.backend.python.target_types import (
+    PythonRequirementModulesField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+    PythonRequirementTarget,
+    PythonRequirementTypeStubModulesField,
+)
+from pants.base.build_root import BuildRoot
+from pants.core.target_types import (
+    TargetGeneratorSourcesHelperSourcesField,
+    TargetGeneratorSourcesHelperTarget,
+)
+from pants.engine.addresses import Address
+from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    GeneratedTargets,
+    GenerateTargetsRequest,
+    InvalidFieldException,
+    SingleSourceField,
+    TargetGenerator,
+)
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-PyprojectAttr = TypedDict(
-    "PyprojectAttr",
-    {
-        "extras": List[str],
-        "git": str,
-        "rev": str,
-        "branch": str,
-        "python": str,
-        "markers": str,
-        "tag": str,
-        "version": str,
-        "url": str,
-        "path": str,
-    },
-    total=False,
-)
+# ---------------------------------------------------------------------------------
+# pyproject.toml parsing
+# ---------------------------------------------------------------------------------
+
+
+class PyprojectAttr(TypedDict, total=False):
+    extras: list[str]
+    git: str
+    rev: str
+    branch: str
+    python: str
+    markers: str
+    tag: str
+    version: str
+    url: str
+    path: str
 
 
 def get_max_caret(parsed_version: Version) -> str:
@@ -73,6 +105,16 @@ def get_max_tilde(parsed_version: Version) -> str:
     return f"{major}.{minor}.0"
 
 
+def get_max_wildcard(parsed_version: Version) -> str:
+    # Note: Assumes this is not a global wildcard, so parsed_version.release has
+    # at least two components.
+    release = list(parsed_version.release)
+    release[-2] += 1
+    major = release[0]
+    minor = release[1]
+    return f"{major}.{minor}.0"
+
+
 def parse_str_version(attributes: str, **kwargs: str) -> str:
     valid_specifiers = "<>!~="
     pep440_reqs = []
@@ -81,26 +123,47 @@ def parse_str_version(attributes: str, **kwargs: str) -> str:
     extras_str = kwargs["extras_str"]
     comma_split_reqs = (i.strip() for i in attributes.split(","))
     for req in comma_split_reqs:
-        is_caret = req[0] == "^"
-        # ~= is an acceptable default operator; however, ~ is not, and IS NOT the same as ~=
-        is_tilde = req[0] == "~" and req[1] != "="
-        if is_caret or is_tilde:
+
+        def parse_version(version_str: str) -> Version:
             try:
-                parsed_version = Version(req[1:])
+                return Version(version_str)
             except InvalidVersion:
                 raise InvalidVersion(
-                    f'Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the '
-                    "poetry_requirements macro.\n\nIf you believe this requirement is valid, "
-                    "consider opening an issue at https://github.com/pantsbuild/pants/issues so "
-                    "that we can update Pants' Poetry macro to support this."
+                    softwrap(
+                        f"""
+                        Failed to parse requirement {proj_name} = "{req}" in {fp} loaded by the
+                        poetry_requirements macro.
+
+                        If you believe this requirement is valid, consider opening an issue at
+                        https://github.com/pantsbuild/pants/issues so that we can update Pants'
+                        Poetry macro to support this.
+                        """
+                    )
                 )
 
-            max_ver = get_max_caret(parsed_version) if is_caret else get_max_tilde(parsed_version)
+        if not req:
+            continue
+        if req[0] == "^":
+            parsed_version = parse_version(req[1:])
+            max_ver = get_max_caret(parsed_version)
             min_ver = f"{parsed_version.public}"
             pep440_reqs.append(f">={min_ver},<{max_ver}")
+        elif req[0] == "~" and req[1] != "=":
+            # ~= is an acceptable default operator; however, ~ is not, and IS NOT the same as ~=
+            parsed_version = parse_version(req[1:])
+            max_ver = get_max_tilde(parsed_version)
+            min_ver = f"{parsed_version.public}"
+            pep440_reqs.append(f">={min_ver},<{max_ver}")
+        elif req[-1] == "*":
+            if req != "*":  # This is not a global wildcard.
+                # To parse we replace the * with a 0.
+                parsed_version = parse_version(f"{req[:-1]}0")
+                max_ver = get_max_wildcard(parsed_version)
+                min_ver = f"{parsed_version.public}"
+                pep440_reqs.append(f">={min_ver},<{max_ver}")
         else:
             pep440_reqs.append(req if req[0] in valid_specifiers else f"=={req}")
-    return f"{proj_name}{extras_str} {','.join(pep440_reqs)}"
+    return f"{proj_name}{extras_str} {','.join(pep440_reqs)}".rstrip()
 
 
 def parse_python_constraint(constr: str | None, fp: str) -> str:
@@ -125,18 +188,17 @@ def parse_python_constraint(constr: str | None, fp: str) -> str:
         return list(itertools.chain(*[i.split(",") for i in lst]))
 
     def prepend(version: str) -> str:
-        return (
-            f"python_version{''.join(i for i in version if i in valid_specifiers)} '"
-            f"{''.join(i for i in version if i not in valid_specifiers)}'"
-        )
+        valid_versions = "".join(i for i in version if i in valid_specifiers)
+        invalid_versions = "".join(i for i in version if i not in valid_specifiers)
+        return f"python_version{valid_versions} '{invalid_versions}'"
 
     prepend_and_clean = [
         [prepend(".".join(j.split(".")[:2])) for j in conv_and(i)] for i in ver_parsed
     ]
     return (
-        f"{'(' if len(or_and_split) > 1 else ''}"
-        f"{') or ('.join([' and '.join(i) for i in prepend_and_clean])}"
-        f"{')' if len(or_and_split) > 1 else ''}"
+        ("(" if len(or_and_split) > 1 else "")
+        + (") or (".join([" and ".join(i) for i in prepend_and_clean]))
+        + (")" if len(or_and_split) > 1 else "")
     )
 
 
@@ -145,16 +207,6 @@ class PyProjectToml:
     build_root: PurePath
     toml_relpath: PurePath
     toml_contents: str
-
-    @classmethod
-    def create(cls, parse_context: ParseContext, pyproject_toml_relpath: str) -> PyProjectToml:
-        build_root = Path(parse_context.build_root)
-        toml_relpath = PurePath(parse_context.rel_path, pyproject_toml_relpath)
-        return cls(
-            build_root=build_root,
-            toml_relpath=toml_relpath,
-            toml_contents=(build_root / toml_relpath).read_text(),
-        )
 
     def parse(self) -> Mapping[str, Any]:
         return toml.loads(self.toml_contents)
@@ -240,6 +292,10 @@ def handle_dict_attr(
 
     git_lookup = attributes.get("git")
     if git_lookup is not None:
+        # If no URL scheme (e.g., `{git = "git@github.com:foo/bar.git"}`) we assume ssh,
+        # i.e., we convert to git+ssh://git@github.com/foo/bar.git.
+        if not urllib.parse.urlsplit(git_lookup).scheme:
+            git_lookup = f"ssh://{git_lookup.replace(':', '/', 1)}"
         rev_lookup = produce_match("#", attributes.get("rev"))
         branch_lookup = produce_match("@", attributes.get("branch"))
         tag_lookup = produce_match("@", attributes.get("tag"))
@@ -268,8 +324,12 @@ def handle_dict_attr(
 
     if len(base) == 0:
         raise ValueError(
-            f"{proj_name} is not formatted correctly; at minimum provide either a version, url, path "
-            "or git location for your dependency. "
+            softwrap(
+                f"""
+                {proj_name} is not formatted correctly; at minimum provide either a version, url,
+                path or git location for your dependency.
+                """
+            )
         )
 
     return add_markers(base, attributes, fp)
@@ -279,11 +339,11 @@ def parse_single_dependency(
     proj_name: str,
     attributes: str | Mapping[str, str | Sequence] | Sequence[Mapping[str, str | Sequence]],
     pyproject_toml: PyProjectToml,
-) -> Iterator[Requirement]:
+) -> Iterator[PipRequirement]:
 
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
-        yield Requirement.parse(
+        yield PipRequirement.parse(
             parse_str_version(
                 attributes,
                 proj_name=proj_name,
@@ -296,29 +356,38 @@ def parse_single_dependency(
         pyproject_attr = cast(PyprojectAttr, attributes)
         req_str = handle_dict_attr(proj_name, pyproject_attr, pyproject_toml)
         if req_str:
-            yield Requirement.parse(req_str)
+            yield PipRequirement.parse(req_str)
     elif isinstance(attributes, list):
         # E.g. ` foo = [{version = "1.1","python" = "2.7"}, {version = "1.1","python" = "2.7"}]
         for attr in attributes:
             req_str = handle_dict_attr(proj_name, attr, pyproject_toml)
             if req_str:
-                yield Requirement.parse(req_str)
+                yield PipRequirement.parse(req_str)
     else:
         raise AssertionError(
-            "Error: invalid Poetry requirement format. Expected type of requirement attributes to "
-            f"be string, dict, or list, but was of type {type(attributes).__name__}."
+            softwrap(
+                f"""
+                Error: invalid Poetry requirement format. Expected type of requirement attributes to
+                be string, dict, or list, but was of type {type(attributes).__name__}.
+                """
+            )
         )
 
 
-def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
+def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
     parsed = pyproject_toml.parse()
     try:
         poetry_vals = parsed["tool"]["poetry"]
     except KeyError:
         raise KeyError(
-            f"No section `tool.poetry` found in {pyproject_toml.toml_relpath}, which "
-            "is loaded by Pants from a `poetry_requirements` macro. "
-            "Did you mean to set up Poetry?"
+            softwrap(
+                f"""
+                No section `tool.poetry` found in {pyproject_toml.toml_relpath}, which
+                is loaded by Pants from a `poetry_requirements` macro.
+
+                Did you mean to set up Poetry?
+                """
+            )
         )
     dependencies = poetry_vals.get("dependencies", {})
     # N.B.: The "python" dependency is a special dependency required by Poetry that only serves to
@@ -327,7 +396,7 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
     dependencies.pop("python", None)
 
     groups = poetry_vals.get("group", {})
-    group_deps: Dict[str, PyprojectAttr] = {}
+    group_deps: dict[str, PyprojectAttr] = {}
 
     for group in groups.values():
         group_deps.update(group.get("dependencies", {}))
@@ -335,10 +404,14 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
     dev_dependencies = poetry_vals.get("dev-dependencies", {})
     if not dependencies and not dev_dependencies and not group_deps:
         logger.warning(
-            "No requirements defined in any Poetry dependency groups, tool.poetry.dependencies and "
-            f"tool.poetry.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded "
-            "by Pants from a poetry_requirements macro. Did you mean to populate these "
-            "with requirements?"
+            softwrap(
+                f"""
+                No requirements defined in any Poetry dependency groups, tool.poetry.dependencies
+                and tool.poetry.dev-dependencies in {pyproject_toml.toml_relpath}, which is loaded
+                by Pants from a poetry_requirements macro. Did you mean to populate these
+                with requirements?
+                """
+            )
         )
 
     return set(
@@ -349,84 +422,122 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[Requirement]:
     )
 
 
-class PoetryRequirements:
-    """Translates dependencies specified in a  pyproject.toml Poetry file to a set of
-    "python_requirements_library" targets.
+# ---------------------------------------------------------------------------------
+# Target generator
+# ---------------------------------------------------------------------------------
 
-    For example, if pyproject.toml contains the following entries under
-    poetry.tool.dependencies: `foo = ">1"` and `bar = ">2.4"`,
 
-    python_requirement_library(
-        name="foo",
-        requirements=["foo>1"],
-      )
+class PoetryRequirementsSourceField(SingleSourceField):
+    default = "pyproject.toml"
+    required = False
 
-      python_requirement_library(
-        name="bar",
-        requirements=["bar>2.4"],
-      )
 
-    See Poetry documentation for correct specification of pyproject.toml:
-    https://python-poetry.org/docs/pyproject/
+class PoetryRequirementsTargetGenerator(TargetGenerator):
+    alias = "poetry_requirements"
+    help = "Generate a `python_requirement` for each entry in a Poetry pyproject.toml."
+    generated_target_cls = PythonRequirementTarget
+    # Note that this does not have a `dependencies` field.
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ModuleMappingField,
+        TypeStubsModuleMappingField,
+        PoetryRequirementsSourceField,
+        RequirementsOverrideField,
+    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (PythonRequirementResolveField,)
 
-    You may also use the parameter `module_mapping` to teach Pants what modules each of your
-    requirements provide. For any requirement unspecified, Pants will default to the name of the
-    requirement. This setting is important for Pants to know how to convert your import
-    statements back into your dependencies. For example:
 
-        python_requirements(
-          module_mapping={
-            "ansicolors": ["colors"],
-            "setuptools": ["pkg_resources"],
-          }
+class GenerateFromPoetryRequirementsRequest(GenerateTargetsRequest):
+    generate_from = PoetryRequirementsTargetGenerator
+
+
+@rule(desc="Generate `python_requirement` targets from Poetry pyproject.toml", level=LogLevel.DEBUG)
+async def generate_from_python_requirement(
+    request: GenerateFromPoetryRequirementsRequest,
+    build_root: BuildRoot,
+    union_membership: UnionMembership,
+) -> GeneratedTargets:
+    generator = request.generator
+    pyproject_rel_path = generator[PoetryRequirementsSourceField].value
+    pyproject_full_path = generator[PoetryRequirementsSourceField].file_path
+    overrides = {
+        canonicalize_project_name(k): v
+        for k, v in request.require_unparametrized_overrides().items()
+    }
+
+    file_tgt = TargetGeneratorSourcesHelperTarget(
+        {TargetGeneratorSourcesHelperSourcesField.alias: pyproject_rel_path},
+        Address(
+            request.template_address.spec_path,
+            target_name=request.template_address.target_name,
+            relative_file_path=pyproject_rel_path,
+        ),
+        union_membership,
+    )
+
+    digest_contents = await Get(
+        DigestContents,
+        PathGlobs(
+            [pyproject_full_path],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"{generator}'s field `{PoetryRequirementsSourceField.alias}`",
+        ),
+    )
+
+    requirements = parse_pyproject_toml(
+        PyProjectToml(
+            build_root=PurePath(build_root.path),
+            toml_relpath=PurePath(pyproject_full_path),
+            toml_contents=digest_contents[0].content.decode(),
         )
-    """
+    )
 
-    def __init__(self, parse_context):
-        self._parse_context = parse_context
+    module_mapping = generator[ModuleMappingField].value
+    stubs_mapping = generator[TypeStubsModuleMappingField].value
 
-    def __call__(
-        self,
-        pyproject_toml_relpath: str = "pyproject.toml",
-        *,
-        module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
-        type_stubs_module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
-    ) -> None:
-        """
-        :param pyproject_toml_relpath: The relpath from this BUILD file to the requirements file.
-            Defaults to a `requirements.txt` file sibling to the BUILD file.
-        :param module_mapping: a mapping of requirement names to a list of the modules they provide.
-            For example, `{"ansicolors": ["colors"]}`. Any unspecified requirements will use the
-            requirement name as the default module, e.g. "Django" will default to
-            `modules=["django"]`.
-        """
-        req_file_tgt = self._parse_context.create_object(
-            "_python_requirements_file",
-            name=pyproject_toml_relpath.replace(os.path.sep, "_"),
-            sources=[pyproject_toml_relpath],
+    def generate_tgt(parsed_req: PipRequirement) -> PythonRequirementTarget:
+        normalized_proj_name = canonicalize_project_name(parsed_req.project_name)
+        tgt_overrides = overrides.pop(normalized_proj_name, {})
+        if Dependencies.alias in tgt_overrides:
+            tgt_overrides[Dependencies.alias] = list(tgt_overrides[Dependencies.alias]) + [
+                file_tgt.address.spec
+            ]
+
+        return PythonRequirementTarget(
+            {
+                **request.template,
+                PythonRequirementsField.alias: [parsed_req],
+                PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
+                PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
+                    normalized_proj_name
+                ),
+                # This may get overridden by `tgt_overrides`, which will have already added in
+                # the file tgt.
+                Dependencies.alias: [file_tgt.address.spec],
+                **tgt_overrides,
+            },
+            request.template_address.create_generated(parsed_req.project_name),
+            union_membership,
         )
-        requirements_dep = f":{req_file_tgt.name}"
 
-        requirements = parse_pyproject_toml(
-            PyProjectToml.create(self._parse_context, pyproject_toml_relpath)
+    result = tuple(generate_tgt(requirement) for requirement in requirements) + (file_tgt,)
+
+    if overrides:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                Unused key in the `overrides` field for {request.template_address}:
+                {sorted(overrides)}
+                """
+            )
         )
-        for parsed_req in requirements:
-            proj_name = parsed_req.project_name
-            req_module_mapping = (
-                {proj_name: module_mapping[proj_name]}
-                if module_mapping and proj_name in module_mapping
-                else None
-            )
-            stubs_module_mapping = (
-                {proj_name: type_stubs_module_mapping[proj_name]}
-                if type_stubs_module_mapping and proj_name in type_stubs_module_mapping
-                else None
-            )
-            self._parse_context.create_object(
-                "python_requirement_library",
-                name=parsed_req.project_name,
-                requirements=[parsed_req],
-                module_mapping=req_module_mapping,
-                type_stubs_module_mapping=stubs_module_mapping,
-                dependencies=[requirements_dep],
-            )
+
+    return GeneratedTargets(generator, result)
+
+
+def rules():
+    return (
+        *collect_rules(),
+        UnionRule(GenerateTargetsRequest, GenerateFromPoetryRequirementsRequest),
+    )

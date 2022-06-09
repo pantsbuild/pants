@@ -7,10 +7,9 @@ See https://www.pantsbuild.org/docs/python-linters-and-formatters and
 https://github.com/google/yapf .
 """
 
-from pants.backend.python.lint import python_fmt
 from pants.backend.python.lint.yapf import rules as yapf_rules
 from pants.backend.python.lint.yapf import skip_field, subsystem
 
 
 def rules():
-    return (*yapf_rules.rules(), *python_fmt.rules(), *skip_field.rules(), *subsystem.rules())
+    return (*yapf_rules.rules(), *skip_field.rules(), *subsystem.rules())

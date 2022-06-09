@@ -16,24 +16,25 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
-  self, GlobExpansionConjunction, GlobMatching, PathGlobs, RelativePath, StrictGlobMatching,
+  self, safe_create_dir_all_ioerror, DirectoryDigest, GlobExpansionConjunction, GlobMatching,
+  PathGlobs, Permissions, RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use log::{debug, info};
 use nails::execution::ExitCode;
 use shell_quote::bash;
-use store::{OneOffStoreFileByDigest, Snapshot, Store};
+use store::{OneOffStoreFileByDigest, Snapshot, Store, StoreError};
 use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tryfuture::try_future;
-use workunit_store::{in_workunit, Metric, RunningWorkunit, WorkunitMetadata};
+use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
-  ProcessResultMetadata, ProcessResultSource,
+  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
+  ProcessError, ProcessResultMetadata, ProcessResultSource,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -43,6 +44,7 @@ pub struct CommandRunner {
   executor: task_executor::Executor,
   work_dir_base: PathBuf,
   named_caches: NamedCaches,
+  immutable_inputs: ImmutableInputs,
   cleanup_local_dirs: bool,
   platform: Platform,
   spawn_lock: RwLock<()>,
@@ -54,6 +56,7 @@ impl CommandRunner {
     executor: task_executor::Executor,
     work_dir_base: PathBuf,
     named_caches: NamedCaches,
+    immutable_inputs: ImmutableInputs,
     cleanup_local_dirs: bool,
   ) -> CommandRunner {
     CommandRunner {
@@ -61,6 +64,7 @@ impl CommandRunner {
       executor,
       work_dir_base,
       named_caches,
+      immutable_inputs,
       cleanup_local_dirs,
       platform: Platform::current().unwrap(),
       spawn_lock: RwLock::new(()),
@@ -116,13 +120,20 @@ impl CommandRunner {
         .map_err(|err| format!("Error expanding output globs: {}", err))
         .await?;
       Snapshot::from_path_stats(
-        store.clone(),
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
       )
       .await
     })
     .boxed()
+  }
+
+  pub fn named_caches(&self) -> &NamedCaches {
+    &self.named_caches
+  }
+
+  pub fn immutable_inputs(&self) -> &ImmutableInputs {
+    &self.immutable_inputs
   }
 }
 
@@ -233,15 +244,6 @@ impl ChildResults {
 
 #[async_trait]
 impl super::CommandRunner for CommandRunner {
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![None, self.platform.into()].iter() {
-      if let Some(compatible_req) = req.0.get(compatible_constraint) {
-        return Some(compatible_req.clone());
-      }
-    }
-    None
-  }
-
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
@@ -249,30 +251,70 @@ impl super::CommandRunner for CommandRunner {
     &self,
     context: Context,
     _workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let req = self.extract_compatible_request(&req).unwrap();
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let req_debug_repr = format!("{:#?}", req);
     in_workunit!(
-      context.workunit_store.clone(),
-      "run_local_process".to_owned(),
-      WorkunitMetadata {
-        // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-        // renders at the Process's level.
-        level: req.level,
-        desc: Some(req.description.clone()),
-        ..WorkunitMetadata::default()
-      },
+      "run_local_process",
+      req.level,
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      desc = Some(req.description.clone()),
       |workunit| async move {
+        // Set up a temporary workdir, which will optionally be preserved.
+        let (workdir_path, maybe_workdir) = {
+          let workdir = tempfile::Builder::new()
+            .prefix("pants-sandbox-")
+            .tempdir_in(&self.work_dir_base)
+            .map_err(|err| {
+              format!(
+                "Error making tempdir for local process execution: {:?}",
+                err
+              )
+            })?;
+          if self.cleanup_local_dirs {
+            // Hold on to the workdir so that we can drop it explicitly after we've finished using it.
+            (workdir.path().to_owned(), Some(workdir))
+          } else {
+            // This consumes the `TempDir` without deleting directory on the filesystem, meaning
+            // that the temporary directory will no longer be automatically deleted when dropped.
+            let preserved_path = workdir.into_path();
+            info!(
+              "Preserving local process execution dir {} for {:?}",
+              preserved_path.display(),
+              req.description
+            );
+            (preserved_path, None)
+          }
+        };
+
+        // Start working on a mutable version of the process.
+        let mut req = req;
+        // Update env, replacing `{chroot}` placeholders with `workdir_path`.
+        update_env(&workdir_path, &mut req);
+
+        // Prepare the workdir.
+        let exclusive_spawn = prepare_workdir(
+          workdir_path.clone(),
+          &req,
+          req.input_digests.input_files.clone(),
+          self.store.clone(),
+          self.executor.clone(),
+          &self.named_caches,
+          &self.immutable_inputs,
+        )
+        .await?;
+
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
-        self
+        let res = self
           .run_and_capture_workdir(
-            req,
+            req.clone(),
             context,
             self.store.clone(),
             self.executor.clone(),
-            self.cleanup_local_dirs,
-            &self.work_dir_base,
+            workdir_path.clone(),
+            (),
+            exclusive_spawn,
             self.platform(),
           )
           .map_err(|msg| {
@@ -284,9 +326,22 @@ impl super::CommandRunner for CommandRunner {
             //
             // Given that this is expected to be rare, we dump the entire process definition in the
             // error.
-            format!("Failed to execute: {}\n\n{}", req_debug_repr, msg)
+            ProcessError::Unclassified(format!("Failed to execute: {}\n\n{}", req_debug_repr, msg))
           })
-          .await
+          .await;
+
+        match maybe_workdir {
+          Some(workdir) => {
+            // Dropping the temporary directory will likely involve a lot of IO: do it in the
+            // background.
+            let _background_cleanup = self.executor.spawn_blocking(|| std::mem::drop(workdir));
+          }
+          None => {
+            setup_run_sh_script(&req.env, &req.working_directory, &req.argv, &workdir_path)?;
+          }
+        }
+
+        res
       }
     )
     .await
@@ -295,15 +350,13 @@ impl super::CommandRunner for CommandRunner {
 
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
-  fn named_caches(&self) -> &NamedCaches {
-    &self.named_caches
-  }
+  type WorkdirToken = ();
 
   async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
+    _workdir_token: (),
     req: Process,
-    _context: Context,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     let cwd = if let Some(ref working_directory) = req.working_directory {
@@ -410,122 +463,20 @@ impl CapturedWorkdir for CommandRunner {
 
 #[async_trait]
 pub trait CapturedWorkdir {
+  type WorkdirToken: Send;
+
   async fn run_and_capture_workdir(
     &self,
     req: Process,
     context: Context,
     store: Store,
     executor: task_executor::Executor,
-    cleanup_local_dirs: bool,
-    workdir_base: &Path,
+    workdir_path: PathBuf,
+    workdir_token: Self::WorkdirToken,
+    exclusive_spawn: bool,
     platform: Platform,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let start_time = Instant::now();
-
-    // Set up a temporary workdir, which will optionally be preserved.
-    let (workdir_path, maybe_workdir) = {
-      let workdir = tempfile::Builder::new()
-        .prefix("process-execution")
-        .tempdir_in(workdir_base)
-        .map_err(|err| {
-          format!(
-            "Error making tempdir for local process execution: {:?}",
-            err
-          )
-        })?;
-      if cleanup_local_dirs {
-        // Hold on to the workdir so that we can drop it explicitly after we've finished using it.
-        (workdir.path().to_owned(), Some(workdir))
-      } else {
-        // This consumes the `TempDir` without deleting directory on the filesystem, meaning
-        // that the temporary directory will no longer be automatically deleted when dropped.
-        let preserved_path = workdir.into_path();
-        info!(
-          "preserving local process execution dir `{:?}` for {:?}",
-          preserved_path, req.description
-        );
-        (preserved_path, None)
-      }
-    };
-
-    // If named caches are configured, collect the symlinks to create.
-    let named_cache_symlinks = self
-      .named_caches()
-      .local_paths(&req.append_only_caches)
-      .collect::<Vec<_>>();
-
-    // Start with async materialization of input snapshots, followed by synchronous materialization
-    // of other configured inputs. Note that we don't do this in parallel, as that might cause
-    // non-determinism when paths overlap.
-    let sandbox = store
-      .materialize_directory(workdir_path.clone(), req.input_files)
-      .await?;
-    let workdir_path2 = workdir_path.clone();
-    let output_file_paths = req.output_files.clone();
-    let output_dir_paths = req.output_directories.clone();
-    let maybe_jdk_home = req.jdk_home.clone();
-    executor
-      .spawn_blocking(move || {
-        if let Some(jdk_home) = maybe_jdk_home {
-          symlink(jdk_home, workdir_path2.join(".jdk"))
-            .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
-        }
-
-        // The bazel remote execution API specifies that the parent directories for output files and
-        // output directories should be created before execution completes: see
-        //   https://github.com/pantsbuild/pants/issues/7084.
-        // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably be
-        // even more efficient to only retain the directories at greatest nesting depth, as
-        // create_dir_all() will ensure all parents are created. At that point, we might consider
-        // explicitly enumerating all the directories to be created and just using create_dir(),
-        // unless there is some optimization in create_dir_all() that makes that less efficient.
-        let parent_paths_to_create: HashSet<_> = output_file_paths
-          .iter()
-          .chain(output_dir_paths.iter())
-          .map(|relative_path| relative_path.as_ref())
-          .chain(named_cache_symlinks.iter().map(|s| s.dst.as_path()))
-          .filter_map(|rel_path| rel_path.parent())
-          .map(|parent_relpath| workdir_path2.join(parent_relpath))
-          .collect();
-        for path in parent_paths_to_create {
-          create_dir_all(path.clone()).map_err(|err| {
-            format!(
-              "Error making parent directory {:?} for local execution: {:?}",
-              path, err
-            )
-          })?;
-        }
-
-        for named_cache_symlink in named_cache_symlinks {
-          symlink(
-            &named_cache_symlink.src,
-            workdir_path2.join(&named_cache_symlink.dst),
-          )
-          .map_err(|err| {
-            format!(
-              "Error making {:?} for local execution: {:?}",
-              named_cache_symlink, err
-            )
-          })?;
-        }
-
-        let res: Result<_, String> = Ok(());
-        res
-      })
-      .await?;
-
-    let exclusive_spawn = RelativePath::new(&req.argv[0]).map_or(false, |relative_path| {
-      let executable_path = if let Some(working_directory) = &req.working_directory {
-        working_directory.join(relative_path)
-      } else {
-        relative_path
-      };
-      let exe_was_materialized = sandbox.contains_file(&executable_path);
-      if exe_was_materialized {
-        debug!("Obtaining exclusive spawn lock for process with argv {:?} since we materialized its executable {:?}.", &req.argv, executable_path);
-      }
-      exe_was_materialized
-    });
 
     // Spawn the process.
     // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
@@ -536,7 +487,7 @@ pub trait CapturedWorkdir {
     let child_results_result = {
       let child_results_future = ChildResults::collect_from(
         self
-          .run_in_workdir(&workdir_path, req.clone(), context, exclusive_spawn)
+          .run_in_workdir(&workdir_path, workdir_token, req.clone(), exclusive_spawn)
           .await?,
       );
       if let Some(req_timeout) = req.timeout {
@@ -549,7 +500,7 @@ pub trait CapturedWorkdir {
       }
     };
 
-    // Capture the process outputs, and optionally clean up the workdir.
+    // Capture the process outputs.
     let output_snapshot = if req.output_files.is_empty() && req.output_directories.is_empty() {
       store::Snapshot::empty()
     } else {
@@ -578,20 +529,12 @@ pub trait CapturedWorkdir {
       .await?
     };
 
-    match maybe_workdir {
-      Some(workdir) => {
-        // Dropping the temporary directory will likely involve a lot of IO: do it in the
-        // background.
-        let _background_cleanup = executor.spawn_blocking(|| std::mem::drop(workdir));
-      }
-      None => {
-        setup_run_sh_script(&req.env, &req.working_directory, &req.argv, &workdir_path)?;
-      }
-    }
-
     let elapsed = start_time.elapsed();
-    let result_metadata =
-      ProcessResultMetadata::new(Some(elapsed.into()), ProcessResultSource::RanLocally);
+    let result_metadata = ProcessResultMetadata::new(
+      Some(elapsed.into()),
+      ProcessResultSource::RanLocally,
+      context.run_id,
+    );
 
     match child_results_result {
       Ok(child_results) => {
@@ -605,7 +548,7 @@ pub trait CapturedWorkdir {
           stdout_digest,
           stderr_digest,
           exit_code: child_results.exit_code,
-          output_directory: output_snapshot.digest,
+          output_directory: output_snapshot.into(),
           platform,
           metadata: result_metadata,
         })
@@ -622,16 +565,14 @@ pub trait CapturedWorkdir {
           stdout_digest,
           stderr_digest: hashing::EMPTY_DIGEST,
           exit_code: -libc::SIGTERM,
-          output_directory: hashing::EMPTY_DIGEST,
+          output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
           platform,
           metadata: result_metadata,
         })
       }
-      Err(msg) => Err(msg),
+      Err(msg) => Err(msg.into()),
     }
   }
-
-  fn named_caches(&self) -> &NamedCaches;
 
   ///
   /// Spawn the given process in a working directory prepared with its expected input digest.
@@ -654,10 +595,156 @@ pub trait CapturedWorkdir {
   async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
+    workdir_token: Self::WorkdirToken,
     req: Process,
-    context: Context,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
+}
+
+/// Updates the Process env.
+///
+/// Mutates the env for the process `req`, replacing any `{chroot}` placeholders with
+/// `workdir_path`.
+///
+/// This matches the behavior of interactive processes executed in a temporary directory and those
+/// executed by the `run` goal.
+///
+/// TODO: align this with the code path for interactive processes. Related issue #14386.
+///
+pub fn update_env(workdir_path: &Path, req: &mut Process) {
+  if let Some(workdir) = workdir_path.to_str() {
+    for value in req.env.values_mut() {
+      if value.contains("{chroot}") {
+        *value = value.replace("{chroot}", workdir);
+      }
+    }
+  }
+}
+
+/// Prepares the given workdir for use by the given Process.
+///
+/// Returns true if the executable for the Process was created in the workdir, indicating that
+/// `exclusive_spawn` is required.
+///
+/// TODO: Both the symlinks for named_caches/immutable_inputs and the empty output directories
+/// required by the spec should be created via a synthetic Digest containing SymlinkNodes and
+/// the empty output directories. That would:
+///   1. improve validation that nothing we create collides.
+///   2. allow for materialization to safely occur fully in parallel, rather than partially
+///      synchronously in the background.
+///
+pub async fn prepare_workdir(
+  workdir_path: PathBuf,
+  req: &Process,
+  materialized_input_digest: DirectoryDigest,
+  store: Store,
+  executor: task_executor::Executor,
+  named_caches: &NamedCaches,
+  immutable_inputs: &ImmutableInputs,
+) -> Result<bool, StoreError> {
+  // Collect the symlinks to create for immutable inputs or named caches.
+  let workdir_symlinks = immutable_inputs
+    .local_paths(&req.input_digests.immutable_inputs)
+    .await?
+    .into_iter()
+    .chain(named_caches.local_paths(&req.append_only_caches))
+    .collect::<Vec<_>>();
+
+  // Capture argv0 as the executable path so that we can test whether we have created it in the
+  // sandbox.
+  let maybe_executable_path = {
+    let mut executable_path = PathBuf::from(&req.argv[0]);
+    if executable_path.is_relative() {
+      if let Some(working_directory) = &req.working_directory {
+        executable_path = working_directory.as_ref().join(executable_path)
+      }
+      Some(executable_path)
+    } else {
+      None
+    }
+  };
+
+  // Start with async materialization of input snapshots, followed by synchronous materialization
+  // of other configured inputs. Note that we don't do this in parallel, as that might cause
+  // non-determinism when paths overlap: see the method doc.
+  let store2 = store.clone();
+  let workdir_path_2 = workdir_path.clone();
+  in_workunit!("setup_sandbox", Level::Debug, |_workunit| async move {
+    store2
+      .materialize_directory(
+        workdir_path_2,
+        materialized_input_digest,
+        Permissions::Writable,
+      )
+      .await
+  })
+  .await?;
+
+  let workdir_path2 = workdir_path.clone();
+  let output_file_paths = req.output_files.clone();
+  let output_dir_paths = req.output_directories.clone();
+  let maybe_jdk_home = req.jdk_home.clone();
+  let exclusive_spawn = executor
+    .spawn_blocking(move || {
+      if let Some(jdk_home) = maybe_jdk_home {
+        symlink(jdk_home, workdir_path2.join(".jdk"))
+          .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
+      }
+
+      // The bazel remote execution API specifies that the parent directories for output files and
+      // output directories should be created before execution completes: see the method doc.
+      let parent_paths_to_create: HashSet<_> = output_file_paths
+        .iter()
+        .chain(output_dir_paths.iter())
+        .map(|relative_path| relative_path.as_ref())
+        .chain(workdir_symlinks.iter().map(|s| s.src.as_path()))
+        .filter_map(|rel_path| rel_path.parent())
+        .map(|parent_relpath| workdir_path2.join(parent_relpath))
+        .collect();
+      for path in parent_paths_to_create {
+        create_dir_all(path.clone()).map_err(|err| {
+          format!(
+            "Error making parent directory {:?} for local execution: {:?}",
+            path, err
+          )
+        })?;
+      }
+
+      for workdir_symlink in workdir_symlinks {
+        // TODO: Move initialization of the dst directory into NamedCaches.
+        safe_create_dir_all_ioerror(&workdir_symlink.dst).map_err(|err| {
+          format!(
+            "Error making {} for local execution: {:?}",
+            workdir_symlink.dst.display(),
+            err
+          )
+        })?;
+        let src = workdir_path2.join(&workdir_symlink.src);
+        symlink(&workdir_symlink.dst, &src).map_err(|err| {
+          format!(
+            "Error linking {} -> {} for local execution: {:?}",
+            src.display(),
+            workdir_symlink.dst.display(),
+            err
+          )
+        })?;
+      }
+
+      let exe_was_materialized = maybe_executable_path
+        .as_ref()
+        .map_or(false, |p| workdir_path2.join(&p).exists());
+      if exe_was_materialized {
+        debug!(
+          "Obtaining exclusive spawn lock for process since \
+               we materialized its executable {:?}.",
+          maybe_executable_path
+        );
+      }
+      let res: Result<_, String> = Ok(exe_was_materialized);
+      res
+    })
+    .await?;
+  Ok(exclusive_spawn)
 }
 
 /// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.

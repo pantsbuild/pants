@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import sys
-from typing import Callable, Optional, TextIO
+from typing import Callable, TextIO
 
 from colors import blue, cyan, green, magenta, red, yellow
 
+from pants.engine.engine_aware import SideEffecting
 from pants.engine.internals.scheduler import SchedulerSession
-from pants.engine.rules import side_effecting
 
 
-@side_effecting
-class Console:
-    """Class responsible for writing text to the console while Pants is running."""
+class Console(SideEffecting):
+    """Class responsible for writing text to the console while Pants is running.
 
-    side_effecting = True
+    A SchedulerSession should always be set in production usage, in order to track side-effects, and
+    tear down any running UI before stdio is rendered.
+    """
 
     def __init__(
         self,
@@ -23,32 +24,33 @@ class Console:
         stdout: TextIO | None = None,
         stderr: TextIO | None = None,
         use_colors: bool = True,
-        session: Optional[SchedulerSession] = None,
+        session: SchedulerSession | None = None,
     ):
-        """If a SchedulerSession is set, any running UI will be torn down before stdio is
-        rendered."""
-
         self._stdin = stdin or sys.stdin
         self._stdout = stdout or sys.stdout
         self._stderr = stderr or sys.stderr
         self._use_colors = use_colors
         self._session = session
+        self._enforce_effects = self._session is not None
 
     @property
     def stdin(self) -> TextIO:
         if self._session:
+            self.side_effected()
             self._session.teardown_dynamic_ui()
         return self._stdin
 
     @property
     def stdout(self) -> TextIO:
         if self._session:
+            self.side_effected()
             self._session.teardown_dynamic_ui()
         return self._stdout
 
     @property
     def stderr(self) -> TextIO:
         if self._session:
+            self.side_effected()
             self._session.teardown_dynamic_ui()
         return self._stderr
 
@@ -71,8 +73,8 @@ class Console:
         self.write_stderr(f"{payload}{end}")
 
     def flush(self) -> None:
-        self.stdout.flush()
-        self.stderr.flush()
+        self._stdout.flush()
+        self._stderr.flush()
 
     def sigil_succeeded(self) -> str:
         """Sigil for a successful item."""
@@ -84,7 +86,7 @@ class Console:
 
     def sigil_failed(self) -> str:
         """Sigil for a failed item."""
-        return self.red("𐄂")
+        return self.red("✕")
 
     def sigil_skipped(self) -> str:
         """Sigil for a skipped item."""

@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,15 +25,18 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+pub mod directory;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
 #[cfg(test)]
 mod posixfs_tests;
 
+pub use crate::directory::{
+  DigestTrie, DirectoryDigest, EMPTY_DIGEST_TREE, EMPTY_DIRECTORY_DIGEST,
+};
 pub use crate::glob_matching::{
-  ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
-  SINGLE_STAR_GLOB,
+  GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
 
 use std::cmp::min;
@@ -49,6 +50,7 @@ use std::{fmt, fs};
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use async_trait::async_trait;
 use bytes::Bytes;
+use deepsize::DeepSizeOf;
 use futures::future::{self, TryFutureExt};
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -75,7 +77,14 @@ pub fn default_cache_path() -> PathBuf {
   cache_path.join("pants")
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize)]
+/// Simplified filesystem Permissions.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Permissions {
+  ReadOnly,
+  Writable,
+}
+
+#[derive(Clone, Debug, DeepSizeOf, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize)]
 pub struct RelativePath(PathBuf);
 
 impl RelativePath {
@@ -138,7 +147,7 @@ impl From<RelativePath> for PathBuf {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub enum Stat {
   Link(Link),
   Dir(Dir),
@@ -166,19 +175,19 @@ impl Stat {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Link(pub PathBuf);
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Dir(pub PathBuf);
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct File {
   pub path: PathBuf,
   pub is_executable: bool,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub enum PathStat {
   Dir {
     // The symbolic name of some filesystem Path, which is context specific.
@@ -209,34 +218,9 @@ impl PathStat {
       &PathStat::File { ref path, .. } => path.as_path(),
     }
   }
-
-  ///
-  /// Sort and ensure that there were no duplicate entries.
-  ///
-  /// TODO: audit if this is even necessary? expand_globs() already sorts and dedupes, but, are
-  /// there other callers of this where we can't be confident the sorting happened? Maybe, we
-  /// should add a light wrapper around `Vec<PathStat>` that ensures it's sorted and deduped, as
-  /// we're now using the type a lot.
-  pub fn normalize_path_stats(mut path_stats: Vec<PathStat>) -> Result<Vec<PathStat>, String> {
-    #[allow(clippy::unnecessary_sort_by)]
-    path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-
-    // The helper assumes that if a Path has multiple children, it must be a directory.
-    // Proactively error if we run into identically named files, because otherwise we will treat
-    // them like empty directories.
-    let pre_dedupe_len = path_stats.len();
-    path_stats.dedup_by(|a, b| a.path() == b.path());
-    if path_stats.len() != pre_dedupe_len {
-      return Err(format!(
-        "Snapshots must be constructed from unique path stats; got duplicates in {:?}",
-        path_stats
-      ));
-    }
-    Ok(path_stats)
-  }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct DirectoryListing(pub Vec<Stat>);
 
 #[derive(Debug)]
@@ -310,9 +294,32 @@ impl GitignoreStyleExcludes {
       ::ignore::Match::Ignore(_) => true,
     }
   }
+
+  ///
+  /// Find out if a path has any ignore patterns for files/paths in its tree.
+  ///
+  /// Used by the IntermediateGlobbedFilesAndDirectories in snapshot_ops.rs,
+  /// to check if it may optimize the snapshot subset operation on this tree,
+  /// or need to check for excluded files/directories.
+  ///
+  pub fn maybe_is_parent_of_ignored_path(&self, path: &Path) -> bool {
+    match path.to_str() {
+      None => true,
+      Some(s) => {
+        for pattern in self.exclude_patterns().iter() {
+          if pattern.starts_with(s) || s.starts_with(pattern) {
+            // In case the pattern is shorter than path, we are inside a ignored tree, so both
+            // parent and child of ignored paths.
+            return true;
+          }
+        }
+        false
+      }
+    }
+  }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum StrictGlobMatching {
   // NB: the Error and Warn variants store a description of the origin of the PathGlob
   // request so that we can make the error message more helpful to users when globs fail to match.
@@ -350,7 +357,7 @@ impl StrictGlobMatching {
   }
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum GlobExpansionConjunction {
   AllMatch,
   AnyMatch,
@@ -372,7 +379,7 @@ pub enum SymlinkBehavior {
   Oblivious,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, DeepSizeOf, Clone, Eq, PartialEq, Hash)]
 pub struct PathGlobs {
   globs: Vec<String>,
   strict_match_behavior: StrictGlobMatching,
@@ -497,14 +504,14 @@ impl PosixFS {
           compute_metadata,
         )
       })
-      .filter(|s| match s {
-        Ok(ref s) =>
-        // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
-        // git-style ignore patterns, we need to know whether a path represents a directory.
-        {
-          !self.ignore.is_ignored(s)
+      .filter_map(|s| match s {
+        Ok(Some(s)) if !self.ignore.is_ignored(&s) => {
+          // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
+          // git-style ignore patterns, we need to know whether a path represents a directory.
+          Some(Ok(s))
         }
-        Err(_) => true,
+        Ok(_) => None,
+        Err(e) => Some(Err(e)),
       })
       .collect::<Result<Vec<_>, io::Error>>()
       .map_err(|e| {
@@ -513,7 +520,6 @@ impl PosixFS {
           format!("Failed to scan directory {:?}: {}", dir_abs, e),
         )
       })?;
-    #[allow(clippy::unnecessary_sort_by)]
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(DirectoryListing(stats))
   }
@@ -538,15 +544,15 @@ impl PosixFS {
             if path_buf.is_absolute() {
               Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Absolute symlink: {:?}", link_abs),
+                format!("Absolute symlink: {:?}", path_buf),
               ))
             } else {
               link_parent
-                .map(|parent| parent.join(path_buf))
+                .map(|parent| parent.join(&path_buf))
                 .ok_or_else(|| {
                   io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Symlink without a parent?: {:?}", link_abs),
+                    format!("Symlink without a parent?: {:?}", path_buf),
                   )
                 })
             }
@@ -574,7 +580,7 @@ impl PosixFS {
     path_for_stat: PathBuf,
     file_type: std::fs::FileType,
     compute_metadata: F,
-  ) -> Result<Stat, io::Error>
+  ) -> Result<Option<Stat>, io::Error>
   where
     F: FnOnce() -> Result<std::fs::Metadata, io::Error>,
   {
@@ -598,23 +604,17 @@ impl PosixFS {
       ));
     }
     if file_type.is_symlink() {
-      Ok(Stat::Link(Link(path_for_stat)))
+      Ok(Some(Stat::Link(Link(path_for_stat))))
     } else if file_type.is_file() {
       let is_executable = compute_metadata()?.permissions().mode() & 0o100 == 0o100;
-      Ok(Stat::File(File {
+      Ok(Some(Stat::File(File {
         path: path_for_stat,
         is_executable: is_executable,
-      }))
+      })))
     } else if file_type.is_dir() {
-      Ok(Stat::Dir(Dir(path_for_stat)))
+      Ok(Some(Stat::Dir(Dir(path_for_stat))))
     } else {
-      Err(io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!(
-          "Expected File, Dir or Link, but {:?} (relative to {:?}) was a {:?}",
-          path_for_stat, absolute_path_to_root, file_type
-        ),
-      ))
+      Ok(None)
     }
   }
 
@@ -624,18 +624,16 @@ impl PosixFS {
       SymlinkBehavior::Aware => fs::symlink_metadata(abs_path),
       SymlinkBehavior::Oblivious => fs::metadata(abs_path),
     };
-    let stat_result = metadata.and_then(|metadata| {
-      PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
-        Ok(metadata)
+    metadata
+      .and_then(|metadata| {
+        PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
+          Ok(metadata)
+        })
       })
-    });
-    match stat_result {
-      Ok(v) => Ok(Some(v)),
-      Err(err) => match err.kind() {
+      .or_else(|err| match err.kind() {
         io::ErrorKind::NotFound => Ok(None),
         _ => Err(err),
-      },
-    }
+      })
   }
 }
 
@@ -655,6 +653,59 @@ impl Vfs<io::Error> for Arc<PosixFS> {
 
   fn mk_error(msg: &str) -> io::Error {
     io::Error::new(io::ErrorKind::Other, msg)
+  }
+}
+
+#[async_trait]
+impl Vfs<String> for DigestTrie {
+  async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
+    // DigestTrie does not currently support Links.
+    Err(format!("{:?} does not exist within this Snapshot.", link))
+  }
+
+  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {
+    // TODO(#14890): Change interface to take a reference to an Entry, and to avoid absolute paths.
+    // That would avoid both the need to handle this root case, and the need to recurse in `entry`
+    // down into children.
+    let directory = if dir.0.components().next().is_none() {
+      directory::Directory::new(directory::Name::new(""), self.entries().into())
+    } else {
+      let entry = self
+        .entry(&dir.0)?
+        .ok_or_else(|| format!("{:?} does not exist within this Snapshot.", dir))?;
+      match entry {
+        directory::Entry::File(_) => {
+          return Err(format!(
+            "Path `{}` was a file rather than a directory.",
+            dir.0.display()
+          ))
+        }
+        directory::Entry::Directory(d) => d.clone(),
+      }
+    };
+
+    Ok(Arc::new(DirectoryListing(
+      directory
+        .tree()
+        .entries()
+        .iter()
+        .map(|child| match child {
+          directory::Entry::File(f) => Stat::File(File {
+            path: dir.0.join(f.name().as_ref()),
+            is_executable: f.is_executable(),
+          }),
+          directory::Entry::Directory(d) => Stat::Dir(Dir(dir.0.join(d.name().as_ref()))),
+        })
+        .collect(),
+    )))
+  }
+
+  fn is_ignored(&self, _stat: &Stat) -> bool {
+    false
+  }
+
+  fn mk_error(msg: &str) -> String {
+    msg.to_owned()
   }
 }
 
@@ -726,6 +777,28 @@ impl fmt::Debug for FileContent {
       describer,
       &self.content[..len]
     )
+  }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct FileEntry {
+  pub path: PathBuf,
+  pub digest: hashing::Digest,
+  pub is_executable: bool,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum DigestEntry {
+  File(FileEntry),
+  EmptyDirectory(PathBuf),
+}
+
+impl DigestEntry {
+  pub fn path(&self) -> &Path {
+    match self {
+      DigestEntry::File(file_entry) => &file_entry.path,
+      DigestEntry::EmptyDirectory(path) => path,
+    }
   }
 }
 

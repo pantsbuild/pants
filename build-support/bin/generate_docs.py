@@ -12,7 +12,7 @@ Live run:
     ./pants run build-support/bin/generate_docs.py -- --sync --api-key=<API_KEY>
 
 where API_KEY is your readme.io API Key, found here:
-  https://dash.readme.com/project/pants/v2.3/api-key
+  https://dash.readme.com/project/pants/v2.6/api-key
 """
 
 from __future__ import annotations
@@ -25,36 +25,50 @@ import os
 import pkgutil
 import re
 import subprocess
+import textwrap
 from html.parser import HTMLParser
 from pathlib import Path, PosixPath
-from typing import Any, Dict, Iterable, Optional, cast
+from typing import Any, Dict, Iterable, cast
 
-import pystache
+import chevron
 import requests
 from common import die
+from readme_api import DocRef, ReadmeAPI
 
+from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.help.help_info_extracter import to_help_str
+from pants.util.strutil import softwrap
 from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
+
+DOC_URL_RE = re.compile(r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)")
 
 
 def main() -> None:
     logging.basicConfig(format="[%(levelname)s]: %(message)s", level=logging.INFO)
     args = create_parser().parse_args()
+
+    if args.sync and not args.api_key:
+        raise Exception("You specified --sync so you must also specify --api-key")
+
     version = determine_pants_version(args.no_prompt)
     help_info = run_pants_help_all()
-    doc_urls = DocUrlMatcher().find_doc_urls(value_strs_iter(help_info))
+    doc_urls = find_doc_urls(value_strs_iter(help_info))
     logger.info("Found the following docsite URLs:")
     for url in sorted(doc_urls):
         logger.info(f"  {url}")
-    logger.info("Fetching titles...")
-    slug_to_title = get_titles(doc_urls)
-    logger.info("Found the following titles:")
-    for slug, title in sorted(slug_to_title.items()):
-        logger.info(f"  {slug}: {title}")
-    rewritten_help_info = rewrite_value_strs(help_info, slug_to_title)
-    generator = ReferenceGenerator(args, version, rewritten_help_info)
+
+    if not args.skip_check_urls:
+        logger.info("Fetching titles...")
+        slug_to_title = get_titles(doc_urls)
+        logger.info("Found the following titles:")
+        for slug, title in sorted(slug_to_title.items()):
+            logger.info(f"  {slug}: {title}")
+
+        help_info = rewrite_value_strs(help_info, slug_to_title)
+
+    generator = ReferenceGenerator(args, version, help_info)
     if args.sync:
         generator.sync()
     else:
@@ -72,37 +86,33 @@ def determine_pants_version(no_prompt: bool) -> str:
     )
     if key_confirmation and key_confirmation.lower() != "y":
         die(
-            "Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change "
-            "src/python/pants/VERSION."
+            softwrap(
+                """
+                Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change
+                src/python/pants/VERSION.
+                """
+            )
         )
     return version
 
 
 # Code to replace doc urls with appropriate markdown, for rendering on the docsite.
 
-_doc_url_pattern = r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)"
+
+def get_doc_slug(url: str) -> str:
+    mo = DOC_URL_RE.match(url)
+    if not mo:
+        raise ValueError(f"Not a docsite URL: {url}")
+    return cast(str, mo.group("slug"))
 
 
-class DocUrlMatcher:
-    """Utilities for regex matching docsite URLs."""
-
-    def __init__(self):
-        self._doc_url_re = re.compile(_doc_url_pattern)
-
-    def slug_for_url(self, url: str) -> str:
-        mo = self._doc_url_re.match(url)
-        if not mo:
-            raise ValueError(f"Not a docsite URL: {url}")
-        return cast(str, mo.group("slug"))
-
-    def find_doc_urls(self, strs: Iterable[str]) -> set[str]:
-        """Find all the docsite urls in the given strings."""
-        return {mo.group(0) for s in strs for mo in self._doc_url_re.finditer(s)}
+def find_doc_urls(strs: Iterable[str]) -> set[str]:
+    """Find all the docsite urls in the given strings."""
+    return {mo.group(0) for s in strs for mo in DOC_URL_RE.finditer(s)}
 
 
 class DocUrlRewriter:
     def __init__(self, slug_to_title: dict[str, str]):
-        self._doc_url_re = re.compile(_doc_url_pattern)
         self._slug_to_title = slug_to_title
 
     def _rewrite_url(self, mo: re.Match) -> str:
@@ -115,7 +125,7 @@ class DocUrlRewriter:
         return f"[{title}](doc:{slug})"
 
     def rewrite(self, s: str) -> str:
-        return self._doc_url_re.sub(self._rewrite_url, s)
+        return DOC_URL_RE.sub(self._rewrite_url, s)
 
 
 class TitleFinder(HTMLParser):
@@ -139,29 +149,38 @@ class TitleFinder(HTMLParser):
             self._title = data.strip()
 
     @property
-    def title(self) -> str | None:
-        return self._title
+    def title(self) -> str:
+        return self._title or ""
 
 
-def get_title_from_page_content(page_content: str) -> str:
-    title_finder = TitleFinder()
-    title_finder.feed(page_content)
-    return title_finder.title or ""
+def get_url(url: str):
+    response = requests.get(url)
+    if response.status_code != 200:
+        die(
+            softwrap(
+                f"""
+                Error getting URL: {url}
 
+                If the URL is pantsbuild.org, a `doc_url` link might be using the wrong slug or the
+                docs for this version might be unpublished. Otherwise, the link might be dead.
 
-def get_title(url: str) -> str:
-    return get_title_from_page_content(requests.get(url).text)
+                You can use `--skip-check-urls` to skip.
+                """
+            )
+        )
+    return response
 
 
 def get_titles(urls: set[str]) -> dict[str, str]:
     """Return map from slug->title for each given docsite URL."""
 
-    matcher = DocUrlMatcher()
     # TODO: Parallelize the http requests.
     #  E.g., by turning generate_docs.py into a plugin goal and using the engine.
     ret = {}
     for url in urls:
-        ret[matcher.slug_for_url(url)] = get_title(url)
+        title_finder = TitleFinder()
+        title_finder.feed(get_url(url).text)
+        ret[get_doc_slug(url)] = title_finder.title
     return ret
 
 
@@ -177,38 +196,82 @@ def create_parser() -> argparse.ArgumentParser:
         "--sync",
         action="store_true",
         default=False,
-        help="Whether to sync the generated reference docs to the docsite. "
-        "If unset, will generate markdown files to the path in --output "
-        "instead.  If set, --api-key must be set.",
+        help=softwrap(
+            """
+            Whether to sync the generated reference docs to the docsite.
+            If unset, will generate markdown files to the path in --output
+            instead.  If set, --api-key must be set.
+            """
+        ),
     )
     parser.add_argument(
         "--output",
         default=PosixPath(os.path.sep) / "tmp" / "pants_docs" / "help" / "option",
         type=Path,
-        help="Path to a directory under which we generate the markdown files. "
-        "Useful for viewing the files locally when testing and debugging "
-        "the renderer.",
+        help=softwrap(
+            """
+            Path to a directory under which we generate the markdown files.
+            Useful for viewing the files locally when testing and debugging
+            the renderer.
+            """
+        ),
     )
     parser.add_argument("--api-key", help="The readme.io API key to use. Required for --sync.")
+    parser.add_argument(
+        "--skip-check-urls",
+        action="store_true",
+        default=False,
+        help="Skip checking URLs (including pantsbuild.org ones).",
+    )
     return parser
 
 
-def run_pants_help_all() -> Dict:
-    deactivated_backends = ["internal_plugins.releases"]
-    activated_backends = [
-        "pants.backend.codegen.protobuf.python",
+def run_pants_help_all() -> dict[str, Any]:
+    # List all (stable enough) backends here.
+    backends = [
         "pants.backend.awslambda.python",
+        "pants.backend.codegen.protobuf.lint.buf",
+        "pants.backend.codegen.protobuf.python",
+        "pants.backend.codegen.thrift.apache.python",
+        "pants.backend.docker",
+        "pants.backend.docker.lint.hadolint",
+        "pants.backend.experimental.codegen.protobuf.go",
+        "pants.backend.experimental.codegen.protobuf.java",
+        "pants.backend.experimental.codegen.protobuf.scala",
+        "pants.backend.experimental.go",
+        "pants.backend.experimental.helm",
+        "pants.backend.experimental.java",
+        "pants.backend.experimental.java.lint.google_java_format",
+        "pants.backend.experimental.kotlin",
+        "pants.backend.experimental.kotlin.lint.ktlint",
+        "pants.backend.experimental.python",
+        "pants.backend.experimental.python.lint.autoflake",
+        "pants.backend.experimental.python.lint.pyupgrade",
+        "pants.backend.experimental.python.packaging.pyoxidizer",
+        "pants.backend.experimental.scala",
+        "pants.backend.experimental.scala.lint.scalafmt",
+        "pants.backend.experimental.terraform",
+        "pants.backend.google_cloud_function.python",
+        "pants.backend.plugin_development",
+        "pants.backend.python",
         "pants.backend.python.lint.bandit",
+        "pants.backend.python.lint.black",
+        "pants.backend.python.lint.docformatter",
+        "pants.backend.python.lint.flake8",
+        "pants.backend.python.lint.isort",
         "pants.backend.python.lint.pylint",
         "pants.backend.python.lint.yapf",
+        "pants.backend.python.mixed_interpreter_constraints",
+        "pants.backend.python.typecheck.mypy",
+        "pants.backend.shell",
+        "pants.backend.shell.lint.shellcheck",
+        "pants.backend.shell.lint.shfmt",
     ]
-    deactivated_plugins = ["toolchain.pants.plugin==0.13.1"]
     argv = [
         "./pants",
         "--concurrent",
-        f"--plugins=-[{', '.join(map(repr, deactivated_plugins))}]",
-        f"--backend-packages=-[{', '.join(map(repr, deactivated_backends))}]",
-        f"--backend-packages=+[{', '.join(map(repr, activated_backends))}]",
+        "--plugins=[]",
+        f"--backend-packages={repr(backends)}",
         "--no-verify-config",
         "--remote-auth-plugin= ",
         "help-all",
@@ -218,31 +281,37 @@ def run_pants_help_all() -> Dict:
         run.check_returncode()
     except subprocess.CalledProcessError:
         logger.error(
-            f"Running {argv} failed with exit code {run.returncode}.\n\nstdout:\n{run.stdout}"
-            f"\n\nstderr:\n{run.stderr}"
+            softwrap(
+                f"""
+                Running {argv} failed with exit code {run.returncode}.
+
+                stdout:
+                {textwrap.indent(run.stdout, " " * 4)}
+
+                stderr:
+                {textwrap.indent(run.stderr, " " * 4)}
+                """
+            )
         )
         raise
-    return cast(Dict, json.loads(run.stdout))
+    return cast("dict[str, Any]", json.loads(run.stdout))
 
 
-def value_strs_iter(help_info: dict) -> Iterable[str]:
+def value_strs_iter(help_info: dict[str, Any]) -> Iterable[str]:
     def _recurse(val: Any) -> Iterable[str]:
         if isinstance(val, str):
             yield val
         if isinstance(val, dict):
             for v in val.values():
-                for x in _recurse(v):
-                    yield x
+                yield from _recurse(v)
         if isinstance(val, list):
             for v in val:
-                for x in _recurse(v):
-                    yield x
+                yield from _recurse(v)
 
-    for x in _recurse(help_info):
-        yield x
+    yield from _recurse(help_info)
 
 
-def rewrite_value_strs(help_info: dict, slug_to_title: dict[str, str]) -> dict:
+def rewrite_value_strs(help_info: dict[str, Any], slug_to_title: dict[str, str]) -> dict[str, Any]:
     """Return a copy of the argument with rewritten docsite URLs."""
     rewriter = DocUrlRewriter(slug_to_title)
 
@@ -255,13 +324,14 @@ def rewrite_value_strs(help_info: dict, slug_to_title: dict[str, str]) -> dict:
             return [_recurse(x) for x in val]
         return val
 
-    return cast(dict, _recurse(help_info))
+    return cast("dict[str, Any]", _recurse(help_info))
 
 
 class ReferenceGenerator:
-    def __init__(self, args: argparse.Namespace, version: str, help_info: dict) -> None:
+    def __init__(self, args: argparse.Namespace, version: str, help_info: dict[str, Any]) -> None:
         self._args = args
-        self._version = version
+
+        self._readme_api = ReadmeAPI(api_key=self._args.api_key, version=version)
 
         def get_tpl(name: str) -> str:
             # Note that loading relative to __name__ may not always work when __name__=='__main__'.
@@ -273,14 +343,14 @@ class ReferenceGenerator:
         options_scope_tpl = get_tpl("options_scope_reference.md.mustache")
         single_option_tpl = get_tpl("single_option_reference.md.mustache")
         target_tpl = get_tpl("target_reference.md.mustache")
-        self._renderer = pystache.Renderer(
-            partials={
+        self._renderer_args = {
+            "partials_dict": {
                 "scoped_options": options_scope_tpl,
                 "single_option": single_option_tpl,
                 "target": target_tpl,
             }
-        )
-        self._category_id: Optional[str] = None  # Fetched lazily.
+        }
+        self._category_id: str | None = None  # Fetched lazily.
 
         # Load the data.
         self._options_info = self.process_options_input(help_info, sync=self._args.sync)
@@ -293,16 +363,19 @@ class ReferenceGenerator:
         return f"reference-{url_safe_scope}" if sync else f"{url_safe_scope}.md"
 
     @classmethod
-    def process_options_input(cls, help_info: dict, *, sync: bool) -> Dict:
+    def process_options_input(cls, help_info: dict[str, Any], *, sync: bool) -> dict:
         scope_to_help_info = help_info["scope_to_help_info"]
 
         # Process the list of consumed_scopes into a comma-separated list, and add it to the option
         # info for the goal's scope, to make it easy to render in the goal's options page.
 
         for goal, goal_info in help_info["name_to_goal_info"].items():
+            assert isinstance(goal_info, dict)
             consumed_scopes = sorted(goal_info["consumed_scopes"])
             linked_consumed_scopes = [
-                f"[{cs}]({cls._link(cs, sync=sync)})" for cs in consumed_scopes if cs
+                f"[{cs}]({cls._link(cs, sync=sync)})"
+                for cs in consumed_scopes
+                if cs and cs != goal_info["name"]
             ]
             comma_separated_consumed_scopes = ", ".join(linked_consumed_scopes)
             scope_to_help_info[goal][
@@ -320,7 +393,19 @@ class ReferenceGenerator:
             else:
                 # It should already be a string, but might as well be safe.
                 default_str = to_help_str(default_help_repr)
-            escaped_default_str = html.escape(default_str, quote=False)
+            # Some option defaults are paths under the buildroot, and we don't want the paths
+            # of the environment in which we happened to run the doc generator to leak into the
+            # published docs. So we replace with a placeholder string.
+            default_str = default_str.replace(get_buildroot(), "<buildroot>")
+            # Similarly, some option defaults are paths under the user's cache dir, so we replace
+            # with a placeholder for the same reason.  Using $XDG_CACHE_HOME as the placeholder is
+            # a useful hint to how the cache dir may be set, even though in practice the user may
+            # not have this env var set. But googling XDG_CACHE_HOME will bring up documentation
+            # of the ~/.cache fallback, so this seems like a sensible placeholder.
+            default_str = default_str.replace(get_pants_cachedir(), "$XDG_CACHE_HOME")
+            escaped_default_str = (
+                html.escape(default_str, quote=False).replace("*", "&ast;").replace("_", "&lowbar;")
+            )
             if "\n" in default_str:
                 option_data["marked_up_default"] = f"<pre>{escaped_default_str}</pre>"
             else:
@@ -337,17 +422,23 @@ class ReferenceGenerator:
         return help_info
 
     @classmethod
-    def process_targets_input(cls, help_info: Dict) -> Dict[str, Dict[str, Any]]:
+    def process_targets_input(cls, help_info: dict[str, Any]) -> dict[str, dict[str, Any]]:
         target_info = help_info["name_to_target_type_info"]
         for target in target_info.values():
             for field in target["fields"]:
                 # Combine the `default` and `required` properties.
-                default_str = html.escape(str(field["default"]))
+                default_str = (
+                    html.escape(str(field["default"]))
+                    .replace("*", "&ast;")
+                    .replace("_", "&lowbar;")
+                )
                 field["default_or_required"] = (
                     "required" if field["required"] else f"default: <code>{default_str}</code>"
                 )
                 field["description"] = str(field["description"])
-            target["fields"] = sorted(target["fields"], key=lambda fld: cast(str, fld["alias"]))
+            target["fields"] = sorted(
+                target["fields"], key=lambda fld: (-fld["required"], cast(str, fld["alias"]))
+            )
             target["description"] = str(target["description"])
 
         return cast(Dict[str, Dict[str, Any]], target_info)
@@ -356,22 +447,10 @@ class ReferenceGenerator:
     def category_id(self) -> str:
         """The id of the "Reference" category on the docsite."""
         if self._category_id is None:
-            self._category_id = self._get_id("categories/reference")
+            self._category_id = self._readme_api.get_category("reference").id
         return self._category_id
 
-    def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
-        """Sends requests to the readme.io API."""
-        url = f"https://dash.readme.io/api/v1/{url_suffix}"
-        headers = {"content-type": "application/json", "x-readme-version": f"v{self._version}"}
-        response = requests.request(
-            method, url, data=payload, headers=headers, auth=(self._args.api_key, "")
-        )
-        response.raise_for_status()
-        return cast(Dict, response.json()) if response.text else {}
-
-    def _create(
-        self, parent_doc_id: Optional[str], slug_suffix: str, title: str, body: str
-    ) -> None:
+    def _create(self, parent_doc_id: str | None, slug_suffix: str, title: str, body: str) -> None:
         """Create a new docsite reference page.
 
         Operates by creating a placeholder page, and then populating it via _update().
@@ -393,57 +472,23 @@ class ReferenceGenerator:
         one we want humans to see (this will not change the slug, see above).
         """
         slug = f"reference-{slug_suffix}"
-
-        logger.info(f"Creating {slug}")
-
-        # See https://docs.readme.com/developers/reference/docs#createdoc.
-        page = {
-            "title": slug,
-            "type": "basic",
-            "body": "",
-            "category": self.category_id,
-            "parentDoc": parent_doc_id,
-            "hidden": False,
-        }
-        payload = json.dumps(page)
-        self._access_readme_api("docs/", "POST", payload)
+        self._readme_api.create_doc(
+            title=slug, category=self.category_id, parentDoc=parent_doc_id, hidden=False
+        )
 
         # Placeholder page exists, now update it with the real title and body.
-        self._update(parent_doc_id, slug, title, body)
-
-    def _update(self, parent_doc_id, slug, title, body):
-        """Update an existing page."""
-
-        logger.info(f"Updating {slug}")
-
-        # See https://docs.readme.com/developers/reference/docs#updatedoc.
-        page = {
-            "title": title,
-            "type": "basic",
-            "body": body,
-            "category": self.category_id,
-            "parentDoc": parent_doc_id,
-            "hidden": False,
-        }
-        payload = json.dumps(page)
-        self._access_readme_api(f"docs/{slug}", "PUT", payload)
-
-    def _delete(self, slug: str) -> None:
-        """Delete an existing page."""
-
-        logger.warning(f"Deleting {slug}")
-        self._access_readme_api(f"docs/{slug}", "DELETE", "")
-
-    def _get_id(self, url) -> str:
-        """Returns the id of the entity at the specified readme.io API url."""
-        return cast(str, self._access_readme_api(url, "GET", "")["_id"])
+        self._readme_api.update_doc(slug=slug, title=title, category=self.category_id, body=body)
 
     def _render_target(self, alias: str) -> str:
-        return cast(str, self._renderer.render("{{> target}}", self._targets_info[alias]))
+        return cast(
+            str, chevron.render("{{> target}}", self._targets_info[alias], **self._renderer_args)
+        )
 
-    def _render_options_body(self, scope_help_info: Dict) -> str:
+    def _render_options_body(self, scope_help_info: dict) -> str:
         """Renders the body of a single options help page."""
-        return cast(str, self._renderer.render("{{> scoped_options}}", scope_help_info))
+        return cast(
+            str, chevron.render("{{> scoped_options}}", scope_help_info, **self._renderer_args)
+        )
 
     @classmethod
     def _render_parent_page_body(cls, items: Iterable[str], *, sync: bool) -> str:
@@ -493,27 +538,30 @@ class ReferenceGenerator:
 
         All pages live under the "reference" category.
 
-        There are three top-level pages under that category:
+        There are four top-level pages under that category:
         - Global options
         - The Goals parent page
         - The Subsystems parent page
+        - The Targets parent page
 
-        The individual pages for each goal/subsystem are nested under the two parent pages.
+        The individual reference pages are nested under these parent pages.
         """
         # Docs appear on the site in creation order.  If we only create new docs
         # that don't already exist then they will appear at the end, instead of in
         # alphabetical order. So we first delete all previous docs, then recreate them.
         #
+        # TODO: Instead of deleting and recreating, we can set the order explicitly.
+        #
         # Note that deleting a non-empty parent will fail, so we delete children first.
-        def do_delete(doc_to_delete):
-            for child in doc_to_delete.get("children", []):
+        def do_delete(docref: DocRef):
+            for child in docref.children:
                 do_delete(child)
-            self._delete(doc_to_delete["slug"])
+            self._readme_api.delete_doc(docref.slug)
 
-        docs = self._access_readme_api("categories/reference/docs", "GET", "")
+        docrefs = self._readme_api.get_docs_for_category("reference")
 
-        for doc in docs:
-            do_delete(doc)
+        for docref in docrefs:
+            do_delete(docref)
 
         # Partition the scopes into goals and subsystems.
         goals = {}
@@ -553,7 +601,7 @@ class ReferenceGenerator:
         )
 
         # Create the individual goal/subsystem/target docs.
-        all_goals_doc_id = self._get_id("docs/reference-all-goals")
+        all_goals_doc_id = self._readme_api.get_doc("reference-all-goals").id
         for scope, shi in sorted(goals.items()):
             self._create(
                 parent_doc_id=all_goals_doc_id,
@@ -562,7 +610,7 @@ class ReferenceGenerator:
                 body=self._render_options_body(shi),
             )
 
-        all_subsystems_doc_id = self._get_id("docs/reference-all-subsystems")
+        all_subsystems_doc_id = self._readme_api.get_doc("reference-all-subsystems").id
         for scope, shi in sorted(subsystems.items()):
             self._create(
                 parent_doc_id=all_subsystems_doc_id,
@@ -571,7 +619,7 @@ class ReferenceGenerator:
                 body=self._render_options_body(shi),
             )
 
-        all_targets_doc_id = self._get_id("docs/reference-all-targets")
+        all_targets_doc_id = self._readme_api.get_doc("reference-all-targets").id
         for alias, data in sorted(self._targets_info.items()):
             self._create(
                 parent_doc_id=all_targets_doc_id,

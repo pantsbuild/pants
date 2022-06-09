@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from pathlib import Path
 from textwrap import dedent
 
 from pants.fs.fs import safe_filename_from_path
@@ -11,7 +12,6 @@ from pants.testutil.pants_integration_test import (
     run_pants_with_workdir,
     setup_tmpdir,
 )
-from pants.util.contextutil import temporary_dir
 
 
 def test_invalid_options() -> None:
@@ -23,7 +23,7 @@ def test_invalid_options() -> None:
     }
     config_errors = [
         "ERROR] Invalid option 'invalid_global' under [GLOBAL]",
-        "ERROR] Invalid scope [invalid_scope]",
+        "ERROR] Invalid section [invalid_scope]",
         "ERROR] Invalid option 'bad_option' under [pytest]",
     ]
 
@@ -46,20 +46,20 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
     plugin = dedent(
         """\
         from pants.option.subsystem import Subsystem
+        from pants.option.option_types import StrOption
         from pants.engine.rules import SubsystemRule
 
         class Options(Subsystem):
             help = "Options just for a test."
             options_scope = "mock-options"
 
-            @classmethod
-            def register_options(cls, register):
-                super().register_options(register)
-                register(
-                    "--deprecated",
-                    removal_version="999.99.9.dev0",
-                    removal_hint="blah",
-                )
+            deprecated = StrOption(
+                "--deprecated",
+                default=None,
+                help="doens't matter",
+                removal_version="999.99.9.dev0",
+                removal_hint="blah",
+            )
 
         def rules():
             return [SubsystemRule(Options)]
@@ -84,7 +84,7 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
         result.assert_success()
         assert unmatched_glob_warning in result.stderr
         assert (
-            "DEPRECATED: option 'deprecated' in scope 'mock-options' will be removed in version "
+            "DEPRECATED: option 'deprecated' in scope 'mock-options' is scheduled to be removed in version "
             "999.99.9.dev0."
         ) in result.stderr
 
@@ -98,16 +98,16 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
         assert "DEPRECATED: option 'another_deprecated'" not in ignore_result.stderr
 
 
-def test_pants_symlink_workdirs() -> None:
-    with temporary_dir() as tmp_dir:
-        symlink_workdir = f"{tmp_dir}/.pants.d"
-        physical_workdir_base = f"{tmp_dir}/workdirs"
-        physical_workdir = f"{physical_workdir_base}/{safe_filename_from_path(symlink_workdir)}"
+def test_pants_symlink_workdirs(tmp_path: Path) -> None:
 
-        pants_run = run_pants_with_workdir(
-            [f"--pants-physical-workdir-base={physical_workdir_base}", "help"],
-            workdir=symlink_workdir,
-        )
-        pants_run.assert_success()
-        # Make sure symlink workdir is pointing to physical workdir
-        assert os.readlink(symlink_workdir) == physical_workdir
+    symlink_workdir = tmp_path / ".pants.d"
+    physical_workdir_base = tmp_path / "workdirs"
+    physical_workdir = physical_workdir_base / safe_filename_from_path(symlink_workdir.as_posix())
+
+    pants_run = run_pants_with_workdir(
+        [f"--pants-physical-workdir-base={physical_workdir_base.as_posix()}", "help"],
+        workdir=symlink_workdir.as_posix(),
+    )
+    pants_run.assert_success()
+    # Make sure symlink workdir is pointing to physical workdir
+    assert Path(os.readlink(symlink_workdir.as_posix())) == physical_workdir

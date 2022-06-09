@@ -11,7 +11,7 @@ import time
 import traceback
 from abc import ABCMeta
 from hashlib import sha256
-from typing import Callable, Optional, cast
+from typing import Callable, cast
 
 import psutil
 
@@ -152,7 +152,7 @@ class ProcessManager:
                 )
 
             if now > info_deadline:
-                logger.info("waiting for {}...".format(ongoing_msg))
+                logger.info(f"waiting for {ongoing_msg}...")
                 rendered_ongoing = True
                 info_deadline = info_deadline + info_interval
             elif wait_interval:
@@ -200,7 +200,7 @@ class ProcessManager:
         try:
             metadata = read_file(file_path).strip()
             return self._maybe_cast(metadata, caster)
-        except (IOError, OSError):
+        except OSError:
             return None
 
     def write_metadata_by_name(self, metadata_key, metadata_value) -> None:
@@ -236,12 +236,12 @@ class ProcessManager:
         :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
         """
         meta_dir = self._get_metadata_dir_by_name(name, self._metadata_base_dir)
-        logger.debug("purging metadata directory: {}".format(meta_dir))
+        logger.debug(f"purging metadata directory: {meta_dir}")
         try:
             rm_rf(meta_dir)
         except OSError as e:
             raise ProcessManager.MetadataError(
-                "failed to purge metadata directory {}: {!r}".format(meta_dir, e)
+                f"failed to purge metadata directory {meta_dir}: {e!r}"
             )
 
     @property
@@ -257,7 +257,7 @@ class ProcessManager:
             # N.B. This lock can't key into the actual named metadata dir (e.g. `.pids/pantsd/lock`
             # via `ProcessManager._get_metadata_dir_by_name()`) because of a need to purge
             # the named metadata dir on startup to avoid stale metadata reads.
-            os.path.join(self._metadata_base_dir, ".lock.{}".format(self._name))
+            os.path.join(self._metadata_base_dir, f".lock.{self._name}")
         )
 
     @property
@@ -328,7 +328,7 @@ class ProcessManager:
             ),
         )
 
-    def write_pid(self, pid: Optional[int] = None):
+    def write_pid(self, pid: int | None = None):
         """Write the current process's PID."""
         pid = os.getpid() if pid is None else pid
         self.write_metadata_by_name(self.PID_KEY, str(pid))
@@ -338,7 +338,7 @@ class ProcessManager:
         cmdline = proc.cmdline()
         return cast(str, cmdline[0] if cmdline else proc.name())
 
-    def write_process_name(self, process_name: Optional[str] = None):
+    def write_process_name(self, process_name: str | None = None):
         """Write the current process's name."""
         process_name = process_name or self._get_process_name()
         self.write_metadata_by_name(self.PROCESS_NAME_KEY, process_name)
@@ -419,11 +419,11 @@ class ProcessManager:
         """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
         alive = self.is_alive()
         if alive:
-            logger.debug("terminating {}".format(self._name))
+            logger.debug(f"terminating {self._name}")
             for signal_type in signal_chain:
                 pid = self.pid
                 try:
-                    logger.debug("sending signal {} to pid {}".format(signal_type, pid))
+                    logger.debug(f"sending signal {signal_type} to pid {pid}")
                     self._kill(signal_type)
                 except OSError as e:
                     logger.warning(
@@ -441,7 +441,7 @@ class ProcessManager:
                         timeout=kill_wait,
                     ):
                         alive = False
-                        logger.debug("successfully terminated pid {}".format(pid))
+                        logger.debug(f"successfully terminated pid {pid}")
                         break
                 except self.Timeout:
                     # Loop to the next kill signal on timeout.

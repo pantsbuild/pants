@@ -53,7 +53,7 @@ def confirm_eventual_success(log_dest: str) -> None:
 
 
 def test_list() -> None:
-    run(["list", "{tmpdir}/foo::"], files={"foo/BUILD": "files(sources=[])"})
+    run(["list", "{tmpdir}/foo::"], files={"foo/BUILD": "target()"})
 
 
 def test_help() -> None:
@@ -67,7 +67,7 @@ def test_ctrl_c(pantsd: bool) -> None:
         dest = os.path.join(workdir, "dest.log")
 
         # Start a pantsd run that will wait forever, then kill the pantsd client.
-        client_handle, _, _ = launch_waiter(
+        client_handle, _, _, _ = launch_waiter(
             workdir=workdir, config=workunit_logger_config(dest, pantsd=pantsd)
         )
         client_pid = client_handle.process.pid

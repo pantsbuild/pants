@@ -1,14 +1,24 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library()
+resource(name="lockfile", source="mypy.lock")
 
-python_tests(name="subsystem_test", sources=["subsystem_test.py"])
-python_tests(
-    name="rules_integration_test",
-    sources=["rules_integration_test.py"],
-    timeout=480,
-    # We want to make sure the default lockfile works for both macOS and Linux.
-    tags=["platform_specific_behavior"],
+python_sources(
+    overrides={"subsystem.py": {"dependencies": [":lockfile"]}},
 )
 
+python_tests(
+    name="tests",
+    overrides={
+        "mypyc_integration_test.py": {
+            "dependencies": ["testprojects/src/python:mypyc_fib_directory"],
+            "tags": ["platform_specific_behavior"],
+            "timeout": 220,
+        },
+        "subsystem_test.py": {"timeout": 180},
+        "rules_integration_test.py": {
+            "tags": ["platform_specific_behavior"],
+            "timeout": 480,
+        },
+    },
+)

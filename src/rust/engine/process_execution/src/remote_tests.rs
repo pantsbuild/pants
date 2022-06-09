@@ -1,31 +1,32 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::gen::google::longrunning::Operation;
 use bytes::Bytes;
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint};
 use maplit::{btreemap, hashset};
 use mock::execution_server::{ExpectedAPICall, MockOperation};
 use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::gen::google::longrunning::Operation;
 use remexec::ExecutedActionMetadata;
 use spectral::prelude::*;
 use spectral::{assert_that, string::StrAssertions};
-use store::Store;
+use store::{SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
-use workunit_store::WorkunitStore;
+use workunit_store::{RunId, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  MultiPlatformProcess, Platform, Process, ProcessCacheScope, ProcessMetadata,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, InputDigests,
+  Platform, Process, ProcessCacheScope, ProcessError, ProcessMetadata,
 };
+use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use std::any::type_name;
 use std::io::Cursor;
 use tonic::{Code, Status};
@@ -36,6 +37,7 @@ const STORE_CONCURRENCY_LIMIT: usize = 256;
 const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 const EXEC_CONCURRENCY_LIMIT: usize = 256;
 const CACHE_CONCURRENCY_LIMIT: usize = 256;
+const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct RemoteTestResult {
@@ -76,7 +78,7 @@ async fn make_execute_request() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_files: input_directory.digest(),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -86,8 +88,8 @@ async fn make_execute_request() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
     execution_slot_variable: None,
+    concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -153,7 +155,7 @@ async fn make_execute_request_with_instance_name() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_files: input_directory.digest(),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -163,8 +165,8 @@ async fn make_execute_request_with_instance_name() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
     execution_slot_variable: None,
+    concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -243,7 +245,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_files: input_directory.digest(),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -253,8 +255,8 @@ async fn make_execute_request_with_cache_key_gen_version() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
     execution_slot_variable: None,
+    concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -331,7 +333,7 @@ async fn make_execute_request_with_jdk() {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
   req.jdk_home = Some(PathBuf::from("/tmp"));
   req.description = "some description".to_owned();
-  req.input_files = input_directory.digest();
+  req.input_digests = InputDigests::with_input_files(input_directory.directory_digest());
 
   let want_command = remexec::Command {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
@@ -387,7 +389,7 @@ async fn make_execute_request_with_jdk() {
 async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let input_directory = TestDirectory::containing_roland();
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
-  req.input_files = input_directory.digest();
+  req.input_digests = InputDigests::with_input_files(input_directory.directory_digest());
   req.description = "some description".to_owned();
   req.jdk_home = Some(PathBuf::from("/tmp"));
 
@@ -480,7 +482,7 @@ async fn make_execute_request_with_timeout() {
       .into_iter()
       .collect(),
     working_directory: None,
-    input_files: input_directory.digest(),
+    input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
     // Intentionally poorly sorted:
     output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
     output_directories: relative_paths(&["directory/name"]).collect(),
@@ -490,8 +492,8 @@ async fn make_execute_request_with_timeout() {
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
     execution_slot_variable: None,
+    concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -550,6 +552,110 @@ async fn make_execute_request_with_timeout() {
 }
 
 #[tokio::test]
+async fn make_execute_request_using_immutable_inputs() {
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
+  let prefix = RelativePath::new("cats").unwrap();
+  let input_directory = TestDirectory::containing_roland();
+  store
+    .record_directory(&input_directory.directory(), false)
+    .await
+    .expect("Saving directory bytes to store");
+  let input_digests = InputDigests::new(
+    &store,
+    EMPTY_DIRECTORY_DIGEST.clone(),
+    {
+      let mut map = BTreeMap::new();
+      map.insert(prefix.clone(), input_directory.directory_digest());
+      map
+    },
+    BTreeSet::new(),
+  )
+  .await
+  .unwrap();
+
+  // The computed input root digest will be prefixed with the mount point.
+  let expected_digest = store
+    .add_prefix(input_directory.directory_digest(), &prefix)
+    .await
+    .unwrap();
+
+  let req = Process {
+    argv: owned_string_vec(&["/bin/echo", "yo"]),
+    env: vec![("SOME".to_owned(), "value".to_owned())]
+      .into_iter()
+      .collect(),
+    working_directory: None,
+    input_digests,
+    output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
+    output_directories: relative_paths(&["directory/name"]).collect(),
+    timeout: None,
+    description: "some description".to_owned(),
+    level: log::Level::Info,
+    append_only_caches: BTreeMap::new(),
+    jdk_home: None,
+    platform_constraint: None,
+    execution_slot_variable: None,
+    concurrency_available: 0,
+    cache_scope: ProcessCacheScope::Always,
+  };
+
+  let want_command = remexec::Command {
+    arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
+    environment_variables: vec![
+      remexec::command::EnvironmentVariable {
+        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        value: "none".to_owned(),
+      },
+      remexec::command::EnvironmentVariable {
+        name: "SOME".to_owned(),
+        value: "value".to_owned(),
+      },
+    ],
+    output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
+    output_directories: vec!["directory/name".to_owned()],
+    platform: Some(remexec::Platform::default()),
+    ..Default::default()
+  };
+
+  let want_action = remexec::Action {
+    command_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "c426b29478ec1ddbd872fbfad63ae9151eb9196edcd1a10aa0aab3aa1b48eef8",
+        )
+        .unwrap(),
+        123,
+      ))
+        .into(),
+    ),
+    input_root_digest: Some((&expected_digest.as_digest()).into()),
+    ..Default::default()
+  };
+
+  let want_execute_request = remexec::ExecuteRequest {
+    action_digest: Some(
+      (&Digest::new(
+        Fingerprint::from_hex_string(
+          "2ec7e0e5e552ddf715ffec03d735ae4c3d6ccd4ad9647fb7aeaa43efec3450c4",
+        )
+        .unwrap(),
+        140,
+      ))
+        .into(),
+    ),
+    ..Default::default()
+  };
+
+  assert_eq!(
+    crate::remote::make_execute_request(&req, ProcessMetadata::default()),
+    Ok((want_action, want_command, want_execute_request))
+  );
+}
+
+#[tokio::test]
 async fn successful_with_only_call_to_execute() {
   WorkunitStore::setup_for_tests();
   let execute_request = echo_foo_request();
@@ -593,7 +699,7 @@ async fn successful_with_only_call_to_execute() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -642,7 +748,7 @@ async fn successful_after_reconnect_with_wait_execution() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -701,7 +807,7 @@ async fn successful_after_reconnect_from_retryable_error() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -742,7 +848,7 @@ async fn successful_served_from_action_cache() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -780,8 +886,8 @@ async fn server_rejecting_execute_request_gives_error() {
   let error = run_command_remote(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
-  assert_that(&error).contains("InvalidArgument");
-  assert_that(&error).contains("Did not expect this request");
+  assert_that(&error.to_string()).contains("InvalidArgument");
+  assert_that(&error.to_string()).contains("Did not expect this request");
 }
 
 #[tokio::test]
@@ -892,12 +998,14 @@ async fn sends_headers() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkunitStore::new(false),
+    workunit_store: WorkunitStore::new(false, log::Level::Debug),
     build_id: String::from("marmosets"),
+    run_id: RunId(0),
   };
   command_runner
     .run(context, &mut workunit, execute_request)
@@ -957,12 +1065,13 @@ async fn extract_response_with_digest_stdout() {
   assert_eq!(result.stdout_bytes, testdata.bytes());
   assert_eq!(result.stderr_bytes, testdata_empty.bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
 
 #[tokio::test]
 async fn extract_response_with_digest_stderr() {
+  let _ = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -984,12 +1093,13 @@ async fn extract_response_with_digest_stderr() {
   assert_eq!(result.stdout_bytes, testdata_empty.bytes());
   assert_eq!(result.stderr_bytes, testdata.bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
 
 #[tokio::test]
 async fn extract_response_with_digest_stdout_osx_remote() {
+  let _ = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -1011,7 +1121,7 @@ async fn extract_response_with_digest_stdout_osx_remote() {
   assert_eq!(result.stdout_bytes, testdata.bytes());
   assert_eq!(result.stderr_bytes, testdata_empty.bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::Macos_x86_64);
 }
 
@@ -1090,6 +1200,7 @@ async fn ensure_inline_stdio_is_stored() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1110,18 +1221,14 @@ async fn ensure_inline_stdio_is_stored() {
       local_store
         .load_file_bytes_with(test_stdout.digest(), |v| Bytes::copy_from_slice(v))
         .await
-        .unwrap()
-        .unwrap()
-        .0,
+        .unwrap(),
       test_stdout.bytes()
     );
     assert_eq!(
       local_store
         .load_file_bytes_with(test_stderr.digest(), |v| Bytes::copy_from_slice(v))
         .await
-        .unwrap()
-        .unwrap()
-        .0,
+        .unwrap(),
       test_stderr.bytes()
     );
   }
@@ -1149,13 +1256,11 @@ async fn bad_result_bytes() {
             name: op_name.clone(),
             done: true,
             result: Some(
-              bazel_protos::gen::google::longrunning::operation::Result::Response(
-                prost_types::Any {
-                  type_url: "type.googleapis.com/build.bazel.remote.execution.v2.ExecuteResponse"
-                    .into(),
-                  value: vec![0x00, 0x00, 0x00],
-                },
-              ),
+              protos::gen::google::longrunning::operation::Result::Response(prost_types::Any {
+                type_url: "type.googleapis.com/build.bazel.remote.execution.v2.ExecuteResponse"
+                  .into(),
+                value: vec![0x00, 0x00, 0x00],
+              }),
             ),
             ..Default::default()
           }),
@@ -1198,15 +1303,13 @@ async fn initial_response_error() {
             Operation {
               name: op_name.to_string(),
               done: true,
-              result: Some(
-                bazel_protos::gen::google::longrunning::operation::Result::Error(
-                  bazel_protos::gen::google::rpc::Status {
-                    code: Code::Internal as i32,
-                    message: "Something went wrong".to_string(),
-                    ..Default::default()
-                  },
-                ),
-              ),
+              result: Some(protos::gen::google::longrunning::operation::Result::Error(
+                protos::gen::google::rpc::Status {
+                  code: Code::Internal as i32,
+                  message: "Something went wrong".to_string(),
+                  ..Default::default()
+                },
+              )),
               ..Default::default()
             }
           })]),
@@ -1220,7 +1323,7 @@ async fn initial_response_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(result, "Internal: Something went wrong");
+  assert_eq!(result.to_string(), "Internal: Something went wrong");
 }
 
 #[tokio::test]
@@ -1263,7 +1366,10 @@ async fn initial_response_missing_response_and_error() {
     .await
     .expect_err("Want Err");
 
-  assert_eq!(result, "Operation finished but no response supplied");
+  assert_eq!(
+    result.to_string(),
+    "Operation finished but no response supplied"
+  );
 }
 
 #[tokio::test]
@@ -1320,7 +1426,7 @@ async fn fails_after_retry_limit_exceeded() {
     .expect_err("Expected error");
 
   assert_eq!(
-    result,
+    result.to_string(),
     "Too many failures from server. The last error was: the bot running the task appears to be lost"
   );
 }
@@ -1380,7 +1486,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
     .expect_err("Expected error");
 
   assert_eq!(
-    result,
+    result.to_string(),
     "Too many failures from server. The last event was the server disconnecting with no error given."
   );
 }
@@ -1479,6 +1585,7 @@ async fn execute_missing_file_uploads_if_known() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1520,10 +1627,7 @@ async fn execute_missing_file_errors_if_unknown() {
   };
 
   let store_dir = TempDir::new().unwrap();
-  let cas = mock::StubCAS::builder()
-    .file(&TestData::roland())
-    .directory(&TestDirectory::containing_roland())
-    .build();
+  let cas = mock::StubCAS::builder().file(&TestData::roland()).build();
   let runtime = task_executor::Executor::new();
   let store = Store::local_only(runtime.clone(), store_dir)
     .unwrap()
@@ -1553,6 +1657,7 @@ async fn execute_missing_file_errors_if_unknown() {
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .unwrap();
@@ -1561,7 +1666,7 @@ async fn execute_missing_file_errors_if_unknown() {
     .run(Context::default(), &mut workunit, cat_roland_request())
     .await
     .expect_err("Want error");
-  assert_contains(&error, &format!("{}", missing_digest.hash));
+  assert_contains(&error.to_string(), &format!("{}", missing_digest.hash));
 }
 
 #[tokio::test]
@@ -1574,7 +1679,7 @@ async fn extract_execute_response_success() {
     name: "cat".to_owned(),
     done: true,
     result: Some(
-      bazel_protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+      protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
         &remexec::ExecuteResponse {
           result: Some(remexec::ActionResult {
             exit_code: wanted_exit_code,
@@ -1590,7 +1695,7 @@ async fn extract_execute_response_success() {
           }),
           ..Default::default()
         },
-        "bazel_protos::gen::",
+        "protos::gen::",
       )),
     ),
     ..Default::default()
@@ -1605,7 +1710,7 @@ async fn extract_execute_response_success() {
   assert_eq!(result.original.exit_code, wanted_exit_code);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::nested().digest()
+    TestDirectory::nested().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
@@ -1616,15 +1721,15 @@ async fn extract_execute_response_timeout() {
     name: "cat".to_owned(),
     done: true,
     result: Some(
-      bazel_protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+      protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
         &remexec::ExecuteResponse {
-          status: Some(bazel_protos::gen::google::rpc::Status {
+          status: Some(protos::gen::google::rpc::Status {
             code: Code::DeadlineExceeded as i32,
             ..Default::default()
           }),
           ..Default::default()
         },
-        "bazel_protos::gen::",
+        "protos::gen::",
       )),
     ),
     ..Default::default()
@@ -1655,7 +1760,7 @@ async fn extract_execute_response_missing_digests() {
 
   assert_eq!(
     extract_execute_response(operation, Platform::Linux_x86_64).await,
-    Err(ExecutionError::MissingDigests(missing_files))
+    Err(ExecutionError::MissingRemoteDigests(missing_files))
   );
 }
 
@@ -1663,7 +1768,7 @@ async fn extract_execute_response_missing_digests() {
 async fn extract_execute_response_missing_other_things() {
   let missing = vec![
     missing_preconditionfailure_violation(&TestData::roland().digest()),
-    bazel_protos::gen::google::rpc::precondition_failure::Violation {
+    protos::gen::google::rpc::precondition_failure::Violation {
       r#type: "MISSING".to_owned(),
       subject: "monkeys".to_owned(),
       ..Default::default()
@@ -1676,19 +1781,17 @@ async fn extract_execute_response_missing_other_things() {
     .unwrap();
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "monkeys"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
 
 #[tokio::test]
 async fn extract_execute_response_other_failed_precondition() {
-  let missing = vec![
-    bazel_protos::gen::google::rpc::precondition_failure::Violation {
-      r#type: "OUT_OF_CAPACITY".to_owned(),
-      ..Default::default()
-    },
-  ];
+  let missing = vec![protos::gen::google::rpc::precondition_failure::Violation {
+    r#type: "OUT_OF_CAPACITY".to_owned(),
+    ..Default::default()
+  }];
 
   let operation = make_precondition_failure_operation(missing)
     .op
@@ -1696,7 +1799,7 @@ async fn extract_execute_response_other_failed_precondition() {
     .unwrap();
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "OUT_OF_CAPACITY"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -1711,7 +1814,9 @@ async fn extract_execute_response_missing_without_list() {
     .unwrap();
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
+    Err(ExecutionError::Fatal(err)) => {
+      assert_contains(&err.to_string().to_lowercase(), "precondition")
+    }
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -1722,29 +1827,29 @@ async fn extract_execute_response_other_status() {
     name: "cat".to_owned(),
     done: true,
     result: Some(
-      bazel_protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+      protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
         &remexec::ExecuteResponse {
-          status: Some(bazel_protos::gen::google::rpc::Status {
+          status: Some(protos::gen::google::rpc::Status {
             code: Code::PermissionDenied as i32,
             ..Default::default()
           }),
           ..Default::default()
         },
-        "bazel_protos::gen::",
+        "protos::gen::",
       )),
     ),
     ..Default::default()
   };
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PermissionDenied"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "PermissionDenied"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let (mut workunit_store, _) = WorkunitStore::setup_for_tests();
+  let (workunit_store, _) = WorkunitStore::setup_for_tests();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -1763,23 +1868,22 @@ async fn remote_workunits_are_stored() {
     create_command_runner(action_cache.address(), &cas, Platform::Linux_x86_64);
 
   command_runner
-    .extract_execute_response(OperationOrStatus::Operation(operation))
+    .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
     .await
     .unwrap();
 
-  let got_workunit_items: HashSet<String> =
-    workunit_store.with_latest_workunits(log::Level::Trace, |_, completed| {
-      completed
-        .iter()
-        .map(|workunit| workunit.name.clone())
-        .collect()
-    });
+  let got_workunit_items: HashSet<&'static str> = workunit_store
+    .latest_workunits(log::Level::Trace)
+    .1
+    .into_iter()
+    .map(|workunit| workunit.name)
+    .collect();
 
   let wanted_workunit_items = hashset! {
-    String::from("remote execution action scheduling"),
-    String::from("remote execution worker input fetching"),
-    String::from("remote execution worker command executing"),
-    String::from("remote execution worker output uploading"),
+    "remote execution action scheduling",
+    "remote execution worker input fetching",
+    "remote execution worker command executing",
+    "remote execution worker output uploading",
   };
 
   assert!(got_workunit_items.is_superset(&wanted_workunit_items));
@@ -1787,7 +1891,7 @@ async fn remote_workunits_are_stored() {
 
 #[tokio::test]
 async fn format_error_complete() {
-  let error = bazel_protos::gen::google::rpc::Status {
+  let error = protos::gen::google::rpc::Status {
     code: Code::Cancelled as i32,
     message: "Oops, oh well!".to_string(),
     ..Default::default()
@@ -1801,7 +1905,7 @@ async fn format_error_complete() {
 
 #[tokio::test]
 async fn extract_execute_response_unknown_code() {
-  let error = bazel_protos::gen::google::rpc::Status {
+  let error = protos::gen::google::rpc::Status {
     code: 555,
     message: "Oops, oh well!".to_string(),
     ..Default::default()
@@ -1923,6 +2027,7 @@ async fn extract_output_files_from_response_two_files_nested() {
 
 #[tokio::test]
 async fn extract_output_files_from_response_just_directory() {
+  let _ = WorkunitStore::setup_for_tests();
   let test_tree: TestTree = TestDirectory::containing_roland().into();
 
   let execute_response = remexec::ExecuteResponse {
@@ -1949,6 +2054,7 @@ async fn extract_output_files_from_response_directories_and_files() {
   // /pets/cats/roland.ext
   // /pets/dogs/robin.ext
 
+  let _ = WorkunitStore::setup_for_tests();
   let execute_response = remexec::ExecuteResponse {
     result: Some(remexec::ActionResult {
       exit_code: 0,
@@ -1986,6 +2092,7 @@ async fn extract_output_files_from_response_directories_and_files() {
 
 #[tokio::test]
 async fn extract_output_files_from_response_no_prefix() {
+  let _ = WorkunitStore::setup_for_tests();
   let execute_response = remexec::ExecuteResponse {
     result: Some(remexec::ActionResult {
       exit_code: 0,
@@ -2004,11 +2111,11 @@ async fn extract_output_files_from_response_no_prefix() {
   )
 }
 
-pub fn echo_foo_request() -> MultiPlatformProcess {
+pub fn echo_foo_request() -> Process {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]));
   req.timeout = Some(Duration::from_millis(5000));
   req.description = "echo a foo".to_string();
-  req.into()
+  req
 }
 
 pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
@@ -2021,7 +2128,7 @@ pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
 }
 
 pub(crate) fn make_retryable_operation_failure() -> MockOperation {
-  let status = bazel_protos::gen::google::rpc::Status {
+  let status = protos::gen::google::rpc::Status {
     code: Code::Aborted as i32,
     message: String::from("the bot running the task appears to be lost"),
     ..Default::default()
@@ -2030,12 +2137,12 @@ pub(crate) fn make_retryable_operation_failure() -> MockOperation {
   let operation = Operation {
     done: true,
     result: Some(
-      bazel_protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+      protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
         &remexec::ExecuteResponse {
           status: Some(status),
           ..Default::default()
         },
-        "bazel_protos::gen::",
+        "protos::gen::",
       )),
     ),
     ..Default::default()
@@ -2088,16 +2195,16 @@ fn make_successful_operation_with_maybe_metadata(
     name: operation_name.to_string(),
     done: true,
     result: Some(
-      bazel_protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+      protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
         &remexec::ExecuteResponse {
-          status: Some(bazel_protos::gen::google::rpc::Status {
+          status: Some(protos::gen::google::rpc::Status {
             code: Code::Ok as i32,
             ..Default::default()
           }),
           result: Some(make_action_result(stdout, stderr, exit_code, metadata)),
           ..Default::default()
         },
-        "bazel_protos::gen::",
+        "protos::gen::",
       )),
     ),
     ..Default::default()
@@ -2151,18 +2258,18 @@ fn timestamp_only_secs(v: i64) -> prost_types::Timestamp {
 }
 
 pub(crate) fn make_precondition_failure_operation(
-  violations: Vec<bazel_protos::gen::google::rpc::precondition_failure::Violation>,
+  violations: Vec<protos::gen::google::rpc::precondition_failure::Violation>,
 ) -> MockOperation {
   let operation = Operation {
     name: "cat".to_owned(),
     done: true,
     result: Some(
-      bazel_protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
+      protos::gen::google::longrunning::operation::Result::Response(make_any_proto(
         &remexec::ExecuteResponse {
           status: Some(make_precondition_failure_status(violations)),
           ..Default::default()
         },
-        "bazel_protos::gen::",
+        "protos::gen::",
       )),
     ),
     ..Default::default()
@@ -2171,37 +2278,33 @@ pub(crate) fn make_precondition_failure_operation(
 }
 
 fn make_precondition_failure_status(
-  violations: Vec<bazel_protos::gen::google::rpc::precondition_failure::Violation>,
-) -> bazel_protos::gen::google::rpc::Status {
-  bazel_protos::gen::google::rpc::Status {
+  violations: Vec<protos::gen::google::rpc::precondition_failure::Violation>,
+) -> protos::gen::google::rpc::Status {
+  protos::gen::google::rpc::Status {
     code: Code::FailedPrecondition as i32,
     details: vec![make_any_proto(
-      &bazel_protos::gen::google::rpc::PreconditionFailure { violations },
-      "bazel_protos::gen::",
+      &protos::gen::google::rpc::PreconditionFailure { violations },
+      "protos::gen::",
     )],
     ..Default::default()
   }
 }
 
 pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
-  request: MultiPlatformProcess,
+  request: Process,
   command_runner: R,
   store: Store,
-) -> Result<RemoteTestResult, String> {
+) -> Result<RemoteTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let original = command_runner
     .run(Context::default(), &mut workunit, request)
     .await?;
-  let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
-    .await?
-    .unwrap()
-    .0;
-  let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
-    .await?
-    .unwrap()
-    .0;
+  let stdout_bytes = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
+    .await?;
+  let stderr_bytes = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
+    .await?;
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2229,6 +2332,7 @@ fn create_command_runner(
     RETRY_INTERVAL,
     EXEC_CONCURRENCY_LIMIT,
     CACHE_CONCURRENCY_LIMIT,
+    CACHE_READ_TIMEOUT,
     None,
   )
   .expect("Failed to make command runner");
@@ -2237,8 +2341,8 @@ fn create_command_runner(
 
 async fn run_command_remote(
   address: String,
-  request: MultiPlatformProcess,
-) -> Result<RemoteTestResult, String> {
+  request: Process,
+) -> Result<RemoteTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
@@ -2250,16 +2354,12 @@ async fn run_command_remote(
     .run(Context::default(), &mut workunit, request)
     .await?;
 
-  let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
-    .await?
-    .unwrap()
-    .0;
-  let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
-    .await?
-    .unwrap()
-    .0;
+  let stdout_bytes = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
+    .await?;
+  let stderr_bytes = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
+    .await?;
   Ok(RemoteTestResult {
     original,
     stdout_bytes,
@@ -2303,22 +2403,18 @@ async fn extract_execute_response(
     create_command_runner(action_cache.address(), &cas, remote_platform);
 
   let original = command_runner
-    .extract_execute_response(OperationOrStatus::Operation(operation))
+    .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
     .await?;
 
   let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   Ok(RemoteTestResult {
     original,
@@ -2329,7 +2425,7 @@ async fn extract_execute_response(
 
 async fn extract_output_files_from_response(
   execute_response: &remexec::ExecuteResponse,
-) -> Result<Digest, String> {
+) -> Result<Digest, StoreError> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
@@ -2343,7 +2439,8 @@ async fn extract_output_files_from_response(
     .result
     .as_ref()
     .ok_or_else(|| "No ActionResult found".to_string())?;
-  crate::remote::extract_output_files(store, action_result, false).await
+  let directory_digest = crate::remote::extract_output_files(store, action_result, false).await?;
+  Ok(directory_digest.as_digest())
 }
 
 pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
@@ -2361,9 +2458,9 @@ pub(crate) fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_typ
 
 pub(crate) fn missing_preconditionfailure_violation(
   digest: &Digest,
-) -> bazel_protos::gen::google::rpc::precondition_failure::Violation {
+) -> protos::gen::google::rpc::precondition_failure::Violation {
   {
-    bazel_protos::gen::google::rpc::precondition_failure::Violation {
+    protos::gen::google::rpc::precondition_failure::Violation {
       r#type: "MISSING".to_owned(),
       subject: format!("blobs/{}/{}", digest.hash, digest.size_bytes),
       ..Default::default()
@@ -2381,20 +2478,21 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
   )
 }
 
-pub(crate) fn cat_roland_request() -> MultiPlatformProcess {
+pub(crate) fn cat_roland_request() -> Process {
   let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
-  process.input_files = TestDirectory::containing_roland().digest();
+  process.input_digests =
+    InputDigests::with_input_files(TestDirectory::containing_roland().directory_digest());
   process.timeout = one_second();
   process.description = "cat a roland".to_string();
-  process.into()
+  process
 }
 
-pub(crate) fn echo_roland_request() -> MultiPlatformProcess {
+pub(crate) fn echo_roland_request() -> Process {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "meoooow"]));
   req.timeout = one_second();
   req.description = "unleash a roaring meow".to_string();
-  req.into()
+  req
 }
 
 pub(crate) fn assert_cancellation_requests(

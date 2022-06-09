@@ -1,21 +1,26 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 
 import pytest
 
+from pants.backend.project_info.filter_targets import FilterSubsystem, TargetGranularity
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
-    AddressSpecsFilter,
     DifferingFamiliesError,
     DuplicateNameError,
+    SpecsFilter,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.target import RegisteredTargetTypes, Tags, Target
+from pants.testutil.option_util import create_goal_subsystem
 from pants.util.frozendict import FrozenDict
 
 
@@ -127,24 +132,45 @@ def test_address_family_duplicate_names() -> None:
         )
 
 
-def test_address_specs_filter() -> None:
-    def make_target(target_name: str, **kwargs) -> TargetAdaptor:
-        parsed_address = Address("", target_name=target_name)
-        return TargetAdaptor(
-            type_alias="", name=parsed_address.target_name, address=parsed_address, **kwargs
-        )
+def test_specs_filter() -> None:
+    class MockTgt1(Target):
+        alias = "tgt1"
+        core_fields = (Tags,)
 
-    untagged_target = make_target(target_name="untagged")
-    b_tagged_target = make_target(target_name="b-tagged", tags=["b"])
-    a_and_b_tagged_target = make_target(target_name="a-and-b-tagged", tags=["a", "b"])
-    none_tagged_target = make_target(target_name="none-tagged-target", tags=None)
+    class MockTgt2(Target):
+        alias = "tgt2"
+        core_fields = (Tags,)
 
-    specs_filter = AddressSpecsFilter(tags=["-a", "+b"])
+    specs_filter = SpecsFilter.create(
+        create_goal_subsystem(
+            FilterSubsystem,
+            target_type=["tgt1"],
+            tag_regex=[],
+            address_regex=[],
+            granularity=TargetGranularity.all_targets,
+        ),
+        RegisteredTargetTypes({"tgt1": MockTgt1, "tgt2": MockTgt2}),
+        tags=["-a", "+b"],
+        exclude_target_regexps=["skip-me"],
+    )
 
-    def matches(tgt: TargetAdaptor) -> bool:
-        return specs_filter.matches(tgt.kwargs["address"], tgt)
+    def make_tgt1(name: str, tags: list[str] | None = None) -> MockTgt1:
+        return MockTgt1({Tags.alias: tags}, Address("", target_name=name))
 
-    assert matches(untagged_target) is False
-    assert matches(b_tagged_target) is True
-    assert matches(a_and_b_tagged_target) is False
-    assert matches(none_tagged_target) is False
+    def make_tgt2(name: str, tags: list[str] | None = None) -> MockTgt2:
+        return MockTgt2({Tags.alias: tags}, Address("", target_name=name))
+
+    untagged_tgt = make_tgt1(name="untagged")
+    b_tagged_tgt = make_tgt1(name="b-tagged", tags=["b"])
+    b_tagged_exclude_regex_tgt = make_tgt1(name="skip-me", tags=["b"])
+    a_and_b_tagged_tgt = make_tgt1(name="a-and-b-tagged", tags=["a", "b"])
+
+    # Even though this has the tag `b`, it should be excluded because the target type.
+    tgt2 = make_tgt2("tgt2", tags=["b"])
+
+    def matches(tgt: Target) -> bool:
+        return specs_filter.matches(tgt)
+
+    assert matches(b_tagged_tgt) is True
+    for t in (untagged_tgt, b_tagged_exclude_regex_tgt, a_and_b_tagged_tgt, tgt2):
+        assert matches(t) is False

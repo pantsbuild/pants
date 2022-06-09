@@ -1,6 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import os
 from pathlib import PurePath
 
 from pants.backend.codegen.protobuf.protoc import Protoc
@@ -10,10 +10,10 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     PythonProtobufMypyPlugin,
     PythonProtobufSubsystem,
 )
-from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggle, ProtobufSources
-from pants.backend.python.target_types import PythonSources
+from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexRequest
+from pants.backend.python.util_rules.pex import PexResolveInfo, VenvPex, VenvPexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
@@ -33,7 +33,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
-    Sources,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -43,8 +42,8 @@ from pants.util.logging import LogLevel
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
-    input = ProtobufSources
-    output = PythonSources
+    input = ProtobufSourceField
+    output = PythonSourceField
 
 
 @rule(desc="Generate Python from Protobuf", level=LogLevel.DEBUG)
@@ -75,12 +74,13 @@ async def generate_python_from_protobuf(
     all_stripped_sources_request = Get(
         StrippedSourceFiles,
         SourceFilesRequest(
-            (tgt.get(Sources) for tgt in transitive_targets.closure),
-            for_sources_types=(ProtobufSources,),
+            tgt[ProtobufSourceField]
+            for tgt in transitive_targets.closure
+            if tgt.has_field(ProtobufSourceField)
         ),
     )
     target_stripped_sources_request = Get(
-        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSources]])
+        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSourceField]])
     )
 
     (
@@ -98,20 +98,15 @@ async def generate_python_from_protobuf(
     protoc_gen_mypy_script = "protoc-gen-mypy"
     protoc_gen_mypy_grpc_script = "protoc-gen-mypy_grpc"
     mypy_pex = None
-    mypy_request = PexRequest(
-        output_filename="mypy_protobuf.pex",
-        internal_only=True,
-        requirements=python_protobuf_mypy_plugin.pex_requirements(),
-        interpreter_constraints=python_protobuf_mypy_plugin.interpreter_constraints,
-    )
 
     if python_protobuf_subsystem.mypy_plugin:
+        mypy_request = python_protobuf_mypy_plugin.to_pex_request()
         mypy_pex = await Get(
             VenvPex,
             VenvPexRequest(bin_names=[protoc_gen_mypy_script], pex_request=mypy_request),
         )
 
-        if request.protocol_target.get(ProtobufGrpcToggle).value:
+        if request.protocol_target.get(ProtobufGrpcToggleField).value:
             mypy_info = await Get(PexResolveInfo, VenvPex, mypy_pex)
 
             # In order to generate stubs for gRPC code, we need mypy-protobuf 2.0 or above.
@@ -134,13 +129,13 @@ async def generate_python_from_protobuf(
             ExternalToolRequest,
             grpc_python_plugin.get_request(Platform.current),
         )
-        if request.protocol_target.get(ProtobufGrpcToggle).value
+        if request.protocol_target.get(ProtobufGrpcToggleField).value
         else None
     )
 
+    protoc_relpath = "__protoc"
     unmerged_digests = [
         all_sources_stripped.snapshot.digest,
-        downloaded_protoc_binary.digest,
         empty_output_dir,
     ]
     if mypy_pex:
@@ -149,7 +144,7 @@ async def generate_python_from_protobuf(
         unmerged_digests.append(downloaded_grpc_plugin.digest)
     input_digest = await Get(Digest, MergeDigests(unmerged_digests))
 
-    argv = [downloaded_protoc_binary.exe, "--python_out", output_dir]
+    argv = [os.path.join(protoc_relpath, downloaded_protoc_binary.exe), "--python_out", output_dir]
     if mypy_pex:
         argv.extend(
             [
@@ -178,6 +173,9 @@ async def generate_python_from_protobuf(
         Process(
             argv,
             input_digest=input_digest,
+            immutable_input_digests={
+                protoc_relpath: downloaded_protoc_binary.digest,
+            },
             description=f"Generating Python sources from {request.protocol_target.address}.",
             level=LogLevel.DEBUG,
             output_directories=(output_dir,),
@@ -194,7 +192,7 @@ async def generate_python_from_protobuf(
         # Verify that the python source root specified by the target is in fact a source root.
         source_root_request = SourceRootRequest(PurePath(py_source_root))
     else:
-        # The target didn't specify a python source root, so use the protobuf_library's source root.
+        # The target didn't specify a python source root, so use the protobuf_source's source root.
         source_root_request = SourceRootRequest.for_target(request.protocol_target)
 
     normalized_digest, source_root = await MultiGet(

@@ -203,7 +203,7 @@ async fn files_are_correctly_executable() {
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
   let treat_bytes = TestData::catnip();
-  let directory = TestDirectory::with_mixed_executable_files();
+  let directory = TestDirectory::with_maybe_executable_files(true);
 
   store
     .store_file_bytes(treat_bytes.bytes(), false)

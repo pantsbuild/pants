@@ -6,6 +6,7 @@ import re
 import textwrap
 
 from pants.testutil.pants_integration_test import run_pants
+from pants.util.docutil import doc_url
 
 
 def test_help() -> None:
@@ -53,12 +54,13 @@ def test_help_specific_target() -> None:
     assert (
         textwrap.dedent(
             """
-            archive
-            -------
+            `archive` target
+            ----------------
 
             A ZIP or TAR file containing loose files and code packages.
 
 
+            Activated by pants.core
             Valid fields:
             """
         )
@@ -71,6 +73,7 @@ def test_help_specific_target() -> None:
             format
                 type: 'tar' | 'tar.bz2' | 'tar.gz' | 'tar.xz' | 'zip'
                 required
+
                 The type of archive file to be generated.
             """
         )
@@ -83,14 +86,14 @@ def test_help_goals() -> None:
     pants_run.assert_success()
     assert "to get help for a specific goal" in pants_run.stdout
     # Spot check a few core goals.
-    for goal in ["filedeps", "list", "roots", "validate"]:
+    for goal in ["filedeps", "list", "roots"]:
         assert goal in pants_run.stdout
 
 
 def test_help_goals_only_show_implemented() -> None:
     # Some core goals, such as `./pants test`, require downstream implementations to work
     # properly. We should only show those goals when an implementation is provided.
-    goals_that_need_implementation = ["binary", "fmt", "lint", "run", "test"]
+    goals_that_need_implementation = ["fmt", "test"]
     command = ["--pants-config-files=[]", "help", "goals"]
 
     not_implemented_run = run_pants(["--backend-packages=[]", *command])
@@ -152,3 +155,60 @@ def test_global_flag_in_scoped_position() -> None:
     pants_run.assert_failure()
     assert "Unknown flag --pants-distdir on test scope" in pants_run.stdout
     assert "Did you mean to use the global --pants-distdir?" in pants_run.stdout
+
+
+def test_help_provided_target_plugin_field() -> None:
+    pants_run = run_pants(
+        [
+            "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python']",
+            "help",
+            "python_distribution",
+        ]
+    )
+    pants_run.assert_success()
+
+    assert (
+        textwrap.dedent(
+            f"""
+            `python_distribution` target
+            ----------------------------
+
+            A publishable Python setuptools distribution (e.g. an sdist or wheel).
+
+            See {doc_url("python-distributions")}.
+
+
+            Activated by pants.backend.python
+            Valid fields:
+            """
+        )
+        in pants_run.stdout
+    )
+
+    assert (
+        textwrap.dedent(
+            """
+            skip_twine
+                from: pants.backend.experimental.python
+                type: bool
+                default: False
+
+                If true, don't publish this target's packages using Twine.
+
+            tags
+                type: Iterable[str] | None
+                default: None
+
+                Arbitrary strings to describe a target.
+            """
+        )
+        in pants_run.stdout
+    )
+
+
+def test_help_ignore_specs() -> None:
+    pants_run = run_pants(
+        ["test", "src/python/pants/bsp/protocol_test.py", "--help"],
+    )
+    pants_run.assert_success()
+    assert "`test` goal options" in pants_run.stdout

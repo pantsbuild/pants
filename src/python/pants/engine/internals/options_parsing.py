@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.session import SessionValues
 from pants.engine.rules import collect_rules, rule
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, NamedCachesDirOption, ProcessCleanupOption
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import Scope, ScopedOptions
@@ -50,8 +50,17 @@ def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
 
 @rule
 def log_level(global_options: GlobalOptions) -> LogLevel:
-    log_level: LogLevel = global_options.options.level
-    return log_level
+    return global_options.level
+
+
+@rule
+def extract_process_cleanup_option(global_options: GlobalOptions) -> ProcessCleanupOption:
+    return ProcessCleanupOption(global_options.process_cleanup)
+
+
+@rule
+def extract_named_caches_dir_option(global_options: GlobalOptions) -> NamedCachesDirOption:
+    return NamedCachesDirOption(global_options.named_caches_dir)
 
 
 def rules():

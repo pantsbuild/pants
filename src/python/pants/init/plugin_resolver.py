@@ -1,18 +1,21 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import site
 import sys
 from dataclasses import dataclass
-from typing import Optional, TypeVar, cast
+from typing import Optional, cast
 
-from pkg_resources import WorkingSet
+from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, PexRequirements, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.session import SessionValues
@@ -21,20 +24,19 @@ from pants.engine.rules import Get, QueryRule, collect_rules, rule
 from pants.init.bootstrap_scheduler import BootstrapScheduler
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
-
-
-S = TypeVar("S", bound=Subsystem)
 
 
 @dataclass(frozen=True)
 class PluginsRequest:
     # Interpreter constraints to resolve for, or None to resolve for the interpreter that Pants is
     # running under.
-    interpreter_constraints: Optional[InterpreterConstraints] = None
+    interpreter_constraints: InterpreterConstraints | None
+    # Requirement constraints to resolve with. If plugins will be loaded into the global working_set
+    # (i.e., onto the `sys.path`), then these should be the current contents of the working_set.
+    constraints: tuple[Requirement, ...]
 
 
 class ResolvedPluginDistributions(DeduplicatedCollection[str]):
@@ -51,7 +53,10 @@ async def resolve_plugins(
     `named_caches` directory), but consequently needs to disable the process cache: see the
     ProcessCacheScope reference in the body.
     """
-    requirements = PexRequirements(sorted(global_options.options.plugins))
+    requirements = PexRequirements(
+        req_strings=sorted(global_options.plugins),
+        constraints_strings=(str(constraint) for constraint in request.constraints),
+    )
     if not requirements:
         return ResolvedPluginDistributions()
 
@@ -72,9 +77,6 @@ async def resolve_plugins(
             python=python,
             requirements=requirements,
             interpreter_constraints=request.interpreter_constraints,
-            # The repository's constraints are not relevant here, because this resolve is mixed
-            # into the Pants' process' path, and never into user code.
-            apply_requirement_constraints=False,
             description=f"Resolving plugins: {', '.join(requirements.req_strings)}",
         ),
     )
@@ -83,7 +85,7 @@ async def resolve_plugins(
     # paths in a way that invalidates the Process-cache. See the method doc.
     cache_scope = (
         ProcessCacheScope.PER_SESSION
-        if global_options.options.plugins_force_resolve
+        if global_options.plugins_force_resolve
         else ProcessCacheScope.PER_RESTART_SUCCESSFUL
     )
 
@@ -101,37 +103,45 @@ async def resolve_plugins(
 
 
 class PluginResolver:
+    """Encapsulates the state of plugin loading for the given WorkingSet.
+
+    Plugin loading is inherently stateful, and so this class captures the state of the WorkingSet at
+    creation time, even though it will be mutated by each call to `PluginResolver.resolve`. This
+    makes the inputs to each `resolve(..)` call idempotent, even if the output is not.
+    """
+
     def __init__(
         self,
         scheduler: BootstrapScheduler,
         interpreter_constraints: Optional[InterpreterConstraints] = None,
+        working_set: Optional[WorkingSet] = None,
     ) -> None:
         self._scheduler = scheduler
-        self._request = PluginsRequest(interpreter_constraints)
+        self._working_set = working_set or global_working_set
+        self._request = PluginsRequest(
+            interpreter_constraints, tuple(dist.as_requirement() for dist in self._working_set)
+        )
 
     def resolve(
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironment,
-        working_set: Optional[WorkingSet] = None,
     ) -> WorkingSet:
-        """Resolves any configured plugins and adds them to the global working set.
-
-        :param working_set: The working set to add the resolved plugins to instead of the global
-                            working set (for testing).
-        """
-        working_set = working_set or global_working_set
-        for resolved_plugin_location in self._resolve_plugins(options_bootstrapper, env):
+        """Resolves any configured plugins and adds them to the working_set."""
+        for resolved_plugin_location in self._resolve_plugins(
+            options_bootstrapper, env, self._request
+        ):
             site.addsitedir(
                 resolved_plugin_location
             )  # Activate any .pth files plugin wheels may have.
-            working_set.add_entry(resolved_plugin_location)
-        return working_set
+            self._working_set.add_entry(resolved_plugin_location)
+        return self._working_set
 
     def _resolve_plugins(
         self,
         options_bootstrapper: OptionsBootstrapper,
         env: CompleteEnvironment,
+        request: PluginsRequest,
     ) -> ResolvedPluginDistributions:
         session = self._scheduler.scheduler.new_session(
             "plugin_resolver",
@@ -144,7 +154,7 @@ class PluginResolver:
         )
         return cast(
             ResolvedPluginDistributions,
-            session.product_request(ResolvedPluginDistributions, [self._request])[0],
+            session.product_request(ResolvedPluginDistributions, [request])[0],
         )
 
 

@@ -25,7 +25,7 @@ class Collection(Tuple[T, ...]):
     N.B: Collection instances are only considered equal if both their types and contents are equal.
     """
 
-    @overload  # noqa: F811
+    @overload  # type: ignore[override]  # noqa: F811
     def __getitem__(self, index: int) -> T:
         ...
 

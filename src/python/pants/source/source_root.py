@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, Iterable, Optional, Set, Tuple
+from typing import Iterable
 
 from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
@@ -16,6 +16,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -35,7 +36,7 @@ class SourceRoot:
 
 @dataclass(frozen=True)
 class OptionalSourceRoot:
-    source_root: Optional[SourceRoot]
+    source_root: SourceRoot | None
 
 
 class SourceRootError(Exception):
@@ -66,7 +67,7 @@ _repo_root = PurePath(os.path.sep)
 
 @dataclass(frozen=True)
 class SourceRootPatternMatcher:
-    root_patterns: Tuple[str, ...]
+    root_patterns: tuple[str, ...]
 
     def __post_init__(self) -> None:
         for root_pattern in self.root_patterns:
@@ -75,7 +76,7 @@ class SourceRootPatternMatcher:
                     f"`..` disallowed in source root pattern: {root_pattern}. "
                 )
 
-    def get_patterns(self) -> Tuple[str, ...]:
+    def get_patterns(self) -> tuple[str, ...]:
         return tuple(self.root_patterns)
 
     def matches_root_patterns(self, relpath: PurePath) -> bool:
@@ -93,42 +94,45 @@ class SourceRootConfig(Subsystem):
     options_scope = "source"
     help = "Configuration for roots of source trees."
 
-    DEFAULT_ROOT_PATTERNS = ["/", "src", "src/python", "src/py"]
+    DEFAULT_ROOT_PATTERNS = [
+        "/",
+        "src",
+        "src/python",
+        "src/py",
+        "src/thrift",
+        "src/protobuf",
+        "src/protos",
+        "src/scala",
+        "src/java",
+    ]
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--root-patterns",
-            metavar='["pattern1", "pattern2", ...]',
-            type=list,
-            default=cls.DEFAULT_ROOT_PATTERNS,
-            advanced=True,
-            help="A list of source root suffixes. A directory with this suffix will be considered "
-            "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
-            "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
-            "buildroot. E.g., `/src/python` will match `<buildroot>/src/python` but not "
-            "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
-            "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
-            "Use `/` to signify that the buildroot itself is a source root. "
-            f"See {doc_url('source-roots')}.",
-        )
-        register(
-            "--marker-filenames",
-            metavar="filename",
-            type=list,
-            member_type=str,
-            default=None,
-            advanced=True,
-            help="The presence of a file of this name in a directory indicates that the directory "
-            "is a source root. The content of the file doesn't matter, and may be empty. "
-            "Useful when you can't or don't wish to centrally enumerate source roots via "
-            "`root_patterns`.",
-        )
+    root_patterns = StrListOption(
+        "--root-patterns",
+        default=DEFAULT_ROOT_PATTERNS,
+        help="A list of source root suffixes. A directory with this suffix will be considered "
+        "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
+        "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
+        "buildroot. E.g., `/src/python` will match `<buildroot>/src/python` but not "
+        "`<buildroot>/project1/src/python`. A `*` wildcard will match a single path segment, "
+        "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
+        "Use `/` to signify that the buildroot itself is a source root. "
+        f"See {doc_url('source-roots')}.",
+        advanced=True,
+        metavar='["pattern1", "pattern2", ...]',
+    )
+    marker_filenames = StrListOption(
+        "--marker-filenames",
+        help="The presence of a file of this name in a directory indicates that the directory "
+        "is a source root. The content of the file doesn't matter, and may be empty. "
+        "Useful when you can't or don't wish to centrally enumerate source roots via "
+        "`root_patterns`.",
+        advanced=True,
+        metavar="filename",
+    )
 
     @memoized_method
     def get_pattern_matcher(self) -> SourceRootPatternMatcher:
-        return SourceRootPatternMatcher(self.options.root_patterns)
+        return SourceRootPatternMatcher(self.root_patterns)
 
 
 @frozen_after_init
@@ -136,8 +140,8 @@ class SourceRootConfig(Subsystem):
 class SourceRootsRequest:
     """Find the source roots for the given files and/or dirs."""
 
-    files: Tuple[PurePath, ...]
-    dirs: Tuple[PurePath, ...]
+    files: tuple[PurePath, ...]
+    dirs: tuple[PurePath, ...]
 
     def __init__(self, files: Iterable[PurePath], dirs: Iterable[PurePath]) -> None:
         self.files = tuple(sorted(files))
@@ -211,18 +215,18 @@ async def get_optional_source_roots(
     # A file cannot be a source root, so request for its parent.
     # In the typical case, where we have multiple files with the same parent, this can
     # dramatically cut down on the number of engine requests.
-    dirs: Set[PurePath] = set(source_roots_request.dirs)
-    file_to_dir: Dict[PurePath, PurePath] = {
+    dirs: set[PurePath] = set(source_roots_request.dirs)
+    file_to_dir: dict[PurePath, PurePath] = {
         file: file.parent for file in source_roots_request.files
     }
     dirs.update(file_to_dir.values())
 
-    dir_to_root: Dict[PurePath, OptionalSourceRoot] = {}
+    dir_to_root: dict[PurePath, OptionalSourceRoot] = {}
     for d in dirs:
         root = await Get(OptionalSourceRoot, SourceRootRequest(d))
         dir_to_root[d] = root
 
-    path_to_optional_root: Dict[PurePath, OptionalSourceRoot] = {}
+    path_to_optional_root: dict[PurePath, OptionalSourceRoot] = {}
     for d in source_roots_request.dirs:
         path_to_optional_root[d] = dir_to_root[d]
     for f, d in file_to_dir.items():
@@ -262,7 +266,7 @@ async def get_optional_source_root(
         return OptionalSourceRoot(SourceRoot(str(path)))
 
     # B) Does it contain a marker file?
-    marker_filenames = source_root_config.options.marker_filenames
+    marker_filenames = source_root_config.marker_filenames
     if marker_filenames:
         for marker_filename in marker_filenames:
             if (
@@ -307,7 +311,7 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     source_root_pattern_matcher = source_root_config.get_pattern_matcher()
 
     # Create globs corresponding to all source root patterns.
-    pattern_matches: Set[str] = set()
+    pattern_matches: set[str] = set()
     for path in source_root_pattern_matcher.get_patterns():
         if path == "/":
             pattern_matches.add("**")
@@ -317,8 +321,8 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
             pattern_matches.add(f"**/{path}/")
 
     # Create globs for any marker files.
-    marker_file_matches: Set[str] = set()
-    for marker_filename in source_root_config.options.marker_filenames:
+    marker_file_matches: set[str] = set()
+    for marker_filename in source_root_config.marker_filenames:
         marker_file_matches.add(f"**/{marker_filename}")
 
     # Match the patterns against actual files, to find the roots that actually exist.

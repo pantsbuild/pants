@@ -1,14 +1,10 @@
-use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
-use std::ffi::OsString;
-use std::path::Component;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use bazel_protos::gen::build::bazel::remote::execution::v2 as remexec;
-use bazel_protos::require_digest;
-use fs::RelativePath;
+use fs::{directory, DigestTrie, RelativePath};
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use grpc_util::retry::status_is_retryable;
@@ -17,18 +13,28 @@ use grpc_util::{
 };
 use hashing::Digest;
 use parking_lot::Mutex;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
 use remexec::action_cache_client::ActionCacheClient;
-use remexec::{ActionResult, Command, FileNode, Tree};
-use store::Store;
+use remexec::{ActionResult, Command, Tree};
+use store::{Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
 
 use crate::remote::make_execute_request;
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
-  ProcessCacheScope, ProcessMetadata, RemoteCacheWarningsBehavior,
+  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
+  ProcessMetadata,
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum RemoteCacheWarningsBehavior {
+  Ignore,
+  FirstOnly,
+  Backoff,
+}
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
 /// of the Remote Execution API.
@@ -45,7 +51,6 @@ pub struct CommandRunner {
   executor: task_executor::Executor,
   store: Store,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
-  headers: BTreeMap<String, String>,
   platform: Platform,
   cache_read: bool,
   cache_write: bool,
@@ -53,6 +58,7 @@ pub struct CommandRunner {
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
+  read_timeout: Duration,
 }
 
 impl CommandRunner {
@@ -70,6 +76,7 @@ impl CommandRunner {
     warnings_behavior: RemoteCacheWarningsBehavior,
     eager_fetch: bool,
     concurrency_limit: usize,
+    read_timeout: Duration,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
       Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
@@ -96,7 +103,6 @@ impl CommandRunner {
       executor,
       store,
       action_cache_client,
-      headers,
       platform,
       cache_read,
       cache_write,
@@ -104,6 +110,7 @@ impl CommandRunner {
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
+      read_timeout,
     })
   }
 
@@ -115,151 +122,55 @@ impl CommandRunner {
   /// Note that the Tree does not include the directory_path as a prefix, per REAPI. This path
   /// gets stored on the OutputDirectory proto.
   ///
-  /// If the output directory does not exist, then returns Ok(None).
-  pub(crate) async fn make_tree_for_output_directory(
-    root_directory_digest: Digest,
+  /// Returns the created Tree and any File Digests referenced within it. If the output directory
+  /// does not exist, then returns Ok(None).
+  pub(crate) fn make_tree_for_output_directory(
+    root_trie: &DigestTrie,
     directory_path: RelativePath,
-    store: &Store,
-  ) -> Result<Option<Tree>, String> {
-    // Traverse down from the root directory digest to find the directory digest for
-    // the output directory.
-    let mut current_directory_digest = root_directory_digest;
-    for next_path_component in directory_path.as_ref().components() {
-      let next_name = match next_path_component {
-        Component::Normal(name) => name
-          .to_str()
-          .ok_or_else(|| format!("unable to convert '{:?}' to string", name))?,
-        _ => return Ok(None),
-      };
-
-      // Load the Directory proto corresponding to `current_directory_digest`.
-      let current_directory = match store.load_directory(current_directory_digest).await? {
-        Some((dir, _)) => dir,
-        None => {
-          return Err(format!(
-            "Directory digest {:?} was referenced in output, but was not found in store.",
-            current_directory_digest
-          ))
-        }
-      };
-
-      // Scan the current directory for the current path component.
-      let dir_node = match current_directory
-        .directories
-        .iter()
-        .find(|dn| dn.name == next_name)
-      {
-        Some(dn) => dn,
-        None => return Ok(None),
-      };
-
-      // Set the current directory digest to be the digest in the DirectoryNode just found.
-      // If there are more path components, then the search will continue there.
-      // Otherwise, if this loop ends then the final Directory digest has been found.
-      current_directory_digest = require_digest(dir_node.digest.as_ref())?;
-    }
-
-    // At this point, `current_directory_digest` holds the digest of the output directory.
-    // This will be the root of the Tree. Add it to a queue of digests to traverse.
-    let mut tree = Tree::default();
-
-    let mut digest_queue = VecDeque::new();
-    digest_queue.push_back(current_directory_digest);
-
-    while let Some(directory_digest) = digest_queue.pop_front() {
-      let directory = match store.load_directory(directory_digest).await? {
-        Some((dir, _)) => dir,
-        None => {
-          return Err(format!(
-            "illegal state: directory for digest {:?} did not exist locally",
-            &current_directory_digest
-          ))
-        }
-      };
-
-      // Add all of the digests for subdirectories into the queue so they are processed
-      // in future iterations of the loop.
-      for subdirectory_node in &directory.directories {
-        let subdirectory_digest = require_digest(subdirectory_node.digest.as_ref())?;
-        digest_queue.push_back(subdirectory_digest);
-      }
-
-      // Store this directory either as the `root` or one of the `children` if not the root.
-      if directory_digest == current_directory_digest {
-        tree.root = Some(directory);
-      } else {
-        tree.children.push(directory)
-      }
-    }
-
-    Ok(Some(tree))
-  }
-
-  pub(crate) async fn extract_output_file(
-    root_directory_digest: Digest,
-    file_path: RelativePath,
-    store: &Store,
-  ) -> Result<Option<FileNode>, String> {
-    // Traverse down from the root directory digest to find the directory digest for
-    // the output directory.
-    let mut current_directory_digest = root_directory_digest;
-    let parent_path = file_path.as_ref().parent();
-    let components_opt = parent_path.map(|x| x.components());
-    if let Some(components) = components_opt {
-      for next_path_component in components {
-        let next_name = match next_path_component {
-          Component::Normal(name) => name
-            .to_str()
-            .ok_or_else(|| format!("unable to convert '{:?}' to string", name))?,
-          _ => return Ok(None),
-        };
-
-        // Load the Directory proto corresponding to `current_directory_digest`.
-        let current_directory = match store.load_directory(current_directory_digest).await? {
-          Some((dir, _)) => dir,
-          None => {
-            return Err(format!(
-              "Directory digest {:?} was referenced in output, but was not found in store.",
-              current_directory_digest
-            ))
-          }
-        };
-
-        // Scan the current directory for the current path component.
-        let dir_node = match current_directory
-          .directories
-          .iter()
-          .find(|dn| dn.name == next_name)
-        {
-          Some(dn) => dn,
-          None => return Ok(None),
-        };
-
-        // Set the current directory digest to be the digest in the DirectoryNode just found.
-        // If there are more path components, then the search will continue there.
-        // Otherwise, if this loop ends then the final Directory digest has been found.
-        current_directory_digest = require_digest(dir_node.digest.as_ref())?;
-      }
-    }
-
-    // Load the final directory.
-    let directory = match store.load_directory(current_directory_digest).await? {
-      Some((dir, _)) => dir,
+  ) -> Result<Option<(Tree, Vec<Digest>)>, String> {
+    let sub_trie = match root_trie.entry(&directory_path)? {
+      Some(directory::Entry::Directory(d)) => d.tree(),
       None => return Ok(None),
+      Some(directory::Entry::File(_)) => {
+        return Err(format!(
+          "Declared output directory path {directory_path:?} in output \
+           digest {trie_digest:?} contained a file instead.",
+          trie_digest = root_trie.compute_root_digest(),
+        ))
+      }
     };
 
-    // Search for the file.
-    let file_base_name = file_path.as_ref().file_name().unwrap();
-    Ok(
-      directory
-        .files
-        .iter()
-        .find(|node| {
-          let name = OsString::from(&node.name);
-          name == file_base_name
-        })
-        .cloned(),
-    )
+    let tree = sub_trie.into();
+    let mut file_digests = Vec::new();
+    sub_trie.walk(&mut |_, entry| match entry {
+      directory::Entry::File(f) => file_digests.push(f.digest()),
+      directory::Entry::Directory(_) => {}
+    });
+
+    Ok(Some((tree, file_digests)))
+  }
+
+  pub(crate) fn extract_output_file(
+    root_trie: &DigestTrie,
+    file_path: &str,
+  ) -> Result<Option<remexec::OutputFile>, String> {
+    match root_trie.entry(&RelativePath::new(file_path)?)? {
+      Some(directory::Entry::File(f)) => {
+        let output_file = remexec::OutputFile {
+          digest: Some(f.digest().into()),
+          path: file_path.to_owned(),
+          is_executable: f.is_executable(),
+          ..remexec::OutputFile::default()
+        };
+        Ok(Some(output_file))
+      }
+      None => Ok(None),
+      Some(directory::Entry::Directory(_)) => Err(format!(
+        "Declared output file path {file_path:?} in output \
+           digest {trie_digest:?} contained a directory instead.",
+        trie_digest = root_trie.compute_root_digest(),
+      )),
+    }
   }
 
   /// Converts a REAPI `Command` and a `FallibleProcessResultWithPlatform` produced from executing
@@ -273,7 +184,11 @@ impl CommandRunner {
     command: &Command,
     result: &FallibleProcessResultWithPlatform,
     store: &Store,
-  ) -> Result<(ActionResult, Vec<Digest>), String> {
+  ) -> Result<(ActionResult, Vec<Digest>), StoreError> {
+    let output_trie = store
+      .load_digest_trie(result.output_directory.clone())
+      .await?;
+
     // Keep track of digests that need to be uploaded.
     let mut digests = HashSet::new();
 
@@ -289,19 +204,17 @@ impl CommandRunner {
     digests.insert(result.stderr_digest);
 
     for output_directory in &command.output_directories {
-      let tree = match Self::make_tree_for_output_directory(
-        result.output_directory,
+      let (tree, file_digests) = match Self::make_tree_for_output_directory(
+        &output_trie,
         RelativePath::new(output_directory).unwrap(),
-        store,
-      )
-      .await?
-      {
-        Some(t) => t,
+      )? {
+        Some(res) => res,
         None => continue,
       };
 
       let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
       digests.insert(tree_digest);
+      digests.extend(file_digests);
 
       action_result
         .output_directories
@@ -311,29 +224,14 @@ impl CommandRunner {
         });
     }
 
-    for output_file in &command.output_files {
-      let file_node = match Self::extract_output_file(
-        result.output_directory,
-        RelativePath::new(output_file).unwrap(),
-        store,
-      )
-      .await?
-      {
-        Some(node) => node,
+    for output_file_path in &command.output_files {
+      let output_file = match Self::extract_output_file(&output_trie, output_file_path)? {
+        Some(output_file) => output_file,
         None => continue,
       };
 
-      let digest = require_digest(file_node.digest.as_ref())?;
-      digests.insert(digest);
-
-      action_result.output_files.push({
-        remexec::OutputFile {
-          digest: Some(digest.into()),
-          path: output_file.to_owned(),
-          is_executable: file_node.is_executable,
-          ..remexec::OutputFile::default()
-        }
-      })
+      digests.insert(require_digest(output_file.digest.as_ref())?);
+      action_result.output_files.push(output_file);
     }
 
     Ok((action_result, digests.into_iter().collect::<Vec<_>>()))
@@ -349,22 +247,25 @@ impl CommandRunner {
     &self,
     context: Context,
     cache_lookup_start: Instant,
-    command: &Command,
     action_digest: Digest,
     request: &Process,
-    mut local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, String>>,
-  ) -> Result<(FallibleProcessResultWithPlatform, bool), String> {
+    mut local_execution_future: BoxFuture<
+      '_,
+      Result<FallibleProcessResultWithPlatform, ProcessError>,
+    >,
+  ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
     // A future to read from the cache and log the results accordingly.
     let cache_read_future = async {
       let response = crate::remote::check_action_cache(
         action_digest,
-        command,
+        &request.description,
         &self.metadata,
         self.platform,
         &context,
         self.action_cache_client.clone(),
         self.store.clone(),
         self.eager_fetch,
+        self.read_timeout,
       )
       .await;
       match response {
@@ -377,7 +278,7 @@ impl CommandRunner {
           cached_response_opt
         }
         Err(err) => {
-          self.log_cache_error(err, CacheErrorType::ReadError);
+          self.log_cache_error(err.to_string(), CacheErrorType::ReadError);
           None
         }
       }
@@ -385,15 +286,9 @@ impl CommandRunner {
     .boxed();
 
     // We speculate between reading from the remote cache vs. running locally.
-    let context2 = context.clone();
     in_workunit!(
-      context.workunit_store.clone(),
-      "remote_cache_read_speculation".to_owned(),
-      WorkunitMetadata {
-        level: Level::Trace,
-        desc: Some(format!("Remote cache lookup: {}", request.description)),
-        ..WorkunitMetadata::default()
-      },
+      "remote_cache_read_speculation",
+      Level::Trace,
       |workunit| async move {
         tokio::select! {
           cache_result = cache_read_future => {
@@ -403,20 +298,19 @@ impl CommandRunner {
               if let Some(time_saved) = cached_response.metadata.time_saved_from_cache(lookup_elapsed) {
                 let time_saved = time_saved.as_millis() as u64;
                 workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
-                context2
-                  .workunit_store
-                  .record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
+                workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
               }
               // When we successfully use the cache, we change the description and increase the level
               // (but not so much that it will be logged by default).
-              workunit.update_metadata(|initial| WorkunitMetadata {
-                desc: initial
-                  .desc
-                  .as_ref()
-                  .map(|desc| format!("Hit: {}", desc)),
-                level: Level::Debug,
-                ..initial
-
+              workunit.update_metadata(|initial| {
+                initial.map(|(initial, _)|
+                (WorkunitMetadata {
+                  desc: initial
+                    .desc
+                    .as_ref()
+                    .map(|desc| format!("Hit: {}", desc)),
+                  ..initial
+                }, Level::Debug))
               });
               Ok((cached_response, true))
             } else {
@@ -438,23 +332,15 @@ impl CommandRunner {
   /// Stores an execution result into the remote Action Cache.
   async fn update_action_cache(
     &self,
-    context: &Context,
     result: &FallibleProcessResultWithPlatform,
     metadata: &ProcessMetadata,
     command: &Command,
     action_digest: Digest,
     command_digest: Digest,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     // Upload the Action and Command, but not the input files. See #12432.
     // Assumption: The Action and Command have already been stored locally.
-    crate::remote::ensure_action_uploaded(
-      context,
-      &self.store,
-      command_digest,
-      action_digest,
-      None,
-    )
-    .await?;
+    crate::remote::ensure_action_uploaded(&self.store, command_digest, action_digest, None).await?;
 
     // Create an ActionResult from the process result.
     let (action_result, digests_for_action_result) = self
@@ -539,19 +425,13 @@ impl crate::CommandRunner for CommandRunner {
     &self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    req: MultiPlatformProcess,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    request: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let request = self
-      .extract_compatible_request(&req)
-      .ok_or_else(|| "No compatible Process found for checking remote cache.".to_owned())?;
     let (action, command, _execute_request) =
       make_execute_request(&request, self.metadata.clone())?;
-    let write_failures_to_cache = req
-      .0
-      .values()
-      .any(|process| process.cache_scope == ProcessCacheScope::Always);
+    let write_failures_to_cache = request.cache_scope == ProcessCacheScope::Always;
 
     // Ensure the action and command are stored locally.
     let (command_digest, action_digest) =
@@ -562,52 +442,31 @@ impl crate::CommandRunner for CommandRunner {
         .speculate_read_action_cache(
           context.clone(),
           cache_lookup_start,
-          &command,
           action_digest,
-          &request,
-          self.underlying.run(context.clone(), workunit, req),
+          &request.clone(),
+          self.underlying.run(context.clone(), workunit, request),
         )
         .await?
     } else {
       (
-        self.underlying.run(context.clone(), workunit, req).await?,
+        self
+          .underlying
+          .run(context.clone(), workunit, request)
+          .await?,
         false,
       )
     };
 
     if !hit_cache && (result.exit_code == 0 || write_failures_to_cache) && self.cache_write {
-      // NB: We use a distinct workunit for the start of the cache write so that we guarantee the
-      // counter is recorded, given that the cache write is async and may still be executing after
-      // the Pants session has finished and workunits are no longer processed.
-      //
-      // TODO(#11688): remove this workunit once we have tailing tasks.
-      in_workunit!(
-        context.workunit_store.clone(),
-        "remote_cache_write_setup".to_owned(),
-        WorkunitMetadata {
-          level: Level::Trace,
-          ..WorkunitMetadata::default()
-        },
-        |workunit| async move {
-          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
-        }
-      )
-      .await;
       let command_runner = self.clone();
       let result = result.clone();
-      let context2 = context.clone();
-      // NB: We use `TaskExecutor::spawn` instead of `tokio::spawn` to ensure logging still works.
       let _write_join = self.executor.spawn(in_workunit!(
-        context.workunit_store,
-        "remote_cache_write".to_owned(),
-        WorkunitMetadata {
-          level: Level::Trace,
-          ..WorkunitMetadata::default()
-        },
+        "remote_cache_write",
+        Level::Trace,
         |workunit| async move {
+          workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
           let write_result = command_runner
             .update_action_cache(
-              &context2,
               &result,
               &command_runner.metadata,
               &command,
@@ -618,7 +477,7 @@ impl crate::CommandRunner for CommandRunner {
           match write_result {
             Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
             Err(err) => {
-              command_runner.log_cache_error(err, CacheErrorType::WriteError);
+              command_runner.log_cache_error(err.to_string(), CacheErrorType::WriteError);
               workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
             }
           };
@@ -629,9 +488,5 @@ impl crate::CommandRunner for CommandRunner {
     }
 
     Ok(result)
-  }
-
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    self.underlying.extract_compatible_request(req)
   }
 }

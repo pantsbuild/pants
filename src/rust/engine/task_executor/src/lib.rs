@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -42,7 +40,7 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct Executor {
-  runtime: Option<Arc<Runtime>>,
+  _runtime: Option<Arc<Runtime>>,
   handle: Handle,
 }
 
@@ -58,7 +56,7 @@ impl Executor {
   ///
   pub fn new() -> Executor {
     Executor {
-      runtime: None,
+      _runtime: None,
       handle: Handle::current(),
     }
   }
@@ -75,7 +73,7 @@ impl Executor {
     let global = GLOBAL_EXECUTOR.load();
     if let Some(ref runtime) = *global {
       return Ok(Executor {
-        runtime: Some(runtime.clone()),
+        _runtime: Some(runtime.clone()),
         handle: runtime.handle().clone(),
       });
     }

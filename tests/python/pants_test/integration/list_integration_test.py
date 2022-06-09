@@ -21,7 +21,7 @@ def test_list_none() -> None:
 def test_list_invalid_dir() -> None:
     pants_run = run_pants(["list", "abcde::"])
     pants_run.assert_failure()
-    assert "ResolveError" in pants_run.stderr
+    assert "Unmatched glob from CLI arguments:" in pants_run.stderr
 
 
 def test_list_testproject() -> None:
@@ -35,9 +35,19 @@ def test_list_testproject() -> None:
     pants_run.assert_success()
     assert pants_run.stdout.strip() == "\n".join(
         [
-            "testprojects/src/python/hello",
-            "testprojects/src/python/hello/greet",
-            "testprojects/src/python/hello/main",
+            "testprojects/src/python/hello:hello",
+            "testprojects/src/python/hello:hello-dist",
+            "testprojects/src/python/hello:resource",
+            "testprojects/src/python/hello/__init__.py",
+            "testprojects/src/python/hello/dist_resource.txt:resource",
+            "testprojects/src/python/hello/greet:greet",
+            "testprojects/src/python/hello/greet:greeting",
+            "testprojects/src/python/hello/greet/__init__.py",
+            "testprojects/src/python/hello/greet/greet.py",
+            "testprojects/src/python/hello/greet/greeting.txt:greeting",
+            "testprojects/src/python/hello/main:main",
             "testprojects/src/python/hello/main:lib",
+            "testprojects/src/python/hello/main/__init__.py:lib",
+            "testprojects/src/python/hello/main/main.py:lib",
         ]
     )

@@ -3,10 +3,9 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 
-from pants.engine.fs import Digest, DigestContents, DigestSubset, FileDigest, PathGlobs
+from pants.engine.fs import Digest, DigestEntries, DigestSubset, FileDigest, FileEntry, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 
 
@@ -18,23 +17,24 @@ class ExtractFileDigest:
 
 @rule
 async def digest_to_file_digest(request: ExtractFileDigest) -> FileDigest:
-    """TODO(#11806): This is just a workaround; this extraction should be provided directly by the engine."""
-
     digest = await Get(Digest, DigestSubset(request.digest, PathGlobs([request.file_path])))
-    digest_contents = await Get(DigestContents, Digest, digest)
-    if len(digest_contents) == 0:
+    digest_entries = await Get(DigestEntries, Digest, digest)
+
+    if len(digest_entries) == 0:
         raise Exception(f"ExtractFileDigest: '{request.file_path}' not found in {request.digest}.")
-    elif len(digest_contents) > 1:
+    elif len(digest_entries) > 1:
         raise Exception(
             f"ExtractFileDigest: Unexpected error: '{request.file_path}' found multiple times in {request.digest}"
         )
 
-    file_content = digest_contents[0]
-    hasher = hashlib.sha256()
-    hasher.update(file_content.content)
-    return FileDigest(
-        fingerprint=hasher.hexdigest(), serialized_bytes_length=len(file_content.content)
-    )
+    file_info = digest_entries[0]
+
+    if not isinstance(file_info, FileEntry):
+        raise AssertionError(
+            f"Unexpected error: '{request.file_path}' refers to a directory, not a file."
+        )
+
+    return file_info.file_digest
 
 
 def rules():

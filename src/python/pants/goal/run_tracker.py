@@ -16,8 +16,8 @@ from typing import Any
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, ExitCode
-from pants.engine.internals import native_engine, native_engine_pyo3
-from pants.option.config import Config
+from pants.engine.internals import native_engine
+from pants.option.errors import ConfigValidationError
 from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
@@ -47,6 +47,7 @@ class RunTracker:
     #  we want to do at the moment, so we maintain this manual list for now.
     STANDARD_GOALS = frozenset(
         (
+            "check",
             "count-loc",
             "dependees",
             "dependencies",
@@ -102,6 +103,14 @@ class RunTracker:
     def goals(self) -> list[str]:
         return self._all_options.goals if self._all_options else []
 
+    @property
+    def active_standard_backends(self) -> list[str]:
+        return [
+            backend
+            for backend in self._all_options.for_global_scope().backend_packages
+            if backend.startswith("pants.backend.")
+        ]
+
     def start(self, run_start_time: float, specs: list[str]) -> None:
         """Start tracking this pants run."""
         if self._has_started:
@@ -154,6 +163,7 @@ class RunTracker:
             "standard_goals": [goal for goal in self.goals if goal in self.STANDARD_GOALS],
             # Lets us know of any custom goals were used, without knowing their names.
             "num_goals": str(len(self.goals)),
+            "active_standard_backends": sorted(self.active_standard_backends),
         }
 
     def set_pantsd_scheduler_metrics(self, metrics: dict[str, int]) -> None:
@@ -221,7 +231,7 @@ class RunTracker:
                 return value
             else:
                 return value[option]
-        except (Config.ConfigValidationError, AttributeError) as e:
+        except (ConfigValidationError, AttributeError) as e:
             option_str = "" if option is None else f" option {option}"
             raise ValueError(
                 f"Couldn't find option scope {scope}{option_str} for recording ({e!r})"
@@ -235,7 +245,7 @@ class RunTracker:
 
         output = []
         try:
-            with open(self.run_logs_file, "r") as f:
+            with open(self.run_logs_file) as f:
                 output = f.readlines()
         except OSError as e:
             logger.warning("Error retrieving per-run logs from RunTracker.", exc_info=e)
@@ -244,4 +254,4 @@ class RunTracker:
 
     @property
     def counter_names(self) -> tuple[str, ...]:
-        return tuple(native_engine_pyo3.all_counter_names())
+        return tuple(native_engine.all_counter_names())

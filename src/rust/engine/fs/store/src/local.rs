@@ -5,9 +5,9 @@ use std::fmt::Debug;
 use std::io::{self, Read};
 use std::path::Path;
 use std::sync::Arc;
-use std::time::{self, Duration};
+use std::time::{self, Duration, Instant};
 
-use bytes::{Buf, Bytes};
+use bytes::Bytes;
 use futures::future;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
@@ -198,7 +198,9 @@ impl ByteStore {
       let mut cursor = txn
         .open_ro_cursor(*database)
         .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
-      for (key, bytes) in cursor.iter() {
+      for key_res in cursor.iter() {
+        let (key, bytes) =
+          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {}", err))?;
         *used_bytes += bytes.len();
 
         // Random access into the lease_database is slower than iterating, but hopefully garbage
@@ -246,19 +248,76 @@ impl ByteStore {
     dbs?.remove(digest.hash).await
   }
 
+  ///
+  /// Store the given data in a single pass, optionally using the given Digest. Prefer `Self::store`
+  /// for values which should not be pulled into memory, and `Self::store_bytes_batch` when storing
+  /// multiple values at a time.
+  ///
   pub async fn store_bytes(
     &self,
     entry_type: EntryType,
+    digest: Option<Digest>,
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Digest, String> {
-    self
-      .store(entry_type, initial_lease, true, move || {
-        Ok(bytes.clone().reader())
-      })
-      .await
+    let dbs = match entry_type {
+      EntryType::Directory => self.inner.directory_dbs.clone(),
+      EntryType::File => self.inner.file_dbs.clone(),
+    };
+    let len = bytes.len();
+    let fingerprint = dbs?
+      .store_bytes(digest.map(|d| d.hash), bytes, initial_lease)
+      .await?;
+
+    Ok(Digest::new(fingerprint, len))
   }
 
+  ///
+  /// Store the given items in a single pass, optionally using the given Digests. Prefer `Self::store`
+  /// for values which should not be pulled into memory.
+  ///
+  /// See also: `Self::store_bytes`.
+  ///
+  pub async fn store_bytes_batch(
+    &self,
+    entry_type: EntryType,
+    items: Vec<(Option<Digest>, Bytes)>,
+    initial_lease: bool,
+  ) -> Result<Vec<Digest>, String> {
+    let dbs = match entry_type {
+      EntryType::Directory => self.inner.directory_dbs.clone(),
+      EntryType::File => self.inner.file_dbs.clone(),
+    };
+    // NB: False positive: we do actually need to create the Vec here, since `items` will move
+    // before we use `lens`.
+    #[allow(clippy::needless_collect)]
+    let lens = items
+      .iter()
+      .map(|(_, bytes)| bytes.len())
+      .collect::<Vec<_>>();
+    let fingerprints = dbs?
+      .store_bytes_batch(
+        items
+          .into_iter()
+          .map(|(d, bytes)| (d.map(|d| d.hash), bytes))
+          .collect(),
+        initial_lease,
+      )
+      .await?;
+
+    Ok(
+      fingerprints
+        .into_iter()
+        .zip(lens.into_iter())
+        .map(|(f, len)| Digest::new(f, len))
+        .collect(),
+    )
+  }
+
+  ///
+  /// Store data in two passes, without buffering it entirely into memory. Prefer
+  /// `Self::store_bytes` for small values which fit comfortably in memory.
+  ///
   pub async fn store<F, R>(
     &self,
     entry_type: EntryType,
@@ -290,24 +349,18 @@ impl ByteStore {
     digest: Digest,
     mut f: F,
   ) -> Result<Option<T>, String> {
+    let start = Instant::now();
     if digest == EMPTY_DIGEST {
       // Avoid I/O for this case. This allows some client-provided operations (like merging
       // snapshots) to work without needing to first store the empty snapshot.
       return Ok(Some(f(&[])));
     }
 
-    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-      workunit_store_handle.store.record_observation(
-        ObservationMetric::LocalStoreReadBlobSize,
-        digest.size_bytes as u64,
-      );
-    }
-
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     }?;
-    dbs
+    let res = dbs
       .load_bytes_with(digest.hash, move |bytes| {
         if bytes.len() == digest.size_bytes {
           Ok(f(bytes))
@@ -322,7 +375,20 @@ impl ByteStore {
           ))
         }
       })
-      .await
+      .await;
+
+    if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+      workunit_store_handle.store.record_observation(
+        ObservationMetric::LocalStoreReadBlobSize,
+        digest.size_bytes as u64,
+      );
+      workunit_store_handle.store.record_observation(
+        ObservationMetric::LocalStoreReadBlobTimeMicros,
+        start.elapsed().as_micros() as u64,
+      );
+    }
+
+    res
   }
 
   pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
@@ -338,7 +404,9 @@ impl ByteStore {
       let mut cursor = txn
         .open_ro_cursor(*database)
         .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
-      for (key, bytes) in cursor.iter() {
+      for key_res in cursor.iter() {
+        let (key, bytes) =
+          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {}", err))?;
         let v = VersionedFingerprint::from_bytes_unsafe(key);
         let fingerprint = v.get_fingerprint();
         digests.push(Digest::new(fingerprint, bytes.len()));

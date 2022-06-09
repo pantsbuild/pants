@@ -90,7 +90,7 @@ def test_deprecated_module(caplog) -> None:
     assert not caplog.records
     deprecated_module(FUTURE_VERSION, hint="Do not use me.")
     assert len(caplog.records) == 1
-    assert "module will be removed" in caplog.text
+    assert "module is scheduled to be removed" in caplog.text
     assert "Do not use me" in caplog.text
 
 
@@ -179,7 +179,29 @@ def test_deprecation_start_period(caplog) -> None:
         start_version=_FAKE_CUR_VERSION,
     )
     assert len(caplog.records) == 1
-    assert "DEPRECATED: demo will be removed in version 999.999.999.dev999." in caplog.text
+    assert (
+        "DEPRECATED: demo is scheduled to be removed in version 999.999.999.dev999." in caplog.text
+    )
+
+
+@unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
+def test_deprecation_memoization(caplog) -> None:
+    caplog.clear()
+    for i in range(3):
+        warn_or_error(
+            removal_version="999.999.999.dev999",
+            entity="memo",
+            hint=None,
+            start_version=_FAKE_CUR_VERSION,
+        )
+    assert len(caplog.records) == 1
+    warn_or_error(
+        removal_version="999.999.999.dev999",
+        entity="another",
+        hint=None,
+        start_version=_FAKE_CUR_VERSION,
+    )
+    assert len(caplog.records) == 2
 
 
 def test_resolve_conflicting_options() -> None:

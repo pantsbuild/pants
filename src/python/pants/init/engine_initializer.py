@@ -6,28 +6,29 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, List, Optional, Tuple, Type, cast
+from typing import Any, ClassVar, Iterable, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
+from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules import system_binaries
 from pants.engine import desktop, environment, fs, platform, process
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals import build_files, graph, options_parsing
+from pants.engine.internals import build_files, graph, options_parsing, specs_rules
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.engine.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.engine.target import RegisteredTargetTypes
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.init import specs_calculator
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
@@ -38,8 +39,10 @@ from pants.option.global_options import (
 )
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
+from pants.vcs.git import rules as git_rules
 
 logger = logging.getLogger(__name__)
 
@@ -55,13 +58,17 @@ class GraphScheduler:
         self,
         build_id,
         dynamic_ui: bool = False,
+        ui_use_prodash: bool = False,
         use_colors=True,
-        session_values: Optional[SessionValues] = None,
-        cancellation_latch: Optional[PySessionCancellationLatch] = None,
+        max_workunit_level: LogLevel = LogLevel.DEBUG,
+        session_values: SessionValues | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
     ) -> GraphSession:
         session = self.scheduler.new_session(
             build_id,
             dynamic_ui,
+            ui_use_prodash,
+            max_workunit_level=max_workunit_level,
             session_values=session_values,
             cancellation_latch=cancellation_latch,
         )
@@ -78,9 +85,9 @@ class GraphSession:
     goal_map: Any
 
     # NB: Keep this in sync with the method `run_goal_rules`.
-    goal_param_types: ClassVar[Tuple[Type, ...]] = (Specs, Console, InteractiveRunner, Workspace)
+    goal_param_types: ClassVar[tuple[type, ...]] = (Specs, Console, Workspace)
 
-    def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
+    def goal_consumed_subsystem_scopes(self, goal_name: str) -> tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
         goal_product = self.goal_map.get(goal_name)
         if not goal_product:
@@ -105,7 +112,7 @@ class GraphSession:
         goals: Iterable[str],
         specs: Specs,
         poll: bool = False,
-        poll_delay: Optional[float] = None,
+        poll_delay: float | None = None,
     ) -> int:
         """Runs @goal_rules sequentially and interactively by requesting their implicit Goal
         products.
@@ -116,20 +123,16 @@ class GraphSession:
         """
 
         workspace = Workspace(self.scheduler_session)
-        interactive_runner = InteractiveRunner(self.scheduler_session)
 
         for goal in goals:
             goal_product = self.goal_map[goal]
             # NB: We no-op for goals that have no implementation because no relevant backends are
             # registered. We might want to reconsider the behavior to instead warn or error when
             # trying to run something like `./pants run` without any backends registered.
-            is_implemented = union_membership.has_members_for_all(
-                goal_product.subsystem_cls.required_union_implementations
-            )
-            if not is_implemented:
+            if not goal_product.subsystem_cls.activated(union_membership):
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
-            params = Params(specs, self.console, workspace, interactive_runner)
+            params = Params(specs, self.console, workspace)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
                 exit_code = self.scheduler_session.run_goal_rule(
@@ -157,13 +160,16 @@ class EngineInitializer:
             output_type = getattr(r, "output_type", None)
             if not output_type or not issubclass(output_type, Goal):
                 continue
+
             goal = r.output_type.name
-            if goal in goal_map:
-                raise EngineInitializer.GoalMappingError(
-                    f"could not map goal `{goal}` to rule `{r}`: already claimed by product "
-                    f"`{goal_map[goal]}`"
-                )
-            goal_map[goal] = r.output_type
+            deprecated_goal = r.output_type.subsystem_cls.deprecated_options_scope
+            for goal_name in [goal, deprecated_goal] if deprecated_goal else [goal]:
+                if goal_name in goal_map:
+                    raise EngineInitializer.GoalMappingError(
+                        f"could not map goal `{goal_name}` to rule `{r}`: already claimed by product "
+                        f"`{goal_map[goal_name]}`"
+                    )
+                goal_map[goal_name] = r.output_type
         return goal_map
 
     @staticmethod
@@ -177,7 +183,6 @@ class EngineInitializer:
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
         execution_options = ExecutionOptions.from_options(bootstrap_options, dynamic_remote_options)
         local_store_options = LocalStoreOptions.from_options(bootstrap_options)
-        engine_visualize_to = GlobalOptions.compute_engine_visualize_to(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
             build_configuration,
             execution_options,
@@ -190,7 +195,7 @@ class EngineInitializer:
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
             include_trace_on_error=bootstrap_options.print_stacktrace,
-            engine_visualize_to=engine_visualize_to,
+            engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
         )
 
@@ -200,21 +205,21 @@ class EngineInitializer:
         execution_options: ExecutionOptions,
         *,
         executor: PyExecutor,
-        pants_ignore_patterns: List[str],
+        pants_ignore_patterns: list[str],
         use_gitignore: bool,
         local_store_options: LocalStoreOptions,
         local_execution_root_dir: str,
         named_caches_dir: str,
-        ca_certs_path: Optional[str] = None,
-        build_root: Optional[str] = None,
+        ca_certs_path: str | None = None,
+        build_root: str | None = None,
         include_trace_on_error: bool = True,
-        engine_visualize_to: Optional[str] = None,
+        engine_visualize_to: str | None = None,
         watch_filesystem: bool = True,
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
 
         rules = build_configuration.rules
-        union_membership = UnionMembership.from_rules(build_configuration.union_rules)
+        union_membership: UnionMembership
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
 
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
@@ -251,9 +256,12 @@ class EngineInitializer:
                 *fs.rules(),
                 *environment.rules(),
                 *desktop.rules(),
+                *git_rules(),
                 *graph.rules(),
+                *specs_rules.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
+                *system_binaries.rules(),
                 *platform.rules(),
                 *changed_rules(),
                 *streaming_workunit_handler_rules(),
@@ -261,7 +269,16 @@ class EngineInitializer:
                 *rules,
             )
         )
+
         goal_map = EngineInitializer._make_goal_map_from_rules(rules)
+
+        union_membership = UnionMembership.from_rules(
+            (
+                *build_configuration.union_rules,
+                *(r for r in rules if isinstance(r, UnionRule)),
+            )
+        )
+
         rules = FrozenOrderedSet(
             (
                 *rules,
@@ -270,6 +287,13 @@ class EngineInitializer:
                     QueryRule(goal_type, GraphSession.goal_param_types)
                     for goal_type in goal_map.values()
                 ),
+                # Install queries for each request/response pair used by the BSP support.
+                # Note: These are necessary because the BSP support is a built-in goal that makes
+                # synchronous requests into the engine.
+                *(
+                    QueryRule(impl.response_type, (impl.request_type, Workspace))
+                    for impl in union_membership.get(BSPHandlerMapping)
+                ),
                 QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.
             )
         )
@@ -277,7 +301,7 @@ class EngineInitializer:
         def ensure_absolute_path(v: str) -> str:
             return Path(v).resolve().as_posix()
 
-        def ensure_optional_absolute_path(v: Optional[str]) -> Optional[str]:
+        def ensure_optional_absolute_path(v: str | None) -> str | None:
             if v is None:
                 return None
             return ensure_absolute_path(v)

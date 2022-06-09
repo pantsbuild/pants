@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -32,22 +30,28 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 #![type_length_limit = "43757804"]
 
+#[macro_use]
+extern crate derivative;
+
 mod context;
-mod core;
+mod downloads;
 mod externs;
 mod interning;
 mod intrinsics;
 mod nodes;
+mod python;
 mod scheduler;
 mod selectors;
 mod session;
 mod tasks;
 mod types;
 
-pub use crate::context::{Core, ExecutionStrategyOptions, LocalStoreOptions, RemotingOptions};
-pub use crate::core::{Failure, Function, Key, Params, TypeId, Value};
+pub use crate::context::{
+  Context, Core, ExecutionStrategyOptions, LocalStoreOptions, RemotingOptions,
+};
 pub use crate::intrinsics::Intrinsics;
+pub use crate::python::{Failure, Function, Key, Params, TypeId, Value};
 pub use crate::scheduler::{ExecutionRequest, ExecutionTermination, Scheduler};
 pub use crate::session::Session;
-pub use crate::tasks::{Rule, Tasks};
+pub use crate::tasks::{Intrinsic, Rule, Tasks};
 pub use crate::types::Types;

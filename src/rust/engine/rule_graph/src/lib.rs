@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -32,6 +30,10 @@ mod rules;
 
 use std::collections::{HashMap, HashSet};
 use std::io;
+
+use deepsize::DeepSizeOf;
+use indexmap::IndexSet;
+use internment::Intern;
 
 pub use crate::builder::Builder;
 pub use crate::rules::{
@@ -58,7 +60,7 @@ impl<R: Rule> UnreachableError<R> {
   }
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum EntryWithDeps<R: Rule> {
   Root(RootEntry<R>),
   Inner(InnerEntry<R>),
@@ -80,16 +82,16 @@ impl<R: Rule> EntryWithDeps<R> {
   }
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Entry<R: Rule> {
   Param(R::TypeId),
-  WithDeps(EntryWithDeps<R>),
+  WithDeps(Intern<EntryWithDeps<R>>),
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct RootEntry<R: Rule>(Query<R>);
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct InnerEntry<R: Rule> {
   params: ParamTypes<R::TypeId>,
   rule: R,
@@ -101,7 +103,7 @@ impl<R: Rule> InnerEntry<R> {
   }
 }
 
-type RuleDependencyEdges<R> = HashMap<EntryWithDeps<R>, RuleEdges<R>>;
+type RuleDependencyEdges<R> = HashMap<Intern<EntryWithDeps<R>>, RuleEdges<R>>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct Diagnostic<R: Rule> {
@@ -243,7 +245,7 @@ fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
 }
 
 impl<R: Rule> RuleGraph<R> {
-  pub fn new(rules: Vec<R>, queries: Vec<Query<R>>) -> Result<RuleGraph<R>, String> {
+  pub fn new(rules: IndexSet<R>, queries: IndexSet<Query<R>>) -> Result<RuleGraph<R>, String> {
     Builder::new(rules, queries).graph()
   }
 
@@ -278,8 +280,8 @@ impl<R: Rule> RuleGraph<R> {
       if let Some(edges) = self.rule_dependency_edges.get(&entry) {
         reachable.insert(entry, edges.clone());
 
-        entry_stack.extend(edges.all_dependencies().filter_map(|e| match e {
-          Entry::WithDeps(e) => Some(e.clone()),
+        entry_stack.extend(edges.all_dependencies().filter_map(|e| match e.as_ref() {
+          Entry::WithDeps(e) => Some(e),
           _ => None,
         }));
       } else {
@@ -318,14 +320,14 @@ impl<R: Rule> RuleGraph<R> {
     &self,
     param_inputs: I,
     product: R::TypeId,
-  ) -> Result<(EntryWithDeps<R>, RuleEdges<R>), String> {
+  ) -> Result<(Intern<EntryWithDeps<R>>, RuleEdges<R>), String> {
     let params: ParamTypes<_> = param_inputs.into_iter().collect();
 
     // Attempt to find an exact match.
-    let maybe_root = EntryWithDeps::Root(RootEntry(Query {
+    let maybe_root = Intern::new(EntryWithDeps::Root(RootEntry(Query {
       product,
       params: params.clone(),
-    }));
+    })));
     if let Some(edges) = self.rule_dependency_edges.get(&maybe_root) {
       return Ok((maybe_root, edges.clone()));
     }
@@ -335,7 +337,7 @@ impl<R: Rule> RuleGraph<R> {
     let subset_matches = self
       .rule_dependency_edges
       .iter()
-      .filter_map(|(entry, edges)| match entry {
+      .filter_map(|(entry, edges)| match entry.as_ref() {
         EntryWithDeps::Root(ref root_entry)
           if root_entry.0.product == product && root_entry.0.params.is_subset(&params) =>
         {
@@ -348,14 +350,14 @@ impl<R: Rule> RuleGraph<R> {
     match subset_matches.len() {
       1 => {
         let (root_entry, edges) = subset_matches[0];
-        Ok((root_entry.clone(), edges.clone()))
+        Ok((*root_entry, edges.clone()))
       }
       0 => {
         // The Params were all registered as RootRules, but the combination wasn't legal.
         let mut suggestions: Vec<_> = self
           .rule_dependency_edges
           .keys()
-          .filter_map(|entry| match entry {
+          .filter_map(|entry| match entry.as_ref() {
             EntryWithDeps::Root(ref root_entry) if root_entry.0.product == product => {
               Some(format!("Params({})", params_str(&root_entry.0.params)))
             }
@@ -430,7 +432,7 @@ impl<R: Rule> RuleGraph<R> {
     let mut root_rule_strs = self
       .rule_dependency_edges
       .iter()
-      .filter_map(|(k, deps)| match k {
+      .filter_map(|(k, deps)| match k.as_ref() {
         EntryWithDeps::Root(_) => {
           let root_str = k.fmt_for_graph(display_args);
           let mut dep_entries = deps
@@ -469,7 +471,7 @@ impl<R: Rule> RuleGraph<R> {
     let mut internal_rule_strs = self
       .rule_dependency_edges
       .iter()
-      .filter_map(|(k, deps)| match k {
+      .filter_map(|(k, deps)| match k.as_ref() {
         &EntryWithDeps::Inner(_) => {
           let mut dep_entries = deps
             .all_dependencies()
@@ -507,23 +509,18 @@ impl<R: Rule> RuleGraph<R> {
 ///
 /// Records the dependency rules for a rule.
 ///
-/// TODO: No longer needs a Vec<Entry>.
-///
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct RuleEdges<R: Rule> {
-  dependencies: HashMap<R::DependencyKey, Vec<Entry<R>>>,
+  dependencies: HashMap<R::DependencyKey, Intern<Entry<R>>>,
 }
 
 impl<R: Rule> RuleEdges<R> {
-  pub fn entry_for(&self, dependency_key: &R::DependencyKey) -> Option<&Entry<R>> {
-    self
-      .dependencies
-      .get(dependency_key)
-      .and_then(|entries| entries.first())
+  pub fn entry_for(&self, dependency_key: &R::DependencyKey) -> Option<Intern<Entry<R>>> {
+    self.dependencies.get(dependency_key).cloned()
   }
 
-  pub fn all_dependencies(&self) -> impl Iterator<Item = &Entry<R>> {
-    self.dependencies.values().flatten()
+  pub fn all_dependencies(&self) -> impl Iterator<Item = &Intern<Entry<R>>> {
+    self.dependencies.values()
   }
 }
 

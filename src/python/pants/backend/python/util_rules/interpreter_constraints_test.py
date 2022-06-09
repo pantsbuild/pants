@@ -4,22 +4,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Iterable
 
 import pytest
 from pkg_resources import Requirement
 
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import (
-    _EXPECTED_LAST_PATCH_VERSION,
+    _PATCH_VERSION_UPPER_BOUND,
     InterpreterConstraints,
 )
 from pants.build_graph.address import Address
 from pants.engine.target import FieldSet
-from pants.python.python_setup import PythonSetup
 from pants.testutil.option_util import create_subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,7 @@ class MockFieldSet(FieldSet):
 
 
 def test_merge_interpreter_constraints() -> None:
-    def assert_merged(*, inp: List[List[str]], expected: List[str]) -> None:
+    def assert_merged(*, inp: list[list[str]], expected: list[str]) -> None:
         result = sorted(str(req) for req in InterpreterConstraints.merge_constraint_sets(inp))
         # Requirement.parse() sorts specs differently than we'd like, so we convert each str to a
         # Requirement.
@@ -125,13 +126,42 @@ def test_merge_interpreter_constraints() -> None:
     # No interpreter is shorthand for CPython, which is how Pex behaves
     assert_merged(inp=[[">=3.5"], ["CPython==3.7.*"]], expected=["CPython>=3.5,==3.7.*"])
 
-    # Different Python interpreters, which are guaranteed to fail when ANDed but are safe when ORed.
-    with pytest.raises(ValueError):
-        InterpreterConstraints.merge_constraint_sets([["CPython==3.7.*"], ["PyPy==43.0"]])
-    assert_merged(inp=[["CPython==3.7.*", "PyPy==43.0"]], expected=["CPython==3.7.*", "PyPy==43.0"])
-
-    # Ensure we can handle empty input.
+    # Handle empty constraints correctly.
+    assert_merged(inp=[[], []], expected=[])
+    assert_merged(inp=[[], ["==3.8.*"]], expected=["CPython==3.8.*"])
+    assert_merged(inp=[[">=3.8.2"], [], ["==3.8.*"]], expected=["CPython>=3.8.2,==3.8.*"])
     assert_merged(inp=[], expected=[])
+
+    # Handle mixed types correctly when there is a solution.
+    assert_merged(inp=[["CPython==3.7.*", "PyPy==43.0"]], expected=["CPython==3.7.*", "PyPy==43.0"])
+    assert_merged(
+        inp=[["CPython==3.7.*", "PyPy>=43.0"], ["PyPy<44.0"]], expected=["PyPy>=43.0,<44.0"]
+    )
+    assert_merged(
+        inp=[
+            ["CPython==3.7.*", "Jython", "PyPy>=43.0"],
+            ["PyPy<44.0", "Jython>=1.2"],
+            ["Jython<1.3", "PyPy<44.0"],
+        ],
+        expected=["PyPy>=43.0,<44.0", "Jython>=1.2,<1.3"],
+    )
+
+    # Ensure we error when there is no solution.
+    def assert_impossible(constraints, expected_msg):
+        with pytest.raises(ValueError) as excinfo:
+            print(InterpreterConstraints.merge_constraint_sets(constraints))
+        assert str(excinfo.value) == softwrap(
+            f"""
+            These interpreter constraints cannot be merged, as they require conflicting
+            interpreter types: {expected_msg}
+            """
+        )
+
+    assert_impossible([["CPython==3.7.*"], ["PyPy==43.0"]], "(CPython==3.7.*) AND (PyPy==43.0)")
+    assert_impossible(
+        [["CPython==3.7.*", "Jython>=1.2"], ["PyPy==43.0", "Stackless<3.7"]],
+        "(CPython==3.7.* OR Jython>=1.2) AND (PyPy==43.0 OR Stackless<3.7)",
+    )
 
 
 @pytest.mark.parametrize(
@@ -183,13 +213,37 @@ def test_interpreter_constraints_do_not_include_python2(constraints):
     ],
 )
 def test_interpreter_constraints_minimum_python_version(
-    constraints: List[str], expected: str
+    constraints: list[str], expected: str
 ) -> None:
     universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
     ics = InterpreterConstraints(constraints)
     assert ics.minimum_python_version(universe) == expected
     assert ics.minimum_python_version(reversed(universe)) == expected
     assert ics.minimum_python_version(sorted(universe)) == expected
+
+
+@pytest.mark.parametrize(
+    "constraints,expected",
+    [
+        (["CPython>=2.7"], "CPython==2.7.*"),
+        (["CPython>=2.7,!=2.7.2"], "CPython==2.7.*,!=2.7.2"),
+        (["CPython>=3.7"], "CPython==3.7.*"),
+        (["CPython>=3.8.3,!=3.8.5,!=3.9.1"], "CPython==3.8.*,!=3.8.0,!=3.8.1,!=3.8.2,!=3.8.5"),
+        (["CPython==3.5.*", "CPython>=3.6"], "CPython==3.5.*"),
+        (["CPython==3.7.*", "PyPy==3.6.*"], "PyPy==3.6.*"),
+        (["CPython"], "CPython==2.7.*"),
+        (["CPython==3.7.*,<3.6"], None),
+        ([], None),
+    ],
+)
+def test_snap_to_minimum(constraints, expected) -> None:
+    universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+    ics = InterpreterConstraints(constraints)
+    snapped = ics.snap_to_minimum(universe)
+    if expected is None:
+        assert snapped is None
+    else:
+        assert snapped == InterpreterConstraints([expected])
 
 
 @pytest.mark.parametrize(
@@ -304,7 +358,7 @@ def test_to_poetry_constraint(constraints: list[str], expected: str) -> None:
     assert InterpreterConstraints(constraints).to_poetry_constraint() == expected
 
 
-_ALL_PATCHES = list(range(_EXPECTED_LAST_PATCH_VERSION + 1))
+_ALL_PATCHES = list(range(_PATCH_VERSION_UPPER_BOUND + 1))
 
 
 def patches(
@@ -324,7 +378,7 @@ def patches(
             ["==2.7.1", ">=3.6.15"],
             (
                 [(2, 7, 1)]
-                + patches(3, 6, range(15, _EXPECTED_LAST_PATCH_VERSION + 1))
+                + patches(3, 6, range(15, _PATCH_VERSION_UPPER_BOUND + 1))
                 + patches(3, 7, _ALL_PATCHES)
                 + patches(3, 8, _ALL_PATCHES)
                 + patches(3, 9, _ALL_PATCHES)

@@ -31,9 +31,7 @@ case "${KERNEL}" in
 esac
 
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
-readonly NATIVE_ENGINE_BINARY_PYO3="native_engine_pyo3.so"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
-readonly NATIVE_ENGINE_RESOURCE_PYO3="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY_PYO3}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 readonly NATIVE_CLIENT_PATH="${REPO_ROOT}/.pants"
 readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
@@ -43,10 +41,8 @@ function _build_native_code() {
   # NB: See Cargo.toml with regard to the `extension-module` features.
   "${REPO_ROOT}/cargo" build \
     --features=extension-module \
-    --features=engine_pyo3/extension-module \
     ${MODE_FLAG} \
     -p engine \
-    -p engine_pyo3 \
     -p client || die
 }
 
@@ -60,7 +56,6 @@ function bootstrap_native_code() {
   fi
 
   if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f \
-    "${NATIVE_ENGINE_RESOURCE_PYO3}" && -f \
     "${NATIVE_CLIENT_PATH}" && \
     "${engine_version_calculated}" == "${engine_version_in_metadata}" ]]; then
     return 0
@@ -70,12 +65,8 @@ function bootstrap_native_code() {
 
   # If bootstrapping the native engine fails, don't attempt to run Pants afterwards.
   local -r native_binary="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
-  local -r native_binary_pyo3="${NATIVE_ROOT}/target/${MODE}/libengine_pyo3.${LIB_EXTENSION}"
   if [[ ! -f "${native_binary}" ]]; then
     die "Failed to build native engine, file missing at ${native_binary}."
-  fi
-  if [[ ! -f "${native_binary_pyo3}" ]]; then
-    die "Failed to build native engine, file missing at ${native_binary_pyo3}."
   fi
 
   # If bootstrapping the native client fails, don't attempt to run Pants afterwards.
@@ -89,9 +80,8 @@ function bootstrap_native_code() {
   # Create the native engine resource.
   # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
   #  process from being killed when recompiling.
-  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_ENGINE_RESOURCE_PYO3}" "${NATIVE_CLIENT_PATH}"
+  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_PATH}"
   cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
-  cp "${native_binary_pyo3}" "${NATIVE_ENGINE_RESOURCE_PYO3}"
   cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_PATH}"
 
   # Create the accompanying metadata file.

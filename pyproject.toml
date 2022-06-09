@@ -33,6 +33,7 @@ omit = ["src/python/pants/__init__.py"]
 namespace_packages = true
 explicit_package_bases = true
 mypy_path = "src/python:tests/python:testprojects/src/python"
+plugins = "mypy_typing_asserts.mypy_plugin, strawberry.ext.mypy_plugin"
 
 no_implicit_optional = true
 implicit_reexport = false
@@ -53,7 +54,9 @@ show_traceback = true
 [[tool.mypy.overrides]]
 module = [
     "bs4",
+    "chevron",
     "colors",
+    "dockerfile",
     "fasteners",
     "freezegun",
     "hdrh",
@@ -61,7 +64,6 @@ module = [
     "ijson",
     "pex.*",
     "psutil",
-    "pystache",
     "setproctitle",
 ]
 ignore_missing_imports = true

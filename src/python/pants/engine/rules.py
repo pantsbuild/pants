@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 
-import ast
 import inspect
-import itertools
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -15,58 +13,34 @@ from typing import (
     Any,
     Callable,
     Iterable,
-    List,
     Mapping,
     Optional,
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
     get_type_hints,
 )
 
+from typing_extensions import ParamSpec
+
+from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
+from pants.engine.internals.rule_visitor import collect_awaitables
+from pants.engine.internals.selectors import AwaitableConstraints
+from pants.engine.internals.selectors import Effect as Effect  # noqa: F401
 from pants.engine.internals.selectors import Get as Get  # noqa: F401
-from pants.engine.internals.selectors import GetConstraints
 from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
-from pants.engine.internals.side_effects import side_effecting as side_effecting  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
-from pants.util.collections import assert_single_element
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
 
-
-class _RuleVisitor(ast.NodeVisitor):
-    """Pull `Get` calls out of an @rule body."""
-
-    def __init__(self, *, resolve_type: Callable[[str], Type[Any]], source_file_name: str) -> None:
-        super().__init__()
-        self.source_file_name = source_file_name
-        self.resolve_type = resolve_type
-        self.gets: List[GetConstraints] = []
-
-    @staticmethod
-    def maybe_extract_get_args(call_node: ast.Call) -> Optional[List[ast.expr]]:
-        """Check if the node looks like a Get(T, ...) call."""
-        if not isinstance(call_node.func, ast.Name):
-            return None
-        if call_node.func.id != "Get":
-            return None
-        return call_node.args
-
-    def visit_Call(self, call_node: ast.Call) -> None:
-        get_args = self.maybe_extract_get_args(call_node)
-        if get_args is not None:
-            product_str, subject_str = GetConstraints.parse_input_and_output_types(
-                get_args, source_file_name=self.source_file_name
-            )
-            get = GetConstraints(self.resolve_type(product_str), self.resolve_type(subject_str))
-            self.gets.append(get)
-        # Ensure we descend into e.g. MultiGet(Get(...)...) calls.
-        self.generic_visit(call_node)
+PANTS_RULES_MODULE_KEY = "__pants_rules__"
 
 
 # NB: This violates Python naming conventions of using snake_case for functions. This is because
@@ -81,14 +55,6 @@ def SubsystemRule(subsystem: Type[Subsystem]) -> TaskRule:
     return TaskRule(**subsystem.signature())
 
 
-def _get_starting_indent(source):
-    """Used to remove leading indentation from `source` so ast.parse() doesn't raise an
-    exception."""
-    if source.startswith(" "):
-        return sum(1 for _ in itertools.takewhile(lambda c: c in {" ", b" "}, source))
-    return 0
-
-
 class RuleType(Enum):
     rule = "rule"
     goal_rule = "goal_rule"
@@ -96,6 +62,7 @@ class RuleType(Enum):
 
 
 def _make_rule(
+    func_id: str,
     rule_type: RuleType,
     return_type: Type,
     parameter_types: Iterable[Type],
@@ -127,46 +94,9 @@ def _make_rule(
         if not inspect.isfunction(func):
             raise ValueError("The @rule decorator must be applied innermost of all decorators.")
 
-        owning_module = sys.modules[func.__module__]
-        source = inspect.getsource(func) or "<string>"
-        source_file = inspect.getsourcefile(func)
-        beginning_indent = _get_starting_indent(source)
-        if beginning_indent:
-            source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
-        module_ast = ast.parse(source)
+        awaitables = FrozenOrderedSet(collect_awaitables(func))
 
-        def resolve_type(name):
-            resolved = getattr(owning_module, name, None) or owning_module.__builtins__.get(
-                name, None
-            )
-            if resolved is None:
-                raise ValueError(
-                    f"Could not resolve type `{name}` in top level of module "
-                    f"{owning_module.__name__} defined in {source_file}"
-                )
-            elif not isinstance(resolved, type):
-                raise ValueError(
-                    f"Expected a `type` constructor for `{name}`, but got: {resolved} (type "
-                    f"`{type(resolved).__name__}`) in {source_file}"
-                )
-            return resolved
-
-        rule_func_node = assert_single_element(
-            node
-            for node in ast.iter_child_nodes(module_ast)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == func.__name__
-        )
-
-        parents_table = {}
-        for parent in ast.walk(rule_func_node):
-            for child in ast.iter_child_nodes(parent):
-                parents_table[child] = parent
-
-        rule_visitor = _RuleVisitor(source_file_name=source_file, resolve_type=resolve_type)
-        rule_visitor.visit(rule_func_node)
-
-        gets = FrozenOrderedSet(rule_visitor.gets)
+        validate_requirements(func_id, parameter_types, awaitables, cacheable)
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
@@ -175,7 +105,7 @@ def _make_rule(
             return_type,
             parameter_types,
             func,
-            input_gets=gets,
+            input_gets=awaitables,
             canonical_name=canonical_name,
             desc=desc,
             level=level,
@@ -207,6 +137,10 @@ class MissingParameterTypeAnnotation(InvalidTypeAnnotation):
     """Indicates a missing parameter type annotation for an `@rule`."""
 
 
+class DuplicateRuleError(TypeError):
+    """Invalid to overwrite `@rule`s using the same name in the same module."""
+
+
 def _ensure_type_annotation(
     *,
     type_annotation: Optional[Type],
@@ -232,6 +166,9 @@ IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"rule_type", "cacheable"}
 def rule_decorator(func, **kwargs) -> Callable:
     if not inspect.isfunction(func):
         raise ValueError("The @rule decorator expects to be placed on a function.")
+
+    if hasattr(func, "rule_helper"):
+        raise ValueError("Cannot use both @rule and @rule_helper")
 
     if (
         len(
@@ -264,11 +201,12 @@ def rule_decorator(func, **kwargs) -> Callable:
         for parameter in inspect.signature(func).parameters
     )
     is_goal_cls = issubclass(return_type, Goal)
-    validate_parameter_types(func_id, parameter_types, cacheable)
 
     # Set a default canonical name if one is not explicitly provided to the module and name of the
     # function that implements it. This is used as the workunit name.
-    effective_name = kwargs.get("canonical_name", f"{func.__module__}.{func.__name__}")
+    effective_name = kwargs.get(
+        "canonical_name", f"{func.__module__}.{func.__qualname__}".replace(".<locals>", "")
+    )
 
     # Set a default description, which is used in the dynamic UI and stacktraces.
     effective_desc = kwargs.get("desc")
@@ -282,7 +220,29 @@ def rule_decorator(func, **kwargs) -> Callable:
             f"argument, but got: {effective_level}"
         )
 
+    module = sys.modules[func.__module__]
+    pants_rules = getattr(module, PANTS_RULES_MODULE_KEY, None)
+    if pants_rules is None:
+        pants_rules = {}
+        setattr(module, PANTS_RULES_MODULE_KEY, pants_rules)
+
+    if effective_name not in pants_rules:
+        pants_rules[effective_name] = func
+    else:
+        prev_func = pants_rules[effective_name]
+        if prev_func.__code__ != func.__code__:
+            raise DuplicateRuleError(
+                softwrap(
+                    f"""
+                    Redeclaring rule {effective_name} with {func} at line
+                    {func.__code__.co_firstlineno}, previously defined by {prev_func} at line
+                    {prev_func.__code__.co_firstlineno}.
+                    """
+                )
+            )
+
     return _make_rule(
+        func_id,
         rule_type,
         return_type,
         parameter_types,
@@ -293,17 +253,37 @@ def rule_decorator(func, **kwargs) -> Callable:
     )(func)
 
 
-def validate_parameter_types(
-    func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool
+def validate_requirements(
+    func_id: str,
+    parameter_types: Tuple[Type, ...],
+    awaitables: Tuple[AwaitableConstraints, ...],
+    cacheable: bool,
 ) -> None:
-    if cacheable:
-        for ty in parameter_types:
-            if side_effecting.is_instance(ty):
-                # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't
-                #  expose those as part of the API, so it's OK for this error not to mention them.
-                raise ValueError(
-                    f"A `@rule` that was not a @goal_rule ({func_id}) has a side-effecting parameter: {ty}"
-                )
+    # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't expose those as
+    # part of the API, so it's OK for these errors not to mention them.
+    for ty in parameter_types:
+        if cacheable and issubclass(ty, SideEffecting):
+            raise ValueError(
+                f"A `@rule` that is not a @goal_rule ({func_id}) may not have "
+                f"a side-effecting parameter: {ty}."
+            )
+    for awaitable in awaitables:
+        input_type_side_effecting = issubclass(awaitable.input_type, SideEffecting)
+        if input_type_side_effecting and not awaitable.is_effect:
+            raise ValueError(
+                f"A `Get` may not request a side-effecting type ({awaitable.input_type}). "
+                f"Use `Effect` instead: `{awaitable}`."
+            )
+        if not input_type_side_effecting and awaitable.is_effect:
+            raise ValueError(
+                f"An `Effect` should not be used with a pure type ({awaitable.input_type}). "
+                f"Use `Get` instead: `{awaitable}`."
+            )
+        if cacheable and awaitable.is_effect:
+            raise ValueError(
+                f"A `@rule` that is not a @goal_rule ({func_id}) may not use an "
+                f"Effect: `{awaitable}`."
+            )
 
 
 def inner_rule(*args, **kwargs) -> Callable:
@@ -331,6 +311,58 @@ def goal_rule(*args, **kwargs) -> Callable:
 # until we figure out the implications, and have a handle on the semantics and use-cases.
 def _uncacheable_rule(*args, **kwargs) -> Callable:
     return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def rule_helper(func: Callable[P, R]) -> Callable[P, R]:
+    """Decorator which marks a function as a "rule helper".
+
+    Functions marked as rule helpers are allowed to be called by rules and other rule helpers
+    and can `await Get/MultiGet`. The rule parser adds these functions' awaitables to the rule's
+    awaitables.
+
+    There are a few restrictions:
+        1. Rule helpers must be "private". I.e. start with an underscore
+        2. Rule hlpers must be `async`
+        3. Rule helpers can't be rules
+        4. Rule helpers must be accessed by attributes chained from a module variable (see below)
+
+    To explain restriction 4, consider the following:
+    ```
+        from some_mod import helper_function, attribute
+
+        ...
+
+        some_instance = AClass()
+
+        @rule
+        async def my_rule(arg: RequestType) -> ReturnType
+            await helper_function()  # OK
+            await attribute.helper()  # OK (assuming `helper` is a @rule_helper)
+            await attribute.otherattr.helper()  # OK (assuming `helper` is a @rule_helper)
+            await some_instance.helper()  # OK (assuming `helper` is a @rule_helper)
+
+            await AClass().helper()  # Not OK, won't collect awaitables from `helper`
+
+            func_var = AClass()
+            await func_var.helper()  # Not OK, won't collect awaitables from `helper`
+            await arg.helper()  # Not OK, won't collect awaitables from `helper`
+    ```
+    """
+    if not func.__name__.startswith("_"):
+        raise ValueError("@rule_helpers must be private. I.e. start with an underscore.")
+
+    if hasattr(func, "rule"):
+        raise ValueError("Cannot use both @rule and @rule_helper.")
+
+    if not inspect.iscoroutinefunction(func):
+        raise ValueError("@rule_helpers must be async.")
+
+    setattr(func, "rule_helper", func)
+    return func
 
 
 class Rule(ABC):
@@ -388,7 +420,7 @@ class TaskRule(Rule):
 
     _output_type: Type
     input_selectors: Tuple[Type, ...]
-    input_gets: Tuple[GetConstraints, ...]
+    input_gets: Tuple[AwaitableConstraints, ...]
     func: Callable
     cacheable: bool
     canonical_name: str
@@ -400,7 +432,7 @@ class TaskRule(Rule):
         output_type: Type,
         input_selectors: Iterable[Type],
         func: Callable,
-        input_gets: Iterable[GetConstraints],
+        input_gets: Iterable[AwaitableConstraints],
         canonical_name: str,
         desc: Optional[str] = None,
         level: LogLevel = LogLevel.TRACE,

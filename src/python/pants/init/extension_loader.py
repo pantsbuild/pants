@@ -9,6 +9,7 @@ from pkg_resources import Requirement, WorkingSet
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.goal.builtins import register_builtin_goals
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -40,6 +41,7 @@ def load_backends_and_plugins(
     bc_builder = bc_builder or BuildConfiguration.Builder()
     load_build_configuration_from_source(bc_builder, backends)
     load_plugins(bc_builder, plugins, working_set)
+    register_builtin_goals(bc_builder)
     return bc_builder.create()
 
 
@@ -109,6 +111,7 @@ def load_build_configuration_from_source(
     :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
       the build configuration.
     """
+    # NB: Backends added here must be explicit dependencies of this module.
     backend_packages = FrozenOrderedSet(["pants.core", "pants.backend.project_info", *backends])
     for backend_package in backend_packages:
         load_backend(build_configuration, backend_package)

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import re
 from glob import glob
-from typing import Iterable, Set
+from typing import Iterable
 
 from common import die
 
@@ -19,7 +20,7 @@ def main() -> None:
     )
 
 
-def find_files(*directories: str, extension: str) -> Set[str]:
+def find_files(*directories: str, extension: str) -> set[str]:
     return {
         fp
         for directory in directories
@@ -27,10 +28,10 @@ def find_files(*directories: str, extension: str) -> Set[str]:
     }
 
 
-def filter_files(files: Iterable[str], *, snippet_regex: str) -> Set[str]:
+def filter_files(files: Iterable[str], *, snippet_regex: str) -> set[str]:
     """Only return files that contain the snippet_regex."""
     regex = re.compile(snippet_regex)
-    result: Set[str] = set()
+    result: set[str] = set()
     for fp in files:
         with open(fp, "r") as f:
             if any(re.search(regex, line) for line in f.readlines()):

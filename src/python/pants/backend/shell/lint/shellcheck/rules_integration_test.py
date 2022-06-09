@@ -9,7 +9,8 @@ import pytest
 
 from pants.backend.shell.lint.shellcheck.rules import ShellcheckFieldSet, ShellcheckRequest
 from pants.backend.shell.lint.shellcheck.rules import rules as shellcheck_rules
-from pants.backend.shell.target_types import ShellLibrary
+from pants.backend.shell.target_types import ShellSourcesGeneratorTarget
+from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
@@ -25,9 +26,10 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *external_tool.rules(),
             *source_files.rules(),
+            *target_types_rules(),
             QueryRule(LintResults, [ShellcheckRequest]),
         ],
-        target_types=[ShellLibrary],
+        target_types=[ShellSourcesGeneratorTarget],
     )
 
 
@@ -60,13 +62,13 @@ def assert_success(
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.sh": GOOD_FILE, "BUILD": "shell_library(name='t')"})
+    rule_runner.write_files({"f.sh": GOOD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     assert_success(rule_runner, tgt)
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_library(name='t')"})
+    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     result = run_shellcheck(rule_runner, [tgt])
     assert len(result) == 1
@@ -76,7 +78,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"good.sh": GOOD_FILE, "bad.sh": BAD_FILE, "BUILD": "shell_library(name='t')"}
+        {"good.sh": GOOD_FILE, "bad.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"}
     )
     tgts = [
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.sh")),
@@ -93,10 +95,10 @@ def test_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "a/f.sh": BAD_FILE,
-            "a/BUILD": "shell_library()",
+            "a/BUILD": "shell_sources()",
             "a/.shellcheckrc": "disable=SC2148",
             "b/f.sh": BAD_FILE,
-            "b/BUILD": "shell_library()",
+            "b/BUILD": "shell_sources()",
         }
     )
     tgts = [
@@ -111,13 +113,13 @@ def test_config_files(rule_runner: RuleRunner) -> None:
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_library(name='t')"})
+    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     assert_success(rule_runner, tgt, extra_args=["--shellcheck-args=-e SC2148"])
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_library(name='t')"})
+    rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))
     result = run_shellcheck(rule_runner, [tgt], extra_args=["--shellcheck-skip"])
     assert not result
@@ -131,9 +133,9 @@ def test_includes_direct_dependencies(rule_runner: RuleRunner) -> None:
             "f.sh": "# shellcheck shell=bash\nsource dep.sh\n",
             "BUILD": dedent(
                 """\
-                shell_library(name='transitive', sources=['transitive_dep.sh'])
-                shell_library(name='dep', sources=['dep.sh'], dependencies=[':transitive'])
-                shell_library(name='t', sources=['f.sh'], dependencies=[':dep'])
+                shell_sources(name='transitive', sources=['transitive_dep.sh'])
+                shell_sources(name='dep', sources=['dep.sh'], dependencies=[':transitive'])
+                shell_sources(name='t', sources=['f.sh'], dependencies=[':dep'])
                 """
             ),
         }

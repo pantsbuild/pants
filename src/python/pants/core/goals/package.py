@@ -1,25 +1,33 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.addresses import Address
-from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
+from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
+    AllTargets,
+    AsyncFieldMixin,
     FieldSet,
+    FieldSetsPerTarget,
+    FieldSetsPerTargetRequest,
     NoApplicableTargetsBehavior,
     StringField,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
+    Targets,
 )
-from pants.engine.unions import union
+from pants.engine.unions import UnionMembership, union
+from pants.util.docutil import bin_name
+from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -36,42 +44,74 @@ class BuiltPackageArtifact:
     Used for logging information about the artifacts that are dumped to the distdir.
     """
 
-    relpath: Optional[str]
-    extra_log_lines: Tuple[str, ...] = tuple()
+    relpath: str | None
+    extra_log_lines: tuple[str, ...] = tuple()
 
 
 @dataclass(frozen=True)
 class BuiltPackage:
     digest: Digest
-    artifacts: Tuple[BuiltPackageArtifact, ...]
+    artifacts: tuple[BuiltPackageArtifact, ...]
 
 
-class OutputPathField(StringField):
+class OutputPathField(StringField, AsyncFieldMixin):
     alias = "output_path"
-    help = (
-        "Where the built asset should be located.\n\nIf undefined, this will use the path to the "
-        "BUILD file, followed by the target name. For example, `src/python/project:app` would be "
-        "`src.python.project/app.ext.\n\nWhen running `./pants package`, this path will be "
-        "prefixed by `--distdir` (e.g. `dist/`).\n\nWarning: setting this value risks naming "
-        "collisions with other package targets you may have."
+    help = softwrap(
+        f"""
+        Where the built asset should be located.
+
+        If undefined, this will use the path to the BUILD file, followed by the target name.
+        For example, `src/python/project:app` would be `src.python.project/app.ext`.
+
+        When running `{bin_name()} package`, this path will be prefixed by `--distdir` (e.g. `dist/`).
+
+        Warning: setting this value risks naming collisions with other package targets you may have.
+        """
     )
 
-    def value_or_default(self, address: Address, *, file_ending: str) -> str:
-        assert not file_ending.startswith("."), "`file_ending` should not start with `.`"
-        return self.value or os.path.join(
-            address.spec_path.replace(os.sep, "."), f"{address.target_name}.{file_ending}"
+    def value_or_default(self, *, file_ending: str | None) -> str:
+        if self.value:
+            return self.value
+        file_prefix = (
+            self.address.generated_name.replace(".", "_")
+            if self.address.generated_name
+            else self.address.target_name
         )
+        if file_ending is None:
+            file_name = file_prefix
+        else:
+            assert not file_ending.startswith("."), "`file_ending` should not start with `.`"
+            file_name = f"{file_prefix}.{file_ending}"
+        return os.path.join(self.address.spec_path.replace(os.sep, "."), file_name)
 
 
 class PackageSubsystem(GoalSubsystem):
     name = "package"
     help = "Create a distributable package."
 
-    required_union_implementations = (PackageFieldSet,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PackageFieldSet in union_membership
 
 
 class Package(Goal):
     subsystem_cls = PackageSubsystem
+
+
+class AllPackageableTargets(Targets):
+    pass
+
+
+@rule(desc="Find all packageable targets in project", level=LogLevel.DEBUG)
+async def find_all_packageable_targets(all_targets: AllTargets) -> AllPackageableTargets:
+    fs_per_target = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, all_targets)
+    )
+    return AllPackageableTargets(
+        target
+        for target, field_sets in zip(all_targets, fs_per_target.collection)
+        if len(field_sets) > 0
+    )
 
 
 @goal_rule
@@ -91,8 +131,8 @@ async def package_asset(workspace: Workspace, dist_dir: DistDir) -> Package:
         Get(BuiltPackage, PackageFieldSet, field_set)
         for field_set in target_roots_to_field_sets.field_sets
     )
-    merged_snapshot = await Get(Snapshot, MergeDigests(pkg.digest for pkg in packages))
-    workspace.write_digest(merged_snapshot.digest, path_prefix=str(dist_dir.relpath))
+    merged_digest = await Get(Digest, MergeDigests(pkg.digest for pkg in packages))
+    workspace.write_digest(merged_digest, path_prefix=str(dist_dir.relpath))
     for pkg in packages:
         for artifact in pkg.artifacts:
             msg = []

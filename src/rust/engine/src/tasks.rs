@@ -3,20 +3,22 @@
 
 use std::fmt;
 
-use crate::core::{Function, TypeId};
 use crate::intrinsics::Intrinsics;
+use crate::python::{Function, TypeId};
 use crate::selectors::{DependencyKey, Get, Select};
 
+use deepsize::DeepSizeOf;
+use indexmap::IndexSet;
+use internment::Intern;
+use log::Level;
 use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
 
-use log::Level;
-
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
   // Intrinsic rules are implemented in rust.
-  Intrinsic(Intrinsic),
+  Intrinsic(Intern<Intrinsic>),
   // Task rules are implemented in python.
-  Task(Task),
+  Task(Intern<Task>),
 }
 
 impl DisplayForGraph for Rule {
@@ -81,16 +83,14 @@ impl rule_graph::Rule for Rule {
 
   fn dependency_keys(&self) -> Vec<DependencyKey> {
     match self {
-      &Rule::Task(Task {
-        ref clause,
-        ref gets,
-        ..
-      }) => clause
+      &Rule::Task(task) => task
+        .clause
         .iter()
         .map(|t| DependencyKey::JustSelect(Select::new(*t)))
-        .chain(gets.iter().map(|g| DependencyKey::JustGet(*g)))
+        .chain(task.gets.iter().map(|g| DependencyKey::JustGet(*g)))
         .collect(),
-      &Rule::Intrinsic(Intrinsic { ref inputs, .. }) => inputs
+      &Rule::Intrinsic(intrinsic) => intrinsic
+        .inputs
         .iter()
         .map(|t| DependencyKey::JustSelect(Select::new(*t)))
         .collect(),
@@ -142,25 +142,29 @@ impl fmt::Display for Rule {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Task {
   pub product: TypeId,
-  pub can_modify_workunit: bool,
+  pub side_effecting: bool,
+  pub engine_aware_return_type: bool,
   pub clause: Vec<TypeId>,
   pub gets: Vec<Get>,
+  // TODO: This is a preliminary implementation of #12934: we should overhaul naming to
+  // align Query and @union/Protocol as described there.
+  pub unions: Vec<Query<Rule>>,
   pub func: Function,
   pub cacheable: bool,
   pub display_info: DisplayInfo,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct DisplayInfo {
   pub name: String,
   pub desc: Option<String>,
   pub level: Level,
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(DeepSizeOf, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Intrinsic {
   pub product: TypeId,
   pub inputs: Vec<TypeId>,
@@ -171,10 +175,10 @@ pub struct Intrinsic {
 ///
 #[derive(Clone, Debug)]
 pub struct Tasks {
-  rules: Vec<Rule>,
+  rules: IndexSet<Rule>,
   // Used during the construction of a rule.
   preparing: Option<Task>,
-  queries: Vec<Query<Rule>>,
+  queries: IndexSet<Query<Rule>>,
 }
 
 ///
@@ -190,23 +194,25 @@ pub struct Tasks {
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
-      rules: Vec::default(),
+      rules: IndexSet::default(),
       preparing: None,
-      queries: Vec::default(),
+      queries: IndexSet::default(),
     }
   }
 
-  pub fn rules(&self) -> &Vec<Rule> {
+  pub fn rules(&self) -> &IndexSet<Rule> {
     &self.rules
   }
 
-  pub fn queries(&self) -> &Vec<Query<Rule>> {
+  pub fn queries(&self) -> &IndexSet<Query<Rule>> {
     &self.queries
   }
 
   pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
     for intrinsic in intrinsics.keys() {
-      self.rules.push(Rule::Intrinsic(intrinsic.clone()))
+      self
+        .rules
+        .insert(Rule::Intrinsic(Intern::new(intrinsic.clone())));
     }
   }
 
@@ -216,8 +222,9 @@ impl Tasks {
   pub fn task_begin(
     &mut self,
     func: Function,
-    product: TypeId,
-    can_modify_workunit: bool,
+    return_type: TypeId,
+    side_effecting: bool,
+    engine_aware_return_type: bool,
     cacheable: bool,
     name: String,
     desc: Option<String>,
@@ -230,10 +237,12 @@ impl Tasks {
 
     self.preparing = Some(Task {
       cacheable,
-      product,
-      can_modify_workunit,
+      product: return_type,
+      side_effecting,
+      engine_aware_return_type,
       clause: Vec::new(),
       gets: Vec::new(),
+      unions: Vec::new(),
       func,
       display_info: DisplayInfo { name, desc, level },
     });
@@ -246,6 +255,17 @@ impl Tasks {
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
       .push(Get { output, input });
+  }
+
+  pub fn add_union(&mut self, product: TypeId, params: Vec<TypeId>) {
+    let query = Query::new(product, params);
+    self.queries.insert(query.clone());
+    self
+      .preparing
+      .as_mut()
+      .expect("Must `begin()` a task creation before adding unions!")
+      .unions
+      .push(query);
   }
 
   pub fn add_select(&mut self, selector: TypeId) {
@@ -263,10 +283,10 @@ impl Tasks {
       .preparing
       .take()
       .expect("Must `begin()` a task creation before ending it!");
-    self.rules.push(Rule::Task(task))
+    self.rules.insert(Rule::Task(Intern::new(task)));
   }
 
   pub fn query_add(&mut self, product: TypeId, params: Vec<TypeId>) {
-    self.queries.push(Query::new(product, params));
+    self.queries.insert(Query::new(product, params));
   }
 }

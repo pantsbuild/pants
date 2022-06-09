@@ -1,15 +1,29 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from packaging.version import Version
 
 from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalTool,
+    ExternalToolRequest,
+)
+from pants.engine.console import Console
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.options_parsing import _Options
+from pants.engine.internals.session import SessionValues
+from pants.engine.rules import Get, collect_rules, goal_rule, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.option.alias import CliAlias
+from pants.option.config import Config
+from pants.option.option_types import DictOption
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
-from pants.util.frozendict import FrozenDict
 from pants.version import PANTS_SEMVER, VERSION
 
 
@@ -17,18 +31,10 @@ class PantsReleases(Subsystem):
     options_scope = "pants-releases"
     help = "Options for Pants's release process."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--release-notes",
-            type=dict,
-            help="A dict from branch name to release notes rst-file location.",
-        )
-
-    @property
-    def _release_notes(self) -> FrozenDict[str, str]:
-        return FrozenDict(self.options.release_notes)
+    _release_notes = DictOption[str](
+        "--release-notes",
+        help="A dict from branch name to release notes rst-file location.",
+    )
 
     @classmethod
     def _branch_name(cls, version: Version) -> str:
@@ -98,12 +104,12 @@ async def pants_setup_kwargs(
     ]
     kwargs["classifiers"] = [*standard_classifiers, *kwargs.get("classifiers", [])]
 
-    # Determine the long description by reading from ABOUT.rst and the release notes.
+    # Determine the long description by reading from ABOUT.md and the release notes.
     notes_file = pants_releases.notes_file_for_version(PANTS_SEMVER)
     digest_contents = await Get(
         DigestContents,
         PathGlobs(
-            ["src/python/pants/ABOUT.rst", notes_file],
+            ["src/python/pants/ABOUT.md", notes_file],
             description_of_origin="Pants release files",
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
         ),
@@ -122,6 +128,9 @@ async def pants_setup_kwargs(
             "Tracker": "https://github.com/pantsbuild/pants/issues",
             "Changelog": "https://www.pantsbuild.org/docs/changelog",
             "Twitter": "https://twitter.com/pantsbuild",
+            "Slack": "https://pantsbuild.slack.com/join/shared_invite/zt-d0uh0mok-RLvVosDiX6JDpvStH~bFBA#/shared-invite/email",
+            "YouTube": "https://www.youtube.com/channel/UCCcfCbDqtqlCkFEuENsHlbQ",
+            "Mailing lists": "https://groups.google.com/g/pants-devel",
         },
         license="Apache License, Version 2.0",
         zip_safe=True,
@@ -136,6 +145,55 @@ async def pants_setup_kwargs(
     kwargs.update(hardcoded_kwargs)
 
     return SetupKwargs(kwargs, address=request.target.address)
+
+
+class CheckDefaultToolsSubsystem(GoalSubsystem):
+    name = "check-default-tools"
+    help = "Options for checking that external tool default locations are correctly typed."
+
+
+class CheckDefaultTools(Goal):
+    subsystem_cls = CheckDefaultToolsSubsystem
+
+
+@goal_rule
+async def check_default_tools(
+    console: Console,
+    real_opts: _Options,
+) -> CheckDefaultTools:
+    # The real options know about all the registered tools.
+    for scope, si in real_opts.options.known_scope_to_info.items():
+        if si.subsystem_cls and issubclass(si.subsystem_cls, ExternalTool):
+            tool_cls = si.subsystem_cls
+            console.print_stdout(f"Checking {console.cyan(tool_cls.name)}:")
+            for known_version in tool_cls.default_known_versions:
+                ver, plat_val, sha256, length = tool_cls.split_known_version_str(known_version)
+                # Note that we don't want to use the real option values here - we want to
+                # verify that the *defaults* aren't broken. However the get_request_for() method
+                # requires an instance (since it can consult option values, including custom
+                # options for specific tools, that we don't know about), so we construct a
+                # default one, but we force the --version to the one we're checking (which will
+                # typically be the same as the default version, but doesn't have to be, if the
+                # tool provides default_known_versions for versions other than default_version).
+                args = ("./pants", f"--{scope}-version={ver}")
+                blank_opts = await Get(
+                    _Options,
+                    SessionValues(
+                        {
+                            OptionsBootstrapper: OptionsBootstrapper(
+                                tuple(), ("./pants",), args, Config(tuple()), CliAlias()
+                            )
+                        }
+                    ),
+                )
+                instance = tool_cls(blank_opts.options.for_scope(scope))
+                req = instance.get_request_for(plat_val, sha256, length)
+                console.write_stdout(f"  version {ver} for {plat_val}... ")
+                # TODO: We'd like to run all the requests concurrently, but since we can't catch
+                #  engine exceptions, we wouldn't have an easy way to output which one failed.
+                await Get(DownloadedExternalTool, ExternalToolRequest, req)
+                console.print_stdout(console.sigil_succeeded())
+    return CheckDefaultTools(exit_code=0)
 
 
 def rules():

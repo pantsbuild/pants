@@ -180,6 +180,7 @@ pub enum EntryState<N: Node> {
     pending_value: AsyncValue<NodeResult<N>>,
     generation: Generation,
     previous_result: Option<EntryResult<N>>,
+    is_cleaning: bool,
   },
   // A node that has completed, and then possibly been marked dirty. Because marking a node
   // dirty does not eagerly re-execute any logic, it will stay this way until a caller moves it
@@ -309,7 +310,8 @@ impl<N: Node> Entry<N> {
     let context = context_factory.clone_for(entry_id);
     let context2 = context.clone();
     let node = node.clone();
-    let (value, mut sender, receiver) = AsyncValue::new();
+    let (value, mut sender, receiver) = AsyncValue::<NodeResult<N>>::new();
+    let is_cleaning = previous_dep_generations.is_some();
 
     let run_or_clean = async move {
       // If we have previous result generations, compare them to all current dependency
@@ -323,7 +325,7 @@ impl<N: Node> Entry<N> {
         {
           // If dependency generations mismatched or failed to fetch, clear the node's dependencies
           // and indicate that it should re-run.
-          context.graph().clear_deps(entry_id, run_token);
+          context.graph().cleaning_failed(entry_id, run_token);
           context.stats().cleaning_failed += 1;
           false
         } else {
@@ -349,20 +351,27 @@ impl<N: Node> Entry<N> {
     };
 
     context_factory.spawn(async move {
-      tokio::select! {
-        _ = sender.closed() => {
-          // We've been explicitly canceled: exit.
-          context2
-            .graph()
-            .cancel(entry_id, run_token);
+      let maybe_res = tokio::select! {
+        abort_item = sender.aborted() => {
+          if let Some(res) = abort_item {
+            // We were aborted via terminate: complete with the given res.
+            Some(res.map(|v| v.0))
+          } else {
+            // We were aborted via drop: exit.
+            context2
+              .graph()
+              .cancel(entry_id, run_token);
+            return;
+          }
         }
         maybe_res = run_or_clean => {
-          // The node completed.
-          context2
-            .graph()
-            .complete(&context2, entry_id, run_token, sender, maybe_res);
+          maybe_res
         }
-      }
+      };
+      // The node completed.
+      context2
+        .graph()
+        .complete(&context2, entry_id, run_token, sender, maybe_res);
     });
 
     (
@@ -371,6 +380,7 @@ impl<N: Node> Entry<N> {
         pending_value: value,
         generation,
         previous_result,
+        is_cleaning,
       },
       receiver,
     )
@@ -754,6 +764,30 @@ impl<N: Node> Entry<N> {
     }
   }
 
+  ///
+  /// Terminates this Node with the given error iff it is Running.
+  ///
+  /// This method is asynchronous: the task running the Node will take some time to notice that it
+  /// has been terminated, and to update the state of the Node.
+  ///
+  pub(crate) fn terminate(&mut self, err: N::Error) {
+    let state = &mut *self.state.lock();
+    test_trace_log!("Terminating node {:?} with {:?}", self.node, err);
+    if let EntryState::Running { pending_value, .. } = state {
+      let _ = pending_value.try_abort(Err(err));
+    };
+  }
+
+  ///
+  /// Indicates that cleaning this Node has failed.
+  ///
+  pub(crate) fn cleaning_failed(&mut self) {
+    let state = &mut *self.state.lock();
+    if let EntryState::Running { is_cleaning, .. } = state {
+      *is_cleaning = false;
+    };
+  }
+
   pub fn is_started(&self) -> bool {
     match *self.state.lock() {
       EntryState::NotStarted { .. } => false,
@@ -764,6 +798,13 @@ impl<N: Node> Entry<N> {
   pub fn is_running(&self) -> bool {
     match *self.state.lock() {
       EntryState::Running { .. } => true,
+      EntryState::Completed { .. } | EntryState::NotStarted { .. } => false,
+    }
+  }
+
+  pub fn is_cleaning(&self) -> bool {
+    match *self.state.lock() {
+      EntryState::Running { is_cleaning, .. } => is_cleaning,
       EntryState::Completed { .. } | EntryState::NotStarted { .. } => false,
     }
   }
@@ -800,6 +841,6 @@ impl<N: Node> Entry<N> {
       Some(ref nr) => format!("{:?}", nr),
       None => "<None>".to_string(),
     };
-    format!("{} == {}", self.node, state).replace("\"", "\\\"")
+    format!("{} == {}", self.node, state).replace('"', "\\\"")
   }
 }

@@ -48,12 +48,12 @@ pub enum PathGlob {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct GlobParsedSource(String);
+struct GlobParsedSource(String);
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct PathGlobIncludeEntry {
-  pub input: GlobParsedSource,
-  pub globs: Vec<PathGlob>,
+  input: GlobParsedSource,
+  globs: Vec<PathGlob>,
 }
 
 impl PathGlob {
@@ -239,18 +239,6 @@ impl PathGlob {
   }
 }
 
-///
-/// This struct extracts out just the include and exclude globs from the `PreparedPathGlobs`
-/// struct. It is a temporary measure to try to share some code between the glob matching
-/// implementation in this file and in snapshot_ops.rs.
-///
-/// TODO(#9967): Remove this struct!
-///
-pub struct ExpandablePathGlobs {
-  pub include: Vec<PathGlob>,
-  pub exclude: Arc<GitignoreStyleExcludes>,
-}
-
 #[derive(Debug, Clone)]
 pub struct PreparedPathGlobs {
   pub(crate) include: Vec<PathGlobIncludeEntry>,
@@ -261,13 +249,6 @@ pub struct PreparedPathGlobs {
 }
 
 impl PreparedPathGlobs {
-  pub fn as_expandable_globs(&self) -> ExpandablePathGlobs {
-    ExpandablePathGlobs {
-      include: Iterator::flatten(self.include.iter().map(|pgie| pgie.globs.clone())).collect(),
-      exclude: self.exclude.clone(),
-    }
-  }
-
   fn parse_patterns_from_include(
     include: &[PathGlobIncludeEntry],
   ) -> Result<Vec<glob::Pattern>, String> {
@@ -344,7 +325,7 @@ impl PreparedPathGlobs {
     self
       .patterns
       .iter()
-      .any(|pattern| pattern.matches_path_with(path, &PATTERN_MATCH_OPTIONS))
+      .any(|pattern| pattern.matches_path_with(path, *PATTERN_MATCH_OPTIONS))
       && !self.exclude.is_ignored_path(path, false)
   }
 }
@@ -669,7 +650,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
         // Escape any globs in the parsed dest, which should guarantee one output PathGlob.
         PathGlob::create(vec![Pattern::escape(dest_str)]).ok()
       })
-      .unwrap_or_else(Vec::new);
+      .unwrap_or_default();
 
     let path_globs =
       PreparedPathGlobs::from_globs(link_globs).map_err(|e| Self::mk_error(e.as_str()))?;

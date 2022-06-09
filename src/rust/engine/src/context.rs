@@ -1,6 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::cmp::max;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
 use std::future::Future;
@@ -10,30 +11,30 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::Failure;
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
+use crate::python::Failure;
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
-use double_checked_cell_async::DoubleCheckedCell;
+use async_oncecell::OnceCell;
+use cache::PersistentCache;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use parking_lot::Mutex;
 use process_execution::{
-  self, BoundedCommandRunner, CommandRunner, NamedCaches, Platform, ProcessMetadata,
-  RemoteCacheWarningsBehavior,
+  self, bounded, local, nailgun, remote, remote_cache, CommandRunner, ImmutableInputs, NamedCaches,
+  Platform, ProcessMetadata, RemoteCacheWarningsBehavior,
 };
+use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
 use rule_graph::RuleGraph;
-use sharded_lmdb::ShardedLmdb;
 use store::{self, Store};
 use task_executor::Executor;
-use uuid::Uuid;
 use watch::{Invalidatable, InvalidationWatcher};
+use workunit_store::RunId;
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
 // and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
@@ -59,13 +60,16 @@ pub struct Core {
   pub intrinsics: Intrinsics,
   pub executor: Executor,
   store: Store,
-  pub command_runner: Box<dyn process_execution::CommandRunner>,
+  pub command_runner: Box<dyn CommandRunner>,
   pub http_client: reqwest::Client,
+  pub local_cache: PersistentCache,
   pub vfs: PosixFS,
   pub watcher: Option<Arc<InvalidationWatcher>>,
   pub build_root: PathBuf,
   pub local_parallelism: usize,
+  pub graceful_shutdown_timeout: Duration,
   pub sessions: Sessions,
+  pub named_caches_dir: PathBuf,
 }
 
 #[derive(Clone, Debug)]
@@ -85,6 +89,7 @@ pub struct RemotingOptions {
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_eager_fetch: bool,
   pub cache_rpc_concurrency: usize,
+  pub cache_read_timeout: Duration,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
@@ -100,6 +105,9 @@ pub struct ExecutionStrategyOptions {
   pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
   pub remote_cache_write: bool,
+  pub child_max_memory: usize,
+  pub child_default_memory: usize,
+  pub graceful_shutdown_timeout: Duration,
 }
 
 #[derive(Clone, Debug)]
@@ -131,7 +139,7 @@ impl Core {
     remoting_opts: &RemotingOptions,
     remote_store_address: &Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
-    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Store, String> {
     let local_only = Store::local_only_with_options(
       executor.clone(),
@@ -164,47 +172,63 @@ impl Core {
     executor: &Executor,
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
-    process_execution_metadata: &ProcessMetadata,
     exec_strategy_opts: &ExecutionStrategyOptions,
-  ) -> Box<dyn CommandRunner> {
-    let local_command_runner = process_execution::local::CommandRunner::new(
+  ) -> Result<Box<dyn CommandRunner>, String> {
+    let immutable_inputs = ImmutableInputs::new(store.clone(), local_execution_root_dir)?;
+    let local_command_runner = local::CommandRunner::new(
       store.clone(),
       executor.clone(),
       local_execution_root_dir.to_path_buf(),
       NamedCaches::new(named_caches_dir.to_path_buf()),
+      immutable_inputs,
       exec_strategy_opts.local_cleanup,
     );
 
-    let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
+    let maybe_nailgunnable_local_command_runner: Box<dyn CommandRunner> =
       if exec_strategy_opts.local_enable_nailgun {
-        Box::new(process_execution::nailgun::CommandRunner::new(
+        // We set the nailgun pool size to the number of instances that fit within the memory
+        // parameters configured when a max child process memory has been given.
+        // Otherwise, pool size will be double of the local parallelism so we can always keep
+        // a jvm warmed up.
+        let pool_size: usize = if exec_strategy_opts.child_max_memory > 0 {
+          max(
+            1,
+            exec_strategy_opts.child_max_memory / exec_strategy_opts.child_default_memory,
+          )
+        } else {
+          exec_strategy_opts.local_parallelism * 2
+        };
+
+        Box::new(nailgun::CommandRunner::new(
           local_command_runner,
-          process_execution_metadata.clone(),
           local_execution_root_dir.to_path_buf(),
+          store.clone(),
           executor.clone(),
+          pool_size,
         ))
       } else {
         Box::new(local_command_runner)
       };
 
-    Box::new(BoundedCommandRunner::new(
+    Ok(Box::new(bounded::CommandRunner::new(
+      executor,
       maybe_nailgunnable_local_command_runner,
       exec_strategy_opts.local_parallelism,
-    ))
+    )))
   }
 
   fn make_command_runner(
     full_store: &Store,
     remote_store_address: &Option<String>,
     executor: &Executor,
+    local_cache: &PersistentCache,
     local_execution_root_dir: &Path,
     named_caches_dir: &Path,
-    local_store_options: &LocalStoreOptions,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
     exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
-    capabilities_cell_opt: Option<Arc<DoubleCheckedCell<ServerCapabilities>>>,
+    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Box<dyn CommandRunner>, String> {
     let remote_caching_used =
       exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write;
@@ -223,16 +247,16 @@ impl Core {
       executor,
       local_execution_root_dir,
       named_caches_dir,
-      process_execution_metadata,
       exec_strategy_opts,
-    );
+    )?;
 
     // Possibly either add the remote execution runner or the remote cache runner.
     // `global_options.py` already validates that both are not set at the same time.
     let maybe_remote_enabled_command_runner: Box<dyn CommandRunner> =
       if remoting_opts.execution_enable {
-        Box::new(BoundedCommandRunner::new(
-          Box::new(process_execution::remote::CommandRunner::new(
+        Box::new(bounded::CommandRunner::new(
+          executor,
+          Box::new(remote::CommandRunner::new(
             // We unwrap because global_options.py will have already validated these are defined.
             remoting_opts.execution_address.as_ref().unwrap(),
             remoting_opts.store_address.as_ref().unwrap(),
@@ -247,12 +271,13 @@ impl Core {
             Duration::from_millis(100),
             remoting_opts.execution_rpc_concurrency,
             remoting_opts.cache_rpc_concurrency,
+            remoting_opts.cache_read_timeout,
             capabilities_cell_opt,
           )?),
           exec_strategy_opts.remote_parallelism,
         ))
       } else if remote_caching_used {
-        Box::new(process_execution::remote_cache::CommandRunner::new(
+        Box::new(remote_cache::CommandRunner::new(
           local_command_runner.into(),
           process_execution_metadata.clone(),
           executor.clone(),
@@ -266,6 +291,7 @@ impl Core {
           remoting_opts.cache_warnings_behavior,
           remoting_opts.cache_eager_fetch,
           remoting_opts.cache_rpc_concurrency,
+          remoting_opts.cache_read_timeout,
         )?)
       } else {
         local_command_runner
@@ -273,17 +299,9 @@ impl Core {
 
     // Possibly use the local cache runner, regardless of remote execution/caching.
     let maybe_local_cached_command_runner = if exec_strategy_opts.local_cache {
-      let process_execution_store = ShardedLmdb::new(
-        local_store_options.store_dir.join("processes"),
-        local_store_options.process_cache_max_size_bytes,
-        executor.clone(),
-        local_store_options.lease_time,
-        local_store_options.shard_count,
-      )
-      .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       Box::new(process_execution::cache::CommandRunner::new(
         maybe_remote_enabled_command_runner.into(),
-        process_execution_store,
+        local_cache.clone(),
         full_store.clone(),
         process_execution_metadata.clone(),
       ))
@@ -363,7 +381,7 @@ impl Core {
       && remoting_opts.execution_address == remoting_opts.store_address
       && remoting_opts.execution_headers == remoting_opts.store_headers
     {
-      Some(Arc::new(DoubleCheckedCell::new()))
+      Some(Arc::new(OnceCell::new()))
     } else {
       None
     };
@@ -384,6 +402,15 @@ impl Core {
       capabilities_cell_opt.clone(),
     )
     .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
+
+    let local_cache = PersistentCache::new(
+      &local_store_options.store_dir,
+      // TODO: Rename.
+      local_store_options.process_cache_max_size_bytes,
+      executor.clone(),
+      local_store_options.lease_time,
+      local_store_options.shard_count,
+    )?;
 
     let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
       && remoting_opts.cache_eager_fetch
@@ -407,9 +434,9 @@ impl Core {
       &full_store,
       &remoting_opts.store_address,
       &executor,
+      &local_cache,
       &local_execution_root_dir,
       &named_caches_dir,
-      &local_store_options,
       &process_execution_metadata,
       &root_ca_certs,
       &exec_strategy_opts,
@@ -417,7 +444,7 @@ impl Core {
       capabilities_cell_opt,
     )?;
 
-    let graph = Arc::new(InvalidatableGraph(Graph::new()));
+    let graph = Arc::new(InvalidatableGraph(Graph::new(executor.clone())));
 
     // These certs are for downloads, not to be confused with the ones used for remoting.
     let ca_certs = Self::load_certificates(ca_certs_path)?;
@@ -466,14 +493,15 @@ impl Core {
       store,
       command_runner,
       http_client,
-      // TODO: Errors in initialization should definitely be exposed as python
-      // exceptions, rather than as panics.
+      local_cache,
       vfs: PosixFS::new(&build_root, ignorer, executor)
         .map_err(|e| format!("Could not initialize Vfs: {:?}", e))?,
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
+      graceful_shutdown_timeout: exec_strategy_opts.graceful_shutdown_timeout,
       sessions,
+      named_caches_dir,
     })
   }
 
@@ -537,7 +565,7 @@ pub struct Context {
   entry_id: Option<EntryId>,
   pub core: Arc<Core>,
   pub session: Session,
-  run_id: Uuid,
+  run_id: RunId,
   stats: Arc<Mutex<graph::Stats>>,
 }
 
@@ -572,7 +600,7 @@ impl Context {
 
 impl NodeContext for Context {
   type Node = NodeKey;
-  type RunId = Uuid;
+  type RunId = RunId;
 
   fn stats<'a>(&'a self) -> Box<dyn DerefMut<Target = graph::Stats> + 'a> {
     Box::new(self.stats.lock())

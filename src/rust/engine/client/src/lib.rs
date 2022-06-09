@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,15 +25,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-mod build_root;
-#[cfg(test)]
-mod build_root_tests;
-
 mod client;
 #[cfg(test)]
 mod client_tests;
-
-pub mod options;
 
 pub mod pantsd;
 #[cfg(test)]
@@ -47,12 +39,3 @@ pub use crate::client::{execute_command, ConnectionSettings};
 
 #[cfg(test)]
 mod lib_tests;
-
-pub fn render_choice(items: &[&str]) -> Option<String> {
-  match items {
-    [] => None,
-    [this] => Some(this.to_string()),
-    [this, that] => Some(format!("{} or {}", this, that)),
-    [these @ .., that] => Some(format!("{} or {}", these.join(", "), that)),
-  }
-}

@@ -1,24 +1,27 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
 from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
 from pants.option.config import Config
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, LogLevelOption
+from pants.option.option_types import BoolOption, IntOption
 from pants.option.options import Options
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
+from pants.util.logging import LogLevel
 
 
-class LogLevel(Enum):
+class LogLevelSimple(Enum):
     INFO = "info"
     DEBUG = "debug"
 
@@ -112,9 +115,10 @@ def test_default() -> None:
         )
         parser.register(*args, **kwargs)
         oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info(
-            "description", parser, False
+            "description", parser, False, "provider"
         )
         assert oshi.description == "description"
+        assert oshi.provider == "provider"
         assert len(oshi.basic) == 1
         ohi = oshi.basic[0]
         assert to_help_str(ohi.default) == expected_default_str
@@ -129,8 +133,8 @@ def test_default() -> None:
     do_test(["--foo"], {"type": int, "default": 65536, "default_help_repr": "64KiB"}, "64KiB")
     do_test(["--foo"], {"type": list}, "[]")
     do_test(["--foo"], {"type": dict}, "{}")
-    do_test(["--foo"], {"type": LogLevel}, "None")
-    do_test(["--foo"], {"type": LogLevel, "default": LogLevel.DEBUG}, "debug")
+    do_test(["--foo"], {"type": LogLevelSimple}, "None")
+    do_test(["--foo"], {"type": LogLevelSimple, "default": LogLevelSimple.DEBUG}, "debug")
 
 
 def test_compute_default():
@@ -143,7 +147,7 @@ def test_compute_default():
     do_test("foo", type=str, default="foo")
     do_test(None, type=str, default=None)
     do_test([1, 2, 3], type=list, member_type=int, default=[1, 2, 3])
-    do_test(LogLevel.INFO, type=LogLevel, default=LogLevel.INFO)
+    do_test(LogLevelSimple.INFO, type=LogLevelSimple, default=LogLevelSimple.INFO)
 
 
 def test_deprecated():
@@ -190,13 +194,13 @@ def test_choices() -> None:
 
 
 def test_choices_enum() -> None:
-    kwargs = {"type": LogLevel}
+    kwargs = {"type": LogLevelSimple}
     ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
     assert ohi.choices == ("info", "debug")
 
 
 def test_list_of_enum() -> None:
-    kwargs = {"type": list, "member_type": LogLevel}
+    kwargs = {"type": list, "member_type": LogLevelSimple}
     ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
     assert ohi.choices == ("info", "debug")
 
@@ -212,7 +216,7 @@ def test_grouping():
             scope_info=GlobalOptions.get_scope_info(),
         )
         parser.register("--foo", **kwargs)
-        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False)
+        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False, "")
         assert exp_to_len(expected_basic) == len(oshi.basic)
         assert exp_to_len(expected_advanced) == len(oshi.advanced)
 
@@ -226,22 +230,21 @@ def test_get_all_help_info():
         options_scope = GLOBAL_SCOPE
         help = "Global options."
 
-        @classmethod
-        def register_options(cls, register):
-            register("-o", "--opt1", type=int, default=42, help="Option 1")
+        opt1 = IntOption("--opt1", default=42, help="Option 1")
+        # This is special in having a short option `-l`. Make sure it works.
+        level = LogLevelOption()
 
     class Foo(Subsystem):
         options_scope = "foo"
         help = "A foo."
 
-        @classmethod
-        def register_options(cls, register):
-            register("--opt2", type=bool, default=True, help="Option 2")
-            register("--opt3", advanced=True, choices=["a", "b", "c"])
+        opt2 = BoolOption("--opt2", default=True, advanced=True, help="Option 2")
 
     class Bar(GoalSubsystem):
         name = "bar"
         help = "The bar goal."
+        deprecated_options_scope = "bar-old"
+        deprecated_options_scope_removal_version = "9.9.999"
 
     class QuxField(StringField):
         alias = "qux"
@@ -261,7 +264,7 @@ def test_get_all_help_info():
 
     options = Options.create(
         env={},
-        config=Config.load_file_contents(""),
+        config=Config.load([]),
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
         args=["./pants"],
         bootstrap_option_values=None,
@@ -270,28 +273,41 @@ def test_get_all_help_info():
     Foo.register_options_on_scope(options)
     Bar.register_options_on_scope(options)
 
+    @rule
+    def rule_info_test(foo: Foo) -> Target:
+        """This rule is for testing info extraction only."""
+
     def fake_consumed_scopes_mapper(scope: str) -> Tuple[str, ...]:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
+
+    bc_builder = BuildConfiguration.Builder()
+    bc_builder.register_subsystems("help_info_extracter_test", (Foo, Bar))
+    bc_builder.register_target_types("help_info_extracter_test", (BazLibrary,))
+    bc_builder.register_rules("help_info_extracter_test", collect_rules(locals()))
 
     all_help_info = HelpInfoExtracter.get_all_help_info(
         options,
         UnionMembership({}),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
+        bc_builder.create(),
     )
-    all_help_info_dict = dataclasses.asdict(all_help_info)
+
+    all_help_info_dict = all_help_info.asdict()
     expected_all_help_info_dict = {
         "scope_to_help_info": {
             GLOBAL_SCOPE: {
                 "scope": GLOBAL_SCOPE,
                 "description": "Global options.",
+                "provider": "",
                 "is_goal": False,
+                "deprecated_scope": None,
                 "basic": (
                     {
-                        "display_args": ("-o=<int>", "--opt1=<int>"),
-                        "comma_separated_display_args": "-o=<int>, --opt1=<int>",
-                        "scoped_cmd_line_args": ("-o", "--opt1"),
-                        "unscoped_cmd_line_args": ("-o", "--opt1"),
+                        "display_args": ("--opt1=<int>",),
+                        "comma_separated_display_args": "--opt1=<int>",
+                        "scoped_cmd_line_args": ("--opt1",),
+                        "unscoped_cmd_line_args": ("--opt1",),
                         "config_key": "opt1",
                         "env_var": "PANTS_OPT1",
                         "value_history": {
@@ -310,15 +326,41 @@ def test_get_all_help_info():
                         "choices": None,
                         "comma_separated_choices": None,
                     },
+                    {
+                        "display_args": ("-l=<LogLevel>", "--level=<LogLevel>"),
+                        "comma_separated_display_args": "-l=<LogLevel>, --level=<LogLevel>",
+                        "scoped_cmd_line_args": ("-l", "--level"),
+                        "unscoped_cmd_line_args": ("-l", "--level"),
+                        "config_key": "level",
+                        "env_var": "PANTS_LEVEL",
+                        "value_history": {
+                            "ranked_values": (
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": LogLevel.INFO, "details": None},
+                            ),
+                        },
+                        "typ": LogLevel,
+                        "default": LogLevel.INFO,
+                        "help": "Set the logging level.",
+                        "deprecation_active": False,
+                        "deprecated_message": None,
+                        "removal_version": None,
+                        "removal_hint": None,
+                        "choices": ("trace", "debug", "info", "warn", "error"),
+                        "comma_separated_choices": "trace, debug, info, warn, error",
+                    },
                 ),
                 "advanced": tuple(),
                 "deprecated": tuple(),
             },
             "foo": {
                 "scope": "foo",
+                "provider": "help_info_extracter_test",
                 "description": "A foo.",
                 "is_goal": False,
-                "basic": (
+                "deprecated_scope": None,
+                "basic": (),
+                "advanced": (
                     {
                         "display_args": ("--[no-]foo-opt2",),
                         "comma_separated_display_args": "--[no-]foo-opt2",
@@ -343,34 +385,24 @@ def test_get_all_help_info():
                         "comma_separated_choices": None,
                     },
                 ),
-                "advanced": (
-                    {
-                        "display_args": ("--foo-opt3=<str>",),
-                        "comma_separated_display_args": "--foo-opt3=<str>",
-                        "scoped_cmd_line_args": ("--foo-opt3",),
-                        "unscoped_cmd_line_args": ("--opt3",),
-                        "config_key": "opt3",
-                        "env_var": "PANTS_FOO_OPT3",
-                        "value_history": {
-                            "ranked_values": ({"rank": Rank.NONE, "value": None, "details": None},),
-                        },
-                        "typ": str,
-                        "default": None,
-                        "help": "No help available.",
-                        "deprecation_active": False,
-                        "deprecated_message": None,
-                        "removal_version": None,
-                        "removal_hint": None,
-                        "choices": ("a", "b", "c"),
-                        "comma_separated_choices": "a, b, c",
-                    },
-                ),
                 "deprecated": tuple(),
             },
             "bar": {
                 "scope": "bar",
+                "provider": "help_info_extracter_test",
                 "description": "The bar goal.",
                 "is_goal": True,
+                "deprecated_scope": "bar-old",
+                "basic": tuple(),
+                "advanced": tuple(),
+                "deprecated": tuple(),
+            },
+            "bar-old": {
+                "scope": "bar-old",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "is_goal": True,
+                "deprecated_scope": "bar-old",
                 "basic": tuple(),
                 "advanced": tuple(),
                 "deprecated": tuple(),
@@ -379,19 +411,29 @@ def test_get_all_help_info():
         "name_to_goal_info": {
             "bar": {
                 "name": "bar",
+                "provider": "help_info_extracter_test",
                 "description": "The bar goal.",
                 "consumed_scopes": ("somescope", "used_by_bar"),
                 "is_implemented": True,
-            }
+            },
+            "bar-old": {
+                "name": "bar",
+                "provider": "help_info_extracter_test",
+                "description": "The bar goal.",
+                "consumed_scopes": ("somescope", "used_by_bar-old"),
+                "is_implemented": True,
+            },
         },
         "name_to_target_type_info": {
             "baz_library": {
                 "alias": "baz_library",
+                "provider": "help_info_extracter_test",
                 "summary": "A library of baz-es.",
                 "description": "A library of baz-es.\n\nUse it however you like.",
                 "fields": (
                     {
                         "alias": "qux",
+                        "provider": "",
                         "default": "'blahblah'",
                         "description": "A qux string.",
                         "required": False,
@@ -399,6 +441,7 @@ def test_get_all_help_info():
                     },
                     {
                         "alias": "quux",
+                        "provider": "",
                         "default": None,
                         "description": "A quux int.\n\nMust be non-zero. Or zero. "
                         "Whatever you like really.",
@@ -408,8 +451,89 @@ def test_get_all_help_info():
                 ),
             }
         },
+        "name_to_rule_info": {
+            "construct_scope_foo": {
+                "description": None,
+                "documentation": "A foo.",
+                "input_gets": ("Get(ScopedOptions, Scope, ..)",),
+                "input_types": (),
+                "name": "construct_scope_foo",
+                "output_type": "Foo",
+                "provider": "help_info_extracter_test",
+            },
+            "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test": {
+                "description": None,
+                "documentation": "This rule is for testing info extraction only.",
+                "input_gets": (),
+                "input_types": ("Foo",),
+                "name": "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                "output_type": "Target",
+                "provider": "help_info_extracter_test",
+            },
+        },
+        "name_to_api_type_info": {
+            "pants.help.help_info_extracter_test.Foo": {
+                "consumed_by_rules": (
+                    "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                ),
+                "dependees": ("help_info_extracter_test",),
+                "dependencies": ("pants.option.scope",),
+                "documentation": None,
+                "is_union": False,
+                "module": "pants.help.help_info_extracter_test",
+                "name": "Foo",
+                "provider": "help_info_extracter_test",
+                "returned_by_rules": ("construct_scope_foo",),
+                "union_members": (),
+                "union_type": None,
+                "used_in_rules": (),
+            },
+            "pants.engine.target.Target": {
+                "consumed_by_rules": (),
+                "dependees": (),
+                "dependencies": (),
+                "documentation": (
+                    "A Target represents an addressable set of metadata.\n\n    Set the `help` "
+                    "class property with a description, which will be used in `./pants help`. For "
+                    "the\n    best rendering, use soft wrapping (e.g. implicit string concatenation"
+                    ") within paragraphs, but\n    hard wrapping (`\n`) to separate distinct "
+                    "paragraphs and/or lists.\n    "
+                ),
+                "is_union": False,
+                "module": "pants.engine.target",
+                "name": "Target",
+                "provider": "help_info_extracter_test",
+                "returned_by_rules": (
+                    "pants.help.help_info_extracter_test.test_get_all_help_info.rule_info_test",
+                ),
+                "union_members": (),
+                "union_type": None,
+                "used_in_rules": (),
+            },
+            "pants.option.scope.Scope": {
+                "consumed_by_rules": (),
+                "dependees": (),
+                "dependencies": (),
+                "documentation": "An options scope.",
+                "is_union": False,
+                "module": "pants.option.scope",
+                "name": "Scope",
+                "provider": "pants.option.scope",
+                "returned_by_rules": (),
+                "union_members": (),
+                "union_type": None,
+                "used_in_rules": ("construct_scope_foo",),
+            },
+        },
     }
-    assert expected_all_help_info_dict == all_help_info_dict
+
+    # Break down this colossal structure into pieces so it is easier to spot where the issue is.
+    # Check keys equality first, then contents
+    assert set(expected_all_help_info_dict) == set(all_help_info_dict)
+    for key in all_help_info_dict:
+        actual = all_help_info_dict[key]
+        expected = expected_all_help_info_dict[key]
+        assert expected == actual
 
 
 def test_pretty_print_type_hint() -> None:

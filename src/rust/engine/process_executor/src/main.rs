@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -34,16 +32,18 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 
-use bazel_protos::gen::build::bazel::remote::execution::v2::{Action, Command};
-use bazel_protos::gen::buildbarn::cas::UncachedActionResult;
-use bazel_protos::require_digest;
-use fs::RelativePath;
+use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata};
+use process_execution::{
+  Context, ImmutableInputs, InputDigests, NamedCaches, Platform, ProcessCacheScope, ProcessMetadata,
+};
 use prost::Message;
-use store::{Store, StoreWrapper};
+use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
+use protos::gen::buildbarn::cas::UncachedActionResult;
+use protos::require_digest;
+use store::Store;
 use structopt::StructOpt;
-use workunit_store::{in_workunit, WorkunitMetadata, WorkunitStore};
+use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(StructOpt)]
 struct CommandSpec {
@@ -84,6 +84,9 @@ struct CommandSpec {
   /// Path to execute the binary at relative to its input digest root.
   #[structopt(long)]
   working_directory: Option<PathBuf>,
+
+  #[structopt(long)]
+  concurrency_available: Option<usize>,
 
   #[structopt(long)]
   cache_key_gen_version: Option<String>,
@@ -188,11 +191,6 @@ struct Opt {
   #[structopt(long, default_value = "128")]
   cache_rpc_concurrency: usize,
 
-  /// Whether or not to enable running the process through a Nailgun server.
-  /// This will likely start a new Nailgun server as a side effect.
-  #[structopt(long)]
-  use_nailgun: bool,
-
   /// Overall timeout in seconds for each request from time of submission.
   #[structopt(long, default_value = "600")]
   overall_deadline_secs: u64,
@@ -212,7 +210,7 @@ struct Opt {
 #[tokio::main]
 async fn main() {
   env_logger::init();
-  let workunit_store = WorkunitStore::new(false);
+  let workunit_store = WorkunitStore::new(false, log::Level::Debug);
   workunit_store.init_thread_state(None);
 
   let args = Opt::from_args();
@@ -274,6 +272,7 @@ async fn main() {
       .chain(request.argv.into_iter())
       .collect();
   }
+  let workdir = args.work_dir.unwrap_or_else(std::env::temp_dir);
 
   let runner: Box<dyn process_execution::CommandRunner> = match args.server {
     Some(address) => {
@@ -304,6 +303,7 @@ async fn main() {
             Duration::from_millis(100),
             args.execution_rpc_concurrency,
             args.cache_rpc_concurrency,
+            Duration::from_secs(2),
             None,
           )
           .expect("Failed to make command runner"),
@@ -315,32 +315,26 @@ async fn main() {
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
       executor,
-      args.work_dir.unwrap_or_else(std::env::temp_dir),
+      workdir.clone(),
       NamedCaches::new(
         args
           .named_cache_path
           .unwrap_or_else(NamedCaches::default_path),
       ),
+      ImmutableInputs::new(store.clone(), &workdir).unwrap(),
       true,
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
-  let result = in_workunit!(
-    workunit_store.clone(),
-    "process_executor".to_owned(),
-    WorkunitMetadata::default(),
-    |workunit| async move {
-      runner
-        .run(Context::default(), workunit, request.into())
-        .await
-    }
-  )
+  let result = in_workunit!("process_executor", Level::Info, |workunit| async move {
+    runner.run(Context::default(), workunit, request).await
+  })
   .await
   .expect("Error executing");
 
   if let Some(output) = args.materialize_output_to {
     store
-      .materialize_directory(output, result.output_directory)
+      .materialize_directory(output, result.output_directory, Permissions::Writable)
       .await
       .unwrap();
   }
@@ -348,16 +342,12 @@ async fn main() {
   let stdout: Vec<u8> = store
     .load_file_bytes_with(result.stdout_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   let stderr: Vec<u8> = store
     .load_file_bytes_with(result.stderr_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   print!("{}", String::from_utf8(stdout).unwrap());
   eprint!("{}", String::from_utf8(stderr).unwrap());
@@ -376,7 +366,7 @@ async fn make_request(
     args.buildbarn_url.as_ref(),
   ) {
     (Some(input_digest), Some(input_digest_length), None, None, None) => {
-      make_request_from_flat_args(args, Digest::new(input_digest, input_digest_length))
+      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length)).await
 
     }
     (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
@@ -394,9 +384,10 @@ async fn make_request(
   }
 }
 
-fn make_request_from_flat_args(
+async fn make_request_from_flat_args(
+  store: &Store,
   args: &Opt,
-  input_root_digest: Digest,
+  input_files: Digest,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let output_files = args
     .command
@@ -421,11 +412,21 @@ fn make_request_from_flat_args(
     })
     .transpose()?;
 
+  // TODO: Add support for immutable inputs.
+  let input_digests = InputDigests::new(
+    store,
+    DirectoryDigest::from_persisted_digest(input_files),
+    BTreeMap::default(),
+    BTreeSet::default(),
+  )
+  .await
+  .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
+
   let process = process_execution::Process {
     argv: args.command.argv.clone(),
     env: collection_from_keyvalues(args.command.env.iter()),
     working_directory,
-    input_files: input_root_digest,
+    input_digests,
     output_files,
     output_directories,
     timeout: Some(Duration::new(15 * 60, 0)),
@@ -434,8 +435,8 @@ fn make_request_from_flat_args(
     append_only_caches: BTreeMap::new(),
     jdk_home: args.command.jdk.clone(),
     platform_constraint: None,
-    is_nailgunnable: args.use_nailgun,
     execution_slot_variable: None,
+    concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -455,9 +456,8 @@ async fn extract_request_from_action_digest(
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let action = store
     .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
-    .await?
-    .ok_or_else(|| format!("Could not find action proto in CAS: {:?}", action_digest))?
-    .0
+    .await
+    .map_err(|e| e.enrich("Could not load action proto from CAS").to_string())?
     .map_err(|err| {
       format!(
         "Error deserializing action proto {:?}: {:?}",
@@ -469,9 +469,11 @@ async fn extract_request_from_action_digest(
     .map_err(|err| format!("Bad Command digest: {:?}", err))?;
   let command = store
     .load_file_bytes_with(command_digest, |bytes| Command::decode(bytes))
-    .await?
-    .ok_or_else(|| format!("Could not find command proto in CAS: {:?}", command_digest))?
-    .0
+    .await
+    .map_err(|e| {
+      e.enrich("Could not load command proto from CAS")
+        .to_string()
+    })?
     .map_err(|err| {
       format!(
         "Error deserializing command proto {:?}: {:?}",
@@ -487,12 +489,17 @@ async fn extract_request_from_action_digest(
     )
   };
 
-  let input_files = require_digest(&action.input_root_digest)
-    .map_err(|err| format!("Bad input root digest: {:?}", err))?;
+  let input_digests = InputDigests::with_input_files(DirectoryDigest::from_persisted_digest(
+    require_digest(&action.input_root_digest)
+      .map_err(|err| format!("Bad input root digest: {:?}", err))?,
+  ));
 
   // In case the local Store doesn't have the input root Directory,
   // have it fetch it and identify it as a Directory, so that it doesn't get confused about the unknown metadata.
-  store.load_directory_or_err(input_files).await?;
+  store
+    .load_directory(input_digests.complete.as_digest())
+    .await
+    .map_err(|e| e.to_string())?;
 
   let process = process_execution::Process {
     argv: command.arguments,
@@ -502,7 +509,7 @@ async fn extract_request_from_action_digest(
       .map(|env| (env.name.clone(), env.value.clone()))
       .collect(),
     working_directory,
-    input_files,
+    input_digests,
     output_files: command
       .output_files
       .iter()
@@ -517,12 +524,12 @@ async fn extract_request_from_action_digest(
       std::time::Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
     }),
     execution_slot_variable: None,
+    concurrency_available: 0,
     description: "".to_string(),
     level: log::Level::Error,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     platform_constraint: None,
-    is_nailgunnable: false,
     cache_scope: ProcessCacheScope::Always,
   };
 
@@ -579,9 +586,8 @@ async fn extract_request_from_buildbarn_url(
         .load_file_bytes_with(action_result_digest, |bytes| {
           UncachedActionResult::decode(bytes)
         })
-        .await?
-        .ok_or_else(|| "Couldn't fetch action result proto".to_owned())?
-        .0
+        .await
+        .map_err(|e| e.enrich("Could not load action result proto").to_string())?
         .map_err(|err| format!("Error deserializing action result proto: {:?}", err))?;
 
       require_digest(&action_result.action_digest)?

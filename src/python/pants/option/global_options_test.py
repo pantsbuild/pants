@@ -16,7 +16,6 @@ from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import DynamicRemoteOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.util.contextutil import temporary_dir
 
 
 def create_dynamic_remote_options(
@@ -46,14 +45,11 @@ def create_dynamic_remote_options(
     return DynamicRemoteOptions.from_options(options, env)[0]
 
 
-def test_dynamic_remote_options_oauth_bearer_token_path() -> None:
-    with temporary_dir() as tempdir:
-        token_path = Path(tempdir, "token.txt")
-        token_path.touch()
-        token_path.write_text("my-token")
-        opts = create_dynamic_remote_options(
-            initial_headers={"foo": "bar"}, token_path=str(token_path)
-        )
+def test_dynamic_remote_options_oauth_bearer_token_path(tmp_path: Path) -> None:
+    token_path = tmp_path / "token.txt"
+    token_path.touch()
+    token_path.write_text("my-token")
+    opts = create_dynamic_remote_options(initial_headers={"foo": "bar"}, token_path=str(token_path))
     assert opts.store_headers == {"authorization": "Bearer my-token", "foo": "bar"}
     assert opts.execution_headers == {
         "authorization": "Bearer my-token",
@@ -61,45 +57,44 @@ def test_dynamic_remote_options_oauth_bearer_token_path() -> None:
     }
 
 
-def test_dynamic_remote_options_auth_plugin() -> None:
-    def compute_options(state: str) -> DynamicRemoteOptions:
-        with temporary_dir() as tempdir:
-            # NB: For an unknown reason, if we use the same file name for multiple runs, the plugin
-            # result gets memoized. So, we use a distinct file name.
-            plugin_path = Path(tempdir, f"auth_plugin_{state}.py")
-            plugin_path.touch()
-            plugin_path.write_text(
-                dedent(
-                    f"""\
-                    from pants.option.global_options import AuthPluginState, AuthPluginResult
+def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
+    def compute_options(state: str, tempdir: Path) -> DynamicRemoteOptions:
+        # NB: For an unknown reason, if we use the same file name for multiple runs, the plugin
+        # result gets memoized. So, we use a distinct file name.
+        plugin_path = tempdir / f"auth_plugin_{state}.py"
+        plugin_path.touch()
+        plugin_path.write_text(
+            dedent(
+                f"""\
+                from pants.option.global_options import AuthPluginState, AuthPluginResult
 
-                    def auth_func(initial_execution_headers, initial_store_headers, options, **kwargs):
-                        return AuthPluginResult(
-                            state=AuthPluginState.{state},
-                            execution_headers={{
-                                **{{k: "baz" for k in initial_execution_headers}},
-                                "exec": "xyz",
-                            }},
-                            store_headers={{
-                                **{{k: "baz" for k in initial_store_headers}},
-                                "store": "abc",
-                                "store_url": options.for_global_scope().remote_store_address,
-                            }},
-                            instance_name="custom_instance",
-                            store_address="grpc://custom_store",
-                            execution_address="grpc://custom_exec",
-                        )
-                    """
-                )
+                def auth_func(initial_execution_headers, initial_store_headers, options, **kwargs):
+                    return AuthPluginResult(
+                        state=AuthPluginState.{state},
+                        execution_headers={{
+                            **{{k: "baz" for k in initial_execution_headers}},
+                            "exec": "xyz",
+                        }},
+                        store_headers={{
+                            **{{k: "baz" for k in initial_store_headers}},
+                            "store": "abc",
+                            "store_url": options.for_global_scope().remote_store_address,
+                        }},
+                        instance_name="custom_instance",
+                        store_address="grpc://custom_store",
+                        execution_address="grpc://custom_exec",
+                    )
+                """
             )
-            sys.path.append(tempdir)
-            result = create_dynamic_remote_options(
-                initial_headers={"foo": "bar"}, plugin=f"auth_plugin_{state}:auth_func"
-            )
-            sys.path.pop()
-            return result
+        )
+        sys.path.append(tempdir.as_posix())
+        result = create_dynamic_remote_options(
+            initial_headers={"foo": "bar"}, plugin=f"auth_plugin_{state}:auth_func"
+        )
+        sys.path.pop()
+        return result
 
-    opts = compute_options("OK")
+    opts = compute_options("OK", tmp_path)
     assert opts.store_headers == {
         "store": "abc",
         "foo": "baz",
@@ -112,7 +107,7 @@ def test_dynamic_remote_options_auth_plugin() -> None:
     assert opts.store_address == "http://custom_store"
     assert opts.execution_address == "http://custom_exec"
 
-    opts = compute_options("UNAVAILABLE")
+    opts = compute_options("UNAVAILABLE", tmp_path)
     assert opts.cache_read is False
     assert opts.instance_name == "main"
 
@@ -135,9 +130,12 @@ def test_execution_options_remote_addresses() -> None:
 
 
 def test_invalidation_globs() -> None:
-    # Confirm that an un-normalized relative path in the pythonpath is filtered out.
+    # Confirm that an un-normalized relative path in the pythonpath is filtered out, and that an
+    # empty entry (i.e.: a relative path for the current directory) doesn't cause an error.
     suffix = "something-ridiculous"
-    ob = OptionsBootstrapper.create(env={}, args=[f"--pythonpath=../{suffix}"], allow_pantsrc=False)
+    ob = OptionsBootstrapper.create(
+        env={}, args=[f"--pythonpath=../{suffix}", "--pythonpath="], allow_pantsrc=False
+    )
     globs = GlobalOptions.compute_pantsd_invalidation_globs(
         get_buildroot(), ob.bootstrap_options.for_global_scope()
     )
