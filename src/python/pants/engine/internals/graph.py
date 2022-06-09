@@ -354,7 +354,7 @@ async def resolve_targets(
                     _TargetParametrizations,
                     _TargetParametrizationsRequest(
                         tgt.address.maybe_convert_to_target_generator(),
-                        description_of_origin="TODO(#14468)",
+                        description_of_origin="<infallible>",
                     ),
                 )
             )
