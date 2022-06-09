@@ -395,7 +395,7 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
 
 @rule(desc="Set up debugpy to run an interactive Pytest session", level=LogLevel.DEBUG)
 async def debugpy_python_test(
-    field_set: TestFieldSet,
+    field_set: PythonTestFieldSet,
     debugpy: DebugPy,
     pytest: PyTest,
 ) -> TestDebugAdaptorRequest:

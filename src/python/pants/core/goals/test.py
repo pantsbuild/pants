@@ -430,9 +430,8 @@ async def _run_debug_tests(
     debug_requests = await MultiGet(
         (
             Get(TestDebugAdaptorRequest, TestFieldSet, field_set)
-            # if test_subsystem.use_debug_adaptor
-            # else Get(TestDebugRequest, TestFieldSet, field_set)
-            # Get(TestDebugRequest, TestFieldSet, field_set)
+            if test_subsystem.use_debug_adaptor
+            else Get(TestDebugRequest, TestFieldSet, field_set)
         )
         for field_set in targets_to_valid_field_sets.field_sets
     )
