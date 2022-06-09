@@ -45,7 +45,7 @@ class DebugPyLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule
-def setup_twine_lockfile(
+def setup_debugpy_lockfile(
     _: DebugPyLockfileSentinel, debugpy: DebugPy, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     return GeneratePythonLockfile.from_tool(
