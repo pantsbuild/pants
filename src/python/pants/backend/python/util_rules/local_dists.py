@@ -23,7 +23,12 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest, WrappedTarget
+from pants.engine.target import (
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
 from pants.util.meta import frozen_after_init
@@ -57,7 +62,10 @@ async def isolate_local_dist_wheels(
     wheels = [wheel for wheel in wheels_snapshot.files if wheel in artifacts]
 
     if not wheels:
-        tgt = await Get(WrappedTarget, Address, dist_field_set.address)
+        tgt = await Get(
+            WrappedTarget,
+            WrappedTargetRequest(dist_field_set.address, description_of_origin="<infallible>"),
+        )
         logger.warning(
             softwrap(
                 f"""

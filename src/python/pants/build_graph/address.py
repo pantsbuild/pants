@@ -7,8 +7,9 @@ import dataclasses
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
+from pants.base.exceptions import MappingError
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import (  # noqa: F401
@@ -17,7 +18,7 @@ from pants.engine.internals.native_engine import (  # noqa: F401
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap, strip_prefix
+from pants.util.strutil import bullet_list, softwrap, strip_prefix
 
 # `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
 BANNED_CHARS_IN_TARGET_NAME = frozenset(r":#!@?/\=")
@@ -626,3 +627,28 @@ class BuildFileAddress:
 
     address: Address
     rel_path: str
+
+
+class ResolveError(MappingError):
+    """Indicates an error resolving targets."""
+
+    @classmethod
+    def did_you_mean(
+        cls,
+        bad_address: Address,
+        *,
+        description_of_origin: str,
+        known_names: Iterable[str],
+        namespace: str,
+    ) -> ResolveError:
+        return cls(
+            softwrap(
+                f"""
+                The address {bad_address} from {description_of_origin} does not exist.
+
+                The target name ':{bad_address.target_name}' is not defined in the directory
+                {namespace}. Did you mean one of these target names?\n
+                """
+                + bullet_list(f":{name}" for name in known_names)
+            )
+        )

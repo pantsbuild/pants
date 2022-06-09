@@ -9,7 +9,6 @@ from typing import Iterable, Type
 
 import pytest
 
-from pants.base.exceptions import ResolveError
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import (
     AddressLiteralSpec,
@@ -26,7 +25,7 @@ from pants.base.specs import (
     Specs,
 )
 from pants.base.specs_parser import SpecsParser
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, ResolveError
 from pants.engine.addresses import Addresses
 from pants.engine.fs import SpecsPaths
 from pants.engine.internals.parametrize import Parametrize
@@ -390,7 +389,7 @@ def test_raw_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> 
         Address("real", target_name="fake_tgt"),
         description_of_origin="tests",
         known_names=["real"],
-        namespace="real"
+        namespace="real",
     )
     assert_resolve_error(AddressLiteralSpec("real", "fake_tgt"), expected=str(did_you_mean))
     assert_resolve_error(AddressLiteralSpec("real/f.txt", "fake_tgt"), expected=str(did_you_mean))

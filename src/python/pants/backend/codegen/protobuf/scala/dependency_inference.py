@@ -10,7 +10,12 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, WrappedTarget
+from pants.engine.target import (
+    InjectDependenciesRequest,
+    InjectedDependencies,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
@@ -84,7 +89,12 @@ async def inject_scalapb_runtime_dependency(
     request: InjectScalaPBRuntimeDependencyRequest,
     jvm: JvmSubsystem,
 ) -> InjectedDependencies:
-    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):

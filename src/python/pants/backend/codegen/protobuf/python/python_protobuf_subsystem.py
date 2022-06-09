@@ -14,9 +14,13 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolRequireme
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.engine.addresses import Address
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, WrappedTarget
+from pants.engine.target import (
+    InjectDependenciesRequest,
+    InjectedDependencies,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
@@ -113,7 +117,12 @@ async def inject_dependencies(
     if not python_protobuf.infer_runtime_dependency:
         return InjectedDependencies()
 
-    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    wrapped_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     tgt = wrapped_tgt.target
     resolve = tgt.get(PythonResolveField).normalized_value(python_setup)
 
@@ -130,7 +139,7 @@ async def inject_dependencies(
         )
     ]
 
-    if wrapped_tgt.target.get(ProtobufGrpcToggleField).value:
+    if tgt.get(ProtobufGrpcToggleField).value:
         result.append(
             find_python_runtime_library_or_raise_error(
                 module_mapping,

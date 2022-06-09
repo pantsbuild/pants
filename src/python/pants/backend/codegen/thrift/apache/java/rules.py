@@ -27,6 +27,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference import artifact_mapper
@@ -123,7 +124,12 @@ async def resolve_apache_thrift_java_runtime_for_resolve(
 async def inject_apache_thrift_java_dependencies(
     request: InjectApacheThriftJavaDependencies, jvm: JvmSubsystem
 ) -> InjectedDependencies:
-    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):

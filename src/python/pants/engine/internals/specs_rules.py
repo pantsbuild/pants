@@ -51,6 +51,7 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
     Targets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
@@ -111,7 +112,10 @@ async def _determine_literal_addresses_from_raw_specs(
 
     # We eagerly call the `WrappedTarget` rule because it will validate that every final address
     # actually exists, such as with generated target addresses.
-    return await MultiGet(Get(WrappedTarget, Address, addr) for addr in all_candidate_addresses)
+    return await MultiGet(
+        Get(WrappedTarget, WrappedTargetRequest(addr, description_of_origin=description_of_origin))
+        for addr in all_candidate_addresses
+    )
 
 
 @rule

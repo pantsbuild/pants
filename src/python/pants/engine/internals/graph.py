@@ -12,9 +12,8 @@ from pathlib import PurePath
 from typing import Iterable, NamedTuple, Sequence, cast
 
 from pants.base.deprecated import resolve_conflicting_options, warn_or_error
-from pants.base.exceptions import ResolveError
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
-from pants.build_graph.address import BuildFileAddressRequest
+from pants.build_graph.address import BuildFileAddressRequest, ResolveError
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -80,6 +79,7 @@ from pants.engine.target import (
     ValidatedDependencies,
     ValidateDependenciesRequest,
     WrappedTarget,
+    WrappedTargetRequest,
     _generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
@@ -105,7 +105,10 @@ logger = logging.getLogger(__name__)
 
 @rule
 async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
-    wrapped_targets = await MultiGet(Get(WrappedTarget, Address, a) for a in addresses)
+    wrapped_targets = await MultiGet(
+        Get(WrappedTarget, WrappedTargetRequest(a, description_of_origin="TODO(#14468)"))
+        for a in addresses
+    )
     return UnexpandedTargets(wrapped_target.target for wrapped_target in wrapped_targets)
 
 
@@ -304,13 +307,16 @@ async def resolve_target_parametrizations(
 
 @rule
 async def resolve_target(
-    address: Address,
+    request: WrappedTargetRequest,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
 ) -> WrappedTarget:
+    address = request.address
     base_address = address.maybe_convert_to_target_generator()
     parametrizations = await Get(
         _TargetParametrizations,
-        _TargetParametrizationsRequest(base_address, description_of_origin="TODO(#14468)"),
+        _TargetParametrizationsRequest(
+            base_address, description_of_origin=request.description_of_origin
+        ),
     )
     if address.is_generated_target:
         # TODO: This is an accommodation to allow using file/generator Addresses for
@@ -909,7 +915,10 @@ async def hydrate_sources(
     # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
     if not request.enable_codegen or generate_request_type is None:
         return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
-    wrapped_protocol_target = await Get(WrappedTarget, Address, sources_field.address)
+    wrapped_protocol_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(sources_field.address, description_of_origin="<infallible>"),
+    )
     generated_sources = await Get(
         GeneratedSources,
         GenerateSourcesRequest,
@@ -1033,7 +1042,10 @@ async def resolve_dependencies(
     subproject_roots: SubprojectRoots,
 ) -> Addresses:
     wrapped_tgt, explicitly_provided = await MultiGet(
-        Get(WrappedTarget, Address, request.field.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
+        ),
         Get(ExplicitlyProvidedDependencies, DependenciesRequest, request),
     )
     tgt = wrapped_tgt.target

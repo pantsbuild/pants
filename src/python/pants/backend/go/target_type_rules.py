@@ -34,8 +34,8 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
 )
-from pants.base.exceptions import ResolveError
 from pants.base.specs import DirGlobSpec, RawSpecs
+from pants.build_graph.address import ResolveError
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
@@ -55,6 +55,7 @@ from pants.engine.target import (
     InvalidFieldException,
     Targets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.frozendict import FrozenDict
@@ -165,7 +166,7 @@ async def inject_go_third_party_package_dependencies(
     addr = request.dependencies_field.address
     go_mod_address = addr.maybe_convert_to_target_generator()
     wrapped_target, go_mod_info = await MultiGet(
-        Get(WrappedTarget, Address, addr),
+        Get(WrappedTarget, WrappedTargetRequest(addr, description_of_origin="<infallible>")),
         Get(GoModInfo, GoModInfoRequest(go_mod_address)),
     )
     tgt = wrapped_target.target
@@ -262,16 +263,21 @@ async def determine_main_pkg_for_go_binary(
 ) -> GoBinaryMainPackage:
     addr = request.field.address
     if request.field.value:
-        wrapped_specified_tgt = await Get(
-            WrappedTarget,
+        description_of_origin = (
+            f"the `{request.field.alias}` field from the target {request.field.address}"
+        )
+        specified_address = await Get(
+            Address,
             AddressInput,
             AddressInput.parse(
                 request.field.value,
                 relative_to=addr.spec_path,
-                description_of_origin=(
-                    f"the `{request.field.alias}` field from the target {request.field.address}"
-                ),
+                description_of_origin=description_of_origin,
             ),
+        )
+        wrapped_specified_tgt = await Get(
+            WrappedTarget,
+            WrappedTargetRequest(specified_address, description_of_origin=description_of_origin),
         )
         if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
             raise InvalidFieldException(
@@ -298,18 +304,16 @@ async def determine_main_pkg_for_go_binary(
     if len(relevant_pkg_targets) == 1:
         return GoBinaryMainPackage(relevant_pkg_targets[0].address)
 
-    wrapped_tgt = await Get(WrappedTarget, Address, addr)
-    alias = wrapped_tgt.target.alias
     if not relevant_pkg_targets:
         raise ResolveError(
-            f"The `{alias}` target {addr} requires that there is a `go_package` "
+            f"The target {addr} requires that there is a `go_package` "
             f"target defined in its directory {addr.spec_path}, but none were found.\n\n"
             "To fix, add a target like `go_package()` or `go_package(name='pkg')` to the BUILD "
             f"file in {addr.spec_path}."
         )
     raise ResolveError(
         f"There are multiple `go_package` targets for the same directory of the "
-        f"`{alias}` target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
+        f"target {addr}: {addr.spec_path}. It is ambiguous what to use as the `main` "
         "package.\n\n"
         f"To fix, please either set the `main` field for `{addr} or remove these "
         "`go_package` targets so that only one remains: "
@@ -325,7 +329,12 @@ class InjectGoBinaryMainDependencyRequest(InjectDependenciesRequest):
 async def inject_go_binary_main_dependency(
     request: InjectGoBinaryMainDependencyRequest,
 ) -> InjectedDependencies:
-    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    wrapped_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     main_pkg = await Get(
         GoBinaryMainPackage,
         GoBinaryMainPackageRequest(wrapped_tgt.target[GoBinaryMainPackageField]),

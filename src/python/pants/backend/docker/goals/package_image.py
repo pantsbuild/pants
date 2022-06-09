@@ -39,7 +39,7 @@ from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, WrappedTarget
+from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.util.strutil import bullet_list
@@ -234,7 +234,10 @@ async def build_docker_image(
                 build_upstream_images=True,
             ),
         ),
-        Get(WrappedTarget, Address, field_set.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+        ),
     )
 
     tags = field_set.image_refs(
