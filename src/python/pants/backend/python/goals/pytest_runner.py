@@ -142,7 +142,7 @@ _EXTRA_OUTPUT_DIR = "extra-output"
 class TestSetupRequest:
     field_set: PythonTestFieldSet
     is_debug: bool
-    main: Optional[MainSpecification] = None  # Default's to pytest.main
+    main: Optional[MainSpecification] = None  # Defaults to pytest.main
     prepend_argv: Tuple[str, ...] = ()
     additional_pexes: Tuple[Pex, ...] = ()
 
