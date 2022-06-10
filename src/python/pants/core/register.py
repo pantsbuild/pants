@@ -23,6 +23,7 @@ from pants.core.goals import (
 )
 from pants.core.target_types import (
     ArchiveTarget,
+    DefaultsTarget,
     FilesGeneratorTarget,
     FileTarget,
     GenericTarget,
@@ -84,12 +85,13 @@ def rules():
 def target_types():
     return [
         ArchiveTarget,
-        FileTarget,
+        DefaultsTarget,
         FilesGeneratorTarget,
+        FileTarget,
         GenericTarget,
-        ResourceTarget,
-        ResourcesGeneratorTarget,
         RelocatedFiles,
+        ResourcesGeneratorTarget,
+        ResourceTarget,
     ]
 
 

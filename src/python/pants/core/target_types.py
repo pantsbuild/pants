@@ -187,8 +187,10 @@ async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSou
 
 
 # -----------------------------------------------------------------------------------------------
-# `file` and`files` targets
+# `file` and `files` targets
 # -----------------------------------------------------------------------------------------------
+
+
 class FileSourceField(AssetSourceField):
     uses_source_roots = False
 
@@ -706,6 +708,46 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         ),
     )
     return BuiltPackage(archive, (BuiltPackageArtifact(output_filename),))
+
+
+# -----------------------------------------------------------------------------------------------
+# `defaults` target
+# -----------------------------------------------------------------------------------------------
+
+
+class DefaultsTarget(Target):
+    alias = "defaults"
+    core_fields = COMMON_TARGET_FIELDS
+    help = softwrap(
+        """
+        A meta target providing scoped default values for all closest targets from current directory
+        and below.
+        """
+    )
+
+
+@dataclass(frozen=True)
+class DefaultsRequest:
+    path: str
+    target_name: str | None = None
+
+    @classmethod
+    def for_target(cls, target: Target, defaults_name: str | None = None) -> DefaultsRequest:
+        return cls(target.address.spec_path, defaults_name)
+
+
+@rule
+async def get_defaults(request: DefaultsRequest, all_targets: AllTargets) -> Targets:
+    """Fetch all applicable `defaults` targets, sorted on specificity (closest first)."""
+    defaults = []
+    for tgt in all_targets:
+        if not isinstance(tgt, DefaultsTarget):
+            continue
+        if request.target_name in (None, tgt.address.target_name) and request.path.startswith(
+            tgt.address.spec_path
+        ):
+            defaults.append(tgt)
+    return Targets(sorted(defaults, key=lambda d: len(d.address.spec_path), reverse=True))
 
 
 def rules():

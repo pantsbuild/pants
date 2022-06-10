@@ -1524,6 +1524,10 @@ class UnrecognizedTargetTypeException(Exception):
         )
 
 
+class VisibilityViolationError(Exception):
+    pass
+
+
 # -----------------------------------------------------------------------------------------------
 # Field templates
 # -----------------------------------------------------------------------------------------------
@@ -2658,7 +2662,34 @@ class DescriptionField(StringField):
     )
 
 
-COMMON_TARGET_FIELDS = (Tags, DescriptionField)
+class VisibilityField(StringSequenceField):
+    PUBLIC_VISIBILITY = "public"
+    PRIVATE_VISIBILITY = "private"
+
+    alias = "visibility"
+    help = softwrap(
+        """
+        TBW.
+        """
+    )
+
+    def get_visibility(self, default: tuple[str, ...] | None = None) -> tuple[str, ...]:
+        return next(value for value in (self.value, default, ()) if value is not None)
+
+    def visible(
+        self, origin: Address, destination: Address, default: tuple[str, ...] | None = None
+    ) -> bool:
+        for rule in self.get_visibility(default):
+            if rule == self.PUBLIC_VISIBILITY:
+                return True
+            if rule == self.PRIVATE_VISIBILITY:
+                return destination.spec_path.startswith(origin.spec_path)
+            if destination.spec_path.startswith(rule):
+                return True
+        return False
+
+
+COMMON_TARGET_FIELDS = (Tags, DescriptionField, VisibilityField)
 
 
 class OverridesField(AsyncFieldMixin, Field):
