@@ -184,7 +184,7 @@ async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRe
 
 
 @rule
-async def setup_junit_debug_adaptor_request(
+async def setup_junit_debug_adapter_request(
     field_set: JunitTestFieldSet,
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("Debugging Java using a debug adaptor has not yet been implemented.")

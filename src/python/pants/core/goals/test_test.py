@@ -158,7 +158,7 @@ def run_test_rule(
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
         debug=debug,
-        debug_adaptor=False,
+        debug_adapter=False,
         use_coverage=use_coverage,
         report=report,
         report_dir=report_dir,
@@ -185,7 +185,7 @@ def run_test_rule(
     def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
 
-    def mock_debug_adaptor_request(_: TestFieldSet) -> TestDebugAdapterRequest:
+    def mock_debug_adapter_request(_: TestFieldSet) -> TestDebugAdapterRequest:
         return TestDebugAdapterRequest(
             InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST)
         )
@@ -231,7 +231,7 @@ def run_test_rule(
                 MockGet(
                     output_type=TestDebugAdapterRequest,
                     input_type=TestFieldSet,
-                    mock=mock_debug_adaptor_request,
+                    mock=mock_debug_adapter_request,
                 ),
                 # Merge XML results.
                 MockGet(
