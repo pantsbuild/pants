@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any, ClassVar
 
-from pants.build_graph.address import Address, AddressInput
+from pants.build_graph.address import Address
 
 # -----------------------------------------------------------------------------------------------
 # Basic JSON Structures
@@ -38,15 +38,6 @@ class BuildTargetIdentifier:
     @classmethod
     def from_address(cls, addr: Address) -> BuildTargetIdentifier:
         return cls(uri=f"pants:{str(addr)}")
-
-    @property
-    def address_input(self) -> AddressInput:
-        if not self.uri.startswith("pants:"):
-            raise ValueError(
-                f"Unknown URI scheme for BSP BuildTargetIdentifier. Expected scheme `pants`, but URI was: {self.uri}"
-            )
-        raw_addr = self.uri[len("pants:") :]
-        return AddressInput.parse(raw_addr, description_of_origin="TODO(#14468)")
 
 
 @dataclass(frozen=True)

@@ -552,7 +552,9 @@ async def coursier_fetch_one_coord(
         targets = await Get(
             Targets,
             UnparsedAddressInputs(
-                [request.pants_address], owning_address=None, description_of_origin="TODO(#14468)"
+                [request.pants_address],
+                owning_address=None,
+                description_of_origin="<infallible - coursier fetch>",
             ),
         )
         req = ArtifactRequirement(request.coord, jar=targets[0][JvmArtifactJarSourceField])
