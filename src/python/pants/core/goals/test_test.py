@@ -25,6 +25,7 @@ from pants.core.goals.test import (
     RuntimePackageDependenciesField,
     ShowOutput,
     Test,
+    TestDebugAdaptorRequest,
     TestDebugRequest,
     TestFieldSet,
     TestResult,
@@ -157,6 +158,7 @@ def run_test_rule(
     test_subsystem = create_goal_subsystem(
         TestSubsystem,
         debug=debug,
+        debug_adaptor=False,
         use_coverage=use_coverage,
         report=report,
         report_dir=report_dir,
@@ -182,6 +184,11 @@ def run_test_rule(
 
     def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
+
+    def mock_debug_adaptor_request(_: TestFieldSet) -> TestDebugAdaptorRequest:
+        return TestDebugAdaptorRequest(
+            InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST)
+        )
 
     def mock_coverage_report_generation(
         coverage_data_collection: MockCoverageDataCollection,
@@ -220,6 +227,11 @@ def run_test_rule(
                     output_type=TestDebugRequest,
                     input_type=TestFieldSet,
                     mock=mock_debug_request,
+                ),
+                MockGet(
+                    output_type=TestDebugAdaptorRequest,
+                    input_type=TestFieldSet,
+                    mock=mock_debug_adaptor_request,
                 ),
                 # Merge XML results.
                 MockGet(
