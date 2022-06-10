@@ -27,7 +27,7 @@ from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
     RuntimePackageDependenciesField,
-    TestDebugAdaptorRequest,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
@@ -398,14 +398,14 @@ async def debugpy_python_test(
     field_set: PythonTestFieldSet,
     debugpy: DebugPy,
     pytest: PyTest,
-) -> TestDebugAdaptorRequest:
+) -> TestDebugAdapterRequest:
     debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
     if pytest.main.spec != "pytest":
         logger.warn(
             softwrap(
                 """
-                Ignoring custom [pytest].console_script/entry_point when using --use-debug-adaptor.
-                `debugpy` (Python's Debug Adaptor) doesn't support this use-case yet.
+                Ignoring custom [pytest].console_script/entry_point when using the debug adapter.
+                `debugpy` (Python's Debug Adapter) doesn't support this use-case yet.
                 """
             )
         )
@@ -429,7 +429,7 @@ async def debugpy_python_test(
             additional_pexes=(debugpy_pex,),
         ),
     )
-    return TestDebugAdaptorRequest(
+    return TestDebugAdapterRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
         )

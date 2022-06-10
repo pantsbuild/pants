@@ -9,7 +9,7 @@ from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import ScalatestTestSourceField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
-    TestDebugAdaptorRequest,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
     TestResult,
@@ -188,10 +188,10 @@ async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> Tes
 
 
 @rule
-async def setup_scalatest_debug_adaptor_request(
+async def setup_scalatest_debug_adapter_request(
     field_set: ScalatestTestFieldSet,
-) -> TestDebugAdaptorRequest:
-    raise NotImplementedError("Debugging Scala using a debug adaptor has not yet been implemented.")
+) -> TestDebugAdapterRequest:
+    raise NotImplementedError("Debugging Scala using a debug adapter has not yet been implemented.")
 
 
 @rule

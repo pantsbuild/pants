@@ -19,7 +19,7 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.test import (
-    TestDebugAdaptorRequest,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
     TestResult,
@@ -149,9 +149,9 @@ async def generate_helm_unittest_debug_request(field_set: HelmUnitTestFieldSet) 
 
 
 @rule
-async def generate_helm_unittest_debug_adaptor_request(
+async def generate_helm_unittest_debug_adapter_request(
     field_set: HelmUnitTestFieldSet,
-) -> TestDebugAdaptorRequest:
+) -> TestDebugAdapterRequest:
     raise NotImplementedError("Can not debug Helm unit tests")
 
 

@@ -25,7 +25,7 @@ from pants.core.goals.test import (
     RuntimePackageDependenciesField,
     ShowOutput,
     Test,
-    TestDebugAdaptorRequest,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
     TestResult,
@@ -185,8 +185,8 @@ def run_test_rule(
     def mock_debug_request(_: TestFieldSet) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
 
-    def mock_debug_adaptor_request(_: TestFieldSet) -> TestDebugAdaptorRequest:
-        return TestDebugAdaptorRequest(
+    def mock_debug_adaptor_request(_: TestFieldSet) -> TestDebugAdapterRequest:
+        return TestDebugAdapterRequest(
             InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST)
         )
 
@@ -229,7 +229,7 @@ def run_test_rule(
                     mock=mock_debug_request,
                 ),
                 MockGet(
-                    output_type=TestDebugAdaptorRequest,
+                    output_type=TestDebugAdapterRequest,
                     input_type=TestFieldSet,
                     mock=mock_debug_adaptor_request,
                 ),

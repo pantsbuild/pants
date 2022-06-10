@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pants.backend.java.subsystems.junit import JUnit
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
-    TestDebugAdaptorRequest,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
     TestResult,
@@ -186,7 +186,7 @@ async def setup_junit_debug_request(field_set: JunitTestFieldSet) -> TestDebugRe
 @rule
 async def setup_junit_debug_adaptor_request(
     field_set: JunitTestFieldSet,
-) -> TestDebugAdaptorRequest:
+) -> TestDebugAdapterRequest:
     raise NotImplementedError("Debugging Java using a debug adaptor has not yet been implemented.")
 
 

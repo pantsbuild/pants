@@ -29,7 +29,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.core.goals.test import (
-    TestDebugAdaptorRequest,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestResult,
     build_runtime_package_dependencies,
@@ -68,7 +68,7 @@ def rule_runner() -> RuleRunner:
             *setuptools_rules(),
             QueryRule(TestResult, (PythonTestFieldSet,)),
             QueryRule(TestDebugRequest, (PythonTestFieldSet,)),
-            QueryRule(TestDebugAdaptorRequest, (PythonTestFieldSet,)),
+            QueryRule(TestDebugAdapterRequest, (PythonTestFieldSet,)),
         ],
         target_types=[
             PexBinary,
@@ -603,7 +603,7 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         Address(PACKAGE, target_name="tests", relative_file_path="test_foo.py")
     )
     inputs = [PythonTestFieldSet.create(tgt)]
-    request = rule_runner.request(TestDebugAdaptorRequest, inputs)
+    request = rule_runner.request(TestDebugAdapterRequest, inputs)
     assert request.process is not None
     assert request.process.argv == (
         "./pytest_runner.pex_pex_shim.sh",

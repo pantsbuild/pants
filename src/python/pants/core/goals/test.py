@@ -182,8 +182,8 @@ class TestDebugRequest:
     __test__ = False
 
 
-class TestDebugAdaptorRequest(TestDebugRequest):
-    """Like TestDebugRequest, but launches the test process using the relevant Debug Adaptor server.
+class TestDebugAdapterRequest(TestDebugRequest):
+    """Like TestDebugRequest, but launches the test process using the relevant Debug Adapter server.
 
     The process should be launched waiting for the client to connect.
     """
@@ -318,12 +318,12 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
-    debug_adaptor = BoolOption(
-        "--debug-adaptor",
+    debug_adapter = BoolOption(
+        "--debug-adapter",
         default=False,
         help=softwrap(
             """
-            Run tests sequentially in an interactive process, using a Debug Adaptor
+            Run tests sequentially in an interactive process, using a Debug Adapter
             (https://microsoft.github.io/debug-adapter-protocol/) for the language if supported.
 
             The interactive process used will be immediately blocked waiting for a client before
@@ -425,21 +425,21 @@ async def _run_debug_tests(
     debug_requests = await MultiGet(
         (
             Get(TestDebugRequest, TestFieldSet, field_set)
-            if not test_subsystem.debug_adaptor
-            else Get(TestDebugAdaptorRequest, TestFieldSet, field_set)
+            if not test_subsystem.debug_adapter
+            else Get(TestDebugAdapterRequest, TestFieldSet, field_set)
         )
         for field_set in targets_to_valid_field_sets.field_sets
     )
     exit_code = 0
     for debug_request, field_set in zip(debug_requests, targets_to_valid_field_sets.field_sets):
         if debug_request.process is None:
-            if test_subsystem.debug_adaptor:
-                logger.info(f"Pants doesnt have an adaptor for {field_set.address}. Skipping test.")
+            if test_subsystem.debug_adapter:
+                logger.info(f"Pants doesnt have an adapter for {field_set.address}. Skipping test.")
             logger.debug(f"Skipping tests for {field_set.address}")
             continue
 
-        if test_subsystem.debug_adaptor:
-            logger.info("Launching debug adaptor. Waiting for client connection...")
+        if test_subsystem.debug_adapter:
+            logger.info("Launching debug adapter. Waiting for client connection...")
 
         debug_result = await Effect(
             InteractiveProcessResult, InteractiveProcess, debug_request.process
@@ -458,7 +458,7 @@ async def run_tests(
     distdir: DistDir,
     run_id: RunId,
 ) -> Test:
-    if test_subsystem.debug or test_subsystem.debug_adaptor:
+    if test_subsystem.debug or test_subsystem.debug_adapter:
         return await _run_debug_tests(test_subsystem)
 
     shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")

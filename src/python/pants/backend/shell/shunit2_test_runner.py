@@ -18,7 +18,7 @@ from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
     RuntimePackageDependenciesField,
-    TestDebugAdaptorRequest,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
@@ -267,8 +267,8 @@ async def setup_shunit2_debug_test(field_set: Shunit2FieldSet) -> TestDebugReque
 
 
 @rule
-async def setup_shunit2_debug_adaptor_test(field_set: Shunit2FieldSet) -> TestDebugAdaptorRequest:
-    raise NotImplementedError("Debugging Shell using a debug adaptor has not yet been implemented.")
+async def setup_shunit2_debug_adapter_test(field_set: Shunit2FieldSet) -> TestDebugAdapterRequest:
+    raise NotImplementedError("Debugging Shell using a debug adapter has not yet been implemented.")
 
 
 def rules():

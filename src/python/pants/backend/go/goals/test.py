@@ -29,7 +29,7 @@ from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConf
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
 from pants.core.goals.test import (
-    TestDebugAdaptorRequest,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
     TestResult,
@@ -331,9 +331,9 @@ async def generate_go_tests_debug_request(field_set: GoTestFieldSet) -> TestDebu
 
 
 @rule
-async def generate_go_tests_debug_adaptor_request(
+async def generate_go_tests_debug_adapter_request(
     field_set: GoTestFieldSet,
-) -> TestDebugAdaptorRequest:
+) -> TestDebugAdapterRequest:
     raise NotImplementedError("This is a stub.")
 
 
