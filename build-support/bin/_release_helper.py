@@ -1248,7 +1248,7 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
                 softwrap(
                     f"""
                     {package.name}. Expected 7 wheels ({{cp37m, cp38, cp39}} x
-                    {{macosx-x86_64, linux-x86_64}} + cp39-macosx),
+                    {{macosx-x86_64, linux-x86_64}} + cp39-macosx-arm64),
                     but found {len(local_files)}:\n    {formatted_local_files}
                     """
                 )

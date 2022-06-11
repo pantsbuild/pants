@@ -180,8 +180,8 @@ class Shunit2TestsOverrideField(OverridesField):
         Shunit2TestTarget.alias,
         """
         overrides={
-            "foo_test.sh": {"timeout": 120]},
-            "bar_test.sh": {"timeout": 200]},
+            "foo_test.sh": {"timeout": 120},
+            "bar_test.sh": {"timeout": 200},
             ("foo_test.sh", "bar_test.sh"): {"tags": ["slow_tests"]},
         }
         """,

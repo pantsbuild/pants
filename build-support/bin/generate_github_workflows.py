@@ -33,8 +33,8 @@ Env = Dict[str, str]
 
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
-    MACOS_X86_64 = "macOS-x86_64"
-    MACOS_ARM64 = "macOS-ARM64"
+    MACOS10_X86_64 = "macOS10-x86_64"
+    MACOS11_ARM64 = "macOS11-ARM64"
 
 
 # ----------------------------------------------------------------------
@@ -53,9 +53,6 @@ NATIVE_FILES = [
 PYTHON37_VERSION = "3.7"
 PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
-
-LINUX_VERSION = "ubuntu-20.04"
-MACOS_VERSION = "macos-10.15"
 
 DONT_SKIP_RUST = "!contains(env.COMMIT_MESSAGE, '[ci skip-rust]')"
 DONT_SKIP_WHEELS = (
@@ -243,30 +240,6 @@ def deploy_to_s3() -> Step:
     }
 
 
-def bootstrap_caches() -> Sequence[Step]:
-    return [
-        *rust_caches(),
-        # NB: This caching is only intended for the bootstrap jobs to avoid them needing to
-        # re-compile when possible. Compare to the upload-artifact and download-artifact actions,
-        # which are how the bootstrap jobs share the compiled binaries with the other jobs like
-        # `lint` and `test`.
-        {
-            "name": "Get native engine hash",
-            "id": "get-engine-hash",
-            "run": 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"\n',
-            "shell": "bash",
-        },
-        {
-            "name": "Cache native engine",
-            "uses": "actions/cache@v3",
-            "with": {
-                "path": "\n".join(NATIVE_FILES),
-                "key": "${{ runner.os }}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1\n",
-            },
-        },
-    ]
-
-
 def setup_primary_python(install_python: bool = True) -> Sequence[Step]:
     ret = []
     if install_python:
@@ -330,29 +303,29 @@ class Helper:
         return str(self.platform.value)
 
     def runs_on(self) -> list[str]:
-        if self.platform == Platform.MACOS_X86_64:
-            return [MACOS_VERSION]
-        if self.platform == Platform.MACOS_ARM64:
-            return ["self-hosted", "macOS", "ARM64"]
+        if self.platform == Platform.MACOS10_X86_64:
+            return ["macos-10.15"]
+        if self.platform == Platform.MACOS11_ARM64:
+            return ["self-hosted", "macOS11", "ARM64"]
         if self.platform == Platform.LINUX_X86_64:
-            return [LINUX_VERSION]
+            return ["ubuntu-20.04"]
         raise ValueError(f"Unsupported platform: {self.platform_name()}")
 
     def platform_env(self):
         ret = {}
-        if self.platform == Platform.MACOS_X86_64:
+        if self.platform == Platform.MACOS10_X86_64:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
             # intel machines. See: https://github.com/giampaolo/psutil/issues/1832
             ret["ARCHFLAGS"] = "-arch x86_64"
-        if self.platform == Platform.MACOS_ARM64:
-            ret["ARCHFLAGS"] = "-arch arm64e"
+        if self.platform == Platform.MACOS11_ARM64:
+            ret["ARCHFLAGS"] = "-arch arm64"
         return ret
 
     def wrap_cmd(self, cmd: str) -> str:
-        if self.platform == Platform.MACOS_ARM64:
+        if self.platform == Platform.MACOS11_ARM64:
             # The self-hosted M1 runner is an X86_64 binary that runs under Rosetta,
             # so we have to explicitly change the arch for the subprocesses it spawns.
-            return f"arch -arm64e {cmd}"
+            return f"arch -arm64 {cmd}"
         return cmd
 
     def native_binaries_upload(self) -> Step:
@@ -395,11 +368,34 @@ class Helper:
             },
         ]
 
+    def bootstrap_caches(self) -> Sequence[Step]:
+        return [
+            *self.rust_caches(),
+            # NB: This caching is only intended for the bootstrap jobs to avoid them needing to
+            # re-compile when possible. Compare to the upload-artifact and download-artifact actions,
+            # which are how the bootstrap jobs share the compiled binaries with the other jobs like
+            # `lint` and `test`.
+            {
+                "name": "Get native engine hash",
+                "id": "get-engine-hash",
+                "run": 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"\n',
+                "shell": "bash",
+            },
+            {
+                "name": "Cache native engine",
+                "uses": "actions/cache@v3",
+                "with": {
+                    "path": "\n".join(NATIVE_FILES),
+                    "key": f"{self.platform_name()}-engine-${{ steps.get-engine-hash.outputs.hash }}-v1\n",
+                },
+            },
+        ]
+
     def bootstrap_pants(self, *, install_python: bool) -> Sequence[Step]:
         return [
             *checkout(),
             *setup_primary_python(install_python=install_python),
-            *bootstrap_caches(),
+            *self.bootstrap_caches(),
             setup_toolchain_auth(),
             {"name": "Bootstrap Pants", "run": self.wrap_cmd("./pants --version\n")},
             {
@@ -419,9 +415,49 @@ class Helper:
         ]
 
 
+def macos_arm64_jobs() -> Jobs:
+    helper_macos_arm64 = Helper(Platform.MACOS11_ARM64)
+    # The setup-python action doesn't yet support installing ARM64 Pythons.
+    # Instead we pre-install Python 3.9 on the self-hosted runner.
+    steps = list(helper_macos_arm64.bootstrap_pants(install_python=False))
+    # TODO: Build local pex? Will require some changes to _release_helper.py to qualify
+    #  the .pex file name with the architecture, intead of just "darwin".
+    steps.append(
+        {
+            "name": "Build wheels",
+            "run": f"USE_PY39=true {helper_macos_arm64.wrap_cmd('./build-support/bin/release.sh build-wheels')}",
+            "if": f"({DONT_SKIP_WHEELS}) && ({IS_PANTS_OWNER})",
+        }
+    )
+    steps.append(
+        {
+            "name": "Build fs_util",
+            "run": f"USE_PY39=true {helper_macos_arm64.wrap_cmd('./build-support/bin/release.sh build-fs-util')}",
+            # We only build fs_util on branch builds, given that Pants compilation already
+            # checks the code compiles and the release process is simple and low-stakes.
+            "if": "github.event_name == 'push'",
+        }
+    )
+    steps.append(deploy_to_s3())
+    return {
+        "build_wheels_macos_arm64": {
+            "name": f"Bootstrap Pants, build wheels and fs_util ({Platform.MACOS11_ARM64.value})",
+            "runs-on": helper_macos_arm64.runs_on(),
+            "needs": "check_labels",
+            "strategy": {"matrix": {"python-version": [PYTHON39_VERSION]}},
+            "timeout-minutes": 60,
+            "if": IS_PANTS_OWNER,
+            "steps": steps,
+            "env": {**helper_macos_arm64.platform_env(), **DISABLE_REMOTE_CACHE_ENV},
+        },
+    }
+
+
 def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
+    # TODO: Break out generating linux and macos X86_64 jobs into their own functions,
+    #  similar to macos_arm64_jobs above.
     helper_linux = Helper(Platform.LINUX_X86_64)
-    helper_macos = Helper(Platform.MACOS_X86_64)
+    helper_macos = Helper(Platform.MACOS10_X86_64)
 
     def test_python_linux(shard: str) -> dict[str, Any]:
         return {
@@ -537,7 +573,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
             ],
         },
         "test_python_macos": {
-            "name": "Test Python (macOS)",
+            "name": f"Test Python ({helper_macos.platform_name()})",
             "runs-on": helper_macos.runs_on(),
             "needs": "bootstrap_pants_macos",
             "strategy": {"matrix": {"python-version": python_versions}},
@@ -566,8 +602,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     }
     if not cron:
 
-        def build_steps(*, platform: Platform) -> list[Step]:
-            helper = Helper(platform)
+        def build_steps(*, helper: Helper) -> list[Step]:
             return [
                 {
                     "name": "Build wheels",
@@ -608,8 +643,8 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         jobs.update(
             {
                 "build_wheels_linux_x86_64": {
-                    "name": "Build wheels and fs_util (Linux x86_64)",
-                    "runs-on": LINUX_VERSION,
+                    "name": f"Build wheels and fs_util (f{helper_linux.platform_name()})",
+                    "runs-on": helper_linux.runs_on(),
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
                     "timeout-minutes": 65,
                     **build_wheels_common,
@@ -626,14 +661,14 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                             ),
                         },
                         setup_toolchain_auth(),
-                        *build_steps(platform=Platform.LINUX_X86_64),
+                        *build_steps(helper=helper_linux),
                         upload_log_artifacts(name="wheels-linux-x86_64"),
                         deploy_to_s3(),
                     ],
                 },
                 "build_wheels_macos_x86_64": {
-                    "name": "Build wheels and fs_util (macOS x86_64)",
-                    "runs-on": MACOS_VERSION,
+                    "name": f"Build wheels and fs_util ({helper_macos.platform_name()})",
+                    "runs-on": helper_macos.runs_on(),
                     "timeout-minutes": 80,
                     **build_wheels_common,
                     "steps": [
@@ -644,14 +679,15 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                         # virtualenv. This is because we must build both these things with
                         # multiple Python versions, whereas that caching assumes only one primary
                         # Python version (marked via matrix.strategy).
-                        *rust_caches(),
-                        *build_steps(platform=Platform.MACOS_X86_64),
+                        *helper_macos.rust_caches(),
+                        *build_steps(helper=helper_macos),
                         upload_log_artifacts(name="wheels-macos-x86_64"),
                         deploy_to_s3(),
                     ],
                 },
             }
         )
+    jobs.update(**macos_arm64_jobs())
     return jobs
 
 
@@ -800,60 +836,6 @@ def generate() -> dict[Path, str]:
         Dumper=NoAliasDumper,
     )
 
-    # The M1 build is a separate workflow because it must run on Python 3.9, whereas we run
-    # the other builds on 3.7 to verify compatibility with earlier Pythons.
-    helper_macos_arm64 = Helper(Platform.MACOS_ARM64)
-    steps = list(helper_macos_arm64.bootstrap_pants(install_python=False))
-    # TODO: Build local pex? Will require some changes to _release_helper.py to qualify
-    #  the .pex file name with the architecture, intead of just "darwin".
-    steps.append(
-        {
-            "name": "Build wheels",
-            "run": f"USE_PY39=true {helper_macos_arm64.wrap_cmd('./build-support/bin/release.sh build-wheels')}",
-            "if": f"({DONT_SKIP_WHEELS}) && ({IS_PANTS_OWNER})",
-        }
-    )
-    steps.append(
-        {
-            "name": "Build fs_util",
-            "run": f"USE_PY39=true {helper_macos_arm64.wrap_cmd('./build-support/bin/release.sh build-fs-util')}",
-            # We only build fs_util on branch builds, given that Pants compilation already
-            # checks the code compiles and the release process is simple and low-stakes.
-            "if": "github.event_name == 'push'",
-        }
-    )
-    steps.append(deploy_to_s3())
-    job = {
-        "name": f"Bootstrap Pants, build wheels and fs_util ({Platform.MACOS_ARM64.value})",
-        "runs-on": helper_macos_arm64.runs_on(),
-        "strategy": {"matrix": {"python-version": [PYTHON39_VERSION]}},
-        "timeout-minutes": 60,
-        "if": IS_PANTS_OWNER,
-        "steps": steps,
-        "env": DISABLE_REMOTE_CACHE_ENV,
-    }
-
-    macos_arm64_yaml = yaml.dump(
-        {
-            "name": "M1 Build",
-            "on": {
-                # TODO: If there is too much contention for resources on our lone M1 self-hosted
-                #  runner, remove the pull_request line, and only build wheels on pushes to main.
-                "pull_request": {},
-                "push": {
-                    "branches-ignore": ["dependabot/**"],
-                },
-            },
-            # The setup-python action doesn't yet support installing ARM64 Pythons.
-            # Instead we pre-install Python 3.9 on the self-hosted runner.
-            "jobs": {
-                "build_wheels_macos_arm64": job,
-            },
-            "env": {**global_env(), **helper_macos_arm64.platform_env()},
-        },
-        Dumper=NoAliasDumper,
-    )
-
     cancel_yaml = yaml.dump(
         {
             # Note that this job runs in the context of the default branch, so its token
@@ -923,7 +905,6 @@ def generate() -> dict[Path, str]:
         Path(".github/workflows/cancel.yaml"): f"{HEADER}\n\n{cancel_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/test-cron.yaml"): f"{HEADER}\n\n{test_cron_yaml}",
-        Path(".github/workflows/m1.yaml"): f"{HEADER}\n\n{macos_arm64_yaml}",
     }
 
 
