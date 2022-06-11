@@ -37,11 +37,62 @@ from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 
 COLLECTION_SCRIPT = r"""\
+import inspect
 from pathlib import Path
 import json
 import sys
 
 import pytest
+from _pytest.compat import get_real_func
+from _pytest import fixtures
+
+
+def get_func_path(func):
+    real_func = get_real_func(func)
+    return inspect.getfile(real_func)
+
+
+def get_fixturedef(fixture_request, name):
+    fixturedef = fixture_request._fixture_defs.get(name)
+    if fixturedef:
+        return fixturedef
+    try:
+        return fixture_request._getnextfixturedef(name)
+    except fixtures.FixtureLookupError:
+        return None
+
+
+def process_fixtures(item):
+    lockfile_definitions = []
+    fixture_request = fixtures.FixtureRequest(item, _ispytest=True)
+    for fixture_name in fixture_request.fixturenames:
+        fixture_def = get_fixturedef(fixture_request, fixture_name)
+        if not fixture_def:
+            continue
+
+        func = fixture_def.func
+        annotations = getattr(func, "__annotations__")
+        if not annotations or annotations.get("return") != "JVMLockfileFixtureDefinition":
+            continue
+
+        # Note: We just invoke the fixture_def function assuming it takes no arguments. The other two
+        # ways of invoking for the fixture value cause errors. I have left them here commented-out as an example
+        # of what failed:
+        #   lockfile_definition = fixture_request.getfixturevalue(fixture_name)
+        #   lockfile_definition = fixture_def.execute(request=request)
+        lockfile_definition = func()
+        if lockfile_definition.__class__.__name__ != "JVMLockfileFixtureDefinition":
+            continue
+
+        cwd = Path.cwd()
+        func_path = Path(get_func_path(func)).relative_to(cwd)
+        lockfile_definitions.append({
+            "lockfile_rel_path": str(lockfile_definition.lockfile_rel_path),
+            "requirements": [c.to_coord_str() for c in lockfile_definition.requirements],
+            "test_file_path": str(func_path),
+        })
+    return lockfile_definitions
+
 
 class CollectionPlugin:
     def __init__(self):
@@ -53,16 +104,13 @@ class CollectionPlugin:
 
 
 collection_plugin = CollectionPlugin()
-pytest.main(["--collect-only", *sys.argv[1:]], plugins=[collection_plugin])
+pytest.main(["--setup-only", *sys.argv[1:]], plugins=[collection_plugin])
+
 output = []
 cwd = Path.cwd()
+
 for item in collection_plugin.collected:
-    for mark in item.iter_markers("jvm_lockfile"):
-        path = Path(item.path).relative_to(cwd)
-        output.append({
-            "kwargs": mark.kwargs,
-            "test_file_path": str(path),
-        })
+    output.extend(process_fixtures(item))
 
 with open("tests.json", "w") as f:
     f.write(json.dumps(output))
@@ -198,7 +246,7 @@ async def collect_fixture_configs(
     configs = []
     for item in raw_config_data:
         config = JVMLockfileFixtureConfig(
-            definition=JVMLockfileFixtureDefinition.from_kwargs(item["kwargs"]),
+            definition=JVMLockfileFixtureDefinition.from_json_dict(item),
             test_file_path=item["test_file_path"],
         )
         configs.append(config)
@@ -212,7 +260,7 @@ async def gather_lockfile_fixtures() -> RenderedJVMLockfileFixtures:
     rendered_fixtures = []
     for config in configs:
         artifact_reqs = ArtifactRequirements(
-            [ArtifactRequirement(coordinate) for coordinate in config.definition.coordinates]
+            [ArtifactRequirement(coordinate) for coordinate in config.definition.requirements]
         )
         lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, artifact_reqs)
         serialized_lockfile = JVMLockfileMetadata.new(artifact_reqs).add_header_to_lockfile(
