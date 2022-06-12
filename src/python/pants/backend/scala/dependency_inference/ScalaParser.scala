@@ -206,17 +206,19 @@ class SourceAnalysisTraverser extends Traverser {
       visitTemplate(templ, name)
     }
 
-    case Defn.Class(mods, nameNode, _tparams, _ctor, templ) => {
+    case Defn.Class(mods, nameNode, _tparams, ctor, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawClass = true)
+      apply(ctor)
       visitTemplate(templ, name)
     }
 
-    case Defn.Trait(mods, nameNode, _tparams, _ctor, templ) => {
+    case Defn.Trait(mods, nameNode, _tparams, ctor, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawTrait = true)
+      apply(ctor)
       visitTemplate(templ, name)
     }
 

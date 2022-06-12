@@ -269,7 +269,13 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 ["Integer", "a", "toInt", "calc.calcFunc"]
             ),
             "org.pantsbuild.example": FrozenOrderedSet(
-                ["ABaseClass", "ATrait1", "ATrait2.Nested", "BaseWithConstructor"]
+                [
+                    "ABaseClass",
+                    "ATrait1",
+                    "SomeTypeInPrimaryConstructor",
+                    "ATrait2.Nested",
+                    "BaseWithConstructor",
+                ]
             ),
         }
     )
@@ -288,6 +294,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.ATrait2.Nested",
         "java.io.BaseWithConstructor",
         "java.io.OuterObject.NestedVal",
+        "java.io.SomeTypeInPrimaryConstructor",
         "java.io.String",
         "java.io.Unit",
         "java.io.a",
@@ -312,6 +319,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.ATrait1",
         "org.pantsbuild.example.ATrait2.Nested",
         "org.pantsbuild.example.OuterObject.NestedVal",
+        "org.pantsbuild.example.SomeTypeInPrimaryConstructor",
         "org.pantsbuild.example.String",
         "org.pantsbuild.example.Unit",
         "org.pantsbuild.example.a",
@@ -335,6 +343,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.LambdaTypeArg1",
         "org.pantsbuild.LambdaTypeArg2",
         "org.pantsbuild.OuterObject.NestedVal",
+        "org.pantsbuild.SomeTypeInPrimaryConstructor",
         "org.pantsbuild.SomeTypeInSecondaryConstructor",
         "org.pantsbuild.String",
         "org.pantsbuild.TupleTypeArg1",
