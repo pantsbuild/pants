@@ -456,7 +456,7 @@ def test_extract_annotations(rule_runner: RuleRunner) -> None:
             """
             package foo
 
-            @objectAnnotation("hello")
+            @objectAnnotation("hello", SomeType)
             object Object {
               @deprecated
               def foo(arg: String @argAnnotation("foo")): Unit = {}
@@ -474,6 +474,7 @@ def test_extract_annotations(rule_runner: RuleRunner) -> None:
         ),
     )
     assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.SomeType",
         "foo.String",
         "foo.Unit",
         "foo.classAnnotation",
