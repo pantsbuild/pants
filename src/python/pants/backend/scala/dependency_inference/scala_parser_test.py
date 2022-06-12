@@ -246,6 +246,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     assert analysis.consumed_symbols_by_scope == FrozenDict(
         {
             "org.pantsbuild.example.OuterClass.NestedObject": FrozenOrderedSet(["String"]),
+            "org.pantsbuild.example.OuterObject": FrozenOrderedSet(["Foo"]),
             "org.pantsbuild.example.Functions": FrozenOrderedSet(
                 [
                     "TupleTypeArg2",
@@ -265,9 +266,11 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.HasPrimaryConstructor": FrozenOrderedSet(
                 ["bar", "SomeTypeInSecondaryConstructor"]
             ),
+            "org.pantsbuild.example.OuterClass": FrozenOrderedSet(["Foo"]),
             "org.pantsbuild.example.ApplyQualifier": FrozenOrderedSet(
                 ["Integer", "a", "toInt", "calc.calcFunc"]
             ),
+            "org.pantsbuild.example.OuterTrait": FrozenOrderedSet(["Foo"]),
             "org.pantsbuild.example": FrozenOrderedSet(
                 [
                     "ABaseClass",
@@ -293,6 +296,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.ATrait1",
         "java.io.ATrait2.Nested",
         "java.io.BaseWithConstructor",
+        "java.io.Foo",
         "java.io.OuterObject.NestedVal",
         "java.io.SomeTypeInPrimaryConstructor",
         "java.io.String",
@@ -314,6 +318,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.ABaseClass",
         "org.pantsbuild.example.AParameterType",
         "org.pantsbuild.example.BaseWithConstructor",
+        "org.pantsbuild.example.Foo",
         "org.pantsbuild.example.Integer",
         "org.pantsbuild.example.SomeTypeInSecondaryConstructor",
         "org.pantsbuild.example.ATrait1",
@@ -338,6 +343,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.ATrait1",
         "org.pantsbuild.ATrait2.Nested",
         "org.pantsbuild.BaseWithConstructor",
+        "org.pantsbuild.Foo",
         "org.pantsbuild.Integer",
         "org.pantsbuild.LambdaReturnType",
         "org.pantsbuild.LambdaTypeArg1",
