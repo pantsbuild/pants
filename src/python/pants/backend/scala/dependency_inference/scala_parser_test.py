@@ -259,6 +259,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                     "LambdaTypeArg2",
                     "AParameterType",
                     "LambdaTypeArg1",
+                    "OuterObject",
                     "bar",
                     "OuterObject.NestedVal",
                 ]
@@ -268,7 +269,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             ),
             "org.pantsbuild.example.OuterClass": FrozenOrderedSet(["Foo"]),
             "org.pantsbuild.example.ApplyQualifier": FrozenOrderedSet(
-                ["Integer", "a", "toInt", "calc.calcFunc"]
+                ["Integer", "a", "toInt", "calc.calcFunc", "calc"]
             ),
             "org.pantsbuild.example.OuterTrait": FrozenOrderedSet(["Foo"]),
             "org.pantsbuild.example": FrozenOrderedSet(
@@ -298,6 +299,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.BaseWithConstructor",
         "java.io.Foo",
         "java.io.OuterObject.NestedVal",
+        "java.io.OuterObject",
         "java.io.SomeTypeInPrimaryConstructor",
         "java.io.String",
         "java.io.Unit",
@@ -308,6 +310,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.LambdaTypeArg2",
         "java.io.SomeTypeInSecondaryConstructor",
         "java.io.bar",
+        "java.io.calc",
         "java.io.calc.calcFunc",
         "java.io.foo",
         "java.io.toInt",
@@ -329,12 +332,14 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.Unit",
         "org.pantsbuild.example.a",
         "org.pantsbuild.example.bar",
+        "org.pantsbuild.example.calc",
         "org.pantsbuild.example.calc.calcFunc",
         "org.pantsbuild.example.foo",
         "org.pantsbuild.example.toInt",
         "org.pantsbuild.example.LambdaReturnType",
         "org.pantsbuild.example.LambdaTypeArg1",
         "org.pantsbuild.example.LambdaTypeArg2",
+        "org.pantsbuild.example.OuterObject",
         "org.pantsbuild.example.TupleTypeArg1",
         "org.pantsbuild.example.TupleTypeArg2",
         "org.pantsbuild.+",
@@ -348,6 +353,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.LambdaReturnType",
         "org.pantsbuild.LambdaTypeArg1",
         "org.pantsbuild.LambdaTypeArg2",
+        "org.pantsbuild.OuterObject",
         "org.pantsbuild.OuterObject.NestedVal",
         "org.pantsbuild.SomeTypeInPrimaryConstructor",
         "org.pantsbuild.SomeTypeInSecondaryConstructor",
@@ -357,6 +363,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.Unit",
         "org.pantsbuild.a",
         "org.pantsbuild.bar",
+        "org.pantsbuild.calc",
         "org.pantsbuild.calc.calcFunc",
         "org.pantsbuild.foo",
         "org.pantsbuild.toInt",
@@ -403,11 +410,14 @@ def test_relative_import(rule_runner: RuleRunner) -> None:
     )
 
     assert set(analysis.fully_qualified_consumed_symbols()) == {
+        "io",
         "io.apply",
         "java.io.apply",
         "org.pantsbuild.io.apply",
+        "pio",
         "pio.apply",
         "scala.io.apply",
+        "sio",
         "sio.apply",
     }
 

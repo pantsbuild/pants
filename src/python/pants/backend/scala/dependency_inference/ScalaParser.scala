@@ -336,7 +336,7 @@ class SourceAnalysisTraverser extends Traverser {
     case node @ Term.Select(_, _) => {
       val name = extractName(node)
       recordConsumedSymbol(name)
-      super.apply(node.qual)
+      apply(node.qual)
     }
 
     case node @ Term.Name(_) => {
