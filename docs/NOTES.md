@@ -6,7 +6,10 @@ Currently the rdme process is manual, until we bed down the process, at which po
 
 ## Versions
 
-Readme expects every version of the docs to correspond to a semver release. 
+Readme expects every version of the docs to correspond to a semver release. Our convention is as follows:
+
+* A version on readme.com corresponds to a pants release (e.g. pants `v2.11` has docs `v2.11`)
+* The current development (`main` branch) docs are kept in a readme.com version that will reflect the next version of Pants (e.g. if the most recent release branch is `v2.97`, then `main`'s docs should be synced to `v2.98`).
 
 
 # Using `rdme` (general notes)
