@@ -418,7 +418,9 @@ async def _run_debug_tests(
         TargetRootsToFieldSets,
         TargetRootsToFieldSetsRequest(
             TestFieldSet,
-            goal_description="`test --debug`",
+            goal_description=(
+                "`test --debug-adapter`" if test_subsystem.debug_adapter else "`test --debug`"
+            ),
             no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
         ),
     )
@@ -441,7 +443,7 @@ async def _run_debug_tests(
             continue
 
         if test_subsystem.debug_adapter:
-            logger.info("Launching debug adapter. Waiting for client connection...")
+            logger.info("Launching debug adapter, which will wait for a client connection...")
 
         debug_result = await Effect(
             InteractiveProcessResult, InteractiveProcess, debug_request.process
