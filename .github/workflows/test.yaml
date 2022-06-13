@@ -287,7 +287,7 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: ${{ github.repository_owner == 'pantsbuild' }}
-    name: Build wheels and fs_util (fLinux-x86_64)
+    name: Build wheels and fs_util (Linux-x86_64)
     needs: check_labels
     runs-on:
     - ubuntu-20.04

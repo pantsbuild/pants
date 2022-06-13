@@ -643,7 +643,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         jobs.update(
             {
                 "build_wheels_linux_x86_64": {
-                    "name": f"Build wheels and fs_util (f{helper_linux.platform_name()})",
+                    "name": f"Build wheels and fs_util ({helper_linux.platform_name()})",
                     "runs-on": helper_linux.runs_on(),
                     "container": "quay.io/pypa/manylinux2014_x86_64:latest",
                     "timeout-minutes": 65,
