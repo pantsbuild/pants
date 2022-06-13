@@ -104,6 +104,8 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 type NestedType = Foo
                 object NestedObject {
                 }
+
+                def a(a: TraitConsumedType): Integer
             }
 
             object OuterObject {
@@ -271,7 +273,9 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.ApplyQualifier": FrozenOrderedSet(
                 ["Integer", "a", "toInt", "calc.calcFunc", "calc"]
             ),
-            "org.pantsbuild.example.OuterTrait": FrozenOrderedSet(["Foo"]),
+            "org.pantsbuild.example.OuterTrait": FrozenOrderedSet(
+                ["Integer", "TraitConsumedType", "Foo"]
+            ),
             "org.pantsbuild.example": FrozenOrderedSet(
                 [
                     "ABaseClass",
@@ -302,6 +306,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.OuterObject",
         "java.io.SomeTypeInPrimaryConstructor",
         "java.io.String",
+        "java.io.TraitConsumedType",
         "java.io.Unit",
         "java.io.a",
         "java.io.Integer",
@@ -329,6 +334,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.OuterObject.NestedVal",
         "org.pantsbuild.example.SomeTypeInPrimaryConstructor",
         "org.pantsbuild.example.String",
+        "org.pantsbuild.example.TraitConsumedType",
         "org.pantsbuild.example.Unit",
         "org.pantsbuild.example.a",
         "org.pantsbuild.example.bar",
@@ -358,6 +364,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.SomeTypeInPrimaryConstructor",
         "org.pantsbuild.SomeTypeInSecondaryConstructor",
         "org.pantsbuild.String",
+        "org.pantsbuild.TraitConsumedType",
         "org.pantsbuild.TupleTypeArg1",
         "org.pantsbuild.TupleTypeArg2",
         "org.pantsbuild.Unit",

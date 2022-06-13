@@ -279,6 +279,22 @@ class SourceAnalysisTraverser extends Traverser {
       withSuppressProvidedNames(() => apply(body))
     }
 
+    case Decl.Def(mods, _nameNode, _tparams, params, decltpe) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+      params.foreach(param => apply(param))
+    }
+
+    case Decl.Val(mods, _pats, decltpe) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+    }
+
+    case Decl.Var(mods, _pats, decltpe) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+    }
+
     case Import(importers) => {
       importers.foreach({ case Importer(ref, importees) =>
         val baseName = extractName(ref)
