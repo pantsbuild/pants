@@ -4,6 +4,8 @@ Pants currently hosts documentation at Readme.com, and we use a combination of t
 
 Currently the rdme process is manual, until we bed down the process, at which point we'll add it to CI.
 
+The motivation for in-repo docs is covered [on this Google doc](https://docs.google.com/document/d/1bZE8PlF9oRzcPQz4-JUFr5vfD0LFHH4V3Nj2k221CFM/view)
+
 ## Versions
 
 Readme expects every version of the docs to correspond to a semver release. Our convention is as follows:
