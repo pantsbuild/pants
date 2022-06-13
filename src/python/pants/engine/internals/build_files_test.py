@@ -21,7 +21,7 @@ from pants.engine.internals.build_files import (
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.target import Dependencies, MultipleSourcesField, StringField, Tags, Target
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
@@ -143,7 +143,9 @@ def test_resolve_address() -> None:
 
 @pytest.fixture
 def target_adaptor_rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[QueryRule(TargetAdaptor, (Address,))], target_types=[MockTgt])
+    return RuleRunner(
+        rules=[QueryRule(TargetAdaptor, (TargetAdaptorRequest,))], target_types=[MockTgt]
+    )
 
 
 def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -169,7 +171,10 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
             )
         }
     )
-    target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld/dir")])
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
+    )
     assert target_adaptor.name is None
     assert target_adaptor.type_alias == "mock_tgt"
     assert target_adaptor.kwargs["dependencies"] == [
@@ -184,7 +189,12 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     assert target_adaptor.kwargs["build_file_dir"] == "build file's dir is: helloworld/dir"
 
     target_adaptor = target_adaptor_rule_runner.request(
-        TargetAdaptor, [Address("helloworld/dir", target_name="t2")]
+        TargetAdaptor,
+        [
+            TargetAdaptorRequest(
+                Address("helloworld/dir", target_name="t2"), description_of_origin="tests"
+            )
+        ],
     )
     assert target_adaptor.name == "t2"
     assert target_adaptor.type_alias == "mock_tgt"
@@ -192,15 +202,21 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError) as exc:
-        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld")])
+        target_adaptor_rule_runner.request(
+            TargetAdaptor,
+            [TargetAdaptorRequest(Address("helloworld"), description_of_origin="tests")],
+        )
     assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
     target_adaptor_rule_runner.write_files({"helloworld/BUILD": "mock_tgt(name='other_tgt')"})
     expected_rx_str = re.escape(
-        "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
+        "The target name ':helloworld' is not defined in the directory helloworld"
     )
     with pytest.raises(ExecutionError, match=expected_rx_str):
-        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld")])
+        target_adaptor_rule_runner.request(
+            TargetAdaptor,
+            [TargetAdaptorRequest(Address("helloworld"), description_of_origin="tests")],
+        )
 
 
 def test_build_file_address() -> None:

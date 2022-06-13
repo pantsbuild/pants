@@ -20,9 +20,10 @@ def test_gather_value_strs():
     assert set(value_strs_iter(help_info)) == {"foo", "bar", "baz", "qux", "quux"}
 
 
-@pytest.mark.parametrize("slug", ["foo-bar", "baz3", "qux"])
-def test_slug_for_url(slug: str) -> None:
-    assert get_doc_slug(doc_url(slug)) == slug
+@pytest.mark.parametrize("arg", ["foo-bar", "baz3", "qux#anchor"])
+def test_slug_for_url(arg: str) -> None:
+    expected_slug = arg.split("#")[0]
+    assert get_doc_slug(doc_url(arg)) == expected_slug
 
 
 def test_slug_for_url_error() -> None:
@@ -66,4 +67,7 @@ def test_doc_url_rewriter():
         }
     )
     assert dur.rewrite(f"See {doc_url('foo')} for details.") == "See [Foo](doc:foo) for details."
-    assert dur.rewrite(f"Check out {doc_url('bar')}.") == "Check out [Welcome to Bar!](doc:bar)."
+    assert (
+        dur.rewrite(f"Check out {doc_url('bar#anchor')}.")
+        == "Check out [Welcome to Bar!](doc:bar#anchor)."
+    )
