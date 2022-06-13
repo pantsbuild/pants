@@ -472,11 +472,7 @@ pub struct ProcessResult(pub process_execution::FallibleProcessResultWithPlatfor
 pub struct ReadLink(Link);
 
 impl ReadLink {
-  async fn run_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<LinkDest> {
+  async fn run_node(self, context: Context) -> NodeResult<LinkDest> {
     let node = self;
     let link_dest = context
       .core
@@ -508,11 +504,7 @@ impl From<ReadLink> for NodeKey {
 pub struct DigestFile(pub File);
 
 impl DigestFile {
-  async fn run_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<hashing::Digest> {
+  async fn run_node(self, context: Context) -> NodeResult<hashing::Digest> {
     let path = context.core.vfs.file_path(&self.0);
     context
       .core
@@ -541,11 +533,7 @@ impl From<DigestFile> for NodeKey {
 pub struct Scandir(Dir);
 
 impl Scandir {
-  async fn run_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Arc<DirectoryListing>> {
+  async fn run_node(self, context: Context) -> NodeResult<Arc<DirectoryListing>> {
     let directory_listing = context
       .core
       .vfs
@@ -626,11 +614,7 @@ impl Paths {
     ))
   }
 
-  async fn run_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Arc<Vec<PathStat>>> {
+  async fn run_node(self, context: Context) -> NodeResult<Arc<Vec<PathStat>>> {
     let path_globs = self.path_globs.parse().map_err(throw)?;
     let path_stats = Self::create(context, path_globs).await?;
     Ok(Arc::new(path_stats))
@@ -651,7 +635,7 @@ impl From<Paths> for NodeKey {
 pub struct SessionValues;
 
 impl SessionValues {
-  async fn run_node(self, context: Context, _workunit: &mut RunningWorkunit) -> NodeResult<Value> {
+  async fn run_node(self, context: Context) -> NodeResult<Value> {
     Ok(Value::new(context.session.session_values()))
   }
 }
@@ -670,7 +654,7 @@ impl From<SessionValues> for NodeKey {
 pub struct RunId;
 
 impl RunId {
-  async fn run_node(self, context: Context, _workunit: &mut RunningWorkunit) -> NodeResult<Value> {
+  async fn run_node(self, context: Context) -> NodeResult<Value> {
     let gil = Python::acquire_gil();
     let py = gil.python();
     Ok(externs::unsafe_call(
@@ -833,11 +817,7 @@ impl Snapshot {
     ))
   }
 
-  async fn run_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<store::Snapshot> {
+  async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
     let path_globs = self.path_globs.parse().map_err(throw)?;
 
     // We rely on Context::expand_globs to track dependencies for scandirs,
@@ -920,11 +900,7 @@ impl DownloadedFile {
     core.store().snapshot_of_one_file(path, digest, true).await
   }
 
-  async fn run_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<store::Snapshot> {
+  async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
     let (url_str, expected_digest) = Python::with_gil(|py| {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
@@ -1387,52 +1363,24 @@ impl Node for NodeKey {
           };
 
         let mut result = match self {
-          NodeKey::DigestFile(n) => {
-            n.run_node(context, workunit)
-              .map_ok(NodeOutput::FileDigest)
-              .await
-          }
-          NodeKey::DownloadedFile(n) => {
-            n.run_node(context, workunit)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
+          NodeKey::DigestFile(n) => n.run_node(context).map_ok(NodeOutput::FileDigest).await,
+          NodeKey::DownloadedFile(n) => n.run_node(context).map_ok(NodeOutput::Snapshot).await,
           NodeKey::ExecuteProcess(n) => {
             n.run_node(context, workunit)
               .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
               .await
           }
-          NodeKey::ReadLink(n) => {
-            n.run_node(context, workunit)
-              .map_ok(NodeOutput::LinkDest)
-              .await
-          }
+          NodeKey::ReadLink(n) => n.run_node(context).map_ok(NodeOutput::LinkDest).await,
           NodeKey::Scandir(n) => {
-            n.run_node(context, workunit)
+            n.run_node(context)
               .map_ok(NodeOutput::DirectoryListing)
               .await
           }
           NodeKey::Select(n) => n.run_node(context).map_ok(NodeOutput::Value).await,
-          NodeKey::Snapshot(n) => {
-            n.run_node(context, workunit)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
-          NodeKey::Paths(n) => {
-            n.run_node(context, workunit)
-              .map_ok(NodeOutput::Paths)
-              .await
-          }
-          NodeKey::SessionValues(n) => {
-            n.run_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
-          NodeKey::RunId(n) => {
-            n.run_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
+          NodeKey::Snapshot(n) => n.run_node(context).map_ok(NodeOutput::Snapshot).await,
+          NodeKey::Paths(n) => n.run_node(context).map_ok(NodeOutput::Paths).await,
+          NodeKey::SessionValues(n) => n.run_node(context).map_ok(NodeOutput::Value).await,
+          NodeKey::RunId(n) => n.run_node(context).map_ok(NodeOutput::Value).await,
           NodeKey::Task(n) => {
             n.run_node(context, workunit)
               .map_ok(NodeOutput::Value)
