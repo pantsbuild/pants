@@ -248,7 +248,7 @@ class SourceAnalysisTraverser extends Traverser {
         recordProvidedName(name)
       })
       decltpe.foreach(tpe => {
-        recordConsumedSymbol(extractName(tpe))
+        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
       })
       super.apply(rhs)
     }

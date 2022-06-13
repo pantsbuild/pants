@@ -494,3 +494,26 @@ def test_extract_annotations(rule_runner: RuleRunner) -> None:
         "foo.valAnnotation",
         "foo.varAnnotation",
     ]
+
+
+def test_type_arguments(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            object Object {
+              var a: A[SomeType] = ???
+              val b: B[AnotherType] = ???
+            }
+            """
+        ),
+    )
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.???",
+        "foo.A",
+        "foo.AnotherType",
+        "foo.B",
+        "foo.SomeType",
+    ]
