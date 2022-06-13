@@ -68,6 +68,7 @@ _orgs = (
         "https://files.readme.io/dd2a703-housinganywhere-small.png",
     ),
     Org("iManage", "https://imanage.com/", "https://files.readme.io/0f7b5f6-imanage-small.png"),
+    Org("Lablup", "https://lablup.com/", "https://files.readme.io/a94d375-lablup-small.png"),
     Org("Myst AI", "https://www.myst.ai/", "https://files.readme.io/802d8fa-myst_ai_small.png"),
     Org("Ocrolus", "https://www.ocrolus.com/", "https://files.readme.io/ff166fa-ocrolus-small.png"),
     Org(
