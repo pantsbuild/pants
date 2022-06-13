@@ -1,22 +1,59 @@
-## Install `rdme`
+# Docs process
+
+Pants currently hosts documentation at Readme.com, and we use a combination of their `rdme` tool to sync handwritten markdown docs, and a custom `generate-docs` script to update Pants' reference documentation.
+
+Currently the rdme process is manual, until we bed down the process, at which point we'll add it to CI.
+
+## Versions
+
+Readme expects every version of the docs to correspond to a semver release. 
+
+
+# Using `rdme` (general notes)
+
+## Setup
+
+### Install `node`
+
+```
+brew install node
+```
+
+### Install `rdme`
+
+From the `docs` directory,
 
 ```
 npm install rdme
 ```
 
-## Using `rdme`
-
-readme.com requires a semantic version for all versions, so a `main` or `dev` version is not possible. I've called our dev docs, which will correspond to `main` as `v0.1.0-dev`.
-
-New versions should be forked from `v0.1.0-dev` at the same time as a release branch is created.
-
-
-### Create a new version:
+### Log in.
 
 ```
-npx rdme versions:create --version=v2.13 --fork="v0.1.0-dev" --main=false --beta=true --isPublic=false
+npx rdme login --2fa
 ```
 
+(the `--2fa` flag makes `rdme` prompt for 2fa codes, which is necessary if you have TOTP 2fa set up on your account)
 
-### Sync docs changes up to `readme.com`
+
+## When cutting a new release branch
+
+Create a fork of the most recent docs branch, and mark it as `beta`, for example:
+
+```
+npx rdme versions:create --version=v2.98 --fork="v2.97" --main=false --beta=true --isPublic=true
+```
+
+will create a new docs version, `2.98` based on a copy of the docs from version `2.97`. 
+
+
+## Sync docs changes up to `readme.com`
+
+Docs markdown files are stored in the `markdown` directory. `rdme` does not do bidirectional sync, so any changes made on readme.com itself _will be deleted_.
+
+Make sure you apply any changes from readme.com locally before syncing up.
+
+```
+npx rdme docs markdown --version v2.98
+```
 
