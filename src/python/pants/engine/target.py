@@ -1813,15 +1813,15 @@ def _validate_choices(
     *,
     valid_choices: Union[Type[Enum], Tuple[Any, ...]],
 ) -> None:
-    valid_choices = set(
+    _valid_choices = set(
         valid_choices
         if isinstance(valid_choices, tuple)
         else (choice.value for choice in valid_choices)
     )
     for choice in values:
-        if choice not in valid_choices:
+        if choice not in _valid_choices:
             raise InvalidFieldChoiceException(
-                address, field_alias, choice, valid_choices=valid_choices
+                address, field_alias, choice, valid_choices=_valid_choices
             )
 
 
