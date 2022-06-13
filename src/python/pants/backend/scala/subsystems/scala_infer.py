@@ -19,3 +19,8 @@ class ScalaInferSubsystem(Subsystem):
         default=True,
         help="Infer a target's dependencies by parsing consumed types from sources.",
     )
+    package_objects = BoolOption(
+        "--package-objects",
+        default=True,
+        help="Add dependency on the package object to every target.",
+    )
