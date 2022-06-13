@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::{self, Debug, Display};
 use std::hash::{self, Hash};
 use std::ops::Deref;
@@ -173,6 +173,7 @@ impl Display for Name {
 pub enum Entry {
   Directory(Directory),
   File(File),
+  Symlink(Symlink),
 }
 
 impl Entry {
@@ -180,6 +181,7 @@ impl Entry {
     match self {
       Entry::Directory(d) => d.name,
       Entry::File(f) => f.name,
+      Entry::Symlink(s) => s.name,
     }
   }
 
@@ -187,6 +189,7 @@ impl Entry {
     match self {
       Entry::Directory(d) => d.digest,
       Entry::File(f) => f.digest,
+      Entry::Symlink(_) => EMPTY_DIGEST,
     }
   }
 }
@@ -310,6 +313,34 @@ impl From<&File> for remexec::FileNode {
     }
   }
 }
+
+#[derive(Clone, DeepSizeOf)]
+pub struct Symlink {
+  name: Name,
+  target: String,
+}
+
+impl TryFrom<&remexec::SymlinkNode> for Symlink {
+  type Error = String;
+
+  fn try_from(symlink_node: &remexec::SymlinkNode) -> Result<Self, Self::Error> {
+    Ok(Self {
+      name: Name(Intern::from(&symlink_node.name)),
+      target: symlink_node.target.clone(),
+    })
+  }
+}
+
+impl From<&Symlink> for remexec::SymlinkNode {
+  fn from(symlink: &Symlink) -> Self {
+    remexec::SymlinkNode {
+      name: symlink.name.as_ref().to_owned(),
+      target: symlink.target.clone(),
+      ..remexec::SymlinkNode::default(),
+    }
+  }
+}
+
 
 // TODO: `PathStat` owns its path, which means it can't be used via recursive slicing. See
 // whether these types can be merged.
@@ -447,6 +478,7 @@ impl DigestTrie {
       .files
       .iter()
       .map(|f| File::try_from(f).map(Entry::File))
+      .chain(root.symlinks.iter().map(|s| Symlink::try_from(s).map(Entry::Symlink)))
       .chain(root.directories.iter().map(|d| {
         Directory::from_remexec_directory_node(d, children_by_digest).map(Entry::Directory)
       }))
@@ -458,17 +490,20 @@ impl DigestTrie {
   pub fn as_remexec_directory(&self) -> remexec::Directory {
     let mut files = Vec::new();
     let mut directories = Vec::new();
+    let mut symlinks = Vec::new();
 
     for entry in &*self.0 {
       match entry {
         Entry::File(f) => files.push(f.into()),
         Entry::Directory(d) => directories.push(d.into()),
+        Entry::Symlink(s) => symlinks.push(s.into()),
       }
     }
 
     remexec::Directory {
       directories,
       files,
+      symlinks,
       ..remexec::Directory::default()
     }
   }
@@ -499,6 +534,7 @@ impl DigestTrie {
         Entry::File(f) => {
           digests.push(f.digest);
         }
+        Entry::Symlink(_) => (),
       }
     }
     digests
@@ -519,6 +555,7 @@ impl DigestTrie {
           // Is the root directory, which is not emitted here.
         }
         Entry::Directory(_) => directories.push(path.to_owned()),
+        Entry::Symlink(_) => (),
       }
     });
     (files, directories)
@@ -569,6 +606,7 @@ impl DigestTrie {
         match entry {
           Entry::File(_) => unique_files.push(path),
           Entry::Directory(_) => unique_dirs.push(path),
+          Entry::Symlink(_) => (), // TODO: Handle symlinks.
         }
       };
 
@@ -672,6 +710,7 @@ impl DigestTrie {
           }
           Entry::Directory(d) => extra_directories.push(d.name.as_ref().to_owned()),
           Entry::File(f) => files.push(f.name.as_ref().to_owned()),
+          Entry::Symlink(s) => (), // TODO: Handle stripping symlink targets?
         }
       }
 
@@ -774,6 +813,13 @@ impl DigestTrie {
             tree_digest = self.compute_root_digest()
           ))
         }
+        Some(Entry::Symlink(_)) => {
+          return Err(format!(
+            "{tree_digest:?} cannot contain a path at {path:?}, \
+             because a symlink was encountered at {path_so_far:?}.",
+            tree_digest = self.compute_root_digest()
+          ))
+        }
       };
     }
 
@@ -823,6 +869,22 @@ impl DigestTrie {
               parent_path,
               mismatched_files,
               mismatched_dirs,
+              vec![],
+            ));
+          }
+
+          // All entries matched: emit one copy.
+          entries.push(first.clone());
+        }
+        Entry::Symlink(s) => {
+          // If any Entry is a Symlink, then the targets must all be identical.
+          let targets_set: BTreeSet<String> = group.iter().map(|s| s.name().to_owned()).collect();
+          if targets_set.len() > 1 {
+            return Err(MergeError::duplicates(
+              parent_path,
+              vec![],
+              vec![],
+              group,
             ));
           }
 
@@ -840,6 +902,7 @@ impl DigestTrie {
               parent_path,
               mismatched_files,
               mismatched_dirs,
+              vec![],
             ));
           }
 
@@ -921,15 +984,17 @@ pub enum MergeError {
     parent_path: PathBuf,
     files: Vec<File>,
     directories: Vec<Directory>,
+    symlinks: Vec<Symlink>,
   },
 }
 
 impl MergeError {
-  fn duplicates(parent_path: PathBuf, files: Vec<&File>, directories: Vec<&Directory>) -> Self {
+  fn duplicates(parent_path: PathBuf, files: Vec<&File>, directories: Vec<&Directory>, symlinks: Vec<&Symlink>) -> Self {
     MergeError::Duplicates {
       parent_path,
       files: files.into_iter().cloned().collect(),
       directories: directories.into_iter().cloned().collect(),
+      symlinks: symlinks.into_iter().cloned().collect(),
     }
   }
 }
