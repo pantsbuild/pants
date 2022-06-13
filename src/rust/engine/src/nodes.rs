@@ -1363,29 +1363,20 @@ impl Node for NodeKey {
           };
 
         let mut result = match self {
-          NodeKey::DigestFile(n) => n.run_node(context).map_ok(NodeOutput::FileDigest).await,
-          NodeKey::DownloadedFile(n) => n.run_node(context).map_ok(NodeOutput::Snapshot).await,
-          NodeKey::ExecuteProcess(n) => {
-            n.run_node(context, workunit)
-              .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
-              .await
-          }
-          NodeKey::ReadLink(n) => n.run_node(context).map_ok(NodeOutput::LinkDest).await,
-          NodeKey::Scandir(n) => {
-            n.run_node(context)
-              .map_ok(NodeOutput::DirectoryListing)
-              .await
-          }
-          NodeKey::Select(n) => n.run_node(context).map_ok(NodeOutput::Value).await,
-          NodeKey::Snapshot(n) => n.run_node(context).map_ok(NodeOutput::Snapshot).await,
-          NodeKey::Paths(n) => n.run_node(context).map_ok(NodeOutput::Paths).await,
-          NodeKey::SessionValues(n) => n.run_node(context).map_ok(NodeOutput::Value).await,
-          NodeKey::RunId(n) => n.run_node(context).map_ok(NodeOutput::Value).await,
-          NodeKey::Task(n) => {
-            n.run_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
+          NodeKey::DigestFile(n) => n.run_node(context).await.map(NodeOutput::FileDigest),
+          NodeKey::DownloadedFile(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
+          NodeKey::ExecuteProcess(n) => n
+            .run_node(context, workunit)
+            .await
+            .map(|r| NodeOutput::ProcessResult(Box::new(r))),
+          NodeKey::ReadLink(n) => n.run_node(context).await.map(NodeOutput::LinkDest),
+          NodeKey::Scandir(n) => n.run_node(context).await.map(NodeOutput::DirectoryListing),
+          NodeKey::Select(n) => n.run_node(context).await.map(NodeOutput::Value),
+          NodeKey::Snapshot(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
+          NodeKey::Paths(n) => n.run_node(context).await.map(NodeOutput::Paths),
+          NodeKey::SessionValues(n) => n.run_node(context).await.map(NodeOutput::Value),
+          NodeKey::RunId(n) => n.run_node(context).await.map(NodeOutput::Value),
+          NodeKey::Task(n) => n.run_node(context, workunit).await.map(NodeOutput::Value),
         };
 
         // If both the Node and the watch failed, prefer the Node's error message.
