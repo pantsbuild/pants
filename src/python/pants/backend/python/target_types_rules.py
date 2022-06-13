@@ -293,17 +293,26 @@ async def resolve_python_distribution_entry_points(
             return ResolvedPythonDistributionEntryPoints()
         address = request.entry_points_field.address
         all_entry_points = cast(_EntryPointsDictType, request.entry_points_field.value)
+        description_of_origin = (
+            f"the `{request.entry_points_field.alias}` field from the target {address}"
+        )
 
     elif request.provides_field:
         address = request.provides_field.address
         provides_field_value = cast(
             _EntryPointsDictType, request.provides_field.value.kwargs.get("entry_points") or {}
         )
-
-        if provides_field_value:
-            all_entry_points = provides_field_value
-        else:
+        if not provides_field_value:
             return ResolvedPythonDistributionEntryPoints()
+
+        all_entry_points = provides_field_value
+        description_of_origin = softwrap(
+            f"""
+            the `entry_points` argument from the `{request.provides_field.alias}` field from
+            the target {address}
+            """
+        )
+
     else:
         return ResolvedPythonDistributionEntryPoints()
 
@@ -326,7 +335,7 @@ async def resolve_python_distribution_entry_points(
         UnparsedAddressInputs(
             target_refs,
             owning_address=address,
-            description_of_origin="TODO(#14468)",
+            description_of_origin=description_of_origin,
         ),
     )
     address_by_ref = dict(zip(target_refs, target_addresses))

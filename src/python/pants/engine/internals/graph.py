@@ -107,7 +107,24 @@ logger = logging.getLogger(__name__)
 @rule
 async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
     wrapped_targets = await MultiGet(
-        Get(WrappedTarget, WrappedTargetRequest(a, description_of_origin="TODO(#14468)"))
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                a,
+                # Idiomatic rules should not be manually constructing `Addresses`. Instead, they
+                # should use `UnparsedAddressInputs` or `Specs` rules.
+                #
+                # It is technically more correct for us to require callers of
+                # `Addresses -> UnexpandedTargets` to specify a `description_of_origin`. But in
+                # practice, this dramatically increases boilerplate, and it should never be
+                # necessary.
+                #
+                # Note that this contrasts with an individual `Address`, which often is unverified
+                # because it can come from the rule `AddressInput -> Address`, which only verifies
+                # that it has legal syntax and does not check the address exists.
+                description_of_origin="<infallible>",
+            ),
+        )
         for a in addresses
     )
     return UnexpandedTargets(wrapped_target.target for wrapped_target in wrapped_targets)
@@ -362,7 +379,10 @@ async def resolve_targets(
                     _TargetParametrizations,
                     _TargetParametrizationsRequest(
                         tgt.address.maybe_convert_to_target_generator(),
-                        description_of_origin="TODO(#14468)",
+                        # Idiomatic rules should not be manually creating `UnexpandedTargets`, so
+                        # we can be confident that the targets actually exist and the addresses
+                        # are already legitimate.
+                        description_of_origin="<infallible>",
                     ),
                 )
             )
@@ -922,7 +942,11 @@ async def hydrate_sources(
         return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
     wrapped_protocol_target = await Get(
         WrappedTarget,
-        WrappedTargetRequest(sources_field.address, description_of_origin="<infallible>"),
+        WrappedTargetRequest(
+            sources_field.address,
+            # It's only possible to hydrate sources on a target that we already know exists.
+            description_of_origin="<infallible>",
+        ),
     )
     generated_sources = await Get(
         GeneratedSources,
@@ -1049,6 +1073,7 @@ async def resolve_dependencies(
     wrapped_tgt, explicitly_provided = await MultiGet(
         Get(
             WrappedTarget,
+            # It's only possible to find dependencies for a target that we already know exists.
             WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
         ),
         Get(ExplicitlyProvidedDependencies, DependenciesRequest, request),

@@ -892,8 +892,8 @@ class PythonTestsOverrideField(OverridesField):
         PythonTestTarget.alias,
         """
         overrides={
-            "foo_test.py": {"timeout": 120]},
-            "bar_test.py": {"timeout": 200]},
+            "foo_test.py": {"timeout": 120},
+            "bar_test.py": {"timeout": 200},
             ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},
         }
         """,
