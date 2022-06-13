@@ -1662,15 +1662,9 @@ class StringField(ScalarField[str]):
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and cls.valid_choices is not None:
-            valid_choices = set(
-                cls.valid_choices
-                if isinstance(cls.valid_choices, tuple)
-                else (choice.value for choice in cls.valid_choices)
+            _validate_choices(
+                address, cls.alias, [value_or_default], valid_choices=cls.valid_choices
             )
-            if value_or_default not in valid_choices:
-                raise InvalidFieldChoiceException(
-                    address, cls.alias, value_or_default, valid_choices=valid_choices
-                )
         return value_or_default
 
 
@@ -1728,16 +1722,7 @@ class StringSequenceField(SequenceField[str]):
     ) -> Optional[Tuple[str, ...]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default and cls.valid_choices is not None:
-            valid_choices = set(
-                cls.valid_choices
-                if isinstance(cls.valid_choices, tuple)
-                else (choice.value for choice in cls.valid_choices)
-            )
-            for choice in value_or_default:
-                if choice not in valid_choices:
-                    raise InvalidFieldChoiceException(
-                        address, cls.alias, choice, valid_choices=valid_choices
-                    )
+            _validate_choices(address, cls.alias, value_or_default, valid_choices=cls.valid_choices)
         return value_or_default
 
 
@@ -1819,6 +1804,25 @@ class DictStringToStringSequenceField(Field):
             except ValueError:
                 raise invalid_type_exception
         return FrozenDict(result)
+
+
+def _validate_choices(
+    address: Address,
+    field_alias: str,
+    values: Iterable[Any],
+    *,
+    valid_choices: Union[Type[Enum], Tuple[Any, ...]],
+) -> None:
+    valid_choices = set(
+        valid_choices
+        if isinstance(valid_choices, tuple)
+        else (choice.value for choice in valid_choices)
+    )
+    for choice in values:
+        if choice not in valid_choices:
+            raise InvalidFieldChoiceException(
+                address, field_alias, choice, valid_choices=valid_choices
+            )
 
 
 # -----------------------------------------------------------------------------------------------
