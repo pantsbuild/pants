@@ -2684,19 +2684,15 @@ class VisibilityField(StringSequenceField):
     PRIVATE_VISIBILITY = "private"
 
     alias = "visibility"
+    default = (PUBLIC_VISIBILITY,)
     help = softwrap(
         """
         TBW.
         """
     )
 
-    def get_visibility(self, default: tuple[str, ...] | None = None) -> tuple[str, ...]:
-        return next(value for value in (self.value, default, ()) if value is not None)
-
-    def visible(
-        self, origin: Address, destination: Address, default: tuple[str, ...] | None = None
-    ) -> bool:
-        for rule in self.get_visibility(default):
+    def visible(self, origin: Address, destination: Address) -> bool:
+        for rule in self.value or ():
             if rule == self.PUBLIC_VISIBILITY:
                 return True
             if rule == self.PRIVATE_VISIBILITY:
