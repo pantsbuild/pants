@@ -23,11 +23,12 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
+from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.target_types import ResourceTarget
 from pants.core.util_rules import source_files
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
 
 
 @pytest.fixture
@@ -47,6 +48,7 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             QueryRule(TestResult, [GoTestFieldSet]),
+            QueryRule(GoModInfo, (GoModInfoRequest,)),
         ],
         target_types=[GoModTarget, GoPackageTarget, ResourceTarget],
     )
@@ -225,6 +227,56 @@ def test_embed_in_external_test(rule_runner: RuleRunner) -> None:
                 func TestBar(t *testing.T) {
                   if testMessage != "hello" {
                     t.Fatalf("testMessage mismatch: want=%s; got=%s", "hello", testMessage)
+                  }
+                }
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
+    assert result.exit_code == 0
+
+
+@logging
+def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                go_mod(name='mod')
+                go_package(name='pkg')
+                """
+            ),
+            "go.mod": dedent(
+                """\
+                module go.example.com/foo
+                go 1.17
+
+                require (
+                \tgithub.com/tdyas/go-embed-sample-for-test v0.0.2
+                )
+                """
+            ),
+            "go.sum": dedent(
+                """\
+            github.com/tdyas/go-embed-sample-for-test v0.0.2 h1:CXEVzWaV1SWp2nyNGnlTd8MQVXPXK+Ef3yhW0+Z5QCw=
+            github.com/tdyas/go-embed-sample-for-test v0.0.2/go.mod h1:HsaA20RG3Z8uFwHjuGA7L7PJPwk8/3Xpaixarj6ZTS8=
+            """
+            ),
+            # At least one Go file is necessary due to bug in Go backend even if package is only for tests.
+            "foo.go": "package foo\n",
+            "foo_test.go": dedent(
+                """\
+                package foo_test
+                import (
+                  "testing"
+                  "github.com/tdyas/go-embed-sample-for-test/pkg"
+                )
+
+                func TestFoo(t *testing.T) {
+                  if pkg.Message == "" {
+                    t.Fatalf("third-party package message not set")
                   }
                 }
                 """

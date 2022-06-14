@@ -189,6 +189,7 @@ async def setup_build_go_package_target_request(
         minimum_go_version = _third_party_pkg_info.minimum_go_version
         go_file_names = _third_party_pkg_info.go_files
         s_file_names = _third_party_pkg_info.s_files
+        embed_config = _third_party_pkg_info.embed_config
 
     else:
         raise AssertionError(

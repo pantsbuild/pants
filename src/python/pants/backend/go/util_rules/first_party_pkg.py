@@ -342,7 +342,7 @@ async def setup_first_party_pkg_digest(
         embed_result = await Get(
             FallibleProcessResult,
             Process(
-                ("./embedder", "patterns.json"),
+                ("./embedder", "patterns.json", "__resources__"),
                 input_digest=input_digest,
                 description=f"Create embed mapping for {request.address}",
                 level=LogLevel.DEBUG,
