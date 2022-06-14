@@ -176,7 +176,7 @@ class ShowOutput(Enum):
 
 @dataclass(frozen=True)
 class TestDebugRequest:
-    process: InteractiveProcess | None
+    process: InteractiveProcess
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -433,15 +433,7 @@ async def _run_debug_tests(
         for field_set in targets_to_valid_field_sets.field_sets
     )
     exit_code = 0
-    for debug_request, field_set in zip(debug_requests, targets_to_valid_field_sets.field_sets):
-        if debug_request.process is None:
-            if test_subsystem.debug_adapter:
-                logger.info(
-                    f"Pants does not have an adapter for {field_set.address}. Skipping test."
-                )
-            logger.debug(f"Skipping tests for {field_set.address}")
-            continue
-
+    for debug_request in debug_requests:
         if test_subsystem.debug_adapter:
             logger.info("Launching debug adapter, which will wait for a client connection...")
 
