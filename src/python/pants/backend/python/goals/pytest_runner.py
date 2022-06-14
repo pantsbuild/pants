@@ -4,15 +4,17 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 from pants.backend.python.goals.coverage_py import (
     CoverageConfig,
     CoverageSubsystem,
     PytestCoverageData,
 )
+from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
@@ -25,6 +27,7 @@ from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
     RuntimePackageDependenciesField,
+    TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
@@ -64,6 +67,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger()
 
@@ -146,6 +150,9 @@ _EXTRA_OUTPUT_DIR = "extra-output"
 class TestSetupRequest:
     field_set: PythonTestFieldSet
     is_debug: bool
+    main: Optional[MainSpecification] = None  # Defaults to pytest.main
+    prepend_argv: Tuple[str, ...] = ()
+    additional_pexes: Tuple[Pex, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -235,9 +242,9 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
-            main=pytest.main,
+            main=request.main or pytest.main,
             internal_only=True,
-            pex_path=[pytest_pex, requirements_pex, local_dists.pex],
+            pex_path=[*request.additional_pexes, pytest_pex, requirements_pex, local_dists.pex],
         ),
     )
     config_files_get = Get(
@@ -322,7 +329,12 @@ async def setup_pytest_for_target(
         Process,
         VenvPexProcess(
             pytest_runner_pex,
-            argv=(*pytest.args, *coverage_args, *field_set_source_files.files),
+            argv=(
+                *request.prepend_argv,
+                *pytest.args,
+                *coverage_args,
+                *field_set_source_files.files,
+            ),
             extra_env=extra_env,
             input_digest=input_digest,
             output_directories=(_EXTRA_OUTPUT_DIR,),
@@ -383,6 +395,49 @@ async def run_python_test(
 async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
     setup = await Get(TestSetup, TestSetupRequest(field_set, is_debug=True))
     return TestDebugRequest(
+        InteractiveProcess.from_process(
+            setup.process, forward_signals_to_process=False, restartable=True
+        )
+    )
+
+
+@rule(desc="Set up debugpy to run an interactive Pytest session", level=LogLevel.DEBUG)
+async def debugpy_python_test(
+    field_set: PythonTestFieldSet,
+    debugpy: DebugPy,
+    pytest: PyTest,
+) -> TestDebugAdapterRequest:
+    debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
+    if pytest.main.spec != "pytest":
+        logger.warn(
+            softwrap(
+                """
+                Ignoring custom [pytest].console_script/entry_point when using the debug adapter.
+                `debugpy` (Python's Debug Adapter) doesn't support this use-case yet.
+                """
+            )
+        )
+
+    setup = await Get(
+        TestSetup,
+        TestSetupRequest(
+            field_set,
+            is_debug=True,
+            main=debugpy.main,
+            prepend_argv=(
+                "--listen",
+                f"{debugpy.host}:{debugpy.port}",
+                "--wait-for-client",
+                # @TODO: Techincally we should use `pytest.main`, however `debugpy` doesn't support
+                # launching an entry_point.
+                # https://github.com/microsoft/debugpy/issues/955
+                "-m",
+                "pytest",
+            ),
+            additional_pexes=(debugpy_pex,),
+        ),
+    )
+    return TestDebugAdapterRequest(
         InteractiveProcess.from_process(
             setup.process, forward_signals_to_process=False, restartable=True
         )

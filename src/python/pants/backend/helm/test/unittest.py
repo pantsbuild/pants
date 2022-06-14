@@ -18,7 +18,13 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.goals.test import (
+    TestDebugAdapterRequest,
+    TestDebugRequest,
+    TestFieldSet,
+    TestResult,
+    TestSubsystem,
+)
 from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -139,6 +145,13 @@ async def run_helm_unittest(
 
 @rule
 async def generate_helm_unittest_debug_request(field_set: HelmUnitTestFieldSet) -> TestDebugRequest:
+    raise NotImplementedError("Can not debug Helm unit tests")
+
+
+@rule
+async def generate_helm_unittest_debug_adapter_request(
+    field_set: HelmUnitTestFieldSet,
+) -> TestDebugAdapterRequest:
     raise NotImplementedError("Can not debug Helm unit tests")
 
 
