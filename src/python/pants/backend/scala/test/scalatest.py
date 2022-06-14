@@ -8,7 +8,13 @@ from dataclasses import dataclass
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.scala.target_types import ScalatestTestSourceField
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.goals.test import (
+    TestDebugAdapterRequest,
+    TestDebugRequest,
+    TestFieldSet,
+    TestResult,
+    TestSubsystem,
+)
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -179,6 +185,13 @@ async def setup_scalatest_debug_request(field_set: ScalatestTestFieldSet) -> Tes
         InteractiveProcessRequest(process, forward_signals_to_process=False, restartable=True),
     )
     return TestDebugRequest(interactive_process)
+
+
+@rule
+async def setup_scalatest_debug_adapter_request(
+    field_set: ScalatestTestFieldSet,
+) -> TestDebugAdapterRequest:
+    raise NotImplementedError("Debugging Scala using a debug adapter has not yet been implemented.")
 
 
 @rule

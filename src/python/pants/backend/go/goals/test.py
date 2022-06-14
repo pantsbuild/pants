@@ -28,7 +28,13 @@ from pants.backend.go.util_rules.first_party_pkg import (
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.goals.test import (
+    TestDebugAdapterRequest,
+    TestDebugRequest,
+    TestFieldSet,
+    TestResult,
+    TestSubsystem,
+)
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
@@ -321,6 +327,13 @@ async def run_go_tests(
 
 @rule
 async def generate_go_tests_debug_request(field_set: GoTestFieldSet) -> TestDebugRequest:
+    raise NotImplementedError("This is a stub.")
+
+
+@rule
+async def generate_go_tests_debug_adapter_request(
+    field_set: GoTestFieldSet,
+) -> TestDebugAdapterRequest:
     raise NotImplementedError("This is a stub.")
 
 
