@@ -4,7 +4,7 @@ slug: "plugins-overview"
 excerpt: "An intro to the Pants engine's core concepts."
 hidden: false
 createdAt: "2020-05-07T22:38:39.922Z"
-updatedAt: "2022-05-16T19:56:56.104Z"
+updatedAt: "2022-05-03T23:53:03.160Z"
 ---
 Pants is designed for extensibility: you can extend Pants by writing custom _plugins_, using a standard Plugin API. In fact, all of Pants's built-in functionality uses the same API!
 
@@ -187,26 +187,8 @@ Pants plugins can be published to PyPI and consumed by other Pants users.
 
 As mentioned above: the plugin API is still unstable, and so supporting multiple versions of Pants with a single plugin version may be challenging. Give careful consideration to who you expect to consume the plugin, and what types of maintenance guarantees you hope to provide.
 
-### Thirdparty dependencies
-
 When publishing a plugin, ensure that any [`python_requirement` targets](doc:python-third-party-dependencies) that the plugin depends on either:
 1. Do not overlap with [the requirements of Pants itself](https://github.com/pantsbuild/pants/blob/aa0932a54e8c1b6ed6f3be8e084a11b2f6c808e5/3rdparty/python/requirements.txt), or
 2. Use range requirements that are compatible with Pants' own requirements.
 
 For example: if a particular version of Pants depends on `requests>=2.25.1` and your plugin must also depend on `requests`, then the safest approach is to specify exactly that range in the plugins' requirements.
-
-### Adapting to changed plugin APIs
-
-If a `@rule` API has been added or removed in versions of Pants that you'd like to support with your plugin, you can use conditional imports to register different `@rules` based on the version:
-
-```python
-from pants.version import PANTS_SEMVER
-
-if PANTS_SEMVER < Version("2.10.0"):
-  import my.plugin.pants_pre_210 as plugin
-else:
-  import my.plugin.pants_default as plugin
-
-def rules():
-  return plugin.rules()
-```

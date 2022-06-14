@@ -4,7 +4,7 @@ slug: "maintainers"
 excerpt: "What Pants maintainers do and how to become one."
 hidden: false
 createdAt: "2020-05-16T22:36:48.659Z"
-updatedAt: "2022-05-26T22:13:54.279Z"
+updatedAt: "2021-03-17T04:37:16.393Z"
 ---
 The Pants community has several Maintainers: people with a proven track record of contributions to the community and an ongoing commitment to the project, who guide the contributions of the wider community.
 [block:api-header]
@@ -39,19 +39,3 @@ Maintainer candidates are nominated by existing maintainers from among the wider
 - A friendly, helpful, positive attitude.
 
 If a contributor has been nominated, and is willing to become a maintainer, then their candidacy will be discussed and voted on by the existing maintainers.
-[block:api-header]
-{
-  "title": "Maintainer onboarding"
-}
-[/block]
-New maintainers should be:
-
-* Added:
-    * to the [Maintainers Github team](https://github.com/orgs/pantsbuild/teams/maintainers)
-    * to the [pants-maintainers@ Google Group](https://groups.google.com/g/pants-maintainers)
-    * to [`MAINTAINERS.md`](https://github.com/pantsbuild/pants/blob/main/MAINTAINERS.md)
-    * to the [Slack #maintainers-confidential room](doc:getting-help#slack)
-* Welcomed:
-    * on the [pants-devel@ Google Group](https://groups.google.com/g/pants-devel)
-    * in the [Slack #announce room](doc:getting-help#slack)
-    * by [@pantsbuild on Twitter](https://twitter.com/pantsbuild)

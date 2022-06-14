@@ -4,7 +4,7 @@ slug: "release-process"
 excerpt: "How to release a new version of `pantsbuild.pants` and its plugins."
 hidden: false
 createdAt: "2020-05-16T22:36:48.334Z"
-updatedAt: "2022-06-08T18:06:57.112Z"
+updatedAt: "2022-05-11T00:46:06.876Z"
 ---
 This page covers the nitty-gritty of executing a release, and is probably only interesting for maintainers. If you're interested in when and why Pants is released, please see the [Release strategy](doc:release-strategy) page.
 [block:api-header]
@@ -310,7 +310,7 @@ If the release series' `.dev0` has already been released, reply to that email th
 > 
 > And a special shout-out to first-time contributor Niki Fitch, with the PR [`Upgrade Rust to 1.63 (#9441)`](https://github.com/pantsbuild/pants/pull/9441). Thank you for your contribution!
 > 
-> _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/docs/release-strategy) page.)_
+> _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/v2.11/docs/release-strategy) page.)_
 
 #### Alpha release
 
@@ -328,7 +328,7 @@ Reply to the email thread for the series' `dev` releases.
 >      Niki Fitch
 >      Mario Rozell
 > 
-> _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/docs/release-strategy) page.)_
+> _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/v2.11/docs/release-strategy) page.)_
 
 #### Release candidate
 
@@ -365,4 +365,4 @@ For the first stable release in the series, first, write a blog post to summariz
 >     Niki Fitch
 >     Mario Rozell
 > 
-> _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/docs/release-strategy) page.)_
+> _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/v2.11/docs/release-strategy) page.)_

@@ -4,9 +4,22 @@ slug: "media"
 excerpt: "Learn more about Pants and related topics from these talks, posts and podcasts featuring Pants contributors and users."
 hidden: false
 createdAt: "2021-04-18T17:27:18.361Z"
-updatedAt: "2022-04-05T22:02:38.457Z"
+updatedAt: "2022-06-03T21:37:45.180Z"
 ---
 ## Talks
+
+
+### Pycon 2022
+#### "Hermetic Environments in Pantsbuild" aka "Fast and Reproducible Tests, Packaging, and Deploys with Pantsbuild"
+April 24, 2022
+https://www.youtube.com/watch?v=0INmW9KaAp4
+https://speakerdeck.com/chrisjrn/hermetic-environments-in-pantsbuild-31d03419-8a15-4cd3-9041-b817b8924b3c
+Pants maintainer Chris Neugebauer gives a deep dive into the sandboxing model used by Pants, the priorities driving its design, and the pros and cons.
+
+#### [LIGHTNING TALK] "Stop Running Your Tests"
+April 23, 2022
+https://youtu.be/r-rpo4Xm_lM?t=2799
+Chris Neugebauer gives a swift and cheeky introduction to Pants.
 
 ### EuroPython 2021
 #### "Python monorepos: what, why and how"
@@ -106,7 +119,6 @@ April 4, 2022
 https://sureshjoshi.com/development/pants-plugin-code-quality
 A follow-up to "Your first Pants plugin" detailing how to manage code quality via plugins, continuous integration checks, and pre-commit hooks.
 
-### Suresh Joshi
 January 25, 2022
 [Tutorial] "Your first Pants plugin"
 https://sureshjoshi.com/development/first-pants-plugin

@@ -4,7 +4,7 @@ slug: "troubleshooting"
 excerpt: "Frequently asked questions (FAQs) and known issues you may encounter."
 hidden: false
 createdAt: "2020-04-10T19:42:28.637Z"
-updatedAt: "2022-05-25T14:34:36.454Z"
+updatedAt: "2022-05-25T17:56:46.677Z"
 ---
 > 👍 We love giving help!
 > 
@@ -139,6 +139,8 @@ On Linux, Pants uses `inotify` to watch all files and directories related to any
 echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 ```
 
+If you are unable to adjust your watch limit, one temporary workaround is to disable `pantsd` and file watching by setting `--no-pantsd --no-watch-filesystem`... but note that this can significantly reduce performance if you are running multiple commands in the same workspace.
+
 How to change your cache directory
 ----------------------------------
 
@@ -177,7 +179,7 @@ For `local_store_dir` and `named_caches_dir`, you may either specify an absolute
 
 It is safe to delete these folders to free up space.
 
-You can also change the cache used by the `./pants` script described in [Installing Pants](doc:installation), which defaults to `~/.pants/cache/setup`. Either set the environment variable `PANTS_SETUP_CACHE` or change the Bash script directly where it defines `PANTS_SETUP_CACHE`. You may use an absolute path or a path relative to the build root. 
+You can also change the cache used by the `./pants` script described in [Installing Pants](doc:installation), which defaults to `~/.pants/cache/setup`. Either set the environment variable `PANTS_SETUP_CACHE` or change the Bash script directly where it defines `PANTS_SETUP_CACHE`. You may use an absolute path or a path relative to the build root.
 
 BadZipFile error when processing Python wheels
 ----------------------------------------------
