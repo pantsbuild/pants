@@ -34,17 +34,17 @@ async def validate_visibility_rules(
         for address in request.dependencies
     )
     dependency_targets = [wrapped.target for wrapped in wrapped_dependency_targets]
-    subject = request.field_set.address
+    origin = request.field_set
     for target in dependency_targets:
         visibility_field = target.get(VisibilityField)
-        if not visibility_field.visible(target.address, subject):
+        if not visibility_field.visible(target.address, origin.address):
             raise VisibilityViolationError(
                 softwrap(
                     f"""
-                    {target.address} is not visible to {subject}.
+                    {target.address} is not visible to {origin.address}.
 
                     Visibility for {target.alias} {target.address} : \
-                    {", ".join(visibility_field.value or ("<none>",))}.
+                    {", ".join(visibility_field.value or ("private",))}.
                     """
                 )
             )

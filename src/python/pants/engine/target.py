@@ -2691,13 +2691,16 @@ class VisibilityField(StringSequenceField):
         """
     )
 
-    def visible(self, origin: Address, destination: Address) -> bool:
+    def visible(self, target: Address, origin: Address) -> bool:
+        # Add trailing slash to cut off paths with common prefixes but different suffixes.
+        target_path = target.spec_path + "/"
+        origin_path = origin.spec_path + "/"
         for rule in self.value or ():
             if rule == self.PUBLIC_VISIBILITY:
                 return True
             if rule == self.PRIVATE_VISIBILITY:
-                return destination.spec_path.startswith(origin.spec_path)
-            if destination.spec_path.startswith(rule):
+                return origin_path.startswith(target_path)
+            if origin_path.startswith(rule):
                 return True
         return False
 
