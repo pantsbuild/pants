@@ -23,7 +23,7 @@ Incremental adoption also allows you to immediately start benefitting from Pants
 [/block]
 ### 1. A basic `pants.toml`
 
-Follow the [Getting Started](doc:getting-started) guide to install Pants and [set up an initial `pants.toml`](doc:initial-configuration). Validate that running `./pants count-loc '**'` works properly. If you want to exclude a specific folder at first, you can use the [`pants_ignore`](https://www.pantsbuild.org/docs/reference-global#section-pants-ignore) option.
+Follow the [Getting Started](doc:getting-started) guide to install Pants and [set up an initial `pants.toml`](doc:initial-configuration). Validate that running `./pants count-loc ::` works properly. If you want to exclude a specific folder at first, you can use the [`pants_ignore`](https://www.pantsbuild.org/docs/reference-global#section-pants-ignore) option.
 
 Add the [relevant backends](doc:enabling-backends) to `[GLOBAL].backend_packages`.
 
@@ -31,7 +31,7 @@ Add the [relevant backends](doc:enabling-backends) to `[GLOBAL].backend_packages
 
 Formatters and linters are often the simplest to get working because—for all tools other than Pylint— you do not need to worry about things like dependencies and third-party requirements.
 
-First, run [`./pants tailor`](doc:create-initial-build-files) to generate BUILD files. This tells Pants which files to operate on, and will allow you to set additional metadata over time like test timeouts and dependencies on resources.
+First, run [`./pants tailor ::`](doc:create-initial-build-files) to generate BUILD files. This tells Pants which files to operate on, and will allow you to set additional metadata over time like test timeouts and dependencies on resources.
 
 Then, activate the [Linters and formatters](doc:python-linters-and-formatters) you'd like to use. Hook up the `fmt` and `lint` goals to your [CI](doc:using-pants-in-ci).
 

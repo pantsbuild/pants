@@ -30,13 +30,13 @@ First, see if Pants can automatically fix any safe deprecations for you:
 ```bash
 # You may want to use `--no-fmt` if your BUILD files are 
 # not already formatted by Black.
-❯ ./pants update-build-files --no-fmt
+❯ ./pants update-build-files --no-fmt ::
 ```
 
 You can add `update-build-files` to your [continuous integration](doc:using-pants-in-ci) so that developers don't accidentally use removed features:
 
 ```bash
-❯ ./pants update-build-files --check
+❯ ./pants update-build-files --check ::
 ```
 
 Then, see if there are any remaining deprecation warnings:

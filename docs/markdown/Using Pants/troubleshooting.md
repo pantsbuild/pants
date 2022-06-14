@@ -88,7 +88,7 @@ Is the missing import from a third-party dependency? Common issues:
 
 - Pants does know about your third-party requirements, e.g. missing `python_requirements` and `go_mod` target generators.
   - To see all third-party requirement targets Pants knows, run `./pants filter --target-type=$tgt ::`, where Python: `python_requirement`, Go: `go_third_party_package`, and JVM: `jvm_artifact`.
-  - Run `./pants tailor`, or manually add the relevant targets.
+  - Run `./pants tailor ::`, or manually add the relevant targets.
 - The dependency is missing from your third-party requirements list, e.g. `go.mod` or `requirements.txt`.
 - The dependency exposes a module different than the default Pants uses, e.g. Python's `ansicolors` exposing `colors`.
   - [Python](doc:python-third-party-dependencies): set the `modules` field and `module_mapping` fields.
@@ -101,7 +101,7 @@ Is the missing import from first-party code? Common issues:
   - Or, it's ignored by Pants. See the above guide "Pants cannot find a file in your project".
 - The file is missing an owning target like `python_sources`, `go_package`, or `resources`.
   - Run `./pants list path/to/file.ext` to see all owning targets.
-  - Try running `./pants tailor`. Warning: some target types like [`resources` and `files`](doc:assets) must be manually added.
+  - Try running `./pants tailor ::`. Warning: some target types like [`resources` and `files`](doc:assets) must be manually added.
 - [Source roots](doc:source-roots) are not set up properly (Python and JVM only).
   - This allows converting file paths like `src/py/project/app.py` to the Python module `project.app`.
 

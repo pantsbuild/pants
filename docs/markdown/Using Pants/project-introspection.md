@@ -283,28 +283,17 @@ $ ./pants paths --from=helloworld/main.py --to=helloworld/translator/translator.
 {
   "codes": [
     {
-      "code": "$ ./pants count-loc ::\n───────────────────────────────────────────────────────────────────────────────\nLanguage                 Files     Lines   Blanks  Comments     Code Complexity\n───────────────────────────────────────────────────────────────────────────────\nPython                    1690    618679    23906      7270   587503      18700\nHTML                        61      6522      694        67     5761          0\nJSON                        36     18755        6         0    18749          0\nYAML                        30      2451        4        19     2428          0\nJavaScript                   6       671       89         8      574         32\nCSV                          1         2        0         0        2          0\nJSONL                        1         4        0         0        4          0\nJinja                        1        11        0         0       11          2\nShell                        1        13        2         2        9          4\nTOML                         1       146        5         0      141          0\n───────────────────────────────────────────────────────────────────────────────\nTotal                     1828    647254    24706      7366   615182      18738\n───────────────────────────────────────────────────────────────────────────────\nEstimated Cost to Develop $22,911,268\nEstimated Schedule Effort 50.432378 months\nEstimated People Required 53.813884\n───────────────────────────────────────────────────────────────────────────────",
+      "code": "❯ ./pants count-loc ::\n───────────────────────────────────────────────────────────────────────────────\nLanguage                 Files     Lines   Blanks  Comments     Code Complexity\n───────────────────────────────────────────────────────────────────────────────\nPython                    1690    618679    23906      7270   587503      18700\nHTML                        61      6522      694        67     5761          0\nJSON                        36     18755        6         0    18749          0\nYAML                        30      2451        4        19     2428          0\nJavaScript                   6       671       89         8      574         32\nCSV                          1         2        0         0        2          0\nJSONL                        1         4        0         0        4          0\nJinja                        1        11        0         0       11          2\nShell                        1        13        2         2        9          4\nTOML                         1       146        5         0      141          0\n───────────────────────────────────────────────────────────────────────────────\nTotal                     1828    647254    24706      7366   615182      18738\n───────────────────────────────────────────────────────────────────────────────\nEstimated Cost to Develop $22,911,268\nEstimated Schedule Effort 50.432378 months\nEstimated People Required 53.813884\n───────────────────────────────────────────────────────────────────────────────",
       "language": "shell"
     }
   ]
 }
 [/block]
 
-[block:code]
-{
-  "codes": [
-    {
-      "code": "$ ./pants count-loc '**/*.py' '**/*.proto'\n───────────────────────────────────────────────────────────────────────────────\nLanguage                 Files     Lines   Blanks  Comments     Code Complexity\n───────────────────────────────────────────────────────────────────────────────\nPython                      13       155       50        22       83          5\nProtocol Buffers             1        11        3         2        6          0\n───────────────────────────────────────────────────────────────────────────────\nTotal                       14       166       53        24       89          5\n───────────────────────────────────────────────────────────────────────────────",
-      "language": "text",
-      "name": "Shell"
-    }
-  ]
-}
-[/block]
 SCC has [dozens of options](https://github.com/boyter/scc#usage). You can pass through options by either setting `--scc-args` or using `--` at the end of your command, like this:
 
 ```bash
-./pants count-loc '**' -- --no-cocomo
+./pants count-loc :: -- --no-cocomo
 ```
 [block:callout]
 {

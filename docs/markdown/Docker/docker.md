@@ -33,7 +33,7 @@ Pants uses [`docker_image`](doc:reference-docker_image) [targets](doc:targets) t
 You can generate initial BUILD files for your Docker images, using [tailor](doc:create-initial-build-files):
 
 ```
-❯ ./pants tailor
+❯ ./pants tailor ::
 Created src/docker/app1/BUILD:
   - Add docker_image target docker
 Created src/docker/app2/BUILD:
