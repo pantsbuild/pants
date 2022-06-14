@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
+use std::fmt::{self, Debug};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -46,7 +47,7 @@ pub enum RemoteCacheWarningsBehavior {
 /// then locally.
 #[derive(Clone)]
 pub struct CommandRunner {
-  underlying: Arc<dyn crate::CommandRunner>,
+  inner: Arc<dyn crate::CommandRunner>,
   metadata: ProcessMetadata,
   executor: task_executor::Executor,
   store: Store,
@@ -63,7 +64,7 @@ pub struct CommandRunner {
 
 impl CommandRunner {
   pub fn new(
-    underlying: Arc<dyn crate::CommandRunner>,
+    inner: Arc<dyn crate::CommandRunner>,
     metadata: ProcessMetadata,
     executor: task_executor::Executor,
     store: Store,
@@ -98,7 +99,7 @@ impl CommandRunner {
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
     Ok(CommandRunner {
-      underlying,
+      inner,
       metadata,
       executor,
       store,
@@ -414,6 +415,14 @@ impl CommandRunner {
   }
 }
 
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("remote_cache::CommandRunner")
+      .field("inner", &self.inner)
+      .finish_non_exhaustive()
+  }
+}
+
 enum CacheErrorType {
   ReadError,
   WriteError,
@@ -444,15 +453,12 @@ impl crate::CommandRunner for CommandRunner {
           cache_lookup_start,
           action_digest,
           &request.clone(),
-          self.underlying.run(context.clone(), workunit, request),
+          self.inner.run(context.clone(), workunit, request),
         )
         .await?
     } else {
       (
-        self
-          .underlying
-          .run(context.clone(), workunit, request)
-          .await?,
+        self.inner.run(context.clone(), workunit, request).await?,
         false,
       )
     };

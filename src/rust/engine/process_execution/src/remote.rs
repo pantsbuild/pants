@@ -1,11 +1,11 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
+use std::fmt::{self, Debug};
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::SystemTime;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
@@ -742,6 +742,13 @@ impl CommandRunner {
         },
       }
     }
+  }
+}
+
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("remote::CommandRunner")
+      .finish_non_exhaustive()
   }
 }
 

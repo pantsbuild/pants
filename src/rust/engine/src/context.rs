@@ -443,6 +443,7 @@ impl Core {
       &remoting_opts,
       capabilities_cell_opt,
     )?;
+    log::debug!("Using {command_runner:?} for process execution.");
 
     let graph = Arc::new(InvalidatableGraph(Graph::new(executor.clone())));
 
@@ -518,7 +519,7 @@ impl Core {
     if let Err(msg) = self.sessions.shutdown(timeout).await {
       log::warn!("During shutdown: {}", msg);
     }
-    // Then clear the Graph to ensure that drop handlers run (particular for running processes).
+    // Then clear the Graph to ensure that drop handlers run (particularly for running processes).
     self.graph.clear();
   }
 }

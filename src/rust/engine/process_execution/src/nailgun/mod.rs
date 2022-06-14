@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{self, Debug};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
@@ -106,6 +107,14 @@ impl CommandRunner {
 
   fn calculate_nailgun_name(main_class: &str) -> String {
     format!("nailgun_server_{}", main_class)
+  }
+}
+
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("nailgun::CommandRunner")
+      .field("inner", &self.inner)
+      .finish_non_exhaustive()
   }
 }
 
