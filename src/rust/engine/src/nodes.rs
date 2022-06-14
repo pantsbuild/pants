@@ -106,8 +106,8 @@ impl StoreFileByDigest<Failure> for Context {
 }
 
 ///
-/// A simplified implementation of graph::Node for members of the NodeKey enum to implement.
-/// NodeKey's impl of graph::Node handles the rest.
+/// Defines the mapping between a NodeKey and its NodeOutput, to allow for type-safe lookups of
+/// (wrapped) `graph` Nodes via `Context::get`.
 ///
 /// The Item type of a WrappedNode is bounded to values that can be stored and retrieved
 /// from the NodeOutput enum. Due to the semantics of memoization, retrieving the typed result
@@ -115,19 +115,19 @@ impl StoreFileByDigest<Failure> for Context {
 /// combination of bounds at usage sites should mean that a failure to unwrap the result is
 /// exceedingly rare.
 ///
-#[async_trait]
 pub trait WrappedNode: Into<NodeKey> {
   type Item: TryFrom<NodeOutput>;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Self::Item>;
 }
 
 ///
 /// A Node that selects a product for some Params.
+///
+/// NB: This is a Node so that it can be used as a root in the graph, but it does not implement
+/// WrappedNode, because it should never be requested as a Node using context.get. Select is a thin
+/// proxy to other Node types (which it requests using context.get), and memoizing it would be
+/// redundant.
+///
+/// Instead, use `Select::run_node` to run the Select logic without memoizing it.
 ///
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Select {
@@ -187,13 +187,13 @@ impl Select {
     async move {
       let edges = edges?;
       Select::new_from_edges(params, product, &edges)
-        .run(context)
+        .run_node(context)
         .await
     }
     .boxed()
   }
 
-  async fn run(self, context: Context) -> NodeResult<Value> {
+  async fn run_node(self, context: Context) -> NodeResult<Value> {
     match self.entry.as_ref() {
       &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
         rule_graph::EntryWithDeps::Inner(ref inner) => match inner.rule() {
@@ -238,26 +238,6 @@ impl Select {
         }
       }
     }
-  }
-}
-
-///
-/// NB: This is a Node so that it can be used as a root in the graph, but it should otherwise
-/// never be requested as a Node using context.get. Select is a thin proxy to other Node types
-/// (which it requests using context.get), and memoizing it would be redundant.
-///
-/// Instead, use `Select::run` to run the Select logic without memoizing it.
-///
-#[async_trait]
-impl WrappedNode for Select {
-  type Item = Value;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Value> {
-    self.run(context).await
   }
 }
 
@@ -399,19 +379,8 @@ impl ExecuteProcess {
     let process = Python::with_gil(|py| Self::lift_process((*value).as_ref(py), input_digests))?;
     Ok(Self { process })
   }
-}
 
-impl From<ExecuteProcess> for NodeKey {
-  fn from(n: ExecuteProcess) -> Self {
-    NodeKey::ExecuteProcess(Box::new(n))
-  }
-}
-
-#[async_trait]
-impl WrappedNode for ExecuteProcess {
-  type Item = ProcessResult;
-
-  async fn run_wrapped_node(
+  async fn run_node(
     self,
     context: Context,
     workunit: &mut RunningWorkunit,
@@ -483,6 +452,16 @@ impl WrappedNode for ExecuteProcess {
   }
 }
 
+impl From<ExecuteProcess> for NodeKey {
+  fn from(n: ExecuteProcess) -> Self {
+    NodeKey::ExecuteProcess(Box::new(n))
+  }
+}
+
+impl WrappedNode for ExecuteProcess {
+  type Item = ProcessResult;
+}
+
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct ProcessResult(pub process_execution::FallibleProcessResultWithPlatform);
 
@@ -492,18 +471,8 @@ pub struct ProcessResult(pub process_execution::FallibleProcessResultWithPlatfor
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct ReadLink(Link);
 
-#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
-pub struct LinkDest(PathBuf);
-
-#[async_trait]
-impl WrappedNode for ReadLink {
-  type Item = LinkDest;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<LinkDest> {
+impl ReadLink {
+  async fn run_node(self, context: Context) -> NodeResult<LinkDest> {
     let node = self;
     let link_dest = context
       .core
@@ -513,6 +482,13 @@ impl WrappedNode for ReadLink {
       .map_err(|e| throw(format!("{}", e)))?;
     Ok(LinkDest(link_dest))
   }
+}
+
+#[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
+pub struct LinkDest(PathBuf);
+
+impl WrappedNode for ReadLink {
+  type Item = LinkDest;
 }
 
 impl From<ReadLink> for NodeKey {
@@ -527,15 +503,8 @@ impl From<ReadLink> for NodeKey {
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct DigestFile(pub File);
 
-#[async_trait]
-impl WrappedNode for DigestFile {
-  type Item = hashing::Digest;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<hashing::Digest> {
+impl DigestFile {
+  async fn run_node(self, context: Context) -> NodeResult<hashing::Digest> {
     let path = context.core.vfs.file_path(&self.0);
     context
       .core
@@ -544,6 +513,10 @@ impl WrappedNode for DigestFile {
       .map_err(throw)
       .await
   }
+}
+
+impl WrappedNode for DigestFile {
+  type Item = hashing::Digest;
 }
 
 impl From<DigestFile> for NodeKey {
@@ -559,15 +532,8 @@ impl From<DigestFile> for NodeKey {
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Scandir(Dir);
 
-#[async_trait]
-impl WrappedNode for Scandir {
-  type Item = Arc<DirectoryListing>;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Arc<DirectoryListing>> {
+impl Scandir {
+  async fn run_node(self, context: Context) -> NodeResult<Arc<DirectoryListing>> {
     let directory_listing = context
       .core
       .vfs
@@ -576,6 +542,10 @@ impl WrappedNode for Scandir {
       .map_err(|e| throw(format!("{}", e)))?;
     Ok(Arc::new(directory_listing))
   }
+}
+
+impl WrappedNode for Scandir {
+  type Item = Arc<DirectoryListing>;
 }
 
 impl From<Scandir> for NodeKey {
@@ -643,21 +613,16 @@ impl Paths {
       ],
     ))
   }
-}
 
-#[async_trait]
-impl WrappedNode for Paths {
-  type Item = Arc<Vec<PathStat>>;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Arc<Vec<PathStat>>> {
+  async fn run_node(self, context: Context) -> NodeResult<Arc<Vec<PathStat>>> {
     let path_globs = self.path_globs.parse().map_err(throw)?;
     let path_stats = Self::create(context, path_globs).await?;
     Ok(Arc::new(path_stats))
   }
+}
+
+impl WrappedNode for Paths {
+  type Item = Arc<Vec<PathStat>>;
 }
 
 impl From<Paths> for NodeKey {
@@ -669,17 +634,14 @@ impl From<Paths> for NodeKey {
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct SessionValues;
 
-#[async_trait]
-impl WrappedNode for SessionValues {
-  type Item = Value;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Value> {
+impl SessionValues {
+  async fn run_node(self, context: Context) -> NodeResult<Value> {
     Ok(Value::new(context.session.session_values()))
   }
+}
+
+impl WrappedNode for SessionValues {
+  type Item = Value;
 }
 
 impl From<SessionValues> for NodeKey {
@@ -691,15 +653,8 @@ impl From<SessionValues> for NodeKey {
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct RunId;
 
-#[async_trait]
-impl WrappedNode for RunId {
-  type Item = Value;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Value> {
+impl RunId {
+  async fn run_node(self, context: Context) -> NodeResult<Value> {
     let gil = Python::acquire_gil();
     let py = gil.python();
     Ok(externs::unsafe_call(
@@ -708,6 +663,10 @@ impl WrappedNode for RunId {
       &[externs::store_u64(py, context.session.run_id().0 as u64)],
     ))
   }
+}
+
+impl WrappedNode for RunId {
+  type Item = Value;
 }
 
 impl From<RunId> for NodeKey {
@@ -857,17 +816,8 @@ impl Snapshot {
       &[externs::store_tuple(py, entries)],
     ))
   }
-}
 
-#[async_trait]
-impl WrappedNode for Snapshot {
-  type Item = store::Snapshot;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<store::Snapshot> {
+  async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
     let path_globs = self.path_globs.parse().map_err(throw)?;
 
     // We rely on Context::expand_globs to track dependencies for scandirs,
@@ -881,6 +831,10 @@ impl WrappedNode for Snapshot {
       .map_err(|e| throw(format!("Snapshot failed: {}", e)))
       .await
   }
+}
+
+impl WrappedNode for Snapshot {
+  type Item = store::Snapshot;
 }
 
 impl From<Snapshot> for NodeKey {
@@ -945,17 +899,8 @@ impl DownloadedFile {
     }
     core.store().snapshot_of_one_file(path, digest, true).await
   }
-}
 
-#[async_trait]
-impl WrappedNode for DownloadedFile {
-  type Item = store::Snapshot;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    _workunit: &mut RunningWorkunit,
-  ) -> NodeResult<store::Snapshot> {
+  async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
     let (url_str, expected_digest) = Python::with_gil(|py| {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
@@ -972,6 +917,10 @@ impl WrappedNode for DownloadedFile {
       .await
       .map_err(throw)
   }
+}
+
+impl WrappedNode for DownloadedFile {
+  type Item = store::Snapshot;
 }
 
 impl From<DownloadedFile> for NodeKey {
@@ -1068,7 +1017,7 @@ impl Task {
                 ))
               }
             })?;
-          select.run(context).await
+          select.run_node(context).await
         }
       })
       .collect::<Vec<_>>();
@@ -1110,27 +1059,8 @@ impl Task {
       }
     }
   }
-}
 
-impl fmt::Debug for Task {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(
-      f,
-      "Task {{ func: {}, params: {}, product: {}, cacheable: {} }}",
-      self.task.func, self.params, self.task.product, self.task.cacheable,
-    )
-  }
-}
-
-#[async_trait]
-impl WrappedNode for Task {
-  type Item = Value;
-
-  async fn run_wrapped_node(
-    self,
-    context: Context,
-    workunit: &mut RunningWorkunit,
-  ) -> NodeResult<Value> {
+  async fn run_node(self, context: Context, workunit: &mut RunningWorkunit) -> NodeResult<Value> {
     let params = self.params;
     let deps = {
       // While waiting for dependencies, mark ourselves blocking.
@@ -1146,7 +1076,7 @@ impl WrappedNode for Task {
           .clause
           .iter()
           .map(|type_id| {
-            Select::new_from_edges(params.clone(), *type_id, edges).run(context.clone())
+            Select::new_from_edges(params.clone(), *type_id, edges).run_node(context.clone())
           })
           .collect::<Vec<_>>(),
       )
@@ -1197,6 +1127,20 @@ impl WrappedNode for Task {
 
     Ok(result_val)
   }
+}
+
+impl fmt::Debug for Task {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(
+      f,
+      "Task {{ func: {}, params: {}, product: {}, cacheable: {} }}",
+      self.task.func, self.params, self.task.product, self.task.cacheable,
+    )
+  }
+}
+
+impl WrappedNode for Task {
+  type Item = Value;
 }
 
 impl From<Task> for NodeKey {
@@ -1419,61 +1363,20 @@ impl Node for NodeKey {
           };
 
         let mut result = match self {
-          NodeKey::DigestFile(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::FileDigest)
-              .await
-          }
-          NodeKey::DownloadedFile(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
-          NodeKey::ExecuteProcess(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
-              .await
-          }
-          NodeKey::ReadLink(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::LinkDest)
-              .await
-          }
-          NodeKey::Scandir(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::DirectoryListing)
-              .await
-          }
-          NodeKey::Select(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
-          NodeKey::Snapshot(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
-          NodeKey::Paths(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Paths)
-              .await
-          }
-          NodeKey::SessionValues(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
-          NodeKey::RunId(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
-          NodeKey::Task(n) => {
-            n.run_wrapped_node(context, workunit)
-              .map_ok(NodeOutput::Value)
-              .await
-          }
+          NodeKey::DigestFile(n) => n.run_node(context).await.map(NodeOutput::FileDigest),
+          NodeKey::DownloadedFile(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
+          NodeKey::ExecuteProcess(n) => n
+            .run_node(context, workunit)
+            .await
+            .map(|r| NodeOutput::ProcessResult(Box::new(r))),
+          NodeKey::ReadLink(n) => n.run_node(context).await.map(NodeOutput::LinkDest),
+          NodeKey::Scandir(n) => n.run_node(context).await.map(NodeOutput::DirectoryListing),
+          NodeKey::Select(n) => n.run_node(context).await.map(NodeOutput::Value),
+          NodeKey::Snapshot(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
+          NodeKey::Paths(n) => n.run_node(context).await.map(NodeOutput::Paths),
+          NodeKey::SessionValues(n) => n.run_node(context).await.map(NodeOutput::Value),
+          NodeKey::RunId(n) => n.run_node(context).await.map(NodeOutput::Value),
+          NodeKey::Task(n) => n.run_node(context, workunit).await.map(NodeOutput::Value),
         };
 
         // If both the Node and the watch failed, prefer the Node's error message.

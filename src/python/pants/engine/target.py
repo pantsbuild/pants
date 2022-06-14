@@ -1502,8 +1502,8 @@ class InvalidFieldChoiceException(InvalidFieldException):
         valid_choices: Iterable[Any],
     ) -> None:
         super().__init__(
-            f"The {repr(field_alias)} field in target {address} must be one of "
-            f"{sorted(valid_choices)}, but was {repr(raw_value)}."
+            f"Values for the {repr(field_alias)} field in target {address} must be one of "
+            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided."
         )
 
 
@@ -1666,15 +1666,9 @@ class StringField(ScalarField[str]):
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and cls.valid_choices is not None:
-            valid_choices = set(
-                cls.valid_choices
-                if isinstance(cls.valid_choices, tuple)
-                else (choice.value for choice in cls.valid_choices)
+            _validate_choices(
+                address, cls.alias, [value_or_default], valid_choices=cls.valid_choices
             )
-            if value_or_default not in valid_choices:
-                raise InvalidFieldChoiceException(
-                    address, cls.alias, value_or_default, valid_choices=valid_choices
-                )
         return value_or_default
 
 
@@ -1724,12 +1718,16 @@ class SequenceField(Generic[T], Field):
 class StringSequenceField(SequenceField[str]):
     expected_element_type = str
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
+    valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
-        return super().compute_value(raw_value, address)
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default and cls.valid_choices is not None:
+            _validate_choices(address, cls.alias, value_or_default, valid_choices=cls.valid_choices)
+        return value_or_default
 
 
 class DictStringToStringField(Field):
@@ -1810,6 +1808,25 @@ class DictStringToStringSequenceField(Field):
             except ValueError:
                 raise invalid_type_exception
         return FrozenDict(result)
+
+
+def _validate_choices(
+    address: Address,
+    field_alias: str,
+    values: Iterable[Any],
+    *,
+    valid_choices: Union[Type[Enum], Tuple[Any, ...]],
+) -> None:
+    _valid_choices = set(
+        valid_choices
+        if isinstance(valid_choices, tuple)
+        else (choice.value for choice in valid_choices)
+    )
+    for choice in values:
+        if choice not in _valid_choices:
+            raise InvalidFieldChoiceException(
+                address, field_alias, choice, valid_choices=_valid_choices
+            )
 
 
 # -----------------------------------------------------------------------------------------------
