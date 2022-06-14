@@ -9,7 +9,6 @@ Active Maintainers
 * Daniel McClanahan
 * Daniel Wagner-Hall
 * Eric Arellano
-* Greg Shuflin
 * Henry Fuller
 * Ity Kaul
 * Patrick Lawson
@@ -32,6 +31,7 @@ Emeritus
 * Eric Ayers
 * Fedor Korotkov
 * Garrett Malmquist
+* Greg Shuflin
 * Larry Hosken
 * Mateo Rodriguez
 * Matt Olsen
