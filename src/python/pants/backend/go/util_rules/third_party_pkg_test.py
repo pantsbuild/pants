@@ -264,6 +264,7 @@ def test_invalid_go_sum(rule_runner: RuleRunner) -> None:
         rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
 
 
+@pytest.mark.skip("broken test")
 def test_missing_go_sum(rule_runner: RuleRunner) -> None:
     digest = set_up_go_mod(
         rule_runner,
@@ -284,8 +285,10 @@ def test_missing_go_sum(rule_runner: RuleRunner) -> None:
     )
     with engine_error(contains="github.com/google/uuid@v1.3.0: missing go.sum entry"):
         rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        assert False, "should not get here!"
 
 
+@pytest.mark.skip("broken test")
 def test_stale_go_mod(rule_runner: RuleRunner) -> None:
     digest = set_up_go_mod(
         rule_runner,
@@ -309,6 +312,7 @@ def test_stale_go_mod(rule_runner: RuleRunner) -> None:
     )
     with engine_error(ProcessExecutionFailure, contains="updates to go.mod needed"):
         rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        assert False, "should not get here!"
 
 
 def test_pkg_missing(rule_runner: RuleRunner) -> None:
