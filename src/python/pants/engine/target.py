@@ -2679,28 +2679,35 @@ class DescriptionField(StringField):
     )
 
 
-class VisibilityField(StringSequenceField):
-    PUBLIC_VISIBILITY = "public"
-    PRIVATE_VISIBILITY = "private"
+class VisibilityField(AsyncFieldMixin, StringSequenceField):
+    PUBLIC_VISIBILITY = "<public>"
+    PRIVATE_VISIBILITY = "<private>"
 
     alias = "visibility"
     default = (PUBLIC_VISIBILITY,)
     help = softwrap(
         """
-        TBW.
+        The `visibility` value specifies a set of project paths, and only targets from within one of
+        these paths are allowed to depend on this target.
+
+        There are two special values, `"<public>"` and `"<private>"`.
+
+        A `"<public>"` visibility will allow any target to depend on this target, while
+        `"<private>"` visibility only allows targets in the same subtree as this target.
+
         """
     )
 
-    def visible(self, target: Address, origin: Address) -> bool:
+    def visible(self, to_address: Address) -> bool:
         # Add trailing slash to cut off paths with common prefixes but different suffixes.
-        target_path = target.spec_path + "/"
-        origin_path = origin.spec_path + "/"
+        target_path = self.address.spec_path + "/"
+        to_path = to_address.spec_path + "/"
         for rule in self.value or ():
             if rule == self.PUBLIC_VISIBILITY:
                 return True
             if rule == self.PRIVATE_VISIBILITY:
-                return origin_path.startswith(target_path)
-            if origin_path.startswith(rule):
+                return to_path.startswith(target_path)
+            if to_path.startswith(rule):
                 return True
         return False
 
