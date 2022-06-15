@@ -8,7 +8,14 @@ from typing import cast
 import pytest
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.run import Run, RunFieldSet, RunRequest, RunSubsystem, run
+from pants.core.goals.run import (
+    Run,
+    RunDebugAdapterRequest,
+    RunFieldSet,
+    RunRequest,
+    RunSubsystem,
+    run,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -43,6 +50,12 @@ def create_mock_run_request(rule_runner: RuleRunner, program_text: bytes) -> Run
     return RunRequest(digest=digest, args=(os.path.join("{chroot}", "program.py"),))
 
 
+def create_mock_run_debug_adapter_request(
+    rule_runner: RuleRunner, program_text: bytes
+) -> RunDebugAdapterRequest:
+    return cast(RunDebugAdapterRequest, create_mock_run_request(rule_runner, program_text))
+
+
 def single_target_run(
     rule_runner: RuleRunner,
     address: Address,
@@ -65,7 +78,7 @@ def single_target_run(
         res = run_rule_with_mocks(
             run,
             rule_args=[
-                create_goal_subsystem(RunSubsystem, args=[], cleanup=True),
+                create_goal_subsystem(RunSubsystem, args=[], cleanup=True, debug_adapter=False),
                 create_subsystem(
                     GlobalOptions, pants_workdir=rule_runner.pants_workdir, process_cleanup=True
                 ),
@@ -88,6 +101,11 @@ def single_target_run(
                     output_type=RunRequest,
                     input_type=TestRunFieldSet,
                     mock=lambda _: create_mock_run_request(rule_runner, program_text),
+                ),
+                MockGet(
+                    output_type=RunDebugAdapterRequest,
+                    input_type=TestRunFieldSet,
+                    mock=lambda _: create_mock_run_debug_adapter_request(rule_runner, program_text),
                 ),
                 MockEffect(
                     output_type=InteractiveProcessResult,
