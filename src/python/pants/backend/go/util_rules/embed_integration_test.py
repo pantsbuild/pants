@@ -247,7 +247,7 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
         f"""\
         module {import_path}
         go 1.16
-    """
+        """
     )
     embed_content = "This message comes from an embedded file."
     mod_zip_bytes = io.BytesIO()
@@ -262,7 +262,7 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
             import _ "embed"
             //go:embed message.txt
             var Message string
-        """
+            """
             ),
         )
         mod_zip.writestr(f"{prefix}/pkg/message.txt", embed_content)
