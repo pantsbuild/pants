@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import os
@@ -11,23 +12,26 @@ from typing import Any
 
 import ijson
 
-from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
 from pants.backend.go.util_rules import pkg_analyzer
+from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.tailor import group_by_dir
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    CreateDigest,
     Digest,
     DigestSubset,
+    FileContent,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     Snapshot,
 )
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -59,6 +63,14 @@ class ThirdPartyPkgAnalysis:
     s_files: tuple[str, ...]
 
     minimum_go_version: str | None
+
+    embed_patterns: tuple[str, ...]
+    test_embed_patterns: tuple[str, ...]
+    xtest_embed_patterns: tuple[str, ...]
+
+    embed_config: EmbedConfig | None = None
+    test_embed_config: EmbedConfig | None = None
+    xtest_embed_config: EmbedConfig | None = None
 
     error: GoThirdPartyPkgError | None = None
 
@@ -252,9 +264,7 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
 
 @rule
 async def analyze_go_third_party_module(
-    request: AnalyzeThirdPartyModuleRequest,
-    analyzer: PackageAnalyzerSetup,
-    golang_subsystem: GolangSubsystem,
+    request: AnalyzeThirdPartyModuleRequest, analyzer: PackageAnalyzerSetup
 ) -> AnalyzedThirdPartyModule:
     # Download the module.
     download_result = await Get(
@@ -430,8 +440,53 @@ async def analyze_go_third_party_package(
         go_files=tuple(request.pkg_json.get("GoFiles", ())),
         s_files=tuple(request.pkg_json.get("SFiles", ())),
         minimum_go_version=request.minimum_go_version,
+        embed_patterns=tuple(request.pkg_json.get("EmbedPatterns", [])),
+        test_embed_patterns=tuple(request.pkg_json.get("TestEmbedPatterns", [])),
+        xtest_embed_patterns=tuple(request.pkg_json.get("XTestEmbedPatterns", [])),
         error=maybe_error,
     )
+
+    if analysis.embed_patterns or analysis.test_embed_patterns or analysis.xtest_embed_patterns:
+        patterns_json = json.dumps(
+            {
+                "EmbedPatterns": analysis.embed_patterns,
+                "TestEmbedPatterns": analysis.test_embed_patterns,
+                "XTestEmbedPatterns": analysis.xtest_embed_patterns,
+            }
+        ).encode("utf-8")
+        embedder, patterns_json_digest = await MultiGet(
+            Get(LoadedGoBinary, LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder")),
+            Get(Digest, CreateDigest([FileContent("patterns.json", patterns_json)])),
+        )
+        input_digest = await Get(
+            Digest, MergeDigests((package_digest, patterns_json_digest, embedder.digest))
+        )
+        embed_result = await Get(
+            FallibleProcessResult,
+            Process(
+                ("./embedder", "patterns.json", request.package_path),
+                input_digest=input_digest,
+                description=f"Create embed mapping for {import_path}",
+                level=LogLevel.DEBUG,
+            ),
+        )
+        if embed_result.exit_code != 0:
+            return FallibleThirdPartyPkgAnalysis(
+                analysis=None,
+                import_path=import_path,
+                exit_code=1,
+                stderr=embed_result.stderr.decode(),
+            )
+        metadata = json.loads(embed_result.stdout)
+        embed_config = EmbedConfig.from_json_dict(metadata.get("EmbedConfig", {}))
+        test_embed_config = EmbedConfig.from_json_dict(metadata.get("TestEmbedConfig", {}))
+        xtest_embed_config = EmbedConfig.from_json_dict(metadata.get("XTestEmbedConfig", {}))
+        analysis = dataclasses.replace(
+            analysis,
+            embed_config=embed_config,
+            test_embed_config=test_embed_config,
+            xtest_embed_config=xtest_embed_config,
+        )
 
     return FallibleThirdPartyPkgAnalysis(
         analysis=analysis,
@@ -536,6 +591,9 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             go_files=(),
             s_files=(),
             minimum_go_version=None,
+            embed_patterns=(),
+            test_embed_patterns=(),
+            xtest_embed_patterns=(),
             error=error,
         )
 
