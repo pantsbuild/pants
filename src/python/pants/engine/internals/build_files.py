@@ -16,8 +16,6 @@ from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import RegisteredTargetTypes
-from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -126,8 +124,6 @@ async def parse_address_family(
     build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
     directory: AddressFamilyRequest,
-    registered_target_types: RegisteredTargetTypes,
-    union_membership: UnionMembership,
 ) -> AddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -145,7 +141,7 @@ async def parse_address_family(
     if not digest_contents:
         raise ResolveError(f"Directory '{directory.path}' does not contain any BUILD files.")
 
-    defaults = directory.defaults.as_mutable(registered_target_types, union_membership)
+    defaults = directory.defaults.as_mutable()
     address_maps = [
         AddressMap.parse(fc.path, fc.content.decode(), parser, prelude_symbols, defaults)
         for fc in digest_contents

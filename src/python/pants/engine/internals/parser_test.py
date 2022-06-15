@@ -17,9 +17,9 @@ from pants.util.frozendict import FrozenDict
 @pytest.fixture
 def buildfile_defaults() -> MutableBuildFileDefaults:
     return (
-        BuildFileDefaultsProvider()
+        BuildFileDefaultsProvider(RegisteredTargetTypes({}), UnionMembership({}))
         .get_defaults_for("")
-        .as_mutable(RegisteredTargetTypes({}), UnionMembership({}))
+        .as_mutable()
     )
 
 

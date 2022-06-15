@@ -1,11 +1,11 @@
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field, replace
-from typing import Any, Iterable, Mapping, Tuple, Union, cast
+from typing import Any, Iterable, Mapping, Tuple, Union
 
 from pants.engine.addresses import Address
 from pants.engine.target import InvalidFieldException, RegisteredTargetTypes
@@ -16,14 +16,16 @@ DefaultFieldValuesT = FrozenDict[str, Any]
 DefaultsValueT = FrozenDict[str, DefaultFieldValuesT]
 DefaultsT = FrozenDict[str, DefaultsValueT]
 
-SetDefaultFieldValuesT = Mapping[str, Any]
-SetDefaultsValueT = Mapping[str, SetDefaultFieldValuesT]
+SetDefaultsValueT = Mapping[str, Any]
 SetDefaultsKeyT = Union[str, Tuple[str, ...]]
 SetDefaultsT = Mapping[SetDefaultsKeyT, SetDefaultsValueT]
 
 
 @dataclass
 class BuildFileDefaultsProvider:
+    registered_target_types: RegisteredTargetTypes
+    union_membership: UnionMembership
+
     # The defaults for each target from all BUILD files, per rel path.
     defaults: dict[str, BuildFileDefaults] = field(default_factory=dict)
 
@@ -52,14 +54,10 @@ class BuildFileDefaults:
     defaults: DefaultsT
     provider: BuildFileDefaultsProvider = field(hash=False, compare=False)
 
-    def as_mutable(
-        self, registered_target_types: RegisteredTargetTypes, union_membership: UnionMembership
-    ) -> MutableBuildFileDefaults:
+    def as_mutable(self) -> MutableBuildFileDefaults:
         return MutableBuildFileDefaults(
             defaults=dict(self.defaults),
             immutable=self,
-            registered_target_types=registered_target_types,
-            union_membership=union_membership,
         )
 
     def commit(self) -> None:
@@ -70,15 +68,29 @@ class BuildFileDefaults:
 class MutableBuildFileDefaults:
     defaults: dict[str, Mapping[str, Any]]
     immutable: BuildFileDefaults
-    registered_target_types: RegisteredTargetTypes
-    union_membership: UnionMembership
+
+    @property
+    def path(self) -> str:
+        return self.immutable.path
+
+    @property
+    def provider(self) -> BuildFileDefaultsProvider:
+        return self.immutable.provider
+
+    @property
+    def registered_target_types(self) -> RegisteredTargetTypes:
+        return self.provider.registered_target_types
+
+    @property
+    def union_membership(self) -> UnionMembership:
+        return self.provider.union_membership
 
     def commit(self) -> None:
         defaults = replace(self.immutable, defaults=self.freezed_defaults())
         defaults.commit()
 
     def freezed_defaults(self) -> DefaultsT:
-        address = Address(self.immutable.path, generated_name="__defaults__")
+        address = Address(self.path, generated_name="__defaults__")
         types = self.registered_target_types.aliases_to_types
         return FrozenDict(
             {
@@ -101,15 +113,15 @@ class MutableBuildFileDefaults:
     def get(self, target_alias: str) -> Mapping[str, Any]:
         return self.defaults.get(target_alias, {})
 
-    def set_defaults(self, *args: SetDefaultsT, **kwargs: SetDefaultsValueT) -> None:
-        defaults: dict[str, dict[str, Any]] = {}
+    def set_defaults(self, *args: SetDefaultsT, extend: bool = False, **kwargs) -> None:
+        defaults: dict[str, dict[str, Any]] = (
+            {} if not extend else {k: dict(v) for k, v in self.defaults.items()}
+        )
         types = self.registered_target_types.aliases_to_types
-        for target, default in (
-            item for arg in (*args, kwargs) for item in cast(SetDefaultsT, arg).items()
-        ):
+        for target, default in (item for arg in args for item in arg.items()):
             if not isinstance(default, dict):
                 raise ValueError(
-                    f"{self.immutable.path}: The default field values passed to __defaults__ for "
+                    f"{self.path}: The default field values passed to __defaults__ for "
                     f"{target} must be a `dict` but got a `{type(default).__name__}`."
                 )
 
@@ -140,6 +152,7 @@ class MutableBuildFileDefaults:
                             f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
                         )
                 # TODO: moved fields for TargetGenerators ?  See: `Target._calculate_field_values()`.
+                # TODO: support parametrization ?
 
                 # Merge all provided defaults for this call.
                 defaults.setdefault(target_type.alias, {}).update(default)

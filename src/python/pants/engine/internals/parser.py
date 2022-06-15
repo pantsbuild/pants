@@ -10,16 +10,12 @@ from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable
 
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.internals.defaults import (
-    MutableBuildFileDefaults,
-    SetDefaultsT,
-    SetDefaultsValueT,
-)
+from pants.engine.internals.defaults import MutableBuildFileDefaults, SetDefaultsT
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -74,7 +70,7 @@ class ParseState(threading.local):
             )
         return self._defaults
 
-    def set_defaults(self, *args: SetDefaultsT, **kwargs: Mapping[str, SetDefaultsValueT]) -> None:
+    def set_defaults(self, *args: SetDefaultsT, **kwargs) -> None:
         self.defaults.set_defaults(*args, **kwargs)
 
     def commit_defaults(self) -> None:
@@ -125,6 +121,7 @@ class Parser:
             **object_aliases.objects,
             "build_file_dir": lambda: PurePath(parse_state.rel_path()),
             "__defaults__": parse_state.set_defaults,
+            "__all__": "__all__",  # Allow using as identifier in the __defaults__ dict.
         }
         symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 

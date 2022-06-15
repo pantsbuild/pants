@@ -235,7 +235,10 @@ class EngineInitializer:
 
         @rule
         def build_file_defaults_provider_singleton() -> BuildFileDefaultsProvider:
-            return BuildFileDefaultsProvider()
+            return BuildFileDefaultsProvider(
+                registered_target_types,
+                union_membership,
+            )
 
         @rule
         def build_configuration_singleton() -> BuildConfiguration:

@@ -34,9 +34,9 @@ def parse_address_map(build_file: str) -> AddressMap:
         build_file,
         parser,
         BuildFilePreludeSymbols(FrozenDict()),
-        BuildFileDefaultsProvider()
+        BuildFileDefaultsProvider(RegisteredTargetTypes({}), UnionMembership({}))
         .get_defaults_for("")
-        .as_mutable(RegisteredTargetTypes({}), UnionMembership({})),
+        .as_mutable(),
     )
     assert path == address_map.path
     return address_map
