@@ -11,7 +11,7 @@ from typing import Iterable, Mapping
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.internals.defaults import BuildFileDefaults
+from pants.engine.internals.defaults import MutableBuildFileDefaults
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
@@ -37,7 +37,7 @@ class AddressMap:
         build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
-        defaults: BuildFileDefaults,
+        defaults: MutableBuildFileDefaults,
     ) -> AddressMap:
         """Parses a source for targets.
 
