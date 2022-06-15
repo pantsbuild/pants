@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import io
+import json
+import zipfile
 from textwrap import dedent
 
 import pytest
@@ -240,6 +243,33 @@ def test_embed_in_external_test(rule_runner: RuleRunner) -> None:
 
 @logging
 def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
+    # Build the zip file and other content needed to simulate a third-party module.
+    import_path = "pantsbuild.org/go-embed-sample-for-test"
+    version = "v0.0.1"
+    go_mod_content = dedent(
+        f"""\
+        module {import_path}
+        go 1.16
+    """
+    )
+    embed_content = "This message comes from an embedded file."
+    mod_zip_bytes = io.BytesIO()
+    with zipfile.ZipFile(mod_zip_bytes, "w") as mod_zip:
+        prefix = f"{import_path}@{version}"
+        mod_zip.writestr(f"{prefix}/go.mod", go_mod_content)
+        mod_zip.writestr(
+            f"{prefix}/pkg/message.go",
+            dedent(
+                """\
+            package pkg
+            import _ "embed"
+            //go:embed message.txt
+            var Message string
+        """
+            ),
+        )
+        mod_zip.writestr(f"{prefix}/pkg/message.txt", embed_content)
+
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -249,40 +279,55 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
                 """
             ),
             "go.mod": dedent(
-                """\
+                f"""\
                 module go.example.com/foo
                 go 1.17
 
                 require (
-                \tgithub.com/tdyas/go-embed-sample-for-test v0.0.2
+                \t{import_path} {version}
                 )
                 """
             ),
-            "go.sum": dedent(
-                """\
-            github.com/tdyas/go-embed-sample-for-test v0.0.2 h1:CXEVzWaV1SWp2nyNGnlTd8MQVXPXK+Ef3yhW0+Z5QCw=
-            github.com/tdyas/go-embed-sample-for-test v0.0.2/go.mod h1:HsaA20RG3Z8uFwHjuGA7L7PJPwk8/3Xpaixarj6ZTS8=
-            """
-            ),
-            # At least one Go file is necessary due to bug in Go backend even if package is only for tests.
+            # Note: At least one Go file is necessary due to bug in Go backend even if package is only for tests.
             "foo.go": "package foo\n",
             "foo_test.go": dedent(
-                """\
+                f"""\
                 package foo_test
                 import (
                   "testing"
-                  "github.com/tdyas/go-embed-sample-for-test/pkg"
+                  "{import_path}/pkg"
                 )
 
-                func TestFoo(t *testing.T) {
-                  if pkg.Message == "" {
-                    t.Fatalf("third-party package message not set")
-                  }
-                }
+                func TestFoo(t *testing.T) {{
+                  if pkg.Message != "{embed_content}" {{
+                    t.Fatalf("third-party embedded content did not match")
+                  }}
+                }}
                 """
             ),
+            # Setup the third-party dependency as a custom Go module proxy site.
+            # See https://go.dev/ref/mod#goproxy-protocol for details.
+            f"go-mod-proxy/{import_path}/@v/list": f"{version}\n",
+            f"go-mod-proxy/{import_path}/@v/{version}.info": json.dumps(
+                {
+                    "Version": version,
+                    "Time": "2022-01-01T01:00:00Z",
+                }
+            ),
+            f"go-mod-proxy/{import_path}/@v/{version}.mod": go_mod_content,
+            f"go-mod-proxy/{import_path}/@v/{version}.zip": mod_zip_bytes.getvalue(),
         }
     )
+
+    rule_runner.set_options(
+        [
+            "--go-test-args=-v -bench=.",
+            f"--golang-subprocess-env-vars=GOPROXY=file://{rule_runner.build_root}/go-mod-proxy",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+        ],
+        env_inherit={"PATH"},
+    )
+
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     result = rule_runner.request(TestResult, [GoTestFieldSet.create(tgt)])
     assert result.exit_code == 0
