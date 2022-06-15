@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from itertools import chain
 
+from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.target_types import (
     HelmChartFieldSet,
     HelmChartTarget,
@@ -14,7 +15,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules import chart, process
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
-from pants.backend.helm.util_rules.process import HelmEvaluateProcess
+from pants.backend.helm.util_rules.process import HelmRenderCmd, HelmRenderProcess
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address, Addresses
@@ -40,10 +41,15 @@ class TooManyChartDependenciesError(ValueError):
         )
 
 
+@dataclass(frozen=True)
+class FindHelmDeploymentChart:
+    field_set: HelmDeploymentFieldSet
+
+
 @rule
-async def get_chart_of_deployment(field_set: HelmDeploymentFieldSet) -> HelmChartRequest:
+async def get_chart_of_deployment(request: FindHelmDeploymentChart) -> HelmChartRequest:
     explicit_dependencies = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(field_set.dependencies)
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
     )
     explicit_targets = await Get(
         Targets,
@@ -58,9 +64,9 @@ async def get_chart_of_deployment(field_set: HelmDeploymentFieldSet) -> HelmChar
 
     found_charts = [tgt for tgt in explicit_targets if HelmChartFieldSet.is_applicable(tgt)]
     if not found_charts:
-        raise MissingHelmDeploymentChartError(field_set.address)
+        raise MissingHelmDeploymentChartError(request.field_set.address)
     if len(found_charts) > 1:
-        raise TooManyChartDependenciesError(field_set.address)
+        raise TooManyChartDependenciesError(request.field_set.address)
 
     return HelmChartRequest.from_target(found_charts[0])
 
@@ -83,16 +89,15 @@ async def render_helm_deployment(request: RenderHelmDeploymentRequest) -> Render
     output_dir = "__output"
 
     chart, value_files = await MultiGet(
-        Get(HelmChart, HelmDeploymentFieldSet, request.field_set),
+        Get(HelmChart, FindHelmDeploymentChart(request.field_set)),
         Get(StrippedSourceFiles, SourceFilesRequest([request.field_set.sources])),
     )
 
     release_name = request.field_set.release_name.value or request.field_set.address.target_name
-
     result = await Get(
         ProcessResult,
-        HelmEvaluateProcess(
-            cmd="template",
+        HelmRenderProcess(
+            cmd=HelmRenderCmd.TEMPLATE,
             release_name=release_name,
             chart_path=chart.path,
             chart_digest=chart.snapshot.digest,
@@ -111,7 +116,7 @@ async def render_helm_deployment(request: RenderHelmDeploymentRequest) -> Render
                 output_dir,
             ],
             message=f"Rendering Helm deployment {request.field_set.address}",
-            output_directories=(output_dir,),
+            output_directory=output_dir,
         ),
     )
 
@@ -122,4 +127,4 @@ async def render_helm_deployment(request: RenderHelmDeploymentRequest) -> Render
 
 
 def rules():
-    return [*collect_rules(), *chart.rules(), *process.rules()]
+    return [*collect_rules(), *chart.rules(), *process.rules(), *post_renderer.rules()]

@@ -15,6 +15,7 @@ from pants.backend.helm.target_types import (
 from pants.backend.helm.testutil import gen_chart_file
 from pants.backend.helm.util_rules import deployment
 from pants.backend.helm.util_rules.chart import HelmChart
+from pants.backend.helm.util_rules.deployment import FindHelmDeploymentChart
 from pants.core.util_rules import external_tool, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
@@ -30,7 +31,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *deployment.rules(),
-            QueryRule(HelmChart, (HelmDeploymentFieldSet,)),
+            QueryRule(HelmChart, (FindHelmDeploymentChart,)),
         ],
     )
 
@@ -54,7 +55,7 @@ def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/bar"))
     field_set = HelmDeploymentFieldSet.create(target)
 
-    chart = rule_runner.request(HelmChart, [field_set])
+    chart = rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])
 
     assert chart.metadata.name == "foo"
     assert chart.metadata.version == "1.0.0"
@@ -68,7 +69,7 @@ def test_fail_when_no_chart_dependency_is_found(rule_runner: RuleRunner) -> None
 
     msg = f"The target '{field_set.address}' is missing a dependency on a `helm_chart` target."
     with pytest.raises(ExecutionError, match=msg):
-        rule_runner.request(HelmChart, [field_set])
+        rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])
 
 
 def test_fail_when_more_than_one_chart_is_found(rule_runner: RuleRunner) -> None:
@@ -97,4 +98,4 @@ def test_fail_when_more_than_one_chart_is_found(rule_runner: RuleRunner) -> None
         "addresses in its dependencies, it should have only one."
     )
     with pytest.raises(ExecutionError, match=msg):
-        rule_runner.request(HelmChart, [field_set])
+        rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])

@@ -69,7 +69,7 @@ class InvalidDeploymentArgs(Exception):
                 {bullet_list([*_VALID_PASSTHROUGH_FLAGS, *_VALID_PASSTHROUGH_OPTS])}
 
                 Most invalid arguments have equivalent fields in the `{HelmDeploymentTarget.alias}` target.
-                Usage of fields is encourage over passthrough arguments as that enables repeatable deployments.
+                Usage of fields is encouraged over passthrough arguments as that enables repeatable deployments.
 
                 Please run `{bin_name()} help {HelmDeploymentTarget.alias}` for more information.
                 """
@@ -129,6 +129,61 @@ async def run_helm_deploy(
     return DeployProcesses(
         [DeployProcess(name=field_set.address.spec, process=interactive_process)]
     )
+
+
+@rule
+async def prepare_post_renderer(
+    field_set: DeployHelmDeploymentFieldSet,
+    mappings: FirstPartyHelmDeploymentMappings,
+    docker_options: DockerOptions,
+) -> PostRendererLauncherSetup:
+    docker_addresses = mappings.docker_images[field_set.address]
+    docker_contexts = await MultiGet(
+        Get(
+            DockerBuildContext,
+            DockerBuildContextRequest(
+                address=addr,
+                build_upstream_images=False,
+            ),
+        )
+        for addr in docker_addresses.values()
+    )
+
+    docker_targets = await Get(Targets, Addresses(docker_addresses.values()))
+    field_sets = [DockerFieldSet.create(tgt) for tgt in docker_targets]
+
+    def resolve_docker_image_ref(address: Address, context: DockerBuildContext) -> str | None:
+        docker_field_sets = [fs for fs in field_sets if fs.address == address]
+        if not docker_field_sets:
+            return None
+
+        result = None
+        docker_field_set = docker_field_sets[0]
+        image_refs = docker_field_set.image_refs(
+            default_repository=docker_options.default_repository,
+            registries=docker_options.registries(),
+            interpolation_context=context.interpolation_context,
+        )
+        if image_refs:
+            result = image_refs[0]
+        return result
+
+    docker_addr_ref_mapping = {
+        addr: resolve_docker_image_ref(addr, ctx)
+        for addr, ctx in zip(docker_addresses.values(), docker_contexts)
+    }
+    replacements = HelmManifestItems(
+        {
+            manifest: {
+                path: str(docker_addr_ref_mapping[address])
+                for path, address in docker_addresses.manifest_items(manifest)
+                if docker_addr_ref_mapping[address]
+            }
+            for manifest in docker_addresses.manifests()
+        }
+    )
+
+    return await Get(PostRendererLauncherSetup, SetupPostRendererLauncher(replacements))
 
 
 def _cleanup_passthrough_args(args: Iterable[str]) -> tuple[list[str], list[str]]:
