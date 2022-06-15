@@ -288,7 +288,7 @@ async def create_docker_build_context(
                 owning_address=dockerfile_info.address,
                 description_of_origin=softwrap(
                     f"""
-                    the FROM arguments from the Dockerfile {dockerfile_info.source}
+                    the FROM arguments from the file {dockerfile_info.source}
                     from the target {dockerfile_info.address}
                     """
                 ),
