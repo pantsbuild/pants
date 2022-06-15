@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -36,9 +37,12 @@ class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
 
 
 @rule
-def scala_settings_request(_: ScalaSettingsRequest) -> TargetFilesGeneratorSettings:
-    # TODO: See https://github.com/pantsbuild/pants/issues/14382.
-    return TargetFilesGeneratorSettings(add_dependencies_on_all_siblings=True)
+def scala_settings_request(
+    scala_infer_subsystem: ScalaInferSubsystem, _: ScalaSettingsRequest
+) -> TargetFilesGeneratorSettings:
+    return TargetFilesGeneratorSettings(
+        add_dependencies_on_all_siblings=scala_infer_subsystem.force_add_siblings_as_dependencies
+    )
 
 
 class ScalaSourceField(SingleSourceField):
