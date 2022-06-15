@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field, replace
-from typing import Any, Iterable, Mapping, Tuple, Type, Union, cast
+from typing import Any, Iterable, Mapping, Tuple, Union, cast
 
 from pants.engine.addresses import Address
-from pants.engine.target import InvalidFieldException, RegisteredTargetTypes, Target
+from pants.engine.target import InvalidFieldException, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
 
@@ -18,7 +18,7 @@ DefaultsT = FrozenDict[str, DefaultsValueT]
 
 SetDefaultFieldValuesT = Mapping[str, Any]
 SetDefaultsValueT = Mapping[str, SetDefaultFieldValuesT]
-SetDefaultsKeyT = Union[Type[Target], str, Tuple[Union[Type[Target], str], ...]]
+SetDefaultsKeyT = Union[str, Tuple[str, ...]]
 SetDefaultsT = Mapping[SetDefaultsKeyT, SetDefaultsValueT]
 
 
@@ -38,7 +38,9 @@ class BuildFileDefaultsProvider:
             return self.defaults.setdefault("", BuildFileDefaults("", FrozenDict(), self))
 
         parent = os.path.dirname(rel_path)
-        return self.defaults.setdefault(rel_path, self.get_defaults_for(parent))
+        return self.defaults.setdefault(
+            rel_path, BuildFileDefaults(rel_path, self.get_defaults_for(parent).defaults, self)
+        )
 
     def set_defaults(self, defaults: BuildFileDefaults) -> None:
         self.defaults[defaults.path] = defaults
@@ -96,6 +98,9 @@ class MutableBuildFileDefaults:
             }
         )
 
+    def get(self, target_alias: str) -> Mapping[str, Any]:
+        return self.defaults.get(target_alias, {})
+
     def set_defaults(self, *args: SetDefaultsT, **kwargs: SetDefaultsValueT) -> None:
         defaults: dict[str, dict[str, Any]] = {}
         types = self.registered_target_types.aliases_to_types
@@ -108,15 +113,13 @@ class MutableBuildFileDefaults:
                     f"{target} must be a `dict` but got a `{type(default).__name__}`."
                 )
 
-            targets: Iterable[Union[Type[Target], str]]
+            targets: Iterable[str]
             if target == "__all__":
-                targets = types.values()
+                targets = types.keys()
             else:
                 targets = target if isinstance(target, tuple) else (target,)
             for target_alias in targets:
-                if isinstance(target_alias, type) and issubclass(target_alias, Target):
-                    target_type = target_alias
-                elif target_alias in types:
+                if target_alias in types:
                     target_type = types[target_alias]
                 else:
                     raise ValueError(
