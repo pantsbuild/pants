@@ -26,12 +26,11 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult
 from pants.core.target_types import ResourceTarget
 from pants.core.util_rules import source_files
-from pants.testutil.rule_runner import QueryRule, RuleRunner, logging
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture
@@ -51,7 +50,6 @@ def rule_runner() -> RuleRunner:
             *third_party_pkg.rules(),
             *source_files.rules(),
             QueryRule(TestResult, [GoTestFieldSet]),
-            QueryRule(GoModInfo, (GoModInfoRequest,)),
         ],
         target_types=[GoModTarget, GoPackageTarget, ResourceTarget],
     )
@@ -241,7 +239,6 @@ def test_embed_in_external_test(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
 
 
-@logging
 def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
     # Build the zip file and other content needed to simulate a third-party module.
     import_path = "pantsbuild.org/go-embed-sample-for-test"
