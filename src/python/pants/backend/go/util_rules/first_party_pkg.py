@@ -325,20 +325,22 @@ async def setup_first_party_pkg_digest(
             Digest, RemovePrefix(resources_sources.snapshot.digest, request.address.spec_path)
         )
         resources_digest = await Get(Digest, AddPrefix(resources_digest, "__resources__"))
-        sources_digest = await Get(Digest, MergeDigests((sources_digest, resources_digest)))
 
-        patterns_json = {
-            "EmbedPatterns": analysis.embed_patterns,
-            "TestEmbedPatterns": analysis.test_embed_patterns,
-            "XTestEmbedPatterns": analysis.xtest_embed_patterns,
-        }
-        patterns_json_digest = await Get(
-            Digest,
-            CreateDigest([FileContent("patterns.json", json.dumps(patterns_json).encode("utf-8"))]),
+        patterns_json = json.dumps(
+            {
+                "EmbedPatterns": analysis.embed_patterns,
+                "TestEmbedPatterns": analysis.test_embed_patterns,
+                "XTestEmbedPatterns": analysis.xtest_embed_patterns,
+            }
+        ).encode("utf-8")
+        sources_digest, patterns_json_digest = await MultiGet(
+            Get(Digest, MergeDigests((sources_digest, resources_digest))),
+            Get(Digest, CreateDigest([FileContent("patterns.json", patterns_json)])),
         )
         input_digest = await Get(
             Digest, MergeDigests((sources_digest, patterns_json_digest, embedder.digest))
         )
+
         embed_result = await Get(
             FallibleProcessResult,
             Process(
