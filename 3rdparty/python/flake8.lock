@@ -12,7 +12,6 @@
 //     "flake8-2020<1.7.0,>=1.6.0",
 //     "flake8-comprehensions<4.0,>=3.8.0",
 //     "flake8-no-implicit-concat",
-//     "flake8-pantsbuild<3,>=2.0",
 //     "flake8<4.0,>=3.9.2"
 //   ]
 // }
@@ -79,13 +78,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9406314803abe1193c064544ab14fdc43c58424c0882f6ff8a581eb73fc9bb58",
-              "url": "https://files.pythonhosted.org/packages/dc/65/5e9e256930fbe186074daf00d68e0cd17facfcb6c2523ade810ea9cd344f/flake8_comprehensions-3.8.0-py3-none-any.whl"
+              "hash": "dad454fd3d525039121e98fa1dd90c46bc138708196a4ebbc949ad3c859adedb",
+              "url": "https://files.pythonhosted.org/packages/b4/52/1411ead4f46e2a3357dafa6569e62b5530f591cb9e582d59b2ad1bb01c2c/flake8_comprehensions-3.10.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8e108707637b1d13734f38e03435984f6b7854fa6b5a4e34f93e69534be8e521",
-              "url": "https://files.pythonhosted.org/packages/8c/56/ba0c2878c2b64237afd978b4f176bcb9d671419d9b71ece454f0117fb943/flake8-comprehensions-3.8.0.tar.gz"
+              "hash": "181158f7e7aa26a63a0a38e6017cef28c6adee71278ce56ce11f6ec9c4905058",
+              "url": "https://files.pythonhosted.org/packages/47/41/d90b53da3e154f963810a55ed046509034d96c17b3753f2ccbd450d224a4/flake8-comprehensions-3.10.0.tar.gz"
             }
           ],
           "project_name": "flake8-comprehensions",
@@ -94,7 +93,7 @@
             "importlib-metadata; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.8"
+          "version": "3.10"
         },
         {
           "artifacts": [
@@ -138,34 +137,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8d45cf26a55fe7d66de944a6c93b64456852cfd3a7bea81640553081469129e7",
-              "url": "https://files.pythonhosted.org/packages/ac/bd/96927daa8c58b14da8c6c4809c028d5a21eb9cb4e0cf887447c45898a4df/flake8_pantsbuild-2.0.0-py3-none-any.whl"
+              "hash": "c58c8eb8a762858f49e18436ff552e83914778e50e9d2f1660535ffb364552ec",
+              "url": "https://files.pythonhosted.org/packages/ab/b5/1bd220dd470b0b912fc31499e0d9c652007a60caf137995867ccc4b98cb6/importlib_metadata-4.11.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1b72558db6d718c33f4410eff80f7afc2bc0300190a733d92b3cf05b231c2450",
-              "url": "https://files.pythonhosted.org/packages/41/a7/c8f796a5856e019e030035c0fc12d561ae27638b38c49a7128a8956f418a/flake8-pantsbuild-2.0.0.tar.gz"
-            }
-          ],
-          "project_name": "flake8-pantsbuild",
-          "requires_dists": [
-            "flake8>=3.7",
-            "importlib_metadata>=1.3.0; python_version < \"3.8\""
-          ],
-          "requires_python": ">=3.6",
-          "version": "2"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "1208431ca90a8cca1a6b8af391bb53c1a2db74e5d1cef6ddced95d4b2062edc6",
-              "url": "https://files.pythonhosted.org/packages/92/f2/c48787ca7d1e20daa185e1b6b2d4e16acd2fb5e0320bc50ffc89b91fa4d7/importlib_metadata-4.11.3-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "ea4c597ebf37142f827b8f39299579e31685c31d3a438b59f469406afd0f2539",
-              "url": "https://files.pythonhosted.org/packages/3e/1d/964b27278cfa369fbe9041f604ab09c6e99556f8b7910781b4584b428c2f/importlib_metadata-4.11.3.tar.gz"
+              "hash": "5d26852efe48c0a32b0509ffbc583fda1a2266545a78d104a6f4aff3db17d700",
+              "url": "https://files.pythonhosted.org/packages/35/a8/f2bd0d488c2bf932b4dda0fb91cbb687c0b1132b33130d1cfad4e2b4b963/importlib_metadata-4.11.4.tar.gz"
             }
           ],
           "project_name": "importlib-metadata",
@@ -190,7 +168,7 @@
             "zipp>=0.5"
           ],
           "requires_python": ">=3.7",
-          "version": "4.11.3"
+          "version": "4.11.4"
         },
         {
           "artifacts": [
@@ -214,19 +192,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "43e6dd9942dffd72661a2c4ef383ad7da1e6a3e968a927ad7a6083ab410a688b",
-              "url": "https://files.pythonhosted.org/packages/e5/c3/48e2c81038f57e8caab9a6e6fb6c2fc23536c59b092abefc447e6b5d1903/more_itertools-8.12.0-py3-none-any.whl"
+              "hash": "c5122bffc5f104d37c1626b8615b511f3427aa5389b94d61e5ef8236bfbc3ddb",
+              "url": "https://files.pythonhosted.org/packages/bd/3f/c4b3dbd315e248f84c388bd4a72b131a29f123ecacc37ffb2b3834546e42/more_itertools-8.13.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7dc6ad46f05f545f900dd59e8dfb4e84a4827b97b3cfecb175ea0c7d247f6064",
-              "url": "https://files.pythonhosted.org/packages/dc/b5/c216ffeace7b89b7387fe08e1b39a07c6da38ea82c60e2e630dd5883813b/more-itertools-8.12.0.tar.gz"
+              "hash": "a42901a0a5b169d925f6f217cd5a190e32ef54360905b9c39ee7db5313bfec0f",
+              "url": "https://files.pythonhosted.org/packages/b4/23/2987c2792c18a211dfe913e2f60e55cde0af6dfc41217e4da74ac7cd68f4/more-itertools-8.13.0.tar.gz"
             }
           ],
           "project_name": "more-itertools",
           "requires_dists": [],
           "requires_python": ">=3.5",
-          "version": "8.12"
+          "version": "8.13"
         },
         {
           "artifacts": [
@@ -268,66 +246,66 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "21c85e0fe4b9a155d0799430b0ad741cdce7e359660ccbd8b530613e8df88ce2",
-              "url": "https://files.pythonhosted.org/packages/45/6b/44f7f8f1e110027cf88956b59f2fad776cca7e1704396d043f89effd3a0e/typing_extensions-4.1.1-py3-none-any.whl"
+              "hash": "6657594ee297170d19f67d55c05852a874e7eb634f4f753dbd667855e07c1708",
+              "url": "https://files.pythonhosted.org/packages/75/e1/932e06004039dd670c9d5e1df0cd606bf46e29a28e65d5bb28e894ea29c9/typing_extensions-4.2.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1a9462dcc3347a79b1f1c0271fbe79e844580bb598bafa1ed208b94da3cdcd42",
-              "url": "https://files.pythonhosted.org/packages/b1/5a/8b5fbb891ef3f81fc923bf3cb4a578c0abf9471eb50ce0f51c74212182ab/typing_extensions-4.1.1.tar.gz"
+              "hash": "f1c24655a0da0d1b67f07e17a5e6b2a105894e6824b92096378bb3668ef02376",
+              "url": "https://files.pythonhosted.org/packages/fe/71/1df93bd59163c8084d812d166c907639646e8aac72886d563851b966bf18/typing_extensions-4.2.0.tar.gz"
             }
           ],
           "project_name": "typing-extensions",
           "requires_dists": [],
-          "requires_python": ">=3.6",
-          "version": "4.1.1"
+          "requires_python": ">=3.7",
+          "version": "4.2"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b47250dd24f92b7dd6a0a8fc5244da14608f3ca90a5efcd37a3b1642fac9a375",
-              "url": "https://files.pythonhosted.org/packages/52/c5/df7953fe6065185af5956265e3b16f13c2826c2b1ba23d43154f3af453bc/zipp-3.7.0-py3-none-any.whl"
+              "hash": "c4f6e5bbf48e74f7a38e7cc5b0480ff42b0ae5178957d564d18932525d5cf099",
+              "url": "https://files.pythonhosted.org/packages/80/0e/16a7ee38617aab6a624e95948d314097cc2669edae9b02ded53309941cfc/zipp-3.8.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9f50f446828eb9d45b267433fd3e9da8d801f614129124863f9c51ebceafb87d",
-              "url": "https://files.pythonhosted.org/packages/94/64/3115548d41cb001378099cb4fc6a6889c64ef43ac1b0e68c9e80b55884fa/zipp-3.7.0.tar.gz"
+              "hash": "56bf8aadb83c24db6c4b577e13de374ccfb67da2078beba1d037c17980bf43ad",
+              "url": "https://files.pythonhosted.org/packages/cc/3c/3e8c69cd493297003da83f26ccf1faea5dd7da7892a0a7c965ac3bcba7bf/zipp-3.8.0.tar.gz"
             }
           ],
           "project_name": "zipp",
           "requires_dists": [
             "func-timeout; extra == \"testing\"",
             "jaraco.itertools; extra == \"testing\"",
-            "jaraco.packaging>=8.2; extra == \"docs\"",
+            "jaraco.packaging>=9; extra == \"docs\"",
             "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-checkdocs>=2.4; extra == \"testing\"",
             "pytest-cov; extra == \"testing\"",
             "pytest-enabler>=1.0.1; extra == \"testing\"",
             "pytest-flake8; extra == \"testing\"",
-            "pytest-mypy; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
+            "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest>=6; extra == \"testing\"",
             "rst.linker>=1.9; extra == \"docs\"",
             "sphinx; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.7"
+          "version": "3.8"
         }
       ],
       "platform_tag": [
-        "cp39",
-        "cp39",
-        "macosx_11_0_arm64"
+        "cp38",
+        "cp38",
+        "manylinux_2_31_x86_64"
       ]
     }
   ],
-  "pex_version": "2.1.72",
+  "path_mappings": {},
+  "pex_version": "2.1.90",
   "prefer_older_binary": false,
   "requirements": [
     "flake8-2020<1.7.0,>=1.6.0",
     "flake8-comprehensions<4.0,>=3.8.0",
     "flake8-no-implicit-concat",
-    "flake8-pantsbuild<3,>=2.0",
     "flake8<4.0,>=3.9.2"
   ],
   "requires_python": [

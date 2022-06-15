@@ -40,7 +40,7 @@ This adds the new `python_awslambda` target, which you can confirm by running `.
 [/block]
 First, add your lambda function in a Python file like you would [normally do with AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html). Specifically, create a function `def my_handler_name(event, context)` with the name you want.
 
-Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`./pants tailor`](doc:create-initial-build-files) to automate this.
+Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`./pants tailor ::`](doc:create-initial-build-files) to automate this.
 
 Add a `python_awslambda` target and define the `runtime` and `handler` fields. The `runtime` should be one of the values from https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html. The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
 

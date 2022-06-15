@@ -31,10 +31,10 @@ backend_packages = [
 ]
 ```
 
-Then run [`./pants tailor`](doc:create-initial-build-files) to generate BUILD files. This will create `java_sources` and `scala_sources` targets in every directory containing library code, as well as test targets like `scalatest_tests` and `junit_tests` for filenames that look like tests.
+Then run [`./pants tailor ::`](doc:create-initial-build-files) to generate BUILD files. This will create `java_sources` and `scala_sources` targets in every directory containing library code, as well as test targets like `scalatest_tests` and `junit_tests` for filenames that look like tests.
 
 ```
-❯ ./pants tailor
+❯ ./pants tailor ::
 Created src/jvm/org/pantsbuild/example/app/BUILD:
   - Add scala_sources target app
 Created src/jvm/org/pantsbuild/example/lib/BUILD:

@@ -6,7 +6,7 @@ hidden: false
 createdAt: "2020-05-11T20:10:29.560Z"
 updatedAt: "2022-02-08T23:44:44.463Z"
 ---
-See [File arguments vs. target arguments](doc:goals#file-arguments-vs-target-arguments) for the normal techniques for telling Pants what to run on. 
+See [File arguments vs. target arguments](doc:goals#goal-arguments) for the normal techniques for telling Pants what to run on. 
 
 See [Project introspection](doc:project-introspection) for queries that you can run and then pipe into another Pants run, such as running over certain target types.
 [block:api-header]
@@ -31,18 +31,11 @@ To run against another branch, run:
 By default, `--changed-since` will only run over files directly changed. Often, though, you will want to run over any [dependees](doc:project-introspection) of those changed files, meaning any targets that depend on the changed files. Use ` --changed-dependees=direct` or ` --changed-dependees=transitive` for this:
 
 ```bash
-$ ./pants \
+❯ ./pants \
   --changed-since=origin/main \
   --changed-dependees=transitive \
   test
 ```
-[block:callout]
-{
-  "type": "warning",
-  "title": "Using a version control system other than Git?",
-  "body": "Please message us on Slack or open a GitHub issue (see [Community](doc:getting-help)). We would be happy to look into adding support for your VCS, such as helping you with a PR to add support."
-}
-[/block]
 
 [block:api-header]
 {

@@ -20,71 +20,58 @@ You'll see more goals activated as you activate more [backends](doc:enabling-bac
 
 For example:
 
-```bash
-❯ ./pants test project/app_test.py
-15:40:37.89 [INFO] Completed: test - project/app_test.py:tests succeeded.
-
-✓ project/app_test.py:tests succeeded.
+```
+❯ ./pants count-loc project/app_test.py
+───────────────────────────────────────────────────────────────────────────────
+Language                 Files     Lines   Blanks  Comments     Code Complexity
+───────────────────────────────────────────────────────────────────────────────
+Python                       1       374       16        19      339          6
+───────────────────────────────────────────────────────────────────────────────
+Total                        1       374       16        19      339          6
+───────────────────────────────────────────────────────────────────────────────
 ```
 
 You can also run multiple goals in a single run of Pants, in which case they will run sequentially:
 
 ```bash
-# Format all code, and then lint it:
-❯ ./pants fmt lint ::
+# Format all code, and then test it:
+❯ ./pants fmt test ::
 ```
 
-Finally, Pants supports running goals in a `--loop`: in this mode, all goals specified will run sequentially, and then Pants will wait until a relevant file has changed to try running them again.
+Finally, Pants supports running goals in a `--loop`. In this mode, all goals specified will run
+sequentially, and then Pants will wait until a relevant file has changed to try running them again.
 
 ```bash
-# Re-run typechecking and testing continuously as files or their dependencies change:
-❯ ./pants --loop check test project/app_test.py
+# Re-run linters and testing continuously as files or their dependencies change:
+❯ ./pants --loop lint test project/app_test.py
 ```
 
 Use `Ctrl+C` to exit the `--loop`.
 
 # Goal arguments
 
-Some simple goals—such as the `roots` goal—do not require arguments. But most goals require some arguments to work on. 
+Most goals require arguments to know what to work on. 
 
-For example, to run the `count-loc` goal, which counts lines of code in your repository, you need to provide a set of files and/or targets to run on:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "$ ./pants count-loc '**'\n───────────────────────────────────────────────────────────────────────────────\nLanguage                 Files     Lines   Blanks  Comments     Code Complexity\n───────────────────────────────────────────────────────────────────────────────\nPython                      13       155       50        22       83          5\nBASH                         2       261       29        22      210         10\nJSON                         2        25        0         0       25          0\nPlain Text                   2        43        1         0       42          0\nTOML                         2        65       14        18       33          0\n...",
-      "language": "text",
-      "name": "Shell"
-    }
-  ]
-}
-[/block]
+You can use several argument types:
+
+| Argument type                   | Semantics                                   | Example                         |
+|---------------------------------|---------------------------------------------|---------------------------------|
+| File path                       | Match the file                              | `./pants test project/tests.py` |
+| Directory path                  | Match everything in the directory           | `./pants test project/utils`    |
+| `::` globs                      | Match everything in the directory and below | `./pants test project::`        |
+| [Target addresses](doc:targets) | Match the target                            | `./pants package project:tests` |
+
+You can combine argument types, e.g. `./pants fmt src/go:: src/py/app.py`.
+
+To ignore something, prefix the argument with `-`. For example, 
+`./pants test :: -project/integration_tests` will run all your tests except for those in the 
+directory `project/integration_tests`.
 
 [block:callout]
 {
-  "type": "info",
-  "title": "Quoting file patterns",
-  "body": "Note the single-quotes around the file pattern `'**'`. This is so that your shell doesn't attempt to expand the pattern, but instead passes it unaltered to Pants."
-}
-[/block]
-## File arguments vs. target arguments
-
-Goal arguments can be of one of two types:
-
-- *File arguments*: file paths and/or globs.
-- *Target arguments*: addresses and/or address globs of [targets](doc:targets).
-
-Typically you can just use file arguments, and not worry about targets.
-
-Any goal can take either type of argument: 
-
-- If a target argument is given, the goal acts on all the files in the matching targets.
-- If a file argument is given, Pants will map the file back to its containing target to read any necessary metadata. 
-[block:callout]
-{
-  "type": "info",
-  "title": "File/target globs",
-  "body": "For file arguments, use `'*'` and `'**'`, with the same semantics as the shell. Reminder: quote the argument if you want Pants to evaluate the glob, rather than your shell.\n\nFor target arguments, you can use:\n\n- `dir::`, where `::` means every target in the current directory and recursively in subdirectories.\n- `dir:`, where `:` means every target in that directory, but not subdirectories.\n\nFor example, `./pants list ::` will find every target in your project."
+  "type": "warning",
+  "title": "Set `[GLOBAL].use_deprecated_directory_cli_args_semantics = false` in `pants.toml`",
+  "body": "This will become the default in Pants 2.14."
 }
 [/block]
 
