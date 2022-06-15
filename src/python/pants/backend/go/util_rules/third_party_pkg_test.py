@@ -264,6 +264,8 @@ def test_invalid_go_sum(rule_runner: RuleRunner) -> None:
         rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
 
 
+@pytest.mark.skip(reason="TODO(#15824)")
+@pytest.mark.no_error_if_skipped
 def test_missing_go_sum(rule_runner: RuleRunner) -> None:
     digest = set_up_go_mod(
         rule_runner,
@@ -286,6 +288,8 @@ def test_missing_go_sum(rule_runner: RuleRunner) -> None:
         rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
 
 
+@pytest.mark.skip(reason="TODO(#15824)")
+@pytest.mark.no_error_if_skipped
 def test_stale_go_mod(rule_runner: RuleRunner) -> None:
     digest = set_up_go_mod(
         rule_runner,
