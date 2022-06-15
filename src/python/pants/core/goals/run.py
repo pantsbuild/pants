@@ -69,6 +69,13 @@ class RunRequest:
         self.extra_env = FrozenDict(extra_env or {})
 
 
+class RunDebugAdapterRequest(RunRequest):
+    """Like RunRequest, but launches the process using the relevant Debug Adapter server.
+
+    The process should be launched waiting for the client to connect.
+    """
+
+
 class RunSubsystem(GoalSubsystem):
     name = "run"
     help = softwrap(
@@ -107,6 +114,20 @@ class RunSubsystem(GoalSubsystem):
             """
         ),
     )
+    # See also `test.py`'s same option
+    debug_adapter = BoolOption(
+        "--debug-adapter",
+        default=False,
+        help=softwrap(
+            """
+            Run the interactive process using a Debug Adapter
+            (https://microsoft.github.io/debug-adapter-protocol/) for the language if supported.
+
+            The interactive process used will be immediately blocked waiting for a client before
+            continuing.
+            """
+        ),
+    )
 
 
 class Run(Goal):
@@ -131,7 +152,11 @@ async def run(
         ),
     )
     field_set = targets_to_valid_field_sets.field_sets[0]
-    request = await Get(RunRequest, RunFieldSet, field_set)
+    request = await (
+        Get(RunRequest, RunFieldSet, field_set)
+        if not run_subsystem.debug_adapter
+        else Get(RunDebugAdapterRequest, RunFieldSet, field_set)
+    )
     wrapped_target = await Get(
         WrappedTarget, WrappedTargetRequest(field_set.address, description_of_origin="<infallible>")
     )

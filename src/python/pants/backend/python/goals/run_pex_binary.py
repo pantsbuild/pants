@@ -21,7 +21,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
@@ -119,6 +119,15 @@ async def create_pex_binary_run_request(
     }
 
     return RunRequest(digest=merged_digest, args=args, extra_env=extra_env)
+
+
+@rule
+async def run_pex_debug_adapter_binary(
+    field_set: PexBinaryFieldSet,
+) -> RunDebugAdapterRequest:
+    raise NotImplementedError(
+        "Debugging a Pex Binary using a debug adapter has not yet been implemented."
+    )
 
 
 def rules():
