@@ -3,17 +3,19 @@
 
 from __future__ import annotations
 
+from pathlib import PurePath
 from textwrap import dedent
 
 import pytest
 
-from pants.k8s import manifest
-from pants.k8s.manifest import (
+from pants.backend.helm.util_rules import manifest
+from pants.backend.helm.util_rules.manifest import (
     ImageRef,
     KubeManifests,
     ParseKubeManifests,
     StandardKind,
 )
+from pants.backend.helm.util_rules.yaml_utils import YamlPath
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -90,17 +92,36 @@ def test_parses_kube_resource_manifests(
         [ParseKubeManifests(manifest_digest, "test_parses_kube_resource_manifests")],
     )
 
-    print(parsed_manifests)
+    if kind == StandardKind.POD:
+        expected_spec_path = YamlPath.parse("spec")
+    else:
+        expected_spec_path = YamlPath.parse("spec/jobTemplate/spec/template/spec")
 
     assert len(parsed_manifests) == 1
     assert parsed_manifests[0].api_version == api_version
     assert parsed_manifests[0].kind == kind
+    assert parsed_manifests[0].filename == PurePath("manifest.yaml")
 
-    assert len(parsed_manifests[0].container_images) == 2
-    assert parsed_manifests[0].container_images == (
+    assert len(parsed_manifests[0].all_containers) == 2
+    assert parsed_manifests[0].pod_spec
+    assert parsed_manifests[0].pod_spec.element_path == expected_spec_path
+
+    assert len(parsed_manifests[0].pod_spec.containers) == 1
+    assert len(parsed_manifests[0].pod_spec.init_containers) == 1
+    assert (
+        parsed_manifests[0].pod_spec.containers[0].element_path
+        == expected_spec_path / "containers" / "0"
+    )
+    assert (
+        parsed_manifests[0].pod_spec.init_containers[0].element_path
+        == expected_spec_path / "initContainers" / "0"
+    )
+
+    parsed_image_refs = [container.image for container in parsed_manifests[0].all_containers]
+    assert parsed_image_refs == [
         ImageRef(registry=None, repository="busybox", tag="1.28"),
         ImageRef(registry=None, repository="busybox", tag="1.29"),
-    )
+    ]
 
 
 def test_parse_multiple_manifests_in_single_file(rule_runner: RuleRunner) -> None:

@@ -1,6 +1,26 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_sources()
+python_requirement(
+    name="yamlpath",
+    requirements=["yamlpath>=3.6,<3.7"],
+    resolve="helm-post-renderer"
+)
+
+python_sources(
+    sources=["*.py", "!*_test.py", "!post_renderer_launcher.py"],
+    dependencies=[":post_renderer"],
+)
+
+python_sources(
+  name="__post_renderer_launcher",
+  sources=["post_renderer_launcher.py"],
+  resolve="helm-post-renderer"
+)
 
 python_tests(name="tests")
+
+resources(
+  name="post_renderer",
+  sources=["post_renderer.lock", "post_renderer_launcher.py"]
+)

@@ -7,13 +7,11 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.docker.subsystems import dockerfile_parser
-from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.docker.target_types import rules as docker_target_types_rules
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.dependency_inference.deployment import (
     AnalyseHelmDeploymentRequest,
+    FirstPartyHelmDeploymentMappings,
     HelmDeploymentReport,
     InjectHelmDeploymentDependenciesRequest,
 )
@@ -31,14 +29,14 @@ from pants.backend.helm.testutil import (
 )
 from pants.backend.helm.util_rules import chart
 from pants.backend.helm.util_rules import process as helm_process
+from pants.backend.helm.util_rules.manifest import ImageRef
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
 from pants.engine import process
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import rules as graph_rules
-from pants.engine.rules import QueryRule, SubsystemRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import InjectedDependencies
-from pants.k8s.manifest import ImageRef
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -51,14 +49,12 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *chart.rules(),
             *deployment.rules(),
-            *dockerfile_parser.rules(),
-            *docker_target_types_rules(),
             *graph_rules(),
             *pex.rules(),
             *process.rules(),
             *stripped_source_files.rules(),
             *helm_process.rules(),
-            SubsystemRule(DockerOptions),
+            QueryRule(FirstPartyHelmDeploymentMappings, ()),
             QueryRule(HelmDeploymentReport, (AnalyseHelmDeploymentRequest,)),
             QueryRule(InjectedDependencies, (InjectHelmDeploymentDependenciesRequest,)),
         ],
@@ -134,7 +130,7 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
                 spec:
                   containers:
                     - name: myapp-container
-                      image: myapp:latest
+                      image: src/image:myapp
                 """
             ),
             "src/deployment/BUILD": "helm_deployment(name='foo', dependencies=['//src/mychart'])",
@@ -149,11 +145,18 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
 
-    tgt = rule_runner.get_target(Address("src/deployment", target_name="foo"))
+    deployment_addr = Address("src/deployment", target_name="foo")
+    tgt = rule_runner.get_target(deployment_addr)
+
+    expected_dependency_addr = Address("src/image", target_name="myapp")
+
+    mappings = rule_runner.request(FirstPartyHelmDeploymentMappings, [])
+    assert mappings.referenced_by(deployment_addr) == [expected_dependency_addr]
+
     dependencies = rule_runner.request(
         InjectedDependencies,
         [InjectHelmDeploymentDependenciesRequest(tgt[HelmDeploymentDependenciesField])],
     )
 
     assert len(dependencies) == 1
-    assert list(dependencies)[0] == Address("src/image", target_name="myapp")
+    assert list(dependencies)[0] == expected_dependency_addr

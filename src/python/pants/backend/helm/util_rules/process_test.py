@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.helm.util_rules import process as helm_process
-from pants.backend.helm.util_rules.process import HelmEvaluateProcess, HelmProcess
+from pants.backend.helm.util_rules.process import HelmProcess, HelmRenderCmd, HelmRenderProcess
 from pants.backend.helm.util_rules.tool import HelmBinary
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, Snapshot
 from pants.engine.process import Process, ProcessCacheScope
@@ -24,7 +24,7 @@ def rule_runner() -> RuleRunner:
             *helm_process.rules(),
             QueryRule(HelmBinary, ()),
             QueryRule(Process, (HelmProcess,)),
-            QueryRule(Process, (HelmEvaluateProcess,)),
+            QueryRule(Process, (HelmRenderProcess,)),
         ],
     )
 
@@ -67,8 +67,8 @@ def test_create_helm_evaluation_process(rule_runner: RuleRunner) -> None:
     )
     value_files_snapshot = rule_runner.request(Snapshot, [value_files_digest])
 
-    eval_process = HelmEvaluateProcess(
-        cmd="foo",
+    eval_process = HelmRenderProcess(
+        cmd=HelmRenderCmd.TEMPLATE,
         chart_path="chart",
         chart_digest=EMPTY_DIGEST,
         release_name="test",
@@ -80,13 +80,13 @@ def test_create_helm_evaluation_process(rule_runner: RuleRunner) -> None:
         extra_argv=["--bar"],
         message="Test Helm process",
         description="Foo evaluated",
-        output_directories=["foo_out"],
+        output_directory="foo_out",
     )
 
     helm_binary = rule_runner.request(HelmBinary, [])
     expected_argv = [
         helm_binary.path,
-        eval_process.cmd,
+        HelmRenderCmd.TEMPLATE.value,
         eval_process.release_name,
         eval_process.chart_path,
         "--description",
@@ -98,13 +98,13 @@ def test_create_helm_evaluation_process(rule_runner: RuleRunner) -> None:
         "--values",
         "more-values.yaml,values.yaml,override-values.yaml",
         "--set",
-        "foo=bar",
+        'foo="bar"',
         *eval_process.extra_argv,
     ]
 
     process = rule_runner.request(Process, [eval_process])
     assert process.argv == tuple(expected_argv)
-    assert process.level == LogLevel.DEBUG
+    assert process.level == LogLevel.INFO
     assert process.cache_scope == ProcessCacheScope.SUCCESSFUL
     assert process.description == eval_process.message
 

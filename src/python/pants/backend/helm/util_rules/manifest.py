@@ -6,11 +6,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum, unique
-from typing import Any, Iterable
+from pathlib import PurePath
+from typing import Any
 
 import yaml
-from yamlpath import YAMLPath
 
+from pants.backend.helm.util_rules.yaml_utils import YamlElement, YamlPath
 from pants.engine.collection import Collection
 from pants.engine.fs import Digest, DigestContents, DigestSubset, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
@@ -78,32 +79,39 @@ class ImageRef:
 
 
 @dataclass(frozen=True)
-class KubeContainer:
+class KubeContainer(YamlElement):
     image: ImageRef
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> KubeContainer:
-        return cls(image=ImageRef.parse(d["image"]))
+    def from_dict(cls, path: YamlPath, d: dict[str, Any]) -> KubeContainer:
+        return cls(element_path=path, image=ImageRef.parse(d["image"]))
 
 
 @dataclass(frozen=True)
-class KubePodSpec:
+class KubePodSpec(YamlElement):
     containers: tuple[KubeContainer, ...]
     init_containers: tuple[KubeContainer, ...]
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> KubePodSpec:
+    def from_dict(cls, path: YamlPath, d: dict[str, Any]) -> KubePodSpec:
         containers = d.get("containers", [])
         init_containers = d.get("initContainers", [])
         return cls(
-            containers=tuple(KubeContainer.from_dict(c) for c in containers),
-            init_containers=tuple(KubeContainer.from_dict(c) for c in init_containers),
+            element_path=path,
+            containers=tuple(
+                KubeContainer.from_dict(path / "containers" / str(idx), c)
+                for idx, c in enumerate(containers)
+            ),
+            init_containers=tuple(
+                KubeContainer.from_dict(path / "initContainers" / str(idx), c)
+                for idx, c in enumerate(init_containers)
+            ),
         )
 
     @staticmethod
     def from_manifest_dict(
-        resource_kind: StandardKind, d: dict[str, Any]
-    ) -> tuple[YAMLPath, KubePodSpec] | None:
+        base_path: YamlPath, resource_kind: StandardKind, d: dict[str, Any]
+    ) -> KubePodSpec | None:
         """Parses the Kubernetes pod specification from the top level definition of a Kubernetes
         resource.
 
@@ -111,7 +119,7 @@ class KubePodSpec:
         found.
         """
 
-        def safe_get(path: Iterable[str]) -> Any | None:
+        def safe_get(path: YamlPath) -> Any | None:
             lookup_from = d
             result = None
             for path_elem in path:
@@ -121,29 +129,29 @@ class KubePodSpec:
                     break
             return result
 
-        def get_spec(path: Iterable[str]) -> tuple[str, dict[str, Any] | None]:
-            return ".".join(path), (safe_get(path) if path else d)
+        def get_spec(path: YamlPath) -> tuple[YamlPath, dict[str, Any] | None]:
+            return path, (safe_get(path) if path else d)
 
-        path = ""
+        path = base_path
         spec = None
         if resource_kind == StandardKind.CRON_JOB:
-            path, spec = get_spec(["jobTemplate", "spec", "template", "spec"])
+            path, spec = get_spec(path / "jobTemplate/spec/template/spec")
         elif resource_kind == StandardKind.DAEMON_SET:
-            path, spec = get_spec(["template", "spec"])
+            path, spec = get_spec(path / "template/spec")
         elif resource_kind == StandardKind.DEPLOYMENT:
-            path, spec = get_spec(["template", "spec"])
+            path, spec = get_spec(path / "template/spec")
         elif resource_kind == StandardKind.JOB:
-            path, spec = get_spec(["template", "spec"])
+            path, spec = get_spec(path / "template/spec")
         elif resource_kind == StandardKind.POD:
-            path, spec = get_spec([])
+            path, spec = get_spec(path)
         elif resource_kind == StandardKind.REPLICA_SET:
-            path, spec = get_spec(["template", "spec"])
+            path, spec = get_spec(path / "template/spec")
         elif resource_kind == StandardKind.STATEFUL_SET:
-            path, spec = get_spec(["template", "spec"])
+            path, spec = get_spec(path / "template/spec")
 
         if not spec:
             return None
-        return YAMLPath(path), KubePodSpec.from_dict(spec)
+        return KubePodSpec.from_dict(path, spec)
 
     @property
     def all_containers(self) -> tuple[KubeContainer, ...]:
@@ -153,14 +161,14 @@ class KubePodSpec:
 
 @dataclass(frozen=True)
 class KubeManifest:
-    filename: str
+    filename: PurePath
 
     api_version: str
     kind: StandardKind | CustomResourceKind
-    _pod_spec: tuple[YAMLPath, KubePodSpec] | None
+    pod_spec: KubePodSpec | None
 
     @classmethod
-    def from_dict(cls, filename: str, d: dict[str, Any]) -> KubeManifest:
+    def from_dict(cls, filename: PurePath, d: dict[str, Any]) -> KubeManifest:
         std_kind: StandardKind | None = None
         try:
             std_kind = StandardKind(d["kind"])
@@ -169,28 +177,21 @@ class KubeManifest:
 
         spec = None
         if std_kind:
-            spec = KubePodSpec.from_manifest_dict(std_kind, d["spec"])
+            base_path = YamlPath.parse("spec")
+            spec = KubePodSpec.from_manifest_dict(base_path, std_kind, d)
 
         return cls(
             filename=filename,
             api_version=d["apiVersion"],
             kind=std_kind or custom_kind,
-            _pod_spec=spec,
+            pod_spec=spec,
         )
 
     @property
-    def container_images(self) -> tuple[ImageRef, ...]:
+    def all_containers(self) -> tuple[KubeContainer, ...]:
         if not self.pod_spec:
             return ()
-        return tuple(cont.image for cont in self.pod_spec.all_containers)
-
-    @property
-    def pod_spec(self) -> KubePodSpec | None:
-        return self._pod_spec[1] if self._pod_spec else None
-
-    @property
-    def pod_spec_path(self) -> YAMLPath | None:
-        return self._pod_spec[0] if self._pod_spec else None
+        return self.pod_spec.all_containers
 
 
 class KubeManifests(Collection[KubeManifest]):
@@ -211,7 +212,7 @@ async def parse_kubernetes_manifests(request: ParseKubeManifests) -> KubeManifes
     digest_contents = await Get(DigestContents, Digest, yaml_subset)
 
     manifests = [
-        KubeManifest.from_dict(file.path, parsed_yaml)
+        KubeManifest.from_dict(PurePath(file.path), parsed_yaml)
         for file in digest_contents
         for parsed_yaml in yaml.safe_load_all(file.content)
     ]
