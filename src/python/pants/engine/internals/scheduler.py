@@ -169,11 +169,13 @@ class Scheduler:
         remoting_options = PyRemotingOptions(
             execution_enable=execution_options.remote_execution,
             store_address=execution_options.remote_store_address,
+            cache_address=execution_options.remote_cache_address,
             execution_address=execution_options.remote_execution_address,
             execution_process_cache_namespace=execution_options.process_execution_cache_namespace,
             instance_name=execution_options.remote_instance_name,
             root_ca_certs_path=execution_options.remote_ca_certs_path,
             store_headers=execution_options.remote_store_headers,
+            cache_headers=execution_options.remote_cache_headers,
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
             store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,

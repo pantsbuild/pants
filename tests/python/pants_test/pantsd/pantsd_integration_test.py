@@ -120,7 +120,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             from pants.option.global_options import AuthPluginState, AuthPluginResult
 
             def auth_func(
-                initial_execution_headers, initial_store_headers, options, env, prior_result
+                initial_execution_headers,
+                initial_store_headers,
+                options,
+                env,
+                prior_result,
+                **kwargs,
             ):
                 # If the first run, don't change the headers, but use the `expiration` as a
                 # sentinel so that future runs know to change it.

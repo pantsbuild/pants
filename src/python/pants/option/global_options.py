@@ -122,10 +122,10 @@ class AuthPluginState(Enum):
 class AuthPluginResult:
     """The return type for a function specified via `--remote-auth-plugin`.
 
-    The returned `store_headers` and `execution_headers` will replace whatever headers Pants would
-    have used normally, e.g. what is set with `--remote-store-headers`. This allows you to control
-    the merge strategy if your plugin sets conflicting headers. Usually, you will want to preserve
-    the `initial_store_headers` and `initial_execution_headers` passed to the plugin.
+    The returned `*_headers` will replace whatever headers Pants would have used normally, e.g. what
+    is set with `--remote-store-headers`. This allows you to control the merge strategy if your
+    plugin sets conflicting headers. Usually, you will want to preserve the `initial_*_headers`
+    passed to the plugin.
 
     If set, the returned `instance_name` will override by `--remote-instance-name`, `store_address`
     will override `--remote-store-address`, and `execution_address` will override
@@ -136,7 +136,9 @@ class AuthPluginResult:
     state: AuthPluginState
     store_headers: dict[str, str]
     execution_headers: dict[str, str]
+    cache_headers: dict[str, str] | None = None
     store_address: str | None = None
+    cache_address: str | None = None
     execution_address: str | None = None
     instance_name: str | None = None
     expiration: datetime | None = None
@@ -152,6 +154,7 @@ class AuthPluginResult:
                 )
 
         assert_valid_address(self.store_address, "store_address")
+        assert_valid_address(self.cache_address, "cache_address")
         assert_valid_address(self.execution_address, "execution_address")
 
     @property
@@ -168,8 +171,10 @@ class DynamicRemoteOptions:
     cache_write: bool
     instance_name: str | None
     store_address: str | None
+    cache_address: str | None
     execution_address: str | None
     store_headers: dict[str, str]
+    cache_headers: dict[str, str]
     execution_headers: dict[str, str]
     parallelism: int
     store_rpc_concurrency: int
@@ -184,8 +189,10 @@ class DynamicRemoteOptions:
             cache_write=False,
             instance_name=None,
             store_address=None,
+            cache_address=None,
             execution_address=None,
             store_headers={},
+            cache_headers={},
             execution_headers={},
             parallelism=DEFAULT_EXECUTION_OPTIONS.process_execution_remote_parallelism,
             store_rpc_concurrency=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_concurrency,
@@ -206,10 +213,12 @@ class DynamicRemoteOptions:
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
         store_address = cast("str | None", bootstrap_options.remote_store_address)
+        cache_address = cast("str | None", bootstrap_options.remote_cache_address)
         execution_address = cast("str | None", bootstrap_options.remote_execution_address)
         instance_name = cast("str | None", bootstrap_options.remote_instance_name)
         execution_headers = cast("dict[str, str]", bootstrap_options.remote_execution_headers)
         store_headers = cast("dict[str, str]", bootstrap_options.remote_store_headers)
+        cache_headers = cast("dict[str, str]", bootstrap_options.remote_cache_headers)
         parallelism = cast(int, bootstrap_options.process_execution_remote_parallelism)
         store_rpc_concurrency = cast(int, bootstrap_options.remote_store_rpc_concurrency)
         cache_rpc_concurrency = cast(int, bootstrap_options.remote_cache_rpc_concurrency)
@@ -248,6 +257,7 @@ class DynamicRemoteOptions:
                 auth_plugin_func(
                     initial_execution_headers=execution_headers,
                     initial_store_headers=store_headers,
+                    initial_cache_headers=cache_headers,
                     options=full_options,
                     env=dict(env),
                     prior_result=prior_result,
@@ -295,6 +305,17 @@ class DynamicRemoteOptions:
                     )
                     store_address = auth_plugin_result.store_address
                 if (
+                    auth_plugin_result.cache_address is not None
+                    and auth_plugin_result.cache_address != cache_address
+                ):
+                    logger.debug(
+                        overridden_opt_log.format(
+                            f"--remote-cache-address={repr(cache_address)}",
+                            repr(auth_plugin_result.cache_address),
+                        )
+                    )
+                    cache_address = auth_plugin_result.cache_address
+                if (
                     auth_plugin_result.execution_address is not None
                     and auth_plugin_result.execution_address != execution_address
                 ):
@@ -313,6 +334,7 @@ class DynamicRemoteOptions:
             re.sub(r"^grpc", "http", execution_address) if execution_address else None
         )
         store_address = re.sub(r"^grpc", "http", store_address) if store_address else None
+        cache_address = re.sub(r"^grpc", "http", cache_address) if cache_address else None
 
         opts = DynamicRemoteOptions(
             execution=execution,
@@ -320,8 +342,10 @@ class DynamicRemoteOptions:
             cache_write=cache_write,
             instance_name=instance_name,
             store_address=store_address,
+            cache_address=cache_address,
             execution_address=execution_address,
             store_headers=store_headers,
+            cache_headers=cache_headers,
             execution_headers=execution_headers,
             parallelism=parallelism,
             store_rpc_concurrency=store_rpc_concurrency,
@@ -365,6 +389,8 @@ class ExecutionOptions:
     remote_store_rpc_concurrency: int
     remote_store_batch_api_size_limit: int
 
+    remote_cache_address: str | None
+    remote_cache_headers: dict[str, str]
     remote_cache_eager_fetch: bool
     remote_cache_warnings: RemoteCacheWarningsBehavior
     remote_cache_rpc_concurrency: int
@@ -409,6 +435,12 @@ class ExecutionOptions:
             remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
             remote_store_batch_api_size_limit=bootstrap_options.remote_store_batch_api_size_limit,
             # Remote cache setup.
+            remote_cache_address=(
+                dynamic_remote_options.cache_address or dynamic_remote_options.store_address
+            ),
+            remote_cache_headers=(
+                dynamic_remote_options.cache_headers or dynamic_remote_options.store_headers
+            ),
             remote_cache_eager_fetch=bootstrap_options.remote_cache_eager_fetch,
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             remote_cache_rpc_concurrency=dynamic_remote_options.cache_rpc_concurrency,
@@ -495,6 +527,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_rpc_concurrency=128,
     remote_store_batch_api_size_limit=4194304,
     # Remote cache setup.
+    remote_cache_address=None,
+    remote_cache_headers={},
     remote_cache_eager_fetch=True,
     remote_cache_warnings=RemoteCacheWarningsBehavior.backoff,
     remote_cache_rpc_concurrency=128,
@@ -1274,16 +1308,19 @@ class BootstrapOptions:
             Format: `path.to.module:my_func`. Pants will import your module and run your
             function. Update the `--pythonpath` option to ensure your file is loadable.
 
-            The function should take the kwargs `initial_store_headers: dict[str, str]`,
-            `initial_execution_headers: dict[str, str]`, `options: Options` (from
-            pants.option.options), `env: dict[str, str]`, and
-            `prior_result: AuthPluginResult | None`. It should return an instance of
-            `AuthPluginResult` from `pants.option.global_options`.
+            The function should take the kwargs:
+              * `initial_store_headers: dict[str, str]`
+              * `initial_cache_headers: dict[str, str]`
+              * `initial_execution_headers: dict[str, str]`
+              * `options: Options` (from pants.option.options)
+              * `env: dict[str, str]`
+              * `prior_result: AuthPluginResult | None`
+
+            It should return an instance of `AuthPluginResult` from `pants.option.global_options`.
 
             Pants will replace the headers it would normally use with whatever your plugin
-            returns; usually, you should include the `initial_store_headers` and
-            `initial_execution_headers` in your result so that options like
-            `--remote-store-headers` still work.
+            returns; usually, you should include the `initial_*_headers` in your result so that
+            options like `--remote-store-headers` still work.
 
             If you return `instance_name`, Pants will replace `--remote-instance-name`
             with this value.
@@ -1357,6 +1394,40 @@ class BootstrapOptions:
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_batch_api_size_limit,
         help="The maximum total size of blobs allowed to be sent in a single batch API call to the remote store.",
+    )
+    remote_cache_address = StrOption(
+        "--remote-cache-address",
+        advanced=True,
+        default=cast(str, DEFAULT_EXECUTION_OPTIONS.remote_cache_address),
+        help=softwrap(
+            """
+            The URI of a server used for the remote "action"/process cache.
+
+            If not set, defaults to `--remote-store-address`.
+
+            Format: `scheme://host:port`. The supported schemes are `grpc` and `grpcs`, i.e. gRPC
+            with TLS enabled. If `grpc` is used, TLS will be disabled.
+            """
+        ),
+    )
+    remote_cache_headers = DictOption(
+        "--remote-cache-headers",
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_headers,
+        help=softwrap(
+            """
+            Headers to set on remote cache requests.
+
+            If not set, defaults to `--remote-store-headers`.
+
+            Format: header=value. Pants may add additional headers.
+
+            See `--remote-execution-headers` and `--remote-store-headers`.
+            """
+        ),
+        default_help_repr=repr(DEFAULT_EXECUTION_OPTIONS.remote_cache_headers).replace(
+            VERSION, "<pants_version>"
+        ),
     )
     remote_cache_warnings = EnumOption(
         "--remote-cache-warnings",
@@ -1813,6 +1884,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         validate_remote_address("remote_execution_address")
         validate_remote_address("remote_store_address")
+        validate_remote_address("remote_cache_address")
 
         # Ensure that remote headers are ASCII.
         def validate_remote_headers(opt_name: str) -> None:
@@ -1831,6 +1903,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         validate_remote_headers("remote_execution_headers")
         validate_remote_headers("remote_store_headers")
+        validate_remote_headers("remote_cache_headers")
 
         illegal_build_ignores = [i for i in opts.build_ignore if i.startswith("!")]
         if illegal_build_ignores:

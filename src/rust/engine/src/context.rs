@@ -79,6 +79,7 @@ pub struct Core {
 pub struct RemotingOptions {
   pub execution_enable: bool,
   pub store_address: Option<String>,
+  pub cache_address: Option<String>,
   pub execution_address: Option<String>,
   pub execution_process_cache_namespace: Option<String>,
   pub instance_name: Option<String>,
@@ -89,6 +90,7 @@ pub struct RemotingOptions {
   pub store_rpc_retries: usize,
   pub store_rpc_concurrency: usize,
   pub store_batch_api_size_limit: usize,
+  pub cache_headers: BTreeMap<String, String>,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_eager_fetch: bool,
   pub cache_rpc_concurrency: usize,
@@ -277,12 +279,11 @@ impl Core {
   }
 
   ///
-  /// Wraps the given runner in any configured caches.
+  /// Wraps the given runner in the remote cache runner.
   ///
   fn make_remote_cached_runner(
     inner_runner: Arc<dyn CommandRunner>,
     full_store: &Store,
-    remote_store_address: &Option<String>,
     executor: &Executor,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
@@ -294,9 +295,9 @@ impl Core {
       process_execution_metadata.clone(),
       executor.clone(),
       full_store.clone(),
-      remote_store_address.as_ref().unwrap(),
+      remoting_opts.cache_address.as_ref().unwrap(),
       root_ca_certs.clone(),
-      remoting_opts.store_headers.clone(),
+      remoting_opts.cache_headers.clone(),
       Platform::current()?,
       exec_strategy_opts.remote_cache_read,
       exec_strategy_opts.remote_cache_write,
@@ -339,7 +340,6 @@ impl Core {
         Some(Self::make_remote_cached_runner(
           leaf_runner.clone(),
           full_store,
-          &remoting_opts.store_address,
           executor,
           process_execution_metadata,
           root_ca_certs,
