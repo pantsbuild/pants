@@ -190,7 +190,6 @@ impl Core {
         Box::new(remote::CommandRunner::new(
           // We unwrap because global_options.py will have already validated these are defined.
           remoting_opts.execution_address.as_ref().unwrap(),
-          remoting_opts.store_address.as_ref().unwrap(),
           process_execution_metadata.clone(),
           root_ca_certs.clone(),
           remoting_opts.execution_headers.clone(),
@@ -201,8 +200,6 @@ impl Core {
           remoting_opts.execution_overall_deadline,
           Duration::from_millis(100),
           remoting_opts.execution_rpc_concurrency,
-          remoting_opts.cache_rpc_concurrency,
-          remoting_opts.cache_read_timeout,
           capabilities_cell_opt,
         )?),
         exec_strategy_opts.remote_parallelism,
@@ -337,8 +334,6 @@ impl Core {
       capabilities_cell_opt,
     )?;
 
-    // TODO: We now use this around either a `local` or `remote` "leaf" runner: should remove the
-    // internal cache checks from `remote`.
     let maybe_remote_cached_runner =
       if exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write {
         Some(Self::make_remote_cached_runner(
