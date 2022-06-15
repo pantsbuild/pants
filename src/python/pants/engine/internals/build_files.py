@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os.path
 from dataclasses import dataclass
 from typing import Any
@@ -11,6 +12,7 @@ from pants.build_graph.address import BuildFileAddressRequest, ResolveError
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsProvider
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
@@ -18,6 +20,8 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -103,12 +107,26 @@ class AddressFamilyDir(EngineAwareParameter):
         return self.path
 
 
+@dataclass(frozen=True)
+class AddressFamilyRequest(AddressFamilyDir):
+    defaults: BuildFileDefaults
+
+
+@rule
+async def get_address_family_request(
+    directory: AddressFamilyDir, defaults_provider: BuildFileDefaultsProvider
+) -> AddressFamilyRequest:
+    return AddressFamilyRequest(
+        path=directory.path, defaults=BuildFileDefaults.for_path(directory.path, defaults_provider)
+    )
+
+
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
     build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
-    directory: AddressFamilyDir,
+    directory: AddressFamilyRequest,
 ) -> AddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -127,7 +145,7 @@ async def parse_address_family(
         raise ResolveError(f"Directory '{directory.path}' does not contain any BUILD files.")
 
     address_maps = [
-        AddressMap.parse(fc.path, fc.content.decode(), parser, prelude_symbols)
+        AddressMap.parse(fc.path, fc.content.decode(), parser, prelude_symbols, directory.defaults)
         for fc in digest_contents
     ]
     return AddressFamily.create(directory.path, address_maps)

@@ -10,6 +10,7 @@ import pytest
 from pants.backend.project_info.filter_targets import FilterSubsystem, TargetGranularity
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsProvider
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
@@ -27,7 +28,13 @@ from pants.util.frozendict import FrozenDict
 def parse_address_map(build_file: str) -> AddressMap:
     path = "/dev/null"
     parser = Parser(build_root="", target_type_aliases=["thing"], object_aliases=BuildFileAliases())
-    address_map = AddressMap.parse(path, build_file, parser, BuildFilePreludeSymbols(FrozenDict()))
+    address_map = AddressMap.parse(
+        path,
+        build_file,
+        parser,
+        BuildFilePreludeSymbols(FrozenDict()),
+        BuildFileDefaults.for_path("", BuildFileDefaultsProvider()),
+    )
     assert path == address_map.path
     return address_map
 

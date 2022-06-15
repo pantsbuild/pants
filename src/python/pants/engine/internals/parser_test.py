@@ -6,6 +6,7 @@ from __future__ import annotations
 import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsProvider
 from pants.engine.internals.parser import BuildFilePreludeSymbols, ParseError, Parser
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -15,7 +16,10 @@ def test_imports_banned() -> None:
     parser = Parser(build_root="", target_type_aliases=[], object_aliases=BuildFileAliases())
     with pytest.raises(ParseError) as exc:
         parser.parse(
-            "dir/BUILD", "\nx = 'hello'\n\nimport os\n", BuildFilePreludeSymbols(FrozenDict())
+            "dir/BUILD",
+            "\nx = 'hello'\n\nimport os\n",
+            BuildFilePreludeSymbols(FrozenDict()),
+            BuildFileDefaults.for_path("", BuildFileDefaultsProvider()),
         )
     assert "Import used in dir/BUILD at line 4" in str(exc.value)
 
@@ -34,7 +38,12 @@ def test_unrecogonized_symbol() -> None:
         prelude_symbols = BuildFilePreludeSymbols(FrozenDict({"prelude": 0}))
         fmt_extra_sym = str(extra_targets)[1:-1] + (", ") if len(extra_targets) != 0 else ""
         with pytest.raises(ParseError) as exc:
-            parser.parse("dir/BUILD", "fake", prelude_symbols)
+            parser.parse(
+                "dir/BUILD",
+                "fake",
+                prelude_symbols,
+                BuildFileDefaults.for_path("", BuildFileDefaultsProvider()),
+            )
         assert str(exc.value) == (
             f"Name 'fake' is not defined.\n\n{dym}"
             "If you expect to see more symbols activated in the below list,"

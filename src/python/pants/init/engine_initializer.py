@@ -20,6 +20,7 @@ from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing, specs_rules
+from pants.engine.internals.defaults import BuildFileDefaultsProvider
 from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
@@ -231,6 +232,10 @@ class EngineInitializer:
                 target_type_aliases=registered_target_types.aliases,
                 object_aliases=build_configuration.registered_aliases,
             )
+
+        @rule
+        def build_file_defaults_provider_singleton() -> BuildFileDefaultsProvider:
+            return BuildFileDefaultsProvider()
 
         @rule
         def build_configuration_singleton() -> BuildConfiguration:

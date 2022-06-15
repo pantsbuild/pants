@@ -11,6 +11,7 @@ from typing import Iterable, Mapping
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.internals.defaults import BuildFileDefaults
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
@@ -36,6 +37,7 @@ class AddressMap:
         build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
+        defaults: BuildFileDefaults,
     ) -> AddressMap:
         """Parses a source for targets.
 
@@ -43,7 +45,7 @@ class AddressMap:
         the same namespace but from a separate source are left as unresolved pointers.
         """
         try:
-            target_adaptors = parser.parse(filepath, build_file_content, extra_symbols)
+            target_adaptors = parser.parse(filepath, build_file_content, extra_symbols, defaults)
         except Exception as e:
             raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
         name_to_target_adaptors: dict[str, TargetAdaptor] = {}

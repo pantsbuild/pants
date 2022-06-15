@@ -15,6 +15,7 @@ from typing import Any, Iterable
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.internals.defaults import BuildFileDefaults, DefaultsT, DefaultsValueT
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -35,10 +36,14 @@ class UnaddressableObjectError(MappingError):
 
 class ParseState(threading.local):
     def __init__(self):
+        self._defaults: BuildFileDefaults | None = None
+        self._parsed_defaults: dict[str, Any] = {}
         self._rel_path: str | None = None
         self._target_adapters: list[TargetAdaptor] = []
 
-    def reset(self, rel_path: str) -> None:
+    def reset(self, rel_path: str, defaults: BuildFileDefaults) -> None:
+        self._defaults = defaults
+        self._parsed_defaults = dict(defaults.defaults)
         self._rel_path = rel_path
         self._target_adapters.clear()
 
@@ -56,6 +61,25 @@ class ParseState(threading.local):
 
     def parsed_targets(self) -> list[TargetAdaptor]:
         return list(self._target_adapters)
+
+    @property
+    def defaults(self) -> BuildFileDefaults:
+        if self._defaults is None:
+            raise AssertionError(
+                "The BUILD file __defaults__ was accessed before being set. This indicates a "
+                "programming error in Pants. Please file a bug report at "
+                "https://github.com/pantsbuild/pants/issues/new."
+            )
+        return self._defaults
+
+    def update_defaults_factory(self, target_type_aliases: Iterable[str]):
+        def update_defaults(self, *args: DefaultsT, **kwargs: dict[str, DefaultsValueT]) -> None:
+            self.defaults.update(self._parsed_defaults, target_type_aliases, (*args, kwargs))
+
+        return update_defaults
+
+    def commit_defaults(self) -> None:
+        self.defaults.provider.update_defaults_for(self.rel_path(), self._parsed_defaults)
 
 
 class Parser:
@@ -101,6 +125,7 @@ class Parser:
         symbols: dict[str, Any] = {
             **object_aliases.objects,
             "build_file_dir": lambda: PurePath(parse_state.rel_path()),
+            "__defaults__": parse_state.update_defaults_factory(target_type_aliases),
         }
         symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 
@@ -113,9 +138,13 @@ class Parser:
         return symbols, parse_state
 
     def parse(
-        self, filepath: str, build_file_content: str, extra_symbols: BuildFilePreludeSymbols
+        self,
+        filepath: str,
+        build_file_content: str,
+        extra_symbols: BuildFilePreludeSymbols,
+        defaults: BuildFileDefaults,
     ) -> list[TargetAdaptor]:
-        self._parse_state.reset(rel_path=os.path.dirname(filepath))
+        self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
 
         # We update the known symbols with Build File Preludes. This is subtle code; functions have
         # their own globals set on __globals__ which they derive from the environment where they
@@ -133,6 +162,7 @@ class Parser:
 
         try:
             exec(build_file_content, global_symbols)
+            self._parse_state.commit_defaults()
         except NameError as e:
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
             original = e.args[0].capitalize()
