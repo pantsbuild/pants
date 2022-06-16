@@ -69,14 +69,14 @@ _HELM_POST_RENDERER_TOOL = "__pants_helm_post_renderer.py"
 
 
 @dataclass(frozen=True)
-class InternalHelmPostRendererSetup:
+class HelmPostRendererTool:
     pex: VenvPex
 
 
 @rule(desc="Prepare Helm post renderer", level=LogLevel.DEBUG)
 async def setup_internal_post_renderer(
     post_renderer: HelmPostRenderer,
-) -> InternalHelmPostRendererSetup:
+) -> HelmPostRendererTool:
     post_renderer_sources = pkgutil.get_data(_HELM_POSTRENDERER_PACKAGE, _HELM_POSTRENDERER_SOURCE)
     if not post_renderer_sources:
         raise ValueError(
@@ -95,7 +95,7 @@ async def setup_internal_post_renderer(
             main=EntryPoint(PurePath(post_renderer_content.path).stem), sources=post_renderer_digest
         ),
     )
-    return InternalHelmPostRendererSetup(post_renderer_pex)
+    return HelmPostRendererTool(post_renderer_pex)
 
 
 HELM_POST_RENDERER_CFG_FILENAME = "post_renderer.cfg.yaml"
@@ -103,12 +103,12 @@ _HELM_POST_RENDERER_WRAPPER_SCRIPT = "post_renderer_wrapper.sh"
 
 
 @dataclass(frozen=True)
-class SetupPostRendererLauncher:
+class SetupHelmPostRenderer:
     replacements: YamlElements[str]
 
 
 @dataclass(frozen=True)
-class PostRendererLauncherSetup:
+class HelmPostRendererRunnable:
     exe: str
     digest: Digest
     immutable_input_digests: FrozenDict[str, Digest]
@@ -118,10 +118,10 @@ class PostRendererLauncherSetup:
 
 @rule(desc="Configure Helm Post Renderer", level=LogLevel.DEBUG)
 async def setup_post_renderer_launcher(
-    request: SetupPostRendererLauncher,
-    post_renderer: InternalHelmPostRendererSetup,
+    request: SetupHelmPostRenderer,
+    post_renderer_tool: HelmPostRendererTool,
     cat_binary: CatBinary,
-) -> PostRendererLauncherSetup:
+) -> HelmPostRendererRunnable:
     post_renderer_config = "---\n"
     for manifest in request.replacements.file_paths():
         post_renderer_config += f'"{manifest}":\n'
@@ -141,7 +141,7 @@ async def setup_post_renderer_launcher(
     post_renderer_process = await Get(
         Process,
         VenvPexProcess(
-            post_renderer.pex,
+            post_renderer_tool.pex,
             argv=[os.path.join(".", HELM_POST_RENDERER_CFG_FILENAME), post_renderer_stdin_file],
             input_digest=post_renderer_cfg_digest,
             description="",
@@ -174,7 +174,7 @@ async def setup_post_renderer_launcher(
     launcher_digest = await Get(
         Digest, MergeDigests([wrapper_digest, post_renderer_process.input_digest])
     )
-    return PostRendererLauncherSetup(
+    return HelmPostRendererRunnable(
         exe=_HELM_POST_RENDERER_WRAPPER_SCRIPT,
         digest=launcher_digest,
         env=post_renderer_process.env,

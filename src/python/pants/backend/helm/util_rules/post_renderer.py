@@ -22,8 +22,8 @@ from pants.backend.docker.util_rules.docker_build_context import (
 from pants.backend.helm.dependency_inference.deployment import FirstPartyHelmDeploymentMappings
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import (
-    PostRendererLauncherSetup,
-    SetupPostRendererLauncher,
+    HelmPostRendererRunnable,
+    SetupHelmPostRenderer,
 )
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.backend.helm.util_rules.yaml_utils import YamlElements
@@ -33,16 +33,16 @@ from pants.engine.target import Targets
 
 
 @dataclass(frozen=True)
-class PreparePostRendererRequest:
+class HelmDeploymentPostRendererRequest:
     field_set: HelmDeploymentFieldSet
 
 
 @rule
-async def prepare_post_renderer(
-    request: PreparePostRendererRequest,
+async def prepare_post_renderer_for_helm_deployment(
+    request: HelmDeploymentPostRendererRequest,
     mappings: FirstPartyHelmDeploymentMappings,
     docker_options: DockerOptions,
-) -> PostRendererLauncherSetup:
+) -> HelmPostRendererRunnable:
     docker_addresses = mappings.docker_images[request.field_set.address]
     docker_contexts = await MultiGet(
         Get(
@@ -89,7 +89,7 @@ async def prepare_post_renderer(
         }
     )
 
-    return await Get(PostRendererLauncherSetup, SetupPostRendererLauncher(replacements))
+    return await Get(HelmPostRendererRunnable, SetupHelmPostRenderer(replacements))
 
 
 def rules():

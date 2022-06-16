@@ -12,7 +12,7 @@ from pathlib import PurePath
 from typing import Iterable, Mapping
 
 from pants.backend.helm.subsystems import post_renderer
-from pants.backend.helm.subsystems.post_renderer import PostRendererLauncherSetup
+from pants.backend.helm.subsystems.post_renderer import HelmPostRendererRunnable
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
@@ -51,7 +51,7 @@ class HelmDeploymentRendererRequest:
     cmd: HelmDeploymentRendererCmd
     description: str = dataclasses.field(compare=False)
     extra_argv: tuple[str, ...]
-    post_renderer: PostRendererLauncherSetup | None
+    post_renderer: HelmPostRendererRunnable | None
     output_directory: str | None
 
     def __init__(
@@ -61,7 +61,7 @@ class HelmDeploymentRendererRequest:
         cmd: HelmDeploymentRendererCmd,
         description: str,
         extra_argv: Iterable[str] | None = None,
-        post_renderer: PostRendererLauncherSetup | None = None,
+        post_renderer: HelmPostRendererRunnable | None = None,
         output_directory: str | None = None,
     ) -> None:
         self.field_set = field_set
@@ -135,28 +135,26 @@ async def setup_render_helm_deployment_process(
     if request.output_directory:
         output_digest = await Get(Digest, CreateDigest([Directory(request.output_directory)]))
 
+    # Ordering the value file names needs to be consistent so overrides are respected
+    sorted_value_files = _sort_value_file_names_for_evaluation(value_files.snapshot.files)
+
+    # Digests to be used as an input into the renderer process
     input_digests = [
         chart.snapshot.digest,
         value_files.snapshot.digest,
         output_digest,
     ]
 
-    if request.post_renderer:
-        input_digests.append(request.post_renderer.digest)
-
-    merged_digests = await Get(Digest, MergeDigests(input_digests))
-
-    # Ordering the value file names needs to be consistent so overrides are respected
-    sorted_value_files = _sort_value_file_names_for_evaluation(value_files.snapshot.files)
-
     env: Mapping[str, str] = {}
     immutable_input_digests: Mapping[str, Digest] = {}
     append_only_caches: Mapping[str, str] = {}
     if request.post_renderer:
+        input_digests.append(request.post_renderer.digest)
         env = request.post_renderer.env
         immutable_input_digests = request.post_renderer.immutable_input_digests
         append_only_caches = request.post_renderer.append_only_caches
 
+    merged_digests = await Get(Digest, MergeDigests(input_digests))
     output_directories = [request.output_directory] if request.output_directory else None
 
     release_name = request.field_set.release_name.value or request.field_set.address.target_name

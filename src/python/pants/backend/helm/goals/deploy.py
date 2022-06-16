@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.helm.dependency_inference import deployment
-from pants.backend.helm.subsystems.post_renderer import PostRendererLauncherSetup
+from pants.backend.helm.subsystems.post_renderer import HelmPostRendererRunnable
 from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeploymentTarget
 from pants.backend.helm.util_rules import post_renderer
-from pants.backend.helm.util_rules.post_renderer import PreparePostRendererRequest
+from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRenderer,
     HelmDeploymentRendererCmd,
@@ -86,7 +86,9 @@ async def run_helm_deploy(
     if invalid_args:
         raise InvalidDeploymentArgs(invalid_args)
 
-    post_renderer = await Get(PostRendererLauncherSetup, PreparePostRendererRequest(field_set))
+    post_renderer = await Get(
+        HelmPostRendererRunnable, HelmDeploymentPostRendererRequest(field_set)
+    )
     renderer = await Get(
         HelmDeploymentRenderer,
         HelmDeploymentRendererRequest(

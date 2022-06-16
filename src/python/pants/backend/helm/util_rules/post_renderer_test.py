@@ -11,7 +11,7 @@ from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.helm.dependency_inference import deployment as infer_deployment
 from pants.backend.helm.subsystems.post_renderer import (
     HELM_POST_RENDERER_CFG_FILENAME,
-    PostRendererLauncherSetup,
+    HelmPostRendererRunnable,
 )
 from pants.backend.helm.target_types import (
     HelmChartTarget,
@@ -24,7 +24,7 @@ from pants.backend.helm.testutil import (
     HELM_VALUES_FILE,
 )
 from pants.backend.helm.util_rules import post_renderer
-from pants.backend.helm.util_rules.post_renderer import PreparePostRendererRequest
+from pants.backend.helm.util_rules.post_renderer import HelmDeploymentPostRendererRequest
 from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRendererCmd,
     HelmDeploymentRendererRequest,
@@ -45,7 +45,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *infer_deployment.rules(),
             *post_renderer.rules(),
-            QueryRule(PostRendererLauncherSetup, (PreparePostRendererRequest,)),
+            QueryRule(HelmPostRendererRunnable, (HelmDeploymentPostRendererRequest,)),
             QueryRule(RenderedFiles, (HelmDeploymentRendererRequest,)),
             QueryRule(ProcessResult, (HelmProcess,)),
         ],
@@ -126,8 +126,8 @@ def test_can_prepare_post_renderer(rule_runner: RuleRunner) -> None:
     field_set = HelmDeploymentFieldSet.create(tgt)
 
     post_renderer = rule_runner.request(
-        PostRendererLauncherSetup,
-        [PreparePostRendererRequest(field_set)],
+        HelmPostRendererRunnable,
+        [HelmDeploymentPostRendererRequest(field_set)],
     )
 
     config_file = _read_file_from_digest(
