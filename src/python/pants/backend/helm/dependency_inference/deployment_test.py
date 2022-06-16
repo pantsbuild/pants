@@ -37,7 +37,7 @@ from pants.engine.addresses import Address
 from pants.engine.internals.graph import rules as graph_rules
 from pants.engine.rules import QueryRule
 from pants.engine.target import InjectedDependencies
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
 
 @pytest.fixture
@@ -142,7 +142,7 @@ def test_inject_deployment_dependencies(rule_runner: RuleRunner) -> None:
     source_root_patterns = ("src/*",)
     rule_runner.set_options(
         [f"--source-root-patterns={repr(source_root_patterns)}"],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
 
     deployment_addr = Address("src/deployment", target_name="foo")

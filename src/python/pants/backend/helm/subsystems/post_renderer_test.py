@@ -38,12 +38,13 @@ def rule_runner() -> RuleRunner:
 
 def test_post_renderer_is_runnable(rule_runner: RuleRunner) -> None:
     replacements = HelmManifestItems(
-        {PurePath("file.yaml"): {YamlPath.parse("root/element"): "replaced_value"}}
+        {PurePath("file.yaml"): {YamlPath.parse("/root/element"): "replaced_value"}}
     )
     expected_cfg_file = dedent(
         """\
+      ---
       "file.yaml":
-        "root/element": "replaced_value"
+        "/root/element": "replaced_value"
       """
     )
 
@@ -52,17 +53,17 @@ def test_post_renderer_is_runnable(rule_runner: RuleRunner) -> None:
     )
     assert post_renderer_setup.exe == "post_renderer_wrapper.sh"
 
-    input_snapshot = rule_runner.request(Snapshot, [post_renderer_setup.input_digest])
+    input_snapshot = rule_runner.request(Snapshot, [post_renderer_setup.digest])
     assert "post_renderer.cfg.yaml" in input_snapshot.files
     assert "post_renderer_wrapper.sh" in input_snapshot.files
 
-    input_contents = rule_runner.request(DigestContents, [post_renderer_setup.input_digest])
+    input_contents = rule_runner.request(DigestContents, [post_renderer_setup.digest])
     for file in input_contents:
         if file.path == "post_renderer.cfg.yaml":
             assert file.content.decode() == expected_cfg_file
         elif file.path == "post_renderer_wrapper.sh":
             script_lines = file.content.decode().splitlines()
             assert (
-                "echo <&0 | ./helm_post_renderer.pex_pex_shim.sh ./post_renderer.cfg.yaml"
+                "./helm_post_renderer.pex_pex_shim.sh ./post_renderer.cfg.yaml ./__stdin.yaml"
                 in script_lines
             )

@@ -105,7 +105,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--set",
         'key="foo"',
         "--post-renderer",
-        "post_renderer_wrapper.sh",
+        "./post_renderer_wrapper.sh",
         "--install",
         "--create-namespace",
         "--kubeconfig",

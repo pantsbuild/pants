@@ -61,7 +61,8 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
         image_refs=HelmManifestItems(
             {
                 manifest.filename: {
-                    container.element_path: container.image for container in manifest.all_containers
+                    container.element_path / "image": container.image
+                    for container in manifest.all_containers
                 }
                 for manifest in manifests
                 if manifest.pod_spec
@@ -75,7 +76,7 @@ class FirstPartyHelmDeploymentMappings:
     docker_images: FrozenDict[Address, HelmManifestItems[Address]]
 
     def referenced_by(self, address: Address) -> list[Address]:
-        if not address in self.docker_images:
+        if address not in self.docker_images:
             return []
         return list(self.docker_images[address].values())
 
@@ -188,10 +189,6 @@ def rules():
         *deployment.rules(),
         *k8s_manifest.rules(),
         *helm_target_types_rules(),
-        # *docker_build_context.rules(),
-        # *docker_build_args.rules(),
-        # *docker_build_env.rules(),
-        # *dockerfile.rules(),
         *docker_target_types_rules(),
         UnionRule(InjectDependenciesRequest, InjectHelmDeploymentDependenciesRequest),
     ]

@@ -22,7 +22,7 @@ class YamlPath:
 
     @classmethod
     def parse(cls, path: str) -> YamlPath:
-        return cls(path.split("/"))
+        return cls([elem for elem in path.split("/") if elem])
 
     @classmethod
     def root(cls) -> YamlPath:
@@ -49,7 +49,7 @@ class YamlPath:
         try:
             int(self.current)
             return True
-        except:
+        except ValueError:
             return False
 
     def __add__(self, other: YamlPath) -> YamlPath:
@@ -62,7 +62,7 @@ class YamlPath:
         return iter(self._elements)
 
     def __str__(self) -> str:
-        return "/".join(self._elements)
+        return f"/{'/'.join(self._elements)}"
 
 
 @dataclass(frozen=True)
