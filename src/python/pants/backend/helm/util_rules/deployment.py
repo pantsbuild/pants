@@ -13,17 +13,13 @@ from typing import Iterable, Mapping
 
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import PostRendererLauncherSetup
-from pants.backend.helm.target_types import (
-    HelmChartFieldSet,
-    HelmChartTarget,
-    HelmDeploymentFieldSet,
-)
+from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.backend.helm.util_rules import chart, tool
-from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
+from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmChart
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -35,55 +31,9 @@ from pants.engine.fs import (
 )
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, ExplicitlyProvidedDependencies, Targets
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
-
-
-class MissingHelmDeploymentChartError(ValueError):
-    def __init__(self, address: Address) -> None:
-        super().__init__(
-            f"The target '{address}' is missing a dependency on a `{HelmChartTarget.alias}` target."
-        )
-
-
-class TooManyChartDependenciesError(ValueError):
-    def __init__(self, address: Address) -> None:
-        super().__init__(
-            f"The target '{address}' has too many `{HelmChartTarget.alias}` "
-            "addresses in its dependencies, it should have only one."
-        )
-
-
-@dataclass(frozen=True)
-class FindHelmDeploymentChart:
-    field_set: HelmDeploymentFieldSet
-
-
-@rule
-async def get_chart_of_deployment(request: FindHelmDeploymentChart) -> HelmChartRequest:
-    explicit_dependencies = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
-    )
-    explicit_targets = await Get(
-        Targets,
-        Addresses(
-            [
-                addr
-                for addr in explicit_dependencies.includes
-                if addr not in explicit_dependencies.ignores
-            ]
-        ),
-    )
-
-    found_charts = [tgt for tgt in explicit_targets if HelmChartFieldSet.is_applicable(tgt)]
-    if not found_charts:
-        raise MissingHelmDeploymentChartError(request.field_set.address)
-    if len(found_charts) > 1:
-        raise TooManyChartDependenciesError(request.field_set.address)
-
-    return HelmChartRequest.from_target(found_charts[0])
 
 
 class HelmDeploymentRendererCmd(Enum):
