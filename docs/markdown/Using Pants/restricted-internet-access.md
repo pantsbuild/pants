@@ -9,62 +9,47 @@ updatedAt: "2022-02-07T05:57:27.289Z"
 Some organizations place restrictions on their users' Internet access, for security or compliance reasons.  Such restrictions may prevent Pants from downloading various underlying tools it uses, and it may interfere with bootstrapping Pants itself. 
 
 In such cases, users are typically still able to access internal proxies and servers. This page shows how to configure Pants to work smoothly in these circumstances.
-[block:api-header]
-{
-  "title": "Installing Pants"
-}
-[/block]
+
+Installing Pants
+----------------
+
 The `./pants` script from [Installing Pants](doc:installation) uses PyPI to download and install the wheel `pantsbuild.pants` and all of Pants's dependencies. 
 
 If you cannot access PyPI directly, you may have an internal mirror or custom Python package repository. If so, you can ensure that `pantsbuild.pants` and all of its dependencies are available in that repository, and modify your `./pants` script to bootstrap from it.
 
-Otherwise, you may instead download Pants as a PEX binary from https://github.com/pantsbuild/pants/releases. After downloading the PEX artifact, you can rename the file to `./pants`, run `chmod +x ./pants`, then run `./pants --version` like you normally would. 
+Otherwise, you may instead download Pants as a PEX binary from <https://github.com/pantsbuild/pants/releases>. After downloading the PEX artifact, you can rename the file to `./pants`, run `chmod +x ./pants`, then run `./pants --version` like you normally would. 
 
-You may want to check the binary into version control so that everyone in your organization can use it. To upgrade to a new Pants release, update the `pants_version` option in `pants.toml` and download the newest release from https://github.com/pantsbuild/pants/releases.
-[block:api-header]
-{
-  "title": "Setting up a Certificate Authority"
-}
-[/block]
+You may want to check the binary into version control so that everyone in your organization can use it. To upgrade to a new Pants release, update the `pants_version` option in `pants.toml` and download the newest release from <https://github.com/pantsbuild/pants/releases>.
+
+Setting up a Certificate Authority
+----------------------------------
+
 You may need to configure Pants to use a custom Certificate Authority (CA) bundle: 
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[GLOBAL]\nca_certs_path = \"/path/to/certs/file\"",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "Setting `HTTP_PROXY` and `HTTPS_PROXY`"
-}
-[/block]
+```toml pants.toml
+[GLOBAL]
+ca_certs_path = "/path/to/certs/file"
+```
+
+Setting `HTTP_PROXY` and `HTTPS_PROXY`
+--------------------------------------
+
 You may need to set standard proxy-related environment variables, such as `http_proxy`, `https_proxy` and `all_proxy`, in executed subprocesses:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[subprocess-environment]\nenv_vars.add = [\"http_proxy=http://myproxy\", \"https_proxy\"]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```toml pants.toml
+[subprocess-environment]
+env_vars.add = ["http_proxy=http://myproxy", "https_proxy"]
+```
+
 You can use lowercase or all-caps env var names.
 
 Note that if you leave of the env var's value, as for `https_proxy` above, Pants will use the value of the same variable in the environment in which it is invoked.
-[block:api-header]
-{
-  "title": "Customizing tool download locations"
-}
-[/block]
+
+Customizing tool download locations
+-----------------------------------
+
 There are three types of tools that Pants may need to download and invoke:
+
 - **Python tools**: these are resolved from a package repository (PyPI by default) via requirement strings such as `mypy==0.910`.
 - **JVM tools**: these are resolved from a package repository (Maven Central by default) via coordinates such as `org.scalatest:scalatest_2.13:3.2.10`.
 - **Standalone binaries**: these are downloaded from a configured URL and verified against a SHA256 hash.
@@ -83,22 +68,17 @@ See [Python third-party dependencies](doc:python-third-party-dependencies#custom
 
 ### JVM tools
 
-Pants downloads the various JVM-related tools it uses from [Maven Central](), just as it does for your JVM code's dependencies.
+Pants downloads the various JVM-related tools it uses from [Maven Central](<>), just as it does for your JVM code's dependencies.
 
 If you use JVM code but cannot access Maven Central directly, then you probably have an internal mirror or a custom JVM package repository. So all you have to do is configure Pants to access this custom repository, and ensure that the tools it needs are available there. 
 
 To do so, set the [`repos`](doc:reference-coursier#section-repos) option on the `[coursier]` scope. E.g., 
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[coursier]\nrepos = [\"https://my.custom.repo/maven2\"]",
-      "language": "text",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```text pants.toml
+[coursier]
+repos = ["https://my.custom.repo/maven2"]
+```
+
 ### Binary tools
 
 Pants downloads various binary tools from preset locations, and verifies them against a SHA. If you are not able to allowlist these locations, you can host the binaries yourself and instruct Pants to use the custom locations. 
@@ -114,28 +94,22 @@ This is best understood by looking at an example:
 - We see the `version` option is set to `3.11.4`. 
 - We are running on macOS ARM, so look up `macos_arm64` in the `url_platform_mapping` option and find the string `osx-x86_64`. 
 
-Thus, the final URL is: 
+Thus, the final URL is:  
 `https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-osx-x86_64.zip`.
 
 It should be clear from this example how to modify the URL template to point to your own hosted binaries:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[protoc]\nurl_template = \"https://my.custom.host/bin/protoc/{version}/{platform}/protoc.zip\"",
-      "language": "python",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```python pants.toml
+[protoc]
+url_template = "https://my.custom.host/bin/protoc/{version}/{platform}/protoc.zip"
+```
+
 For simplicity, we used the original value for `url_platform_mapping`, meaning that we set up our hosted URL to store the macOS x86 binary at `.../osx-x86_64/protoc.zip`, for example. You can override the option `url_platform_mapping` if you want to use different values.
 
-Occasionally, new Pants releases will upgrade to new versions of these binaries, which will be mentioned in the "User API Changes" part of the changelog https://github.com/pantsbuild/pants/tree/master/src/python/pants/notes. When upgrading to these new Pants releases, you should download the new artifact and upload a copy to your host.
-[block:callout]
-{
-  "type": "info",
-  "title": "Asking for help",
-  "body": "It's possible that Pants does not yet have all the mechanisms it'll need to work with your organization's specific networking setup, which we'd love to fix.\n\nPlease reach out on [Slack](doc:community) or open a [GitHub issue](https://github.com/pantsbuild/pants/issues) for any help."
-}
-[/block]
+Occasionally, new Pants releases will upgrade to new versions of these binaries, which will be mentioned in the "User API Changes" part of the changelog <https://github.com/pantsbuild/pants/tree/master/src/python/pants/notes>. When upgrading to these new Pants releases, you should download the new artifact and upload a copy to your host.
+
+> 📘 Asking for help
+> 
+> It's possible that Pants does not yet have all the mechanisms it'll need to work with your organization's specific networking setup, which we'd love to fix.
+> 
+> Please reach out on [Slack](doc:community) or open a [GitHub issue](https://github.com/pantsbuild/pants/issues) for any help.

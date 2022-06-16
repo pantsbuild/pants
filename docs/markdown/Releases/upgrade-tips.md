@@ -6,19 +6,15 @@ hidden: false
 createdAt: "2020-05-16T22:53:24.499Z"
 updatedAt: "2022-01-13T04:03:33.172Z"
 ---
-[block:callout]
-{
-  "type": "info",
-  "title": "Reminder: change the `pants_version` to upgrade",
-  "body": "Change the `pants_version` option in the `[GLOBAL]` scope in your pants.toml to upgrade.\n\nYou can see all releases at https://pypi.org/project/pantsbuild.pants/#history."
-}
-[/block]
+> 📘 Reminder: change the `pants_version` to upgrade
+> 
+> Change the `pants_version` option in the `[GLOBAL]` scope in your pants.toml to upgrade.
+> 
+> You can see all releases at <https://pypi.org/project/pantsbuild.pants/#history>.
 
-[block:api-header]
-{
-  "title": "Upgrade one minor release at a time"
-}
-[/block]
+Upgrade one minor release at a time
+-----------------------------------
+
 Per our [Deprecation policy](doc:deprecation-policy), deprecations must last a minimum of one minor release. For example, something may be deprecated in 2.1.0 and then removed in 2.2.0.
 
 This means that it is helpful to upgrade one minor release at a time so that you can see all deprecation warnings. 
@@ -48,43 +44,34 @@ Then, see if there are any remaining deprecation warnings:
 ```
 
 It is also helpful to spot-check that your main commands like `lint`, `package`, and `test` still work by running on a single target.
-[block:callout]
-{
-  "type": "info",
-  "title": "Use dev releases for the newest",
-  "body": "As described in our [Release strategy](doc:release-strategy), we make weekly dev releases with all the latest features and bug fixes we've been working on. While dev releases are less stable, they mean you get access to improvements sooner. \n\nIf you encounter any blocking issues, you can easily roll back to a prior version by changing the `pants_version` option. (Please let us know the issue by opening a [GitHub issue](https://github.com/pantsbuild/pants/issues) or messaging us on [Slack](doc:community))."
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "Ignore deprecation messages with `ignore_warnings`"
-}
-[/block]
+> 📘 Use dev releases for the newest
+> 
+> As described in our [Release strategy](doc:release-strategy), we make weekly dev releases with all the latest features and bug fixes we've been working on. While dev releases are less stable, they mean you get access to improvements sooner. 
+> 
+> If you encounter any blocking issues, you can easily roll back to a prior version by changing the `pants_version` option. (Please let us know the issue by opening a [GitHub issue](https://github.com/pantsbuild/pants/issues) or messaging us on [Slack](doc:community)).
+
+Ignore deprecation messages with `ignore_warnings`
+--------------------------------------------------
+
 Sometimes when upgrading, you will not have time to fully fix the deprecation. The `ignore_warnings` option allows you to silence those deprecations.
 
 The `ignore_warnings` option expects a string with the start of the deprecation warning. You can also prefix the string with `$regex$` to use a regex pattern instead of literal string matching.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[GLOBAL]\nignore_warnings = [\n  \"DEPRECATED: option 'config' in scope 'flake8' will be removed\",\n  \"$regex$DEPRECATED:\\\\s*\",\n]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "Check for updates to the `./pants` script"
-}
-[/block]
+```toml pants.toml
+[GLOBAL]
+ignore_warnings = [
+  "DEPRECATED: option 'config' in scope 'flake8' will be removed",
+  "$regex$DEPRECATED:\\s*",
+]
+```
+
+Check for updates to the `./pants` script
+-----------------------------------------
+
 Run `curl -L -o ./pants https://pantsbuild.github.io/setup/pants` to check if there have been any changes, e.g. adding support for running Pants with new Python interpreters.
-[block:api-header]
-{
-  "title": "Find any bugs or issues?"
-}
-[/block]
+
+Find any bugs or issues?
+------------------------
+
 Please either open a [GitHub issue](https://github.com/pantsbuild/pants/issues) or head over to [Slack](doc:community). We'd be happy to help and would appreciate knowing about the issue!
