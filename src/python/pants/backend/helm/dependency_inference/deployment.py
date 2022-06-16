@@ -59,10 +59,6 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
             cmd=HelmDeploymentRendererCmd.TEMPLATE,
             field_set=request.field_set,
             description=f"Rendering Helm deployment {request.field_set.address}",
-            extra_argv=[
-                "--output-dir",
-                output_dir,
-            ],
             output_directory=output_dir,
         ),
     )

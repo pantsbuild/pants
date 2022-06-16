@@ -17,7 +17,7 @@ from yamlpath.wrappers import ConsolePrinter  # pants: no-infer-dep
 _SOURCE_FILENAME_PREFIX = "# Source: "
 
 
-def build_template_map(input_file: str) -> dict[str, str]:
+def build_template_map(input_file: str) -> dict[str, list[str]]:
     result = {}
     template_files = []
     with open(input_file, "r", encoding="utf-8") as f:
@@ -29,11 +29,13 @@ def build_template_map(input_file: str) -> dict[str, str]:
             continue
 
         template_name = lines[0][len(_SOURCE_FILENAME_PREFIX) :]
-        # We need to strip out the header of the YAML file so we can render it properly later
-        if len(lines) > 1:
-            result[template_name] = "\n".join(lines[1:])
-        else:
-            result[template_name] = "\n"
+
+        current_contents = result.get(template_name, None)
+        if not current_contents:
+            current_contents = []
+            result[template_name] = current_contents
+
+        current_contents.append("\n".join(lines[1:]))
 
     return result
 
@@ -75,7 +77,9 @@ def main(args: list[str]) -> None:
         if not file_contents:
             continue
 
-        (template_data, doc_loaded) = Parsers.get_yaml_data(yaml, log, file_contents, literal=True)
+        (template_data, doc_loaded) = Parsers.get_yaml_data(
+            yaml, log, "---\n".join(file_contents), literal=True
+        )
         if not doc_loaded:
             continue
 

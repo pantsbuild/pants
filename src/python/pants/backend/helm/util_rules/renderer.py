@@ -21,9 +21,11 @@ from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    EMPTY_SNAPSHOT,
     CreateDigest,
     Digest,
     Directory,
+    FileContent,
     MergeDigests,
     RemovePrefix,
     Snapshot,
@@ -187,6 +189,7 @@ async def setup_render_helm_deployment_process(
                 if request.post_renderer
                 else ()
             ),
+            *(("--output-dir", request.output_directory) if request.output_directory else ()),
             *request.extra_argv,
         ],
         extra_env=env,
@@ -202,14 +205,51 @@ async def setup_render_helm_deployment_process(
     )
 
 
+_HELM_OUTPUT_FILE_MARKER = "# Source: "
+
+
 @rule
 async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
+    def file_content(file_name: str, lines: Iterable[str]) -> FileContent:
+        content = "\n".join(lines) + "\n"
+        if not content.startswith("---"):
+            content = "---\n" + content
+        return FileContent(file_name, content.encode("utf-8"))
+
+    def parse_renderer_output(result: ProcessResult) -> list[FileContent]:
+        rendered_files_contents = result.stdout.decode("utf-8")
+        rendered_files: dict[str, list[str]] = {}
+
+        curr_file_name = None
+        curr_file_lines: list[str] = []
+        for line in rendered_files_contents.splitlines():
+            if not line:
+                continue
+
+            if line.startswith(_HELM_OUTPUT_FILE_MARKER):
+                curr_file_name = line[len(_HELM_OUTPUT_FILE_MARKER) :]
+
+            if not curr_file_name:
+                continue
+
+            curr_file_lines = rendered_files.get(curr_file_name, [])
+            if not curr_file_lines:
+                curr_file_lines = []
+                rendered_files[curr_file_name] = curr_file_lines
+            curr_file_lines.append(line)
+
+        return [file_content(file_name, lines) for file_name, lines in rendered_files.items()]
+
     result = await Get(ProcessResult, HelmProcess, renderer.process)
-    output_snapshot = await (
-        Get(Snapshot, RemovePrefix(result.output_digest, renderer.output_directory))
-        if renderer.output_directory
-        else Get(Snapshot, Digest, result.stdout_digest)
-    )
+
+    output_snapshot = EMPTY_SNAPSHOT
+    if not renderer.output_directory:
+        output_snapshot = await Get(Snapshot, CreateDigest(parse_renderer_output(result)))
+    else:
+        output_snapshot = await Get(
+            Snapshot, RemovePrefix(result.output_digest, renderer.output_directory)
+        )
+
     return RenderedFiles(output_snapshot)
 
 
