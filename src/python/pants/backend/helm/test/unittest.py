@@ -20,6 +20,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
+from pants.backend.helm.util_rules.process import HelmProcess
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
@@ -27,7 +28,6 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
-from pants.backend.helm.util_rules.process import HelmProcess
 from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
