@@ -6,68 +6,49 @@ hidden: false
 createdAt: "2020-03-03T00:57:15.994Z"
 updatedAt: "2022-04-03T02:01:57.201Z"
 ---
-[block:callout]
-{
-  "type": "success",
-  "title": "Benefit of Pants: consistent interface",
-  "body": "`./pants lint` and `./pants fmt` will consistently and correctly run all your linters and formatters. No need to remember how to invoke each tool, and no need to write custom scripts. \n\nThis consistent interface even works with multiple languages, like running Python linters at the same time as Go, Shell, Java, and Scala."
-}
-[/block]
+> 👍 Benefit of Pants: consistent interface
+> 
+> `./pants lint` and `./pants fmt` will consistently and correctly run all your linters and formatters. No need to remember how to invoke each tool, and no need to write custom scripts. 
+> 
+> This consistent interface even works with multiple languages, like running Python linters at the same time as Go, Shell, Java, and Scala.
 
-[block:callout]
-{
-  "type": "success",
-  "title": "Benefit of Pants: concurrency",
-  "body": "Pants does several things to speed up running formatters and linters:\n\n* Automatically configures tools that support concurrency (e.g. a `--jobs` option) based on your number of cores and what else is already running.\n* Runs everything in parallel with the `lint` goal (although not the `fmt` goal, which pipes the results of one formatter to the next for correctness).\n* Runs in batches of 256 files by default, which gives parallelism even for tools that don't have a `--jobs` option. This also increases cache reuse."
-}
-[/block]
+> 👍 Benefit of Pants: concurrency
+> 
+> Pants does several things to speed up running formatters and linters:
+> 
+> - Automatically configures tools that support concurrency (e.g. a `--jobs` option) based on your number of cores and what else is already running.
+> - Runs everything in parallel with the `lint` goal (although not the `fmt` goal, which pipes the results of one formatter to the next for correctness).
+> - Runs in batches of 256 files by default, which gives parallelism even for tools that don't have a `--jobs` option. This also increases cache reuse.
 
-[block:api-header]
-{
-  "title": "Activating linters and formatters"
-}
-[/block]
+Activating linters and formatters
+---------------------------------
+
 Linter/formatter support is implemented in separate [backends](doc:enabling-backends) so that they are easy to opt in to individually:
-[block:parameters]
-{
-  "data": {
-    "h-0": "Backend",
-    "h-1": "Tool",
-    "0-0": "`pants.backend.python.lint.bandit`",
-    "0-1": "[Bandit](https://bandit.readthedocs.io/en/latest/): security linter",
-    "1-0": "`pants.backend.python.lint.black`",
-    "1-1": "[Black](https://black.readthedocs.io/en/stable/): code formatter",
-    "2-0": "`pants.backend.python.lint.docformatter`",
-    "2-1": "[Docformatter](https://pypi.org/project/docformatter/): docstring formatter",
-    "3-0": "`pants.backend.python.lint.flake8`",
-    "3-1": "[Flake8](https://flake8.pycqa.org/en/latest/): style and bug linter",
-    "4-0": "`pants.backend.python.lint.isort`",
-    "4-1": "[isort](https://readthedocs.org/projects/isort/): import statement formatter",
-    "5-0": "`pants.backend.python.lint.pylint`",
-    "5-1": "[Pylint](https://pylint.pycqa.org/): style and bug linter",
-    "6-0": "`pants.backend.python.lint.yapf`",
-    "6-1": "[Yapf](https://github.com/google/yapf): code formatter",
-    "7-0": "`pants.backend.experimental.python.lint.autoflake`",
-    "7-1": "[Autoflake](https://github.com/myint/autoflake): remove unused imports",
-    "8-0": "`pants.backend.experimental.python.lint.pyupgrade`",
-    "8-1": "[Pyupgrade](https://github.com/asottile/pyupgrade): automatically update code to use modern Python idioms like `f-strings`"
-  },
-  "cols": 2,
-  "rows": 9
-}
-[/block]
+
+| Backend                                            | Tool                                                                                                                       |
+| :------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
+| `pants.backend.python.lint.bandit`                 | [Bandit](https://bandit.readthedocs.io/en/latest/): security linter                                                        |
+| `pants.backend.python.lint.black`                  | [Black](https://black.readthedocs.io/en/stable/): code formatter                                                           |
+| `pants.backend.python.lint.docformatter`           | [Docformatter](https://pypi.org/project/docformatter/): docstring formatter                                                |
+| `pants.backend.python.lint.flake8`                 | [Flake8](https://flake8.pycqa.org/en/latest/): style and bug linter                                                        |
+| `pants.backend.python.lint.isort`                  | [isort](https://readthedocs.org/projects/isort/): import statement formatter                                               |
+| `pants.backend.python.lint.pylint`                 | [Pylint](https://pylint.pycqa.org/): style and bug linter                                                                  |
+| `pants.backend.python.lint.yapf`                   | [Yapf](https://github.com/google/yapf): code formatter                                                                     |
+| `pants.backend.experimental.python.lint.autoflake` | [Autoflake](https://github.com/myint/autoflake): remove unused imports                                                     |
+| `pants.backend.experimental.python.lint.pyupgrade` | [Pyupgrade](https://github.com/asottile/pyupgrade): automatically update code to use modern Python idioms like `f-strings` |
+
 To enable, add the appropriate backends in `pants.toml`:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[GLOBAL]\n...\nbackend_packages = [\n  'pants.backend.python',\n  'pants.backend.python.lint.black',\n  'pants.backend.python.lint.isort',\n]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```toml pants.toml
+[GLOBAL]
+...
+backend_packages = [
+  'pants.backend.python',
+  'pants.backend.python.lint.black',
+  'pants.backend.python.lint.isort',
+]
+```
+
 You should now be able to run `./pants lint`, and possibly `./pants fmt`:
 
 ```
@@ -83,68 +64,52 @@ All done! ✨ 🍰 ✨
 ✓ Flake8 succeeded.
 ✓ isort succeeded.
 ```
-[block:callout]
-{
-  "type": "info",
-  "title": "How to activate MyPy",
-  "body": "MyPy is run with the [check goal](doc:python-check-goal), rather than `lint`."
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "Configuring the tools, e.g. adding plugins"
-}
-[/block]
+> 📘 How to activate MyPy
+> 
+> MyPy is run with the [check goal](doc:python-check-goal), rather than `lint`.
+
+Configuring the tools, e.g. adding plugins
+------------------------------------------
+
 You can configure each formatter and linter using these options:
-[block:parameters]
-{
-  "data": {
-    "h-0": "Option",
-    "h-1": "What it does",
-    "0-0": "`version`",
-    "0-1": "E.g. `flake8==3.8.0`.",
-    "1-0": "`extra_requirements`",
-    "1-1": "Any additional dependencies to install, such as any plugins.",
-    "2-0": "`interpreter_constraints`",
-    "2-1": "What interpreter to run the tool with. (`bandit`, `flake8`, and `pylint` instead determine this based on your [code's interpreter constraints](doc:python-interpreter-compatibility).)",
-    "3-0": "`args`",
-    "3-1": "Any command-line arguments you want to pass to the tool.",
-    "4-0": "`config`",
-    "4-1": "Path to a config file. Useful if the file is in a non-standard location such that it cannot be auto-discovered.",
-    "5-0": "`lockfile`",
-    "5-1": "Path to a custom lockfile if the default does not work, or `\"<none>\"` to opt out. See [Third-party dependencies](doc:python-third-party-dependencies#tool-lockfiles)."
-  },
-  "cols": 2,
-  "rows": 6
-}
-[/block]
-For example:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[docformatter]\nargs = [\"--wrap-summaries=100\", \"--wrap-descriptions=100\"]\n\n[flake8]\n# Load a config file in a non-standard location.\nconfig = \"build-support/flake8\"\n# Change the version and add a custom plugin. Because we do this, we\n# use a custom lockfile.\nversion = \"flake8==3.8.0\"\nextra_requirements.add = [\"flake8-2020\"]\nlockfile = \"3rdparty/flake8_lockfile.txt\"",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
-Run `./pants help-advanced black`, `./pants help-advanced flake8`, and so on for more information.
-[block:callout]
-{
-  "type": "info",
-  "title": "Config files are normally auto-discovered",
-  "body": "For tools that autodiscover config files—such as Black, isort, Flake8, and Pylint—Pants will include any relevant config files in the process's sandbox when running the tool.\n\nIf your config file is in a non-standard location, you must instead set the `--config` option, e.g. `[isort].config`. This will ensure that the config file is included in the process's sandbox and Pants will instruct the tool to load the config."
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "Running only certain formatters or linters"
-}
-[/block]
+| Option                    | What it does                                                                                                                                                                           |
+| :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`                 | E.g. `flake8==3.8.0`.                                                                                                                                                                  |
+| `extra_requirements`      | Any additional dependencies to install, such as any plugins.                                                                                                                           |
+| `interpreter_constraints` | What interpreter to run the tool with. (`bandit`, `flake8`, and `pylint` instead determine this based on your [code's interpreter constraints](doc:python-interpreter-compatibility).) |
+| `args`                    | Any command-line arguments you want to pass to the tool.                                                                                                                               |
+| `config`                  | Path to a config file. Useful if the file is in a non-standard location such that it cannot be auto-discovered.                                                                        |
+| `lockfile`                | Path to a custom lockfile if the default does not work, or `"<none>"` to opt out. See [Third-party dependencies](doc:python-third-party-dependencies#tool-lockfiles).                  |
+
+For example:
+
+```toml pants.toml
+[docformatter]
+args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
+
+[flake8]
+# Load a config file in a non-standard location.
+config = "build-support/flake8"
+# Change the version and add a custom plugin. Because we do this, we
+# use a custom lockfile.
+version = "flake8==3.8.0"
+extra_requirements.add = ["flake8-2020"]
+lockfile = "3rdparty/flake8_lockfile.txt"
+```
+
+Run `./pants help-advanced black`, `./pants help-advanced flake8`, and so on for more information.
+
+> 📘 Config files are normally auto-discovered
+> 
+> For tools that autodiscover config files—such as Black, isort, Flake8, and Pylint—Pants will include any relevant config files in the process's sandbox when running the tool.
+> 
+> If your config file is in a non-standard location, you must instead set the `--config` option, e.g. `[isort].config`. This will ensure that the config file is included in the process's sandbox and Pants will instruct the tool to load the config.
+
+Running only certain formatters or linters
+------------------------------------------
+
 To temporarily skip a tool, use the `--skip` option for that tool. For example, run:
 
 ```bash
@@ -162,23 +127,30 @@ You can also use the `--lint-only` and `--fmt-only` options with the names of th
 ```
 
 You can also skip for certain targets with the `skip_<tool>` fields, which can be useful for [incrementally adopting new tools](https://www.youtube.com/watch?v=BOhcdRsmv0s). For example:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "python_sources(\n    name=\"lib\",\n    # Skip Black for all non-test files in this folder.\n    skip_black=True,\n    overrides={\n        \"strutil.py\": {\"skip_flake8\": True},\n        (\"docutil.py\", \"dirutil.py\"): {\"skip_isort\": True},\n    },\n)\n\npython_tests(\n    name=\"tests\",\n    # Skip isort for all the test files in this folder.\n    skip_isort=True,\n)",
-      "language": "python",
-      "name": "project/BUILD"
-    }
-  ]
-}
-[/block]
+
+```python project/BUILD
+python_sources(
+    name="lib",
+    # Skip Black for all non-test files in this folder.
+    skip_black=True,
+    overrides={
+        "strutil.py": {"skip_flake8": True},
+        ("docutil.py", "dirutil.py"): {"skip_isort": True},
+    },
+)
+
+python_tests(
+    name="tests",
+    # Skip isort for all the test files in this folder.
+    skip_isort=True,
+)
+```
+
 When you run `./pants fmt` and `./pants lint`, Pants will ignore any files belonging to skipped targets.
-[block:api-header]
-{
-  "title": "Tip: only run over changed files"
-}
-[/block]
+
+Tip: only run over changed files
+--------------------------------
+
 With formatters and linters, there is usually no need to rerun on files that have not changed.
 
 Use the option `--changed-since` to get much better performance, like this:
@@ -194,27 +166,27 @@ or
 ```
 
 Pants will find which files have changed and only run over those files. See [Advanced target selection](doc:advanced-target-selection) for more information.
-[block:api-header]
-{
-  "title": "Tips for specific tools"
-}
-[/block]
+
+Tips for specific tools
+-----------------------
+
 ### Order of `backend_packages` matters for `fmt`
 
 Pants will run formatters in the order in which they appear in the `backend_packages` option. 
 
 For example, you likely want to put Autoflake (which removes unused imports) before Black and Isort, which will format your import statements.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[GLOBAL]\nbackend_packages = [\n    # Note that we want Autoflake to run before Black and isort, \n    # so it must appear first.\n    \"pants.backend.python.experimental.autoflake\",\n    \"pants.backend.python.black\",\n    \"pants.backend.python.isort\",\n]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```toml pants.toml
+[GLOBAL]
+backend_packages = [
+    # Note that we want Autoflake to run before Black and isort, 
+    # so it must appear first.
+    "pants.backend.python.experimental.autoflake",
+    "pants.backend.python.black",
+    "pants.backend.python.isort",
+]
+```
+
 ### Bandit and Flake8: report files
 
 Flake8 and Bandit can both generate report files saved to disk. 
@@ -234,7 +206,6 @@ Pants will copy all reports into the folder `dist/lint/<linter_name>`.
 ### Pylint and Flake8: how to add first-party plugins
 
 See [`[pylint].source_plugins`](https://www.pantsbuild.org/docs/reference-pylint#section-source-plugins) and [`[flake8].source_plugins`](https://www.pantsbuild.org/docs/reference-flake8#section-source-plugins) for instructions to add plugins written by you.
-
 
 ### Bandit: less verbose logging
 
