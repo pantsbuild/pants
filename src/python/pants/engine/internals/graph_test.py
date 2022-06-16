@@ -13,6 +13,7 @@ import pytest
 
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
+from pants.build_graph.address import ResolveError
 from pants.engine.addresses import Address, Addresses, AddressInput, UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
 from pants.engine.internals.graph import (
@@ -1940,3 +1941,12 @@ def test_resolve_unparsed_address_inputs() -> None:
         Address("project", target_name="t1"),
         Address("project", target_name="t2"),
     }
+    with engine_error(ResolveError, contains="from my tests"):
+        rule_runner.request(
+            Addresses,
+            [
+                UnparsedAddressInputs(
+                    ["project:fake"], owning_address=None, description_of_origin="my tests"
+                )
+            ],
+        )

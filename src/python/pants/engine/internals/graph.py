@@ -1223,6 +1223,16 @@ async def resolve_unparsed_address_inputs(
         )
         for v in request.values
     )
+    # Validate that the addresses exist. We do this eagerly here because
+    # `Addresses -> UnexpandedTargets` does not preserve the `description_of_origin`, so it would
+    # be too late, per https://github.com/pantsbuild/pants/issues/15858.
+    await MultiGet(
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(addr, description_of_origin=request.description_of_origin),
+        )
+        for addr in addresses
+    )
     return Addresses(addresses)
 
 
