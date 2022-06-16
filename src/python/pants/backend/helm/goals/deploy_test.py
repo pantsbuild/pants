@@ -98,6 +98,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         '"Foo deployment"',
         "--namespace",
         "uat",
+        "--create-namespace",
         "--skip-crds",
         "--no-hooks",
         "--values",
