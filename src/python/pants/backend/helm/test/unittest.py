@@ -20,7 +20,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
-from pants.backend.helm.util_rules.process import HelmProcess
+from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
