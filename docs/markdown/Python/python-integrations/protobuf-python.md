@@ -76,10 +76,10 @@ Pants will then automatically add these dependencies to your `protobuf_source` t
 Step 3: Generate `protobuf_sources` target
 ------------------------------------------
 
-Run [`./pants tailor ::`](doc:create-initial-build-files) for Pants to create a `protobuf_sources` target wherever you have `.proto` files:
+Run [`./pants tailor`](doc:create-initial-build-files) for Pants to create a `protobuf_sources` target wherever you have `.proto` files:
 
 ```
-$ ./pants tailor ::
+$ ./pants tailor
 Created src/protos/BUILD:
   - Add protobuf_sources target protos
 ```
@@ -141,7 +141,7 @@ Protobuf and source roots
 
 By default, generated code goes into the same [source root](doc:source-roots) as the `.proto` file from which it was generated. For example, a file `src/proto/example/f.proto` will generate `src/proto/example/f_pb2.py`. 
 
-However, this may not always be what you want. In particular, you may not want to have to add `__init__py` files under `src/proto` just so you can import Python code generated to that source root.
+However, this may not always be what you want. In particular, you may not want to have to add `__init__.py` files under `src/proto` just so you can import Python code generated to that source root.
 
 You can configure a different source root for generated code by setting the `python_source_root` field:
 
