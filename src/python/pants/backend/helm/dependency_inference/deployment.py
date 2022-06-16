@@ -18,7 +18,7 @@ from pants.backend.helm.util_rules import deployment
 from pants.backend.helm.util_rules import manifest as k8s_manifest
 from pants.backend.helm.util_rules.deployment import RenderedDeployment, RenderHelmDeploymentRequest
 from pants.backend.helm.util_rules.manifest import ImageRef, KubeManifests, ParseKubeManifests
-from pants.backend.helm.util_rules.yaml_utils import HelmManifestItems
+from pants.backend.helm.util_rules.yaml_utils import YamlElements
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
@@ -38,7 +38,7 @@ class AnalyseHelmDeploymentRequest:
 
 @dataclass(frozen=True)
 class HelmDeploymentReport:
-    image_refs: HelmManifestItems[ImageRef]
+    image_refs: YamlElements[ImageRef]
 
     @property
     def all_image_refs(self) -> FrozenOrderedSet[ImageRef]:
@@ -58,7 +58,7 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
     )
 
     return HelmDeploymentReport(
-        image_refs=HelmManifestItems(
+        image_refs=YamlElements(
             {
                 manifest.filename: {
                     container.element_path / "image": container.image
@@ -73,7 +73,7 @@ async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeplo
 
 @dataclass(frozen=True)
 class FirstPartyHelmDeploymentMappings:
-    docker_images: FrozenDict[Address, HelmManifestItems[Address]]
+    docker_images: FrozenDict[Address, YamlElements[Address]]
 
     def referenced_by(self, address: Address) -> list[Address]:
         if address not in self.docker_images:
@@ -91,18 +91,18 @@ async def first_party_helm_deployment_mappings(
         for field_set in field_sets
     )
 
-    def image_refs_to_addresses(info: HelmDeploymentReport) -> HelmManifestItems[Address]:
+    def image_refs_to_addresses(info: HelmDeploymentReport) -> YamlElements[Address]:
         """Filters the `ImageRef`s that are in fact `docker_image` addresses and returns those."""
 
-        return HelmManifestItems(
+        return YamlElements(
             {
                 filename: {
                     elem_path: tgt.address
                     for tgt in docker_targets
-                    for elem_path, ref in info.image_refs.manifest_items(filename)
+                    for elem_path, ref in info.image_refs.yaml_items(filename)
                     if str(ref) == str(tgt.address)
                 }
-                for filename in info.image_refs.manifests()
+                for filename in info.image_refs.file_paths()
             }
         )
 
@@ -111,45 +111,6 @@ async def first_party_helm_deployment_mappings(
         for fs, info in zip(field_sets, all_deployments_info)
     }
     return FirstPartyHelmDeploymentMappings(docker_images=FrozenDict(docker_images_mapping))
-
-
-# @dataclass(frozen=True)
-# class HelmDeploymentContainerMapping:
-#     containers: FrozenDict[ImageRef, Address]
-
-
-# @rule
-# async def build_helm_deployment_mapping(
-#     all_targets: AllDockerImageTargets, docker_options: DockerOptions
-# ) -> HelmDeploymentContainerMapping:
-#     docker_field_sets = [DockerFieldSet.create(tgt) for tgt in all_targets]
-#     docker_contexts = await MultiGet(
-#         Get(
-#             DockerBuildContext,
-#             DockerBuildContextRequest(
-#                 address=field_set.address,
-#                 build_upstream_images=False,
-#             ),
-#         )
-#         for field_set in docker_field_sets
-#     )
-
-#     def parse_container_ref(
-#         field_set: DockerFieldSet, context: DockerBuildContext
-#     ) -> list[ImageRef]:
-#         image_refs = field_set.image_refs(
-#             default_repository=docker_options.default_repository,
-#             registries=docker_options.registries(),
-#             interpolation_context=context.interpolation_context,
-#         )
-#         return [ImageRef.parse(ref) for ref in image_refs]
-
-#     docker_image_refs = {
-#         container_ref: field_set.address
-#         for field_set, context in zip(docker_field_sets, docker_contexts)
-#         for container_ref in parse_container_ref(field_set, context)
-#     }
-#     return HelmDeploymentContainerMapping(containers=FrozenDict(docker_image_refs))
 
 
 class InjectHelmDeploymentDependenciesRequest(InjectDependenciesRequest):
@@ -161,20 +122,6 @@ async def inject_deployment_dependencies(
     request: InjectHelmDeploymentDependenciesRequest, mapping: FirstPartyHelmDeploymentMappings
 ) -> InjectedDependencies:
     docker_images = mapping.referenced_by(request.dependencies_field.address)
-
-    # wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    # field_set = HelmDeploymentFieldSet.create(wrapped_target.target)
-    # report = await Get(HelmDeploymentReport, AnalyseHelmDeploymentRequest(field_set))
-
-    # logging.debug(
-    #     f"Target {request.dependencies_field.address} references {pluralize(len(docker_images), 'image')}."
-    # )
-
-    # found_docker_image_addresses = [
-    #     address
-    #     for container_ref, address in mapping.containers.items()
-    #     if container_ref in report.image_refs.values()
-    # ]
 
     logging.debug(
         f"Found {pluralize(len(docker_images), 'dependency')} for target {request.dependencies_field.address}"

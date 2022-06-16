@@ -13,7 +13,7 @@ from pants.backend.helm.subsystems.post_renderer import (
     PostRendererLauncherSetup,
     SetupPostRendererLauncher,
 )
-from pants.backend.helm.util_rules.yaml_utils import HelmManifestItems, YamlPath
+from pants.backend.helm.util_rules.yaml_utils import YamlElements, YamlPath
 from pants.engine.fs import DigestContents, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
@@ -37,7 +37,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_post_renderer_is_runnable(rule_runner: RuleRunner) -> None:
-    replacements = HelmManifestItems(
+    replacements = YamlElements(
         {PurePath("file.yaml"): {YamlPath.parse("/root/element"): "replaced_value"}}
     )
     expected_cfg_file = dedent(

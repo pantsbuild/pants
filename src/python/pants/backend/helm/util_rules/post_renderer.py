@@ -26,7 +26,7 @@ from pants.backend.helm.subsystems.post_renderer import (
     SetupPostRendererLauncher,
 )
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
-from pants.backend.helm.util_rules.yaml_utils import HelmManifestItems
+from pants.backend.helm.util_rules.yaml_utils import YamlElements
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets
@@ -78,14 +78,14 @@ async def prepare_post_renderer(
         addr: resolve_docker_image_ref(addr, ctx)
         for addr, ctx in zip(docker_addresses.values(), docker_contexts)
     }
-    replacements = HelmManifestItems(
+    replacements = YamlElements(
         {
             manifest: {
                 path: str(docker_addr_ref_mapping[address])
-                for path, address in docker_addresses.manifest_items(manifest)
+                for path, address in docker_addresses.yaml_items(manifest)
                 if docker_addr_ref_mapping[address]
             }
-            for manifest in docker_addresses.manifests()
+            for manifest in docker_addresses.file_paths()
         }
     )
 

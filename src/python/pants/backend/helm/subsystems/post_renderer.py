@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
 
-from pants.backend.helm.util_rules.yaml_utils import HelmManifestItems
+from pants.backend.helm.util_rules.yaml_utils import YamlElements
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
@@ -104,7 +104,7 @@ _HELM_POST_RENDERER_WRAPPER_SCRIPT = "post_renderer_wrapper.sh"
 
 @dataclass(frozen=True)
 class SetupPostRendererLauncher:
-    replacements: HelmManifestItems[str]
+    replacements: YamlElements[str]
 
 
 @dataclass(frozen=True)
@@ -123,9 +123,9 @@ async def setup_post_renderer_launcher(
     cat_binary: CatBinary,
 ) -> PostRendererLauncherSetup:
     post_renderer_config = "---\n"
-    for manifest in request.replacements.manifests():
+    for manifest in request.replacements.file_paths():
         post_renderer_config += f'"{manifest}":\n'
-        for path, replacement in request.replacements.manifest_items(manifest):
+        for path, replacement in request.replacements.yaml_items(manifest):
             post_renderer_config += f'  "{path}": "{replacement}"\n'
 
     post_renderer_cfg_digest = await Get(

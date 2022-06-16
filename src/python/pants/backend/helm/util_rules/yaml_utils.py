@@ -75,7 +75,7 @@ T = TypeVar("T")
 
 @dataclass(unsafe_hash=True)
 @frozen_after_init
-class HelmManifestItems(Generic[T]):
+class YamlElements(Generic[T]):
     _data: FrozenDict[PurePath, FrozenDict[YamlPath, T]]
 
     def __init__(self, data: Mapping[PurePath, Mapping[YamlPath, T]] = {}) -> None:
@@ -88,11 +88,11 @@ class HelmManifestItems(Generic[T]):
             for path, value in path_mapping.items():
                 yield filename, path, value
 
-    def manifests(self) -> Iterable[PurePath]:
+    def file_paths(self) -> Iterable[PurePath]:
         return self._data.keys()
 
-    def manifest_items(self, manifest: PurePath) -> Iterable[tuple[YamlPath, T]]:
-        return self._data.get(manifest, {}).items()
+    def yaml_items(self, path: PurePath) -> Iterable[tuple[YamlPath, T]]:
+        return self._data.get(path, {}).items()
 
     def values(self) -> Iterator[T]:
         for _, _, value in self.items():
