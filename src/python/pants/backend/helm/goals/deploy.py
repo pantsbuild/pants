@@ -183,8 +183,6 @@ async def prepare_post_renderer(
         }
     )
 
-    return await Get(PostRendererLauncherSetup, SetupPostRendererLauncher(replacements))
-
 
 def _cleanup_passthrough_args(args: Iterable[str]) -> tuple[list[str], list[str]]:
     valid_args: list[str] = []
