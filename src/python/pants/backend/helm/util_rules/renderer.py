@@ -174,6 +174,7 @@ async def setup_render_helm_deployment_process(
                 if request.field_set.namespace.value
                 else ()
             ),
+            *(("--create-namespace",) if request.field_set.create_namespace.value else ()),
             *(("--skip-crds",) if request.field_set.skip_crds.value else ()),
             *(("--no-hooks",) if request.field_set.no_hooks.value else ()),
             *(("--values", ",".join(sorted_value_files)) if sorted_value_files else ()),

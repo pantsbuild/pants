@@ -98,6 +98,7 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         '"Foo deployment"',
         "--namespace",
         "uat",
+        "--create-namespace",
         "--skip-crds",
         "--no-hooks",
         "--values",
@@ -107,7 +108,6 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--post-renderer",
         "./post_renderer_wrapper.sh",
         "--install",
-        "--create-namespace",
         "--kubeconfig",
         "./kubeconfig",
     )
