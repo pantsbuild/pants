@@ -286,8 +286,11 @@ impl Core {
     executor: &Executor,
     process_execution_metadata: &ProcessMetadata,
     root_ca_certs: &Option<Vec<u8>>,
-    exec_strategy_opts: &ExecutionStrategyOptions,
+    _exec_strategy_opts: &ExecutionStrategyOptions,
     remoting_opts: &RemotingOptions,
+    remote_cache_read: bool,
+    remote_cache_write: bool,
+    eager_fetch: bool,
   ) -> Result<Arc<dyn CommandRunner>, String> {
     Ok(Arc::new(remote_cache::CommandRunner::new(
       inner_runner,
@@ -298,10 +301,10 @@ impl Core {
       root_ca_certs.clone(),
       remoting_opts.store_headers.clone(),
       Platform::current()?,
-      exec_strategy_opts.remote_cache_read,
-      exec_strategy_opts.remote_cache_write,
+      remote_cache_read,
+      remote_cache_write,
       remoting_opts.cache_warnings_behavior,
-      remoting_opts.cache_eager_fetch,
+      eager_fetch,
       remoting_opts.cache_rpc_concurrency,
       remoting_opts.cache_read_timeout,
     )?))
@@ -334,34 +337,49 @@ impl Core {
       capabilities_cell_opt,
     )?;
 
-    let maybe_remote_cached_runner =
-      if exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write {
-        Some(Self::make_remote_cached_runner(
-          leaf_runner.clone(),
-          full_store,
-          &remoting_opts.store_address,
-          executor,
-          process_execution_metadata,
-          root_ca_certs,
-          exec_strategy_opts,
-          remoting_opts,
-        )?)
-      } else {
-        None
-      };
-
-    let maybe_local_cached_runner = if exec_strategy_opts.local_cache {
-      Some(Self::make_local_cached_runner(
-        maybe_remote_cached_runner
-          .clone()
-          .unwrap_or_else(|| leaf_runner.clone()),
+    // TODO: Until we can deprecate letting the flag default, we implicitly disable
+    // eager_fetch when remote execution is in use.
+    let eager_fetch = remoting_opts.cache_eager_fetch && !remoting_opts.execution_enable;
+    // TODO: Until we can deprecate letting remote-cache-{read,write} default, we implicitly
+    // enable them when remote execution is in use.
+    let remote_cache_read = exec_strategy_opts.remote_cache_read || remoting_opts.execution_enable;
+    let remote_cache_write =
+      exec_strategy_opts.remote_cache_write || remoting_opts.execution_enable;
+    let maybe_remote_cached_runner = if remote_cache_read || remote_cache_write {
+      Some(Self::make_remote_cached_runner(
+        leaf_runner.clone(),
         full_store,
-        local_cache,
+        &remoting_opts.store_address,
+        executor,
         process_execution_metadata,
-      ))
+        root_ca_certs,
+        exec_strategy_opts,
+        remoting_opts,
+        remote_cache_read,
+        remote_cache_write,
+        eager_fetch,
+      )?)
     } else {
       None
     };
+
+    // TODO: The local cache eagerly fetches outputs independent of the `eager_fetch` flag. Once
+    // `eager_fetch` backtracks via https://github.com/pantsbuild/pants/issues/11331, the local
+    // cache will be able to obey `eager_fetch` as well, and can efficiently be used with remote
+    // execution.
+    let maybe_local_cached_runner =
+      if exec_strategy_opts.local_cache && !remoting_opts.execution_enable {
+        Some(Self::make_local_cached_runner(
+          maybe_remote_cached_runner
+            .clone()
+            .unwrap_or_else(|| leaf_runner.clone()),
+          full_store,
+          local_cache,
+          process_execution_metadata,
+        ))
+      } else {
+        None
+      };
 
     Ok(
       vec![
