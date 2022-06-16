@@ -6,21 +6,17 @@ hidden: false
 createdAt: "2020-09-28T23:03:33.586Z"
 updatedAt: "2022-03-12T22:33:31.603Z"
 ---
-[block:api-header]
-{
-  "title": "Recommended steps"
-}
-[/block]
+Recommended steps
+-----------------
+
 If you have an existing repository, we recommend incrementally adopting to reduce the surface area of change, which reduces risk.
 
 Incremental adoption also allows you to immediately start benefitting from Pants, then deepen adoption at your own pace, instead of postponing benefit until you are ready to make dramatic change all at once.
-[block:callout]
-{
-  "type": "info",
-  "body": "We would love to help you with adopting Pants. Please reach out through [Slack](doc:getting-help).",
-  "title": "Joining Slack"
-}
-[/block]
+
+> 📘 Joining Slack
+> 
+> We would love to help you with adopting Pants. Please reach out through [Slack](doc:getting-help).
+
 ### 1. A basic `pants.toml`
 
 Follow the [Getting Started](doc:getting-started) guide to install Pants and [set up an initial `pants.toml`](doc:initial-configuration). Validate that running `./pants count-loc ::` works properly. If you want to exclude a specific folder at first, you can use the [`pants_ignore`](https://www.pantsbuild.org/docs/reference-global#section-pants-ignore) option.
@@ -43,21 +39,24 @@ Pants's [dependency inference](doc:targets) will infer most dependencies for you
 
 Try running `./pants test ::` to see if any tests fail. Sometimes, your tests will fail with Pants even if they pass with your normal setup because tests are more isolated than when running Pytest/unittest directly:
 
-* Tests run in a sandbox, meaning they can only access dependencies that Pants knows about. If you have a missing file or missing import, run `./pants dependencies path/to/my_test.py` and `./pants dependencies --transitive path/to/my_test.py` to confirm what you are expecting is known by Pants. If not, see [Troubleshooting / common issues](doc:troubleshooting) for reasons dependency inference can fail.
-* Test files are isolated from each other. If your tests depended on running in a certain order, they may now fail. This requires rewriting your tests to remove the shared global state.
+- Tests run in a sandbox, meaning they can only access dependencies that Pants knows about. If you have a missing file or missing import, run `./pants dependencies path/to/my_test.py` and `./pants dependencies --transitive path/to/my_test.py` to confirm what you are expecting is known by Pants. If not, see [Troubleshooting / common issues](doc:troubleshooting) for reasons dependency inference can fail.
+- Test files are isolated from each other. If your tests depended on running in a certain order, they may now fail. This requires rewriting your tests to remove the shared global state.
 
 You can port your tests incrementally with the `skip_tests` field:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "python_tests(\n    name=\"tests\",\n    # Skip all tests in this folder.\n    skip_tests=True,\n    # Or, use `overrides` to only skip some test files.\n    overrides={\n        \"dirutil_test.py\": {\"skip_tests\": True},\n        (\"osutil_test.py\", \"strutil.py\"): {\"skip_tests\": True},\n    },\n)",
-      "language": "python",
-      "name": "project/BUILD"
-    }
-  ]
-}
-[/block]
+
+```python project/BUILD
+python_tests(
+    name="tests",
+    # Skip all tests in this folder.
+    skip_tests=True,
+    # Or, use `overrides` to only skip some test files.
+    overrides={
+        "dirutil_test.py": {"skip_tests": True},
+        ("osutil_test.py", "strutil.py"): {"skip_tests": True},
+    },
+)
+```
+
 `./pants test ::` will only run the relevant tests. You can combine this with [`./pants peek`](doc:project-introspection) to get a list of test files that should be run with your original test runner:
 
 ```
@@ -82,40 +81,31 @@ Check out [Plugins Overview](doc:plugins-overview). We'd also love to help in th
 
 Some example plugins that users have written:
 
-* Cython support
-* Building a Docker image with packages built via `./pants package`
-* Custom `setup.py` logic to compute the `version` dynamically
-* Jupyter support
-[block:api-header]
-{
-  "title": "Migrating from other BUILD tools? Set custom BUILD file names"
-}
-[/block]
+- Cython support
+- Building a Docker image with packages built via `./pants package`
+- Custom `setup.py` logic to compute the `version` dynamically
+- Jupyter support
+
+Migrating from other BUILD tools? Set custom BUILD file names
+-------------------------------------------------------------
+
 If you're migrating from another system that already uses the name `BUILD`, such as Bazel or Please, you have a few ways to avoid conflicts:
 
 First, by default Pants recognizes `BUILD.extension` for any `extension` as a valid BUILD file. So you can use a name like `BUILD.pants` without changing configuration.
 
 Second, you can [configure](doc:reference-global#section-build-patterns) Pants to use a different set of file names entirely:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[GLOBAL]\nbuild_patterns = [\"PANTSBUILD\", \"PANTSBUILD.*\"]\n\n[tailor]\nbuild_file_name = \"PANTSBUILD\"",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```toml pants.toml
+[GLOBAL]
+build_patterns = ["PANTSBUILD", "PANTSBUILD.*"]
+
+[tailor]
+build_file_name = "PANTSBUILD"
+```
+
 And finally you can configure Pants to not look for BUILD files in certain locations. This can be helpful, for example, if you use Pants for some languages and another tool for other languages:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[GLOBAL]\nbuild_ignore = [\"src/cpp\"]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```toml pants.toml
+[GLOBAL]
+build_ignore = ["src/cpp"]
+```

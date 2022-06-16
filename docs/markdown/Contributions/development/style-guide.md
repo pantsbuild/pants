@@ -6,30 +6,47 @@ hidden: false
 createdAt: "2020-05-17T04:29:11.796Z"
 updatedAt: "2022-04-26T23:57:26.701Z"
 ---
-[block:api-header]
-{
-  "title": "Reminder: running the autoformatters and linters"
-}
-[/block]
+Reminder: running the autoformatters and linters
+------------------------------------------------
+
 Most of Pants' style is enforced via Black, isort, Docformatter, Flake8, and MyPy. Run these commands frequently when developing:
 
 ```bash
 $ ./pants --changed-since=HEAD fmt
 $ build-support/githooks/pre-commit
 ```
-[block:callout]
-{
-  "type": "info",
-  "title": "Tip: improving Black's formatting by wrapping in `()`",
-  "body": "Sometimes, Black will split code over multiple lines awkwardly. For example:\n\n```python\nStrOption(\n    \"--pants-bin-name\",\n    default=\"./pants\",\n    help=\"The name of the script or binary used to invoke pants. \"\n    \"Useful when printing help messages.\",\n)\n```\n\nOften, you can improve Black's formatting by wrapping the expression in parentheses, then rerunning `fmt`:\n\n```python\nStrOption(\n    \"--pants-bin-name\",\n    default=\"./pants\",\n    help=(\n        \"The name of the script or binary used to invoke pants. \"\n        \"Useful when printing help messages.\"\n    ),\n)\n```\n\nThis is not mandatory, only encouraged."
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "Comments"
-}
-[/block]
+> 📘 Tip: improving Black's formatting by wrapping in `()`
+> 
+> Sometimes, Black will split code over multiple lines awkwardly. For example:
+> 
+> ```python
+> StrOption(
+>     "--pants-bin-name",
+>     default="./pants",
+>     help="The name of the script or binary used to invoke pants. "
+>     "Useful when printing help messages.",
+> )
+> ```
+> 
+> Often, you can improve Black's formatting by wrapping the expression in parentheses, then rerunning `fmt`:
+> 
+> ```python
+> StrOption(
+>     "--pants-bin-name",
+>     default="./pants",
+>     help=(
+>         "The name of the script or binary used to invoke pants. "
+>         "Useful when printing help messages."
+>     ),
+> )
+> ```
+> 
+> This is not mandatory, only encouraged.
+
+Comments
+--------
+
 ### Style
 
 Comments must have a space after the starting `#`. All comments should be complete sentences and should end with a period.
@@ -55,6 +72,7 @@ We strive for self-documenting code. Often, a comment can be better expressed by
 Further, there is no need to document how typical Python constructs behave, including how type hints work. 
 
 Bad:
+
 ```
 # Loop 10 times.
 for _ in range(10):
@@ -79,6 +97,7 @@ def __hash__(self):
 class OrderedSet:
     ...
 ```
+
 ### TODOs
 
 When creating a TODO, first [create an issue](https://github.com/pantsbuild/pants/issues/new) in GitHub. Then, link to the issue # in parantheses and add a brief description.
@@ -88,12 +107,12 @@ For example:
 ```python
 # TODO(#5427): Remove this block once we can get rid of the `globs` feature.
 ```
-[block:api-header]
-{
-  "title": "Strings"
-}
-[/block]
+
+Strings
+-------
+
 ### Use `f-strings`
+
 Use f-strings instead of `.format()` and `%`.
 
 ```python
@@ -104,11 +123,10 @@ f"Hello {name}!"
 "Hello {}".format(name)
 "Hello %s" % name
 ```
-[block:api-header]
-{
-  "title": "Conditionals"
-}
-[/block]
+
+Conditionals
+------------
+
 ### Prefer conditional expressions (ternary expressions)
 
 Similar to most languages' ternary expressions using `?`, Python has [conditional expressions](https://stackoverflow.com/a/394814). Prefer these to explicit `if else` statements because we generally prefer expressions to statements and they often better express the intent of assigning one of two values based on some predicate.
@@ -146,11 +164,10 @@ def safe_divide(dividend: int, divisor: int) -> Optional[int]:
 ```
 
 Why prefer this? It reduces nesting and reduces the cognitive load of readers. See [here](https://medium.com/@scadge/if-statements-design-guard-clauses-might-be-all-you-need-67219a1a981a) for more explanation.
-[block:api-header]
-{
-  "title": "Collections"
-}
-[/block]
+
+Collections
+-----------
+
 ### Use collection literals
 
 Collection literals are easier to read and have better performance.
@@ -177,7 +194,7 @@ a_dict = dict(k=v)
 
 Python has several ways to merge iterables (e.g. sets, tuples, and lists): using `+` or `|`, using mutation like `extend()`, and using unpacking with the `*` character. Prefer unpacking because it makes it easier to merge collections with individual elements; it is formatted better by Black; and allows merging different iterable types together, like merging a list and tuple together.
 
-For dictionaries, the only two ways to merge are using mutation like `.update()` or using `**` unpacking (we cannot use PEP 584's `|` operator yet because we need to support < Python 3.9.). Prefer merging with `**` for the same reasons as iterables, in addition to us preferring expressions to mutation.
+For dictionaries, the only two ways to merge are using mutation like `.update()` or using `**` unpacking (we cannot use PEP 584's `|` operator yet because we need to support \< Python 3.9.). Prefer merging with `**` for the same reasons as iterables, in addition to us preferring expressions to mutation.
 
 ```python
 # Preferred
@@ -196,7 +213,7 @@ new_dict["key"] = "value"
 
 ### Prefer comprehensions
 
-[Comprehensions](https://python-3-patterns-idioms-test.readthedocs.io/en/latest/Comprehensions.html) should generally be preferred to explicit loops and `map`/`filter` when creating a new collection. (See https://www.youtube.com/watch?v=ei71YpmfRX4 for a deep dive on comprehensions.)
+[Comprehensions](https://python-3-patterns-idioms-test.readthedocs.io/en/latest/Comprehensions.html) should generally be preferred to explicit loops and `map`/`filter` when creating a new collection. (See <https://www.youtube.com/watch?v=ei71YpmfRX4> for a deep dive on comprehensions.)
 
 Why avoid `map`/`filter`? Normally, these are fantastic constructs and you'll find them abundantly in the [Rust codebase](doc:contributions-rust). They are awkward in Python, however, due to poor support for lambdas and because you would typically need to wrap the expression in a call to `list()` or `tuple()` to convert it from a generator expression to a concrete collection.
 
@@ -219,11 +236,10 @@ There are some exceptions, including, but not limited to:
 - If mutations are involved, use a `for` loop.
 - If constructing multiple collections by iterating over the same original collection, use a `for` loop for performance.
 - If the comprehension gets too complex, a `for` loop may be appropriate. Although, first consider refactoring with a helper function.
-[block:api-header]
-{
-  "title": "Classes"
-}
-[/block]
+
+Classes
+-------
+
 ### Prefer dataclasses
 
 We prefer [dataclasses](https://realpython.com/python-data-classes/) because they are declarative, integrate nicely with MyPy, and generate sensible defaults, such as a sensible `repr` method.
@@ -246,7 +262,7 @@ class Example:
 
 Dataclasses should be marked with `frozen=True`.
 
-If you want to validate the input, use `__post_init__`:
+If you want to validate the input, use `**post_init**`:
 
 ```python
 @dataclass(frozen=True)
@@ -277,11 +293,10 @@ class Example:
     def __init__(self, values: Iterable[str]) -> None:
         self.values = tuple(values)
 ```
-[block:api-header]
-{
-  "title": "Type hints"
-}
-[/block]
+
+Type hints
+----------
+
 Refer to [MyPy documentation](https://mypy.readthedocs.io/en/stable/introduction.html) for an explanation of type hints, including some advanced features you may encounter in our codebase like `Protocol` and `@overload`.
 
 ### Annotate all new code
@@ -299,13 +314,13 @@ def test_demo():
 ```
 
 Precisely, all function definitions should have annotations for their parameters and their return type. MyPy will then tell you which other lines need annotations.
-[block:callout]
-{
-  "type": "info",
-  "title": "Interacting with legacy code? Consider adding type hints.",
-  "body": "Pants did not widely use type hints until the end of 2019. So, a substantial portion of the codebase is still untyped.\n\nIf you are working with legacy code, it is often valuable to start by adding type hints. This will both help you to understand that code and to improve the quality of the codebase. Land those type hints as a precursor to your main PR."
-}
-[/block]
+
+> 📘 Interacting with legacy code? Consider adding type hints.
+> 
+> Pants did not widely use type hints until the end of 2019. So, a substantial portion of the codebase is still untyped.
+> 
+> If you are working with legacy code, it is often valuable to start by adding type hints. This will both help you to understand that code and to improve the quality of the codebase. Land those type hints as a precursor to your main PR.
+
 ### Prefer `cast()` to override annotations
 
 MyPy will complain when it cannot infer the types of certain lines. You must then either fix the underlying API that MyPy does not understand or explicitly provide an annotation at the call site. 
@@ -379,11 +394,10 @@ merge_constraints([constraint for constraint in all_constraints if constraint.st
 ```
 
 The return type, however, should usually be as precise as possible so that call sites have better type inference.
-[block:api-header]
-{
-  "title": "Tests"
-}
-[/block]
+
+Tests
+-----
+
 ### Use Pytest-style instead of `unittest`
 
 ```python
