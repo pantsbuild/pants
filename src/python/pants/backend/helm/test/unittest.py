@@ -20,6 +20,7 @@ from pants.backend.helm.target_types import (
 )
 from pants.backend.helm.util_rules import process as helm_process
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
+from pants.backend.helm.util_rules.process import HelmProcess
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
@@ -27,15 +28,13 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
-from pants.backend.helm.util_rules.process import HelmProcess
 from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
-from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
     SourcesField,
