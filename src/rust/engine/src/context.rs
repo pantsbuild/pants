@@ -266,12 +266,14 @@ impl Core {
     inner_runner: Arc<dyn CommandRunner>,
     full_store: &Store,
     local_cache: &PersistentCache,
+    eager_fetch: bool,
     process_execution_metadata: &ProcessMetadata,
   ) -> Arc<dyn CommandRunner> {
     Arc::new(process_execution::cache::CommandRunner::new(
       inner_runner,
       local_cache.clone(),
       full_store.clone(),
+      eager_fetch,
       process_execution_metadata.clone(),
     ))
   }
@@ -363,23 +365,19 @@ impl Core {
       None
     };
 
-    // TODO: The local cache eagerly fetches outputs independent of the `eager_fetch` flag. Once
-    // `eager_fetch` backtracks via https://github.com/pantsbuild/pants/issues/11331, the local
-    // cache will be able to obey `eager_fetch` as well, and can efficiently be used with remote
-    // execution.
-    let maybe_local_cached_runner =
-      if exec_strategy_opts.local_cache && !remoting_opts.execution_enable {
-        Some(Self::make_local_cached_runner(
-          maybe_remote_cached_runner
-            .clone()
-            .unwrap_or_else(|| leaf_runner.clone()),
-          full_store,
-          local_cache,
-          process_execution_metadata,
-        ))
-      } else {
-        None
-      };
+    let maybe_local_cached_runner = if exec_strategy_opts.local_cache {
+      Some(Self::make_local_cached_runner(
+        maybe_remote_cached_runner
+          .clone()
+          .unwrap_or_else(|| leaf_runner.clone()),
+        full_store,
+        local_cache,
+        remoting_opts.cache_eager_fetch,
+        process_execution_metadata,
+      ))
+    } else {
+      None
+    };
 
     Ok(
       vec![

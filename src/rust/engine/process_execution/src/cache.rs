@@ -33,6 +33,7 @@ pub struct CommandRunner {
   inner: Arc<dyn crate::CommandRunner>,
   cache: PersistentCache,
   file_store: Store,
+  eager_fetch: bool,
   metadata: ProcessMetadata,
 }
 
@@ -41,12 +42,14 @@ impl CommandRunner {
     inner: Arc<dyn crate::CommandRunner>,
     cache: PersistentCache,
     file_store: Store,
+    eager_fetch: bool,
     metadata: ProcessMetadata,
   ) -> CommandRunner {
     CommandRunner {
       inner,
       cache,
       file_store,
+      eager_fetch,
       metadata,
     }
   }
@@ -196,23 +199,26 @@ impl CommandRunner {
       return Ok(None);
     };
 
-    // Ensure that all digests in the result are loadable, erroring if any are not.
-    // TODO: Make conditional on `eager_fetch`, since backtracking makes this unnecessary as well.
-    let _ = future::try_join_all(vec![
-      self
-        .file_store
-        .ensure_local_has_file(result.stdout_digest)
-        .boxed(),
-      self
-        .file_store
-        .ensure_local_has_file(result.stderr_digest)
-        .boxed(),
-      self
-        .file_store
-        .ensure_local_has_recursive_directory(result.output_directory.clone())
-        .boxed(),
-    ])
-    .await?;
+    // If eager_fetch is enabled, ensure that all digests in the result are loadable, erroring
+    // if any are not. If eager_fetch is disabled, a Digest which is discovered to be missing later
+    // on during execution will cause backtracking.
+    if self.eager_fetch {
+      let _ = future::try_join_all(vec![
+        self
+          .file_store
+          .ensure_local_has_file(result.stdout_digest)
+          .boxed(),
+        self
+          .file_store
+          .ensure_local_has_file(result.stderr_digest)
+          .boxed(),
+        self
+          .file_store
+          .ensure_local_has_recursive_directory(result.output_directory.clone())
+          .boxed(),
+      ])
+      .await?;
+    }
 
     Ok(Some(result))
   }
