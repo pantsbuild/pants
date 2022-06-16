@@ -40,10 +40,10 @@ python_sources(name="lib")
 python_tests(name="tests")
 ```
 
-You can generate these targets by running [`./pants tailor ::`](doc:create-initial-build-files).
+You can generate these targets by running [`./pants tailor`](doc:create-initial-build-files).
 
 ```
-❯ ./pants tailor ::
+❯ ./pants tailor
 Created project/BUILD:
   - Add python_sources target project
   - Add python_tests target tests

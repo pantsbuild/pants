@@ -44,10 +44,10 @@ backend_packages = [
 ]
 ```
 
-Then, run [`./pants tailor ::`](doc:create-initial-build-files) to generate BUILD files:
+Then, run [`./pants tailor`](doc:create-initial-build-files) to generate BUILD files:
 
 ```
-$ ./pants tailor ::
+$ ./pants tailor
 Created scripts/BUILD:
   - Add shell_sources target scripts
 Created scripts/subdir/BUILD:
