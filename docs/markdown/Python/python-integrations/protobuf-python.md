@@ -130,18 +130,18 @@ from project.example.f_pb2_grcp import GreeterServicer
 > 
 > You do not need to run this goal for codegen to work when using Pants; `export-codegen` is only for external consumption outside of Pants.
 
-> 🚧 You likely need to add empty `**init**.py` files
+> 🚧 You likely need to add empty `__init__.py` files
 > 
-> By default, Pants will generate the Python files in the same directory as the `.proto` file. To get Python imports working properly, you will likely need to add an empty `**init**.py` in the same location, and possibly in ancestor directories.
+> By default, Pants will generate the Python files in the same directory as the `.proto` file. To get Python imports working properly, you will likely need to add an empty `__init__.py` in the same location, and possibly in ancestor directories.
 > 
-> See the below section "Protobuf and source roots" for how to generate into a different directory. If you use this option, you will still likely need an empty `**init**.py` file in the destination directory.
+> See the below section "Protobuf and source roots" for how to generate into a different directory. If you use this option, you will still likely need an empty `__init__.py` file in the destination directory.
 
 Protobuf and source roots
 -------------------------
 
 By default, generated code goes into the same [source root](doc:source-roots) as the `.proto` file from which it was generated. For example, a file `src/proto/example/f.proto` will generate `src/proto/example/f_pb2.py`. 
 
-However, this may not always be what you want. In particular, you may not want to have to add `**init**py` files under `src/proto` just so you can import Python code generated to that source root.
+However, this may not always be what you want. In particular, you may not want to have to add `__init__py` files under `src/proto` just so you can import Python code generated to that source root.
 
 You can configure a different source root for generated code by setting the `python_source_root` field:
 

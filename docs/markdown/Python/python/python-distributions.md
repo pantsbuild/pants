@@ -112,7 +112,7 @@ python_distribution(
     dependencies=[
         # Dependencies on code to be packaged into the distribution.
     ],
-		provides=python_artifact(
+	provides=python_artifact(
         name="mydist",
         version="2.21.0",
         description="An example distribution built with Pants.",

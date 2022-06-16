@@ -426,7 +426,7 @@ Coverage will report data on any files encountered during the tests. You can fil
 > global_report = true
 > ```
 > 
-> In this case, Coverage will report on [all files it considers importable](https://coverage.readthedocs.io/en/6.3.2/source.html), i.e. files at the root of the tree, or in directories with a `**init**.py` file, possibly omitting files in [implicit namespace packages](https://peps.python.org/pep-0420/) that lack `**init**.py` files. This is a shortcoming of Coverage itself.
+> In this case, Coverage will report on [all files it considers importable](https://coverage.readthedocs.io/en/6.3.2/source.html), i.e. files at the root of the tree, or in directories with a `__init__.py` file, possibly omitting files in [implicit namespace packages](https://peps.python.org/pep-0420/) that lack `__init__.py` files. This is a shortcoming of Coverage itself.
 
 Pants will default to writing the results to the console, but you can also output in HTML, XML, JSON, or the raw SQLite file:
 

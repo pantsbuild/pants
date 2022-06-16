@@ -158,7 +158,7 @@ Change `src/python/pants/VERSION` to the new release, e.g. `2.12.0.dev0`. If you
 
 ### 4. Post the prep to GitHub
 
-Open a pull request on GitHub to merge into `main`. Post the PR to the  in Slack.  
+Open a pull request on GitHub to merge into `main`. Post the PR to the `#development` in Slack.  
 
 Merge once approved and green.
 
@@ -210,7 +210,7 @@ Also, update the [Changelog](doc:changelog)'s "highlights" column with a link to
 
 > 🚧 Don't have edit access?
 > 
-> Ping someone in the  in Slack to be added. Alternatively, you can "Suggest edits" in the top right corner.
+> Ping someone in the `#maintainers-confidential` channel in Slack to be added. Alternatively, you can "Suggest edits" in the top right corner.
 
 Step 3: Wait for CI to build the wheels
 ---------------------------------------
@@ -261,7 +261,7 @@ Step 6: Announce the change
 Announce the release to:
 
 1. the [pants-devel](https://groups.google.com/forum/#!forum/pants-devel) list
-2. the  in Slack
+2. the `#announce` channel in Slack
 
 ### Sample emails for `pants-devel`
 
@@ -285,12 +285,10 @@ If the release series' `.dev0` has already been released, reply to that email th
 >
 > Thank you to this week's contributors:
 >
-> ```
 >  Eustolia Palledino
 >  Ahmad Wensel
 >  Rae Efird
 >  Niki Fitch
-> ```
 >
 > And a special shout-out to first-time contributor Niki Fitch, with the PR [`Upgrade Rust to 1.63 (#9441)`](https://github.com/pantsbuild/pants/pull/9441). Thank you for your contribution!
 >
@@ -308,10 +306,8 @@ Reply to the email thread for the series' `dev` releases.
 >
 > Thank you to everyone who contributed patches in this cycle!
 >
-> ```
 >  Niki Fitch
 >  Mario Rozell
-> ```
 >
 > _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/docs/release-strategy) page.)_
 
@@ -325,10 +321,8 @@ Create a new email thread for `rc0`. For other `rc`s, reply to the email thread 
 >
 > Thank you to everyone who tested the previous release, and thank you to the folks who contributed patches!
 >
-> ```
 >  Niki Fitch
 >  Mario Rozell
-> ```
 >
 > _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/v2.11/docs/release-strategy) page.)_
 
@@ -344,12 +338,10 @@ For the first stable release in the series, first, write a blog post to summariz
 >
 > Thanks to all of the contributors to the 2.9 series!
 >
-> ```
 > Eustolia Palledino
 > Ahmad Wensel
 > Rae Efird
 > Niki Fitch
 > Mario Rozell
-> ```
 >
 > _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/docs/release-strategy) page.)_

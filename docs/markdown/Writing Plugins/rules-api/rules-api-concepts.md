@@ -182,7 +182,7 @@ async def compute_fibonacci(n: int) -> Fibonacci:
 Valid types
 -----------
 
-Types used as inputs to `Get`s or `Query`s must be hashable, and therefore should be immutable. Specifically, the type must have implemented `**hash**()` and `**eq**()`. While the engine will not validate that your type is immutable, you should be careful to ensure this so that the cache works properly.
+Types used as inputs to `Get`s or `Query`s must be hashable, and therefore should be immutable. Specifically, the type must have implemented `__hash__()` and `__eq__()`. While the engine will not validate that your type is immutable, you should be careful to ensure this so that the cache works properly.
 
 Because you should use immutable types, use these collection types:
 
@@ -206,7 +206,7 @@ Python 3's [dataclasses](https://docs.python.org/3/library/dataclasses.html) wor
 
 You do not need to use dataclasses. You can use alternatives like `attrs` or normal Python classes. However, dataclasses are a nice default.
 
-You should set `@dataclass(frozen=True)` for Python to autogenerate `**hash**()` and to ensure that the type is immutable.
+You should set `@dataclass(frozen=True)` for Python to autogenerate `__hash__()` and to ensure that the type is immutable.
 
 ```python
 from __future__ import annotations
@@ -225,13 +225,13 @@ async def demo(name: Name) -> Foo:
 
 > 🚧 Don't use `NamedTuple`
 > 
-> `NamedTuple` behaves similarly to dataclasses, but it should not be used because the `**eq**()` implementation uses structural equality, rather than the nominal equality used by the engine.
+> `NamedTuple` behaves similarly to dataclasses, but it should not be used because the `__eq__()` implementation uses structural equality, rather than the nominal equality used by the engine.
 
-> 📘 Custom dataclass `**init**()`
+> 📘 Custom dataclass `__init__()`
 > 
-> Sometimes, you may want to have a custom `**init**()` constructor. For example, you may want your dataclass to store a `tuple[str, ...]`, but for your constructor to take the more flexible `Iterable[str]` which you then convert to an immutable tuple sequence.
+> Sometimes, you may want to have a custom `__init__()` constructor. For example, you may want your dataclass to store a `tuple[str, ...]`, but for your constructor to take the more flexible `Iterable[str]` which you then convert to an immutable tuple sequence.
 > 
-> Normally, `@dataclass(frozen=True)` will not allow you to have a custom `**init**()`. But, if you do not set `frozen=True`, then your dataclass would be mutable, which is dangerous with the engine.  
+> Normally, `@dataclass(frozen=True)` will not allow you to have a custom `__init__()`. But, if you do not set `frozen=True`, then your dataclass would be mutable, which is dangerous with the engine.  
 > 
 > Instead, we added a decorator called `@frozen_after_init`, which can be combined with `@dataclass(unsafe_hash=True)`.
 > 

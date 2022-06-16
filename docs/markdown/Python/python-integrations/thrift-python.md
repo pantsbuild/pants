@@ -85,7 +85,7 @@ Step 4: Confirm Python imports are working
 
 Now, you can import the generated Python modules in your Python code.
 
-For each Thrift file, the compiler will generate at least three files `**init**.py`, `ttypes.py`, and `constants.py`. The location of those files—and corresponding imports—depends on whether you set `namespace py` in your `.thrift` file:
+For each Thrift file, the compiler will generate at least three files `__init__.py`, `ttypes.py`, and `constants.py`. The location of those files—and corresponding imports—depends on whether you set `namespace py` in your `.thrift` file:
 
 [block:parameters]
 {
@@ -95,10 +95,10 @@ For each Thrift file, the compiler will generate at least three files `**init**.
     "h-2": "Example",
     "0-0": "unset",
     "0-1": "Files generated as top-level modules, without any prefix directories.",
-    "0-2": "`models/user.thrift`  \n  \nGenerated:  \n  \n- `**init**.py`\n- `user/**init**.py`\n- `user/constants.py`\n- `user/ttypes.py`Python import:  \n`import user.ttypes`",
+    "0-2": "`models/user.thrift`  \n  \nGenerated:  \n  \n- `__init__.py`\n- `user/__init__.py`\n- `user/constants.py`\n- `user/ttypes.py`Python import:  \n`import user.ttypes`",
     "1-0": "set",
     "1-1": "Files generated into the namespace.",
-    "1-2": "`models/user.thrift`, with `namespace py custom_namespace.user`  \n  \nGenerated:  \n  \n- `**init**.py`\n- `custom_namespace/**init**.py`\n- `custom_namespace/user/**init**.py`\n- `custom_namespace/user/constants.py`\n- `custom_namespace/user/ttypes.py`Python import:  \n`import custom_namespace.user.ttypes`"
+    "1-2": "`models/user.thrift`, with `namespace py custom_namespace.user`  \n  \nGenerated:  \n  \n- `__init__.py`\n- `custom_namespace/__init__.py`\n- `custom_namespace/user/__init__.py`\n- `custom_namespace/user/constants.py`\n- `custom_namespace/user/ttypes.py`Python import:  \n`import custom_namespace.user.ttypes`"
   },
   "cols": 3,
   "rows": 2,

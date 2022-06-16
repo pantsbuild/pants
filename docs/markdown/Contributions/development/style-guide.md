@@ -262,7 +262,7 @@ class Example:
 
 Dataclasses should be marked with `frozen=True`.
 
-If you want to validate the input, use `**post_init**`:
+If you want to validate the input, use `__post_init__`:
 
 ```python
 @dataclass(frozen=True)
