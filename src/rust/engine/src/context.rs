@@ -350,18 +350,23 @@ impl Core {
         None
       };
 
-    let maybe_local_cached_runner = if exec_strategy_opts.local_cache {
-      Some(Self::make_local_cached_runner(
-        maybe_remote_cached_runner
-          .clone()
-          .unwrap_or_else(|| leaf_runner.clone()),
-        full_store,
-        local_cache,
-        process_execution_metadata,
-      ))
-    } else {
-      None
-    };
+    // TODO: The local cache eagerly fetches outputs independent of the `eager_fetch` flag. Once
+    // `eager_fetch` backtracks via https://github.com/pantsbuild/pants/issues/11331, the local
+    // cache will be able to obey `eager_fetch` as well, and can efficiently be used with remote
+    // execution.
+    let maybe_local_cached_runner =
+      if exec_strategy_opts.local_cache && !remoting_opts.execution_enable {
+        Some(Self::make_local_cached_runner(
+          maybe_remote_cached_runner
+            .clone()
+            .unwrap_or_else(|| leaf_runner.clone()),
+          full_store,
+          local_cache,
+          process_execution_metadata,
+        ))
+      } else {
+        None
+      };
 
     Ok(
       vec![
