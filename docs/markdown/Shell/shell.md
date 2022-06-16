@@ -44,7 +44,7 @@ backend_packages = [
 ]
 ```
 
-Then, run [`./pants tailor`](doc:create-initial-build-files) to generate BUILD files:
+Then, run [`./pants tailor`](doc:initial-configuration#5-generate-build-files) to generate BUILD files:
 
 ```
 $ ./pants tailor
@@ -207,7 +207,7 @@ To use shunit2 with Pants:
 1. Create a test file like `tests.sh`, `test_foo.sh`, or `foo_test.sh`.
    - Refer to <https://github.com/kward/shunit2/> for how to write shUnit2 tests.
 2. Create a `shunit2_test` or `shunit2_tests` target in the directory's BUILD file.
-   - You can run [`./pants tailor`](doc:create-initial-build-files) to automate this step.
+   - You can run [`./pants tailor`](doc:initial-configuration#5-generate-build-files) to automate this step.
 3. Specify which shell to run your tests with, either by setting a shebang directly in the test file or by setting the field `shell` on the `shunit2_test` / `shunit2_tests` target.
    - See [here](doc:reference-shunit2_tests#codeshellcode) for all supported shells.
 

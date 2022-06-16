@@ -64,7 +64,7 @@ version: 0.1.0
 > 
 > You can use the `helm create` command to create an initial skeleton for your chart but be sure you have properly configured your source root patterns (as shown in the previous section) since the `helm create` command will create a folder name with the name of your chart and place the sources inside.
 
-Then run [`./pants tailor`](doc:create-initial-build-files) to generate `BUILD` files. This will scan your source repository in search of `Chart.yaml` or `Chart.yml` files and create a `helm_chart` target for each of them.
+Then run [`./pants tailor`](doc:initial-configuration#5-generate-build-files) to generate `BUILD` files. This will scan your source repository in search of `Chart.yaml` or `Chart.yml` files and create a `helm_chart` target for each of them.
 
 ```
 ❯ ./pants tailor
