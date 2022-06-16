@@ -19,7 +19,6 @@ from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmCha
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -31,7 +30,6 @@ from pants.engine.fs import (
 )
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
@@ -45,7 +43,7 @@ class HelmDeploymentRendererCmd(Enum):
 
 @dataclass(unsafe_hash=True)
 @frozen_after_init
-class SetupHelmDeploymentRenderer:
+class HelmDeploymentRendererRequest:
     field_set: HelmDeploymentFieldSet
 
     cmd: HelmDeploymentRendererCmd
@@ -88,6 +86,12 @@ class SetupHelmDeploymentRenderer:
 class HelmDeploymentRenderer:
     chart: HelmChart
     process: HelmProcess
+    output_directory: str | None
+
+
+@dataclass(frozen=True)
+class RenderedFiles:
+    snapshot: Snapshot
 
 
 def _sort_value_file_names_for_evaluation(filenames: Iterable[str]) -> list[str]:
@@ -118,7 +122,7 @@ def _sort_value_file_names_for_evaluation(filenames: Iterable[str]) -> list[str]
 
 @rule
 async def setup_render_helm_deployment_process(
-    request: SetupHelmDeploymentRenderer,
+    request: HelmDeploymentRendererRequest,
 ) -> HelmDeploymentRenderer:
     chart, value_files = await MultiGet(
         Get(HelmChart, FindHelmDeploymentChart(request.field_set)),
@@ -193,50 +197,20 @@ async def setup_render_helm_deployment_process(
         output_directories=output_directories,
     )
 
-    return HelmDeploymentRenderer(chart=chart, process=process)
-
-
-@dataclass(frozen=True)
-class RenderHelmDeploymentRequest:
-    """Renders a `helm_deployment` target and produces a snapshot containing the rendered
-    manifests."""
-
-    field_set: HelmDeploymentFieldSet
-    api_versions: tuple[str, ...] = ()
-    kube_version: str | None = None
-
-
-@dataclass(frozen=True)
-class RenderedDeployment:
-    address: Address
-    snapshot: Snapshot
-
-
-@rule(desc="Render Helm deployment", level=LogLevel.DEBUG)
-async def render_helm_deployment(request: RenderHelmDeploymentRequest) -> RenderedDeployment:
-    output_dir = "__output"
-
-    renderer = await Get(
-        HelmDeploymentRenderer,
-        SetupHelmDeploymentRenderer(
-            cmd=HelmDeploymentRendererCmd.TEMPLATE,
-            field_set=request.field_set,
-            description=f"Rendering Helm deployment {request.field_set.address}",
-            extra_argv=[
-                *(("--kube-version", request.kube_version) if request.kube_version else ()),
-                *chain.from_iterable(
-                    [("--api-versions", api_version) for api_version in request.api_versions]
-                ),
-                "--output-dir",
-                output_dir,
-            ],
-            output_directory=output_dir,
-        ),
+    return HelmDeploymentRenderer(
+        chart=chart, process=process, output_directory=request.output_directory
     )
-    result = await Get(ProcessResult, HelmProcess, renderer.process)
 
-    output_snapshot = await Get(Snapshot, RemovePrefix(result.output_digest, output_dir))
-    return RenderedDeployment(address=request.field_set.address, snapshot=output_snapshot)
+
+@rule
+async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
+    result = await Get(ProcessResult, HelmProcess, renderer.process)
+    output_snapshot = await (
+        Get(Snapshot, RemovePrefix(result.output_digest, renderer.output_directory))
+        if renderer.output_directory
+        else Get(Snapshot, Digest, result.stdout_digest)
+    )
+    return RenderedFiles(output_snapshot)
 
 
 def rules():

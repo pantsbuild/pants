@@ -6,9 +6,9 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.helm.target_types import HelmChartTarget, HelmDeploymentTarget
-from pants.backend.helm.util_rules import deployment
+from pants.backend.helm.util_rules import renderer
 from pants.backend.helm.util_rules.chart import HelmChart
-from pants.backend.helm.util_rules.deployment import FindHelmDeploymentChart
+from pants.backend.helm.util_rules.renderer import FindHelmDeploymentChart
 from pants.core.util_rules import external_tool, stripped_source_files
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -21,7 +21,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *external_tool.rules(),
             *stripped_source_files.rules(),
-            *deployment.rules(),
+            *renderer.rules(),
             QueryRule(HelmChart, (FindHelmDeploymentChart,)),
         ],
     )

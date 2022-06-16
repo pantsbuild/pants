@@ -11,12 +11,12 @@ from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.subsystems.post_renderer import PostRendererLauncherSetup
 from pants.backend.helm.target_types import HelmDeploymentFieldSet, HelmDeploymentTarget
 from pants.backend.helm.util_rules import post_renderer
-from pants.backend.helm.util_rules.deployment import (
+from pants.backend.helm.util_rules.post_renderer import PreparePostRendererRequest
+from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRenderer,
     HelmDeploymentRendererCmd,
-    SetupHelmDeploymentRenderer,
+    HelmDeploymentRendererRequest,
 )
-from pants.backend.helm.util_rules.post_renderer import PreparePostRendererRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeployProcesses, DeploySubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessRequest, Process
@@ -89,7 +89,7 @@ async def run_helm_deploy(
     post_renderer = await Get(PostRendererLauncherSetup, PreparePostRendererRequest(field_set))
     renderer = await Get(
         HelmDeploymentRenderer,
-        SetupHelmDeploymentRenderer(
+        HelmDeploymentRendererRequest(
             cmd=HelmDeploymentRendererCmd.UPGRADE,
             field_set=field_set,
             extra_argv=[

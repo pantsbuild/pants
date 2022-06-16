@@ -14,10 +14,14 @@ from pants.backend.helm.target_types import (
     HelmDeploymentFieldSet,
 )
 from pants.backend.helm.target_types import rules as helm_target_types_rules
-from pants.backend.helm.util_rules import deployment
 from pants.backend.helm.util_rules import manifest as k8s_manifest
-from pants.backend.helm.util_rules.deployment import RenderedDeployment, RenderHelmDeploymentRequest
+from pants.backend.helm.util_rules import renderer
 from pants.backend.helm.util_rules.manifest import ImageRef, KubeManifests, ParseKubeManifests
+from pants.backend.helm.util_rules.renderer import (
+    HelmDeploymentRendererCmd,
+    HelmDeploymentRendererRequest,
+    RenderedFiles,
+)
 from pants.backend.helm.util_rules.yaml_utils import YamlElements
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -47,9 +51,20 @@ class HelmDeploymentReport:
 
 @rule(desc="Analyse Helm deployment", level=LogLevel.DEBUG)
 async def analyse_deployment(request: AnalyseHelmDeploymentRequest) -> HelmDeploymentReport:
+    output_dir = "__output"
+
     rendered_deployment = await Get(
-        RenderedDeployment,
-        RenderHelmDeploymentRequest(field_set=request.field_set),
+        RenderedFiles,
+        HelmDeploymentRendererRequest(
+            cmd=HelmDeploymentRendererCmd.TEMPLATE,
+            field_set=request.field_set,
+            description=f"Rendering Helm deployment {request.field_set.address}",
+            extra_argv=[
+                "--output-dir",
+                output_dir,
+            ],
+            output_directory=output_dir,
+        ),
     )
 
     manifests = await Get(
@@ -133,7 +148,7 @@ async def inject_deployment_dependencies(
 def rules():
     return [
         *collect_rules(),
-        *deployment.rules(),
+        *renderer.rules(),
         *k8s_manifest.rules(),
         *helm_target_types_rules(),
         *docker_target_types_rules(),

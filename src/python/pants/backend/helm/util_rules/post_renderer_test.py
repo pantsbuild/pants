@@ -24,12 +24,12 @@ from pants.backend.helm.testutil import (
     HELM_VALUES_FILE,
 )
 from pants.backend.helm.util_rules import post_renderer
-from pants.backend.helm.util_rules.deployment import (
+from pants.backend.helm.util_rules.post_renderer import PreparePostRendererRequest
+from pants.backend.helm.util_rules.renderer import (
     HelmDeploymentRenderer,
     HelmDeploymentRendererCmd,
-    SetupHelmDeploymentRenderer,
+    HelmDeploymentRendererRequest,
 )
-from pants.backend.helm.util_rules.post_renderer import PreparePostRendererRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.engine.addresses import Address
 from pants.engine.fs import (
@@ -55,7 +55,7 @@ def rule_runner() -> RuleRunner:
             *infer_deployment.rules(),
             *post_renderer.rules(),
             QueryRule(PostRendererLauncherSetup, (PreparePostRendererRequest,)),
-            QueryRule(HelmDeploymentRenderer, (SetupHelmDeploymentRenderer,)),
+            QueryRule(HelmDeploymentRenderer, (HelmDeploymentRendererRequest,)),
             QueryRule(ProcessResult, (HelmProcess,)),
         ],
     )
@@ -94,7 +94,7 @@ def _run_post_renderer(
     renderer = rule_runner.request(
         HelmDeploymentRenderer,
         [
-            SetupHelmDeploymentRenderer(
+            HelmDeploymentRendererRequest(
                 field_set=field_set,
                 cmd=HelmDeploymentRendererCmd.TEMPLATE,
                 description="Test post-renderer output",
