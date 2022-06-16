@@ -409,7 +409,7 @@ async def debugpy_python_test(
 ) -> TestDebugAdapterRequest:
     debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
     if pytest.main.spec != "pytest":
-        logger.warn(
+        logger.warning(
             softwrap(
                 """
                 Ignoring custom [pytest].console_script/entry_point when using the debug adapter.

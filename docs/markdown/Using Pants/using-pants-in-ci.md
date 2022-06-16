@@ -63,17 +63,18 @@ We recommend running these commands in CI:
 
 ```shell
 ❯ ./pants --version  # Bootstrap Pants.
-❯ ./pants \  # Check for updates to BUILD files.
-   tailor --check \
-   update-build-files --check
-❯ ./pants --changed-since=origin/main lint
+❯ ./pants \
+  --changed-since=origin/main \
+  tailor --check \
+  update-build-files --check \
+  lint
 ❯ ./pants \
   --changed-since=origin/main \
   --changed-dependees=transitive \
   check test
 ```
 
-Because most linters do not care about a target's dependencies, we lint all changed targets, but not any dependees of those changed targets.
+Because most linters do not care about a target's dependencies, we lint all changed files and targets, but not any dependees of those changes.
 
 Meanwhile, tests should be rerun when any changes are made to the tests _or_ to dependencies of those tests, so we use the option `--changed-dependees=transitive`. `check` should also run on any transitive changes.
 
@@ -107,10 +108,10 @@ Alternatively, you can simply run over all your code. Pants's caching means that
 
 ```bash
 ❯ ./pants --version  # Bootstrap Pants.
-❯ ./pants \  # Check for updates to BUILD files.
+❯ ./pants \
    tailor --check \
-   update-build-files --check
-❯ ./pants lint check test ::
+   update-build-files --check \
+   lint check test ::
 ```
 
 However, when the cache gets too big, it should be nuked (see "Directories to cache"), so your CI may end up doing more work than Approach #1.
