@@ -9,21 +9,18 @@ updatedAt: "2022-05-07T23:43:05.454Z"
 Pants supports code generators that convert a protocol language like Protobuf into other languages, such as Python or Java. The same protocol source may be used to generate multiple distinct languages.
 
 Pants will not actually write the generated files to disk, except when running `./pants export-codegen`. Instead, any targets that depend on the protocol targets will cause their code to be generated, and those generated files will be copied over into the "chroot" (temporary directory) where Pants executes.
-[block:callout]
-{
-  "type": "info",
-  "title": "Example: Protobuf -> Python",
-  "body": "This guide walks through each step of adding Protobuf to generate Python sources. See [here](https://github.com/pantsbuild/pants/tree/master/src/python/pants/backend/codegen/protobuf) for the final result."
-}
-[/block]
+
+> 📘 Example: Protobuf -> Python
+> 
+> This guide walks through each step of adding Protobuf to generate Python sources. See [here](https://github.com/pantsbuild/pants/tree/master/src/python/pants/backend/codegen/protobuf) for the final result.
+
 This guide assumes that you are running a code generator that already exists outside of Pants as a stand-alone binary, such as running Protoc or Thrift.
 
 If you are instead writing your own code generation logic inline, you can skip Step 2. In Step 4, rather than running a `Process`, use [`CreateDigest`](doc:rules-api-file-system).
-[block:api-header]
-{
-  "title": "1. Create a target type for the protocol"
-}
-[/block]
+
+1. Create a target type for the protocol
+----------------------------------------
+
 You will need to define a new target type to allow users to provide metadata for their protocol files, e.g. their `.proto` files. See [Creating new targets](doc:target-api-new-targets) for a guide on how to do this.
 
 ```python
@@ -36,7 +33,7 @@ class ProtobufSourceTarget(Target):
     alias = "protobuf_source"
     help = "A single Protobuf file."
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ProtobufSourceField)
-``` 
+```
 
 You should define a subclass of `SourcesField`, like `ProtobufSourceField` or `ThriftSourceField`. This is important for Step 3.
 
@@ -91,11 +88,10 @@ def rules():
 ```
 
 This example hardcodes the injected address. You can instead add logic to your rule to make this dynamic. For example, in Pants's Protobuf implementation, Pants looks for a `python_requirement` target with `protobuf`. See [protobuf/python/python_protobuf_subsystem.py](https://github.com/pantsbuild/pants/blob/main/src/python/pants/backend/codegen/protobuf/python/python_protobuf_subsystem.py).
-[block:api-header]
-{
-  "title": "2. Install your code generator"
-}
-[/block]
+
+2. Install your code generator
+------------------------------
+
 There are several ways for Pants to install your tool. See [Installing tools](doc:rules-api-installing-tools). This example will use `ExternalTool` because there is already a pre-compiled binary for Protoc.
 
 ```python
@@ -130,11 +126,10 @@ class Protoc(ExternalTool):
     def generate_exe(self, _: Platform) -> str:
         return "./bin/protoc"
 ```
-[block:api-header]
-{
-  "title": "3. Create a `GenerateSourcesRequest`"
-}
-[/block]
+
+3. Create a `GenerateSourcesRequest`
+------------------------------------
+
 `GenerateSourcesRequest` tells Pants the `input` and the `output` of your code generator, such as going from `ProtobufSourceField -> PythonSourceField`. Pants will use this to determine when to use your code generation implementation.
 
 Subclass `GenerateSourcesRequest`:
@@ -165,11 +160,10 @@ def rules():
         UnionRule(GenerateSourcesRequest, GeneratePythonFromProtobufRequest),
     ]
 ```
-[block:api-header]
-{
-  "title": "4. Create a rule for your codegen logic"
-}
-[/block]
+
+4. Create a rule for your codegen logic
+---------------------------------------
+
 Your rule should take as a parameter the `GenerateSourcesRequest` from Step 3 and the `Subsystem` (or `ExternalTool`) from Step 2. It should return `GeneratedSources`.
 
 ```python
@@ -275,39 +269,28 @@ async def generate_python_from_protobuf(
 ```
 
 Finally, update your plugin's `register.py` to activate this file's rules.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "from protobuf import python_support\n\ndef rules():\n    return [*python_support.rules()]",
-      "language": "python",
-      "name": "pants-plugins/protobuf/register.py"
-    }
-  ]
-}
-[/block]
 
-[block:callout]
-{
-  "type": "info",
-  "title": "Tip: use `export-codegen` to test it works",
-  "body": "Run `./pants export-codegen path/to/file.ext` to ensure Pants is correctly generating the file. This will write the generated file(s) under the `dist/` directory, using the same path that will be used during Pants runs."
-}
-[/block]
+```python pants-plugins/protobuf/register.py
+from protobuf import python_support
 
-[block:api-header]
-{
-  "title": "5. Audit call sites to ensure they've enabled codegen"
-}
-[/block]
+def rules():
+    return [*python_support.rules()]
+```
+
+> 📘 Tip: use `export-codegen` to test it works
+> 
+> Run `./pants export-codegen path/to/file.ext` to ensure Pants is correctly generating the file. This will write the generated file(s) under the `dist/` directory, using the same path that will be used during Pants runs.
+
+5. Audit call sites to ensure they've enabled codegen
+-----------------------------------------------------
+
 Call sites must opt into using codegen, and they must also specify what types of sources they're expecting. See [Rules and the Target API](doc:rules-api-and-target-api) about `SourcesField`.
 
 For example, if you added a code generator that goes from `ProtobufSourceField -> JavaSourceField`, then Pants's Python backend would not use your new implementation because it ignores `JavaSourceField`.
 
 You should check that everywhere you're expecting is using your new codegen implementation by manually testing it out. Create a new protocol target, add it to the `dependencies` field of a target, and then run goals like `./pants package` and `./pants test` to make sure that the generated file works correctly.
-[block:api-header]
-{
-  "title": "6. Add tests (optional)"
-}
-[/block]
+
+6. Add tests (optional)
+-----------------------
+
 Refer to [Testing rules](doc:rules-api-testing).

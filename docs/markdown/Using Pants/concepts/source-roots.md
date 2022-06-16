@@ -6,14 +6,14 @@ hidden: false
 createdAt: "2020-02-21T17:44:27.655Z"
 updatedAt: "2022-02-08T22:56:49.862Z"
 ---
-[block:callout]
-{
-  "type": "info",
-  "title": "Go and Shell can skip this page",
-  "body": "Go does have a notion of source roots: where your `go.mod` is located. However, that is handled automatically by Pants without you needing to follow this page.\n\nShell does not have any notion of source roots."
-}
-[/block]
-# What are source roots?
+> 📘 Go and Shell can skip this page
+> 
+> Go does have a notion of source roots: where your `go.mod` is located. However, that is handled automatically by Pants without you needing to follow this page.
+> 
+> Shell does not have any notion of source roots.
+
+What are source roots?
+======================
 
 Some project layouts use top-level folders for namespace purposes, but have the code live underneath. However, the code's imports will ignore these top-level folders, thanks to mechanisms like the `$PYTHONPATH` and the JVM classpath. _Source roots_ are a generic equivalent of these concepts.
 
@@ -44,7 +44,8 @@ pkgutil.get_data("project.config", "prod.json")
 
 In the example above, `src/python` is a source root. So, when some code says `from project.app import App`, Pants can know that this corresponds to the code in `src/python/project/app.py`.
 
-# Configuring source roots
+Configuring source roots
+========================
 
 There are two ways to configure source roots:
 
@@ -60,20 +61,19 @@ src/python
 src/rust
 ```
 
-## Configuring source roots using patterns
+Configuring source roots using patterns
+---------------------------------------
 
 You can provide a set of patterns that match your source roots:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[source]\nroot_patterns = [\n  '/src/python',\n  '/test/python',\n]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```toml pants.toml
+[source]
+root_patterns = [
+  '/src/python',
+  '/test/python',
+]
+```
+
 The `/` prefix means that the source root is located at the build root, so it will match `src/python`, but not `project1/src/python`.
 
 You can leave off the `/` prefix to match any directory whose suffix matches a pattern. For example, `root_patterns = ["src/python"]` would consider all of these to be source roots, if they exist:
@@ -81,7 +81,7 @@ You can leave off the `/` prefix to match any directory whose suffix matches a p
 - `src/python`
 - `project1/src/python`
 
-You can use `*` as a glob. For example, `root_patterns = ["/src/*"]` would consider all of these to be source roots:
+You can use `_` as a glob. For example, `root_patterns = ["/src/_"]` would consider all of these to be source roots:
 
 - `src/python`
 - `src/java`
@@ -115,39 +115,28 @@ pkgutil.get_data("project.config", "prod.json")
 ```
 
 If you have no source roots, use this config:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[source]\nroot_patterns = [\"/\"]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
 
-[block:callout]
-{
-  "type": "info",
-  "title": "Default source roots",
-  "body": "The default value of the `root_patterns` config key is `[\"/\", \"src\", \"src/python\", \"src/py\", \"src/java\", \"src/scala\", \"src/thrift\", \"src/protos\", \"src/protobuf\"]`. \n\nThese capture a range of common cases, including a source root at the root of the repository. If your source roots match these patterns, you don't need to explicitly configure them."
-}
-[/block]
-## Configuring source roots using marker files
+```toml pants.toml
+[source]
+root_patterns = ["/"]
+```
+
+> 📘 Default source roots
+> 
+> The default value of the `root_patterns` config key is `["/", "src", "src/python", "src/py", "src/java", "src/scala", "src/thrift", "src/protos", "src/protobuf"]`. 
+> 
+> These capture a range of common cases, including a source root at the root of the repository. If your source roots match these patterns, you don't need to explicitly configure them.
+
+Configuring source roots using marker files
+-------------------------------------------
 
 You can also denote your source roots using specially-named marker files. To do so, first pick a name (or multiple names) to use:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[source]\nmarker_filenames = [\"SOURCE_ROOT\"]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```toml pants.toml
+[source]
+marker_filenames = ["SOURCE_ROOT"]
+```
+
 Then, place a file of that name in each of the source roots. The contents of those files don't matter. They can be empty.
 
 For example, given this Python repo, where we have a `setup.py` for each distinct project:
@@ -168,17 +157,12 @@ For example, given this Python repo, where we have a `setup.py` for each distinc
 ```
 
 We could use this config:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[source]\nmarker_filenames = [\"setup.py\"]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```toml pants.toml
+[source]
+marker_filenames = ["setup.py"]
+```
+
 We can then run `./pants roots` to find these source roots used:
 
 ```
@@ -201,11 +185,13 @@ import server.server.app
 from utils.utils.strutil import capitalize
 ```
 
-# Examples
+Examples
+========
 
 These project structures are all valid; Pants does not expect you to reorganize your codebase to use the tool. 
 
-## `src/<lang>` setup
+`src/<lang>` setup
+------------------
 
 This setup is common in "polyglot" repositories: i.e. repos with multiple languages.
 
@@ -262,21 +248,20 @@ import org.pantsbuild.project.util.Math
 ```
 
 ### Config:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[source]\nroot_patterns = [\n    \"/src/java\",\n    \"/src/python\",\n    \"/test/python\",\n]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
+
+```toml pants.toml
+[source]
+root_patterns = [
+    "/src/java",
+    "/src/python",
+    "/test/python",
+]
+```
 
 Note that we organized our 3rdparty requirements in the top-level folders `3rdparty/python` and `3rdparty/java`, but we do not need to include them as source roots because we do not have any first-party code there.
 
-## Multiple top-level projects
+Multiple top-level projects
+---------------------------
 
 ### Project:
 
@@ -323,30 +308,26 @@ Note that even though the projects live in different top-level folders, you are 
 ### Config:
 
 Either of these are valid and they have the same result:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[source]\nroot_patterns = [\n  \"/ads/py\",\n  \"/base/py\",\n  \"/new/js\",\n]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
 
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[source]\nroot_patterns = [\n  \"py\",\n  \"js\",\n]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
-## No source root
+```toml pants.toml
+[source]
+root_patterns = [
+  "/ads/py",
+  "/base/py",
+  "/new/js",
+]
+```
+
+```toml pants.toml
+[source]
+root_patterns = [
+  "py",
+  "js",
+]
+```
+
+No source root
+--------------
 
 Warning: while this project structure is valid, it often does not scale as well as your codebase grows, such as adding new languages.
 
@@ -378,25 +359,13 @@ pkgutil.get_data("project.config", "prod.json")
 ### Config:
 
 Either of these are valid and they have the same result:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[source]\nroot_patterns = [\"/\"]",
-      "language": "toml",
-      "name": "pants.toml"
-    }
-  ]
-}
-[/block]
 
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[source]\nmarker_filenames = [\"pyproject.toml\"]",
-      "language": "toml"
-    }
-  ]
-}
-[/block]
+```toml pants.toml
+[source]
+root_patterns = ["/"]
+```
+
+```toml
+[source]
+marker_filenames = ["pyproject.toml"]
+```

@@ -7,41 +7,31 @@ createdAt: "2020-05-16T23:11:31.121Z"
 updatedAt: "2022-02-08T20:56:52.599Z"
 ---
 We welcome contributions to Rust! We use Rust to implement the Pants engine in a performant, safe, and ergonomic way.
-[block:callout]
-{
-  "type": "info",
-  "title": "Still learning Rust? Ask to get added to reviews",
-  "body": "We'd be happy to ping you on Rust changes we make for you to see how Rust is used in the wild. Please message us on the #engine channel in [Slack](doc:community) to let us know your interest."
-}
-[/block]
 
-[block:callout]
-{
-  "type": "warning",
-  "title": "Recommendation: share your plan first",
-  "body": "Because changes to Rust deeply impact how Pants runs, it is especially helpful to share any plans to work on Rust before making changes. Please message us on [Slack](doc:community) in the #engine channel or open a [GitHub issue](https://github.com/pantsbuild/pants/issues)."
-}
-[/block]
+> 📘 Still learning Rust? Ask to get added to reviews
+> 
+> We'd be happy to ping you on Rust changes we make for you to see how Rust is used in the wild. Please message us on the #engine channel in [Slack](doc:community) to let us know your interest.
 
-[block:api-header]
-{
-  "title": "Code organization"
-}
-[/block]
+> 🚧 Recommendation: share your plan first
+> 
+> Because changes to Rust deeply impact how Pants runs, it is especially helpful to share any plans to work on Rust before making changes. Please message us on [Slack](doc:community) in the #engine channel or open a [GitHub issue](https://github.com/pantsbuild/pants/issues).
+
+Code organization
+-----------------
+
 The code for the top-level Pants Rust crate lives in `src/rust/engine`. The top-level `Cargo.toml` file at `src/rust/engine/Cargo.toml` defines a cargo workspace containing a number of other subcrates, which live in subdirectories of `src/rust/engine`. Defining multiple subcrates in this way allows changes affecting one subcrate to avoid affecting other subcrates and triggering more recompilation than is necessary.
 
 Several of the particularly important subcrates are:
 
-* `graph`: the core of Pants's rule graph implementation.
-* `ui`: the dynamic UI.
-* `sharded_lmdb`: custom wrappers around the `crates.io` `lmdb` crate, which provides bindings to [lmdb](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database).
-* `fs`: manipulating the filesystem.
-* `process_execution`: running local and remote processes.
-[block:api-header]
-{
-  "title": "Rust <-> Python interaction"
-}
-[/block]
+- `graph`: the core of Pants's rule graph implementation.
+- `ui`: the dynamic UI.
+- `sharded_lmdb`: custom wrappers around the `crates.io` `lmdb` crate, which provides bindings to [lmdb](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database).
+- `fs`: manipulating the filesystem.
+- `process_execution`: running local and remote processes.
+
+Rust \<-> Python interaction
+----------------------------
+
 Pants is best conceptualized as a Python program that makes frequent foreign function interface (FFI) calls into Rust code. 
 
 The top-level `engine` Rust crate gets compiled into a library named `native_engine.so`, which Python code knows how to interact with. We use the Rust [PyO3](https://pyo3.rs/) crate to manage foreign function interaction.
@@ -51,23 +41,22 @@ The C FFI functions that Rust code exposes as a public interface live in `src/ru
 Rust can also invoke Python functions and object constructors thanks to [PyO3](https://pyo3.rs) crate.
 
 We are planning to port additional functionality from Python to Rust, generally for performance reasons.
-[block:api-header]
-{
-  "title": "Common commands"
-}
-[/block]
+
+Common commands
+---------------
+
 Rather than using a global installation of Cargo, use the `./cargo` script.
 
 ### Compile
 
 To check that the Rust code is valid, use `./cargo check`. To check that it integrates correctly with Pants' Python code, use `MODE=debug ./pants ...` as usual (which will `compile` first, and is slower than `check`).
-[block:callout]
-{
-  "type": "warning",
-  "title": "Set `MODE=debug` when iterating on Rust",
-  "body": "As described in [Setting up Pants](doc:contributor-setup), we default to compiling Rust in release mode, rather than debug mode.\n\nWhen working on Rust, you typically should set the environment variable `MODE=debug` for substantially faster compiles."
-}
-[/block]
+
+> 🚧 Set `MODE=debug` when iterating on Rust
+> 
+> As described in [Setting up Pants](doc:contributor-setup), we default to compiling Rust in release mode, rather than debug mode.
+> 
+> When working on Rust, you typically should set the environment variable `MODE=debug` for substantially faster compiles.
+
 ### Run tests
 
 To run tests for all crates, run:
@@ -87,13 +76,18 @@ To run for a specific test, use Cargo's filtering mechanism, e.g.:
 ```bash
 ./cargo test -p fs read_file_missing
 ```
-[block:callout]
-{
-  "type": "info",
-  "title": "Tip: enabling logging in tests",
-  "body": "When debugging, it can be helpful to capture logs with [`env_logger`](https://docs.rs/env_logger/0.6.1/env_logger/).\n\nTo enable logging:\n\n1. Add `env_logger = \"...\"` to `dev-dependencies` in the crate's `Cargo.toml`, replacing the `...` with the relevant version. Search for the version used in other crates.\n2. At the start of your test, add `let _logger = env_logger::try_init();`.\n3. Add log statements wherever you'd like using `log::info!()` et al.\n4. Run your test with `RUST_LOG=trace ./cargo test -p $crate test_name -- --nocapture`, using one of `error`, `warn`, `info`, `debug`, or `trace`."
-}
-[/block]
+
+> 📘 Tip: enabling logging in tests
+> 
+> When debugging, it can be helpful to capture logs with [`env_logger`](https://docs.rs/env_logger/0.6.1/env_logger/).
+> 
+> To enable logging:
+> 
+> 1. Add `env_logger = "..."` to `dev-dependencies` in the crate's `Cargo.toml`, replacing the `...` with the relevant version. Search for the version used in other crates.
+> 2. At the start of your test, add `let _logger = env_logger::try_init();`.
+> 3. Add log statements wherever you'd like using `log::info!()` et al.
+> 4. Run your test with `RUST_LOG=trace ./cargo test -p $crate test_name -- --nocapture`, using one of `error`, `warn`, `info`, `debug`, or `trace`.
+
 ### Autoformat
 
 ```bash
@@ -107,11 +101,10 @@ To run in lint mode, add `--check`.
 ```bash
 ./cargo clippy
 ```
-[block:api-header]
-{
-  "title": "The `fs_util` tool"
-}
-[/block]
+
+The `fs_util` tool
+------------------
+
 `fs_util` is a utility that enables you to interact with `Snapshot`s from the command line. You can use it to help debug issues with snapshotted files.
 
 To build it, run this from the root of the repository:

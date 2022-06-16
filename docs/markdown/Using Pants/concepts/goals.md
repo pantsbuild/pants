@@ -16,7 +16,8 @@ To see the current list of goals, run:
 
 You'll see more goals activated as you activate more [backends](doc:enabling-backends).
 
-# Running goals
+Running goals
+=============
 
 For example:
 
@@ -38,7 +39,7 @@ You can also run multiple goals in a single run of Pants, in which case they wil
 ❯ ./pants fmt test ::
 ```
 
-Finally, Pants supports running goals in a `--loop`. In this mode, all goals specified will run
+Finally, Pants supports running goals in a `--loop`. In this mode, all goals specified will run  
 sequentially, and then Pants will wait until a relevant file has changed to try running them again.
 
 ```bash
@@ -48,14 +49,15 @@ sequentially, and then Pants will wait until a relevant file has changed to try 
 
 Use `Ctrl+C` to exit the `--loop`.
 
-# Goal arguments
+Goal arguments
+==============
 
 Most goals require arguments to know what to work on. 
 
 You can use several argument types:
 
 | Argument type                   | Semantics                                   | Example                         |
-|---------------------------------|---------------------------------------------|---------------------------------|
+| ------------------------------- | ------------------------------------------- | ------------------------------- |
 | File path                       | Match the file                              | `./pants test project/tests.py` |
 | Directory path                  | Match everything in the directory           | `./pants test project/utils`    |
 | `::` globs                      | Match everything in the directory and below | `./pants test project::`        |
@@ -63,26 +65,20 @@ You can use several argument types:
 
 You can combine argument types, e.g. `./pants fmt src/go:: src/py/app.py`.
 
-To ignore something, prefix the argument with `-`. For example, 
-`./pants test :: -project/integration_tests` will run all your tests except for those in the 
+To ignore something, prefix the argument with `-`. For example,  
+`./pants test :: -project/integration_tests` will run all your tests except for those in the  
 directory `project/integration_tests`.
 
-[block:callout]
-{
-  "type": "warning",
-  "title": "Set `[GLOBAL].use_deprecated_directory_cli_args_semantics = false` in `pants.toml`",
-  "body": "This will become the default in Pants 2.14."
-}
-[/block]
+> 🚧 Set `[GLOBAL].use_deprecated_directory_cli_args_semantics = false` in `pants.toml`
+> 
+> This will become the default in Pants 2.14.
 
-[block:callout]
-{
-  "type": "info",
-  "title": "Tip: advanced target selection, such as running over changed files",
-  "body": "See [Advanced target selection](doc:advanced-target-selection) for alternative techniques to specify which files/targets to run on."
-}
-[/block]
-## Goal options
+> 📘 Tip: advanced target selection, such as running over changed files
+> 
+> See [Advanced target selection](doc:advanced-target-selection) for alternative techniques to specify which files/targets to run on.
+
+Goal options
+------------
 
 Many goals also have [options](doc:options) to change how they behave. Every option in Pants can be set via an environment variable, config file, and the command line.
 

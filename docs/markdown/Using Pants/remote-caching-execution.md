@@ -5,7 +5,8 @@ hidden: false
 createdAt: "2021-03-19T21:39:51.235Z"
 updatedAt: "2021-03-19T21:39:51.235Z"
 ---
-# Overview
+Overview
+========
 
 Ordinarily, Pants executes processes locally on the system on which it is run and also caches the results of those processes locally as well. Besides this "local execution" mode of operation, Pants also supports two distributed modes of operation:
 
@@ -15,7 +16,8 @@ Ordinarily, Pants executes processes locally on the system on which it is run an
 
 Pants does this by using the "Remote Execution API" to converse with the remote cache or remote execution server.
 
-## What is Remote Execution API?
+What is Remote Execution API?
+-----------------------------
 
 Pants is compatible with remote caching and remote execution servers that comply with the [Remote Execution API](https://github.com/bazelbuild/remote-apis) standard ("REAPI"). The REAPI protocol is supported by several different server and client projects including Bazel and of course Pants.
 
@@ -27,16 +29,18 @@ Pants calls the CAS a "store server" and the execution service an "execution ser
 
 The REAPI model contains the notion of an "instance." An "instance" is a distinct deployment of a CAS and/or execution service that is given a specific name. All REAPI operations send an instance name to the server, thus a single network endpoint can conceivably support multiple REAPI deployments.
 
-# Server compatibility
+Server compatibility
+====================
 
 In order to use remote caching or remote execution, Pants will need access to a server that complies with REAPI. Pants is known to work with:
 
-* [BuildBarn](https://github.com/buildbarn/bb-remote-execution)
-* [Buildfarm](https://github.com/bazelbuild/bazel-buildfarm/) 
-* [BuildGrid](https://buildgrid.build/)
+- [BuildBarn](https://github.com/buildbarn/bb-remote-execution)
+- [Buildfarm](https://github.com/bazelbuild/bazel-buildfarm/) 
+- [BuildGrid](https://buildgrid.build/)
 
 **Note**: Setup of a remote execution server is beyond the scope of this documentation. All three server projects have support channels on the BuildTeamWorld Slack. [Go here to obtain an invite to that Slack.](https://bit.ly/2SG1amT)
 
-# Resources
+Resources
+=========
 
 - The [remote-apis-testing project](https://gitlab.com/remote-apis-testing/remote-apis-testing) maintains a compatibility test suite of the various server and client implementations of REAPI.
