@@ -133,7 +133,7 @@ These labels are used to generate the changelist for each release.
 > 
 > - "Do you know of a better way to do this? This felt clunky to write."
 > - "This was really tricky to figure out because there are so many edge cases. I'd appreciate extra attention here, please."
-> - "Note that I did not use a dataclass here because I do not want any of the methods like `**eq**` to be generated."
+> - "Note that I did not use a dataclass here because I do not want any of the methods like `__eq__` to be generated."
 
 > 📘 FYI: we squash merge
 > 

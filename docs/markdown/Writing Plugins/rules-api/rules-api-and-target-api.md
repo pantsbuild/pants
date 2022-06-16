@@ -9,15 +9,13 @@ updatedAt: "2022-04-27T17:50:52.879Z"
 Start by reading the [Concepts](doc:target-api-concepts) of the Target API.
 
 Note that the engine does not have special knowledge about `Target`s and `Field`s. To the engine, these are like any other types you'd use, and the `@rule`s to work with targets are like any other `@rule`.
-[block:api-header]
-{
-  "title": "How to read values from a `Target`"
-}
-[/block]
+
+How to read values from a `Target`
+----------------------------------
+
 As explained in [Concepts](doc:target-api-concepts), a `Target` is an addressable combination of fields, where each field gives some metadata about your code.
 
 To read a particular `Field` for a `Target`, look it up with the `Field`'s class in square brackets, like you would look up a normal Python dictionary:
-
 
 ```python
 from pants.backend.python.target_types import PythonTestsTimeoutField
@@ -78,19 +76,18 @@ A `Target` has a field `address: Address`, e.g. `my_tgt.address`.
 
 You can also create an `Address` object directly, which is often useful in tests:
 
-* `project:tgt` -> `Address("project", target_name="tgt")`
-* `project/` -> `Address("project")`
-* `//:top-level` -> `Address("", target_name="top_level")`
-* `project/app.py:tgt` -> `Address("project", target_name="tgt", relative_file_name="app.py")
-* `project:tgt#generated` -> `Address("project", target_name="tgt", generated_name="generated")`
-* `project:tgt@shell=zsh`: `Address("project", target_name="tgt", parameters={"shell": "zsh"})`
+- `project:tgt` -> `Address("project", target_name="tgt")`
+- `project/` -> `Address("project")`
+- `//:top-level` -> `Address("", target_name="top_level")`
+- `project/app.py:tgt` -> \`Address("project", target_name="tgt", relative_file_name="app.py")
+- `project:tgt#generated` -> `Address("project", target_name="tgt", generated_name="generated")`
+- `project:tgt@shell=zsh`: `Address("project", target_name="tgt", parameters={"shell": "zsh"})`
 
 You can use `str(address)` or `address.spec` to get the normalized string representation. `address.spec_path` will give the path to the parent directory of the target's original BUILD file.
-[block:api-header]
-{
-  "title": "How to resolve targets"
-}
-[/block]
+
+How to resolve targets
+----------------------
+
 How do you get `Target`s in the first place in your plugin? 
 
 As explained in [Goal rules](doc:rules-api-goal-rules), to get all of the targets specified on the command line by a user, you can request the type `Targets` as a parameter to your `@rule` or `@goal_rule`. From there, you can optionally filter out the targets you want, such as by using `target.has_field()`.
@@ -112,12 +109,12 @@ Given targets, you can find their direct and transitive dependencies. See the be
 
 You can also find targets by writing your own `Spec`s, rather than using what the user provided. (All of these types come from `pants.base.specs`.)
 
-* `await Get(Targets, AddressSpecs([DescendantAddresses("dir")])` -> `./pants list dir::`
-* `await Get(Targets, AddressSpecs([SiblingAddresses("dir")])` -> `./pants list dir:`
-* `await Get(Targets, AddressSpecs([AscendantAddresess("dir")])` -> will find all targets in this directory and above
-* `await Get(Targets, AddressSpecs([AddressLiteral("dir", "tgt")])` -> `./pants list dir:tgt`
-* `await Get(Targets, FilesystemSpecs([FilesystemLiteralSpec("dir/f.ext")])` -> `./pants list dir/f.ext`
-* `await Get(Targets, FilesystemSpecs([FilesystemGlobSpec("dir/*.ext")])` -> `./pants list 'dir/*.ext'`
+- `await Get(Targets, AddressSpecs([DescendantAddresses("dir")])` -> `./pants list dir::`
+- `await Get(Targets, AddressSpecs([SiblingAddresses("dir")])` -> `./pants list dir:`
+- `await Get(Targets, AddressSpecs([AscendantAddresess("dir")])` -> will find all targets in this directory and above
+- `await Get(Targets, AddressSpecs([AddressLiteral("dir", "tgt")])` -> `./pants list dir:tgt`
+- `await Get(Targets, FilesystemSpecs([FilesystemLiteralSpec("dir/f.ext")])` -> `./pants list dir/f.ext`
+- `await Get(Targets, FilesystemSpecs([FilesystemGlobSpec("dir/_.ext")])` -> `./pants list 'dir/_.ext'`
 
 Finally, you can look up an `Address` given a raw address string. This is often useful to allow a user to refer to targets in [Options](doc:rules-api-subsystems) and in `Field`s in your `Target`. For example, this mechanism is how the `dependencies` field works. This will error if the address does not exist.
 
@@ -150,11 +147,9 @@ async def example(...) -> Foo:
     target = targets[0]
 ```
 
-[block:api-header]
-{
-  "title": "The `Dependencies` field"
-}
-[/block]
+The `Dependencies` field
+------------------------
+
 The `Dependencies` field is an `AsyncField`, which means that you must use the engine to hydrate its values, rather than using `Dependencies.value` like normal.
 
 ```python
@@ -230,11 +225,10 @@ async def demo(...) -> Foo:
 ```
 
 Pants will include your special-cased dependencies with `./pants dependencies`, `./pants dependees`, and `./pants --changed-since`, but the dependencies will not show up when using `await Get(Addresses, DependenciesRequest)`.
-[block:api-header]
-{
-  "title": "`SourcesField`"
-}
-[/block]
+
+`SourcesField`
+--------------
+
 `SourceField` is an `AsyncField`, which means that you must use the engine to hydrate its values, rather than using `Sources.value` like normal.
 
 Some Pants targets like `python_test` have the field `source: str`, whereas others like `go_package` have the field `sources: list[str]`. These are represented by the fields `SingleSourceField` and `MultipleSourcesField`. When you're defining a new target type, you should choose which of these to subclass. However, when operating over sources generically in your `@rules`, you can use the common base class `SourcesField` so that your rule works with both formats.
@@ -267,7 +261,7 @@ async def demo(...) -> Foo:
 ```
 
 `SourceFilesRequest` expects an iterable of `SourcesField` objects. `SourceFiles` has a field `snapshot: Snapshot` with the merged snapshot of all resolved input sources fields.
- 
+
 ### Enabling codegen
 
 If you want your plugin to work with code generation, you must set the argument `enable_codegen=True`, along with `for_sources_types` with the types of `SourcesField` you're expecting.
@@ -337,11 +331,10 @@ async demo(...) -> Foo:
 `StrippedSourceFiles` has a single field `snapshot: Snapshot`.
 
 You can also use `Get(StrippedSourceFiles, SourceFilesRequest)`, and the engine will automatically go from `SourceFilesRequest -> SourceFiles -> StrippedSourceFiles)`.
-[block:api-header]
-{
-  "title": "`FieldSet`s"
-}
-[/block]
+
+`FieldSet`s
+-----------
+
 A `FieldSet` is a way to specify which Fields your rule needs to use in a typed way that is understood by the engine.
 
 Normally, your rule should simply use `tgt.get()` and `tgt.has_field()` instead of a `FieldSet`. However, for several of the [Common plugin tasks](doc:common-plugin-tasks), you will instead need to create a `FieldSet` so that the combination of fields you use can be represented by a type understood by the engine.
