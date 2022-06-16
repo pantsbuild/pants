@@ -27,7 +27,7 @@ Add the [relevant backends](doc:enabling-backends) to `[GLOBAL].backend_packages
 
 Formatters and linters are often the simplest to get working because—for all tools other than Pylint— you do not need to worry about things like dependencies and third-party requirements.
 
-First, run [`./pants tailor ::`](doc:create-initial-build-files) to generate BUILD files. This tells Pants which files to operate on, and will allow you to set additional metadata over time like test timeouts and dependencies on resources.
+First, run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files. This tells Pants which files to operate on, and will allow you to set additional metadata over time like test timeouts and dependencies on resources.
 
 Then, activate the [Linters and formatters](doc:python-linters-and-formatters) you'd like to use. Hook up the `fmt` and `lint` goals to your [CI](doc:using-pants-in-ci).
 

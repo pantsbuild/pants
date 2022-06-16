@@ -45,7 +45,7 @@ expected_version = "1.17"
 
 You can also set `[golang].go_search_paths` to influence where Pants looks for Go, e.g. `["/usr/bin"]`. It defaults to your `PATH`.
 
-Then run [`./pants tailor ::`](doc:create-initial-build-files) to generate BUILD files. This will add a `go_mod` target where you have your `go.mod` file, a `go_package` target for every directory with a `.go` file, and a `go_binary` target in every directory where you have `package main`.
+Then run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files. This will add a `go_mod` target where you have your `go.mod` file, a `go_package` target for every directory with a `.go` file, and a `go_binary` target in every directory where you have `package main`.
 
 ```
 ❯ ./pants tailor ::
