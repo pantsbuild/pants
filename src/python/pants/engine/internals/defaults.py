@@ -130,7 +130,7 @@ class MutableBuildFileDefaults:
                 targets = types.keys()
             else:
                 targets = target if isinstance(target, tuple) else (target,)
-            for target_alias in targets:
+            for target_alias in map(str, targets):
                 if target_alias in types:
                     target_type = types[target_alias]
                 else:

@@ -100,7 +100,18 @@ class Parser:
         # file parse with a reset of the ParseState for the calling thread.
         parse_state = ParseState()
 
-        class Registrar(str):
+        class Registrar:
+            def __init__(self, type_alias: str) -> None:
+                self._type_alias = type_alias
+
+            def __str__(self) -> str:
+                """The MutableBuildFileDefaults.set_defaults() rely on string inputs.
+
+                This allows the use of the BUILD file symbols for the target types to be used un-
+                quoted for the defaults dictionary.
+                """
+                return self._type_alias
+
             def __call__(self, **kwargs: Any) -> TargetAdaptor:
                 # Target names default to the name of the directory their BUILD file is in
                 # (as long as it's not the root directory).
@@ -111,9 +122,9 @@ class Parser:
                         )
                     kwargs["name"] = None
 
-                raw_values = dict(parse_state.defaults.get(self))
+                raw_values = dict(parse_state.defaults.get(self._type_alias))
                 raw_values.update(kwargs)
-                target_adaptor = TargetAdaptor(str(self), **raw_values)
+                target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
                 parse_state.add(target_adaptor)
                 return target_adaptor
 
@@ -121,7 +132,6 @@ class Parser:
             **object_aliases.objects,
             "build_file_dir": lambda: PurePath(parse_state.rel_path()),
             "__defaults__": parse_state.set_defaults,
-            "__all__": "__all__",  # Allow using as identifier in the __defaults__ dict.
         }
         symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 
