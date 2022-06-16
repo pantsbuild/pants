@@ -48,7 +48,6 @@ from pants.engine.target import (
     OptionalSingleSourceField,
     OverridesField,
     ScalarField,
-    SecondaryOwnerMixin,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -258,7 +257,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
+class PexEntryPointField(AsyncFieldMixin, Field):
     alias = "entry_point"
     default = None
     help = softwrap(
@@ -568,6 +567,7 @@ class PexIncludeToolsField(BoolField):
     )
 
 
+# @TODO: Move to python_source (and friends)
 class RunInSandboxField(BoolField):
     alias = "run_in_sandbox"
     default = True
@@ -581,8 +581,7 @@ class RunInSandboxField(BoolField):
 
         The latter mode may be necessary if the binary being run writes files into the repo and
         computes their location relative to the executed files. Django's makemigrations command
-        is an example of such a process.  It may also have lower latency, since no files need
-        to be copied into a chroot.
+        is an example of such a process.
         """
     )
 

@@ -29,6 +29,23 @@ class PexRuntimeEnvironment(Subsystem):
     options_scope = "pex"
     help = "How Pants uses Pex to run Python subprocesses."
 
+    run_packaged_firstparty_code = BoolOption(
+        "--run-packaged-firstparty-code",
+        default=False,
+        help=softwrap(
+            """
+            If `True`, `run`ning a `pex_binary` will build the PEX via `package` and run it directly.
+            This makes `run` equivalent to running `package` and running the artifact.
+
+            If `False`, `run`ning a `pex_binary` will run your firstparty code by copying sources to
+            a sandbox (while still using a PEX for thirdparty dependencies).
+            Note that support has been added to Pants to allow you to `run` any `python_source`,
+            so setting this to `False` should be reserved for maintaining backwards-compatibility
+            with previous versions of Pants.
+            """
+        ),
+    )
+
     # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
     #  per-process override.
     _executable_search_paths = StrListOption(
