@@ -18,9 +18,9 @@ from pants.backend.helm.target_types import (
     HelmChartTarget,
     HelmDeploymentFieldSet,
 )
-from pants.backend.helm.util_rules import chart, process
+from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
-from pants.backend.helm.util_rules.process import HelmProcess
+from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address, Addresses
@@ -290,4 +290,4 @@ async def render_helm_deployment(request: RenderHelmDeploymentRequest) -> Render
 
 
 def rules():
-    return [*collect_rules(), *chart.rules(), *process.rules(), *post_renderer.rules()]
+    return [*collect_rules(), *chart.rules(), *tool.rules(), *post_renderer.rules()]

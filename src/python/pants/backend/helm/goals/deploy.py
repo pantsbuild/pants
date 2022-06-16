@@ -17,7 +17,7 @@ from pants.backend.helm.util_rules.deployment import (
     SetupHelmDeploymentRenderer,
 )
 from pants.backend.helm.util_rules.post_renderer import PreparePostRendererRequest
-from pants.backend.helm.util_rules.process import HelmProcess
+from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.deploy import DeployFieldSet, DeployProcess, DeployProcesses, DeploySubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessRequest, Process
 from pants.engine.rules import Get, collect_rules, rule

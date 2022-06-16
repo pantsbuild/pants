@@ -27,8 +27,7 @@ from pants.backend.helm.testutil import (
     HELM_VALUES_FILE,
     K8S_SERVICE_TEMPLATE,
 )
-from pants.backend.helm.util_rules import chart
-from pants.backend.helm.util_rules import process as helm_process
+from pants.backend.helm.util_rules import chart, tool
 from pants.backend.helm.util_rules.manifest import ImageRef
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules import config_files, external_tool, stripped_source_files
@@ -53,7 +52,7 @@ def rule_runner() -> RuleRunner:
             *pex.rules(),
             *process.rules(),
             *stripped_source_files.rules(),
-            *helm_process.rules(),
+            *tool.rules(),
             QueryRule(FirstPartyHelmDeploymentMappings, ()),
             QueryRule(HelmDeploymentReport, (AnalyseHelmDeploymentRequest,)),
             QueryRule(InjectedDependencies, (InjectHelmDeploymentDependenciesRequest,)),

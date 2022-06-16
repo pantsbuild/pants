@@ -14,7 +14,7 @@ from pants.backend.helm.target_types import (
     HelmRegistriesField,
     HelmSkipPushField,
 )
-from pants.backend.helm.util_rules.process import HelmProcess
+from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.publish import (
     PublishFieldSet,
     PublishOutputData,

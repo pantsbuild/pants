@@ -9,8 +9,8 @@ import pytest
 
 from pants.backend.helm.subsystems import unittest as unittest_subsystem
 from pants.backend.helm.subsystems.unittest import HelmUnitTestSubsystem
-from pants.backend.helm.util_rules import process as helm_process
-from pants.backend.helm.util_rules.process import HelmProcess
+from pants.backend.helm.util_rules import tool
+from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.process import ProcessResult
 from pants.engine.rules import QueryRule
@@ -21,7 +21,7 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *helm_process.rules(),
+            *tool.rules(),
             *unittest_subsystem.rules(),
             QueryRule(ProcessResult, (HelmProcess,)),
         ]

@@ -7,10 +7,13 @@ import pytest
 
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.util_rules import tool
-from pants.backend.helm.util_rules.tool import HelmBinary
+from pants.backend.helm.util_rules.tool import HelmBinary, HelmProcess
+from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.platform import Platform
+from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -21,6 +24,7 @@ def rule_runner() -> RuleRunner:
             *tool.rules(),
             QueryRule(HelmBinary, ()),
             QueryRule(HelmSubsystem, ()),
+            QueryRule(Process, (HelmProcess,)),
         ],
     )
 

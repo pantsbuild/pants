@@ -8,7 +8,7 @@ import logging
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any, ClassVar, Generic, Mapping, Type, TypeVar
+from typing import Any, ClassVar, Generic, Iterable, Mapping, Type, TypeVar
 
 import yaml
 from typing_extensions import final
@@ -22,6 +22,7 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
+from pants.engine import process
 from pants.engine.collection import Collection
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
@@ -35,6 +36,7 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.native_engine import AddPrefix, MergeDigests
 from pants.engine.platform import Platform
+from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 from pants.option.subsystem import Subsystem
@@ -419,4 +421,4 @@ def helm_process(request: HelmProcess, helm_binary: HelmBinary) -> Process:
 
 
 def rules():
-    return [*collect_rules(), *external_tool.rules()]
+    return [*collect_rules(), *external_tool.rules(), *process.rules()]

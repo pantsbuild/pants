@@ -30,7 +30,7 @@ from pants.backend.helm.util_rules.deployment import (
     SetupHelmDeploymentRenderer,
 )
 from pants.backend.helm.util_rules.post_renderer import PreparePostRendererRequest
-from pants.backend.helm.util_rules.process import HelmProcess
+from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,

@@ -18,9 +18,9 @@ from pants.backend.helm.target_types import (
     HelmUnitTestTestTarget,
     HelmUnitTestTimeoutField,
 )
-from pants.backend.helm.util_rules import process as helm_process
+from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
-from pants.backend.helm.util_rules.process import HelmProcess
+from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
@@ -168,6 +168,6 @@ def rules():
         *collect_rules(),
         *subsystem_rules(),
         *dependency_rules(),
-        *helm_process.rules(),
+        *tool.rules(),
         UnionRule(TestFieldSet, HelmUnitTestFieldSet),
     ]
