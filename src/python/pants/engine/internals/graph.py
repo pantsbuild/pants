@@ -1232,10 +1232,10 @@ async def resolve_unparsed_address_inputs(
         maybe_addresses = await MultiGet(
             Get(MaybeAddress, AddressInput, ai) for ai in address_inputs
         )
-        addresses = []
+        valid_addresses = []
         for maybe_address, address_input in zip(maybe_addresses, address_inputs):
             if isinstance(maybe_address.val, Address):
-                addresses.append(maybe_address.val)
+                valid_addresses.append(maybe_address.val)
             else:
                 invalid_addresses.append(address_input.spec)
 
@@ -1248,7 +1248,7 @@ async def resolve_unparsed_address_inputs(
                     """
                 )
             )
-        return Addresses(addresses)
+        return Addresses(valid_addresses)
 
     addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in address_inputs)
     return Addresses(addresses)
