@@ -56,6 +56,7 @@ class BuildFileDefaults:
 
     def as_mutable(self) -> MutableBuildFileDefaults:
         return MutableBuildFileDefaults(
+            address=Address(self.path, generated_name="__defaults__"),
             defaults=dict(self.defaults),
             immutable=self,
         )
@@ -66,6 +67,7 @@ class BuildFileDefaults:
 
 @dataclass
 class MutableBuildFileDefaults:
+    address: Address
     defaults: dict[str, Mapping[str, Any]]
     immutable: BuildFileDefaults
 
@@ -90,14 +92,13 @@ class MutableBuildFileDefaults:
         defaults.commit()
 
     def freezed_defaults(self) -> DefaultsT:
-        address = Address(self.path, generated_name="__defaults__")
         types = self.registered_target_types.aliases_to_types
         return FrozenDict(
             {
                 target_alias: FrozenDict(
                     {
                         field_type.alias: field_type.compute_value(
-                            raw_value=default, address=address
+                            raw_value=default, address=self.address
                         )
                         for field_alias, default in fields.items()
                         for field_type in types[target_alias].class_field_types(
@@ -113,49 +114,88 @@ class MutableBuildFileDefaults:
     def get(self, target_alias: str) -> Mapping[str, Any]:
         return self.defaults.get(target_alias, {})
 
-    def set_defaults(self, *args: SetDefaultsT, extend: bool = False, **kwargs) -> None:
+    def set_defaults(
+        self,
+        *args: SetDefaultsT,
+        all: SetDefaultsValueT | None = None,
+        extend: bool = False,
+        **kwargs,
+    ) -> None:
         defaults: dict[str, dict[str, Any]] = (
             {} if not extend else {k: dict(v) for k, v in self.defaults.items()}
         )
+
+        if all is not None:
+            self._process_defaults(
+                defaults,
+                {tuple(self.registered_target_types.aliases): all},
+                ignore_unknown_fields=True,
+            )
+
+        for arg in args:
+            self._process_defaults(defaults, arg)
+
+        # Update with new defaults, dropping targets without any default values.
+        for tgt, default in defaults.items():
+            if not default:
+                self.defaults.pop(tgt, None)
+            else:
+                self.defaults[tgt] = default
+
+    def _process_defaults(
+        self,
+        defaults: dict[str, dict[str, Any]],
+        targets_defaults: SetDefaultsT,
+        ignore_unknown_fields: bool = False,
+    ):
+        if not isinstance(targets_defaults, dict):
+            raise ValueError(
+                f"Expected dictionary mapping targets to default field values for {self.address} "
+                f"but got: {type(targets_defaults).__name__}."
+            )
+
         types = self.registered_target_types.aliases_to_types
-        for target, default in (item for arg in args for item in arg.items()):
+        for target, default in targets_defaults.items():
             if not isinstance(default, dict):
                 raise ValueError(
-                    f"{self.path}: The default field values passed to __defaults__ for "
-                    f"{target} must be a `dict` but got a `{type(default).__name__}`."
+                    f"Invalid default field values in {self.address} for target type {target}, "
+                    f"must be an `dict` but was {default!r} with type `{type(default).__name__}`."
                 )
 
             targets: Iterable[str]
-            if target == "__all__":
-                targets = types.keys()
-            else:
-                targets = target if isinstance(target, tuple) else (target,)
+            targets = target if isinstance(target, tuple) else (target,)
             for target_alias in map(str, targets):
                 if target_alias in types:
                     target_type = types[target_alias]
                 else:
-                    raise ValueError(
-                        f"Attempt to set __defaults__ for unknown target type: {target_alias}."
-                    )
+                    raise ValueError(f"Unrecognized target type {target_alias} in {self.address}.")
+
+                # Copy default dict if we may mutate it.
+                raw_values = dict(default) if ignore_unknown_fields else default
 
                 # Validate that field exists on target
                 target_fields = target_type.class_field_types(self.union_membership)
                 valid_field_aliases = set()
+
+                # TODO: this valid aliases calculation is done every time a target is instantiated
+                # as well. But it should be enough to do once, and re-use as it doesn't change
+                # during a run.
                 for fld in target_fields:
                     valid_field_aliases.add(fld.alias)
                     if fld.deprecated_alias is not None:
                         valid_field_aliases.add(fld.deprecated_alias)
+
                 for field_alias in default.keys():
                     if field_alias not in valid_field_aliases:
-                        raise InvalidFieldException(
-                            f"Unrecognized field `{field_alias}` for target {target_type.alias}. "
-                            f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
-                        )
+                        if ignore_unknown_fields:
+                            del raw_values[field_alias]
+                        else:
+                            raise InvalidFieldException(
+                                f"Unrecognized field `{field_alias}` for target {target_type.alias}. "
+                                f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
+                            )
                 # TODO: moved fields for TargetGenerators ?  See: `Target._calculate_field_values()`.
                 # TODO: support parametrization ?
 
                 # Merge all provided defaults for this call.
-                defaults.setdefault(target_type.alias, {}).update(default)
-
-        # Replace any inherited defaults with the new set of defaults.
-        self.defaults.update(defaults)
+                defaults.setdefault(target_type.alias, {}).update(raw_values)
