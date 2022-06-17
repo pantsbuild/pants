@@ -18,19 +18,19 @@ Pants provides several goals to provide insights into your project's structure.
 }
 [/block]
 
-[block:callout]
-{
-  "type": "info",
-  "title": "Tip: Use `xargs` to pipe these goals into other Pants commands",
-  "body": "For example:\n\n```bash\n$ ./pants dependees project/util.py | xargs ./pants test\n```\n\nSee [Advanced target selection](doc:advanced-target-selection) for more info and other techniques to use the results."
-}
-[/block]
+> 📘 Tip: Use `xargs` to pipe these goals into other Pants commands
+> 
+> For example:
+> 
+> ```bash
+> $ ./pants dependees project/util.py | xargs ./pants test
+> ```
+> 
+> See [Advanced target selection](doc:advanced-target-selection) for more info and other techniques to use the results.
 
-[block:api-header]
-{
-  "title": "`list` - find your project's targets"
-}
-[/block]
+`list` - find your project's targets
+------------------------------------
+
 `list` will find all targets that match the arguments.
 
 For example, to show all targets in your project:
@@ -52,11 +52,10 @@ You can specify a file, which will find the target(s) owning that file:
 ❯ ./pants list helloworld/greet/greeting_test.py
 helloworld/greet/greeting_test.py:tests
 ```
-[block:api-header]
-{
-  "title": "`filter` - find targets that match a predicate"
-}
-[/block]
+
+`filter` - find targets that match a predicate
+----------------------------------------------
+
 `filter` is like `list`, but will only include targets that match the predicate(s).
 
 Specify a predicate by using one of the below `filter` options, like `--target-type`. You can use a comma to OR multiple values, meaning that at least one member must be matched. You can repeat the option multiple times to AND each filter. You can prefix the filter with `-` to negate the filter, meaning that the target must not be true for the filter.
@@ -85,11 +84,10 @@ Regex strings for the address, such as `^dir` or `:util$`.
 ### `filter --tag-regex`
 
 Regex strings for the `tags` field. Alternatively, you can use the global `--tags` option, which uses exact string matches instead of regex. See [Advanced target selection](doc:advanced-target-selection).
-[block:api-header]
-{
-  "title": "`dependencies` - find a target's dependencies"
-}
-[/block]
+
+`dependencies` - find a target's dependencies
+---------------------------------------------
+
 Use `dependencies` to list all targets used directly by a target.
 
 ```bash
@@ -118,11 +116,10 @@ helloworld/greet:translations
 helloworld/main.py:lib
 helloworld/translator/translator.py:lib
 ```
-[block:api-header]
-{
-  "title": "`dependees` - find which targets depend on a target"
-}
-[/block]
+
+`dependees` - find which targets depend on a target
+---------------------------------------------------
+
 The `dependees` goal finds all targets that directly depend on the target you specify.
 
 ```bash
@@ -157,11 +154,10 @@ To include the original target itself, use `--closed`:
 //:ansicolors
 helloworld/main.py:lib
 ```
-[block:api-header]
-{
-  "title": "`filedeps` - find which files a target owns"
-}
-[/block]
+
+`filedeps` - find which files a target owns
+-------------------------------------------
+
 `filedeps` outputs all of the files belonging to a target, based on its `sources` field.
 
 ```bash
@@ -191,11 +187,10 @@ helloworld/greet/greeting.py
 helloworld/greet/translations.json
 ...
 ```
-[block:api-header]
-{
-  "title": "`peek` - programmatically inspect a target"
-}
-[/block]
+
+`peek` - programmatically inspect a target
+------------------------------------------
+
 `peek` outputs JSON for each target specified.
 
 ```bash
@@ -240,27 +235,54 @@ $ ./pants peek --exclude-defaults helloworld/util:tests
   }
 ]
 ```
-[block:callout]
-{
-  "type": "info",
-  "title": "Piping peek output into jq",
-  "body": "`peek` can be particularly useful when paired with [JQ](https://stedolan.github.io/jq/) to query the JSON. For example, you can combine `./pants peek` with JQ to find all targets where you set the field `skip_flake8=True`:\n\n```bash\n$ ./pants peek :: | jq -r '.[] | select(.skip_flake8 == true) | .[\"address\"]'\nhelloworld/greet:lib\nhelloworld/greet:tests\nhelloworld/util:lib\n```"
-}
-[/block]
 
-[block:callout]
-{
-  "type": "info",
-  "title": "Piping other introspection commands into `./pants peek`",
-  "body": "Some introspection goals, such as `filter`, `dependencies` and `dependees` emit a flat list of target addresses. It's often useful to expand each of those into a full JSON structure with detailed properties of each target, by piping to `./pants peek`:\n\n```bash\n./pants dependees  helloworld/main.py:lib | xargs ./pants peek --exclude-defaults\n[\n  {\n    \"address\": \"helloworld:lib\",\n    \"target_type\": \"python_sources\",\n    \"dependencies\": [\n      \"helloworld/__init__.py:lib\",\n      \"helloworld/main.py:lib\"\n    ],\n    \"sources\": [\n      \"helloworld/__init__.py\",\n      \"helloworld/main.py\"\n    ]\n  },\n  {\n    \"address\": \"helloworld:pex_binary\",\n    \"target_type\": \"pex_binary\",\n    \"dependencies\": [\n      \"helloworld/main.py:lib\"\n    ],\n    \"entry_point\": {\n      \"module\": \"main.py\",\n      \"function\": null\n    }\n  }\n]\n```"
-}
-[/block]
+> 📘 Piping peek output into jq
+> 
+> `peek` can be particularly useful when paired with [JQ](https://stedolan.github.io/jq/) to query the JSON. For example, you can combine `./pants peek` with JQ to find all targets where you set the field `skip_flake8=True`:
+> 
+> ```bash
+> $ ./pants peek :: | jq -r '.[] | select(.skip_flake8 == true) | .["address"]'
+> helloworld/greet:lib
+> helloworld/greet:tests
+> helloworld/util:lib
+> ```
 
-[block:api-header]
-{
-  "title": "`paths` - find dependency paths"
-}
-[/block]
+> 📘 Piping other introspection commands into `./pants peek`
+> 
+> Some introspection goals, such as `filter`, `dependencies` and `dependees` emit a flat list of target addresses. It's often useful to expand each of those into a full JSON structure with detailed properties of each target, by piping to `./pants peek`:
+> 
+> ```bash
+> ./pants dependees  helloworld/main.py:lib | xargs ./pants peek --exclude-defaults
+> [
+>   {
+>     "address": "helloworld:lib",
+>     "target_type": "python_sources",
+>     "dependencies": [
+>       "helloworld/__init__.py:lib",
+>       "helloworld/main.py:lib"
+>     ],
+>     "sources": [
+>       "helloworld/__init__.py",
+>       "helloworld/main.py"
+>     ]
+>   },
+>   {
+>     "address": "helloworld:pex_binary",
+>     "target_type": "pex_binary",
+>     "dependencies": [
+>       "helloworld/main.py:lib"
+>     ],
+>     "entry_point": {
+>       "module": "main.py",
+>       "function": null
+>     }
+>   }
+> ]
+> ```
+
+`paths` - find dependency paths
+-------------------------------
+
 `paths` emits a list of all dependency paths between two targets:
 
 ```bash
@@ -273,32 +295,51 @@ $ ./pants paths --from=helloworld/main.py --to=helloworld/translator/translator.
   ]
 ]
 ```
-[block:api-header]
-{
-  "title": "`count-loc` - count lines of code"
-}
-[/block]
+
+`count-loc` - count lines of code
+---------------------------------
+
 `count-loc` counts the lines of code of the specified files by running the [Succinct Code Counter](https://github.com/boyter/scc) tool.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "❯ ./pants count-loc ::\n───────────────────────────────────────────────────────────────────────────────\nLanguage                 Files     Lines   Blanks  Comments     Code Complexity\n───────────────────────────────────────────────────────────────────────────────\nPython                    1690    618679    23906      7270   587503      18700\nHTML                        61      6522      694        67     5761          0\nJSON                        36     18755        6         0    18749          0\nYAML                        30      2451        4        19     2428          0\nJavaScript                   6       671       89         8      574         32\nCSV                          1         2        0         0        2          0\nJSONL                        1         4        0         0        4          0\nJinja                        1        11        0         0       11          2\nShell                        1        13        2         2        9          4\nTOML                         1       146        5         0      141          0\n───────────────────────────────────────────────────────────────────────────────\nTotal                     1828    647254    24706      7366   615182      18738\n───────────────────────────────────────────────────────────────────────────────\nEstimated Cost to Develop $22,911,268\nEstimated Schedule Effort 50.432378 months\nEstimated People Required 53.813884\n───────────────────────────────────────────────────────────────────────────────",
-      "language": "shell"
-    }
-  ]
-}
-[/block]
+
+```shell
+❯ ./pants count-loc ::
+───────────────────────────────────────────────────────────────────────────────
+Language                 Files     Lines   Blanks  Comments     Code Complexity
+───────────────────────────────────────────────────────────────────────────────
+Python                    1690    618679    23906      7270   587503      18700
+HTML                        61      6522      694        67     5761          0
+JSON                        36     18755        6         0    18749          0
+YAML                        30      2451        4        19     2428          0
+JavaScript                   6       671       89         8      574         32
+CSV                          1         2        0         0        2          0
+JSONL                        1         4        0         0        4          0
+Jinja                        1        11        0         0       11          2
+Shell                        1        13        2         2        9          4
+TOML                         1       146        5         0      141          0
+───────────────────────────────────────────────────────────────────────────────
+Total                     1828    647254    24706      7366   615182      18738
+───────────────────────────────────────────────────────────────────────────────
+Estimated Cost to Develop $22,911,268
+Estimated Schedule Effort 50.432378 months
+Estimated People Required 53.813884
+───────────────────────────────────────────────────────────────────────────────
+```
 
 SCC has [dozens of options](https://github.com/boyter/scc#usage). You can pass through options by either setting `--scc-args` or using `--` at the end of your command, like this:
 
 ```bash
 ./pants count-loc :: -- --no-cocomo
 ```
-[block:callout]
-{
-  "type": "warning",
-  "title": "See unexpected results? Set `pants_ignore`.",
-  "body": "By default, Pants will ignore all globs specified in your `.gitignore`, along with `dist/` and any hidden files.\n\nTo ignore additional files, add to the global option `pants_ignore` in your `pants.toml`, using the same [syntax](https://git-scm.com/docs/gitignore) as `.gitignore` files. \n\nFor example:\n\n```toml\n[GLOBAL]\npants_ignore.add = [\"/ignore_this_dir/\"]\n```"
-}
-[/block]
+
+> 🚧 See unexpected results? Set `pants_ignore`.
+> 
+> By default, Pants will ignore all globs specified in your `.gitignore`, along with `dist/` and any hidden files.
+> 
+> To ignore additional files, add to the global option `pants_ignore` in your `pants.toml`, using the same [syntax](https://git-scm.com/docs/gitignore) as `.gitignore` files. 
+> 
+> For example:
+> 
+> ```toml pants.toml
+> [GLOBAL]
+> pants_ignore.add = ["/ignore_this_dir/"]
+> ```

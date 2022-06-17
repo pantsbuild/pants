@@ -9,19 +9,16 @@ updatedAt: "2021-03-18T23:59:53.235Z"
 The `package` goal bundles all the relevant code and third-party dependencies into a single asset, such as a JAR, PEX, or zip file. 
 
 Often, the asset is executable, but it need not be.
-[block:callout]
-{
-  "type": "info",
-  "title": "Example repository",
-  "body": "This guide walks through adding a simple `package` implementation for Bash that simply puts all the relevant source files into a `.zip` file.\n\nThis duplicates the `archive` target type, and is solely implemented for instructional purposes. See [here](https://github.com/pantsbuild/example-plugin/blob/main/pants-plugins/examples/bash/package_bash_binary.py) for the final implementation."
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "1. Set up a package target type (recommended)"
-}
-[/block]
+> 📘 Example repository
+> 
+> This guide walks through adding a simple `package` implementation for Bash that simply puts all the relevant source files into a `.zip` file.
+> 
+> This duplicates the `archive` target type, and is solely implemented for instructional purposes. See [here](https://github.com/pantsbuild/example-plugin/blob/main/pants-plugins/examples/bash/package_bash_binary.py) for the final implementation.
+
+1. Set up a package target type (recommended)
+---------------------------------------------
+
 Usually, you will want to add a new target type for your implementation, such as `pex_binary` or `python_distribution`.
 
 The fields depend on what makes sense for the package format you're adding support for. For example, when wrapping a binary format like Pex or PyInstaller, you may want a field corresponding to each of the tool's option, like `zip_safe` and `ignore_errors`. Often, you will want a field for the entry point.
@@ -49,19 +46,20 @@ class BashBinarySources(BashSources):
      alias = "bash_binary"
      core_fields = (*COMMON_TARGET_FIELDS, OutputPathField, Dependencies, BashBinarySources)
 ```
-[block:callout]
-{
-  "type": "warning",
-  "title": "Binary targets and the `sources` field",
-  "body": "We've found that it often works best for targets used by the `package` goal to not have a `sources` field. Instead, use a \"library\" target to describe the source code, and add the library as a dependency of the binary target. For example, a `pex_binary` target may depend on some `python_library` targets.\n\nWhy do we recommend not having a `sources` field? It can be helpful with modeling to have a clear separation between targets describing first-party code vs. artifacts you want to build. For example, this allows you to use a default value for the `sources` field of your library target without worrying that a user unintentionally set their binary's `sources` to overlap with the library's (things like dependency inference do not work as well when >1 target refer to the same source file.)\n\nHowever, sometimes it does make sense to have a `sources` field, such as a `dockerfile` target type. Likewise, this guide uses a `sources` field for simplicity. \n\nWarning: If you do have a `sources` field, set `expected_num_files` to `1` or `range(0, 2)`. Because Pants operates on a file-level, it would try to create one distinct package for each source file belonging to your target, even though you probably only wanted a single package built."
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "2. Set up a subclass of `PackageFieldSet`"
-}
-[/block]
+> 🚧 Binary targets and the `sources` field
+> 
+> We've found that it often works best for targets used by the `package` goal to not have a `sources` field. Instead, use a "library" target to describe the source code, and add the library as a dependency of the binary target. For example, a `pex_binary` target may depend on some `python_library` targets.
+> 
+> Why do we recommend not having a `sources` field? It can be helpful with modeling to have a clear separation between targets describing first-party code vs. artifacts you want to build. For example, this allows you to use a default value for the `sources` field of your library target without worrying that a user unintentionally set their binary's `sources` to overlap with the library's (things like dependency inference do not work as well when >1 target refer to the same source file.)
+> 
+> However, sometimes it does make sense to have a `sources` field, such as a `dockerfile` target type. Likewise, this guide uses a `sources` field for simplicity. 
+> 
+> Warning: If you do have a `sources` field, set `expected_num_files` to `1` or `range(0, 2)`. Because Pants operates on a file-level, it would try to create one distinct package for each source file belonging to your target, even though you probably only wanted a single package built.
+
+2. Set up a subclass of `PackageFieldSet`
+-----------------------------------------
+
 As described in [Rules and the Target API](doc:rules-api-and-target-api), a `FieldSet` is a way to tell Pants which `Field`s you care about targets having for your plugin to work.
 
 Create a new dataclass that subclasses `PackageFieldSet`. Set the class property `required_fields` to the fields your target must have registered to work. Usually, this is a field like `BashBinarySources` or `BashBinaryEntryPoint`.
@@ -93,11 +91,10 @@ def rules():
         UnionRule(PackageFieldSet, BashBinaryFieldSet),
     ]
 ```
-[block:api-header]
-{
-  "title": "3. Create a rule for your logic"
-}
-[/block]
+
+3. Create a rule for your logic
+-------------------------------
+
 Your rule should take as a parameter the `PackageFieldSet` from Step 2. It should return `BuiltPackage`, which has the fields `digest: Digest` and `artifacts: Tuple[BuiltPackageArtifact, ...]`, where each `BuiltPackageArtifact` has the field `relpath: str` and optional `extra_log_lines: Tuple[str, ...]`.
 
 Your package rule can have whatever logic you'd like to create a package. All that Pants cares about is that you return a valid `BuiltPackage` object. 
@@ -171,21 +168,18 @@ async def package_bash_binary(field_set: BashBinaryFieldSet) -> BuiltPckage:
 Note that we use `field_set.output_path.value_or_default` to determine the output filename, which will use the `output_path` field if defined, and will default to an unambiguous value otherwise.
 
 Finally, update your plugin's `register.py` to activate this file's rules.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "from bash import package_binary\n\n\ndef rules():\n    return [*package_binary.rules()]",
-      "language": "python",
-      "name": "pants-plugins/bash/register.py"
-    }
-  ]
-}
-[/block]
+
+```python pants-plugins/bash/register.py
+from bash import package_binary
+
+
+def rules():
+    return [*package_binary.rules()]
+```
+
 Now, when you run `./pants package ::`, Pants should create packages for all your package target types in the `--pants-distdir` (defaults to `dist/`).
-[block:api-header]
-{
-  "title": "4. Add tests (optional)"
-}
-[/block]
+
+4. Add tests (optional)
+-----------------------
+
 Refer to [Testing rules](doc:rules-api-testing).

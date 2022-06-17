@@ -1,10 +1,15 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 from textwrap import dedent
 
 import pytest
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixture
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.kotlin.compile import kotlinc_plugins
 from pants.backend.kotlin.compile.kotlinc import CompileKotlinSourceRequest
 from pants.backend.kotlin.compile.kotlinc import rules as kotlinc_rules
@@ -71,10 +76,20 @@ KOTLIN_STDLIB_REQUIREMENTS = [
     f"org.jetbrains.kotlin:kotlin-script-runtime:{_KOTLIN_VERSION}",
 ]
 
-kotlin_stdlib_jvm_lockfile = pytest.mark.jvm_lockfile(
-    path="kotlin-stdlib.test.lock",
-    requirements=KOTLIN_STDLIB_REQUIREMENTS,
-)
+
+@pytest.fixture
+def kotlin_stdlib_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "kotlin-stdlib.test.lock",
+        KOTLIN_STDLIB_REQUIREMENTS,
+    )
+
+
+@pytest.fixture
+def kotlin_stdlib_jvm_lockfile(
+    kotlin_stdlib_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return kotlin_stdlib_jvm_lockfile_def.load(request)
 
 
 KOTLIN_LIB_SOURCE = dedent(
@@ -103,8 +118,9 @@ KOTLIN_LIB_MAIN_SOURCE = dedent(
 
 
 @maybe_skip_jdk_test
-@kotlin_stdlib_jvm_lockfile
-def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
+def test_compile_no_deps(
+    rule_runner: RuleRunner, kotlin_stdlib_jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -114,8 +130,8 @@ def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixtu
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": kotlin_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": kotlin_stdlib_jvm_lockfile.serialized_lockfile,
             "ExampleLib.kt": KOTLIN_LIB_SOURCE,
         }
     )
@@ -150,8 +166,9 @@ def test_compile_no_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixtu
 
 
 @maybe_skip_jdk_test
-@kotlin_stdlib_jvm_lockfile
-def test_compile_with_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
+def test_compile_with_deps(
+    rule_runner: RuleRunner, kotlin_stdlib_jvm_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -164,8 +181,8 @@ def test_compile_with_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": kotlin_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": kotlin_stdlib_jvm_lockfile.serialized_lockfile,
             "Example.kt": KOTLIN_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -198,9 +215,8 @@ def test_compile_with_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
 
 
 @maybe_skip_jdk_test
-@kotlin_stdlib_jvm_lockfile
 def test_compile_with_missing_dep_fails(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, kotlin_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -212,8 +228,8 @@ def test_compile_with_missing_dep_fails(
                 """
             ),
             "Example.kt": KOTLIN_LIB_MAIN_SOURCE,
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": kotlin_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": kotlin_stdlib_jvm_lockfile.serialized_lockfile,
         }
     )
     request = CompileKotlinSourceRequest(
@@ -227,12 +243,25 @@ def test_compile_with_missing_dep_fails(
     assert "Example.kt:4:31: error: unresolved reference: lib" in fallible_result.stderr
 
 
+@pytest.fixture
+def kotlin_stdlib_with_joda_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "kotlin-stdlib-with-joda.test.lock",
+        ["joda-time:joda-time:2.10.10"] + KOTLIN_STDLIB_REQUIREMENTS,
+    )
+
+
+@pytest.fixture
+def kotlin_stdlib_with_joda_lockfile(
+    kotlin_stdlib_with_joda_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return kotlin_stdlib_with_joda_lockfile_def.load(request)
+
+
 @maybe_skip_jdk_test
-@pytest.mark.jvm_lockfile(
-    path="kotlin-stdlib-with-joda.test.lock",
-    requirements=["joda-time:joda-time:2.10.10"] + KOTLIN_STDLIB_REQUIREMENTS,
-)
-def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
+def test_compile_with_maven_deps(
+    rule_runner: RuleRunner, kotlin_stdlib_with_joda_lockfile: JVMLockfileFixture
+) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -245,8 +274,8 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockf
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": kotlin_stdlib_with_joda_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": kotlin_stdlib_with_joda_lockfile.serialized_lockfile,
             "Example.kt": dedent(
                 """
                 package org.pantsbuild.example
@@ -282,9 +311,8 @@ def test_compile_with_maven_deps(rule_runner: RuleRunner, jvm_lockfile: JVMLockf
 
 
 @maybe_skip_jdk_test
-@kotlin_stdlib_jvm_lockfile
 def test_compile_with_undeclared_jvm_artifact_target_fails(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, kotlin_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -295,8 +323,8 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": kotlin_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": kotlin_stdlib_jvm_lockfile.serialized_lockfile,
             "Example.kt": dedent(
                 """
                 package org.pantsbuild.example
@@ -324,9 +352,8 @@ def test_compile_with_undeclared_jvm_artifact_target_fails(
 
 
 @maybe_skip_jdk_test
-@kotlin_stdlib_jvm_lockfile
 def test_compile_with_undeclared_jvm_artifact_dependency_fails(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, kotlin_stdlib_jvm_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -337,8 +364,8 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(
                 )
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": kotlin_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": kotlin_stdlib_jvm_lockfile.serialized_lockfile,
             "Example.kt": dedent(
                 """
                 package org.pantsbuild.example
@@ -365,14 +392,24 @@ def test_compile_with_undeclared_jvm_artifact_dependency_fails(
     assert "unresolved reference: joda" in fallible_result.stderr
 
 
+@pytest.fixture
+def kotlinc_allopen_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "kotlinc-allopen.test.lock",
+        [f"org.jetbrains.kotlin:kotlin-allopen:{_KOTLIN_VERSION}"] + KOTLIN_STDLIB_REQUIREMENTS,
+    )
+
+
+@pytest.fixture
+def kotlinc_allopen_lockfile(
+    kotlinc_allopen_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return kotlinc_allopen_lockfile_def.load(request)
+
+
 @maybe_skip_jdk_test
-@pytest.mark.jvm_lockfile(
-    path="kotlinc-allopen.test.lock",
-    requirements=[f"org.jetbrains.kotlin:kotlin-allopen:{_KOTLIN_VERSION}"]
-    + KOTLIN_STDLIB_REQUIREMENTS,
-)
 def test_compile_with_kotlinc_plugin(
-    rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture
+    rule_runner: RuleRunner, kotlinc_allopen_lockfile: JVMLockfileFixture
 ) -> None:
     rule_runner.write_files(
         {
@@ -388,8 +425,8 @@ def test_compile_with_kotlinc_plugin(
                 kotlin_sources()
                 """
             ),
-            "3rdparty/jvm/BUILD": jvm_lockfile.requirements_as_jvm_artifact_targets(),
-            "3rdparty/jvm/default.lock": jvm_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": kotlinc_allopen_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": kotlinc_allopen_lockfile.serialized_lockfile,
             "lib/Grok.kt": dedent(
                 """
                 package lib

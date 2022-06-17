@@ -6,7 +6,8 @@ hidden: false
 createdAt: "2020-02-21T17:44:27.231Z"
 updatedAt: "2022-03-18T23:55:37.347Z"
 ---
-# Option scopes
+Option scopes
+=============
 
 Options are partitioned into named _scopes_.
 
@@ -14,7 +15,8 @@ Some systemwide options belong in the _global scope_. For example, the `--level`
 
 Other options belong to a _subsystem scope_. A _subsystem_ is simply a collection of related options, in a scope. For example, the `pytest` subsystem contains options related to [Python's test framework pytest](doc:reference-pytest). 
 
-# Setting options
+Setting options
+===============
 
 Every option can be set in the following ways, in order of precedence:
 
@@ -26,7 +28,8 @@ If an option isn't set in one of these ways, it will take on a default value.
 
 You can inspect both the current value and the default value by using `./pants help $scope` or `./pants help-advanced $scope`, e.g. `./pants help global`.
 
-## Command-line flags
+Command-line flags
+------------------
 
 Global options are set using an unqualified flag:
 
@@ -40,7 +43,8 @@ Subsystem options are set by providing the flag, with the name prefixed with the
 ./pants --source-root-patterns="['^ext']"
 ```
 
-## Environment variables
+Environment variables
+---------------------
 
 Global options are set using the environment variable `PANTS_{OPTION_NAME}`:
 
@@ -48,7 +52,7 @@ Global options are set using the environment variable `PANTS_{OPTION_NAME}`:
 PANTS_LEVEL=debug ./pants ...
 ```
 
-Subsystem options are set using the environment variable
+Subsystem options are set using the environment variable  
 `PANTS_{SCOPE}_{OPTION_NAME}`:
 
 ```bash
@@ -57,7 +61,8 @@ PANTS_SOURCE_ROOT_PATTERNS="['^ext']" ./pants ...
 
 Note that the scope and option name are upper-cased, and any dashes in the option flag name are converted to underscores: `--multiword-name` becomes `MULTIWORD_NAME`.
 
-## Config file entries
+Config file entries
+-------------------
 
 Global options are set in the `GLOBAL` section of the config file:
 
@@ -82,7 +87,8 @@ Additionally, a few different variables may be interpolated into strings in conf
 pythonpath = ["%(buildroot)s/examples"]
 ```
 
-# Option types
+Option types
+============
 
 Every option has a type, and any values you set must be of that type.
 
@@ -96,34 +102,40 @@ The option types are:
 
 A list-valued option may also declare a specific type for its members (e.g., a list of strings, or a list of integers). 
 
-## String and integer values
+String and integer values
+-------------------------
 
 Standalone string and integer values are written without quotes. Any quotes will be considered part of the value, after shell escaping.
 
 ### Command-line flags:
+
 ```bash
 ./pants --scope-intopt=42
 ./pants --scope-stropt=qux
 ```
 
 ### Environment variables:
+
 ```bash
 PANTS_SCOPE_INTOPT=42
 PANTS_SCOPE_STROPT=qux
 ```
 
 ### Config file entries:
+
 ```toml
 [scope]
 intopt = 42
 stropt = "qux"
 ```
 
-## Boolean values
+Boolean values
+--------------
 
 Boolean values can be specified using the special strings `true` and `false`. When specifying them via command-line flags you can also use the `--boolopt/--no-boolopt` syntax.
 
 ### Command-line flags:
+
 ```bash
 ./pants --scope-boolopt=true
 ./pants --scope-boolopt
@@ -131,21 +143,25 @@ Boolean values can be specified using the special strings `true` and `false`. Wh
 ```
 
 ### Environment variables:
+
 ```bash
 PANTS_SCOPE_BOOLOPT=true
 ```
 
 ### Config file entries:
+
 ```toml
 [scope]
 boolopt = true
 ```
 
-## List values
+List values
+-----------
 
 List values are parsed as Python list literals, so you must quote string values, and you may need to apply shell-level quoting and/or escaping, as required.
 
 ### Command-line flags:
+
 ```bash
 ./pants --scope-listopt="['foo','bar']"
 ```
@@ -157,6 +173,7 @@ You can also leave off the `[]` to _append_ elements. So we can rewrite the abov
 ```
 
 ### Environment variables:
+
 ```bash
 PANTS_SCOPE_LISTOPT="['foo','bar']"
 ```
@@ -168,6 +185,7 @@ PANTS_SCOPE_LISTOPT=foo
 ```
 
 ### Config file entries:
+
 ```toml
 [scope]
 listopt = [
@@ -204,23 +222,41 @@ will set the value to `[2, 3, 4]`, and
 ```
 
 will set the value to `[3, 4]`.
-[block:callout]
-{
-  "type": "info",
-  "title": "Add/remove syntax in .toml files",
-  "body": "The +/- syntax works in .toml files, but the entire value must be quoted:\n\n```toml\n[scope]\nlistopt = \"+[1,2],-[3,4]\"\n```\n\nThis means that TOML treats the value as a string, instead of a TOML list. \n\nAlternatively, you can use this syntactic sugar, which allows the values to be regular TOML lists: \n\n```toml\n[scope]\nlistopt.add = [1, 2]\nlistopt.remove = [3, 4]\n```\n\nBut note that this only works in Pants's `.toml` config files, not in environment variables or command-line flags."
-}
-[/block]
-## Dict values
+
+> 📘 Add/remove syntax in .toml files
+> 
+> The +/- syntax works in .toml files, but the entire value must be quoted:
+> 
+> ```toml
+> [scope]
+> listopt = "+[1,2],-[3,4]"
+> ```
+> 
+> This means that TOML treats the value as a string, instead of a TOML list. 
+> 
+> Alternatively, you can use this syntactic sugar, which allows the values to be regular TOML lists: 
+> 
+> ```toml
+> [scope]
+> listopt.add = [1, 2]
+> listopt.remove = [3, 4]
+> ```
+> 
+> But note that this only works in Pants's `.toml` config files, not in environment variables or command-line flags.
+
+Dict values
+-----------
 
 Dict values are parsed as Python dict literals on the command-line and environment variables, so you must quote string keys and values, and you may need to apply shell-level quoting and/or escaping, as required.
 
 ### Command-line flags:
+
 ```bash
 ./pants --scope-dictopt="{'foo':1,'bar':2}"
 ```
 
 ### Environment variables:
+
 ```bash
 PANTS_SCOPE_DICTOPT="{'foo':1,'bar':2}"
 ```
@@ -269,20 +305,18 @@ will set the value to `{'foo': 42, 'bar': 2, 'baz': 3}`, and
 
 will set the value to `{'foo': 42, 'baz': 3}`.
 
-# `.pants.rc` file
+`.pants.rc` file
+================
 
 You can set up personal Pants config files, using the same TOML syntax as `pants.toml`. By default, Pants looks for the paths `/etc/pantsrc`, `~/.pants.rc`, and `.pants.rc` in the repository root.
 
 For example:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "[python]\n# Even though our repository uses 3.8+, because I have an M1, \n# I must use Python 3.9+.\ninterpreter_constraints = [\"==3.9.*\"]",
-      "language": "toml",
-      "name": ".pants.rc"
-    }
-  ]
-}
-[/block]
+
+```toml .pants.rc
+[python]
+# Even though our repository uses 3.8+, because I have an M1, 
+# I must use Python 3.9+.
+interpreter_constraints = ["==3.9.*"]
+```
+
 If you want to ban this feature, set `[GLOBAL].pantsrc = false` in `pants.toml`.

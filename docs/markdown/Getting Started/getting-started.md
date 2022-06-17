@@ -11,8 +11,8 @@ We recommend joining our [Slack workspace](doc:the-pants-community), in case you
 
 And if you want to show support for the project, [GitHub stars](https://github.com/pantsbuild/pants) are always appreciated!
 
-* [Prerequisites](doc:prerequisites) 
-* [Installing Pants](doc:installation) 
-* [Initial configuration](doc:initial-configuration)
-* [Example repositories](doc:example-repos)
-* [Incremental adoption](doc:existing-repositories)
+- [Prerequisites](doc:prerequisites) 
+- [Installing Pants](doc:installation) 
+- [Initial configuration](doc:initial-configuration)
+- [Example repositories](doc:example-repos)
+- [Incremental adoption](doc:existing-repositories)
