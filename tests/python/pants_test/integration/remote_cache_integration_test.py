@@ -32,7 +32,7 @@ def remote_cache_args(
 
 def test_warns_on_remote_cache_errors() -> None:
     executor = PyExecutor(core_threads=2, max_threads=4)
-    cas = PyStubCAS.builder().cas_always_errors().build(executor)
+    cas = PyStubCAS.builder().ac_always_errors().cas_always_errors().build(executor)
 
     def run(behavior: RemoteCacheWarningsBehavior) -> str:
         pants_run = run_pants(
@@ -49,7 +49,7 @@ def test_warns_on_remote_cache_errors() -> None:
         return pants_run.stderr
 
     def read_err(i: int) -> str:
-        return f"Failed to read from remote cache ({i} occurrences so far): Unimplemented"
+        return f"Failed to read from remote cache ({i} occurrences so far): Unavailable"
 
     def write_err(i: int) -> str:
         return (

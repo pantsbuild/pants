@@ -53,6 +53,7 @@ impl Drop for StubCAS {
 }
 
 pub struct StubCASBuilder {
+  ac_always_errors: bool,
   cas_always_errors: bool,
   chunk_size_bytes: Option<usize>,
   content: HashMap<Fingerprint, Bytes>,
@@ -66,6 +67,7 @@ pub struct StubCASBuilder {
 impl StubCASBuilder {
   pub fn new() -> Self {
     StubCASBuilder {
+      ac_always_errors: false,
       cas_always_errors: false,
       chunk_size_bytes: None,
       content: HashMap::new(),
@@ -117,6 +119,11 @@ impl StubCASBuilder {
     self
   }
 
+  pub fn ac_always_errors(mut self) -> Self {
+    self.ac_always_errors = true;
+    self
+  }
+
   pub fn cas_always_errors(mut self) -> Self {
     self.cas_always_errors = true;
     self
@@ -163,7 +170,7 @@ impl StubCASBuilder {
     };
 
     let action_map = Arc::new(Mutex::new(HashMap::new()));
-    let ac_always_errors = Arc::new(AtomicBool::new(false));
+    let ac_always_errors = Arc::new(AtomicBool::new(self.ac_always_errors));
     let ac_responder = ActionCacheResponder {
       action_map: action_map.clone(),
       always_errors: ac_always_errors.clone(),

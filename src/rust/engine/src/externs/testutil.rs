@@ -24,6 +24,14 @@ struct PyStubCASBuilder(Arc<Mutex<Option<StubCASBuilder>>>);
 
 #[pymethods]
 impl PyStubCASBuilder {
+  fn ac_always_errors(&mut self) -> PyResult<PyStubCASBuilder> {
+    let mut builder_opt = self.0.lock();
+    let builder = builder_opt
+      .take()
+      .ok_or_else(|| PyAssertionError::new_err("Unable to unwrap StubCASBuilder"))?;
+    *builder_opt = Some(builder.ac_always_errors());
+    Ok(PyStubCASBuilder(self.0.clone()))
+  }
   fn cas_always_errors(&mut self) -> PyResult<PyStubCASBuilder> {
     let mut builder_opt = self.0.lock();
     let builder = builder_opt
