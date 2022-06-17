@@ -708,7 +708,7 @@ impl Context {
     // TODO: Currently needs a combination of `visit_live` and `invalidate_from_roots` because
     // `invalidate_from_roots` cannot view `Node` results. This could lead to a race condition
     // where a `Node` is invalidated multiple times, which might cause it to increment its attempt
-    // count multiple times.
+    // count multiple times. See https://github.com/pantsbuild/pants/issues/15867
     let mut roots = HashSet::new();
     self.core.graph.visit_live(self, |k, v| match k {
       NodeKey::ExecuteProcess(p) if v.digests().contains(&digest) => {
@@ -748,7 +748,7 @@ impl Context {
     // We invalidated a Node, and the caller (at some level above us in the stack) should retry.
     // Complete this node with the Invalidated state.
     // TODO: Differentiate the reasons for Invalidation (filesystem changes vs missing digests) to
-    // improve warning messages.
+    // improve warning messages. See https://github.com/pantsbuild/pants/issues/15867
     Err(Failure::Invalidated)
   }
 
