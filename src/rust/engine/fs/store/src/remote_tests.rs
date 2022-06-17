@@ -65,7 +65,7 @@ async fn missing_directory() {
 #[tokio::test]
 async fn load_file_grpc_error() {
   let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::always_errors();
+  let cas = StubCAS::cas_always_errors();
 
   let error = load_file_bytes(&new_byte_store(&cas), TestData::roland().digest())
     .await
@@ -80,7 +80,7 @@ async fn load_file_grpc_error() {
 #[tokio::test]
 async fn load_directory_grpc_error() {
   let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::always_errors();
+  let cas = StubCAS::cas_always_errors();
 
   let error = load_directory_proto_bytes(
     &new_byte_store(&cas),
@@ -212,7 +212,7 @@ async fn write_empty_file() {
 
 #[tokio::test]
 async fn write_file_errors() {
-  let cas = StubCAS::always_errors();
+  let cas = StubCAS::cas_always_errors();
 
   let store = new_byte_store(&cas);
   let error = store
@@ -290,7 +290,7 @@ async fn list_missing_digests_some_missing() {
 #[tokio::test]
 async fn list_missing_digests_error() {
   let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::always_errors();
+  let cas = StubCAS::cas_always_errors();
 
   let store = new_byte_store(&cas);
 

@@ -5,17 +5,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use maplit::hashset;
+use tempfile::TempDir;
+use tokio::time::sleep;
+
 use fs::{DirectoryDigest, RelativePath, EMPTY_DIRECTORY_DIGEST};
 use grpc_util::tls;
 use hashing::{Digest, EMPTY_DIGEST};
-use maplit::hashset;
-use mock::{StubActionCache, StubCAS};
+use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
-use remexec::ActionResult;
 use store::Store;
-use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
-use tokio::time::sleep;
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::{ensure_action_stored_locally, make_execute_request};
@@ -74,14 +74,17 @@ impl CommandRunnerTrait for MockLocalCommandRunner {
 struct StoreSetup {
   pub store: Store,
   pub _store_temp_dir: TempDir,
-  pub _cas: StubCAS,
+  pub cas: StubCAS,
   pub executor: task_executor::Executor,
 }
 
 impl StoreSetup {
-  pub fn new() -> StoreSetup {
+  pub fn new() -> Self {
+    Self::new_with_stub_cas(StubCAS::builder().build())
+  }
+
+  pub fn new_with_stub_cas(cas: StubCAS) -> Self {
     let executor = task_executor::Executor::new();
-    let cas = StubCAS::builder().build();
     let store_temp_dir = TempDir::new().unwrap();
     let store_dir = store_temp_dir.path().join("store_dir");
     let store = Store::local_only(executor.clone(), store_dir)
@@ -99,10 +102,10 @@ impl StoreSetup {
         4 * 1024 * 1024,
       )
       .unwrap();
-    StoreSetup {
+    Self {
       store,
       _store_temp_dir: store_temp_dir,
-      _cas: cas,
+      cas,
       executor,
     }
   }
@@ -124,18 +127,15 @@ fn create_local_runner(
 fn create_cached_runner(
   local: Box<dyn CommandRunnerTrait>,
   store_setup: &StoreSetup,
-  read_delay_ms: u64,
-  write_delay_ms: u64,
   eager_fetch: bool,
-) -> (Box<dyn CommandRunnerTrait>, StubActionCache) {
-  let action_cache = StubActionCache::new_with_delays(read_delay_ms, write_delay_ms).unwrap();
-  let runner = Box::new(
+) -> Box<dyn CommandRunnerTrait> {
+  Box::new(
     crate::remote_cache::CommandRunner::new(
       local.into(),
       ProcessMetadata::default(),
       store_setup.executor.clone(),
       store_setup.store.clone(),
-      &action_cache.address(),
+      &store_setup.cas.address(),
       None,
       BTreeMap::default(),
       Platform::current().unwrap(),
@@ -147,39 +147,22 @@ fn create_cached_runner(
       CACHE_READ_TIMEOUT,
     )
     .expect("caching command runner"),
-  );
-  (runner, action_cache)
+  )
 }
 
-async fn create_process(store: &Store) -> (Process, Digest) {
+// TODO: Unfortunately, this code cannot be moved to the `testutil::mock` crate, because that
+// introduces a cycle between this crate and that one.
+async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
   let process = Process::new(vec![
     "this process will not execute: see MockLocalCommandRunner".to_string(),
   ]);
   let (action, command, _exec_request) =
     make_execute_request(&process, ProcessMetadata::default()).unwrap();
-  let (_command_digest, action_digest) = ensure_action_stored_locally(store, &command, &action)
-    .await
-    .unwrap();
+  let (_command_digest, action_digest) =
+    ensure_action_stored_locally(&store_setup.store, &command, &action)
+      .await
+      .unwrap();
   (process, action_digest)
-}
-
-fn insert_into_action_cache(
-  action_cache: &StubActionCache,
-  action_digest: &Digest,
-  exit_code: i32,
-  stdout_digest: Digest,
-  stderr_digest: Digest,
-) {
-  let action_result = ActionResult {
-    exit_code,
-    stdout_digest: Some(stdout_digest.into()),
-    stderr_digest: Some(stderr_digest.into()),
-    ..ActionResult::default()
-  };
-  action_cache
-    .action_map
-    .lock()
-    .insert(action_digest.hash, action_result);
 }
 
 #[tokio::test]
@@ -187,14 +170,17 @@ async fn cache_read_success() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
-  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
+  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
 
-  let (process, action_digest) = create_process(&store_setup.store).await;
-  insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+  let (process, action_digest) = create_process(&store_setup).await;
+  store_setup
+    .cas
+    .action_cache
+    .insert(action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(Context::default(), &mut workunit, process.clone().into())
+    .run(Context::default(), &mut workunit, process.into())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 0);
@@ -208,11 +194,18 @@ async fn cache_read_skipped_on_action_cache_errors() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
-  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
+  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
 
-  let (process, action_digest) = create_process(&store_setup.store).await;
-  insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
-  action_cache.always_errors.store(true, Ordering::SeqCst);
+  let (process, action_digest) = create_process(&store_setup).await;
+  store_setup
+    .cas
+    .action_cache
+    .insert(action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+  store_setup
+    .cas
+    .action_cache
+    .always_errors
+    .store(true, Ordering::SeqCst);
 
   assert_eq!(
     workunit_store.get_metrics().get("remote_cache_read_errors"),
@@ -220,7 +213,7 @@ async fn cache_read_skipped_on_action_cache_errors() {
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(Context::default(), &mut workunit, process.clone().into())
+    .run(Context::default(), &mut workunit, process.into())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
@@ -238,13 +231,12 @@ async fn cache_read_skipped_on_store_errors() {
   let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 500);
-  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, true);
+  let cache_runner = create_cached_runner(local_runner, &store_setup, true);
 
   // Claim that the process has a non-empty and not-persisted stdout digest.
-  let (process, action_digest) = create_process(&store_setup.store).await;
-  insert_into_action_cache(
-    &action_cache,
-    &action_digest,
+  let (process, action_digest) = create_process(&store_setup).await;
+  store_setup.cas.action_cache.insert(
+    action_digest,
     0,
     Digest::of_bytes("pigs flying".as_bytes()),
     EMPTY_DIGEST,
@@ -256,7 +248,7 @@ async fn cache_read_skipped_on_store_errors() {
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(Context::default(), &mut workunit, process.clone().into())
+    .run(Context::default(), &mut workunit, process.into())
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
@@ -277,13 +269,11 @@ async fn cache_read_eager_fetch() {
   async fn run_process(eager_fetch: bool, workunit: &mut RunningWorkunit) -> (i32, usize) {
     let store_setup = StoreSetup::new();
     let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
-    let (cache_runner, action_cache) =
-      create_cached_runner(local_runner, &store_setup, 0, 0, eager_fetch);
+    let cache_runner = create_cached_runner(local_runner, &store_setup, eager_fetch);
 
-    let (process, action_digest) = create_process(&store_setup.store).await;
-    insert_into_action_cache(
-      &action_cache,
-      &action_digest,
+    let (process, action_digest) = create_process(&store_setup).await;
+    store_setup.cas.action_cache.insert(
+      action_digest,
       0,
       TestData::roland().digest(),
       TestData::roland().digest(),
@@ -291,7 +281,7 @@ async fn cache_read_eager_fetch() {
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
     let remote_result = cache_runner
-      .run(Context::default(), workunit, process.clone().into())
+      .run(Context::default(), workunit, process.into())
       .await
       .unwrap();
 
@@ -318,19 +308,25 @@ async fn cache_read_speculation() {
     cache_hit: bool,
     workunit: &mut RunningWorkunit,
   ) -> (i32, usize) {
-    let store_setup = StoreSetup::new();
+    let store_setup = StoreSetup::new_with_stub_cas(
+      StubCAS::builder()
+        .ac_read_delay(Duration::from_millis(remote_delay_ms))
+        .build(),
+    );
     let (local_runner, local_runner_call_counter) = create_local_runner(1, local_delay_ms);
-    let (cache_runner, action_cache) =
-      create_cached_runner(local_runner, &store_setup, remote_delay_ms, 0, false);
+    let cache_runner = create_cached_runner(local_runner, &store_setup, false);
 
-    let (process, action_digest) = create_process(&store_setup.store).await;
+    let (process, action_digest) = create_process(&store_setup).await;
     if cache_hit {
-      insert_into_action_cache(&action_cache, &action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
+      store_setup
+        .cas
+        .action_cache
+        .insert(action_digest, 0, EMPTY_DIGEST, EMPTY_DIGEST);
     }
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
     let remote_result = cache_runner
-      .run(Context::default(), workunit, process.clone().into())
+      .run(Context::default(), workunit, process.into())
       .await
       .unwrap();
 
@@ -359,11 +355,11 @@ async fn cache_write_success() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
-  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
-  let (process, action_digest) = create_process(&store_setup.store).await;
+  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
+  let (process, action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
-  assert!(action_cache.action_map.lock().is_empty());
+  assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
     .run(Context::default(), &mut workunit, process.clone().into())
@@ -374,11 +370,12 @@ async fn cache_write_success() {
 
   // Wait for the cache write block to finish.
   sleep(Duration::from_secs(1)).await;
-  assert_eq!(action_cache.action_map.lock().len(), 1);
-  let action_map_mutex_guard = action_cache.action_map.lock();
+  assert_eq!(store_setup.cas.action_cache.len(), 1);
   assert_eq!(
-    action_map_mutex_guard
-      .get(&action_digest.hash)
+    store_setup
+      .cas
+      .action_cache
+      .get(action_digest)
       .unwrap()
       .exit_code,
     0
@@ -390,11 +387,11 @@ async fn cache_write_not_for_failures() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let store_setup = StoreSetup::new();
   let (local_runner, local_runner_call_counter) = create_local_runner(1, 100);
-  let (cache_runner, action_cache) = create_cached_runner(local_runner, &store_setup, 0, 0, false);
-  let (process, _action_digest) = create_process(&store_setup.store).await;
+  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
+  let (process, _action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
-  assert!(action_cache.action_map.lock().is_empty());
+  assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
     .run(Context::default(), &mut workunit, process.clone().into())
@@ -405,21 +402,24 @@ async fn cache_write_not_for_failures() {
 
   // Wait for the cache write block to finish.
   sleep(Duration::from_millis(100)).await;
-  assert!(action_cache.action_map.lock().is_empty());
+  assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 }
 
 /// Cache writes should be async and not block the CommandRunner from returning.
 #[tokio::test]
 async fn cache_write_does_not_block() {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
-  let store_setup = StoreSetup::new();
+  let store_setup = StoreSetup::new_with_stub_cas(
+    StubCAS::builder()
+      .ac_write_delay(Duration::from_millis(100))
+      .build(),
+  );
   let (local_runner, local_runner_call_counter) = create_local_runner(0, 100);
-  let (cache_runner, action_cache) =
-    create_cached_runner(local_runner, &store_setup, 0, 100, false);
-  let (process, action_digest) = create_process(&store_setup.store).await;
+  let cache_runner = create_cached_runner(local_runner, &store_setup, false);
+  let (process, action_digest) = create_process(&store_setup).await;
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
-  assert!(action_cache.action_map.lock().is_empty());
+  assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
     .run(Context::default(), &mut workunit, process.clone().into())
@@ -430,14 +430,15 @@ async fn cache_write_does_not_block() {
 
   // We expect the cache write to have not finished yet, even though we already finished
   // CommandRunner::run().
-  assert!(action_cache.action_map.lock().is_empty());
+  assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 
   sleep(Duration::from_secs(1)).await;
-  assert_eq!(action_cache.action_map.lock().len(), 1);
-  let action_map_mutex_guard = action_cache.action_map.lock();
+  assert_eq!(store_setup.cas.action_cache.len(), 1);
   assert_eq!(
-    action_map_mutex_guard
-      .get(&action_digest.hash)
+    store_setup
+      .cas
+      .action_cache
+      .get(action_digest)
       .unwrap()
       .exit_code,
     0
@@ -594,13 +595,13 @@ async fn make_action_result_basic() {
     .expect("Error saving directory");
 
   let mock_command_runner = Arc::new(MockCommandRunner);
-  let action_cache = StubActionCache::new().unwrap();
+  let cas = StubCAS::builder().build();
   let runner = crate::remote_cache::CommandRunner::new(
     mock_command_runner.clone(),
     ProcessMetadata::default(),
     executor.clone(),
     store.clone(),
-    &action_cache.address(),
+    &cas.address(),
     None,
     BTreeMap::default(),
     Platform::current().unwrap(),
