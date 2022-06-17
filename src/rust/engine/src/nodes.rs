@@ -387,7 +387,7 @@ impl ExecuteProcess {
   ) -> NodeResult<ProcessResult> {
     let request = self.process;
 
-    let command_runner = &context.core.command_runner;
+    let command_runner = &context.core.command_runners[0];
 
     let execution_context = process_execution::Context::new(
       context.session.workunit_store(),

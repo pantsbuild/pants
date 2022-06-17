@@ -12,11 +12,9 @@ This guide assumes that you are running a formatter that already exists outside 
 
 If you are instead writing your own formatting logic inline, you can skip Step 1. In Step 4, you will not need to use `Process`.
 
-[block:api-header]
-{
-  "title": "1. Install your formatter"
-}
-[/block]
+1. Install your formatter
+-------------------------
+
 There are several ways for Pants to install your formatter. See [Installing tools](doc:rules-api-installing-tools). This example will use `ExternalTool` because there is already a pre-compiled binary for shfmt.
 
 You will also likely want to register some options, like `--config`, `--skip`, and `--args`. Options are registered through a [`Subsystem`](doc:rules-api-subsystems). If you are using `ExternalTool`, this is already a subclass of `Subsystem`. Otherwise, create a subclass of `Subsystem`. Then, set the class property `options_scope` to the name of the tool, e.g. `"shfmt"` or `"prettier"`. Finally, add options from `pants.option.option_types`.
@@ -62,11 +60,10 @@ class Shfmt(ExternalTool):
         plat_str = self.platform_mapping[plat.value]
         return f"./shfmt_{self.version}_{plat_str}"
 ```
-[block:api-header]
-{
-  "title": "2. Set up a `FieldSet` and `FmtRequest`/`LintTargetsRequest`"
-}
-[/block]
+
+2. Set up a `FieldSet` and `FmtRequest`/`LintTargetsRequest`
+------------------------------------------------------------
+
 As described in [Rules and the Target API](doc:rules-api-and-target-api), a `FieldSet` is a way to tell Pants which `Field`s you care about targets having for your plugin to work.
 
 Usually, you should add a subclass of `SourcesField` to the class property `required_fields`, such as `ShellSourceField` or `PythonSourceField`. This means that your linter will run on any target with that sources field or a subclass of it.
@@ -112,11 +109,10 @@ def rules():
         UnionRule(LintTargetsRequest, ShfmtRequest),
     ]
 ```
-[block:api-header]
-{
-  "title": "3. Create `fmt` and `lint` rules"
-}
-[/block]
+
+3. Create `fmt` and `lint` rules
+--------------------------------
+
 You will need rules for both `fmt` and `lint`. Both rules should take the `LintTargetsRequest`/`FmtRequest` from step 3  (e.g. `ShfmtRequest`) as a parameter. The `fmt` rule should return `FmtResult`, and the `lint` rule should return `LintResults`.
 
 ```python
@@ -241,21 +237,18 @@ If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, 
 Use `Get(Digest, MergeDigests)` to combine the different inputs together, such as merging the source files and downloaded tool.
 
 Finally, update your plugin's `register.py` to activate this file's rules. Note that we must register the rules added in Step 2, as well.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "from shell import shfmt\n\n\ndef rules():\n    return [*shfmt.rules()]",
-      "language": "python",
-      "name": "pants-plugins/shell/register.py"
-    }
-  ]
-}
-[/block]
+
+```python pants-plugins/shell/register.py
+from shell import shfmt
+
+
+def rules():
+    return [*shfmt.rules()]
+```
+
 Now, when you run `./pants fmt ::` or `./pants lint ::`, your new formatter should run. 
-[block:api-header]
-{
-  "title": "5. Add tests (optional)"
-}
-[/block]
+
+5. Add tests (optional)
+-----------------------
+
 Refer to [Testing rules](doc:rules-api-testing).

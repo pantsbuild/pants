@@ -13,7 +13,6 @@ from typing import Any
 import ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
-from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
@@ -265,9 +264,7 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
 
 @rule
 async def analyze_go_third_party_module(
-    request: AnalyzeThirdPartyModuleRequest,
-    analyzer: PackageAnalyzerSetup,
-    golang_subsystem: GolangSubsystem,
+    request: AnalyzeThirdPartyModuleRequest, analyzer: PackageAnalyzerSetup
 ) -> AnalyzedThirdPartyModule:
     # Download the module.
     download_result = await Get(
@@ -450,17 +447,16 @@ async def analyze_go_third_party_package(
     )
 
     if analysis.embed_patterns or analysis.test_embed_patterns or analysis.xtest_embed_patterns:
-        embedder = await Get(
-            LoadedGoBinary, LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder")
-        )
-        patterns_json = {
-            "EmbedPatterns": analysis.embed_patterns,
-            "TestEmbedPatterns": analysis.test_embed_patterns,
-            "XTestEmbedPatterns": analysis.xtest_embed_patterns,
-        }
-        patterns_json_digest = await Get(
-            Digest,
-            CreateDigest([FileContent("patterns.json", json.dumps(patterns_json).encode("utf-8"))]),
+        patterns_json = json.dumps(
+            {
+                "EmbedPatterns": analysis.embed_patterns,
+                "TestEmbedPatterns": analysis.test_embed_patterns,
+                "XTestEmbedPatterns": analysis.xtest_embed_patterns,
+            }
+        ).encode("utf-8")
+        embedder, patterns_json_digest = await MultiGet(
+            Get(LoadedGoBinary, LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder")),
+            Get(Digest, CreateDigest([FileContent("patterns.json", patterns_json)])),
         )
         input_digest = await Get(
             Digest, MergeDigests((package_digest, patterns_json_digest, embedder.digest))

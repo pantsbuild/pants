@@ -1,16 +1,15 @@
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
+use std::fmt::{self, Debug};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use fs::{directory, DigestTrie, RelativePath};
-use futures::future::BoxFuture;
+use futures::future::{self, BoxFuture, TryFutureExt};
 use futures::FutureExt;
-use grpc_util::retry::status_is_retryable;
-use grpc_util::{
-  headers_to_http_header_map, layered_service, retry::retry_call, status_to_str, LayeredService,
-};
+use grpc_util::retry::{retry_call, status_is_retryable};
+use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -22,11 +21,12 @@ use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
 
-use crate::remote::make_execute_request;
+use crate::remote::{apply_headers, make_execute_request, populate_fallible_execution_result};
 use crate::{
   Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessMetadata,
+  ProcessMetadata, ProcessResultSource,
 };
+use tonic::{Code, Request, Status};
 
 #[derive(Clone, Copy, Debug, PartialEq, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
@@ -46,7 +46,7 @@ pub enum RemoteCacheWarningsBehavior {
 /// then locally.
 #[derive(Clone)]
 pub struct CommandRunner {
-  underlying: Arc<dyn crate::CommandRunner>,
+  inner: Arc<dyn crate::CommandRunner>,
   metadata: ProcessMetadata,
   executor: task_executor::Executor,
   store: Store,
@@ -63,7 +63,7 @@ pub struct CommandRunner {
 
 impl CommandRunner {
   pub fn new(
-    underlying: Arc<dyn crate::CommandRunner>,
+    inner: Arc<dyn crate::CommandRunner>,
     metadata: ProcessMetadata,
     executor: task_executor::Executor,
     store: Store,
@@ -98,7 +98,7 @@ impl CommandRunner {
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
     Ok(CommandRunner {
-      underlying,
+      inner,
       metadata,
       executor,
       store,
@@ -256,7 +256,7 @@ impl CommandRunner {
   ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
     // A future to read from the cache and log the results accordingly.
     let cache_read_future = async {
-      let response = crate::remote::check_action_cache(
+      let response = check_action_cache(
         action_digest,
         &request.description,
         &self.metadata,
@@ -414,6 +414,14 @@ impl CommandRunner {
   }
 }
 
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("remote_cache::CommandRunner")
+      .field("inner", &self.inner)
+      .finish_non_exhaustive()
+  }
+}
+
 enum CacheErrorType {
   ReadError,
   WriteError,
@@ -444,15 +452,12 @@ impl crate::CommandRunner for CommandRunner {
           cache_lookup_start,
           action_digest,
           &request.clone(),
-          self.underlying.run(context.clone(), workunit, request),
+          self.inner.run(context.clone(), workunit, request),
         )
         .await?
     } else {
       (
-        self
-          .underlying
-          .run(context.clone(), workunit, request)
-          .await?,
+        self.inner.run(context.clone(), workunit, request).await?,
         false,
       )
     };
@@ -489,4 +494,110 @@ impl crate::CommandRunner for CommandRunner {
 
     Ok(result)
   }
+}
+
+/// Check the remote Action Cache for a cached result of running the given `command` and the Action
+/// with the given `action_digest`.
+///
+/// This check is necessary because some REAPI servers do not short-circuit the Execute method
+/// by checking the Action Cache (e.g., BuildBarn). Thus, this client must check the cache
+/// explicitly in order to avoid duplicating already-cached work. This behavior matches
+/// the Bazel RE client.
+async fn check_action_cache(
+  action_digest: Digest,
+  command_description: &str,
+  metadata: &ProcessMetadata,
+  platform: Platform,
+  context: &Context,
+  action_cache_client: Arc<ActionCacheClient<LayeredService>>,
+  store: Store,
+  eager_fetch: bool,
+  timeout_duration: Duration,
+) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
+  in_workunit!(
+    "check_action_cache",
+    Level::Debug,
+    desc = Some(format!("Remote cache lookup for: {}", command_description)),
+    |workunit| async move {
+      workunit.increment_counter(Metric::RemoteCacheRequests, 1);
+
+      let client = action_cache_client.as_ref().clone();
+      let response = retry_call(
+        client,
+        move |mut client| {
+          let request = remexec::GetActionResultRequest {
+            action_digest: Some(action_digest.into()),
+            instance_name: metadata.instance_name.as_ref().cloned().unwrap_or_default(),
+            ..remexec::GetActionResultRequest::default()
+          };
+          let request = apply_headers(Request::new(request), &context.build_id);
+          async move {
+            let lookup_fut = client.get_action_result(request);
+            let timeout_fut = tokio::time::timeout(timeout_duration, lookup_fut);
+            timeout_fut
+              .await
+              .unwrap_or_else(|_| Err(Status::unavailable("Pants client timeout")))
+          }
+        },
+        status_is_retryable,
+      )
+      .and_then(|action_result| async move {
+        let action_result = action_result.into_inner();
+        let response = populate_fallible_execution_result(
+          store.clone(),
+          context.run_id,
+          &action_result,
+          platform,
+          false,
+          ProcessResultSource::HitRemotely,
+        )
+        .await
+        .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
+
+        if eager_fetch {
+          // NB: `ensure_local_has_file` and `ensure_local_has_recursive_directory` are internally
+          // retried.
+          let response = response.clone();
+          in_workunit!(
+            "eager_fetch_action_cache",
+            Level::Trace,
+            desc = Some("eagerly fetching after action cache hit".to_owned()),
+            |_workunit| async move {
+              future::try_join_all(vec![
+                store.ensure_local_has_file(response.stdout_digest).boxed(),
+                store.ensure_local_has_file(response.stderr_digest).boxed(),
+                store
+                  .ensure_local_has_recursive_directory(response.output_directory)
+                  .boxed(),
+              ])
+              .await
+            }
+          )
+          .await
+          .map_err(|e| Status::unavailable(format!("Output content could not be loaded: {e}")))?;
+        }
+        Ok(response)
+      })
+      .await;
+
+      match response {
+        Ok(response) => {
+          workunit.increment_counter(Metric::RemoteCacheRequestsCached, 1);
+          Ok(Some(response))
+        }
+        Err(status) => match status.code() {
+          Code::NotFound => {
+            workunit.increment_counter(Metric::RemoteCacheRequestsUncached, 1);
+            Ok(None)
+          }
+          _ => {
+            workunit.increment_counter(Metric::RemoteCacheReadErrors, 1);
+            // TODO: Ensure that we're catching missing digests.
+            Err(status_to_str(status).into())
+          }
+        },
+      }
+    }
+  )
+  .await
 }

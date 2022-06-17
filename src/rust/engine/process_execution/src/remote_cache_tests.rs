@@ -28,7 +28,7 @@ use crate::{
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// A mock of the local runner used for better hermeticity of the tests.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct MockLocalCommandRunner {
   result: Result<FallibleProcessResultWithPlatform, ProcessError>,
   call_counter: Arc<AtomicUsize>,
@@ -553,6 +553,7 @@ async fn extract_output_file() {
 
 #[tokio::test]
 async fn make_action_result_basic() {
+  #[derive(Debug)]
   struct MockCommandRunner;
 
   #[async_trait]
