@@ -6,7 +6,7 @@ from __future__ import annotations
 import time
 
 from pants.engine.fs import Digest, DigestContents, DigestEntries, FileDigest, FileEntry
-from pants.engine.internals.native_engine import PyExecutor, PyStubActionCache, PyStubCAS
+from pants.engine.internals.native_engine import PyExecutor, PyStubCAS
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, rule
 from pants.option.global_options import RemoteCacheWarningsBehavior
@@ -18,25 +18,21 @@ from pants.util.logging import LogLevel
 def remote_cache_args(
     store_address: str,
     warnings_behavior: RemoteCacheWarningsBehavior = RemoteCacheWarningsBehavior.backoff,
-    *,
-    cache_address: str | None = None,
 ) -> list[str]:
     # NB: Our options code expects `grpc://`, which it will then convert back to
     # `http://` before sending over FFI.
     store_address = store_address.replace("http://", "grpc://")
-    cache_address = cache_address.replace("http://", "grpc://") if cache_address else None
     return [
         "--remote-cache-read",
         "--remote-cache-write",
         f"--remote-cache-warnings={warnings_behavior.value}",
         f"--remote-store-address={store_address}",
-        *([f"--remote-cache-address={cache_address}"] if cache_address else []),
     ]
 
 
 def test_warns_on_remote_cache_errors() -> None:
     executor = PyExecutor(core_threads=2, max_threads=4)
-    cas = PyStubCAS.builder().always_errors().build(executor)
+    cas = PyStubCAS.builder().cas_always_errors().build(executor)
 
     def run(behavior: RemoteCacheWarningsBehavior) -> str:
         pants_run = run_pants(
@@ -107,7 +103,6 @@ async def entries_from_process(process_result: ProcessResult) -> ProcessOutputEn
 def test_lazy_fetch_backtracking() -> None:
     executor = PyExecutor(core_threads=2, max_threads=4)
     cas = PyStubCAS.builder().build(executor)
-    action_cache = PyStubActionCache(executor)
 
     def run() -> tuple[FileDigest, dict[str, int]]:
         # Use an isolated store to ensure that the only content is in the remote/stub cache.
@@ -117,7 +112,7 @@ def test_lazy_fetch_backtracking() -> None:
             bootstrap_args=[
                 "--no-remote-cache-eager-fetch",
                 "--no-local-cache",
-                *remote_cache_args(store_address=cas.address, cache_address=action_cache.address),
+                *remote_cache_args(cas.address),
             ],
         )
         entries = rule_runner.request(
@@ -140,9 +135,9 @@ def test_lazy_fetch_backtracking() -> None:
         return entry.file_digest, rule_runner.scheduler.get_metrics()
 
     # Run once to populate the remote cache, and validate that there is one entry afterwards.
-    assert action_cache.len() == 0
+    assert cas.action_cache_len() == 0
     file_digest1, metrics1 = run()
-    assert action_cache.len() == 1
+    assert cas.action_cache_len() == 1
     assert metrics1["remote_cache_requests"] == 1
     assert metrics1["remote_cache_requests_uncached"] == 1
 

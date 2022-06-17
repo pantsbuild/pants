@@ -278,7 +278,7 @@ async fn load_file_remote_error_is_error() {
   let dir = TempDir::new().unwrap();
 
   let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::always_errors();
+  let cas = StubCAS::cas_always_errors();
   let error = load_file_bytes(
     &new_store(dir.path(), &cas.address()),
     TestData::roland().digest(),
@@ -303,7 +303,7 @@ async fn load_directory_remote_error_is_error() {
   let dir = TempDir::new().unwrap();
 
   let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::always_errors();
+  let cas = StubCAS::cas_always_errors();
   let error = new_store(dir.path(), &cas.address())
     .load_directory(TestData::roland().digest())
     .await
