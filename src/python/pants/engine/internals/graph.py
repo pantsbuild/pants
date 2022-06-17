@@ -722,7 +722,7 @@ def _log_or_raise_unmatched_owners(
     msg = (
         f"{prefix} See {doc_url('targets')} for more information on target definitions."
         f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
-        f"{doc_url('create-initial-build-files')}.{option_msg}"
+        f"{doc_url('initial-configuration#5-generate-build-files')}.{option_msg}"
     )
 
     if owners_not_found_behavior == OwnersNotFoundBehavior.warn:

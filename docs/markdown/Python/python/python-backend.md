@@ -40,7 +40,7 @@ python_sources(name="lib")
 python_tests(name="tests")
 ```
 
-You can generate these targets by running [`./pants tailor`](doc:create-initial-build-files).
+You can generate these targets by running [`./pants tailor`](doc:initial-configuration#5-generate-build-files).
 
 ```
 ❯ ./pants tailor
