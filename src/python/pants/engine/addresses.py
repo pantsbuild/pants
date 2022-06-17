@@ -63,6 +63,7 @@ class UnparsedAddressInputs:
     values: tuple[str, ...]
     relative_to: str | None
     description_of_origin: str
+    skip_invalid_addresses: bool
 
     def __init__(
         self,
@@ -70,7 +71,9 @@ class UnparsedAddressInputs:
         *,
         owning_address: Address | None,
         description_of_origin: str,
+        skip_invalid_addresses: bool = False,
     ) -> None:
         self.values = tuple(values)
         self.relative_to = owning_address.spec_path if owning_address else None
         self.description_of_origin = description_of_origin
+        self.skip_invalid_addresses = skip_invalid_addresses
