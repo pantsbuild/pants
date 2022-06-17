@@ -9,6 +9,7 @@ from pants.backend.scala.dependency_inference import scala_parser
 from pants.backend.scala.dependency_inference.scala_parser import (
     AnalyzeScalaSourceRequest,
     ScalaImport,
+    ScalaProvidedSymbol,
     ScalaSourceDependencyAnalysis,
 )
 from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
@@ -143,7 +144,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         ),
     )
 
-    assert sorted(analysis.provided_symbols) == [
+    assert sorted(symbol.name for symbol in analysis.provided_symbols) == [
         "org.pantsbuild.example.ASubClass",
         "org.pantsbuild.example.ASubTrait",
         "org.pantsbuild.example.ApplyQualifier",
@@ -177,7 +178,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.OuterTrait.NestedVar",
     ]
 
-    assert sorted(analysis.provided_symbols_encoded) == [
+    assert sorted(symbol.name for symbol in analysis.provided_symbols_encoded) == [
         "org.pantsbuild.example.ASubClass",
         "org.pantsbuild.example.ASubTrait",
         "org.pantsbuild.example.ApplyQualifier",
@@ -409,7 +410,10 @@ def test_package_object(rule_runner: RuleRunner) -> None:
             """
         ),
     )
-    assert sorted(analysis.provided_symbols) == ["foo.bar", "foo.bar.Hello"]
+    assert sorted(symbol.name for symbol in analysis.provided_symbols) == [
+        "foo.bar",
+        "foo.bar.Hello",
+    ]
 
 
 def test_source3(rule_runner: RuleRunner) -> None:
@@ -467,4 +471,28 @@ def test_extract_annotations(rule_runner: RuleRunner) -> None:
         "foo.traitAnnotation",
         "foo.valAnnotation",
         "foo.varAnnotation",
+    ]
+
+
+def test_recursive_objects(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            object Bar {
+                def a = ???
+            }
+
+            object Foo extends Bar {
+                def b = ???
+            }
+            """
+        ),
+    )
+    assert sorted(analysis.provided_symbols, key=lambda s: s.name) == [
+        ScalaProvidedSymbol("foo.Bar", False),
+        ScalaProvidedSymbol("foo.Bar.a", False),
+        ScalaProvidedSymbol("foo.Foo", True),
     ]

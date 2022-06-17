@@ -25,14 +25,17 @@ case class AnImport(
 )
 
 case class Analysis(
-    providedSymbols: Vector[String],
-    providedSymbolsEncoded: Vector[String],
+    providedSymbols: Vector[Analysis.ProvidedSymbol],
+    providedSymbolsEncoded: Vector[Analysis.ProvidedSymbol],
     importsByScope: HashMap[String, ArrayBuffer[AnImport]],
     consumedSymbolsByScope: HashMap[String, HashSet[String]],
     scopes: Vector[String]
 )
+object Analysis {
+  case class ProvidedSymbol(name: String, recursive: Boolean)
+}
 
-case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boolean)
+case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boolean, recursive: Boolean)
 
 class SourceAnalysisTraverser extends Traverser {
   val nameParts = ArrayBuffer[String]()
@@ -111,7 +114,8 @@ class SourceAnalysisTraverser extends Traverser {
       symbolName: String,
       sawClass: Boolean = false,
       sawTrait: Boolean = false,
-      sawObject: Boolean = false
+      sawObject: Boolean = false,
+      recursive: Boolean = false
   ): Unit = {
     if (!skipProvidedNames) {
       val fullPackageName = nameParts.mkString(".")
@@ -125,14 +129,16 @@ class SourceAnalysisTraverser extends Traverser {
         val newSymbol = ProvidedSymbol(
           sawClass = existingSymbol.sawClass || sawClass,
           sawTrait = existingSymbol.sawTrait || sawTrait,
-          sawObject = existingSymbol.sawObject || sawObject
+          sawObject = existingSymbol.sawObject || sawObject,
+          recursive = existingSymbol.sawObject || recursive
         )
         providedSymbols(symbolName) = newSymbol
       } else {
         providedSymbols(symbolName) = ProvidedSymbol(
           sawClass = sawClass,
           sawTrait = sawTrait,
-          sawObject = sawObject
+          sawObject = sawObject,
+          recursive
         )
       }
     }
@@ -223,8 +229,18 @@ class SourceAnalysisTraverser extends Traverser {
     case Defn.Object(mods, nameNode, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
-      recordProvidedName(name, sawObject = true)
-      visitTemplate(templ, name)
+
+      // TODO: should object already be recursive?
+      // an object is recursive if extends another type because we cannot figure out the provided types
+      // in the parents, we just mark the object as recursive (which is indicated by non-empty inits)
+      val recursive = !templ.inits.isEmpty
+      recordProvidedName(name, sawObject = true, recursive = recursive)
+      
+      // If the object is recursive, no need to provide the symbols inside
+      if (recursive)
+        withSuppressProvidedNames(() => visitTemplate(templ, name))
+      else
+        visitTemplate(templ, name)
     }
 
     case Defn.Type(mods, nameNode, _tparams, _body) => {
@@ -336,30 +352,30 @@ class SourceAnalysisTraverser extends Traverser {
     case node => super.apply(node)
   }
 
-  def gatherProvidedSymbols(): Vector[String] = {
+  def gatherProvidedSymbols(): Vector[Analysis.ProvidedSymbol] = {
     providedSymbolsByScope
       .flatMap({ case (scopeName, symbolsForScope) =>
-        symbolsForScope.keys.map(symbolName => s"${scopeName}.${symbolName}").toVector
+        symbolsForScope.map { case(symbolName, symbol) => Analysis.ProvidedSymbol(s"${scopeName}.${symbolName}", symbol.recursive)}.toVector
       })
       .toVector
   }
 
-  def gatherEncodedProvidedSymbols(): Vector[String] = {
+  def gatherEncodedProvidedSymbols(): Vector[Analysis.ProvidedSymbol] = {
     providedSymbolsByScope
       .flatMap({ case (scopeName, symbolsForScope) =>
         val encodedSymbolsForScope = symbolsForScope.flatMap({
           case (symbolName, symbol) => {
             val encodedSymbolName = NameTransformer.encode(symbolName)
-            val result = ArrayBuffer[String](encodedSymbolName)
+            val result = ArrayBuffer[Analysis.ProvidedSymbol](Analysis.ProvidedSymbol(encodedSymbolName, symbol.recursive))
             if (symbol.sawObject) {
-              result.append(encodedSymbolName + "$")
-              result.append(encodedSymbolName + "$.MODULE$")
+              result.append(Analysis.ProvidedSymbol(encodedSymbolName + "$", symbol.recursive))
+              result.append(Analysis.ProvidedSymbol(encodedSymbolName + "$.MODULE$", symbol.recursive))
             }
             result.toVector
           }
         })
 
-        encodedSymbolsForScope.map(symbolName => s"${scopeName}.${symbolName}")
+        encodedSymbolsForScope.map(symbol => symbol.copy(name = s"${scopeName}.${symbol.name}"))
       })
       .toVector
   }
