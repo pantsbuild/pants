@@ -292,6 +292,7 @@ async def create_docker_build_context(
                     from the target {dockerfile_info.address}
                     """
                 ),
+                skip_invalid_addresses=True,
             ),
         )
         # Map those addresses to the corresponding built image ref (tag).
