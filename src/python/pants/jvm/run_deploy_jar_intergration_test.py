@@ -1,12 +1,15 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import textwrap
+from __future__ import annotations
+
 from textwrap import dedent
 
-from pants.engine.internals.native_engine import FileDigest
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+import pytest
+
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
 EMPTY_RESOLVE = """
@@ -20,47 +23,19 @@ EMPTY_RESOLVE = """
 """
 
 
-DEFAULT_LOCKFILE = (
-    TestCoursierWrapper(
-        CoursierResolvedLockfile(
-            (
-                CoursierLockfileEntry(
-                    coord=Coordinate(
-                        group="org.scala-lang", artifact="scala-library", version="2.13.6"
-                    ),
-                    file_name="org.scala-lang_scala-library_2.13.6.jar",
-                    direct_dependencies=Coordinates(),
-                    dependencies=Coordinates(),
-                    file_digest=FileDigest(
-                        "f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a", 5955737
-                    ),
-                ),
-            )
-        )
+@pytest.fixture
+def scala_stdlib_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scala-library-2.13.test.lock",
+        ["org.scala-lang:scala-library:2.13.8"],
     )
-    .serialize(
-        [
-            ArtifactRequirement(
-                coordinate=Coordinate(
-                    group="org.scala-lang", artifact="scala-library", version="2.13.6"
-                )
-            )
-        ]
-    )
-    .replace("{", "{{")
-    .replace("}", "}}")
-)
 
-DEFAULT_SCALA_LIBRARY_TARGET = textwrap.dedent(
-    """\
-    jvm_artifact(
-      name="org.scala-lang_scala-library_2.13.6",
-      group="org.scala-lang",
-      artifact="scala-library",
-      version="2.13.6",
-    )
-    """
-)
+
+@pytest.fixture
+def scala_stdlib_jvm_lockfile(
+    scala_stdlib_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scala_stdlib_jvm_lockfile_def.load(request)
 
 
 def test_java() -> None:
@@ -102,7 +77,7 @@ def test_java() -> None:
         assert result.stdout.strip() == "Hello, World!"
 
 
-def test_scala() -> None:
+def test_scala(scala_stdlib_jvm_lockfile: JVMLockfileFixture) -> None:
     sources = {
         "src/org/pantsbuild/test/Hello.scala": dedent(
             """\
@@ -126,8 +101,8 @@ def test_scala() -> None:
             )
             """
         ),
-        "BUILD": DEFAULT_SCALA_LIBRARY_TARGET,
-        "lockfile": DEFAULT_LOCKFILE,
+        "BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+        "lockfile": scala_stdlib_jvm_lockfile.serialized_lockfile,
     }
     with setup_tmpdir(sources) as tmpdir:
         args = [
