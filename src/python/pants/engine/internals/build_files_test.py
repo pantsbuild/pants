@@ -14,15 +14,24 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
-    AddressFamilyDir,
+    AddressFamilyRequest,
     BuildFileOptions,
     evaluate_preludes,
     parse_address_family,
 )
+from pants.engine.internals.defaults import BuildFileDefaultsProvider
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.target import Dependencies, MultipleSourcesField, StringField, Tags, Target
+from pants.engine.target import (
+    Dependencies,
+    MultipleSourcesField,
+    RegisteredTargetTypes,
+    StringField,
+    Tags,
+    Target,
+)
+from pants.engine.unions import UnionMembership
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
@@ -35,7 +44,12 @@ def test_parse_address_family_empty() -> None:
             Parser(build_root="", target_type_aliases=[], object_aliases=BuildFileAliases()),
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict()),
-            AddressFamilyDir("/dev/null"),
+            AddressFamilyRequest(
+                "/dev/null",
+                BuildFileDefaultsProvider(
+                    RegisteredTargetTypes({}), UnionMembership({})
+                ).get_defaults_for(""),
+            ),
         ],
         mock_gets=[
             MockGet(
@@ -198,6 +212,37 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     )
     assert target_adaptor.name == "t2"
     assert target_adaptor.type_alias == "mock_tgt"
+
+
+def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "helloworld/dir/BUILD": dedent(
+                """\
+                __defaults__(all=dict(tags=["24"]))
+                mock_tgt(tags=["42"])
+                mock_tgt(name='t2')
+                """
+            )
+        }
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
+    )
+    assert target_adaptor.name is None
+    assert target_adaptor.kwargs["tags"] == ["42"]
+
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [
+            TargetAdaptorRequest(
+                Address("helloworld/dir", target_name="t2"), description_of_origin="tests"
+            )
+        ],
+    )
+    assert target_adaptor.name == "t2"
+    assert target_adaptor.kwargs["tags"] == ["24"]
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
