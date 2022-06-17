@@ -40,7 +40,7 @@ Each target type has different _fields_, or individual metadata values. Run `./p
 
 All target types have a `name` field, which is used to identify the target. Target names must be unique within a directory.
 
-Use [`./pants tailor`](doc:create-initial-build-files) to automate generating BUILD files, and [`./pants update-build-files`](doc:reference-update-build-files) to reformat them (using `black`, [by default](doc:reference-update-build-files#section-formatter)).
+Use [`./pants tailor ::`](doc:create-initial-build-files) to automate generating BUILD files, and [`./pants update-build-files ::`](doc:reference-update-build-files) to reformat them (using `black`, [by default](doc:reference-update-build-files#section-formatter)).
 
 # Target addresses
 
@@ -134,7 +134,7 @@ To reduce boilerplate, Pants provides target types that generate other targets. 
 * `python_tests` -> `python_test`
 * `go_mod` -> `go_third_party_package`
 
-Usually, prefer these target generators. [`./pants tailor`](doc:create-initial-build-files) will automatically add them for you.
+Usually, prefer these target generators. [`./pants tailor ::`](doc:create-initial-build-files) will automatically add them for you.
 
 Run `./pants help targets` to see how the target determines what to generate. Targets for first-party code, like `resources` and `python_tests`, will generate one target for each file in their `sources` field.
 
@@ -185,7 +185,7 @@ You can use the address for the target generator as an alias for all of its gene
 {
   "type": "info",
   "title": "Tip: one BUILD file per directory",
-  "body": "Target generation means that it is technically possible to put everything in a single BUILD file.\n\nHowever, we've found that it usually scales much better to use a single BUILD file per directory. Even if you start with using the defaults for everything, projects usually need to change some metadata over time, like adding a `timeout` to a test file or adding `dependencies` on resources. \n\nIt's useful for metadata to be as fine-grained as feasible, such as by using the `overrides` field to only change the files you need to. Fine-grained metadata is key to having smaller cache keys (resulting in more cache hits), and allows you to more accurately reflect the status of your project. We have found that using one BUILD file per directory encourages fine-grained metadata by defining the metadata adjacent to where the code lives.\n\n[`./pants tailor`](doc:create-initial-build-files) will automatically create targets that only apply metadata for the directory."
+  "body": "Target generation means that it is technically possible to put everything in a single BUILD file.\n\nHowever, we've found that it usually scales much better to use a single BUILD file per directory. Even if you start with using the defaults for everything, projects usually need to change some metadata over time, like adding a `timeout` to a test file or adding `dependencies` on resources. \n\nIt's useful for metadata to be as fine-grained as feasible, such as by using the `overrides` field to only change the files you need to. Fine-grained metadata is key to having smaller cache keys (resulting in more cache hits), and allows you to more accurately reflect the status of your project. We have found that using one BUILD file per directory encourages fine-grained metadata by defining the metadata adjacent to where the code lives.\n\n[`./pants tailor ::`](doc:create-initial-build-files) will automatically create targets that only apply metadata for the directory."
 }
 [/block]
 # Parametrizing targets

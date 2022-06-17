@@ -84,14 +84,14 @@ If you use Git, we recommend adding these lines to your top-level `.gitignore` f
 [/block]
 # 5. Generate BUILD files
 
-Once you have enabled the backends for the language(s) you'd like to use, run [`./pants tailor`](doc:create-initial-build-files) to generate an initial set of [BUILD](doc:targets) files.
+Once you have enabled the backends for the language(s) you'd like to use, run [`./pants tailor ::`](doc:create-initial-build-files) to generate an initial set of [BUILD](doc:targets) files.
 
 [BUILD](doc:targets) files provide metadata about your code (the timeout of a test, any dependencies which cannot be inferred, etc). BUILD files are typically located in the same directory as the code they describe. Unlike many other systems, Pants BUILD files are usually very succinct, as most metadata is either inferred from static analysis, assumed from sensible defaults, or generated for you. 
 
-In general, you should create (and update) BUILD files by running `./pants tailor`:
+In general, you should create (and update) BUILD files by running `./pants tailor ::`:
 
 ```
-❯ ./pants tailor
+❯ ./pants tailor ::
 Created scripts/BUILD:
   - Add shell_sources target scripts
 Created src/py/project/BUILD:
@@ -109,8 +109,8 @@ To ignore false positives, set `[tailor].ignore_paths` and `[tailor].ignore_addi
 [block:callout]
 {
   "type": "info",
-  "body": "We recommend running `./pants tailor --check` in your [continuous integration](doc:doc:using-pants-in-ci) so that you don't forget to add any targets and BUILD files (which might mean that tests aren't run or code isn't validated).\n\n```\n❯ ./pants tailor --check\nWould create scripts/BUILD:\n  - Add shell_sources target scripts\n\nTo fix `tailor` failures, run `./pants tailor`.\n```",
-  "title": "Run `./pants tailor --check` in CI"
+  "body": "We recommend running `./pants tailor --check ::` in your [continuous integration](doc:doc:using-pants-in-ci) so that you don't forget to add any targets and BUILD files (which might mean that tests aren't run or code isn't validated).\n\n```\n❯ ./pants tailor --check ::\nWould create scripts/BUILD:\n  - Add shell_sources target scripts\n\nTo fix `tailor` failures, run `./pants tailor`.\n```",
+  "title": "Run `./pants tailor --check ::` in CI"
 }
 [/block]
 # 6. Visit a language specific overview

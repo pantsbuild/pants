@@ -40,7 +40,7 @@ This adds the new `python_google_cloud_function` target, which you can confirm b
 [/block]
 First, add your Cloud function in a Python file like you would [normally do with Google Cloud Functions](https://cloud.google.com/functions/docs/first-python), such as creating a function `def my_handler_name(event, context)` for event-based functions.
 
-Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`./pants tailor`](doc:create-initial-build-files) to automate this.
+Then, in your BUILD file, make sure that you have a `python_source` or `python_sources` target with the handler file included in the `sources` field. You can use [`./pants tailor ::`](doc:create-initial-build-files) to automate this.
 
 Add a `python_google_cloud_function` target and define the `runtime`, `handler`, and `type` fields. The `type` should be either `"event"` or `"http"`. The `runtime` should be one of the values from https://cloud.google.com/functions/docs/concepts/python-runtime. The `handler` has the form `handler_file.py:handler_func`, which Pants will convert into a well-formed entry point. Alternatively, you can set `handler` to the format `path.to.module:handler_func`.
 

@@ -88,10 +88,10 @@ Pants will then automatically add these dependencies to your `protobuf_source` t
   "title": "Step 3: Generate `protobuf_sources` target"
 }
 [/block]
-Run [`./pants tailor`](doc:create-initial-build-files) for Pants to create a `protobuf_sources` target wherever you have `.proto` files:
+Run [`./pants tailor ::`](doc:create-initial-build-files) for Pants to create a `protobuf_sources` target wherever you have `.proto` files:
 
 ```
-$ ./pants tailor
+$ ./pants tailor ::
 Created src/protos/BUILD:
   - Add protobuf_sources target protos
 ```

@@ -92,10 +92,10 @@ Pants will then automatically add these dependencies to your `thrift_sources` ta
   "title": "Step 3: Generate `thrift_sources` target"
 }
 [/block]
-Run [`./pants tailor`](doc:create-initial-build-files) for Pants to create a `thrift_sources` target wherever you have `.thrift` files:
+Run [`./pants tailor ::`](doc:create-initial-build-files) for Pants to create a `thrift_sources` target wherever you have `.thrift` files:
 
 ```
-$ ./pants tailor
+$ ./pants tailor ::
 Created src/thrift/BUILD:
   - Add thrift_sources target thrift
 ```
