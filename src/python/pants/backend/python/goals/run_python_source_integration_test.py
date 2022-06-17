@@ -168,7 +168,6 @@ def test_local_dist() -> None:
             """\
             python_sources(name="lib", sources=["bar.py", "setup.py"])
 
-
             python_distribution(
                 name="dist",
                 dependencies=[":lib"],

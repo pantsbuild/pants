@@ -48,6 +48,7 @@ from pants.engine.target import (
     OptionalSingleSourceField,
     OverridesField,
     ScalarField,
+    SecondaryOwnerMixin,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -257,7 +258,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-class PexEntryPointField(AsyncFieldMixin, Field):
+class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
     help = softwrap(
@@ -567,25 +568,6 @@ class PexIncludeToolsField(BoolField):
     )
 
 
-# @TODO: Move to python_source (and friends)
-class RunInSandboxField(BoolField):
-    alias = "run_in_sandbox"
-    default = True
-    help = softwrap(
-        """
-        If true, runs of this target with the `run` goal will copy the needed first-party sources
-        into a temporary chroot and run from there.
-        If false, runs of this target with the `run` goal will use the in-repo sources directly.
-
-        The former mode is more hermetic, and is closer to building and running a standalone binary.
-
-        The latter mode may be necessary if the binary being run writes files into the repo and
-        computes their location relative to the executed files. Django's makemigrations command
-        is an example of such a process.
-        """
-    )
-
-
 _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
@@ -602,7 +584,6 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexExecutionModeField,
     PexIncludeRequirementsField,
     PexIncludeToolsField,
-    RunInSandboxField,
     RestartableField,
 )
 
