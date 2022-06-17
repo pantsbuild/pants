@@ -258,6 +258,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
+# @TODO: Remove the SecondaryOwnerMixin in Pants 2.14.0
 class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
