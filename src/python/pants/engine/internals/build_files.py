@@ -7,8 +7,14 @@ import os.path
 from dataclasses import dataclass
 from typing import Any
 
-from pants.build_graph.address import BuildFileAddressRequest, ResolveError
-from pants.engine.addresses import Address, AddressInput, BuildFileAddress
+from pants.build_graph.address import (
+    Address,
+    AddressInput,
+    BuildFileAddress,
+    BuildFileAddressRequest,
+    MaybeAddress,
+    ResolveError,
+)
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsProvider
@@ -63,7 +69,7 @@ async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePr
 
 
 @rule
-async def resolve_address(address_input: AddressInput) -> Address:
+async def maybe_resolve_address(address_input: AddressInput) -> MaybeAddress:
     # Determine the type of the path_component of the input.
     if address_input.path_component:
         paths = await Get(Paths, PathGlobs(globs=(address_input.path_component,)))
@@ -73,14 +79,14 @@ async def resolve_address(address_input: AddressInput) -> Address:
         is_file, is_dir = False, True
 
     if is_file:
-        return address_input.file_to_address()
-    elif is_dir:
-        return address_input.dir_to_address()
-    else:
-        spec = address_input.path_component
-        if address_input.target_component:
-            spec += f":{address_input.target_component}"
-        raise ResolveError(
+        return MaybeAddress(address_input.file_to_address())
+    if is_dir:
+        return MaybeAddress(address_input.dir_to_address())
+    spec = address_input.path_component
+    if address_input.target_component:
+        spec += f":{address_input.target_component}"
+    return MaybeAddress(
+        ResolveError(
             softwrap(
                 f"""
                 The file or directory '{address_input.path_component}' does not exist on disk in
@@ -89,6 +95,14 @@ async def resolve_address(address_input: AddressInput) -> Address:
                 """
             )
         )
+    )
+
+
+@rule
+async def resolve_address(maybe_address: MaybeAddress) -> Address:
+    if isinstance(maybe_address.val, ResolveError):
+        raise maybe_address.val
+    return maybe_address.val
 
 
 @dataclass(frozen=True)

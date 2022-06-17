@@ -1,3 +1,4 @@
+use std::fmt::{self, Debug};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -29,7 +30,7 @@ struct PlatformAndResponseBytes {
 
 #[derive(Clone)]
 pub struct CommandRunner {
-  underlying: Arc<dyn crate::CommandRunner>,
+  inner: Arc<dyn crate::CommandRunner>,
   cache: PersistentCache,
   file_store: Store,
   metadata: ProcessMetadata,
@@ -37,17 +38,25 @@ pub struct CommandRunner {
 
 impl CommandRunner {
   pub fn new(
-    underlying: Arc<dyn crate::CommandRunner>,
+    inner: Arc<dyn crate::CommandRunner>,
     cache: PersistentCache,
     file_store: Store,
     metadata: ProcessMetadata,
   ) -> CommandRunner {
     CommandRunner {
-      underlying,
+      inner,
       cache,
       file_store,
       metadata,
     }
+  }
+}
+
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("cache::CommandRunner")
+      .field("inner", &self.inner)
+      .finish_non_exhaustive()
   }
 }
 
@@ -125,7 +134,7 @@ impl crate::CommandRunner for CommandRunner {
       return Ok(result);
     }
 
-    let result = self.underlying.run(context.clone(), workunit, req).await?;
+    let result = self.inner.run(context.clone(), workunit, req).await?;
     if result.exit_code == 0 || write_failures_to_cache {
       let result = result.clone();
       in_workunit!("local_cache_write", Level::Trace, |workunit| async move {

@@ -652,3 +652,20 @@ class ResolveError(MappingError):
                 + bullet_list(f":{name}" for name in known_names)
             )
         )
+
+
+@dataclass(frozen=True)
+class MaybeAddress:
+    """A target address, or an error if it could not be created.
+
+    Use `Get(MaybeAddress, AddressInput)`, rather than the fallible variant
+    `Get(Address, AddressInput)`.
+
+    Note that this does not validate the address's target actually exists. It only validates that
+    the address is well-formed and that its spec_path exists.
+
+    Reminder: you may need to catch errors when creating the input `AddressInput` if the address is
+    not well-formed.
+    """
+
+    val: Address | ResolveError
