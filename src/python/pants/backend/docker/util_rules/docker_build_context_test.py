@@ -223,6 +223,7 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
                 docker_image(
                   name="image",
                   repository="upstream/{name}",
+                  image_tags=["1.0"],
                   instructions=["FROM alpine"],
                 )
                 """
@@ -244,11 +245,11 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
         build_upstream_images=True,
         expected_interpolation_context={
             "tags": {
-                "baseimage": "latest",
-                "stage0": "latest",
+                "baseimage": "1.0",
+                "stage0": "1.0",
             },
             "build_args": {
-                "BASE_IMAGE": "upstream/image:latest",
+                "BASE_IMAGE": "upstream/image:1.0",
             },
         },
     )
@@ -274,12 +275,11 @@ def test_from_image_build_arg_not_in_repo_issue_15585(rule_runner: RuleRunner) -
         build_upstream_images=True,
         expected_interpolation_context={
             "tags": {
-                "baseimage": "",
-                "stage0": "",
+                "baseimage": "3.10.2-slim",
+                "stage0": "3.10.2-slim",
             },
-            "build_args": {
-                "BASE_IMAGE": "python:3.10.2-slim",
-            },
+            # PYTHON_VERSION will be treated like any other build ARG.
+            "build_args": {},
         },
     )
 
