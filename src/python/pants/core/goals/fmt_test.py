@@ -12,8 +12,14 @@ from typing import List, Type
 from pants.core.goals.fmt import Fmt, FmtRequest, FmtResult
 from pants.core.goals.fmt import rules as fmt_rules
 from pants.core.util_rules import source_files
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    EMPTY_SNAPSHOT,
+    CreateDigest,
+    Digest,
+    FileContent,
+    Snapshot,
+)
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
