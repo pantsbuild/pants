@@ -11,7 +11,7 @@
 package main
 
 import (
-    "encoding/json"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -411,7 +411,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	result, err := computeEmbedConfigs("__resources__", &patterns)
+	rootDir := os.Args[2]
+	result, err := computeEmbedConfigs(rootDir, &patterns)
 	if err != nil {
 		fmt.Printf("{\"Error\": \"Failed to find embedded resources: %s\"}", err)
 		os.Exit(1)

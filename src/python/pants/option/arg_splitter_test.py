@@ -22,6 +22,7 @@ def known_scope_infos() -> list[ScopeInfo]:
         ScopeInfo("test", is_goal=True),
         ScopeInfo("jvm", is_goal=False),
         ScopeInfo("reporting", is_goal=False),
+        ScopeInfo("bsp", is_goal=True, is_builtin=True),
         # TODO: move help related tests closer to `pants.goal.help` to avoid this cludge.
         *(goal.get_scope_info() for goal in builtin_goals()),
     ]
@@ -81,7 +82,6 @@ def test_is_spec(tmp_path: Path, splitter: ArgSplitter, known_scope_infos: list[
         "a/b/*.txt",
         "a/b/test*",
         "a/**/*",
-        "-",
         "a/b.txt:tgt",
         "a/b.txt:../tgt",
         "dir#gen",
@@ -99,6 +99,9 @@ def test_is_spec(tmp_path: Path, splitter: ArgSplitter, known_scope_infos: list[
     for s in unambiguous_specs:
         assert splitter.likely_a_spec(s) is True
         assert splitter.likely_a_spec(f"-{s}") is True
+
+    assert splitter.likely_a_spec("-") is True
+    assert splitter.likely_a_spec("--") is False
 
     # With directories on disk to tiebreak.
     splitter = ArgSplitter(known_scope_infos, tmp_path.as_posix())
@@ -309,21 +312,21 @@ def help_no_arguments_test(command_line: str, *scopes: str, **expected):
         help_no_arguments_test("./pants help-all", "help-all", expected_help_all=True),
         help_test(
             "./pants --help-advanced --help",
-            expected_goals=["help"],
+            expected_goals=["help-advanced"],
             expected_scope_to_flags={"": [], "help": [], "help-advanced": []},
             expected_specs=[],
-            expected_help_advanced=True,
+            expected_help_advanced=False,
         ),
         help_test(
             "./pants --help --help-advanced --builtin-option --help-advanced-option",
-            expected_goals=["help-advanced"],
+            expected_goals=["help"],
             expected_scope_to_flags={
                 "": [],
-                "help": ["--builtin-option"],
-                "help-advanced": ["--option"],
+                "help": [],
+                "help-advanced": ["--builtin-option", "--option"],
             },
             expected_specs=[],
-            expected_help_advanced=False,
+            expected_help_advanced=True,
         ),
         help_test(
             "./pants -f",
@@ -368,6 +371,24 @@ def help_no_arguments_test(command_line: str, *scopes: str, **expected):
             expected_specs=["src/foo/bar:baz"],
         ),
         help_test(
+            "./pants test src/foo/bar:baz --help",
+            expected_goals=["test"],
+            expected_scope_to_flags={"": [], "test": [], "help": []},
+            expected_specs=["src/foo/bar:baz"],
+        ),
+        help_test(
+            "./pants --help test src/foo/bar:baz",
+            expected_goals=["test"],
+            expected_scope_to_flags={"": [], "test": [], "help": []},
+            expected_specs=["src/foo/bar:baz"],
+        ),
+        help_test(
+            "./pants test --help src/foo/bar:baz",
+            expected_goals=["test"],
+            expected_scope_to_flags={"": [], "test": [], "help": []},
+            expected_specs=["src/foo/bar:baz"],
+        ),
+        help_test(
             "./pants check --help-advanced test",
             expected_goals=["check", "test"],
             expected_scope_to_flags={"": [], "check": [], "help-advanced": [], "test": []},
@@ -383,10 +404,16 @@ def help_no_arguments_test(command_line: str, *scopes: str, **expected):
         ),
         help_test(
             "./pants check help-all test --help",
-            expected_goals=["check", "test", "help"],
+            expected_goals=["check", "test", "help-all"],
             expected_scope_to_flags={"": [], "check": [], "help": [], "help-all": [], "test": []},
             expected_specs=[],
-            expected_help_all=True,
+            expected_help_all=False,
+        ),
+        help_test(
+            "./pants bsp --help",
+            expected_goals=["bsp"],
+            expected_scope_to_flags={"": [], "help": [], "bsp": []},
+            expected_specs=[],
         ),
     ],
 )

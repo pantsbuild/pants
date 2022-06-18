@@ -44,6 +44,7 @@ from pants.engine.addresses import Addresses
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.contextutil import pushd
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import softwrap
 
 
 @pytest.fixture
@@ -68,6 +69,8 @@ def rule_runner() -> RuleRunner:
     )
 
 
+@pytest.mark.skip(reason="TODO(#15824)")
+@pytest.mark.no_error_if_skipped
 def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
     def create_target_files(
         directory: str, *, req_resolve: str, source_resolve: str, test_resolve: str
@@ -341,9 +344,11 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
 
     with engine_error(
         ValueError,
-        contains=(
-            "`[python].resolve_all_constraints` is enabled, so "
-            "`[python].requirement_constraints` must also be set."
+        contains=softwrap(
+            """
+            `[python].resolve_all_constraints` is enabled, so
+            `[python].requirement_constraints` must also be set.
+            """
         ),
     ):
         get_pex_request(None, resolve_all_constraints=True)

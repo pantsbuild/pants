@@ -12,7 +12,7 @@ from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTa
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -22,7 +22,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
             *pipenv_requirements.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ),
         target_types=[PipenvRequirementsTargetGenerator],
     )
@@ -36,7 +36,14 @@ def assert_pipenv_requirements(
     expected_targets: set[Target],
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, "Pipfile.lock": dumps(pipfile_lock)})
-    result = rule_runner.request(_TargetParametrizations, [Address("", target_name="reqs")])
+    result = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="reqs"), description_of_origin="tests"
+            )
+        ],
+    )
     assert set(result.parametrizations.values()) == expected_targets
 
 

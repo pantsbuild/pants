@@ -11,6 +11,14 @@ import pytest
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
+from pants.backend.python.util_rules.pex_requirements import (
+    LoadedLockfile,
+    LoadedLockfileRequest,
+    Lockfile,
+)
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.goals.update_build_files import (
     FormatWithBlackRequest,
     FormatWithYapfRequest,
@@ -22,6 +30,7 @@ from pants.core.goals.update_build_files import (
     RewrittenBuildFileRequest,
     UpdateBuildFilesGoal,
     UpdateBuildFilesSubsystem,
+    _find_python_interpreter_constraints_from_lockfile,
     determine_renamed_field_types,
     format_build_file_with_black,
     format_build_file_with_yapf,
@@ -31,10 +40,13 @@ from pants.core.goals.update_build_files import (
 )
 from pants.core.target_types import GenericTarget
 from pants.core.util_rules import config_files
+from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
+from pants.option.ranked_value import Rank, RankedValue
+from pants.testutil.option_util import create_subsystem
+from pants.testutil.rule_runner import GoalRuleResult, MockGet, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
 # ------------------------------------------------------------------------------------------
@@ -127,6 +139,57 @@ def test_goal_check_mode(generic_goal_rule_runner: RuleRunner) -> None:
     assert (
         Path(generic_goal_rule_runner.build_root, "dir/BUILD").read_text() == "# line 1\n# line 2\n"
     )
+
+
+def test_find_python_interpreter_constraints_from_lockfile() -> None:
+    def assert_ics(
+        lockfile: str,
+        expected: list[str],
+        *,
+        ics: RankedValue = RankedValue(Rank.HARDCODED, Black.default_interpreter_constraints),
+        metadata: PythonLockfileMetadata
+        | None = PythonLockfileMetadata.new(InterpreterConstraints(["==2.7.*"]), set()),
+    ) -> None:
+        black = create_subsystem(
+            Black,
+            lockfile=lockfile,
+            interpreter_constraints=ics,
+            version="v",
+            extra_requirements=[],
+        )
+        loaded_lock = LoadedLockfile(
+            EMPTY_DIGEST,
+            "black.lock",
+            metadata=metadata,
+            requirement_estimate=1,
+            is_pex_native=True,
+            constraints_strings=None,
+            original_lockfile=Lockfile(
+                "black.lock", file_path_description_of_origin="foo", resolve_name="black"
+            ),
+        )
+        result = run_rule_with_mocks(
+            _find_python_interpreter_constraints_from_lockfile,
+            rule_args=[black],
+            mock_gets=[
+                MockGet(
+                    output_type=LoadedLockfile,
+                    input_type=LoadedLockfileRequest,
+                    mock=lambda _: loaded_lock,
+                )
+            ],
+        )
+        assert result == InterpreterConstraints(expected)
+
+    # If ICs are set by user, always use those.
+    for lockfile in (NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE, "black.lock"):
+        assert_ics(lockfile, ["==3.8.*"], ics=RankedValue(Rank.CONFIG, ["==3.8.*"]))
+
+    assert_ics(NO_TOOL_LOCKFILE, Black.default_interpreter_constraints)
+    assert_ics(DEFAULT_TOOL_LOCKFILE, Black.default_interpreter_constraints)
+
+    assert_ics("black.lock", ["==2.7.*"])
+    assert_ics("black.lock", Black.default_interpreter_constraints, metadata=None)
 
 
 # ------------------------------------------------------------------------------------------

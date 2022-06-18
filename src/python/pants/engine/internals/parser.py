@@ -89,12 +89,11 @@ class Parser:
                 # Target names default to the name of the directory their BUILD file is in
                 # (as long as it's not the root directory).
                 if "name" not in kwargs:
-                    dirname = os.path.basename(parse_state.rel_path())
-                    if not dirname:
+                    if not parse_state.rel_path():
                         raise UnaddressableObjectError(
                             "Targets in root-level BUILD files must be named explicitly."
                         )
-                    kwargs["name"] = dirname
+                    kwargs["name"] = None
                 target_adaptor = TargetAdaptor(self._type_alias, **kwargs)
                 parse_state.add(target_adaptor)
                 return target_adaptor

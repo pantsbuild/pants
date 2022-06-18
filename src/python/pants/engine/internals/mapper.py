@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os.path
 import re
 from dataclasses import dataclass
 from typing import Iterable, Mapping
@@ -47,7 +48,7 @@ class AddressMap:
             raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
         name_to_target_adaptors: dict[str, TargetAdaptor] = {}
         for target_adaptor in target_adaptors:
-            name = target_adaptor.name
+            name = target_adaptor.name or os.path.basename(os.path.dirname(filepath))
             if name in name_to_target_adaptors:
                 duplicate = name_to_target_adaptors[name]
                 raise DuplicateNameError(

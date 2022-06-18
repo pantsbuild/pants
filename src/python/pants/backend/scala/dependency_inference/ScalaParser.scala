@@ -37,6 +37,7 @@ case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boole
 class SourceAnalysisTraverser extends Traverser {
   val nameParts = ArrayBuffer[String]()
   var skipProvidedNames = false
+  var visitInitArgs = false
 
   val providedSymbolsByScope = HashMap[String, HashMap[String, ProvidedSymbol]]()
   val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
@@ -186,7 +187,11 @@ class SourceAnalysisTraverser extends Traverser {
 
   def visitMods(mods: List[Mod]): Unit = {
     mods.foreach({
-      case Mod.Annot(init) => apply(init) // rely on `Init` extraction in main parsing match code
+      case Mod.Annot(init) =>
+        val currentVisitInitArgs = visitInitArgs
+        visitInitArgs = true
+        apply(init) // rely on `Init` extraction in main parsing match code
+        visitInitArgs = currentVisitInitArgs
       case _               => ()
     })
   }
@@ -206,17 +211,19 @@ class SourceAnalysisTraverser extends Traverser {
       visitTemplate(templ, name)
     }
 
-    case Defn.Class(mods, nameNode, _tparams, _ctor, templ) => {
+    case Defn.Class(mods, nameNode, _tparams, ctor, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawClass = true)
+      apply(ctor)
       visitTemplate(templ, name)
     }
 
-    case Defn.Trait(mods, nameNode, _tparams, _ctor, templ) => {
+    case Defn.Trait(mods, nameNode, _tparams, ctor, templ) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name, sawTrait = true)
+      apply(ctor)
       visitTemplate(templ, name)
     }
 
@@ -227,10 +234,11 @@ class SourceAnalysisTraverser extends Traverser {
       visitTemplate(templ, name)
     }
 
-    case Defn.Type(mods, nameNode, _tparams, _body) => {
+    case Defn.Type(mods, nameNode, _tparams, body) => {
       visitMods(mods)
       val name = extractName(nameNode)
       recordProvidedName(name)
+      extractNamesFromTypeTree(body).foreach(recordConsumedSymbol(_))
     }
 
     case Defn.Val(mods, pats, decltpe, rhs) => {
@@ -240,7 +248,7 @@ class SourceAnalysisTraverser extends Traverser {
         recordProvidedName(name)
       })
       decltpe.foreach(tpe => {
-        recordConsumedSymbol(extractName(tpe))
+        extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
       })
       super.apply(rhs)
     }
@@ -271,6 +279,22 @@ class SourceAnalysisTraverser extends Traverser {
       withSuppressProvidedNames(() => apply(body))
     }
 
+    case Decl.Def(mods, _nameNode, _tparams, params, decltpe) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+      params.foreach(param => apply(param))
+    }
+
+    case Decl.Val(mods, _pats, decltpe) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+    }
+
+    case Decl.Var(mods, _pats, decltpe) => {
+      visitMods(mods)
+      extractNamesFromTypeTree(decltpe).foreach(recordConsumedSymbol(_))
+    }
+
     case Import(importers) => {
       importers.foreach({ case Importer(ref, importees) =>
         val baseName = extractName(ref)
@@ -296,8 +320,11 @@ class SourceAnalysisTraverser extends Traverser {
       })
     }
 
-    case Init(tpe, _name, _argss) => {
+    case Init(tpe, _name, argss) => {
       extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
+
+      if (visitInitArgs)
+        argss.foreach(_.foreach(apply))
     }
 
     case Term.Param(mods, _name, decltpe, _default) => {
@@ -325,7 +352,7 @@ class SourceAnalysisTraverser extends Traverser {
     case node @ Term.Select(_, _) => {
       val name = extractName(node)
       recordConsumedSymbol(name)
-      super.apply(node.qual)
+      apply(node.qual)
     }
 
     case node @ Term.Name(_) => {
@@ -376,11 +403,26 @@ class SourceAnalysisTraverser extends Traverser {
 }
 
 object ScalaParser {
-  def analyze(pathStr: String): Analysis = {
+  def analyze(pathStr: String, scalaVersion: String, source3: Boolean): Analysis = {
     val path = java.nio.file.Paths.get(pathStr)
     val bytes = java.nio.file.Files.readAllBytes(path)
     val text = new String(bytes, "UTF-8")
-    val input = Input.VirtualFile(path.toString, text)
+
+    val dialect =
+      scalaVersion.take(4) match {
+        case "2.10"            => dialects.Scala210
+        case "2.11"            => dialects.Scala211
+        case "2.12" if source3 => dialects.Scala212Source3
+        case "2.12"            => dialects.Scala212
+        case "2.13" if source3 => dialects.Scala213Source3
+        case "2.13"            => dialects.Scala213
+        case "3.0"             => dialects.Scala3
+        case _ =>
+          if (scalaVersion.take(2) == "3.") dialects.Scala3
+          else dialects.Scala213
+      }
+
+    val input = dialect(Input.VirtualFile(path.toString, text))
 
     val tree = input.parse[Source].get
 
@@ -391,7 +433,10 @@ object ScalaParser {
 
   def main(args: Array[String]): Unit = {
     val outputPath = java.nio.file.Paths.get(args(0))
-    val analysis = analyze(args(1))
+    val pathStr = args(1)
+    val scalaVersion = args(2)
+    val source3 = args(3).toBoolean
+    val analysis = analyze(pathStr, scalaVersion, source3)
 
     val json = analysis.asJson.noSpaces
     java.nio.file.Files.write(

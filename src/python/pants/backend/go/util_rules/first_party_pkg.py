@@ -9,7 +9,6 @@ from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
-from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
@@ -36,6 +35,7 @@ from pants.engine.target import (
     SourcesField,
     Targets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.util.dirutil import fast_relpath
 from pants.util.logging import LogLevel
@@ -234,12 +234,15 @@ async def compute_first_party_package_import_path(
 
 @rule
 async def analyze_first_party_package(
-    request: FirstPartyPkgAnalysisRequest,
-    analyzer: PackageAnalyzerSetup,
-    golang_subsystem: GolangSubsystem,
+    request: FirstPartyPkgAnalysisRequest, analyzer: PackageAnalyzerSetup
 ) -> FallibleFirstPartyPkgAnalysis:
     wrapped_target, import_path_info, owning_go_mod = await MultiGet(
-        Get(WrappedTarget, Address, request.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                request.address, description_of_origin="<first party pkg analysis>"
+            ),
+        ),
         Get(FirstPartyPkgImportPath, FirstPartyPkgImportPathRequest(request.address)),
         Get(OwningGoMod, OwningGoModRequest(request.address)),
     )
@@ -276,7 +279,12 @@ async def setup_first_party_pkg_digest(
 ) -> FallibleFirstPartyPkgDigest:
     embedder, wrapped_target, maybe_analysis = await MultiGet(
         Get(LoadedGoBinary, LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder")),
-        Get(WrappedTarget, Address, request.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(
+                request.address, description_of_origin="<first party digest setup>"
+            ),
+        ),
         Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(request.address)),
     )
     if maybe_analysis.analysis is None:
@@ -317,24 +325,26 @@ async def setup_first_party_pkg_digest(
             Digest, RemovePrefix(resources_sources.snapshot.digest, request.address.spec_path)
         )
         resources_digest = await Get(Digest, AddPrefix(resources_digest, "__resources__"))
-        sources_digest = await Get(Digest, MergeDigests((sources_digest, resources_digest)))
 
-        patterns_json = {
-            "EmbedPatterns": analysis.embed_patterns,
-            "TestEmbedPatterns": analysis.test_embed_patterns,
-            "XTestEmbedPatterns": analysis.xtest_embed_patterns,
-        }
-        patterns_json_digest = await Get(
-            Digest,
-            CreateDigest([FileContent("patterns.json", json.dumps(patterns_json).encode("utf-8"))]),
+        patterns_json = json.dumps(
+            {
+                "EmbedPatterns": analysis.embed_patterns,
+                "TestEmbedPatterns": analysis.test_embed_patterns,
+                "XTestEmbedPatterns": analysis.xtest_embed_patterns,
+            }
+        ).encode("utf-8")
+        sources_digest, patterns_json_digest = await MultiGet(
+            Get(Digest, MergeDigests((sources_digest, resources_digest))),
+            Get(Digest, CreateDigest([FileContent("patterns.json", patterns_json)])),
         )
         input_digest = await Get(
             Digest, MergeDigests((sources_digest, patterns_json_digest, embedder.digest))
         )
+
         embed_result = await Get(
             FallibleProcessResult,
             Process(
-                ("./embedder", "patterns.json"),
+                ("./embedder", "patterns.json", "__resources__"),
                 input_digest=input_digest,
                 description=f"Create embed mapping for {request.address}",
                 level=LogLevel.DEBUG,

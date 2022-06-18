@@ -57,6 +57,7 @@ def calculate_specs(
         )
     specs = SpecsParser().parse_specs(
         options.specs,
+        description_of_origin="CLI arguments",
         unmatched_glob_behavior=unmatched_cli_globs,
         convert_dir_literal_to_address_literal=convert_dir_literal_to_address_literal,
     )
@@ -97,7 +98,7 @@ def calculate_specs(
 
     address_literal_specs = []
     for address in cast(ChangedAddresses, changed_addresses):
-        address_input = AddressInput.parse(address.spec)
+        address_input = AddressInput.parse(address.spec, description_of_origin="`--changed-since`")
         address_literal_specs.append(
             AddressLiteralSpec(
                 path_component=address_input.path_component,
@@ -116,8 +117,9 @@ def calculate_specs(
             unmatched_glob_behavior=unmatched_cli_globs,
             filter_by_global_options=True,
             from_change_detection=True,
+            description_of_origin="`--changed-since`",
         ),
-        ignores=RawSpecs(),
+        ignores=RawSpecs(description_of_origin="`--changed-since`"),
     )
 
 

@@ -9,6 +9,7 @@ from typing import cast
 
 import pytest
 
+from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
@@ -20,9 +21,15 @@ from pants.engine.internals.build_files import (
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.target import Dependencies, MultipleSourcesField, StringField, Tags, Target
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import (
+    MockGet,
+    QueryRule,
+    RuleRunner,
+    engine_error,
+    run_rule_with_mocks,
+)
 from pants.util.frozendict import FrozenDict
 
 
@@ -101,40 +108,56 @@ class MockTgt(Target):
 
 
 def test_resolve_address() -> None:
-    rule_runner = RuleRunner(rules=[QueryRule(Address, (AddressInput,))])
+    rule_runner = RuleRunner(
+        rules=[QueryRule(Address, [AddressInput]), QueryRule(MaybeAddress, [AddressInput])]
+    )
     rule_runner.write_files({"a/b/c.txt": "", "f.txt": ""})
 
     def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
         assert rule_runner.request(Address, [address_input]) == expected
 
     assert_is_expected(
-        AddressInput("a/b/c.txt"), Address("a/b", target_name=None, relative_file_path="c.txt")
+        AddressInput("a/b/c.txt", description_of_origin="tests"),
+        Address("a/b", target_name=None, relative_file_path="c.txt"),
     )
     assert_is_expected(
-        AddressInput("a/b"), Address("a/b", target_name=None, relative_file_path=None)
+        AddressInput("a/b", description_of_origin="tests"),
+        Address("a/b", target_name=None, relative_file_path=None),
     )
 
-    assert_is_expected(AddressInput("a/b", target_component="c"), Address("a/b", target_name="c"))
     assert_is_expected(
-        AddressInput("a/b/c.txt", target_component="c"),
+        AddressInput("a/b", target_component="c", description_of_origin="tests"),
+        Address("a/b", target_name="c"),
+    )
+    assert_is_expected(
+        AddressInput("a/b/c.txt", target_component="c", description_of_origin="tests"),
         Address("a/b", relative_file_path="c.txt", target_name="c"),
     )
 
     # Top-level addresses will not have a path_component, unless they are a file address.
     assert_is_expected(
-        AddressInput("f.txt", target_component="original"),
+        AddressInput("f.txt", target_component="original", description_of_origin="tests"),
         Address("", relative_file_path="f.txt", target_name="original"),
     )
-    assert_is_expected(AddressInput("", target_component="t"), Address("", target_name="t"))
+    assert_is_expected(
+        AddressInput("", target_component="t", description_of_origin="tests"),
+        Address("", target_name="t"),
+    )
 
-    with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(Address, [AddressInput("a/b/fake")])
-    assert "'a/b/fake' does not exist on disk" in str(exc.value)
+    bad_address_input = AddressInput("a/b/fake", description_of_origin="tests")
+    expected_err = "'a/b/fake' does not exist on disk"
+    with engine_error(ResolveError, contains=expected_err):
+        rule_runner.request(Address, [bad_address_input])
+    maybe_addr = rule_runner.request(MaybeAddress, [bad_address_input])
+    assert isinstance(maybe_addr.val, ResolveError)
+    assert expected_err in str(maybe_addr.val)
 
 
 @pytest.fixture
 def target_adaptor_rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[QueryRule(TargetAdaptor, (Address,))], target_types=[MockTgt])
+    return RuleRunner(
+        rules=[QueryRule(TargetAdaptor, (TargetAdaptorRequest,))], target_types=[MockTgt]
+    )
 
 
 def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -154,13 +177,17 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
                     ],
                     build_file_dir=f"build file's dir is: {build_file_dir()}"
                 )
+
+                mock_tgt(name='t2')
                 """
             )
         }
     )
-    addr = Address("helloworld/dir")
-    target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [addr])
-    assert target_adaptor.name == "dir"
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
+    )
+    assert target_adaptor.name is None
     assert target_adaptor.type_alias == "mock_tgt"
     assert target_adaptor.kwargs["dependencies"] == [
         ":dir",
@@ -173,29 +200,48 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     assert target_adaptor.kwargs["fake_field"] == 42
     assert target_adaptor.kwargs["build_file_dir"] == "build file's dir is: helloworld/dir"
 
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [
+            TargetAdaptorRequest(
+                Address("helloworld/dir", target_name="t2"), description_of_origin="tests"
+            )
+        ],
+    )
+    assert target_adaptor.name == "t2"
+    assert target_adaptor.type_alias == "mock_tgt"
+
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError) as exc:
-        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld")])
+        target_adaptor_rule_runner.request(
+            TargetAdaptor,
+            [TargetAdaptorRequest(Address("helloworld"), description_of_origin="tests")],
+        )
     assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
     target_adaptor_rule_runner.write_files({"helloworld/BUILD": "mock_tgt(name='other_tgt')"})
     expected_rx_str = re.escape(
-        "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
+        "The target name ':helloworld' is not defined in the directory helloworld"
     )
     with pytest.raises(ExecutionError, match=expected_rx_str):
-        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld")])
+        target_adaptor_rule_runner.request(
+            TargetAdaptor,
+            [TargetAdaptorRequest(Address("helloworld"), description_of_origin="tests")],
+        )
 
 
 def test_build_file_address() -> None:
     rule_runner = RuleRunner(
-        rules=[QueryRule(BuildFileAddress, (Address,))], target_types=[MockTgt]
+        rules=[QueryRule(BuildFileAddress, [BuildFileAddressRequest])], target_types=[MockTgt]
     )
     rule_runner.write_files({"helloworld/BUILD.ext": "mock_tgt()"})
 
     def assert_bfa_resolved(address: Address) -> None:
         expected_bfa = BuildFileAddress(address, "helloworld/BUILD.ext")
-        bfa = rule_runner.request(BuildFileAddress, [address])
+        bfa = rule_runner.request(
+            BuildFileAddress, [BuildFileAddressRequest(address, description_of_origin="tests")]
+        )
         assert bfa == expected_bfa
 
     assert_bfa_resolved(Address("helloworld"))

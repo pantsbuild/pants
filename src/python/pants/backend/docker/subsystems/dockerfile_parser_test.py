@@ -8,7 +8,6 @@ import pytest
 
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
 from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_rules
-from pants.backend.docker.subsystems.dockerfile_parser import split_iterable
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
@@ -73,7 +72,7 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
 
     addr = Address("test")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
-    assert info.from_image_addresses == (":base",)
+    assert info.from_image_build_args.to_dict() == {"BASE_IMAGE": ":base"}
     assert info.copy_source_paths == (
         "some.target/binary.pex",
         "some.target/tool.pex",
@@ -81,10 +80,6 @@ def test_parsed_injectables(files: list[tuple[str, str]], rule_runner: RuleRunne
         "another/cli.pex",
         "tool",
     )
-
-
-def test_split_iterable() -> None:
-    assert [("a", "b"), ("c",)] == list(split_iterable("-", ("a", "b", "-", "c")))
 
 
 def test_build_args(rule_runner: RuleRunner) -> None:
@@ -128,7 +123,7 @@ def test_from_image_build_arg_names(rule_runner: RuleRunner) -> None:
     )
     addr = Address("test/downstream", target_name="image")
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(addr)])
-    assert info.from_image_build_arg_names == ("BASE_IMAGE",)
+    assert info.from_image_build_args.to_dict() == {"BASE_IMAGE": "test/upstream:image"}
 
 
 def test_inconsistent_build_args(rule_runner: RuleRunner) -> None:
@@ -173,7 +168,7 @@ def test_copy_source_references(rule_runner: RuleRunner) -> None:
     )
 
     info = rule_runner.request(DockerfileInfo, [DockerfileInfoRequest(Address("test"))])
-    assert info.copy_sources == ("a", "b", "c/d", "e/f/g", "j", "k")
+    assert info.copy_source_paths == ("a", "b", "c/d", "e/f/g", "j", "k")
 
 
 def test_baseimage_tags(rule_runner: RuleRunner) -> None:

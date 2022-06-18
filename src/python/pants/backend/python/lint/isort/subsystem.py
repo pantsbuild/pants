@@ -18,6 +18,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileListOption, SkipOption
 from pants.util.docutil import git_url
+from pants.util.strutil import softwrap
 
 
 class Isort(PythonToolBase):
@@ -51,24 +52,31 @@ class Isort(PythonToolBase):
         #  When deprecating, also deprecate the user manually setting `--settings` with
         #  `[isort].args`.
         advanced=True,
-        help=lambda cls: (
-            "Path to config file understood by isort "
-            "(https://pycqa.github.io/isort/docs/configuration/config_files/).\n\n"
-            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-            f"this option if the config is located in a non-standard location.\n\n"
-            "If using isort 5+ and you specify only 1 config file, Pants will configure "
-            "isort's argv to point to your config file."
+        help=lambda cls: softwrap(
+            f"""
+            Path to config file understood by isort
+            (https://pycqa.github.io/isort/docs/configuration/config_files/).
+
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+
+            If using isort 5+ and you specify only 1 config file, Pants will configure
+            isort's argv to point to your config file.
+            """
         ),
     )
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,
         advanced=True,
-        help=lambda cls: (
-            "If true, Pants will include any relevant config files during "
-            "runs (`.isort.cfg`, `pyproject.toml`, `setup.cfg`, `tox.ini` and `.editorconfig`)."
-            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-            f"non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include any relevant config files during
+            runs (`.isort.cfg`, `pyproject.toml`, `setup.cfg`, `tox.ini` and `.editorconfig`).
+
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
         ),
     )
 

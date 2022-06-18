@@ -10,7 +10,12 @@ from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import InjectDependenciesRequest, InjectedDependencies, WrappedTarget
+from pants.engine.target import (
+    InjectDependenciesRequest,
+    InjectedDependencies,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
@@ -84,7 +89,12 @@ async def inject_scalapb_runtime_dependency(
     request: InjectScalaPBRuntimeDependencyRequest,
     jvm: JvmSubsystem,
 ) -> InjectedDependencies:
-    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    wrapped_target = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     target = wrapped_target.target
 
     if not target.has_field(JvmResolveField):
@@ -120,23 +130,18 @@ class ConflictingScalaPBRuntimeVersionInResolveError(ValueError):
 class MissingScalaPBRuntimeInResolveError(ValueError):
     def __init__(self, resolve_name: str, version: str, scala_binary_version: str) -> None:
         super().__init__(
-            softwrap(
-                f"""
-                The JVM resolve `{resolve_name}` does not contain a requirement for the ScalaPB runtime.
-                Since at least one Scala target type in this repository consumes a `protobuf_sources` target
-                in this resolve, the resolve must contain a `jvm_artifact` target for the ScalaPB runtime.
-
-                Please add the following `jvm_artifact` target somewhere in the repository and re-run
-                `{bin_name()} generate-lockfiles --resolve={resolve_name}`:
-                    jvm_artifact(
-                        name="{_SCALAPB_RUNTIME_GROUP}_{_SCALAPB_RUNTIME_ARTIFACT}_{scala_binary_version}",
-                        group="{_SCALAPB_RUNTIME_GROUP}",
-                        artifact="{_SCALAPB_RUNTIME_ARTIFACT}_{scala_binary_version}",
-                        version="{version}",
-                        resolve="{resolve_name}",
-                    )
-                """
-            )
+            f"The JVM resolve `{resolve_name}` does not contain a requirement for the ScalaPB runtime. "
+            "Since at least one JVM target type in this repository consumes a `protobuf_sources` target "
+            "in this resolve, the resolve must contain a `jvm_artifact` target for the ScalaPB runtime.\n\n"
+            "Please add the following `jvm_artifact` target somewhere in the repository and re-run "
+            f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
+            "jvm_artifact(\n"
+            f'  name="{_SCALAPB_RUNTIME_GROUP}_{_SCALAPB_RUNTIME_ARTIFACT}_{scala_binary_version}",\n'
+            f'  group="{_SCALAPB_RUNTIME_GROUP}",\n',
+            f'  artifact="{_SCALAPB_RUNTIME_ARTIFACT}_{scala_binary_version}",\n',
+            f'  version="{version}",\n',
+            f'  resolve="{resolve_name}",\n',
+            ")",
         )
 
 

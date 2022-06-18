@@ -58,11 +58,15 @@ class PutativeTargetsRequest(metaclass=ABCMeta):
     dirs: tuple[str, ...]
     deprecated_recursive_dirs: tuple[str, ...] = ()
 
-    def path_globs(self, filename_glob: str) -> PathGlobs:
+    def path_globs(self, *filename_globs: str) -> PathGlobs:
         return PathGlobs(
             globs=(
-                *(os.path.join(d, filename_glob) for d in self.dirs),
-                *(os.path.join(d, "**", filename_glob) for d in self.deprecated_recursive_dirs),
+                *(os.path.join(d, glob) for d in self.dirs for glob in filename_globs),
+                *(
+                    os.path.join(d, "**", glob)
+                    for d in self.deprecated_recursive_dirs
+                    for glob in filename_globs
+                ),
             )
         )
 
@@ -259,7 +263,14 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
 class TailorSubsystem(GoalSubsystem):
     name = "tailor"
-    help = "Auto-generate BUILD file targets for new source files."
+    help = softwrap(
+        """
+        Auto-generate BUILD file targets for new source files.
+
+        Each specific `tailor` implementation may be disabled through language-specific options,
+        e.g. `[python].tailor_pex_binary_targets` and `[shell-setup].tailor`.
+        """
+    )
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
@@ -472,7 +483,10 @@ async def restrict_conflicting_sources(ptgt: PutativeTarget) -> DisjointSourcePu
     source_dirs = {os.path.dirname(path) for path in source_path_set}
     possible_owners = await Get(
         UnexpandedTargets,
-        RawSpecs(ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs)),
+        RawSpecs(
+            ancestor_globs=tuple(AncestorGlobSpec(d) for d in source_dirs),
+            description_of_origin="the `tailor` goal",
+        ),
     )
     possible_owners_sources = await MultiGet(
         Get(SourcesPaths, SourcesPathsRequest(t.get(SourcesField))) for t in possible_owners

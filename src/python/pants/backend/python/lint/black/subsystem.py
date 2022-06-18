@@ -22,6 +22,7 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class Black(PythonToolBase):
@@ -48,21 +49,27 @@ class Black(PythonToolBase):
         "--config",
         default=None,
         advanced=True,
-        help=lambda cls: (
-            "Path to a TOML config file understood by Black "
-            "(https://github.com/psf/black#configuration-format).\n\n"
-            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-            f"this option if the config is located in a non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            Path to a TOML config file understood by Black
+            (https://github.com/psf/black#configuration-format).
+
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
         ),
     )
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,
         advanced=True,
-        help=lambda cls: (
-            "If true, Pants will include any relevant pyproject.toml config files during runs."
-            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-            f"non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include any relevant pyproject.toml config files during runs.
+
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
         ),
     )
 

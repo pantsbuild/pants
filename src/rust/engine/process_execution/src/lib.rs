@@ -29,6 +29,7 @@ extern crate derivative;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::{TryFrom, TryInto};
+use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -42,7 +43,7 @@ use itertools::Itertools;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use serde::{Deserialize, Serialize};
-use store::{SnapshotOps, Store};
+use store::{SnapshotOps, Store, StoreError};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 pub mod bounded;
@@ -79,6 +80,49 @@ pub use crate::children::ManagedChild;
 pub use crate::immutable_inputs::ImmutableInputs;
 pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProcessError {
+  /// A Digest was not present in either of the local or remote Stores.
+  MissingDigest(String, Digest),
+  /// All other error types.
+  Unclassified(String),
+}
+
+impl ProcessError {
+  pub fn enrich(self, prefix: &str) -> Self {
+    match self {
+      Self::MissingDigest(s, d) => Self::MissingDigest(format!("{prefix}: {s}"), d),
+      Self::Unclassified(s) => Self::Unclassified(format!("{prefix}: {s}")),
+    }
+  }
+}
+
+impl Display for ProcessError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::MissingDigest(s, d) => {
+        write!(f, "{s}: {d:?}")
+      }
+      Self::Unclassified(s) => write!(f, "{s}"),
+    }
+  }
+}
+
+impl From<StoreError> for ProcessError {
+  fn from(err: StoreError) -> Self {
+    match err {
+      StoreError::MissingDigest(s, d) => Self::MissingDigest(s, d),
+      StoreError::Unclassified(s) => Self::Unclassified(s),
+    }
+  }
+}
+
+impl From<String> for ProcessError {
+  fn from(err: String) -> Self {
+    Self::Unclassified(err)
+  }
+}
 
 #[derive(
   PartialOrd, Ord, Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq, Hash, Serialize, Deserialize,
@@ -245,7 +289,7 @@ pub struct InputDigests {
 
   /// If non-empty, use nailgun in supported runners, using the specified `immutable_inputs` keys
   /// as server inputs. All other keys (and the input_files) will be client inputs.
-  pub use_nailgun: Vec<RelativePath>,
+  pub use_nailgun: BTreeSet<RelativePath>,
 }
 
 impl InputDigests {
@@ -253,8 +297,8 @@ impl InputDigests {
     store: &Store,
     input_files: DirectoryDigest,
     immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
-    use_nailgun: Vec<RelativePath>,
-  ) -> Result<Self, String> {
+    use_nailgun: BTreeSet<RelativePath>,
+  ) -> Result<Self, StoreError> {
     // Collect all digests into `complete`.
     let mut complete_digests = try_join_all(
       immutable_inputs
@@ -288,17 +332,20 @@ impl InputDigests {
     })
   }
 
-  pub async fn new_from_merged(store: &Store, from: Vec<InputDigests>) -> Result<Self, String> {
+  pub async fn new_from_merged(store: &Store, from: Vec<InputDigests>) -> Result<Self, StoreError> {
     let mut merged_immutable_inputs = BTreeMap::new();
     for input_digests in from.iter() {
       let size_before = merged_immutable_inputs.len();
       let immutable_inputs = &input_digests.immutable_inputs;
       merged_immutable_inputs.append(&mut immutable_inputs.clone());
       if size_before + immutable_inputs.len() != merged_immutable_inputs.len() {
-        return Err(format!(
-          "Tried to merge two-or-more immutable inputs at the same path with different values! \
+        return Err(
+          format!(
+            "Tried to merge two-or-more immutable inputs at the same path with different values! \
             The collision involved one of the entries in: {immutable_inputs:?}"
-        ));
+          )
+          .into(),
+        );
       }
     }
 
@@ -330,7 +377,6 @@ impl InputDigests {
           .map(|input_digests| input_digests.use_nailgun.clone()),
       )
       .into_iter()
-      .unique()
       .collect(),
     })
   }
@@ -341,7 +387,7 @@ impl InputDigests {
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
       input_files,
       immutable_inputs: BTreeMap::new(),
-      use_nailgun: Vec::new(),
+      use_nailgun: BTreeSet::new(),
     }
   }
 
@@ -365,7 +411,7 @@ impl InputDigests {
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
         input_files: self.input_files.clone(),
         immutable_inputs: client,
-        use_nailgun: vec![],
+        use_nailgun: BTreeSet::new(),
       },
       // Server.
       InputDigests {
@@ -373,7 +419,7 @@ impl InputDigests {
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
         input_files: EMPTY_DIRECTORY_DIGEST.clone(),
         immutable_inputs: server,
-        use_nailgun: vec![],
+        use_nailgun: BTreeSet::new(),
       },
     )
   }
@@ -386,7 +432,7 @@ impl Default for InputDigests {
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
       input_files: EMPTY_DIRECTORY_DIGEST.clone(),
       immutable_inputs: BTreeMap::new(),
-      use_nailgun: Vec::new(),
+      use_nailgun: BTreeSet::new(),
     }
   }
 }
@@ -737,7 +783,7 @@ impl Context {
 }
 
 #[async_trait]
-pub trait CommandRunner: Send + Sync {
+pub trait CommandRunner: Send + Sync + Debug {
   ///
   /// Submit a request for execution on the underlying runtime, and return
   /// a future for it.
@@ -747,7 +793,7 @@ pub trait CommandRunner: Send + Sync {
     context: Context,
     workunit: &mut RunningWorkunit,
     req: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String>;
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError>;
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?

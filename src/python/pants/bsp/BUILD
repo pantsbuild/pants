@@ -6,10 +6,9 @@ python_sources()
 python_tests(
     name="tests",
     dependencies=[":test_resources"],
+    overrides={
+        "protocol_test.py": {"timeout": 240},
+    },
 )
 
 resources(name="test_resources", sources=["*.test.lock"])
-
-python_test_utils(
-    name="test_utils",
-)

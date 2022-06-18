@@ -7,16 +7,23 @@ import os.path
 from dataclasses import dataclass
 from typing import Any
 
-from pants.base.exceptions import ResolveError
-from pants.engine.addresses import Address, AddressInput, BuildFileAddress
+from pants.build_graph.address import (
+    Address,
+    AddressInput,
+    BuildFileAddress,
+    BuildFileAddressRequest,
+    MaybeAddress,
+    ResolveError,
+)
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -61,7 +68,7 @@ async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePr
 
 
 @rule
-async def resolve_address(address_input: AddressInput) -> Address:
+async def maybe_resolve_address(address_input: AddressInput) -> MaybeAddress:
     # Determine the type of the path_component of the input.
     if address_input.path_component:
         paths = await Get(Paths, PathGlobs(globs=(address_input.path_component,)))
@@ -71,17 +78,30 @@ async def resolve_address(address_input: AddressInput) -> Address:
         is_file, is_dir = False, True
 
     if is_file:
-        return address_input.file_to_address()
-    elif is_dir:
-        return address_input.dir_to_address()
-    else:
-        spec = address_input.path_component
-        if address_input.target_component:
-            spec += f":{address_input.target_component}"
-        raise ResolveError(
-            f"The file or directory '{address_input.path_component}' does not exist on disk in the "
-            f"workspace, so the address '{spec}' cannot be resolved."
+        return MaybeAddress(address_input.file_to_address())
+    if is_dir:
+        return MaybeAddress(address_input.dir_to_address())
+    spec = address_input.path_component
+    if address_input.target_component:
+        spec += f":{address_input.target_component}"
+    return MaybeAddress(
+        ResolveError(
+            softwrap(
+                f"""
+                The file or directory '{address_input.path_component}' does not exist on disk in
+                the workspace, so the address '{spec}' from {address_input.description_of_origin}
+                cannot be resolved.
+                """
+            )
         )
+    )
+
+
+@rule
+async def resolve_address(maybe_address: MaybeAddress) -> Address:
+    if isinstance(maybe_address.val, ResolveError):
+        raise maybe_address.val
+    return maybe_address.val
 
 
 @dataclass(frozen=True)
@@ -128,12 +148,14 @@ async def parse_address_family(
 
 
 @rule
-async def find_build_file(address: Address) -> BuildFileAddress:
+async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
+    address = request.address
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
     owning_address = address.maybe_convert_to_target_generator()
     if address_family.get_target_adaptor(owning_address) is None:
         raise ResolveError.did_you_mean(
-            bad_name=owning_address.target_name,
+            owning_address,
+            description_of_origin=request.description_of_origin,
             known_names=address_family.target_names,
             namespace=address_family.namespace,
         )
@@ -146,18 +168,20 @@ async def find_build_file(address: Address) -> BuildFileAddress:
 
 
 @rule
-async def find_target_adaptor(address: Address) -> TargetAdaptor:
+async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
+    address = request.address
     if address.is_generated_target:
         raise AssertionError(
             "Generated targets are not defined in BUILD files, and so do not have "
-            f"TargetAdaptors: {address}"
+            f"TargetAdaptors: {request}"
         )
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
     target_adaptor = address_family.get_target_adaptor(address)
     if target_adaptor is None:
         raise ResolveError.did_you_mean(
-            bad_name=address.target_name,
+            address,
+            description_of_origin=request.description_of_origin,
             known_names=address_family.target_names,
             namespace=address_family.namespace,
         )

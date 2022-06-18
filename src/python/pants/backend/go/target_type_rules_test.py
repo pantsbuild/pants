@@ -29,15 +29,14 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
-from pants.base.exceptions import ResolveError
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, ResolveError
 from pants.core.target_types import (
     GenericTarget,
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
 )
 from pants.engine.addresses import Addresses
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.rules import QueryRule
 from pants.engine.target import (
     Dependencies,
@@ -65,7 +64,7 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *link.rules(),
             *assembly.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
             QueryRule(Addresses, [DependenciesRequest]),
             QueryRule(GoBinaryMainPackage, [GoBinaryMainPackageRequest]),
             QueryRule(InjectedDependencies, [InjectGoBinaryMainDependencyRequest]),
@@ -202,7 +201,10 @@ def test_generate_package_targets(rule_runner: RuleRunner) -> None:
             "src/go/another_dir/subdir/f.go": "",
         }
     )
-    generated = rule_runner.request(_TargetParametrizations, [Address("src/go")]).parametrizations
+    generated = rule_runner.request(
+        _TargetParametrizations,
+        [_TargetParametrizationsRequest(Address("src/go"), description_of_origin="tests")],
+    ).parametrizations
 
     file_tgts = [
         TargetGeneratorSourcesHelperTarget(

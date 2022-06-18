@@ -27,7 +27,7 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
-    skip_unless_python27_and_python3_present,
+    skip_unless_all_pythons_present,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -146,7 +146,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-@skip_unless_python27_and_python3_present
+@skip_unless_all_pythons_present("2.7", "3.7")
 def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -154,7 +154,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_sources(name='py2', interpreter_constraints=['==2.7.*'])
-                python_sources(name='py3', interpreter_constraints=['CPython>=3.7,<4'])
+                python_sources(name='py3', interpreter_constraints=['CPython==3.7.*'])
                 """
             ),
         }
@@ -188,7 +188,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert "invalid syntax (<string>, line 2) (syntax-error)" in batched_py2_result.stdout
 
     assert batched_py3_result.exit_code == 0
-    assert batched_py3_result.partition_description == "['CPython<4,>=3.7']"
+    assert batched_py3_result.partition_description == "['CPython==3.7.*']"
     assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
 
 
@@ -457,6 +457,7 @@ def test_source_plugin(rule_runner: RuleRunner) -> None:
     assert result.report == EMPTY_DIGEST
 
 
+@skip_unless_all_pythons_present("3.8", "3.9")
 def test_partition_targets(rule_runner: RuleRunner) -> None:
     def create_folder(folder: str, resolve: str, interpreter: str) -> dict[str, str]:
         return {

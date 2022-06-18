@@ -12,6 +12,7 @@ from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import InjectDependenciesRequest, InjectedDependencies
 from pants.engine.unions import UnionRule
+from pants.util.strutil import softwrap
 
 
 class InjectDockerDependencies(InjectDependenciesRequest):
@@ -31,8 +32,15 @@ async def inject_docker_dependencies(
         await Get(
             Addresses,
             UnparsedAddressInputs(
-                dockerfile_info.from_image_addresses,
+                (v for v in dockerfile_info.from_image_build_args.to_dict().values() if v),
                 owning_address=dockerfile_info.address,
+                description_of_origin=softwrap(
+                    f"""
+                    the FROM arguments from the file {dockerfile_info.source}
+                    from the target {dockerfile_info.address}
+                    """
+                ),
+                skip_invalid_addresses=True,
             ),
         )
     )

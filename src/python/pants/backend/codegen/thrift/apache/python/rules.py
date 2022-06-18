@@ -14,7 +14,6 @@ from pants.backend.codegen.utils import find_python_runtime_library_or_raise_err
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonResolveField, PythonSourceField
-from pants.engine.addresses import Address
 from pants.engine.fs import AddPrefix, Digest, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -23,6 +22,7 @@ from pants.engine.target import (
     InjectDependenciesRequest,
     InjectedDependencies,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -78,7 +78,12 @@ async def find_apache_thrift_python_requirement(
     if not thrift_python.infer_runtime_dependency:
         return InjectedDependencies()
 
-    wrapped_tgt = await Get(WrappedTarget, Address, request.dependencies_field.address)
+    wrapped_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(
+            request.dependencies_field.address, description_of_origin="<infallible>"
+        ),
+    )
     resolve = wrapped_tgt.target.get(PythonResolveField).normalized_value(python_setup)
 
     addr = find_python_runtime_library_or_raise_error(

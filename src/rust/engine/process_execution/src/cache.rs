@@ -1,3 +1,4 @@
+use std::fmt::{self, Debug};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -10,13 +11,13 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType};
 use serde::{Deserialize, Serialize};
-use store::Store;
+use store::{Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
   ProcessMetadata, ProcessResultSource,
 };
 
@@ -29,25 +30,36 @@ struct PlatformAndResponseBytes {
 
 #[derive(Clone)]
 pub struct CommandRunner {
-  underlying: Arc<dyn crate::CommandRunner>,
+  inner: Arc<dyn crate::CommandRunner>,
   cache: PersistentCache,
   file_store: Store,
+  eager_fetch: bool,
   metadata: ProcessMetadata,
 }
 
 impl CommandRunner {
   pub fn new(
-    underlying: Arc<dyn crate::CommandRunner>,
+    inner: Arc<dyn crate::CommandRunner>,
     cache: PersistentCache,
     file_store: Store,
+    eager_fetch: bool,
     metadata: ProcessMetadata,
   ) -> CommandRunner {
     CommandRunner {
-      underlying,
+      inner,
       cache,
       file_store,
+      eager_fetch,
       metadata,
     }
+  }
+}
+
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("cache::CommandRunner")
+      .field("inner", &self.inner)
+      .finish_non_exhaustive()
   }
 }
 
@@ -58,7 +70,7 @@ impl crate::CommandRunner for CommandRunner {
     context: Context,
     workunit: &mut RunningWorkunit,
     req: Process,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     let cache_lookup_start = Instant::now();
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
@@ -125,7 +137,7 @@ impl crate::CommandRunner for CommandRunner {
       return Ok(result);
     }
 
-    let result = self.underlying.run(context.clone(), workunit, req).await?;
+    let result = self.inner.run(context.clone(), workunit, req).await?;
     if result.exit_code == 0 || write_failures_to_cache {
       let result = result.clone();
       in_workunit!("local_cache_write", Level::Trace, |workunit| async move {
@@ -148,7 +160,7 @@ impl CommandRunner {
     &self,
     context: &Context,
     action_key: &CacheKey,
-  ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
+  ) -> Result<Option<FallibleProcessResultWithPlatform>, StoreError> {
     use remexec::ExecuteResponse;
 
     // See whether there is a cache entry.
@@ -177,28 +189,36 @@ impl CommandRunner {
         )
         .await?
       } else {
-        return Err("action result missing from ExecuteResponse".into());
+        return Err(
+          "action result missing from ExecuteResponse"
+            .to_owned()
+            .into(),
+        );
       }
     } else {
       return Ok(None);
     };
 
-    // Ensure that all digests in the result are loadable, erroring if any are not.
-    let _ = future::try_join_all(vec![
-      self
-        .file_store
-        .ensure_local_has_file(result.stdout_digest)
-        .boxed(),
-      self
-        .file_store
-        .ensure_local_has_file(result.stderr_digest)
-        .boxed(),
-      self
-        .file_store
-        .ensure_local_has_recursive_directory(result.output_directory.clone())
-        .boxed(),
-    ])
-    .await?;
+    // If eager_fetch is enabled, ensure that all digests in the result are loadable, erroring
+    // if any are not. If eager_fetch is disabled, a Digest which is discovered to be missing later
+    // on during execution will cause backtracking.
+    if self.eager_fetch {
+      let _ = future::try_join_all(vec![
+        self
+          .file_store
+          .ensure_local_has_file(result.stdout_digest)
+          .boxed(),
+        self
+          .file_store
+          .ensure_local_has_file(result.stderr_digest)
+          .boxed(),
+        self
+          .file_store
+          .ensure_local_has_recursive_directory(result.output_directory.clone())
+          .boxed(),
+      ])
+      .await?;
+    }
 
     Ok(Some(result))
   }
@@ -207,7 +227,7 @@ impl CommandRunner {
     &self,
     action_key: &CacheKey,
     result: &FallibleProcessResultWithPlatform,
-  ) -> Result<(), String> {
+  ) -> Result<(), StoreError> {
     let stdout_digest = result.stdout_digest;
     let stderr_digest = result.stderr_digest;
 
@@ -255,6 +275,7 @@ impl CommandRunner {
       )
     })?;
 
-    self.cache.store(action_key, bytes_to_store).await
+    self.cache.store(action_key, bytes_to_store).await?;
+    Ok(())
   }
 }

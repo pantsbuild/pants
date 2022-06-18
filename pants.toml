@@ -5,8 +5,8 @@ print_stacktrace = true
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
   "pants.backend.python",
-  "pants.backend.experimental.python.docs.sphinx",
   "pants.backend.experimental.python.lint.autoflake",
+  "pants.backend.explorer",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
@@ -32,7 +32,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.19.0",
+  "toolchain.pants.plugin==0.20.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -54,16 +54,13 @@ pants_ignore.add = [
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
   "!/pants.pex",
+  # Ignore node modules for docs processing tools
+  "/docs/node_modules",
 ]
 
 build_ignore.add = [
   # Disable Go targets by default so Pants developers do not need Go installed.
   "testprojects/src/go/**",
-]
-
-ignore_warnings.add = [
-  # TODO: `toolchain.pants.plugin==0.18.0` must still use the old `get_git` implementation.
-  "DEPRECATED: pants.base.build_environment.get_git"
 ]
 
 use_deprecated_directory_cli_args_semantics = false
@@ -74,6 +71,8 @@ unmatched_build_file_globs = "error"
 remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
+# See https://github.com/pantsbuild/pants/issues/11331.
+remote_cache_eager_fetch = false
 
 [anonymous-telemetry]
 enabled = true
@@ -109,11 +108,6 @@ ignore_paths = [
 ]
 ignore_adding_targets = [
   "src/python/pants:__main__",
-  "src/python/pants/backend/go/go_sources:bin",
-  "src/python/pants/backend/go/go_sources:go_sources0",
-  "src/python/pants/backend/go/go_sources/analyze_package:bin",
-  "src/python/pants/backend/go/go_sources/embedcfg:bin",
-  "src/python/pants/backend/go/go_sources/generate_testmain:bin",
   "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",
   "src/python/pants/backend/python/dependency_inference/scripts:dependency_parser0",
   "src/python/pants/backend/terraform:hcl2_parser0",
@@ -143,7 +137,6 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 [flake8]
 config = "build-support/flake8/.flake8"
 extra_requirements.add = [
-  "flake8-pantsbuild>=2.0,<3",
   "flake8-2020>=1.6.0,<1.7.0",
   "flake8-no-implicit-concat",
   "flake8-comprehensions>=3.8.0,<4.0",
@@ -185,6 +178,7 @@ extra_env_vars = [
 interpreter_constraints = [">=3.7,<3.10"]
 extra_requirements.add = [
   "mypy-typing-asserts",
+  "strawberry-graphql>=0.95.1,<0.96",
 ]
 lockfile = "3rdparty/python/mypy.lock"
 

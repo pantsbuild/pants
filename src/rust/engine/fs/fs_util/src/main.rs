@@ -47,7 +47,9 @@ use parking_lot::Mutex;
 use protos::require_digest;
 use serde_derive::Serialize;
 use std::collections::BTreeMap;
-use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest, SubsetParams, UploadSummary};
+use store::{
+  Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams, UploadSummary,
+};
 
 #[derive(Debug)]
 enum ExitCode {
@@ -57,6 +59,15 @@ enum ExitCode {
 
 #[derive(Debug)]
 struct ExitError(String, ExitCode);
+
+impl From<StoreError> for ExitError {
+  fn from(s: StoreError) -> Self {
+    match s {
+      md @ StoreError::MissingDigest { .. } => ExitError(md.to_string(), ExitCode::NotFound),
+      StoreError::Unclassified(s) => ExitError(s, ExitCode::UnknownError),
+    }
+  }
+}
 
 impl From<String> for ExitError {
   fn from(s: String) -> Self {
@@ -455,15 +466,11 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .parse::<usize>()
             .expect("size_bytes must be a non-negative number");
           let digest = Digest::new(fingerprint, size_bytes);
-          let write_result = store
-            .load_file_bytes_with(digest, |bytes| io::stdout().write_all(bytes).unwrap())
-            .await?;
-          write_result.ok_or_else(|| {
-            ExitError(
-              format!("File with digest {:?} not found", digest),
-              ExitCode::NotFound,
-            )
-          })
+          Ok(
+            store
+              .load_file_bytes_with(digest, |bytes| io::stdout().write_all(bytes).unwrap())
+              .await?,
+          )
         }
         ("save", args) => {
           let path = PathBuf::from(args.value_of("path").unwrap());
@@ -523,16 +530,11 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .expect("protocol error");
         let output_digest =
           output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?;
-        store
-          .materialize_directory(destination, output_digest, Permissions::Writable)
-          .await
-          .map_err(|err| {
-            if err.contains("not found") {
-              ExitError(err, ExitCode::NotFound)
-            } else {
-              err.into()
-            }
-          })
+        Ok(
+          store
+            .materialize_directory(destination, output_digest, Permissions::Writable)
+            .await?,
+        )
       }
       (_, _) => unimplemented!(),
     },
@@ -546,16 +548,11 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
         let digest = DirectoryDigest::from_persisted_digest(Digest::new(fingerprint, size_bytes));
-        store
-          .materialize_directory(destination, digest, Permissions::Writable)
-          .await
-          .map_err(|err| {
-            if err.contains("not found") {
-              ExitError(err, ExitCode::NotFound)
-            } else {
-              err.into()
-            }
-          })
+        Ok(
+          store
+            .materialize_directory(destination, digest, Permissions::Writable)
+            .await?,
+        )
       }
       ("save", args) => {
         let posix_fs = Arc::new(make_posix_fs(
@@ -629,53 +626,36 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .await?;
         }
 
-        let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
-          "binary" => {
-            let maybe_directory = store.load_directory(digest.as_digest()).await?;
-            maybe_directory.map(|d| d.to_bytes().to_vec())
-          }
-          "text" => {
-            let maybe_p = store.load_directory(digest.as_digest()).await?;
-            maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
-          }
-          "recursive-file-list" => {
-            let maybe_v = expand_files(store, digest.as_digest()).await?;
-            maybe_v
-              .map(|v| {
-                v.into_iter()
-                  .map(|(name, _digest)| format!("{}\n", name))
-                  .collect::<Vec<String>>()
-                  .join("")
-              })
-              .map(String::into_bytes)
-          }
-          "recursive-file-list-with-digests" => {
-            let maybe_v = expand_files(store, digest.as_digest()).await?;
-            maybe_v
-              .map(|v| {
-                v.into_iter()
-                  .map(|(name, digest)| {
-                    format!("{} {:<16} {}\n", digest.hash, digest.size_bytes, name)
-                  })
-                  .collect::<Vec<String>>()
-                  .join("")
-              })
-              .map(String::into_bytes)
-          }
+        let proto_bytes: Vec<u8> = match args.value_of("output-format").unwrap() {
+          "binary" => store
+            .load_directory(digest.as_digest())
+            .await?
+            .to_bytes()
+            .to_vec(),
+          "text" => format!("{:?}\n", store.load_directory(digest.as_digest()).await?)
+            .as_bytes()
+            .to_vec(),
+          "recursive-file-list" => expand_files(store, digest.as_digest())
+            .await?
+            .into_iter()
+            .map(|(name, _digest)| format!("{}\n", name))
+            .collect::<Vec<String>>()
+            .join("")
+            .into_bytes(),
+          "recursive-file-list-with-digests" => expand_files(store, digest.as_digest())
+            .await?
+            .into_iter()
+            .map(|(name, digest)| format!("{} {:<16} {}\n", digest.hash, digest.size_bytes, name))
+            .collect::<Vec<String>>()
+            .join("")
+            .into_bytes(),
           format => {
             return Err(format!("Unexpected value of --output-format arg: {}", format).into())
           }
         };
-        match proto_bytes {
-          Some(bytes) => {
-            io::stdout().write_all(&bytes).unwrap();
-            Ok(())
-          }
-          None => Err(ExitError(
-            format!("Directory with digest {:?} not found", digest),
-            ExitCode::NotFound,
-          )),
-        }
+
+        io::stdout().write_all(&proto_bytes).unwrap();
+        Ok(())
       }
       (_, _) => unimplemented!(),
     },
@@ -687,26 +667,17 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
       let digest = Digest::new(fingerprint, size_bytes);
-      let v = match store
+      let bytes = match store
         .load_file_bytes_with(digest, Bytes::copy_from_slice)
-        .await?
+        .await
       {
-        None => {
-          let maybe_dir = store.load_directory(digest).await?;
-          maybe_dir.map(|dir| dir.to_bytes())
-        }
-        Some(bytes) => Some(bytes),
+        Err(StoreError::MissingDigest { .. }) => store.load_directory(digest).await?.to_bytes(),
+        Err(e) => return Err(e.into()),
+        Ok(bytes) => bytes,
       };
-      match v {
-        Some(bytes) => {
-          io::stdout().write_all(&bytes).unwrap();
-          Ok(())
-        }
-        None => Err(ExitError(
-          format!("Digest {:?} not found", digest),
-          ExitCode::NotFound,
-        )),
-      }
+
+      io::stdout().write_all(&bytes).unwrap();
+      Ok(())
     }
     ("directories", sub_match) => match expect_subcommand(sub_match) {
       ("list", _) => {
@@ -738,17 +709,13 @@ fn expect_subcommand(matches: &clap::ArgMatches) -> (&str, &clap::ArgMatches) {
     .unwrap_or_else(|| panic!("Expected subcommand. See `--help`."))
 }
 
-async fn expand_files(
-  store: Store,
-  digest: Digest,
-) -> Result<Option<Vec<(String, Digest)>>, String> {
+async fn expand_files(store: Store, digest: Digest) -> Result<Vec<(String, Digest)>, StoreError> {
   let files = Arc::new(Mutex::new(Vec::new()));
-  let vec_opt = expand_files_helper(store, digest, String::new(), files.clone()).await?;
-  Ok(vec_opt.map(|_| {
-    let mut v = Arc::try_unwrap(files).unwrap().into_inner();
-    v.sort_by(|(l, _), (r, _)| l.cmp(r));
-    v
-  }))
+  expand_files_helper(store, digest, String::new(), files.clone()).await?;
+
+  let mut v = Arc::try_unwrap(files).unwrap().into_inner();
+  v.sort_by(|(l, _), (r, _)| l.cmp(r));
+  Ok(v)
 }
 
 fn expand_files_helper(
@@ -756,44 +723,39 @@ fn expand_files_helper(
   digest: Digest,
   prefix: String,
   files: Arc<Mutex<Vec<(String, Digest)>>>,
-) -> BoxFuture<'static, Result<Option<()>, String>> {
+) -> BoxFuture<'static, Result<(), StoreError>> {
   async move {
-    let maybe_dir = store.load_directory(digest).await?;
-    match maybe_dir {
-      Some(dir) => {
-        {
-          let mut files_unlocked = files.lock();
-          for file in &dir.files {
-            let file_digest = require_digest(file.digest.as_ref())?;
-            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest));
-          }
-        }
-        let subdirs_and_digests = dir
-          .directories
-          .iter()
-          .map(move |subdir| {
-            let digest = require_digest(subdir.digest.as_ref());
-            digest.map(|digest| (subdir, digest))
-          })
-          .collect::<Result<Vec<_>, _>>()?;
-        future::try_join_all(
-          subdirs_and_digests
-            .into_iter()
-            .map(move |(subdir, digest)| {
-              expand_files_helper(
-                store.clone(),
-                digest,
-                format!("{}{}/", prefix, subdir.name),
-                files.clone(),
-              )
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await
-        .map(|_| Some(()))
+    let dir = store.load_directory(digest).await?;
+    {
+      let mut files_unlocked = files.lock();
+      for file in &dir.files {
+        let file_digest = require_digest(file.digest.as_ref())?;
+        files_unlocked.push((format!("{}{}", prefix, file.name), file_digest));
       }
-      None => Ok(None),
     }
+    let subdirs_and_digests = dir
+      .directories
+      .iter()
+      .map(move |subdir| {
+        let digest = require_digest(subdir.digest.as_ref());
+        digest.map(|digest| (subdir, digest))
+      })
+      .collect::<Result<Vec<_>, _>>()?;
+    future::try_join_all(
+      subdirs_and_digests
+        .into_iter()
+        .map(move |(subdir, digest)| {
+          expand_files_helper(
+            store.clone(),
+            digest,
+            format!("{}{}/", prefix, subdir.name),
+            files.clone(),
+          )
+        })
+        .collect::<Vec<_>>(),
+    )
+    .await
+    .map(|_| ())
   }
   .boxed()
 }
@@ -812,7 +774,7 @@ async fn ensure_uploaded_to_remote(
   store: &Store,
   store_has_remote: bool,
   digest: Digest,
-) -> Result<SummaryWithDigest, String> {
+) -> Result<SummaryWithDigest, StoreError> {
   let summary = if store_has_remote {
     store
       .ensure_remote_has_recursive(vec![digest])

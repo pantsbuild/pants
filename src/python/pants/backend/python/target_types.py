@@ -184,36 +184,56 @@ class EntryPoint(MainSpecification):
         entry_point = value.strip()
         if not entry_point:
             raise ValueError(
-                f"The {given} cannot be blank. It must indicate a Python module by name or path "
-                f"and an optional nullary function in that module separated by a colon, i.e.: "
-                f"module_name_or_path(':'function_name)?"
+                softwrap(
+                    f"""
+                    The {given} cannot be blank. It must indicate a Python module by name or path
+                    and an optional nullary function in that module separated by a colon, i.e.:
+                    module_name_or_path(':'function_name)?
+                    """
+                )
             )
         module_or_path, sep, func = entry_point.partition(":")
         if not module_or_path:
             raise ValueError(f"The {given} must specify a module; given: {value!r}")
         if ":" in func:
             raise ValueError(
-                f"The {given} can only contain one colon separating the entry point's module from "
-                f"the entry point function in that module; given: {value!r}"
+                softwrap(
+                    f"""
+                    The {given} can only contain one colon separating the entry point's module from
+                    the entry point function in that module; given: {value!r}
+                    """
+                )
             )
         if sep and not func:
             logger.warning(
-                f"Assuming no entry point function and stripping trailing ':' from the {given}: "
-                f"{value!r}. Consider deleting it to make it clear no entry point function is "
-                f"intended."
+                softwrap(
+                    f"""
+                    Assuming no entry point function and stripping trailing ':' from the {given}:
+                    {value!r}. Consider deleting it to make it clear no entry point function is
+                    intended.
+                    """
+                )
             )
         return cls(module=module_or_path, function=func if func else None)
 
     def __post_init__(self):
         if ":" in self.module:
             raise ValueError(
-                "The `:` character is not valid in a module name. Given an entry point module of "
-                f"{self.module}. Did you mean to use EntryPoint.parse?"
+                softwrap(
+                    f"""
+                    The `:` character is not valid in a module name. Given an entry point module of
+                    {self.module}. Did you mean to use EntryPoint.parse?
+                    """
+                )
             )
         if self.function and ":" in self.function:
             raise ValueError(
-                "The `:` character is not valid in a function name. Given an entry point function"
-                f" of {self.function}."
+                softwrap(
+                    f"""
+                    The `:` character is not valid in a function name. Given an entry point function
+                    of {self.function}.
+                    """
+                )
             )
 
     def iter_pex_args(self) -> Iterator[str]:
@@ -548,6 +568,25 @@ class PexIncludeToolsField(BoolField):
     )
 
 
+class RunInSandboxField(BoolField):
+    alias = "run_in_sandbox"
+    default = True
+    help = softwrap(
+        """
+        If true, runs of this target with the `run` goal will copy the needed first-party sources
+        into a temporary chroot and run from there.
+        If false, runs of this target with the `run` goal will use the in-repo sources directly.
+
+        The former mode is more hermetic, and is closer to building and running a standalone binary.
+
+        The latter mode may be necessary if the binary being run writes files into the repo and
+        computes their location relative to the executed files. Django's makemigrations command
+        is an example of such a process.  It may also have lower latency, since no files need
+        to be copied into a chroot.
+        """
+    )
+
+
 _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
@@ -564,6 +603,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexExecutionModeField,
     PexIncludeRequirementsField,
     PexIncludeToolsField,
+    RunInSandboxField,
     RestartableField,
 )
 
@@ -589,9 +629,13 @@ class PexBinary(Target):
     def validate(self) -> None:
         if self[PexEntryPointField].value is not None and self[PexScriptField].value is not None:
             raise InvalidTargetException(
-                f"The `{self.alias}` target {self.address} cannot set both the "
-                f"`{self[PexEntryPointField].alias}` and `{self[PexScriptField].alias}` fields at "
-                "the same time. To fix, please remove one."
+                softwrap(
+                    f"""
+                    The `{self.alias}` target {self.address} cannot set both the
+                    `{self[PexEntryPointField].alias}` and `{self[PexScriptField].alias}` fields at
+                    the same time. To fix, please remove one.
+                    """
+                )
             )
 
 
@@ -719,11 +763,16 @@ class PythonTestSourceField(PythonSourceField):
         file_name = os.path.basename(file)
         if file_name == "conftest.py":
             raise InvalidFieldException(
-                f"The {repr(self.alias)} field in target {self.address} should not be set to the "
-                f"file 'conftest.py', but was set to {repr(self.value)}.\n\nInstead, use a "
-                "`python_source` target or the target generator `python_test_utils`. You can run "
-                f"`{bin_name()} tailor` after removing this target ({self.address}) to autogenerate a "
-                "`python_test_utils` target."
+                softwrap(
+                    f"""
+                    The {repr(self.alias)} field in target {self.address} should not be set to the
+                    file 'conftest.py', but was set to {repr(self.value)}.
+
+                    Instead, use a `python_source` target or the target generator `python_test_utils`.
+                    You can run `{bin_name()} tailor` after removing this target ({self.address}) to
+                    autogenerate a `python_test_utils` target.
+                    """
+                )
             )
 
 
@@ -824,11 +873,17 @@ class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
         conftest_files = [fp for fp in files if os.path.basename(fp) == "conftest.py"]
         if conftest_files:
             raise InvalidFieldException(
-                f"The {repr(self.alias)} field in target {self.address} should not include the "
-                f"file 'conftest.py', but included these: {conftest_files}.\n\nInstead, use a "
-                "`python_source` target or the target generator `python_test_utils`. You can run "
-                f"`{bin_name()} tailor` after removing the files from the {repr(self.alias)} field of "
-                f"this target ({self.address}) to autogenerate a `python_test_utils` target."
+                softwrap(
+                    f"""
+                    The {repr(self.alias)} field in target {self.address} should not include the
+                    file 'conftest.py', but included these: {conftest_files}.
+
+                    Instead, use a `python_source` target or the target generator `python_test_utils`.
+                    You can run `{bin_name()} tailor` after removing the files from the
+                    {repr(self.alias)} field of this target ({self.address}) to autogenerate a
+                    `python_test_utils` target.
+                    """
+                )
             )
 
 
@@ -837,8 +892,8 @@ class PythonTestsOverrideField(OverridesField):
         PythonTestTarget.alias,
         """
         overrides={
-            "foo_test.py": {"timeout": 120]},
-            "bar_test.py": {"timeout": 200]},
+            "foo_test.py": {"timeout": 120},
+            "bar_test.py": {"timeout": 200},
             ("foo_test.py", "bar_test.py"): {"tags": ["slow_tests"]},
         }
         """,
@@ -1115,10 +1170,14 @@ class PythonRequirementTarget(Target):
             and self[PythonRequirementTypeStubModulesField].value
         ):
             raise InvalidTargetException(
-                f"The `{self.alias}` target {self.address} cannot set both the "
-                f"`{self[PythonRequirementModulesField].alias}` and "
-                f"`{self[PythonRequirementTypeStubModulesField].alias}` fields at the same time. "
-                "To fix, please remove one."
+                softwrap(
+                    f"""
+                    The `{self.alias}` target {self.address} cannot set both the
+                    `{self[PythonRequirementModulesField].alias}` and
+                    `{self[PythonRequirementTypeStubModulesField].alias}` fields at the same time.
+                    To fix, please remove one.
+                    """
+                )
             )
 
 
@@ -1128,12 +1187,12 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
     This will safely ignore any options starting with `--` and will ignore comments. Any pip-style
     VCS requirements will fail, with a helpful error message describing how to use PEP 440.
     """
-    for i, line in enumerate(content.splitlines()):
+    for i, line in enumerate(content.splitlines(), start=1):
         line, _, _ = line.partition("--")
         line = line.strip().rstrip("\\")
-        if not line or line.startswith("#"):
+        if not line or line.startswith(("#", "-")):
             continue
-        yield PipRequirement.parse(line, description_of_origin=f"{rel_path} at line {i + 1}")
+        yield PipRequirement.parse(line, description_of_origin=f"{rel_path} at line {i}")
 
 
 # -----------------------------------------------------------------------------------------------

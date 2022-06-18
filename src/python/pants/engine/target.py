@@ -298,6 +298,7 @@ class Target:
     plugin_fields: tuple[type[Field], ...]
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
+    name_explicitly_set: bool
 
     @final
     def __init__(
@@ -309,6 +310,7 @@ class Target:
         # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: UnionMembership | None = None,
         *,
+        name_explicitly_set: bool = True,
         residence_dir: str | None = None,
     ) -> None:
         """Create a target.
@@ -341,6 +343,7 @@ class Target:
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
         self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
+        self.name_explicitly_set = name_explicitly_set
         self.field_values = self._calculate_field_values(unhydrated_values, address)
         self.validate()
 
@@ -349,17 +352,11 @@ class Target:
         self, unhydrated_values: dict[str, Any], address: Address
     ) -> FrozenDict[type[Field], Field]:
         field_values = {}
-        valid_aliases = set()
-        aliases_to_field_types = {}
-        for field_type in self.field_types:
-            valid_aliases.add(field_type.alias)
-            aliases_to_field_types[field_type.alias] = field_type
-            if field_type.deprecated_alias is not None:
-                valid_aliases.add(field_type.deprecated_alias)
-                aliases_to_field_types[field_type.deprecated_alias] = field_type
+        aliases_to_field_types = self._get_field_aliases_to_field_types(self.field_types)
 
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
+                valid_aliases = set(aliases_to_field_types.keys())
                 if isinstance(self, TargetGenerator):
                     # Even though moved_fields don't live on the target generator, they are valid
                     # for users to specify. It's intentional that these are only used for
@@ -385,6 +382,18 @@ class Target:
                 key=lambda field_type_to_val_pair: field_type_to_val_pair[0].alias,
             )
         )
+
+    @final
+    @classmethod
+    def _get_field_aliases_to_field_types(
+        cls, field_types: tuple[type[Field], ...]
+    ) -> dict[str, type[Field]]:
+        aliases_to_field_types = {}
+        for field_type in field_types:
+            aliases_to_field_types[field_type.alias] = field_type
+            if field_type.deprecated_alias is not None:
+                aliases_to_field_types[field_type.deprecated_alias] = field_type
+        return aliases_to_field_types
 
     @final
     @property
@@ -620,6 +629,18 @@ class Target:
         context. If the validation only makes sense for certain goals acting on targets; those
         validations should be done in the associated rules.
         """
+
+
+@dataclass(frozen=True)
+class WrappedTargetRequest:
+    """Used with `WrappedTarget` to get the Target corresponding to an address.
+
+    `description_of_origin` is used for error messages when the address does not actually exist. If
+    you are confident this cannot happen, set the string to something like `<infallible>`.
+    """
+
+    address: Address
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -1176,7 +1197,7 @@ def _generate_file_level_targets(
         return generated_target_cls(
             generated_target_fields,
             address,
-            union_membership,
+            union_membership=union_membership,
             residence_dir=os.path.dirname(full_fp),
         )
 
@@ -1487,8 +1508,8 @@ class InvalidFieldChoiceException(InvalidFieldException):
         valid_choices: Iterable[Any],
     ) -> None:
         super().__init__(
-            f"The {repr(field_alias)} field in target {address} must be one of "
-            f"{sorted(valid_choices)}, but was {repr(raw_value)}."
+            f"Values for the {repr(field_alias)} field in target {address} must be one of "
+            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided."
         )
 
 
@@ -1647,15 +1668,9 @@ class StringField(ScalarField[str]):
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and cls.valid_choices is not None:
-            valid_choices = set(
-                cls.valid_choices
-                if isinstance(cls.valid_choices, tuple)
-                else (choice.value for choice in cls.valid_choices)
+            _validate_choices(
+                address, cls.alias, [value_or_default], valid_choices=cls.valid_choices
             )
-            if value_or_default not in valid_choices:
-                raise InvalidFieldChoiceException(
-                    address, cls.alias, value_or_default, valid_choices=valid_choices
-                )
         return value_or_default
 
 
@@ -1705,12 +1720,16 @@ class SequenceField(Generic[T], Field):
 class StringSequenceField(SequenceField[str]):
     expected_element_type = str
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
+    valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
-        return super().compute_value(raw_value, address)
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default and cls.valid_choices is not None:
+            _validate_choices(address, cls.alias, value_or_default, valid_choices=cls.valid_choices)
+        return value_or_default
 
 
 class DictStringToStringField(Field):
@@ -1791,6 +1810,25 @@ class DictStringToStringSequenceField(Field):
             except ValueError:
                 raise invalid_type_exception
         return FrozenDict(result)
+
+
+def _validate_choices(
+    address: Address,
+    field_alias: str,
+    values: Iterable[Any],
+    *,
+    valid_choices: Union[Type[Enum], Tuple[Any, ...]],
+) -> None:
+    _valid_choices = set(
+        valid_choices
+        if isinstance(valid_choices, tuple)
+        else (choice.value for choice in valid_choices)
+    )
+    for choice in values:
+        if choice not in _valid_choices:
+            raise InvalidFieldChoiceException(
+                address, field_alias, choice, valid_choices=_valid_choices
+            )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -2329,11 +2367,15 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 
     @memoized_property
     def unevaluated_transitive_excludes(self) -> UnparsedAddressInputs:
-        if not self.supports_transitive_excludes or not self.value:
-            return UnparsedAddressInputs((), owning_address=self.address)
+        val = (
+            (v[2:] for v in self.value if v.startswith("!!"))
+            if self.supports_transitive_excludes and self.value
+            else ()
+        )
         return UnparsedAddressInputs(
-            (v[2:] for v in self.value if v.startswith("!!")),
+            val,
             owning_address=self.address,
+            description_of_origin=f"the `{self.alias}` field from the target {self.address}",
         )
 
 
@@ -2604,7 +2646,11 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     def to_unparsed_address_inputs(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self.value or (), owning_address=self.address)
+        return UnparsedAddressInputs(
+            self.value or (),
+            owning_address=self.address,
+            description_of_origin=f"the `{self.alias}` from the target {self.address}",
+        )
 
 
 # -----------------------------------------------------------------------------------------------

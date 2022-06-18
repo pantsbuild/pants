@@ -12,12 +12,12 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, ImmutableInputs,
-  NamedCaches, Process, ProcessMetadata,
+  NamedCaches, Process, ProcessError, ProcessMetadata,
 };
 
 struct RoundtripResults {
-  uncached: Result<FallibleProcessResultWithPlatform, String>,
-  maybe_cached: Result<FallibleProcessResultWithPlatform, String>,
+  uncached: Result<FallibleProcessResultWithPlatform, ProcessError>,
+  maybe_cached: Result<FallibleProcessResultWithPlatform, ProcessError>,
 }
 
 fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
@@ -58,6 +58,7 @@ fn create_cached_runner(
     local.into(),
     cache,
     store,
+    true,
     ProcessMetadata::default(),
   ));
 
@@ -158,7 +159,6 @@ async fn recover_from_missing_store_contents() {
     let output_dir = store
       .load_directory(output_dir_digest.as_digest())
       .await
-      .unwrap()
       .unwrap();
     let output_child_digest = output_dir
       .files

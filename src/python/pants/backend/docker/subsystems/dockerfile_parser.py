@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
+import json
 import pkgutil
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterator
 
 from pants.backend.docker.target_types import DockerImageSourceField
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
@@ -22,7 +22,13 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, WrappedTarget
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    SourcesField,
+    WrappedTarget,
+    WrappedTargetRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
@@ -122,13 +128,14 @@ class DockerfileInfoError(Exception):
 class DockerfileInfo:
     address: Address
     digest: Digest
+
+    # Data from the parsed Dockerfile, keep in sync with
+    # `dockerfile_wrapper_script.py:ParsedDockerfileInfo`:
     source: str
-    from_image_addresses: tuple[str, ...] = ()
-    copy_source_paths: tuple[str, ...] = ()
-    version_tags: tuple[str, ...] = ()
     build_args: DockerBuildArgs = DockerBuildArgs()
-    from_image_build_arg_names: tuple[str, ...] = ()
-    copy_sources: tuple[str, ...] = ()
+    copy_source_paths: tuple[str, ...] = ()
+    from_image_build_args: DockerBuildArgs = DockerBuildArgs()
+    version_tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -136,17 +143,11 @@ class DockerfileInfoRequest:
     address: Address
 
 
-def split_iterable(sep: str, obj: list[str] | tuple[str, ...]) -> Iterator[tuple[str, ...]]:
-    while sep in obj:
-        idx = obj.index(sep)
-        yield tuple(obj[:idx])
-        obj = obj[idx + 1 :]
-    yield tuple(obj)
-
-
 @rule
 async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
-    wrapped_target = await Get(WrappedTarget, Address, request.address)
+    wrapped_target = await Get(
+        WrappedTarget, WrappedTargetRequest(request.address, description_of_origin="<infallible>")
+    )
     target = wrapped_target.target
     sources = await Get(
         HydratedSources,
@@ -157,44 +158,48 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
         ),
     )
 
-    dockerfile = sources.snapshot.files[0]
+    dockerfiles = sources.snapshot.files
+    assert len(dockerfiles) == 1, (
+        f"Internal error: Expected a single source file to Dockerfile parse request {request}, "
+        f"got: {dockerfiles}."
+    )
 
     result = await Get(
         ProcessResult,
         DockerfileParseRequest(
             sources.snapshot.digest,
-            (
-                "version-tags,from-image-addresses,copy-source-paths,build-args,from-image-build-args,copy-sources",
-                dockerfile,
-            ),
+            dockerfiles,
         ),
     )
 
-    output = result.stdout.decode("utf-8").strip().split("\n")
-    (
-        version_tags,
-        from_image_addresses,
-        copy_source_paths,
-        build_args,
-        from_image_build_arg_names,
-        copy_sources,
-    ) = split_iterable("---", output)
+    try:
+        raw_output = result.stdout.decode("utf-8")
+        outputs = json.loads(raw_output)
+        assert len(outputs) == len(dockerfiles)
+    except Exception as e:
+        raise DockerfileInfoError(
+            f"Unexpected failure to parse Dockerfiles: {', '.join(dockerfiles)}, "
+            f"for the {request.address} target: {e}"
+        ) from e
 
+    info = outputs[0]
     try:
         return DockerfileInfo(
             address=request.address,
             digest=sources.snapshot.digest,
-            source=dockerfile,
-            from_image_addresses=from_image_addresses,
-            copy_source_paths=copy_source_paths,
-            version_tags=version_tags,
-            build_args=DockerBuildArgs.from_strings(*build_args, duplicates_must_match=True),
-            from_image_build_arg_names=from_image_build_arg_names,
-            copy_sources=copy_sources,
+            source=info["source"],
+            build_args=DockerBuildArgs.from_strings(
+                *info["build_args"], duplicates_must_match=True
+            ),
+            copy_source_paths=tuple(info["copy_source_paths"]),
+            from_image_build_args=DockerBuildArgs.from_strings(
+                *info["from_image_build_args"], duplicates_must_match=True
+            ),
+            version_tags=tuple(info["version_tags"]),
         )
     except ValueError as e:
         raise DockerfileInfoError(
-            f"Error while parsing {dockerfile} for the {request.address} target: {e}"
+            f"Error while parsing {info['source']} for the {request.address} target: {e}"
         ) from e
 
 

@@ -204,7 +204,10 @@ class AncestorGlobSpec(Spec):
 
 
 def _create_path_globs(
-    globs: Iterable[str], unmatched_glob_behavior: GlobMatchErrorBehavior
+    globs: Iterable[str],
+    unmatched_glob_behavior: GlobMatchErrorBehavior,
+    *,
+    description_of_origin: str,
 ) -> PathGlobs:
     return PathGlobs(
         globs=globs,
@@ -212,7 +215,9 @@ def _create_path_globs(
         # We validate that _every_ glob is valid.
         conjunction=GlobExpansionConjunction.all_match,
         description_of_origin=(
-            None if unmatched_glob_behavior == GlobMatchErrorBehavior.ignore else "CLI arguments"
+            None
+            if unmatched_glob_behavior == GlobMatchErrorBehavior.ignore
+            else description_of_origin
         ),
     )
 
@@ -227,6 +232,8 @@ class RawSpecs:
     When you want to operate on what the user specified, use `Specs`. Otherwise, you can use
     either `Specs` or `RawSpecs` in rules, e.g. to find what targets exist in a directory.
     """
+
+    description_of_origin: str
 
     address_literals: tuple[AddressLiteralSpec, ...] = ()
     file_literals: tuple[FileLiteralSpec, ...] = ()
@@ -245,6 +252,7 @@ class RawSpecs:
         cls,
         specs: Iterable[Spec],
         *,
+        description_of_origin: str,
         convert_dir_literal_to_address_literal: bool,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
         filter_by_global_options: bool = False,
@@ -283,13 +291,14 @@ class RawSpecs:
             else:
                 raise AssertionError(f"Unexpected type of Spec: {repr(spec)}")
         return RawSpecs(
-            tuple(address_literals),
-            tuple(file_literals),
-            tuple(file_globs),
-            tuple(dir_literals),
-            tuple(dir_globs),
-            tuple(recursive_globs),
-            tuple(ancestor_globs),
+            address_literals=tuple(address_literals),
+            file_literals=tuple(file_literals),
+            file_globs=tuple(file_globs),
+            dir_literals=tuple(dir_literals),
+            dir_globs=tuple(dir_globs),
+            recursive_globs=tuple(recursive_globs),
+            ancestor_globs=tuple(ancestor_globs),
+            description_of_origin=description_of_origin,
             unmatched_glob_behavior=unmatched_glob_behavior,
             filter_by_global_options=filter_by_global_options,
             from_change_detection=from_change_detection,
@@ -306,7 +315,7 @@ class RawSpecs:
             or self.ancestor_globs
         )
 
-    def to_specs_snapshot_path_globs(self) -> PathGlobs:
+    def to_specs_paths_path_globs(self) -> PathGlobs:
         """`PathGlobs` to find all files from the specs, independent of targets."""
         relevant_specs: Iterable[
             FileLiteralSpec | FileGlobSpec | DirLiteralSpec | DirGlobSpec | RecursiveGlobSpec
@@ -318,7 +327,13 @@ class RawSpecs:
             *self.recursive_globs,
         )
         return _create_path_globs(
-            (spec.to_glob() for spec in relevant_specs), self.unmatched_glob_behavior
+            (spec.to_glob() for spec in relevant_specs),
+            (
+                GlobMatchErrorBehavior.ignore
+                if self.from_change_detection
+                else self.unmatched_glob_behavior
+            ),
+            description_of_origin=self.description_of_origin,
         )
 
 
@@ -329,6 +344,8 @@ class RawSpecsWithoutFileOwners:
     This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
     `Get(Addresses, RawSpecs)`, which will result in this rule being used.
     """
+
+    description_of_origin: str
 
     address_literals: tuple[AddressLiteralSpec, ...] = ()
     dir_literals: tuple[DirLiteralSpec, ...] = ()
@@ -342,11 +359,12 @@ class RawSpecsWithoutFileOwners:
     @classmethod
     def from_raw_specs(cls, specs: RawSpecs) -> RawSpecsWithoutFileOwners:
         return RawSpecsWithoutFileOwners(
-            specs.address_literals,
-            specs.dir_literals,
-            specs.dir_globs,
-            specs.recursive_globs,
-            specs.ancestor_globs,
+            address_literals=specs.address_literals,
+            dir_literals=specs.dir_literals,
+            dir_globs=specs.dir_globs,
+            recursive_globs=specs.recursive_globs,
+            ancestor_globs=specs.ancestor_globs,
+            description_of_origin=specs.description_of_origin,
             unmatched_glob_behavior=specs.unmatched_glob_behavior,
             filter_by_global_options=specs.filter_by_global_options,
         )
@@ -397,7 +415,11 @@ class RawSpecsWithoutFileOwners:
         validation_path_globs = (
             PathGlobs(())
             if self.unmatched_glob_behavior == GlobMatchErrorBehavior.ignore
-            else _create_path_globs((*validation_includes, *ignores), self.unmatched_glob_behavior)
+            else _create_path_globs(
+                (*validation_includes, *ignores),
+                self.unmatched_glob_behavior,
+                description_of_origin=self.description_of_origin,
+            )
         )
         return build_path_globs, validation_path_globs
 
@@ -410,6 +432,8 @@ class RawSpecsWithOnlyFileOwners:
     `Get(Addresses, RawSpecs)`, which will result in this rule being used.
     """
 
+    description_of_origin: str
+
     file_literals: tuple[FileLiteralSpec, ...] = ()
     file_globs: tuple[FileGlobSpec, ...] = ()
 
@@ -420,8 +444,9 @@ class RawSpecsWithOnlyFileOwners:
     @classmethod
     def from_raw_specs(cls, specs: RawSpecs) -> RawSpecsWithOnlyFileOwners:
         return RawSpecsWithOnlyFileOwners(
-            specs.file_literals,
-            specs.file_globs,
+            description_of_origin=specs.description_of_origin,
+            file_literals=specs.file_literals,
+            file_globs=specs.file_globs,
             unmatched_glob_behavior=specs.unmatched_glob_behavior,
             filter_by_global_options=specs.filter_by_global_options,
             from_change_detection=specs.from_change_detection,
@@ -434,7 +459,11 @@ class RawSpecsWithOnlyFileOwners:
             if self.from_change_detection
             else self.unmatched_glob_behavior
         )
-        return _create_path_globs((spec.to_glob(),), unmatched_glob_behavior)
+        return _create_path_globs(
+            (spec.to_glob(),),
+            unmatched_glob_behavior,
+            description_of_origin=self.description_of_origin,
+        )
 
     def all_specs(self) -> Iterator[FileLiteralSpec | FileGlobSpec]:
         yield from self.file_literals
@@ -454,11 +483,18 @@ class Specs:
     directory,  you can directly use `RawSpecs`.
     """
 
-    includes: RawSpecs = RawSpecs()
-    ignores: RawSpecs = RawSpecs()
+    includes: RawSpecs
+    ignores: RawSpecs
 
     def __bool__(self) -> bool:
         return bool(self.includes) or bool(self.ignores)
+
+    @classmethod
+    def empty(self) -> Specs:
+        return Specs(
+            RawSpecs(description_of_origin="<not used>"),
+            RawSpecs(description_of_origin="<not used>"),
+        )
 
     def arguments_provided_description(self) -> str | None:
         """A description of what the user specified, e.g. 'target arguments'."""

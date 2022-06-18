@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
-from typing import Iterator
+from typing import Iterator, cast
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
@@ -39,7 +39,7 @@ from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Target, WrappedTarget
+from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.util.strutil import bullet_list
@@ -170,7 +170,9 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         if self.context_root.value is not None:
             context_root = self.context_root.value
         else:
-            context_root = default_context_root
+            context_root = cast(
+                str, self.context_root.compute_value(default_context_root, self.address)
+            )
         if context_root.startswith("./"):
             context_root = os.path.join(self.address.spec_path, context_root)
         return os.path.normpath(context_root)
@@ -225,6 +227,7 @@ async def build_docker_image(
     docker: DockerBinary,
     process_cleanup: ProcessCleanupOption,
 ) -> BuiltPackage:
+    """Build a Docker image using `docker build`."""
     context, wrapped_target = await MultiGet(
         Get(
             DockerBuildContext,
@@ -233,7 +236,10 @@ async def build_docker_image(
                 build_upstream_images=True,
             ),
         ),
-        Get(WrappedTarget, Address, field_set.address),
+        Get(
+            WrappedTarget,
+            WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
+        ),
     )
 
     tags = field_set.image_refs(

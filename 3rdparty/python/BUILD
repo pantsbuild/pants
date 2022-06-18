@@ -2,6 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_requirements(
+    module_mapping={
+        "strawberry-graphql": ["strawberry"],
+    },
     overrides={
         "humbug": {"dependencies": ["#setuptools"]},
     },

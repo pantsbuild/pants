@@ -17,9 +17,8 @@ use fs::{
   PreparedPathGlobs, SymlinkBehavior, EMPTY_DIGEST_TREE,
 };
 use hashing::{Digest, EMPTY_DIGEST};
-use protos::gen::build::bazel::remote::execution::v2 as remexec;
 
-use crate::Store;
+use crate::{Store, StoreError};
 
 /// The listing of a DirectoryDigest.
 ///
@@ -88,19 +87,11 @@ impl Snapshot {
     })
   }
 
-  pub async fn from_digest(store: Store, digest: DirectoryDigest) -> Result<Snapshot, String> {
+  pub async fn from_digest(store: Store, digest: DirectoryDigest) -> Result<Snapshot, StoreError> {
     Ok(Self {
       digest: digest.as_digest(),
       tree: store.load_digest_trie(digest).await?,
     })
-  }
-
-  pub async fn get_directory_or_err(
-    store: Store,
-    digest: Digest,
-  ) -> Result<remexec::Directory, String> {
-    let maybe_dir = store.load_directory(digest).await?;
-    maybe_dir.ok_or_else(|| format!("{:?} was not known", digest))
   }
 
   ///
@@ -126,7 +117,9 @@ impl Snapshot {
     // Attempt to use the digest hint to load a Snapshot without expanding the globs; otherwise,
     // expand the globs to capture a Snapshot.
     let snapshot_result = if let Some(digest) = digest_hint {
-      Snapshot::from_digest(store.clone(), digest).await
+      Snapshot::from_digest(store.clone(), digest)
+        .await
+        .map_err(|e| e.to_string())
     } else {
       Err("No digest hint provided.".to_string())
     };

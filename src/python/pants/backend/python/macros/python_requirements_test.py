@@ -12,7 +12,7 @@ from pants.backend.python.macros.python_requirements import PythonRequirementsTa
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
-from pants.engine.internals.graph import _TargetParametrizations
+from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
@@ -22,7 +22,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *python_requirements.rules(),
-            QueryRule(_TargetParametrizations, [Address]),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
         target_types=[PythonRequirementsTargetGenerator],
     )
@@ -37,7 +37,14 @@ def assert_python_requirements(
     requirements_txt_relpath: str = "requirements.txt",
 ) -> None:
     rule_runner.write_files({"BUILD": build_file_entry, requirements_txt_relpath: requirements_txt})
-    result = rule_runner.request(_TargetParametrizations, [Address("", target_name="reqs")])
+    result = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="reqs"), description_of_origin="tests"
+            )
+        ],
+    )
     assert set(result.parametrizations.values()) == expected_targets
 
 

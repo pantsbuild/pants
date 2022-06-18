@@ -18,6 +18,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.docutil import git_url
+from pants.util.strutil import softwrap
 
 
 class Yapf(PythonToolBase):
@@ -40,31 +41,41 @@ class Yapf(PythonToolBase):
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(
         example="--no-local-style",
-        extra_help="Certain arguments, specifically `--recursive`, `--in-place`, and "
-        "`--parallel`, will be ignored because Pants takes care of finding "
-        "all the relevant files and running the formatting in parallel.",
+        extra_help=softwrap(
+            """
+            Certain arguments, specifically `--recursive`, `--in-place`, and
+            `--parallel`, will be ignored because Pants takes care of finding
+            all the relevant files and running the formatting in parallel.
+            """
+        ),
     )
     export = ExportToolOption()
     config = FileOption(
         "--config",
         default=None,
         advanced=True,
-        help=lambda cls: (
-            "Path to style file understood by yapf "
-            "(https://github.com/google/yapf#formatting-style/).\n\n"
-            f"Setting this option will disable `[{cls.options_scope}].config_discovery`. Use "
-            f"this option if the config is located in a non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            Path to style file understood by yapf
+            (https://github.com/google/yapf#formatting-style/).
+
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
         ),
     )
     config_discovery = BoolOption(
         "--config-discovery",
         default=True,
         advanced=True,
-        help=lambda cls: (
-            "If true, Pants will include any relevant config files during "
-            "runs (`.style.yapf`, `pyproject.toml`, and `setup.cfg`)."
-            f"\n\nUse `[{cls.options_scope}].config` instead if your config is in a "
-            f"non-standard location."
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include any relevant config files during
+            runs (`.style.yapf`, `pyproject.toml`, and `setup.cfg`).
+
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
         ),
     )
 

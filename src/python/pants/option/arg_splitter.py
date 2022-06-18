@@ -40,6 +40,7 @@ class ThingHelp(HelpRequest):
 
     advanced: bool = False
     things: tuple[str, ...] = ()
+    likely_specs: tuple[str, ...] = ()
 
 
 class VersionHelp(HelpRequest):
@@ -150,7 +151,10 @@ class ArgSplitter:
                 return scope
 
             nonlocal builtin_goal
-            if scope_info.is_builtin and not builtin_goal:
+            if scope_info.is_builtin and (not builtin_goal or scope.startswith("-")):
+                if builtin_goal:
+                    goals.add(builtin_goal)
+
                 # Get scope from info in case we hit an aliased builtin goal.
                 builtin_goal = scope_info.scope
             else:
@@ -230,7 +234,11 @@ class ArgSplitter:
     def likely_a_spec(self, arg: str) -> bool:
         """Return whether `arg` looks like a spec, rather than a goal name."""
         # Check if it's an ignore spec.
-        if arg.startswith("-") and arg not in self._single_dash_goal_aliases:
+        if (
+            arg.startswith("-")
+            and arg not in self._single_dash_goal_aliases
+            and not arg.startswith("--")
+        ):
             return True
         return any(c in arg for c in (os.path.sep, ".", ":", "*", "#")) or os.path.exists(
             os.path.join(self._buildroot, arg)

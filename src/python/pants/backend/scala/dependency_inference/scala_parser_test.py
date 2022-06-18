@@ -7,13 +7,14 @@ import pytest
 from pants.backend.scala import target_types
 from pants.backend.scala.dependency_inference import scala_parser
 from pants.backend.scala.dependency_inference.scala_parser import (
+    AnalyzeScalaSourceRequest,
     ScalaImport,
     ScalaSourceDependencyAnalysis,
 )
 from pants.backend.scala.target_types import ScalaSourceField, ScalaSourceTarget
 from pants.build_graph.address import Address
 from pants.core.util_rules import source_files
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.target import SourcesField
 from pants.jvm import jdk_rules
 from pants.jvm import util_rules as jvm_util_rules
@@ -33,8 +34,8 @@ def rule_runner() -> RuleRunner:
             *jdk_rules.rules(),
             *target_types.rules(),
             *jvm_util_rules.rules(),
-            QueryRule(SourceFiles, (SourceFilesRequest,)),
-            QueryRule(ScalaSourceDependencyAnalysis, (SourceFiles,)),
+            QueryRule(AnalyzeScalaSourceRequest, (SourceFilesRequest,)),
+            QueryRule(ScalaSourceDependencyAnalysis, (AnalyzeScalaSourceRequest,)),
         ],
         target_types=[ScalaSourceTarget],
     )
@@ -52,8 +53,8 @@ def _analyze(rule_runner: RuleRunner, source: str) -> ScalaSourceDependencyAnaly
 
     target = rule_runner.get_target(address=Address("", target_name="source"))
 
-    source_files = rule_runner.request(
-        SourceFiles,
+    request = rule_runner.request(
+        AnalyzeScalaSourceRequest,
         [
             SourceFilesRequest(
                 (target.get(SourcesField),),
@@ -63,7 +64,7 @@ def _analyze(rule_runner: RuleRunner, source: str) -> ScalaSourceDependencyAnaly
         ],
     )
 
-    return rule_runner.request(ScalaSourceDependencyAnalysis, [source_files])
+    return rule_runner.request(ScalaSourceDependencyAnalysis, [request])
 
 
 def test_parser_simple(rule_runner: RuleRunner) -> None:
@@ -103,6 +104,8 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                 type NestedType = Foo
                 object NestedObject {
                 }
+
+                def a(a: TraitConsumedType): Integer
             }
 
             object OuterObject {
@@ -245,6 +248,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
     assert analysis.consumed_symbols_by_scope == FrozenDict(
         {
             "org.pantsbuild.example.OuterClass.NestedObject": FrozenOrderedSet(["String"]),
+            "org.pantsbuild.example.OuterObject": FrozenOrderedSet(["Foo"]),
             "org.pantsbuild.example.Functions": FrozenOrderedSet(
                 [
                     "TupleTypeArg2",
@@ -257,6 +261,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                     "LambdaTypeArg2",
                     "AParameterType",
                     "LambdaTypeArg1",
+                    "OuterObject",
                     "bar",
                     "OuterObject.NestedVal",
                 ]
@@ -264,11 +269,21 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
             "org.pantsbuild.example.HasPrimaryConstructor": FrozenOrderedSet(
                 ["bar", "SomeTypeInSecondaryConstructor"]
             ),
+            "org.pantsbuild.example.OuterClass": FrozenOrderedSet(["Foo"]),
             "org.pantsbuild.example.ApplyQualifier": FrozenOrderedSet(
-                ["Integer", "a", "toInt", "calc.calcFunc"]
+                ["Integer", "a", "toInt", "calc.calcFunc", "calc"]
+            ),
+            "org.pantsbuild.example.OuterTrait": FrozenOrderedSet(
+                ["Integer", "TraitConsumedType", "Foo"]
             ),
             "org.pantsbuild.example": FrozenOrderedSet(
-                ["ABaseClass", "ATrait1", "ATrait2.Nested", "BaseWithConstructor"]
+                [
+                    "ABaseClass",
+                    "ATrait1",
+                    "SomeTypeInPrimaryConstructor",
+                    "ATrait2.Nested",
+                    "BaseWithConstructor",
+                ]
             ),
         }
     )
@@ -286,8 +301,12 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.ATrait1",
         "java.io.ATrait2.Nested",
         "java.io.BaseWithConstructor",
+        "java.io.Foo",
         "java.io.OuterObject.NestedVal",
+        "java.io.OuterObject",
+        "java.io.SomeTypeInPrimaryConstructor",
         "java.io.String",
+        "java.io.TraitConsumedType",
         "java.io.Unit",
         "java.io.a",
         "java.io.Integer",
@@ -296,6 +315,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "java.io.LambdaTypeArg2",
         "java.io.SomeTypeInSecondaryConstructor",
         "java.io.bar",
+        "java.io.calc",
         "java.io.calc.calcFunc",
         "java.io.foo",
         "java.io.toInt",
@@ -306,21 +326,26 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.example.ABaseClass",
         "org.pantsbuild.example.AParameterType",
         "org.pantsbuild.example.BaseWithConstructor",
+        "org.pantsbuild.example.Foo",
         "org.pantsbuild.example.Integer",
         "org.pantsbuild.example.SomeTypeInSecondaryConstructor",
         "org.pantsbuild.example.ATrait1",
         "org.pantsbuild.example.ATrait2.Nested",
         "org.pantsbuild.example.OuterObject.NestedVal",
+        "org.pantsbuild.example.SomeTypeInPrimaryConstructor",
         "org.pantsbuild.example.String",
+        "org.pantsbuild.example.TraitConsumedType",
         "org.pantsbuild.example.Unit",
         "org.pantsbuild.example.a",
         "org.pantsbuild.example.bar",
+        "org.pantsbuild.example.calc",
         "org.pantsbuild.example.calc.calcFunc",
         "org.pantsbuild.example.foo",
         "org.pantsbuild.example.toInt",
         "org.pantsbuild.example.LambdaReturnType",
         "org.pantsbuild.example.LambdaTypeArg1",
         "org.pantsbuild.example.LambdaTypeArg2",
+        "org.pantsbuild.example.OuterObject",
         "org.pantsbuild.example.TupleTypeArg1",
         "org.pantsbuild.example.TupleTypeArg2",
         "org.pantsbuild.+",
@@ -329,18 +354,23 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
         "org.pantsbuild.ATrait1",
         "org.pantsbuild.ATrait2.Nested",
         "org.pantsbuild.BaseWithConstructor",
+        "org.pantsbuild.Foo",
         "org.pantsbuild.Integer",
         "org.pantsbuild.LambdaReturnType",
         "org.pantsbuild.LambdaTypeArg1",
         "org.pantsbuild.LambdaTypeArg2",
+        "org.pantsbuild.OuterObject",
         "org.pantsbuild.OuterObject.NestedVal",
+        "org.pantsbuild.SomeTypeInPrimaryConstructor",
         "org.pantsbuild.SomeTypeInSecondaryConstructor",
         "org.pantsbuild.String",
+        "org.pantsbuild.TraitConsumedType",
         "org.pantsbuild.TupleTypeArg1",
         "org.pantsbuild.TupleTypeArg2",
         "org.pantsbuild.Unit",
         "org.pantsbuild.a",
         "org.pantsbuild.bar",
+        "org.pantsbuild.calc",
         "org.pantsbuild.calc.calcFunc",
         "org.pantsbuild.foo",
         "org.pantsbuild.toInt",
@@ -387,11 +417,14 @@ def test_relative_import(rule_runner: RuleRunner) -> None:
     )
 
     assert set(analysis.fully_qualified_consumed_symbols()) == {
+        "io",
         "io.apply",
         "java.io.apply",
         "org.pantsbuild.io.apply",
+        "pio",
         "pio.apply",
         "scala.io.apply",
+        "sio",
         "sio.apply",
     }
 
@@ -411,6 +444,28 @@ def test_package_object(rule_runner: RuleRunner) -> None:
     assert sorted(analysis.provided_symbols) == ["foo.bar", "foo.bar.Hello"]
 
 
+def test_source3(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'2.13.8'}",
+            "--scalac-args=['-Xsource:3']",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            import bar.*
+            """
+        ),
+    )
+    assert analysis.imports_by_scope.get("foo") == (ScalaImport("bar", None, True),)
+
+
 def test_extract_annotations(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
         rule_runner,
@@ -418,7 +473,7 @@ def test_extract_annotations(rule_runner: RuleRunner) -> None:
             """
             package foo
 
-            @objectAnnotation("hello")
+            @objectAnnotation("hello", SomeType)
             object Object {
               @deprecated
               def foo(arg: String @argAnnotation("foo")): Unit = {}
@@ -436,6 +491,7 @@ def test_extract_annotations(rule_runner: RuleRunner) -> None:
         ),
     )
     assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.SomeType",
         "foo.String",
         "foo.Unit",
         "foo.classAnnotation",
@@ -444,4 +500,27 @@ def test_extract_annotations(rule_runner: RuleRunner) -> None:
         "foo.traitAnnotation",
         "foo.valAnnotation",
         "foo.varAnnotation",
+    ]
+
+
+def test_type_arguments(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            object Object {
+              var a: A[SomeType] = ???
+              val b: B[AnotherType] = ???
+            }
+            """
+        ),
+    )
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.???",
+        "foo.A",
+        "foo.AnotherType",
+        "foo.B",
+        "foo.SomeType",
     ]

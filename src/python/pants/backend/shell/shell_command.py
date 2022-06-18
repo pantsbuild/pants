@@ -14,6 +14,7 @@ from pants.backend.shell.builtin import BASH_BUILTIN_COMMANDS
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
+    ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
     ShellCommandOutputsField,
     ShellCommandRunWorkdirField,
@@ -31,7 +32,6 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathRequest,
     BinaryPaths,
 )
-from pants.engine.addresses import Address
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -54,6 +54,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -115,6 +116,7 @@ async def prepare_shell_command_process(
     timeout = shell_command.get(ShellCommandTimeoutField).value
     tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value
     outputs = shell_command.get(ShellCommandOutputsField).value or ()
+    extra_env_vars = shell_command.get(ShellCommandExtraEnvVarsField).value or ()
 
     if not command:
         raise ValueError(
@@ -161,6 +163,9 @@ async def prepare_shell_command_process(
                     tool_request,
                     rationale=f"execute `{shell_command.alias}` {shell_command.address}",
                 )
+
+    extra_env = await Get(Environment, EnvironmentRequest(extra_env_vars))
+    command_env.update(extra_env)
 
     transitive_targets = await Get(
         TransitiveTargets,
@@ -231,7 +236,10 @@ async def prepare_shell_command_process(
 
 @rule
 async def run_shell_command_request(shell_command: RunShellCommand) -> RunRequest:
-    wrapped_tgt = await Get(WrappedTarget, Address, shell_command.address)
+    wrapped_tgt = await Get(
+        WrappedTarget,
+        WrappedTargetRequest(shell_command.address, description_of_origin="<infallible>"),
+    )
     process = await Get(Process, ShellCommandProcessRequest(wrapped_tgt.target))
     return RunRequest(
         digest=process.input_digest,

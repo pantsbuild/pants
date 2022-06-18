@@ -34,6 +34,7 @@ from pants.engine.target import AllTargets, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -362,9 +363,13 @@ class PythonModuleOwners:
     def __post_init__(self) -> None:
         if self.unambiguous and self.ambiguous:
             raise AssertionError(
-                "A module has both unambiguous and ambiguous owners, which is a bug in the "
-                "dependency inference code. Please file a bug report at "
-                "https://github.com/pantsbuild/pants/issues/new."
+                softwrap(
+                    """
+                    A module has both unambiguous and ambiguous owners, which is a bug in the
+                    dependency inference code. Please file a bug report at
+                    https://github.com/pantsbuild/pants/issues/new.
+                    """
+                )
             )
 
 

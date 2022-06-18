@@ -42,7 +42,9 @@ from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
 
-DOC_URL_RE = re.compile(r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)")
+DOC_URL_RE = re.compile(
+    r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)(?P<anchor>#[a-zA-Z0-9_-]+)?"
+)
 
 
 def main() -> None:
@@ -119,10 +121,11 @@ class DocUrlRewriter:
         # The docsite injects the version automatically at markdown rendering time, so we
         # must not also do so, or it will be doubled, and the resulting links will be broken.
         slug = mo.group("slug")
+        anchor = mo.group("anchor") or ""
         title = self._slug_to_title.get(slug)
         if not title:
             raise ValueError(f"Found empty or no title for {mo.group(0)}")
-        return f"[{title}](doc:{slug})"
+        return f"[{title}](doc:{slug}{anchor})"
 
     def rewrite(self, s: str) -> str:
         return DOC_URL_RE.sub(self._rewrite_url, s)
@@ -245,7 +248,6 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.kotlin",
         "pants.backend.experimental.kotlin.lint.ktlint",
         "pants.backend.experimental.python",
-        "pants.backend.experimental.python.docs.sphinx",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
         "pants.backend.experimental.python.packaging.pyoxidizer",

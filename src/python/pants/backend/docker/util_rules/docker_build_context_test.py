@@ -625,12 +625,10 @@ def test_create_docker_build_context() -> None:
             address=Address("test"),
             digest=EMPTY_DIGEST,
             source="test/Dockerfile",
-            from_image_addresses=(),
-            copy_source_paths=(),
-            version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
             build_args=DockerBuildArgs.from_strings(),
-            from_image_build_arg_names=(),
-            copy_sources=(),
+            copy_source_paths=(),
+            from_image_build_args=DockerBuildArgs.from_strings(),
+            version_tags=("base latest", "stage1 1.2", "dev 2.0", "prod 2.0"),
         ),
     )
     assert list(context.build_args) == ["ARGNAME=value1"]

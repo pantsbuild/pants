@@ -1,5 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
@@ -8,7 +9,10 @@ from urllib.parse import urlparse
 import pytest
 from pylsp_jsonrpc.exceptions import JsonRpcException  # type: ignore[import]
 
-from internal_plugins.test_lockfile_fixtures.lockfile_fixture import JVMLockfileFixture
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.java.bsp.rules import rules as java_bsp_rules
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
@@ -117,13 +121,22 @@ def jvm_rule_runner() -> RuleRunner:
     return rule_runner
 
 
-@pytest.mark.jvm_lockfile(
-    path="protocol-intellij.test.lock",
-    requirements=[
-        "org.scala-lang:scala-library:2.13.6",
-        "org.scalatest:scalatest_2.13:3.2.10",
-    ],
-)
+@pytest.fixture
+def jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "protocol-intellij.test.lock",
+        [
+            "org.scala-lang:scala-library:2.13.6",
+            "org.scalatest:scalatest_2.13:3.2.10",
+        ],
+    )
+
+
+@pytest.fixture
+def jvm_lockfile(jvm_lockfile_def: JVMLockfileFixtureDefinition, request) -> JVMLockfileFixture:
+    return jvm_lockfile_def.load(request)
+
+
 def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFixture) -> None:
     jvm_rule_runner.write_files(
         {
@@ -168,6 +181,12 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
 
     target_ids = (BuildTargetIdentifier("pants:default"),)
 
+    # We set a very high timeout here (was 15s) due to CI flakes as documented in:
+    #   https://github.com/pantsbuild/pants/issues/15657
+    # This seems to paper over some slow interaction between requests and the LMDB
+    # store as noted in the ticket.
+    timeout = 45
+
     with setup_bsp_server(
         jvm_rule_runner,
         notification_names={"build/taskStart", "build/taskProgress", "build/taskFinish"},
@@ -188,14 +207,14 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
                     "supportedScalaVersions": [],
                 },
             ).to_json_dict(),
-        ).result(timeout=15)
+        ).result(timeout=timeout)
 
         # build/initialized
         endpoint.notify("build/initialized")
 
         # workspace/buildTargets
         build_targets = WorkspaceBuildTargetsResult.from_json_dict(
-            endpoint.request("workspace/buildTargets").result(timeout=15)
+            endpoint.request("workspace/buildTargets").result(timeout=timeout)
         )
         assert len(build_targets.targets) == 1
         assert build_targets.targets[0].capabilities == BuildTargetCapabilities(can_compile=True)
@@ -205,25 +224,25 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
         sources = SourcesResult.from_json_dict(
             endpoint.request(
                 "buildTarget/sources", SourcesParams(target_ids).to_json_dict()
-            ).result(timeout=15)
+            ).result(timeout=timeout)
         )
         assert len(sources.items[0].sources) == 2
 
         # buildTarget/dependencySources - (NB: stubbed)
         _ = endpoint.request(
             "buildTarget/dependencySources", DependencySourcesParams(target_ids).to_json_dict()
-        ).result(timeout=15)
+        ).result(timeout=timeout)
 
         # buildTarget/resources - (NB: used only to index resources)
         _ = endpoint.request(
             "buildTarget/resources", ResourcesParams(target_ids).to_json_dict()
-        ).result(timeout=15)
+        ).result(timeout=timeout)
 
         # buildTarget/scalacOptions
         scalac_options = ScalacOptionsResult.from_json_dict(
             endpoint.request(
                 "buildTarget/scalacOptions", ScalacOptionsParams(target_ids).to_json_dict()
-            ).result(timeout=15)
+            ).result(timeout=timeout)
         )
         assert scalac_options.items[0].classpath
         class_directory = Path(urlparse(scalac_options.items[0].class_directory).path)
@@ -233,7 +252,7 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
         compile_result = CompileResult.from_json_dict(
             endpoint.request(
                 "buildTarget/compile", CompileParams(target_ids).to_json_dict()
-            ).result(timeout=15)
+            ).result(timeout=timeout)
         )
         assert StatusCode(compile_result.status_code) == StatusCode.OK
         notifications.assert_received_unordered(

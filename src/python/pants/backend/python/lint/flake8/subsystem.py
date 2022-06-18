@@ -162,7 +162,11 @@ class Flake8(PythonToolBase):
 
     @property
     def source_plugins(self) -> UnparsedAddressInputs:
-        return UnparsedAddressInputs(self._source_plugins, owning_address=None)
+        return UnparsedAddressInputs(
+            self._source_plugins,
+            owning_address=None,
+            description_of_origin=f"the option `[{self.options_scope}].source_plugins`",
+        )
 
 
 # --------------------------------------------------------------------------------------
@@ -273,9 +277,11 @@ class Flake8LockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule(
-    desc=(
-        "Determine all Python interpreter versions used by Flake8 in your project (for lockfile "
-        "generation)"
+    desc=softwrap(
+        """
+        Determine all Python interpreter versions used by Flake8 in your project
+        (for lockfile generation)
+        """
     ),
     level=LogLevel.DEBUG,
 )
@@ -309,9 +315,11 @@ class Flake8ExportSentinel(ExportPythonToolSentinel):
 
 
 @rule(
-    desc=(
-        "Determine all Python interpreter versions used by Flake8 in your project (for "
-        "`export` goal)"
+    desc=softwrap(
+        """
+        Determine all Python interpreter versions used by Flake8 in your project
+        (for `export` goal)
+        """
     ),
     level=LogLevel.DEBUG,
 )

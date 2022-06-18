@@ -143,6 +143,7 @@ async def infer_terraform_module_dependencies(
         RawSpecs(
             dir_globs=tuple(DirGlobSpec(path) for path in candidate_spec_paths),
             unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            description_of_origin="the `terraform_module` dependency inference rule",
         ),
     )
     # TODO: Need to either implement the standard ambiguous dependency logic or ban >1 terraform_module

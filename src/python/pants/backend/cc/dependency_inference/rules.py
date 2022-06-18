@@ -28,6 +28,7 @@ from pants.engine.target import (
     InferredDependencies,
     Targets,
     WrappedTarget,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -47,7 +48,7 @@ class AllCCTargets(Targets):
 
 
 @rule(desc="Find all CC targets in project", level=LogLevel.DEBUG)
-def find_all_protobuf_targets(targets: AllTargets) -> AllCCTargets:
+def find_all_cc_targets(targets: AllTargets) -> AllCCTargets:
     return AllCCTargets(tgt for tgt in targets if tgt.has_field(CCSourceField))
 
 
@@ -120,7 +121,9 @@ async def infer_cc_source_dependencies(
         return InferredDependencies([])
 
     address = request.sources_field.address
-    wrapped_tgt = await Get(WrappedTarget, Address, address)
+    wrapped_tgt = await Get(
+        WrappedTarget, WrappedTargetRequest(address, description_of_origin="<infallible>")
+    )
     explicitly_provided_deps, hydrated_sources = await MultiGet(
         Get(ExplicitlyProvidedDependencies, DependenciesRequest(wrapped_tgt.target[Dependencies])),
         Get(HydratedSources, HydrateSourcesRequest(request.sources_field)),
