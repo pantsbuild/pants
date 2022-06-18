@@ -53,6 +53,8 @@ pub enum Metric {
   RemoteStoreBlobBytesDownloaded,
   /// Total number of bytes of blobs uploaded to a remote CAS.
   RemoteStoreBlobBytesUploaded,
+  /// Number of times that we backtracked due to missing digests.
+  BacktrackAttempts,
 }
 
 impl Metric {

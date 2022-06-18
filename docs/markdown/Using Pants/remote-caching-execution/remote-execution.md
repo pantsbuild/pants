@@ -5,24 +5,25 @@ hidden: false
 createdAt: "2020-11-13T23:44:25.806Z"
 updatedAt: "2021-03-19T21:47:56.096Z"
 ---
-[block:callout]
-{
-  "type": "warning",
-  "title": "Remote execution support is still experimental",
-  "body": "Remote execution support in Pants comes with several limitations. For example, Pants requires that the server's operating system match the client's operating system. In practice, this means that Pants must be running on Linux because all three major server projects generally only operate on Linux."
-}
-[/block]
-# What is remote execution?
+> 🚧 Remote execution support is still experimental
+> 
+> Remote execution support in Pants comes with several limitations. For example, Pants requires that the server's operating system match the client's operating system. In practice, this means that Pants must be running on Linux because all three major server projects generally only operate on Linux.
+
+What is remote execution?
+=========================
 
 "Remote execution" allows Pants to offload execution of processes to a remote server that complies with the [Remote Execution API](https://github.com/bazelbuild/remote-apis) standard ("REAPI"). The REAPI standard is supported by several different server and client projects including Bazel and of course Pants.
 
-# Setup
+Setup
+=====
 
-## Server
+Server
+------
 
 Remote execution requires the availability of a REAPI-compatible execution server. See the [REAPI server compatibility guide](doc:remote-caching-execution#server-compatibility) for more information.
 
-## Pants
+Pants
+-----
 
 After you have either set up a REAPI server or obtained access to one, the next step is to point Pants to it so that Pants may submit REAPI execution requests. The server should be running a CAS and execution service. These may be the same network endpoint, but for Pants' purposes, they are configured by different configuration options.
 
@@ -91,11 +92,13 @@ remote_instance_name = "main"
 remote_ca_certs_path = "/etc/ssl/certs/ca-certificates.crt"
 ```
 
-# Reference
+Reference
+=========
 
 Run `./pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
 
-# Limitations
+Limitations
+===========
 
 The remote execution support in Pants is still experimental and comes with several limitations:
 

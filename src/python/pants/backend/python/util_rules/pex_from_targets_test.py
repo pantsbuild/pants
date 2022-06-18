@@ -69,6 +69,8 @@ def rule_runner() -> RuleRunner:
     )
 
 
+@pytest.mark.skip(reason="TODO(#15824)")
+@pytest.mark.no_error_if_skipped
 def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
     def create_target_files(
         directory: str, *, req_resolve: str, source_resolve: str, test_resolve: str

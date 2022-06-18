@@ -30,10 +30,10 @@ A Docker image is built from a recipe specified by a [Dockerfile](https://docs.d
 
 Pants uses [`docker_image`](doc:reference-docker_image) [targets](doc:targets) to indicate which Dockerfiles you want Pants to know about, and to add any necessary metadata. 
 
-You can generate initial BUILD files for your Docker images, using [tailor](doc:create-initial-build-files):
+You can generate initial BUILD files for your Docker images, using [tailor](doc:initial-configuration#5-generate-build-files):
 
 ```
-❯ ./pants tailor
+❯ ./pants tailor ::
 Created src/docker/app1/BUILD:
   - Add docker_image target docker
 Created src/docker/app2/BUILD:
