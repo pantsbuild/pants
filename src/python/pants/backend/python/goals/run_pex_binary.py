@@ -1,9 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from ast import arg
 import os
 
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.target_types import (
     PexBinaryDefaults,
     ResolvedPexEntryPoint,
@@ -11,7 +13,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import Pex
+from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
@@ -23,10 +25,14 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+
+
+def _in_chroot(relpath: str) -> str:
+    return os.path.join("{chroot}", relpath)
 
 
 @rule(level=LogLevel.DEBUG)
@@ -99,13 +105,12 @@ async def create_pex_binary_run_request(
     ]
     merged_digest = await Get(Digest, MergeDigests(input_digests))
 
-    def in_chroot(relpath: str) -> str:
-        return os.path.join("{chroot}", relpath)
-
     complete_pex_env = pex_env.in_workspace()
-    args = complete_pex_env.create_argv(in_chroot(pex.name), python=pex.python)
+    # NB. If this changes, please consider how it affects the `DebugRequest` below
+    # (which is not easy to write automated tests for)
+    args = complete_pex_env.create_argv(_in_chroot(pex.name), python=pex.python)
 
-    chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
+    chrooted_source_roots = [_in_chroot(sr) for sr in sources.source_roots]
     # The order here is important: we want the in-repo sources to take precedence over their
     # copies in the sandbox (see above for why those copies exist even in non-sandboxed mode).
     source_roots = [
@@ -114,7 +119,7 @@ async def create_pex_binary_run_request(
     ]
     extra_env = {
         **complete_pex_env.environment_dict(python_configured=pex.python is not None),
-        "PEX_PATH": in_chroot(local_dists.pex.name),
+        "PEX_PATH": _in_chroot(local_dists.pex.name),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
 
@@ -124,10 +129,27 @@ async def create_pex_binary_run_request(
 @rule
 async def run_pex_debug_adapter_binary(
     field_set: PexBinaryFieldSet,
+    debugpy: DebugPy,
 ) -> RunDebugAdapterRequest:
-    raise NotImplementedError(
-        "Debugging a Pex Binary using a debug adapter has not yet been implemented."
+    regular_run_request, debugpy_pex = await MultiGet(
+        Get(RunRequest, PexBinaryFieldSet, field_set),
+        Get(Pex, PexRequest, debugpy.to_pex_request()),
     )
+
+    merged_digest = await Get(
+        Digest, MergeDigests([regular_run_request.digest, debugpy_pex.digest])
+    )
+    args = [
+        regular_run_request.args[0],  # python executable
+        _in_chroot(debugpy_pex.name),
+        "--listen",
+        f"{debugpy.host}:{debugpy.port}",
+        "--wait-for-client",
+        *regular_run_request.args[1:],  # built pex args
+    ]
+    extra_env = regular_run_request.extra_env
+
+    return RunDebugAdapterRequest(digest=merged_digest, args=args, extra_env=extra_env)
 
 
 def rules():
