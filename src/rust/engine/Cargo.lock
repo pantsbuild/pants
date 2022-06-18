@@ -112,9 +112,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.56"
+version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96cf8829f67d2eab0b2dfa42c5d0ef737e0724e4a82b01b3e292456202b19716"
+checksum = "76464446b8bc32758d7e88ee1a804d9914cd9b1cb264c029899680b0be29826f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1252,12 +1252,17 @@ dependencies = [
  "either",
  "futures",
  "http",
+ "http-body",
  "hyper",
  "hyper-rustls",
  "itertools",
  "lazy_static",
  "parking_lot 0.11.2",
+<<<<<<< HEAD
  "pin-project 1.0.12",
+=======
+ "pin-project 1.0.10",
+>>>>>>> 15dd07196 (checkpoint)
  "prost",
  "prost-build",
  "prost-types",
@@ -2864,9 +2869,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.20.2"
+version = "0.20.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d37e5e2290f3e040b594b1a9e04377c2c671f1a1cfd9bfdef82106ac1c113f84"
+checksum = "5aab8ee6c7097ed6057f43c187a62418d0c05a4bd5f18b3571db50ee0f9ce033"
 dependencies = [
  "log",
  "ring",

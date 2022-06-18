@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use futures::FutureExt;
-use grpc_util::hyper::AddrIncomingWithStream;
+use grpc_util::hyper_util::AddrIncomingWithStream;
 use hashing::Fingerprint;
 use parking_lot::Mutex;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;

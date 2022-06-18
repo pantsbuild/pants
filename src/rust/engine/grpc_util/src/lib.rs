@@ -24,33 +24,39 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+#![allow(unused_imports)]
 
-use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use ::hyper::client::HttpConnector;
 use ::hyper::Uri;
 use either::Either;
+use futures::future::BoxFuture;
 use http::header::{HeaderName, USER_AGENT};
 use http::{HeaderMap, HeaderValue};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use tokio_rustls::rustls::ClientConfig;
-use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
+use tonic::body::BoxBody;
+use tonic::transport::Channel;
+use tonic::Status;
 use tower::limit::ConcurrencyLimit;
+use tower::util::{BoxService, MapRequest};
 use tower::ServiceBuilder;
+use tower_service::Service;
 use workunit_store::ObservationMetric;
 
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
 use crate::metrics::{NetworkMetrics, NetworkMetricsLayer};
+// use crate::boxed::BoxServiceSync;
 
-use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
-
+// pub mod boxed;
 pub mod headers;
-pub mod hyper;
+pub mod hyper_util;
 pub mod metrics;
 pub mod prost;
 pub mod retry;
@@ -59,18 +65,31 @@ pub mod tls;
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
 // Service layers that we use universally. If this type becomes unwieldy, or our various Services
 // diverge in which layers they use, we should instead use a Box<dyn Service<..>>.
-pub type LayeredService = SetRequestHeaders<ConcurrencyLimit<NetworkMetrics<Channel>>>;
+pub type LayeredService = Pin<Box<
+  dyn Service<
+      http::Request<BoxBody>,
+      Response = hyper::Response<hyper::Body>,
+      Error = hyper::Error,
+      Future = BoxFuture<'static, Result<hyper::Response<hyper::Body>, hyper::Error>>,
+    > + Send
+    + Sync
+    + 'static,
+>>;
 
 pub fn layered_service(
-  channel: Channel,
+  service: LayeredService,
   concurrency_limit: usize,
   http_headers: HeaderMap,
 ) -> LayeredService {
-  ServiceBuilder::new()
+  let service = ServiceBuilder::new()
+    // .layer(BoxServiceSync::layer())
+    .boxed()
     .layer(SetRequestHeadersLayer::new(http_headers))
     .concurrency_limit(concurrency_limit)
     .layer(NetworkMetricsLayer::new(&METRIC_FOR_REAPI_PATH))
-    .service(channel)
+    .service(service);
+
+  Box::pin(service) as LayeredService
 }
 
 lazy_static! {
@@ -84,60 +103,35 @@ lazy_static! {
   };
 }
 
-/// Create a Tonic `Endpoint` from a string containing a schema and IP address/name.
-pub fn create_endpoint(
-  addr: &str,
-  tls_config_opt: Option<&ClientConfig>,
-  headers: &mut BTreeMap<String, String>,
-) -> Result<Endpoint, String> {
-  let uri =
-    tonic::transport::Uri::try_from(addr).map_err(|err| format!("invalid address: {}", err))?;
-  let endpoint = Channel::builder(uri);
-
-  let endpoint = if let Some(tls_config) = tls_config_opt {
-    endpoint
-      .tls_config(ClientTlsConfig::new().rustls_client_config(tls_config.clone()))
-      .map_err(|e| format!("TLS setup error: {}", e))?
-  } else {
-    endpoint
-  };
-
-  let endpoint = match headers.entry(USER_AGENT.as_str().to_owned()) {
-    Entry::Occupied(e) => {
-      let (_, user_agent) = e.remove_entry();
-      endpoint
-        .user_agent(user_agent)
-        .map_err(|e| format!("Unable to convert user-agent header: {}", e))?
-    }
-    Entry::Vacant(_) => endpoint,
-  };
-
-  Ok(endpoint)
-}
-
 /// Create a Hyper client for use by gRPC users.
 ///
 /// This cannot use Tonic's wrappers because Tonic removed the ability to specify rustls client
 /// config in its API in the latest version. Tonic's recommended way to use rustls now is to
 /// manually setup the connection as per the example at:
 /// https://github.com/hyperium/tonic/blob/master/examples/src/tls/client_rustls.rs
-pub fn create_endppint_rusttls(addr: &str, tls_config: &ClientConfig, _headers: &mut BTreeMap<String, String>) {
+pub fn create_endpoint(
+  addr: &str,
+  tls_config: Option<&ClientConfig>,
+  _headers: &mut BTreeMap<String, String>,
+) -> Result<LayeredService, String> {
   let mut http = HttpConnector::new();
   http.enforce_http(false);
 
-  let connector = tower::ServiceBuilder::new()
-    .layer_fn(move |s| {
-      let tls_config = tls_config.clone();
+  let connector = if let Some(tls_config) = tls_config {
+    hyper_rustls::HttpsConnectorBuilder::new()
+      .with_tls_config(tls_config.clone())
+      .https_or_http()
+      .enable_http2()
+      .build()
+  } else {
+    hyper_rustls::HttpsConnectorBuilder::new()
+      .with_native_roots()
+      .https_or_http()
+      .enable_http2()
+      .build()
+  };
 
-      hyper_rustls::HttpsConnectorBuilder::new()
-        .with_tls_config(tls_config)
-        .https_or_http()
-        .enable_http2()
-        .wrap_connector(s)
-    })
-    .service(http);
-
-  let client = hyper::Client::builder().build(connector);
+  let client: hyper::Client<_, tonic::body::BoxBody> = hyper::Client::builder().build(connector);
 
   // Hyper expects an absolute `Uri` to allow it to know which server to connect too.
   // Currently, tonic's generated code only sets the `path_and_query` section so we
@@ -145,6 +139,7 @@ pub fn create_endppint_rusttls(addr: &str, tls_config: &ClientConfig, _headers: 
   // scheme and authority.
   let uri = Uri::from_str(addr).map_err(|_| format!("Invalid URL"))?;
   let svc = tower::ServiceBuilder::new()
+    .boxed()
     .map_request(move |mut req: http::Request<tonic::body::BoxBody>| {
       let uri = Uri::builder()
         .scheme(uri.scheme().unwrap().clone())
@@ -158,7 +153,7 @@ pub fn create_endppint_rusttls(addr: &str, tls_config: &ClientConfig, _headers: 
     })
     .service(client);
 
-  svc
+  Ok(Box::new(svc) as LayeredService)
 }
 
 pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<HeaderMap, String> {
@@ -203,7 +198,7 @@ mod tests {
   use tonic::transport::{Channel, Server};
   use tonic::{Request, Response, Status};
 
-  use crate::hyper::AddrIncomingWithStream;
+  use crate::hyper_util::AddrIncomingWithStream;
 
   #[tokio::test]
   async fn user_agent_is_set_correctly() {
@@ -261,17 +256,13 @@ mod tests {
     };
 
     let endpoint = super::create_endpoint(
-      &format!("grpc://127.0.0.1:{}", local_addr.port()),
+      &format!("http://127.0.0.1:{}", local_addr.port()),
       None,
       &mut headers,
     )
     .unwrap();
 
-    let channel = Channel::balance_list(vec![endpoint].into_iter());
-
-    let mut client = gen::test_client::TestClient::new(channel);
-    if let Err(err) = client.call(gen::Input {}).await {
-      panic!("test failed: {}", err.message());
-    }
+    let mut client = gen::test_client::TestClient::new(endpoint);
+    client.call(gen::Input {}).await.expect("success");
   }
 }

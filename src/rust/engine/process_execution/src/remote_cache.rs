@@ -90,11 +90,7 @@ impl CommandRunner {
       &mut headers,
     )?;
     let http_headers = headers_to_http_header_map(&headers)?;
-    let channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
-      concurrency_limit,
-      http_headers,
-    );
+    let channel = layered_service(endpoint, concurrency_limit, http_headers);
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
     Ok(CommandRunner {

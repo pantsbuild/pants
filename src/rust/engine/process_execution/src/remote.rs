@@ -142,7 +142,7 @@ impl CommandRunner {
     )?;
     let execution_http_headers = headers_to_http_header_map(&execution_headers)?;
     let execution_channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),
+      execution_endpoint,
       execution_concurrency_limit,
       execution_http_headers,
     );

@@ -29,11 +29,7 @@ impl TryFrom<Config> for ClientConfig {
   /// Create a rust-tls `ClientConfig` from root CA certs, falling back to the rust-tls-native-certs
   /// crate if specific root CA certs were not given.
   fn try_from(config: Config) -> Result<Self, Self::Error> {
-    let mut tls_config = ClientConfig::builder()
-      .with_safe_default_cipher_suites()
-      .with_safe_default_kx_groups()
-      .with_safe_default_protocol_versions()
-      .map_err(|err| format!("TLS setup error: {err}"))?;
+    let tls_config = ClientConfig::builder().with_safe_defaults();
 
     // Add the root store.
     let mut tls_config = match config.certificate_check {
@@ -154,6 +150,10 @@ fn der_key_from_pem_bytes(pem_bytes: Vec<u8>) -> Result<rustls::PrivateKey, Stri
     Item::X509Certificate(_) => {
       return Err("Found certificate in PEM file but expected private key".to_owned())
     }
+    Item::ECKey(_) => {
+      return Err("EC certificate not currently supported. Contact Pantsbuild Slack.".to_owned())
+    }
+    _ => return Err("Unknown entry in PEM file. Contact Pantsbuild Slack.".to_owned()),
   };
   Ok(rustls::PrivateKey(key))
 }

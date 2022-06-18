@@ -11,7 +11,9 @@ use bytes::{Bytes, BytesMut};
 use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
+use grpc_util::{
+  headers_to_http_header_map, layered_service, status_to_str, BoxTonicService, LayeredService,
+};
 use hashing::Digest;
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -32,10 +34,10 @@ pub struct ByteStore {
   chunk_size_bytes: usize,
   _upload_timeout: Duration,
   _rpc_attempts: usize,
-  byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
-  cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
+  byte_stream_client: Arc<ByteStreamClient<LayeredService<BoxTonicService>>>,
+  cas_client: Arc<ContentAddressableStorageClient<LayeredService<BoxTonicService>>>,
   capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
-  capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
+  capabilities_client: Arc<CapabilitiesClient<LayeredService<BoxTonicService>>>,
   batch_api_size_limit: usize,
 }
 
@@ -90,11 +92,7 @@ impl ByteStore {
     let endpoint =
       grpc_util::create_endpoint(cas_address, tls_client_config.as_ref(), &mut headers)?;
     let http_headers = headers_to_http_header_map(&headers)?;
-    let channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
-      rpc_concurrency_limit,
-      http_headers,
-    );
+    let channel = layered_service(endpoint, rpc_concurrency_limit, http_headers);
 
     let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
 
