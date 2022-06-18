@@ -254,6 +254,36 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_from_image_build_arg_not_in_repo_issue_15585(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/image/BUILD": "docker_image()",
+            "test/image/Dockerfile": dedent(
+                """\
+                ARG PYTHON_VERSION="python:3.10.2-slim"
+                FROM $PYTHON_VERSION
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("test/image", target_name="image"),
+        expected_files=["test/image/Dockerfile"],
+        build_upstream_images=True,
+        expected_interpolation_context={
+            "tags": {
+                "baseimage": "",
+                "stage0": "",
+            },
+            "build_args": {
+                "BASE_IMAGE": "python:3.10.2-slim",
+            },
+        },
+    )
+
+
 def test_files_out_of_tree(rule_runner: RuleRunner) -> None:
     # src/a:img_A -> res/static:files
     rule_runner.write_files(
