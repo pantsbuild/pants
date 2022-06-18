@@ -102,7 +102,9 @@ def test_scala(scala_stdlib_jvm_lockfile: JVMLockfileFixture) -> None:
             """
         ),
         "BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
-        "lockfile": scala_stdlib_jvm_lockfile.serialized_lockfile,
+        "lockfile": scala_stdlib_jvm_lockfile.serialized_lockfile.replace("{", "{{").replace(
+            "}", "}}"
+        ),
     }
     with setup_tmpdir(sources) as tmpdir:
         args = [
@@ -111,6 +113,7 @@ def test_scala(scala_stdlib_jvm_lockfile: JVMLockfileFixture) -> None:
             "--pants-ignore=__pycache__",
             f'--jvm-resolves={{"jvm-default": "{tmpdir}/lockfile"}}',
             "--jvm-default-resolve=jvm-default",
+            "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
             "run",
             f"{tmpdir}/src/org/pantsbuild/test:test_deploy_jar",
         ]
