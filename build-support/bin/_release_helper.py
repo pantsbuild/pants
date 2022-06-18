@@ -900,7 +900,6 @@ def publish() -> None:
     upload_wheels_via_twine()
     tag_release()
     banner("Successfully released to PyPI and GitHub")
-    prompt_apple_silicon()
     prompt_to_generate_docs()
 
 
@@ -1090,22 +1089,6 @@ def prompt_artifact_freshness() -> None:
         )
     else:
         print("No stale artifacts detected.")
-
-
-def prompt_apple_silicon() -> None:
-    input(
-        softwrap(
-            f"""
-            We need to release for Apple Silicon. Please message Eric on Slack asking to release
-            for {CONSTANTS.pants_stable_version}.
-
-            (You do not need to wait for Eric to finish their part. You can continue in the release
-            process once you've messaged them.)
-
-            Hit enter when you've messaged Eric:
-            """
-        )
-    )
 
 
 def prompt_to_generate_docs() -> None:
