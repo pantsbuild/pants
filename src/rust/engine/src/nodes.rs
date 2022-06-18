@@ -1262,7 +1262,6 @@ impl NodeKey {
         // until we're certain that it has begun executing (if at all).
         Level::Debug
       }
-      NodeKey::DownloadedFile(..) => Level::Debug,
       _ => Level::Trace,
     }
   }
@@ -1306,14 +1305,14 @@ impl NodeKey {
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
       }
-      NodeKey::DownloadedFile(ref d) => Some(format!("Downloading: {}", d.0)),
       NodeKey::ReadLink(ReadLink(Link(path))) => Some(format!("Reading link: {}", path.display())),
       NodeKey::Scandir(Scandir(Dir(path))) => {
         Some(format!("Reading directory: {}", path.display()))
       }
-      NodeKey::Select(..) => None,
-      NodeKey::SessionValues(..) => None,
-      NodeKey::RunId(..) => None,
+      NodeKey::DownloadedFile(..)
+      | NodeKey::Select(..)
+      | NodeKey::SessionValues(..)
+      | NodeKey::RunId(..) => None,
     }
   }
 
