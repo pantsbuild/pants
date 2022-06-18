@@ -8,10 +8,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes};
 use futures::stream::StreamExt;
+use humansize::{file_size_opts, FileSize};
 use reqwest::Error;
 use url::Url;
 
 use crate::context::Core;
+use workunit_store::{in_workunit, Level};
 
 #[async_trait]
 trait StreamingDownload: Send {
@@ -121,50 +123,64 @@ pub async fn download(
   file_name: String,
   expected_digest: hashing::Digest,
 ) -> Result<(), String> {
-  let mut response_stream = start_download(&core, url, file_name).await?;
+  let core2 = core.clone();
+  let (actual_digest, bytes) = in_workunit!(
+    "download_file",
+    Level::Debug,
+    desc = Some(format!(
+      "Downloading: {url} ({})",
+      expected_digest
+        .size_bytes
+        .file_size(file_size_opts::CONVENTIONAL)
+        .unwrap()
+    )),
+    |_workunit| async move {
+      let mut response_stream = start_download(&core2, url, file_name).await?;
+      struct SizeLimiter<W: std::io::Write> {
+        writer: W,
+        written: usize,
+        size_limit: usize,
+      }
 
-  let (actual_digest, bytes) = {
-    struct SizeLimiter<W: std::io::Write> {
-      writer: W,
-      written: usize,
-      size_limit: usize,
-    }
+      impl<W: std::io::Write> Write for SizeLimiter<W> {
+        fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+          let new_size = self.written + buf.len();
+          if new_size > self.size_limit {
+            Err(std::io::Error::new(
+              std::io::ErrorKind::InvalidData,
+              "Downloaded file was larger than expected digest",
+            ))
+          } else {
+            self.written = new_size;
+            self.writer.write_all(buf)?;
+            Ok(buf.len())
+          }
+        }
 
-    impl<W: std::io::Write> Write for SizeLimiter<W> {
-      fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
-        let new_size = self.written + buf.len();
-        if new_size > self.size_limit {
-          Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Downloaded file was larger than expected digest",
-          ))
-        } else {
-          self.written = new_size;
-          self.writer.write_all(buf)?;
-          Ok(buf.len())
+        fn flush(&mut self) -> Result<(), std::io::Error> {
+          self.writer.flush()
         }
       }
 
-      fn flush(&mut self) -> Result<(), std::io::Error> {
-        self.writer.flush()
+      let mut hasher = hashing::WriterHasher::new(SizeLimiter {
+        writer: bytes::BytesMut::with_capacity(expected_digest.size_bytes).writer(),
+        written: 0,
+        size_limit: expected_digest.size_bytes,
+      });
+
+      while let Some(next_chunk) = response_stream.next().await {
+        let chunk =
+          next_chunk.map_err(|err| format!("Error reading URL fetch response: {}", err))?;
+        hasher
+          .write_all(&chunk)
+          .map_err(|err| format!("Error hashing/capturing URL fetch response: {}", err))?;
       }
+      let (digest, bytewriter) = hasher.finish();
+      let res: Result<_, String> = Ok((digest, bytewriter.writer.into_inner().freeze()));
+      res
     }
-
-    let mut hasher = hashing::WriterHasher::new(SizeLimiter {
-      writer: bytes::BytesMut::with_capacity(expected_digest.size_bytes).writer(),
-      written: 0,
-      size_limit: expected_digest.size_bytes,
-    });
-
-    while let Some(next_chunk) = response_stream.next().await {
-      let chunk = next_chunk.map_err(|err| format!("Error reading URL fetch response: {}", err))?;
-      hasher
-        .write_all(&chunk)
-        .map_err(|err| format!("Error hashing/capturing URL fetch response: {}", err))?;
-    }
-    let (digest, bytewriter) = hasher.finish();
-    (digest, bytewriter.writer.into_inner().freeze())
-  };
+  )
+  .await?;
 
   if expected_digest != actual_digest {
     return Err(format!(
