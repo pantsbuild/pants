@@ -40,6 +40,7 @@ class PexRuntimeEnvironment(Subsystem):
 
             If `False`, `run`ning a `pex_binary` will run your firstparty code by copying sources to
             a sandbox (while still using a PEX for thirdparty dependencies).
+
             Note that support has been added to Pants to allow you to `run` any `python_source`,
             so setting this to `False` should be reserved for maintaining backwards-compatibility
             with previous versions of Pants.
@@ -89,12 +90,12 @@ class PexRuntimeEnvironment(Subsystem):
     def run_packaged_firstparty_code(self) -> bool:
         if self.options.is_default("run_packaged_firstparty_code"):
             warn_or_error(
-                "2.14.0dev0",
+                "2.14.0.dev0",
                 "the option --pex-run-packaged-firstparty-code defaulting to false",
                 softwrap(
                     """
-                    In Pants 2.14, running a `pex_binary` will actually package the PEX and run it,
-                    as if you ran `package` followed by executing the built PEX.
+                    In Pants 2.14, by default, running a `pex_binary` will actually package the PEX
+                    and run it, as if you ran `package` followed by executing the built PEX.
 
                     To fix this deprecation, explictly set `run_packaged_firstparty_code` in the
                     `[pex]` section of `pants.toml`. Set it to `false` to use the "old" behavior.
