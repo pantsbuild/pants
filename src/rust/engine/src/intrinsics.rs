@@ -176,7 +176,7 @@ fn process_request_to_process_result(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let process_request = ExecuteProcess::lift(&context.core.store(), args.pop().unwrap())
-      .map_err(|e| throw(format!("Error lifting Process: {}", e)))
+      .map_err(|e| e.enrich("Error lifting Process"))
       .await?;
 
     let result = context.get(process_request).await?.0;

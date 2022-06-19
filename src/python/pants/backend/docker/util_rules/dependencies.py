@@ -40,6 +40,7 @@ async def inject_docker_dependencies(
                     from the target {dockerfile_info.address}
                     """
                 ),
+                skip_invalid_addresses=True,
             ),
         )
     )

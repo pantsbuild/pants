@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::cmp::max;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::{Into, TryInto};
 use std::future::Future;
 use std::io::Read;
@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::intrinsics::Intrinsics;
-use crate::nodes::{NodeKey, WrappedNode};
+use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, WrappedNode};
 use crate::python::Failure;
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
@@ -34,7 +34,7 @@ use rule_graph::RuleGraph;
 use store::{self, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidationWatcher};
-use workunit_store::RunId;
+use workunit_store::{Metric, RunId, RunningWorkunit};
 
 // The reqwest crate has no support for ingesting multiple certificates in a single file,
 // and requires single PEM blocks. There is a crate (https://crates.io/crates/pem) that can decode
@@ -266,12 +266,14 @@ impl Core {
     inner_runner: Arc<dyn CommandRunner>,
     full_store: &Store,
     local_cache: &PersistentCache,
+    eager_fetch: bool,
     process_execution_metadata: &ProcessMetadata,
   ) -> Arc<dyn CommandRunner> {
     Arc::new(process_execution::cache::CommandRunner::new(
       inner_runner,
       local_cache.clone(),
       full_store.clone(),
+      eager_fetch,
       process_execution_metadata.clone(),
     ))
   }
@@ -363,23 +365,19 @@ impl Core {
       None
     };
 
-    // TODO: The local cache eagerly fetches outputs independent of the `eager_fetch` flag. Once
-    // `eager_fetch` backtracks via https://github.com/pantsbuild/pants/issues/11331, the local
-    // cache will be able to obey `eager_fetch` as well, and can efficiently be used with remote
-    // execution.
-    let maybe_local_cached_runner =
-      if exec_strategy_opts.local_cache && !remoting_opts.execution_enable {
-        Some(Self::make_local_cached_runner(
-          maybe_remote_cached_runner
-            .clone()
-            .unwrap_or_else(|| leaf_runner.clone()),
-          full_store,
-          local_cache,
-          process_execution_metadata,
-        ))
-      } else {
-        None
-      };
+    let maybe_local_cached_runner = if exec_strategy_opts.local_cache {
+      Some(Self::make_local_cached_runner(
+        maybe_remote_cached_runner
+          .clone()
+          .unwrap_or_else(|| leaf_runner.clone()),
+        full_store,
+        local_cache,
+        remoting_opts.cache_eager_fetch,
+        process_execution_metadata,
+      ))
+    } else {
+      None
+    };
 
     Ok(
       vec![
@@ -650,6 +648,12 @@ pub struct Context {
   pub core: Arc<Core>,
   pub session: Session,
   run_id: RunId,
+  /// The number of attempts which have been made to backtrack to a particular ExecuteProcess node.
+  ///
+  /// Presence in this map at process runtime indicates that the pricess is being retried, and that
+  /// there was something invalid or unusable about previous attempts. Successive attempts should
+  /// run in a different mode (skipping caches, etc) to attempt to produce a valid result.
+  backtrack_attempts: Arc<Mutex<HashMap<ExecuteProcess, usize>>>,
   stats: Arc<Mutex<graph::Stats>>,
 }
 
@@ -661,6 +665,7 @@ impl Context {
       core,
       session,
       run_id,
+      backtrack_attempts: Arc::default(),
       stats: Arc::default(),
     }
   }
@@ -668,7 +673,7 @@ impl Context {
   ///
   /// Get the future value for the given Node implementation.
   ///
-  pub async fn get<N: WrappedNode>(&self, node: N) -> Result<N::Item, Failure> {
+  pub async fn get<N: WrappedNode>(&self, node: N) -> NodeResult<N::Item> {
     let node_result = self
       .core
       .graph
@@ -679,6 +684,91 @@ impl Context {
         .try_into()
         .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
     )
+  }
+
+  ///
+  /// If the given Result is a Failure::MissingDigest, attempts to invalidate the Node which was
+  /// the source of the Digest, potentially causing indirect retry of the Result.
+  ///
+  /// If we successfully locate and restart the source of the Digest, converts the Result into a
+  /// `Failure::Invalidated`, which will cause retry at some level above us.
+  ///
+  pub fn maybe_backtrack(
+    &self,
+    result: NodeResult<NodeOutput>,
+    workunit: &mut RunningWorkunit,
+  ) -> NodeResult<NodeOutput> {
+    let digest = if let Err(Failure::MissingDigest(_, d)) = result.as_ref() {
+      *d
+    } else {
+      return result;
+    };
+
+    // Locate the source(s) of this Digest.
+    // TODO: Currently needs a combination of `visit_live` and `invalidate_from_roots` because
+    // `invalidate_from_roots` cannot view `Node` results. This could lead to a race condition
+    // where a `Node` is invalidated multiple times, which might cause it to increment its attempt
+    // count multiple times. See https://github.com/pantsbuild/pants/issues/15867
+    let mut roots = HashSet::new();
+    self.core.graph.visit_live(self, |k, v| match k {
+      NodeKey::ExecuteProcess(p) if v.digests().contains(&digest) => {
+        roots.insert(p.clone());
+      }
+      _ => (),
+    });
+
+    if roots.is_empty() {
+      // We did not identify any roots to invalidate: allow the Node to fail.
+      return result;
+    }
+
+    // Trigger backtrack attempts for the matched Nodes.
+    {
+      let mut backtrack_attempts = self.backtrack_attempts.lock();
+      for root in &roots {
+        let attempt = backtrack_attempts.entry((**root).clone()).or_insert(1);
+        let description = &root.process.description;
+        workunit.increment_counter(Metric::BacktrackAttempts, 1);
+        log::warn!(
+          "Making attempt {attempt} to backtrack and retry `{description}`, due to \
+            missing digest {digest:?}."
+        );
+      }
+    }
+
+    // Invalidate the matched roots.
+    self
+      .core
+      .graph
+      .invalidate_from_roots(move |node| match node {
+        NodeKey::ExecuteProcess(p) => roots.contains(p),
+        _ => false,
+      });
+
+    // We invalidated a Node, and the caller (at some level above us in the stack) should retry.
+    // Complete this node with the Invalidated state.
+    // TODO: Differentiate the reasons for Invalidation (filesystem changes vs missing digests) to
+    // improve warning messages. See https://github.com/pantsbuild/pants/issues/15867
+    Err(Failure::Invalidated)
+  }
+
+  ///
+  /// Called before executing a process to determine whether it is backtracking, and if so, to
+  /// increment the attempt count.
+  ///
+  /// A process which has not been marked backtracking will always return 0, regardless of the
+  /// number of calls to this method.
+  ///
+  pub fn maybe_start_backtracking(&self, node: &ExecuteProcess) -> usize {
+    let mut backtrack_attempts = self.backtrack_attempts.lock();
+    let entry: Option<&mut usize> = backtrack_attempts.get_mut(node);
+    if let Some(entry) = entry {
+      let attempt = *entry;
+      *entry += 1;
+      attempt
+    } else {
+      0
+    }
   }
 }
 
@@ -700,6 +790,7 @@ impl NodeContext for Context {
       core: self.core.clone(),
       session: self.session.clone(),
       run_id: self.run_id,
+      backtrack_attempts: self.backtrack_attempts.clone(),
       stats: self.stats.clone(),
     }
   }

@@ -9,7 +9,7 @@ from typing import cast
 
 import pytest
 
-from pants.build_graph.address import BuildFileAddressRequest
+from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
@@ -23,7 +23,13 @@ from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.target import Dependencies, MultipleSourcesField, StringField, Tags, Target
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import (
+    MockGet,
+    QueryRule,
+    RuleRunner,
+    engine_error,
+    run_rule_with_mocks,
+)
 from pants.util.frozendict import FrozenDict
 
 
@@ -102,7 +108,9 @@ class MockTgt(Target):
 
 
 def test_resolve_address() -> None:
-    rule_runner = RuleRunner(rules=[QueryRule(Address, (AddressInput,))])
+    rule_runner = RuleRunner(
+        rules=[QueryRule(Address, [AddressInput]), QueryRule(MaybeAddress, [AddressInput])]
+    )
     rule_runner.write_files({"a/b/c.txt": "", "f.txt": ""})
 
     def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
@@ -136,9 +144,13 @@ def test_resolve_address() -> None:
         Address("", target_name="t"),
     )
 
-    with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(Address, [AddressInput("a/b/fake", description_of_origin="tests")])
-    assert "'a/b/fake' does not exist on disk" in str(exc.value)
+    bad_address_input = AddressInput("a/b/fake", description_of_origin="tests")
+    expected_err = "'a/b/fake' does not exist on disk"
+    with engine_error(ResolveError, contains=expected_err):
+        rule_runner.request(Address, [bad_address_input])
+    maybe_addr = rule_runner.request(MaybeAddress, [bad_address_input])
+    assert isinstance(maybe_addr.val, ResolveError)
+    assert expected_err in str(maybe_addr.val)
 
 
 @pytest.fixture

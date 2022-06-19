@@ -1711,9 +1711,9 @@ async fn remote_workunits_are_stored() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let action_cache = mock::StubActionCache::new().unwrap();
-  let (command_runner, _store) =
-    create_command_runner(action_cache.address(), &cas, Platform::Linux_x86_64);
+  // TODO: This CommandRunner is only used for parsing, add so intentionally passes a CAS/AC
+  // address rather than an Execution address.
+  let (command_runner, _store) = create_command_runner(cas.address(), &cas, Platform::Linux_x86_64);
 
   command_runner
     .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
@@ -2161,7 +2161,7 @@ pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
 }
 
 fn create_command_runner(
-  address: String,
+  execution_address: String,
   cas: &mock::StubCAS,
   platform: Platform,
 ) -> (CommandRunner, Store) {
@@ -2169,7 +2169,7 @@ fn create_command_runner(
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
-    &address,
+    &execution_address,
     ProcessMetadata::default(),
     None,
     BTreeMap::new(),
@@ -2185,7 +2185,7 @@ fn create_command_runner(
 }
 
 async fn run_command_remote(
-  address: String,
+  execution_address: String,
   request: Process,
 ) -> Result<RemoteTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
@@ -2194,7 +2194,8 @@ async fn run_command_remote(
     .directory(&TestDirectory::containing_roland())
     .tree(&TestTree::roland_at_root())
     .build();
-  let (command_runner, store) = create_command_runner(address, &cas, Platform::Linux_x86_64);
+  let (command_runner, store) =
+    create_command_runner(execution_address, &cas, Platform::Linux_x86_64);
   let original = command_runner
     .run(Context::default(), &mut workunit, request)
     .await?;
@@ -2238,14 +2239,13 @@ async fn extract_execute_response(
   operation: Operation,
   remote_platform: Platform,
 ) -> Result<RemoteTestResult, ExecutionError> {
-  let action_cache = mock::StubActionCache::new().expect("failed to create action cache");
-
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let (command_runner, store) =
-    create_command_runner(action_cache.address(), &cas, remote_platform);
+  // TODO: This CommandRunner is only used for parsing, add so intentionally passes a CAS/AC
+  // address rather than an Execution address.
+  let (command_runner, store) = create_command_runner(cas.address(), &cas, remote_platform);
 
   let original = command_runner
     .extract_execute_response(RunId(0), OperationOrStatus::Operation(operation))
