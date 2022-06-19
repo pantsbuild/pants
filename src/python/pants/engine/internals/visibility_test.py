@@ -53,48 +53,40 @@ def rule_runner() -> RuleRunner:
     [
         pytest.param(dict(), dict(), no_exception(), id="Empty"),
         pytest.param(
-            dict(a=["<private>"], a_sub=["<private>"]),
+            dict(a=["src/test/a::"], a_sub=["src/test/a/sub::"]),
             dict(a=["src/test/b:x"], a_sub=["src/test/a:x"]),
             no_exception(),
             id="a private ok",
         ),
         pytest.param(
-            dict(a=["<private>"], a_sub=["<private>"]),
+            dict(a=["src/test/a::"], a_sub=["src/test/a/sub::"]),
             dict(b=["src/test/a:x"]),
             engine_error(
-                VisibilityViolationError, contains="src/test/a:x is not visible to src/test/b:x."
+                VisibilityViolationError, contains="src/test/a:x has visibility: src/test/a::"
             ),
             id="a private violated",
         ),
         pytest.param(
-            dict(a=["<private>"], a_sub=["<private>"]),
-            dict(b=["src/test/a:x"]),
-            engine_error(
-                VisibilityViolationError, contains="src/test/a:x is not visible to src/test/b:x."
-            ),
-            id="a private violated",
-        ),
-        pytest.param(
-            dict(a=["<public>"], a_sub=["<private>"]),
+            dict(a=["::"], a_sub=["src/test/a/sub::"]),
             dict(b=["src/test/a:x"], b_sub=["src/test/a/sub:x"]),
             engine_error(
                 VisibilityViolationError,
-                contains="src/test/a/sub:x is not visible to src/test/b/sub:x.",
+                contains="src/test/a/sub:x has visibility: src/test/a/sub::",
             ),
             id="a sub private violated",
         ),
         pytest.param(
-            dict(a=["<private>"], a_sub=["src/test/b/sub/", "<private>"]),
+            dict(a=["src/test/a::"], a_sub=["src/test/b/sub/", "src/test/a/sub::"]),
             dict(a=["src/test/b:x"], b_sub=["src/test/a/sub:x"]),
             no_exception(),
             id="a private punch whole for package",
         ),
         pytest.param(
-            dict(a=["<private>"], a_sub=["src/test/b/sub/", "<private>"]),
+            dict(a=["src/test/a::"], a_sub=["src/test/b/sub/", "src/test/a/sub::"]),
             dict(a=["src/test/b:x"], b_subsuffix=["src/test/a/sub:x"]),
             engine_error(
                 VisibilityViolationError,
-                contains="src/test/a/sub:x is not visible to src/test/b/subsuffix:x.",
+                contains="src/test/a/sub:x has visibility: src/test/b/sub, src/test/a/sub::",
             ),
             id="a private punch whole for package violation",
         ),
@@ -103,7 +95,7 @@ def rule_runner() -> RuleRunner:
             dict(a_sub=["src/test/a:x"]),
             engine_error(
                 VisibilityViolationError,
-                contains="src/test/a:x is not visible to src/test/a/sub:x.",
+                contains=" * src/test/a:x has visibility: <none>",
             ),
             id="not visible at all",
         ),

@@ -304,6 +304,15 @@ class RawSpecs:
             from_change_detection=from_change_detection,
         )
 
+    def _all_specs(self) -> Iterator[Spec]:
+        yield from self.address_literals
+        yield from self.file_literals
+        yield from self.file_globs
+        yield from self.dir_literals
+        yield from self.dir_globs
+        yield from self.recursive_globs
+        yield from self.ancestor_globs
+
     def __bool__(self) -> bool:
         return bool(
             self.address_literals
@@ -488,6 +497,13 @@ class Specs:
 
     def __bool__(self) -> bool:
         return bool(self.includes) or bool(self.ignores)
+
+    def __str__(self) -> str:
+        return ", ".join(
+            f"{prefix}{spec}"
+            for prefix, raw_specs in (("!", self.ignores), ("", self.includes))
+            for spec in raw_specs._all_specs()
+        )
 
     @classmethod
     def empty(self) -> Specs:

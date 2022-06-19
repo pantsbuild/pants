@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.base.specs import Specs
+from pants.base.specs_parser import SpecsParser
+from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSet,
@@ -14,7 +18,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 
 class ValidateVisibilityRulesFieldSet(FieldSet):
@@ -34,21 +38,44 @@ async def validate_visibility_rules(
         for address in request.dependencies
     )
     dependency_targets = [wrapped.target for wrapped in wrapped_dependency_targets]
-    to_address = request.field_set.address
-    for target in dependency_targets:
-        visibility_field = target.get(VisibilityField)
-        if not visibility_field.visible(to_address):
-            raise VisibilityViolationError(
-                softwrap(
-                    f"""
-                    {target.address} is not visible to {to_address}.
+    specs_parser = SpecsParser()
+    targets_visibility_specs = {
+        target: specs_parser.parse_specs(
+            target.get(VisibilityField).value or (),
+            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+            convert_dir_literal_to_address_literal=False,
+            description_of_origin=f"the visibility field on {target.address}",
+        )
+        for target in dependency_targets
+    }
 
-                    Visibility for {target.alias} {target.address} : \
-                    {", ".join(visibility_field.value or ("<none>",))}.
-                    """
+    targets_allowed_addresses = zip(
+        targets_visibility_specs.keys(),
+        await MultiGet(Get(Addresses, Specs, specs) for specs in targets_visibility_specs.values()),
+    )
+
+    invalid_deps = {
+        (target, targets_visibility_specs[target])
+        for target, allowed_addresses in targets_allowed_addresses
+        if request.field_set.address not in allowed_addresses
+    }
+
+    if not invalid_deps:
+        return ValidatedDependencies()
+    else:
+        raise VisibilityViolationError(
+            softwrap(
+                f"""
+                The following {pluralize(len(invalid_deps), "target")} {"is" if len(invalid_deps) ==
+                1 else "are"} not visible to {request.field_set.address}:
+
+                """
+                + bullet_list(
+                    f"""{dep.address} has visibility: {specs or "<none>"}"""
+                    for dep, specs in invalid_deps
                 )
             )
-    return ValidatedDependencies()
+        )
 
 
 def rules():
