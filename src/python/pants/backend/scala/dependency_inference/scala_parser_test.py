@@ -282,6 +282,7 @@ def test_parser_simple(rule_runner: RuleRunner) -> None:
                     "ABaseClass",
                     "ATrait1",
                     "SomeTypeInPrimaryConstructor",
+                    "foo",
                     "ATrait2.Nested",
                     "BaseWithConstructor",
                 ]
@@ -552,4 +553,27 @@ def test_recursive_objects(rule_runner: RuleRunner) -> None:
         ScalaProvidedSymbol("foo.Bar", False),
         ScalaProvidedSymbol("foo.Bar.a", False),
         ScalaProvidedSymbol("foo.Foo", True),
+    ]
+
+
+def test_object_extends_ctor(rule_runner: RuleRunner) -> None:
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package foo
+
+            import example._
+
+            object Foo extends Bar(hello) {
+            }
+            """
+        ),
+    )
+
+    assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "example.Bar",
+        "example.hello",
+        "foo.Bar",
+        "foo.hello",
     ]
