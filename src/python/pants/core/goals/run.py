@@ -177,6 +177,9 @@ async def run(
 
         args = (arg.format(chroot=tmpdir) for arg in request.args)
         env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
+        if run_subsystem.debug_adapter:
+            logger.info("Launching debug adapter, which will wait for a client connection...")
+
         result = await Effect(
             InteractiveProcessResult,
             InteractiveProcess(

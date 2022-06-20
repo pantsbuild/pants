@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from ast import arg
+
 import os
 
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -25,7 +25,7 @@ from pants.backend.python.util_rules.python_sources import (
 )
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -131,7 +131,17 @@ async def run_pex_debug_adapter_binary(
     field_set: PexBinaryFieldSet,
     debugpy: DebugPy,
 ) -> RunDebugAdapterRequest:
-    regular_run_request, debugpy_pex = await MultiGet(
+    if field_set.run_in_sandbox:
+        # @TODO: Impove error
+        raise ValueError(
+            "Cannot use --debug-adapter if `run_in_sandbox` is `True`. Your breakpoints won't be hit."
+        )
+
+    entry_point, regular_run_request, debugpy_pex = await MultiGet(
+        Get(
+            ResolvedPexEntryPoint,
+            ResolvePexEntryPointRequest(field_set.entry_point),
+        ),
         Get(RunRequest, PexBinaryFieldSet, field_set),
         Get(Pex, PexRequest, debugpy.to_pex_request()),
     )
@@ -139,15 +149,27 @@ async def run_pex_debug_adapter_binary(
     merged_digest = await Get(
         Digest, MergeDigests([regular_run_request.digest, debugpy_pex.digest])
     )
+    extra_env = dict(regular_run_request.extra_env)
+    extra_env["PEX_PATH"] = os.pathsep.join(
+        [
+            extra_env["PEX_PATH"],
+            # For debugpy to work properly, we need to have just one "environment" for our
+            # command to run in. Therefore, we cobble one together by exeucting debugpy's PEX, and
+            # shoehorning in the original PEX through PEX_PATH.
+            _in_chroot(os.path.basename(regular_run_request.args[1])),
+        ]
+    )
     args = [
         regular_run_request.args[0],  # python executable
         _in_chroot(debugpy_pex.name),
         "--listen",
         f"{debugpy.host}:{debugpy.port}",
         "--wait-for-client",
-        *regular_run_request.args[1:],  # built pex args
+        # @TODO: Only works for module, function support means we'll need to use -c.
+        # See https://github.com/microsoft/debugpy/issues/955
+        "-m",
+        entry_point.val.module,
     ]
-    extra_env = regular_run_request.extra_env
 
     return RunDebugAdapterRequest(digest=merged_digest, args=args, extra_env=extra_env)
 
