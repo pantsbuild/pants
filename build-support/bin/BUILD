@@ -31,5 +31,4 @@ pex_binaries(
         "_release_helper.py",
         "reversion.py",
     ],
-    execution_mode="venv",
 )
