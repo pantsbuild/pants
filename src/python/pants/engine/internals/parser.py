@@ -15,7 +15,7 @@ from typing import Any, Iterable
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.internals.defaults import MutableBuildFileDefaults, SetDefaultsT
+from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -36,11 +36,11 @@ class UnaddressableObjectError(MappingError):
 
 class ParseState(threading.local):
     def __init__(self):
-        self._defaults: MutableBuildFileDefaults | None = None
+        self._defaults: BuildFileDefaultsParserState | None = None
         self._rel_path: str | None = None
         self._target_adapters: list[TargetAdaptor] = []
 
-    def reset(self, rel_path: str, defaults: MutableBuildFileDefaults) -> None:
+    def reset(self, rel_path: str, defaults: BuildFileDefaultsParserState) -> None:
         self._defaults = defaults
         self._rel_path = rel_path
         self._target_adapters.clear()
@@ -61,7 +61,7 @@ class ParseState(threading.local):
         return list(self._target_adapters)
 
     @property
-    def defaults(self) -> MutableBuildFileDefaults:
+    def defaults(self) -> BuildFileDefaultsParserState:
         if self._defaults is None:
             raise AssertionError(
                 "The BUILD file __defaults__ was accessed before being set. This indicates a "
@@ -72,9 +72,6 @@ class ParseState(threading.local):
 
     def set_defaults(self, *args: SetDefaultsT, **kwargs) -> None:
         self.defaults.set_defaults(*args, **kwargs)
-
-    def commit_defaults(self) -> None:
-        self.defaults.commit()
 
 
 class Parser:
@@ -105,7 +102,7 @@ class Parser:
                 self._type_alias = type_alias
 
             def __str__(self) -> str:
-                """The MutableBuildFileDefaults.set_defaults() rely on string inputs.
+                """The BuildFileDefaultsParserState.set_defaults() rely on string inputs.
 
                 This allows the use of the BUILD file symbols for the target types to be used un-
                 quoted for the defaults dictionary.
@@ -148,7 +145,7 @@ class Parser:
         filepath: str,
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
-        defaults: MutableBuildFileDefaults,
+        defaults: BuildFileDefaultsParserState,
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
 
@@ -168,7 +165,6 @@ class Parser:
 
         try:
             exec(build_file_content, global_symbols)
-            self._parse_state.commit_defaults()
         except NameError as e:
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
             original = e.args[0].capitalize()

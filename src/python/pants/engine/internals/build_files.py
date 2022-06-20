@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os.path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from pants.build_graph.address import (
@@ -113,22 +113,32 @@ class AddressFamilyDir(EngineAwareParameter):
     """
 
     path: str
+    build_files_required: bool = field(default=True, hash=False, compare=False)
 
     def debug_hint(self) -> str:
         return self.path
 
 
 @dataclass(frozen=True)
-class AddressFamilyRequest(AddressFamilyDir):
+class AddressFamilyRequest:
     defaults: BuildFileDefaults
+    directory: AddressFamilyDir
 
 
 @rule
-async def get_address_family_request(
-    directory: AddressFamilyDir, defaults_provider: BuildFileDefaultsProvider
-) -> AddressFamilyRequest:
+async def get_address_family_request(directory: AddressFamilyDir) -> AddressFamilyRequest:
+    parent = os.path.dirname(directory.path)
+    if parent != directory.path:
+        parent_family = await Get(
+            AddressFamily, AddressFamilyDir(parent, build_files_required=False)
+        )
+        defaults = parent_family.defaults
+    else:
+        defaults = BuildFileDefaults({})
+
     return AddressFamilyRequest(
-        path=directory.path, defaults=defaults_provider.get_defaults_for(directory.path)
+        defaults=defaults,
+        directory=directory,
     )
 
 
@@ -137,12 +147,14 @@ async def parse_address_family(
     parser: Parser,
     build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
-    directory: AddressFamilyRequest,
+    request: AddressFamilyRequest,
+    defaults_provider: BuildFileDefaultsProvider,
 ) -> AddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
     The AddressFamily may be empty, but it will not be None.
     """
+    directory = request.directory
     digest_contents = await Get(
         DigestContents,
         PathGlobs(
@@ -152,15 +164,15 @@ async def parse_address_family(
             )
         ),
     )
-    if not digest_contents:
+    if not digest_contents and directory.build_files_required:
         raise ResolveError(f"Directory '{directory.path}' does not contain any BUILD files.")
 
-    defaults = directory.defaults.as_mutable()
+    defaults = defaults_provider.get_parser_defaults(directory.path, request.defaults)
     address_maps = [
         AddressMap.parse(fc.path, fc.content.decode(), parser, prelude_symbols, defaults)
         for fc in digest_contents
     ]
-    return AddressFamily.create(directory.path, address_maps)
+    return AddressFamily.create(directory.path, address_maps, defaults.freezed_defaults())
 
 
 @rule

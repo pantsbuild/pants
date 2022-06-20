@@ -10,7 +10,7 @@ import pytest
 from pants.backend.project_info.filter_targets import FilterSubsystem, TargetGranularity
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.internals.defaults import BuildFileDefaultsProvider
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsProvider
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
@@ -34,9 +34,9 @@ def parse_address_map(build_file: str) -> AddressMap:
         build_file,
         parser,
         BuildFilePreludeSymbols(FrozenDict()),
-        BuildFileDefaultsProvider(RegisteredTargetTypes({}), UnionMembership({}))
-        .get_defaults_for("")
-        .as_mutable(),
+        BuildFileDefaultsProvider(
+            RegisteredTargetTypes({}), UnionMembership({})
+        ).get_parser_defaults("", BuildFileDefaults({})),
     )
     assert path == address_map.path
     return address_map

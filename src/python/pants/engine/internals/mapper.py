@@ -11,7 +11,7 @@ from typing import Iterable, Mapping
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.internals.defaults import MutableBuildFileDefaults
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
@@ -37,7 +37,7 @@ class AddressMap:
         build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
-        defaults: MutableBuildFileDefaults,
+        defaults: BuildFileDefaultsParserState,
     ) -> AddressMap:
         """Parses a source for targets.
 
@@ -83,9 +83,15 @@ class AddressFamily:
     # The directory from which the adaptors were parsed.
     namespace: str
     name_to_target_adaptors: dict[str, tuple[str, TargetAdaptor]]
+    defaults: BuildFileDefaults
 
     @classmethod
-    def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> AddressFamily:
+    def create(
+        cls,
+        spec_path: str,
+        address_maps: Iterable[AddressMap],
+        defaults: BuildFileDefaults = BuildFileDefaults({}),
+    ) -> AddressFamily:
         """Creates an address family from the given set of address maps.
 
         :param spec_path: The directory prefix shared by all address_maps.
@@ -115,6 +121,7 @@ class AddressFamily:
         return AddressFamily(
             namespace=spec_path,
             name_to_target_adaptors=dict(sorted(name_to_target_adaptors.items())),
+            defaults=defaults,
         )
 
     @memoized_property
@@ -146,7 +153,7 @@ class AddressFamily:
         return target_adaptor
 
     def __hash__(self):
-        return hash(self.namespace)
+        return hash((self.namespace, self.defaults))
 
     def __repr__(self) -> str:
         return (

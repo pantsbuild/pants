@@ -14,12 +14,13 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
+    AddressFamilyDir,
     AddressFamilyRequest,
     BuildFileOptions,
     evaluate_preludes,
     parse_address_family,
 )
-from pants.engine.internals.defaults import BuildFileDefaultsProvider
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsProvider
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
@@ -51,11 +52,10 @@ def test_parse_address_family_empty() -> None:
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict()),
             AddressFamilyRequest(
-                "/dev/null",
-                BuildFileDefaultsProvider(
-                    RegisteredTargetTypes({}), UnionMembership({})
-                ).get_defaults_for(""),
+                directory=AddressFamilyDir("/dev/null"),
+                defaults=BuildFileDefaults({}),
             ),
+            BuildFileDefaultsProvider(RegisteredTargetTypes({}), UnionMembership({})),
         ],
         mock_gets=[
             MockGet(

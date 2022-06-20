@@ -3,18 +3,13 @@
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Tuple, Union
 
 from pants.engine.addresses import Address
-from pants.engine.target import InvalidFieldException, RegisteredTargetTypes
+from pants.engine.target import ImmutableValue, InvalidFieldException, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
-
-DefaultFieldValuesT = FrozenDict[str, Any]
-DefaultsValueT = FrozenDict[str, DefaultFieldValuesT]
-DefaultsT = FrozenDict[str, DefaultsValueT]
 
 SetDefaultsValueT = Mapping[str, Any]
 SetDefaultsKeyT = Union[str, Tuple[str, ...]]
@@ -26,58 +21,25 @@ class BuildFileDefaultsProvider:
     registered_target_types: RegisteredTargetTypes
     union_membership: UnionMembership
 
-    # The defaults for each target from all BUILD files, per rel path.
-    defaults: dict[str, BuildFileDefaults] = field(default_factory=dict)
-
-    def get_defaults_for(self, rel_path: str) -> BuildFileDefaults:
-        # The BUILD file parsing is executed in order to ensure we don't get a race condition
-        # creating defaults here.
-
-        if rel_path in self.defaults:
-            return self.defaults[rel_path]
-
-        if rel_path == "":
-            return self.defaults.setdefault("", BuildFileDefaults("", FrozenDict(), self))
-
-        parent = os.path.dirname(rel_path)
-        return self.defaults.setdefault(
-            rel_path, BuildFileDefaults(rel_path, self.get_defaults_for(parent).defaults, self)
+    def get_parser_defaults(
+        self, path: str, defaults: BuildFileDefaults
+    ) -> BuildFileDefaultsParserState:
+        return BuildFileDefaultsParserState(
+            address=Address(path, generated_name="__defaults__"),
+            defaults=dict(defaults),
+            provider=self,
         )
 
-    def set_defaults(self, defaults: BuildFileDefaults) -> None:
-        self.defaults[defaults.path] = defaults
 
-
-@dataclass(frozen=True)
-class BuildFileDefaults:
-    path: str
-    defaults: DefaultsT
-    provider: BuildFileDefaultsProvider = field(hash=False, compare=False)
-
-    def as_mutable(self) -> MutableBuildFileDefaults:
-        return MutableBuildFileDefaults(
-            address=Address(self.path, generated_name="__defaults__"),
-            defaults=dict(self.defaults),
-            immutable=self,
-        )
-
-    def commit(self) -> None:
-        self.provider.set_defaults(self)
+class BuildFileDefaults(FrozenDict[str, FrozenDict[str, ImmutableValue]]):
+    """Map target types to default field values."""
 
 
 @dataclass
-class MutableBuildFileDefaults:
+class BuildFileDefaultsParserState:
     address: Address
     defaults: dict[str, Mapping[str, Any]]
-    immutable: BuildFileDefaults
-
-    @property
-    def path(self) -> str:
-        return self.immutable.path
-
-    @property
-    def provider(self) -> BuildFileDefaultsProvider:
-        return self.immutable.provider
+    provider: BuildFileDefaultsProvider
 
     @property
     def registered_target_types(self) -> RegisteredTargetTypes:
@@ -87,13 +49,9 @@ class MutableBuildFileDefaults:
     def union_membership(self) -> UnionMembership:
         return self.provider.union_membership
 
-    def commit(self) -> None:
-        defaults = replace(self.immutable, defaults=self.freezed_defaults())
-        defaults.commit()
-
-    def freezed_defaults(self) -> DefaultsT:
+    def freezed_defaults(self) -> BuildFileDefaults:
         types = self.registered_target_types.aliases_to_types
-        return FrozenDict(
+        return BuildFileDefaults(
             {
                 target_alias: FrozenDict(
                     {
@@ -112,6 +70,7 @@ class MutableBuildFileDefaults:
         )
 
     def get(self, target_alias: str) -> Mapping[str, Any]:
+        # Used by `pants.engine.internals.parser.Parser._generate_symbols.Registrar.__call__`
         return self.defaults.get(target_alias, {})
 
     def set_defaults(
