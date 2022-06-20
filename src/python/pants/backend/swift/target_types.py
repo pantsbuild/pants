@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
+    FieldSet,
     MultipleSourcesField,
     SingleSourceField,
     Target,
@@ -21,6 +24,20 @@ class SwiftSourceField(SingleSourceField):
 
 class SwiftGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = SWIFT_FILE_EXTENSIONS
+
+
+@dataclass(frozen=True)
+class SwiftFieldSet(FieldSet):
+    required_fields = (SwiftSourceField,)
+
+    source: SwiftSourceField
+
+
+@dataclass(frozen=True)
+class SwiftGeneratorFieldSet(FieldSet):
+    required_fields = (SwiftGeneratorSourcesField,)
+
+    sources: SwiftGeneratorSourcesField
 
 
 # -----------------------------------------------------------------------------------------------
