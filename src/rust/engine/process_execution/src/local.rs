@@ -483,7 +483,7 @@ pub trait CapturedWorkdir {
     workdir_token: Self::WorkdirToken,
     exclusive_spawn: bool,
     platform: Platform,
-  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
 
     // Spawn the process.
@@ -578,7 +578,7 @@ pub trait CapturedWorkdir {
           metadata: result_metadata,
         })
       }
-      Err(msg) => Err(msg.into()),
+      Err(msg) => Err(msg),
     }
   }
 

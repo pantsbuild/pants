@@ -78,6 +78,8 @@ async def infer_scala_dependencies_via_source_analysis(
         symbols.update(analysis.all_imports())
     if scala_infer_subsystem.consumed_types:
         symbols.update(analysis.fully_qualified_consumed_symbols())
+    if scala_infer_subsystem.package_objects:
+        symbols.update(analysis.scopes)
 
     resolve = tgt[JvmResolveField].normalized_value(jvm)
 

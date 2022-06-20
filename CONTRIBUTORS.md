@@ -96,6 +96,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Itay Donanhirsh
 + Ity Kaul
 + Jackson Davis
++ Jacob Floyd
 + Jake Donham
 + Jakub Bujny
 + James Bench

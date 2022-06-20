@@ -40,7 +40,7 @@ use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use hashing::Digest;
-use store::{self, Store, StoreFileByDigest};
+use store::{self, Store, StoreError, StoreFileByDigest};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, UserMetadataItem,
   WorkunitMetadata,
@@ -261,14 +261,14 @@ pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
 ///
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct ExecuteProcess {
-  process: Process,
+  pub process: Process,
 }
 
 impl ExecuteProcess {
   async fn lift_process_input_digests(
     store: &Store,
     value: &Value,
-  ) -> Result<InputDigests, String> {
+  ) -> Result<InputDigests, StoreError> {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
       let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
@@ -294,10 +294,10 @@ impl ExecuteProcess {
 
     input_digests_fut?
       .await
-      .map_err(|e| format!("Failed to merge input digests for process: {}", e))
+      .map_err(|e| e.enrich("Failed to merge input digests for process"))
   }
 
-  fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, String> {
+  pub fn lift_process(value: &PyAny, input_digests: InputDigests) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
       None => None,
@@ -374,7 +374,7 @@ impl ExecuteProcess {
     })
   }
 
-  pub async fn lift(store: &Store, value: Value) -> Result<Self, String> {
+  pub async fn lift(store: &Store, value: Value) -> Result<Self, StoreError> {
     let input_digests = Self::lift_process_input_digests(store, &value).await?;
     let process = Python::with_gil(|py| Self::lift_process((*value).as_ref(py), input_digests))?;
     Ok(Self { process })
@@ -384,10 +384,18 @@ impl ExecuteProcess {
     self,
     context: Context,
     workunit: &mut RunningWorkunit,
+    attempt: usize,
   ) -> NodeResult<ProcessResult> {
     let request = self.process;
 
-    let command_runner = &context.core.command_runners[0];
+    let command_runner = context.core.command_runners.get(attempt).ok_or_else(|| {
+      // NB: We only backtrack for a Process if it produces a Digest which cannot be consumed
+      // from disk: if we've fallen all the way back to local execution, and even that
+      // produces an unreadable Digest, then there is a fundamental implementation issue.
+      throw(format!(
+        "Process {request:?} produced an invalid result on all configured command runners."
+      ))
+    })?;
 
     let execution_context = process_execution::Context::new(
       context.session.workunit_store(),
@@ -1241,7 +1249,6 @@ impl NodeKey {
         // until we're certain that it has begun executing (if at all).
         Level::Debug
       }
-      NodeKey::DownloadedFile(..) => Level::Debug,
       _ => Level::Trace,
     }
   }
@@ -1285,14 +1292,26 @@ impl NodeKey {
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
       }
-      NodeKey::DownloadedFile(ref d) => Some(format!("Downloading: {}", d.0)),
       NodeKey::ReadLink(ReadLink(Link(path))) => Some(format!("Reading link: {}", path.display())),
       NodeKey::Scandir(Scandir(Dir(path))) => {
         Some(format!("Reading directory: {}", path.display()))
       }
-      NodeKey::Select(..) => None,
-      NodeKey::SessionValues(..) => None,
-      NodeKey::RunId(..) => None,
+      NodeKey::DownloadedFile(..)
+      | NodeKey::Select(..)
+      | NodeKey::SessionValues(..)
+      | NodeKey::RunId(..) => None,
+    }
+  }
+
+  async fn maybe_watch(&self, context: &Context) -> NodeResult<()> {
+    if let Some((path, watcher)) = self.fs_subject().zip(context.core.watcher.as_ref()) {
+      let abs_path = context.core.build_root.join(path);
+      watcher
+        .watch(abs_path)
+        .map_err(|e| Context::mk_error(&e))
+        .await
+    } else {
+      Ok(())
     }
   }
 
@@ -1347,28 +1366,19 @@ impl Node for NodeKey {
           .collect()
       },
       |workunit| async move {
-        // To avoid races, we must ensure that we have installed a watch for the subject before
-        // executing the node logic. But in case of failure, we wait to see if the Node itself
-        // fails, and prefer that error message if so (because we have little control over the
-        // error messages of the watch API).
-        let maybe_watch =
-          if let Some((path, watcher)) = self.fs_subject().zip(context.core.watcher.as_ref()) {
-            let abs_path = context.core.build_root.join(path);
-            watcher
-              .watch(abs_path)
-              .map_err(|e| Context::mk_error(&e))
-              .await
-          } else {
-            Ok(())
-          };
+        // Ensure that we have installed filesystem watches before Nodes which inspect the
+        // filesystem.
+        let maybe_watch = self.maybe_watch(&context).await;
 
         let mut result = match self {
           NodeKey::DigestFile(n) => n.run_node(context).await.map(NodeOutput::FileDigest),
           NodeKey::DownloadedFile(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
-          NodeKey::ExecuteProcess(n) => n
-            .run_node(context, workunit)
-            .await
-            .map(|r| NodeOutput::ProcessResult(Box::new(r))),
+          NodeKey::ExecuteProcess(n) => {
+            let attempt = context.maybe_start_backtracking(&n);
+            n.run_node(context, workunit, attempt)
+              .await
+              .map(|r| NodeOutput::ProcessResult(Box::new(r)))
+          }
           NodeKey::ReadLink(n) => n.run_node(context).await.map(NodeOutput::LinkDest),
           NodeKey::Scandir(n) => n.run_node(context).await.map(NodeOutput::DirectoryListing),
           NodeKey::Select(n) => n.run_node(context).await.map(NodeOutput::Value),
@@ -1379,7 +1389,11 @@ impl Node for NodeKey {
           NodeKey::Task(n) => n.run_node(context, workunit).await.map(NodeOutput::Value),
         };
 
-        // If both the Node and the watch failed, prefer the Node's error message.
+        // If the Node failed with MissingDigest, attempt to invalidate the source of the Digest.
+        result = context2.maybe_backtrack(result, workunit);
+
+        // If both the Node and the watch failed, prefer the Node's error message (we have little
+        // control over the error messages of the watch API).
         match (&result, maybe_watch) {
           (Ok(_), Ok(_)) => {}
           (Err(_), _) => {}
