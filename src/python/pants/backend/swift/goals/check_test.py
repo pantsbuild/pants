@@ -22,7 +22,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *source_files.rules(),
             *check.rules(),
@@ -32,6 +32,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[SwiftSourcesGeneratorTarget],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 STANDALONE_FILE = dedent(
