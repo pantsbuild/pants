@@ -131,7 +131,7 @@ class SourceAnalysisTraverser extends Traverser {
           sawClass = existingSymbol.sawClass || sawClass,
           sawTrait = existingSymbol.sawTrait || sawTrait,
           sawObject = existingSymbol.sawObject || sawObject,
-          recursive = existingSymbol.sawObject || recursive
+          recursive = existingSymbol.recursive || recursive
         )
         providedSymbols(symbolName) = newSymbol
       } else {
@@ -139,7 +139,7 @@ class SourceAnalysisTraverser extends Traverser {
           sawClass = sawClass,
           sawTrait = sawTrait,
           sawObject = sawObject,
-          recursive
+          recursive = recursive
         )
       }
     }
