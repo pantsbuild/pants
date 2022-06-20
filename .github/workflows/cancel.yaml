@@ -3,8 +3,13 @@
 #   ./pants run build-support/bin/generate_github_workflows.py
 
 
+permissions:
+  contents: read
+
 jobs:
   cancel:
+    permissions:
+      actions: write  # for styfle/cancel-workflow-action to cancel/stop running workflows
     if: ${{ github.repository_owner == 'pantsbuild' }}
     runs-on: ubuntu-latest
     steps:

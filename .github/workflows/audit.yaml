@@ -3,6 +3,9 @@
 #   ./pants run build-support/bin/generate_github_workflows.py
 
 
+permissions:
+  contents: read
+
 jobs:
   audit:
     if: ${{ github.repository_owner == 'pantsbuild' }}
