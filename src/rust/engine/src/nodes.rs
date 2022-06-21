@@ -384,18 +384,22 @@ impl ExecuteProcess {
     self,
     context: Context,
     workunit: &mut RunningWorkunit,
-    attempt: usize,
+    backtrack_level: usize,
   ) -> NodeResult<ProcessResult> {
     let request = self.process;
 
-    let command_runner = context.core.command_runners.get(attempt).ok_or_else(|| {
-      // NB: We only backtrack for a Process if it produces a Digest which cannot be consumed
-      // from disk: if we've fallen all the way back to local execution, and even that
-      // produces an unreadable Digest, then there is a fundamental implementation issue.
-      throw(format!(
-        "Process {request:?} produced an invalid result on all configured command runners."
-      ))
-    })?;
+    let command_runner = context
+      .core
+      .command_runners
+      .get(backtrack_level)
+      .ok_or_else(|| {
+        // NB: We only backtrack for a Process if it produces a Digest which cannot be consumed
+        // from disk: if we've fallen all the way back to local execution, and even that
+        // produces an unreadable Digest, then there is a fundamental implementation issue.
+        throw(format!(
+          "Process {request:?} produced an invalid result on all configured command runners."
+        ))
+      })?;
 
     let execution_context = process_execution::Context::new(
       context.session.workunit_store(),
@@ -456,7 +460,10 @@ impl ExecuteProcess {
       }
     }
 
-    Ok(ProcessResult(res))
+    Ok(ProcessResult {
+      result: res,
+      backtrack_level,
+    })
   }
 }
 
@@ -471,7 +478,13 @@ impl WrappedNode for ExecuteProcess {
 }
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
-pub struct ProcessResult(pub process_execution::FallibleProcessResultWithPlatform);
+pub struct ProcessResult {
+  pub result: process_execution::FallibleProcessResultWithPlatform,
+  /// The backtrack_level which produced this result. If a Digest from a particular result is
+  /// missing, the next attempt needs to use a higher level of backtracking (i.e.: remove more
+  /// caches).
+  pub backtrack_level: usize,
+}
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).
@@ -1375,8 +1388,8 @@ impl Node for NodeKey {
           NodeKey::DigestFile(n) => n.run_node(context).await.map(NodeOutput::FileDigest),
           NodeKey::DownloadedFile(n) => n.run_node(context).await.map(NodeOutput::Snapshot),
           NodeKey::ExecuteProcess(n) => {
-            let attempt = context.maybe_start_backtracking(&n);
-            n.run_node(context, workunit, attempt)
+            let backtrack_level = context.maybe_start_backtracking(&n);
+            n.run_node(context, workunit, backtrack_level)
               .await
               .map(|r| NodeOutput::ProcessResult(Box::new(r)))
           }
@@ -1461,7 +1474,7 @@ impl Node for NodeKey {
         match ep.process.cache_scope {
           ProcessCacheScope::Always | ProcessCacheScope::PerRestartAlways => true,
           ProcessCacheScope::Successful | ProcessCacheScope::PerRestartSuccessful => {
-            process_result.0.exit_code == 0
+            process_result.result.exit_code == 0
           }
           ProcessCacheScope::PerSession => false,
         }
@@ -1572,9 +1585,9 @@ impl NodeOutput {
         dd.digests()
       }
       NodeOutput::ProcessResult(p) => {
-        let mut digests = p.0.output_directory.digests();
-        digests.push(p.0.stdout_digest);
-        digests.push(p.0.stderr_digest);
+        let mut digests = p.result.output_directory.digests();
+        digests.push(p.result.stdout_digest);
+        digests.push(p.result.stderr_digest);
         digests
       }
       NodeOutput::DirectoryListing(_)
