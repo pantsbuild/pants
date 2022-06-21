@@ -653,7 +653,7 @@ pub struct Context {
   /// Presence in this map at process runtime indicates that the pricess is being retried, and that
   /// there was something invalid or unusable about previous attempts. Successive attempts should
   /// run in a different mode (skipping caches, etc) to attempt to produce a valid result.
-  backtrack_attempts: Arc<Mutex<HashMap<ExecuteProcess, usize>>>,
+  backtrack_levels: Arc<Mutex<HashMap<ExecuteProcess, usize>>>,
   stats: Arc<Mutex<graph::Stats>>,
 }
 
@@ -665,7 +665,7 @@ impl Context {
       core,
       session,
       run_id,
-      backtrack_attempts: Arc::default(),
+      backtrack_levels: Arc::default(),
       stats: Arc::default(),
     }
   }
@@ -704,37 +704,59 @@ impl Context {
       return result;
     };
 
-    // Locate the source(s) of this Digest.
+    // Locate the source(s) of this Digest and their backtracking levels.
     // TODO: Currently needs a combination of `visit_live` and `invalidate_from_roots` because
-    // `invalidate_from_roots` cannot view `Node` results. This could lead to a race condition
-    // where a `Node` is invalidated multiple times, which might cause it to increment its attempt
-    // count multiple times. See https://github.com/pantsbuild/pants/issues/15867
-    let mut roots = HashSet::new();
+    // `invalidate_from_roots` cannot view `Node` results. Would be more efficient as a merged
+    // method.
+    let mut candidate_roots = Vec::new();
     self.core.graph.visit_live(self, |k, v| match k {
       NodeKey::ExecuteProcess(p) if v.digests().contains(&digest) => {
-        roots.insert(p.clone());
+        if let NodeOutput::ProcessResult(pr) = v {
+          candidate_roots.push((p.clone(), pr.backtrack_level));
+        }
       }
       _ => (),
     });
 
-    if roots.is_empty() {
+    if candidate_roots.is_empty() {
       // We did not identify any roots to invalidate: allow the Node to fail.
       return result;
     }
 
-    // Trigger backtrack attempts for the matched Nodes.
-    {
-      let mut backtrack_attempts = self.backtrack_attempts.lock();
-      for root in &roots {
-        let attempt = backtrack_attempts.entry((**root).clone()).or_insert(1);
-        let description = &root.process.description;
-        workunit.increment_counter(Metric::BacktrackAttempts, 1);
-        log::warn!(
-          "Making attempt {attempt} to backtrack and retry `{description}`, due to \
-            missing digest {digest:?}."
-        );
-      }
-    }
+    // Attempt to trigger backtrack attempts for the matched Nodes. It's possible that we are not
+    // the first consumer to notice that this Node needs to backtrack, so we only actually report
+    // that we're backtracking if the new level is an increase from the old level.
+    let roots = candidate_roots
+      .into_iter()
+      .filter_map(|(root, invalid_level)| {
+        let next_level = invalid_level + 1;
+        let maybe_new_level = {
+          let mut backtrack_levels = self.backtrack_levels.lock();
+          if let Some(old_backtrack_level) = backtrack_levels.get_mut(&root) {
+            if next_level > *old_backtrack_level {
+              *old_backtrack_level = next_level;
+              Some(next_level)
+            } else {
+              None
+            }
+          } else {
+            backtrack_levels.insert((*root).clone(), next_level);
+            Some(next_level)
+          }
+        };
+        if let Some(new_level) = maybe_new_level {
+          workunit.increment_counter(Metric::BacktrackAttempts, 1);
+          let description = &root.process.description;
+          log::warn!(
+            "Making attempt {new_level} to backtrack and retry `{description}`, due to \
+              missing digest {digest:?}."
+          );
+          Some(root)
+        } else {
+          None
+        }
+      })
+      .collect::<HashSet<_>>();
 
     // Invalidate the matched roots.
     self
@@ -753,22 +775,12 @@ impl Context {
   }
 
   ///
-  /// Called before executing a process to determine whether it is backtracking, and if so, to
-  /// increment the attempt count.
+  /// Called before executing a process to determine whether it is backtracking.
   ///
-  /// A process which has not been marked backtracking will always return 0, regardless of the
-  /// number of calls to this method.
+  /// A process which has not been marked backtracking will always return 0.
   ///
   pub fn maybe_start_backtracking(&self, node: &ExecuteProcess) -> usize {
-    let mut backtrack_attempts = self.backtrack_attempts.lock();
-    let entry: Option<&mut usize> = backtrack_attempts.get_mut(node);
-    if let Some(entry) = entry {
-      let attempt = *entry;
-      *entry += 1;
-      attempt
-    } else {
-      0
-    }
+    self.backtrack_levels.lock().get(node).cloned().unwrap_or(0)
   }
 }
 
@@ -790,7 +802,7 @@ impl NodeContext for Context {
       core: self.core.clone(),
       session: self.session.clone(),
       run_id: self.run_id,
-      backtrack_attempts: self.backtrack_attempts.clone(),
+      backtrack_levels: self.backtrack_levels.clone(),
       stats: self.stats.clone(),
     }
   }
