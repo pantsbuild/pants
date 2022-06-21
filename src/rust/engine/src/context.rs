@@ -372,7 +372,7 @@ impl Core {
           .unwrap_or_else(|| leaf_runner.clone()),
         full_store,
         local_cache,
-        remoting_opts.cache_eager_fetch,
+        eager_fetch,
         process_execution_metadata,
       ))
     } else {
