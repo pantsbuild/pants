@@ -70,7 +70,7 @@ _known_packages = [
 
 _expected_owners = {"benjyw", "John.Sirois", "stuhood"}
 
-_expected_maintainers = {"EricArellano", "gshuflin", "illicitonion", "wisechengyi"}
+_expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi"}
 
 
 # Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
@@ -900,7 +900,6 @@ def publish() -> None:
     upload_wheels_via_twine()
     tag_release()
     banner("Successfully released to PyPI and GitHub")
-    prompt_apple_silicon()
     prompt_to_generate_docs()
 
 
@@ -1092,22 +1091,6 @@ def prompt_artifact_freshness() -> None:
         print("No stale artifacts detected.")
 
 
-def prompt_apple_silicon() -> None:
-    input(
-        softwrap(
-            f"""
-            We need to release for Apple Silicon. Please message Eric on Slack asking to release
-            for {CONSTANTS.pants_stable_version}.
-
-            (You do not need to wait for Eric to finish their part. You can continue in the release
-            process once you've messaged them.)
-
-            Hit enter when you've messaged Eric:
-            """
-        )
-    )
-
-
 def prompt_to_generate_docs() -> None:
     has_docs_access = input(
         softwrap(
@@ -1248,7 +1231,7 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
                 softwrap(
                     f"""
                     {package.name}. Expected 7 wheels ({{cp37m, cp38, cp39}} x
-                    {{macosx-x86_64, linux-x86_64}} + cp39-macosx),
+                    {{macosx-x86_64, linux-x86_64}} + cp39-macosx-arm64),
                     but found {len(local_files)}:\n    {formatted_local_files}
                     """
                 )

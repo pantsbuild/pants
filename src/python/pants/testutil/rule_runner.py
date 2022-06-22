@@ -135,6 +135,11 @@ def engine_error(
                 f"expected: {contains}\n\n"
                 f"exception: {underlying}"
             )
+    else:
+        raise AssertionError(
+            "DID NOT RAISE ExecutionError with underlying exception type "
+            f"{expected_underlying_exception}."
+        )
 
 
 # -----------------------------------------------------------------------------------------------

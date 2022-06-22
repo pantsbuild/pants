@@ -151,7 +151,10 @@ class ArgSplitter:
                 return scope
 
             nonlocal builtin_goal
-            if scope_info.is_builtin and not builtin_goal:
+            if scope_info.is_builtin and (not builtin_goal or scope.startswith("-")):
+                if builtin_goal:
+                    goals.add(builtin_goal)
+
                 # Get scope from info in case we hit an aliased builtin goal.
                 builtin_goal = scope_info.scope
             else:

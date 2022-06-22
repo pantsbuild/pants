@@ -19,7 +19,12 @@ from pants.option.scope import ScopeInfo
 class BuiltinGoal(ABC, GoalSubsystem):
     """Builtin goals have precedence over regular goal rules.
 
-    If a builtin goal is invoked, any remaining arguments are passed unaltered to the builtin goal.
+    Only a single builtin goal is executed per run, any remaining goals/arguments are passed
+    unaltered to the builtin goal.
+
+    When multiple builtin goals are presented, the first builtin goal will be used unless there is a
+    builtin goal that begin with a hyphen (`-`), in which case the last such "option goal" will be
+    prioritized. This is to support things like `./pants some-builtin-goal --help`.
     """
 
     # Used by `pants.option.arg_splitter.ArgSplitter()` to optionally allow aliasing builtin goals.

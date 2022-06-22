@@ -54,6 +54,8 @@ pants_ignore.add = [
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
   "!/pants.pex",
+  # Ignore node modules for docs processing tools
+  "/docs/node_modules",
 ]
 
 build_ignore.add = [
@@ -69,6 +71,8 @@ unmatched_build_file_globs = "error"
 remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
+# See https://github.com/pantsbuild/pants/issues/11331.
+remote_cache_eager_fetch = false
 
 [anonymous-telemetry]
 enabled = true
@@ -133,7 +137,6 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 [flake8]
 config = "build-support/flake8/.flake8"
 extra_requirements.add = [
-  "flake8-pantsbuild>=2.0,<3",
   "flake8-2020>=1.6.0,<1.7.0",
   "flake8-no-implicit-concat",
   "flake8-comprehensions>=3.8.0,<4.0",

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::cmp::{max, min, Ordering, Reverse};
 use std::collections::VecDeque;
+use std::fmt::{self, Debug};
 use std::future::Future;
 use std::sync::{atomic, Arc};
 use std::time::{Duration, Instant};
@@ -50,6 +51,14 @@ impl CommandRunner {
         Duration::from_millis(200),
       ),
     }
+  }
+}
+
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("bounded::CommandRunner")
+      .field("inner", &self.inner)
+      .finish_non_exhaustive()
   }
 }
 

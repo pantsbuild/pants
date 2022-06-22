@@ -352,17 +352,11 @@ class Target:
         self, unhydrated_values: dict[str, Any], address: Address
     ) -> FrozenDict[type[Field], Field]:
         field_values = {}
-        valid_aliases = set()
-        aliases_to_field_types = {}
-        for field_type in self.field_types:
-            valid_aliases.add(field_type.alias)
-            aliases_to_field_types[field_type.alias] = field_type
-            if field_type.deprecated_alias is not None:
-                valid_aliases.add(field_type.deprecated_alias)
-                aliases_to_field_types[field_type.deprecated_alias] = field_type
+        aliases_to_field_types = self._get_field_aliases_to_field_types(self.field_types)
 
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
+                valid_aliases = set(aliases_to_field_types.keys())
                 if isinstance(self, TargetGenerator):
                     # Even though moved_fields don't live on the target generator, they are valid
                     # for users to specify. It's intentional that these are only used for
@@ -388,6 +382,18 @@ class Target:
                 key=lambda field_type_to_val_pair: field_type_to_val_pair[0].alias,
             )
         )
+
+    @final
+    @classmethod
+    def _get_field_aliases_to_field_types(
+        cls, field_types: tuple[type[Field], ...]
+    ) -> dict[str, type[Field]]:
+        aliases_to_field_types = {}
+        for field_type in field_types:
+            aliases_to_field_types[field_type.alias] = field_type
+            if field_type.deprecated_alias is not None:
+                aliases_to_field_types[field_type.deprecated_alias] = field_type
+        return aliases_to_field_types
 
     @final
     @property
@@ -1502,8 +1508,8 @@ class InvalidFieldChoiceException(InvalidFieldException):
         valid_choices: Iterable[Any],
     ) -> None:
         super().__init__(
-            f"The {repr(field_alias)} field in target {address} must be one of "
-            f"{sorted(valid_choices)}, but was {repr(raw_value)}."
+            f"Values for the {repr(field_alias)} field in target {address} must be one of "
+            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided."
         )
 
 
@@ -1662,15 +1668,9 @@ class StringField(ScalarField[str]):
     def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is not None and cls.valid_choices is not None:
-            valid_choices = set(
-                cls.valid_choices
-                if isinstance(cls.valid_choices, tuple)
-                else (choice.value for choice in cls.valid_choices)
+            _validate_choices(
+                address, cls.alias, [value_or_default], valid_choices=cls.valid_choices
             )
-            if value_or_default not in valid_choices:
-                raise InvalidFieldChoiceException(
-                    address, cls.alias, value_or_default, valid_choices=valid_choices
-                )
         return value_or_default
 
 
@@ -1720,12 +1720,16 @@ class SequenceField(Generic[T], Field):
 class StringSequenceField(SequenceField[str]):
     expected_element_type = str
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
+    valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], address: Address
     ) -> Optional[Tuple[str, ...]]:
-        return super().compute_value(raw_value, address)
+        value_or_default = super().compute_value(raw_value, address)
+        if value_or_default and cls.valid_choices is not None:
+            _validate_choices(address, cls.alias, value_or_default, valid_choices=cls.valid_choices)
+        return value_or_default
 
 
 class DictStringToStringField(Field):
@@ -1806,6 +1810,25 @@ class DictStringToStringSequenceField(Field):
             except ValueError:
                 raise invalid_type_exception
         return FrozenDict(result)
+
+
+def _validate_choices(
+    address: Address,
+    field_alias: str,
+    values: Iterable[Any],
+    *,
+    valid_choices: Union[Type[Enum], Tuple[Any, ...]],
+) -> None:
+    _valid_choices = set(
+        valid_choices
+        if isinstance(valid_choices, tuple)
+        else (choice.value for choice in valid_choices)
+    )
+    for choice in values:
+        if choice not in _valid_choices:
+            raise InvalidFieldChoiceException(
+                address, field_alias, choice, valid_choices=_valid_choices
+            )
 
 
 # -----------------------------------------------------------------------------------------------

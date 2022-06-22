@@ -9,10 +9,10 @@ from pants.build_graph.address import (
     Address,
     AddressInput,
     AddressParseException,
-    InvalidParameters,
-    InvalidSpecPath,
-    InvalidTargetName,
-    UnsupportedWildcard,
+    InvalidParametersError,
+    InvalidSpecPathError,
+    InvalidTargetNameError,
+    UnsupportedWildcardError,
 )
 from pants.util.frozendict import FrozenDict
 
@@ -108,7 +108,7 @@ def test_address_input_parse_spec() -> None:
     ["..", ".", "//..", "//.", "a/.", "a/..", "../a", "a/../a", "a/:a", "a/b/:b", "/a", "///a"],
 )
 def test_address_input_parse_bad_path_component(spec: str) -> None:
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         AddressInput.parse(spec, description_of_origin="tests")
 
 
@@ -139,7 +139,7 @@ def test_address_input_parse(spec: str, expected: str) -> None:
     ],
 )
 def test_address_bad_target_component(spec: str) -> None:
-    with pytest.raises(InvalidTargetName):
+    with pytest.raises(InvalidTargetNameError):
         AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
 
 
@@ -154,19 +154,19 @@ def test_address_bad_target_component(spec: str) -> None:
     ],
 )
 def test_address_bad_wildcard(spec: str) -> None:
-    with pytest.raises(UnsupportedWildcard):
+    with pytest.raises(UnsupportedWildcardError):
         AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
 
 
 @pytest.mark.parametrize("spec", ["//:t#gen!", "//:t#gen?", "//:t#gen=", "//:t#gen#"])
 def test_address_generated_name(spec: str) -> None:
-    with pytest.raises(InvalidTargetName):
+    with pytest.raises(InvalidTargetNameError):
         AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
 
 
 @pytest.mark.parametrize("spec", ["//:t@k=#gen", "//:t@k#gen=v"])
 def test_address_invalid_params(spec: str) -> None:
-    with pytest.raises(InvalidParameters):
+    with pytest.raises(InvalidParametersError):
         AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
 
 
@@ -236,21 +236,21 @@ def test_address_input_from_file() -> None:
     ).file_to_address() == Address("", target_name="original", relative_file_path="a/b/c.txt")
 
     # These refer to targets "below" the file, which is illegal.
-    with pytest.raises(InvalidTargetName):
+    with pytest.raises(InvalidTargetNameError):
         AddressInput(
             "f.txt", target_component="subdir/tgt", description_of_origin="tests"
         ).file_to_address()
-    with pytest.raises(InvalidTargetName):
+    with pytest.raises(InvalidTargetNameError):
         AddressInput(
             "f.txt", target_component="subdir../tgt", description_of_origin="tests"
         ).file_to_address()
-    with pytest.raises(InvalidTargetName):
+    with pytest.raises(InvalidTargetNameError):
         AddressInput(
             "a/f.txt", target_component="../a/original", description_of_origin="tests"
         ).file_to_address()
 
     # Top-level files must include a target_name.
-    with pytest.raises(InvalidTargetName):
+    with pytest.raises(InvalidTargetNameError):
         AddressInput("f.txt", description_of_origin="tests").file_to_address()
     assert AddressInput(
         "f.txt", target_component="tgt", description_of_origin="tests"
@@ -300,11 +300,11 @@ def test_address_normalize_target_name() -> None:
 
 
 def test_address_validate_build_in_spec_path() -> None:
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         Address("a/b/BUILD")
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         Address("a/b/BUILD.ext")
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         Address("a/b/BUILD", target_name="foo")
 
     # It's fine to use BUILD in the relative_file_path, target_name, or generated_name, though.
