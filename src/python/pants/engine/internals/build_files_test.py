@@ -232,7 +232,7 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
         {
             "helloworld/dir/BUILD": dedent(
                 """\
-                __defaults__(all=dict(tags=["24"]))
+                __defaults__({mock_tgt: dict(resolve="mock")}, all=dict(tags=["24"]))
                 mock_tgt(tags=["42"])
                 mock_tgt(name='t2')
                 """
@@ -244,6 +244,7 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
         [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
     )
     assert target_adaptor.name is None
+    assert target_adaptor.kwargs["resolve"] == "mock"
     assert target_adaptor.kwargs["tags"] == ["42"]
 
     target_adaptor = target_adaptor_rule_runner.request(
@@ -255,6 +256,7 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
         ],
     )
     assert target_adaptor.name == "t2"
+    assert target_adaptor.kwargs["resolve"] == "mock"
     assert target_adaptor.kwargs["tags"] == ["24"]
 
 

@@ -21,7 +21,7 @@ Subdirectories may override defaults from a parent BUILD file:
 
     # src/example/override/BUILD
 
-    # For `files` and `resources` targets, we to use some other defaults.
+    # For `files` and `resources` targets, we want to use some other defaults.
     __defaults__({
       (files, resources): dict(tags=["example", "overridden"], description="Our assets")
     })
