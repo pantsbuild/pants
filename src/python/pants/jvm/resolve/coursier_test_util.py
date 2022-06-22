@@ -17,7 +17,3 @@ def _make_empty_lockfile() -> bytes:
 
 
 EMPTY_JVM_LOCKFILE = _make_empty_lockfile()
-
-
-class TestCoursierWrapper:
-    pass
