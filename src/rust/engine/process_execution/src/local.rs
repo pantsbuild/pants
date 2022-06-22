@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ffi::OsStr;
+use std::fmt::{self, Debug};
 use std::fs::create_dir_all;
 use std::io::Write;
 use std::ops::Neg;
@@ -134,6 +135,13 @@ impl CommandRunner {
 
   pub fn immutable_inputs(&self) -> &ImmutableInputs {
     &self.immutable_inputs
+  }
+}
+
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("local::CommandRunner")
+      .finish_non_exhaustive()
   }
 }
 
@@ -475,7 +483,7 @@ pub trait CapturedWorkdir {
     workdir_token: Self::WorkdirToken,
     exclusive_spawn: bool,
     platform: Platform,
-  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
 
     // Spawn the process.
@@ -570,7 +578,7 @@ pub trait CapturedWorkdir {
           metadata: result_metadata,
         })
       }
-      Err(msg) => Err(msg.into()),
+      Err(msg) => Err(msg),
     }
   }
 

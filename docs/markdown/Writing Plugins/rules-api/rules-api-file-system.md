@@ -9,19 +9,14 @@ updatedAt: "2022-04-26T22:22:28.000Z"
 It is not safe to use functions like `open` or the non-pure operations of `pathlib.Path` like you normally might: this will break caching because they do not hook up to Pants's file watcher. 
 
 Instead, Pants has several mechanisms to work with the file system in a safe and concurrent way.
-[block:callout]
-{
-  "type": "warning",
-  "title": "Missing certain file operations?",
-  "body": "If it would help you to have a certain file operation, please let us know by either opening a new [GitHub issue](https://github.com/pantsbuild/pants/issues) or by messaging us on [Slack](doc:community) in the #plugins room."
-}
-[/block]
 
-[block:api-header]
-{
-  "title": "Core abstractions: `Digest` and `Snapshot`"
-}
-[/block]
+> 🚧 Missing certain file operations?
+> 
+> If it would help you to have a certain file operation, please let us know by either opening a new [GitHub issue](https://github.com/pantsbuild/pants/issues) or by messaging us on [Slack](doc:community) in the #plugins room.
+
+Core abstractions: `Digest` and `Snapshot`
+------------------------------------------
+
 The core building block is a `Digest`, which is a lightweight reference to a set of files known about by the engine.
 
 - The `Digest` is only a reference; the files are stored in the engine's persistent [content-addressable storage (CAS)](https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database).
@@ -58,12 +53,11 @@ from pants.engine.rules import Get, rule
 async def demo(...) -> Foo:
     ...
     snapshot = await Get(Snapshot, Digest, my_digest)
-``` 
-[block:api-header]
-{
-  "title": "`CreateDigest`: create new files"
-}
-[/block]
+```
+
+`CreateDigest`: create new files
+--------------------------------
+
 `CreateDigest` allows you to create a new digest with whichever files you would like, even if they do not exist on disk.
 
 ```python
@@ -74,7 +68,7 @@ from pants.engine.rules import Get, rule
 async def demo(...) -> Foo:
     ...
     digest = await Get(Digest, CreateDigest([FileContent("f1.txt", b"hello world")]))
-``` 
+```
 
 The `CreateDigest` constructor expects an iterable including any of these types:
 
@@ -83,11 +77,10 @@ The `CreateDigest` constructor expects an iterable including any of these types:
 - `FileEntry` objects, which are handles to existing files from `DigestEntries`. Do not manually create these.
 
 This does _not_ write the `Digest` to the build root. Use `Workspace.write_digest()` for that.
-[block:api-header]
-{
-  "title": "`PathGlobs`: read from filesystem"
-}
-[/block]
+
+`PathGlobs`: read from filesystem
+---------------------------------
+
 `PathGlobs` allows you to read from the local file system using globbing. That is, sets of filenames with wildcard characters.
 
 ```python
@@ -98,11 +91,11 @@ from pants.engine.rules import Get, rule
 async def demo(...) -> Foo:
     ...
     digest = await Get(Digest, PathGlobs(["**/*.txt", "!ignore_me.txt"])
-``` 
+```
 
-* All globs must be relative paths, relative to the build root.
-* `PathGlobs` uses the same syntax as the `sources` field, which is roughly Git's syntax. Use `*` for globs over just the current working directory, `**` for recursive globs over everything below (at any level the current working directory, and prefix with `!` for ignores.
-* `PathGlobs` will ignore all values from the global option `pants_ignore`.
+- All globs must be relative paths, relative to the build root.
+- `PathGlobs` uses the same syntax as the `sources` field, which is roughly Git's syntax. Use `*` for globs over just the current working directory, `**` for recursive globs over everything below (at any level the current working directory, and prefix with `!` for ignores.
+- `PathGlobs` will ignore all values from the global option `pants_ignore`.
 
 By default, the engine will no-op for any globs that are unmatched. If you want to instead warn or error, set `glob_match_error_behavior=GlobMatchErrorBehavior.warn` or `GlobMatchErrorBehavior.error`. This will require that you also set `description_of_origin`, which is a human-friendly description of where the `PathGlobs` is coming from so that the error message is helpful. For example:
 
@@ -140,12 +133,11 @@ async def demo(...) -> Foo:
     ...
     paths = await Get(Paths, PathGlobs(["**/*.txt", "!ignore_me.txt"])
     logger.info(paths.files)
-``` 
-[block:api-header]
-{
-  "title": "`DigestContents`: read contents of files"
-}
-[/block]
+```
+
+`DigestContents`: read contents of files
+----------------------------------------
+
 `DigestContents` allows you to get the file contents from a `Digest`.
 
 ```python
@@ -159,30 +151,25 @@ async def demo(...) -> Foo:
     for file_content in digest_contents:
         logger.info(file_content.path)
         logger.info(file_content.content)  # This will be `bytes`.
-``` 
+```
 
 The result will be a sequence of `FileContent` objects, which each have a property `path: str` and a property `content: bytes`. You may want to call `content.decode()` to convert to `str`.
-[block:callout]
-{
-  "type": "warning",
-  "title": "You may not need `DigestContents`",
-  "body": "Only use `DigestContents` if you need to read and operate on the content of files directly in your rule.\n\n* If you are running a `Process`, you only need to pass the `Digest` as input and that process will be able to read all the files in its environment. If you only need a list of files included in the digest, use `Get(Snapshot, Digest)`.\n\n* If you just need to manipulate the directory structure of a `Digest`, such as renaming files,  use `DigestEntries` with `CreateDigest` or use `AddPrefix` and `RemovePrefix`. These avoid reading the file content into memory."
-}
-[/block]
 
-[block:callout]
-{
-  "type": "warning",
-  "title": "Does not handle empty directories in a `Digest`",
-  "body": "`DigestContents` does not have a way to represent empty directories in a `Digest` since it is only a sequence of `FileContent` objects. That is, passing the `FileContent` objects to `CreateDigest` will not result in the original `Digest` if there were empty directories in that original `Digest`. Use `DigestEntries` instead if your rule needs to handle empty directories in a `Digest`."
-}
-[/block]
+> 🚧 You may not need `DigestContents`
+> 
+> Only use `DigestContents` if you need to read and operate on the content of files directly in your rule.
+> 
+> - If you are running a `Process`, you only need to pass the `Digest` as input and that process will be able to read all the files in its environment. If you only need a list of files included in the digest, use `Get(Snapshot, Digest)`.
+> 
+> - If you just need to manipulate the directory structure of a `Digest`, such as renaming files,  use `DigestEntries` with `CreateDigest` or use `AddPrefix` and `RemovePrefix`. These avoid reading the file content into memory.
 
-[block:api-header]
-{
-  "title": "`DigestEntries`: light-weight handles to files"
-}
-[/block]
+> 🚧 Does not handle empty directories in a `Digest`
+> 
+> `DigestContents` does not have a way to represent empty directories in a `Digest` since it is only a sequence of `FileContent` objects. That is, passing the `FileContent` objects to `CreateDigest` will not result in the original `Digest` if there were empty directories in that original `Digest`. Use `DigestEntries` instead if your rule needs to handle empty directories in a `Digest`.
+
+`DigestEntries`: light-weight handles to files
+----------------------------------------------
+
 `DigestEntries` allows a rule to obtain the filenames (with content digests) and empty directories from a `Digest`. The value of a `DigestEntries` is a sequence of `FileEntry` and `Directory` objects representing files and empty directories in the `Digest`, respectively. That sequence can be passed to `CreateDigest` to recreate the original `Digest`.
 
 This is useful if you need to manipulate the directory structure of a `Digest` without actually needing to bring the file contents into memory (which is what occurs if you were to use `DigestContents`).
@@ -202,12 +189,11 @@ async def demo(...) -> Foo:
         elif isinstance(entry, Directory):
             logger.info(f"Empty directory: {entry.path}")
 
-``` 
-[block:api-header]
-{
-  "title": "`MergeDigests`: merge collections of files"
-}
-[/block]
+```
+
+`MergeDigests`: merge collections of files
+------------------------------------------
+
 Often, you will need to provide a single `Digest` somewhere in your plugin—such as the `input_digest` for a `Process`—but you may have multiple `Digest`s that you want to use. Use `MergeDigests` to combine them all into a single `Digest`.
 
 ```python
@@ -223,14 +209,13 @@ async def demo(...) -> Foo:
     )
 ```
 
-* It is okay if multiple digests include the same file, so long as they have identical content.
-* If any digests have different content for the same file, the engine will error. Unlike Git, the engine does not attempt to resolve merge conflicts.
-* It is okay if some of the digests are empty, i.e. `EMPTY_DIGEST`.
-[block:api-header]
-{
-  "title": "`DigestSubset`: extract certain files from a `Digest`"
-}
-[/block]
+- It is okay if multiple digests include the same file, so long as they have identical content.
+- If any digests have different content for the same file, the engine will error. Unlike Git, the engine does not attempt to resolve merge conflicts.
+- It is okay if some of the digests are empty, i.e. `EMPTY_DIGEST`.
+
+`DigestSubset`: extract certain files from a `Digest`
+-----------------------------------------------------
+
 To get certain files out of a `Digest`, use `DigestSubset`.
 
 ```python
@@ -246,13 +231,11 @@ async def demo(...) -> Foo:
 ```
 
 See the section `PathGlobs` for more details on how the type works.
-[block:api-header]
-{
-  "title": "`AddPrefix` and `RemovePrefix`"
-}
-[/block]
-Use `AddPrefix` and `RemovePrefix` to change the paths of every file in the digest, while keeping the file contents the same.
 
+`AddPrefix` and `RemovePrefix`
+------------------------------
+
+Use `AddPrefix` and `RemovePrefix` to change the paths of every file in the digest, while keeping the file contents the same.
 
 ```python
 from pants.engine.fs import AddPrefix, Digest, RemovePrefix
@@ -267,11 +250,10 @@ async def demo(...) -> Foo:
 ```
 
 `RemovePrefix` will error if it encounters any files that do not have the requested prefix.
-[block:api-header]
-{
-  "title": "`Workspace.write_digest()`: save to disk"
-}
-[/block]
+
+`Workspace.write_digest()`: save to disk
+----------------------------------------
+
 To write a digest to disk in the build root, request the type `Workspace`, then use its method `.write_digest()`.
 
 ```python
@@ -285,8 +267,8 @@ async def run_my_goal(..., workspace: Workspace) -> MyGoal:
     workspace.write_digest(digest)
 ```
 
-* The digest will always be written to the build root; you cannot write to arbitrary locations on your machine.
-* You may set the optional parameter `path_prefix: str` with a relative path.
+- The digest will always be written to the build root; you cannot write to arbitrary locations on your machine.
+- You may set the optional parameter `path_prefix: str` with a relative path.
 
 `Workspace` is a special type that can only be requested in `@goal_rule`s because it is only safe to write to disk in a `@goal_rule`. So, a common pattern is for "downstream" rules to return a `Digest` with the contents they want to write to disk, and then the `@goal_rule` aggregating all the results and writing them to disk. For example, for the `fmt` goal, each `FmtResult` includes a `digest` field.
 
@@ -305,11 +287,10 @@ Good:
 merged_digest = await Get(Digest, MergeDigests(all_digests))
 workspace.write_digest(merged_digest)
 ```
-[block:api-header]
-{
-  "title": "`DownloadFile`"
-}
-[/block]
+
+`DownloadFile`
+--------------
+
 `DownloadFile` allows you to download an asset using a `GET` request.
 
 ```python
@@ -330,10 +311,9 @@ async def demo(...) -> Foo:
 `DownloadFile` expects a `url: str` parameter pointing to a stable URL for the asset, along with an `expected_digest: FileDigest` parameter. A `FileDigest` is like a normal `Digest`, but represents a single file, rather than a set of files/directories. To determine the `expected_digest`, manually download the file, then run `shasum -a 256` to compute the fingerprint and `wc -c` to compute the expected length of the downloaded file in bytes.
 
 Often, you will want to download a pre-compiled binary for a tool. When doing this, use `ExternalTool` instead for help with extracting the binary from the download. See [Installing tools](doc:rules-api-installing-tools).
-[block:callout]
-{
-  "type": "warning",
-  "title": "HTTP requests without digests are unsafe",
-  "body": "It is not safe to use `DownloadFile` for mutable HTTP requests, as it will never ping the server for updates once it is cached. It is also not safe to use the `requests` library or similar because it will not be cached safely.\n\nYou can use a `Process` with uniquely identifying information in its arguments to run `/usr/bin/curl`."
-}
-[/block]
+
+> 🚧 HTTP requests without digests are unsafe
+> 
+> It is not safe to use `DownloadFile` for mutable HTTP requests, as it will never ping the server for updates once it is cached. It is also not safe to use the `requests` library or similar because it will not be cached safely.
+> 
+> You can use a `Process` with uniquely identifying information in its arguments to run `/usr/bin/curl`.

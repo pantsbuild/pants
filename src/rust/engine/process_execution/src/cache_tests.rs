@@ -58,6 +58,7 @@ fn create_cached_runner(
     local.into(),
     cache,
     store,
+    true,
     ProcessMetadata::default(),
   ));
 

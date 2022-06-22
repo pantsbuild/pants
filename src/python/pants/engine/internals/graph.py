@@ -13,7 +13,7 @@ from typing import Iterable, NamedTuple, Sequence, cast
 
 from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
-from pants.build_graph.address import BuildFileAddressRequest, ResolveError
+from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -24,6 +24,7 @@ from pants.engine.addresses import (
 from pants.engine.collection import Collection
 from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizations as _TargetParametrizations,
@@ -1210,19 +1211,46 @@ async def resolve_dependencies(
 async def resolve_unparsed_address_inputs(
     request: UnparsedAddressInputs, subproject_roots: SubprojectRoots
 ) -> Addresses:
-    addresses = await MultiGet(
-        Get(
-            Address,
-            AddressInput,
-            AddressInput.parse(
-                v,
-                relative_to=request.relative_to,
-                subproject_roots=subproject_roots,
-                description_of_origin=request.description_of_origin,
-            ),
+    address_inputs = []
+    invalid_addresses = []
+    for v in request.values:
+        try:
+            address_inputs.append(
+                AddressInput.parse(
+                    v,
+                    relative_to=request.relative_to,
+                    subproject_roots=subproject_roots,
+                    description_of_origin=request.description_of_origin,
+                )
+            )
+        except AddressParseException:
+            if not request.skip_invalid_addresses:
+                raise
+            invalid_addresses.append(v)
+
+    if request.skip_invalid_addresses:
+        maybe_addresses = await MultiGet(
+            Get(MaybeAddress, AddressInput, ai) for ai in address_inputs
         )
-        for v in request.values
-    )
+        valid_addresses = []
+        for maybe_address, address_input in zip(maybe_addresses, address_inputs):
+            if isinstance(maybe_address.val, Address):
+                valid_addresses.append(maybe_address.val)
+            else:
+                invalid_addresses.append(address_input.spec)
+
+        if invalid_addresses:
+            logger.debug(
+                softwrap(
+                    f"""
+                    Invalid addresses from {request.description_of_origin}:
+                    {sorted(invalid_addresses)}. Skipping them.
+                    """
+                )
+            )
+        return Addresses(valid_addresses)
+
+    addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in address_inputs)
     return Addresses(addresses)
 
 

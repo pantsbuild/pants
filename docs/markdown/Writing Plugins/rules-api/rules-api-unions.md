@@ -11,28 +11,47 @@ Union rules solve the same problem that polymorphism solves in general: how to w
 For example, Pants has many generic goals like `lint` and `test`. Those `@goal_rule` definitions cannot know about every concrete linter or test implementation ahead-of-time.
 
 Unions allow a specific linter to be registered with `UnionRule(LintTargetsRequest, ShellcheckRequest)`, and then for `lint.py` to access its type:
-[block:code]
-{
-  "codes": [
-    {
-      "code": "from pants.engine.rules import Get, MultiGet, goal_rule\nfrom pants.engine.target import Targets\nfrom pants.engine.unions import UnionMembership\n\n..\n\n@goal_rule\nasync def lint(..., targets: Targets, union_membership: UnionMembership) -> Lint:\n    lint_request_types = union_membership[LintTargetsRequest]\n    concrete_requests = [\n        request_type(\n            request_type.field_set_type.create(target)\n            for target in targets\n            if request_type.field_set_type.is_valid(target)\n        )\n        for request_type in lint_request_types\n    ]\n    results = await MultiGet(\n        Get(LintResults, LintTargetsRequest, concrete_request)\n        for concrete_request in concrete_requests\n    )",
-      "language": "python",
-      "name": "pants/core/goals/lint.py"
-    },
-    {
-      "code": "from pants.core.goals.lint import LintRequest\n\nclass ShellcheckRequest(LintRequest):\n    ...\n\n...\n  \ndef rules():\n    return [UnionRule(LintRequest, ShellcheckRequest)",
-      "language": "python",
-      "name": "pants-plugins/bash/shellcheck.py"
-    }
-  ]
-}
-[/block]
+
+```python pants/core/goals/lint.py
+from pants.engine.rules import Get, MultiGet, goal_rule
+from pants.engine.target import Targets
+from pants.engine.unions import UnionMembership
+
+..
+
+@goal_rule
+async def lint(..., targets: Targets, union_membership: UnionMembership) -> Lint:
+    lint_request_types = union_membership[LintTargetsRequest]
+    concrete_requests = [
+        request_type(
+            request_type.field_set_type.create(target)
+            for target in targets
+            if request_type.field_set_type.is_valid(target)
+        )
+        for request_type in lint_request_types
+    ]
+    results = await MultiGet(
+        Get(LintResults, LintTargetsRequest, concrete_request)
+        for concrete_request in concrete_requests
+    )
+```
+```python pants-plugins/bash/shellcheck.py
+from pants.core.goals.lint import LintRequest
+
+class ShellcheckRequest(LintRequest):
+    ...
+
+...
+  
+def rules():
+    return [UnionRule(LintRequest, ShellcheckRequest)
+```
+
 This example will find all registered linter implementations by looking up `union_membership[LintTargetsRequest]`, which returns a tuple of all `LintTargetsRequest ` types that were registered with a `UnionRule`, such as `ShellcheckRequest` and `Flake8Request`.
-[block:api-header]
-{
-  "title": "How to create a new Union"
-}
-[/block]
+
+How to create a new Union
+-------------------------
+
 To set up a new union, create a class for the union "base". Typically, this should be an [abstract class](https://docs.python.org/3/library/abc.html) that is subclassed by the union members, but it does not need to be. Mark the class with `@union`.
 
 ```python
@@ -46,7 +65,7 @@ class Vehicle(ABC):
    def num_wheels(self) -> int:
         pass
 ```
- 
+
 Then, register every implementation of your union with `UnionRule`:
 
 ```python

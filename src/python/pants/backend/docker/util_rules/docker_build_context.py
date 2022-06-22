@@ -46,6 +46,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -237,8 +238,10 @@ async def create_docker_build_context(
         Get(BuiltPackage, PackageFieldSet, field_set)
         for field_set in embedded_pkgs_per_target.field_sets
         # Exclude docker images, unless build_upstream_images is true.
-        if request.build_upstream_images
-        or not isinstance(getattr(field_set, "source", None), DockerImageSourceField)
+        if (
+            request.build_upstream_images
+            or not isinstance(getattr(field_set, "source", None), DockerImageSourceField)
+        )
     )
 
     if request.build_upstream_images:
@@ -283,7 +286,13 @@ async def create_docker_build_context(
             UnparsedAddressInputs(
                 dockerfile_build_args.values(),
                 owning_address=dockerfile_info.address,
-                description_of_origin="TODO(#14468)",
+                description_of_origin=softwrap(
+                    f"""
+                    the FROM arguments from the file {dockerfile_info.source}
+                    from the target {dockerfile_info.address}
+                    """
+                ),
+                skip_invalid_addresses=True,
             ),
         )
         # Map those addresses to the corresponding built image ref (tag).
