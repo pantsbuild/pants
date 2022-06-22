@@ -8,7 +8,7 @@ from collections import namedtuple
 import pytest
 
 from pants.core.target_types import GenericTarget
-from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsProvider
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.target import InvalidFieldException, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.testutil.pytest_util import no_exception
@@ -24,23 +24,27 @@ class Test2Target(GenericTarget):
 
 
 @pytest.fixture
-def provider() -> BuildFileDefaultsProvider:
-    return BuildFileDefaultsProvider(
-        RegisteredTargetTypes(
-            {tgt.alias: tgt for tgt in (GenericTarget, Test1Target, Test2Target)}
-        ),
-        UnionMembership({}),
+def registered_target_types() -> RegisteredTargetTypes:
+    return RegisteredTargetTypes(
+        {tgt.alias: tgt for tgt in (GenericTarget, Test1Target, Test2Target)}
     )
 
 
-def test_assumptions(provider: BuildFileDefaultsProvider) -> None:
-    defaults = provider.get_parser_defaults("", BuildFileDefaults({}))
-    assert defaults.provider is provider
+@pytest.fixture
+def union_membership() -> UnionMembership:
+    return UnionMembership({})
 
+
+def test_assumptions(
+    registered_target_types: RegisteredTargetTypes, union_membership: UnionMembership
+) -> None:
+    defaults = BuildFileDefaultsParserState.create(
+        "", BuildFileDefaults({}), registered_target_types, union_membership
+    )
     defaults.set_defaults({"target": dict(tags=["foo", "bar"])})
 
-    freezed = defaults.freezed_defaults()
-    assert freezed == BuildFileDefaults(
+    frozen = defaults.get_frozen_defaults()
+    assert frozen == BuildFileDefaults(
         {
             "target": FrozenDict({"tags": ("foo", "bar")}),
         }
@@ -182,16 +186,22 @@ Scenario = namedtuple(
         ),
     ],
 )
-def test_set_defaults(provider: BuildFileDefaultsProvider, scenario: Scenario) -> None:
+def test_set_defaults(
+    scenario: Scenario,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
+) -> None:
     with (scenario.expected_error or no_exception()):
-        defaults = provider.get_parser_defaults(
+        defaults = BuildFileDefaultsParserState.create(
             scenario.path,
             BuildFileDefaults(
                 {tgt: FrozenDict(val) for tgt, val in scenario.parent_defaults.items()}
             ),
+            registered_target_types,
+            union_membership,
         )
         defaults.set_defaults(*scenario.args, **scenario.kwargs)
         actual_defaults = {
-            tgt: dict(field_values) for tgt, field_values in defaults.freezed_defaults().items()
+            tgt: dict(field_values) for tgt, field_values in defaults.get_frozen_defaults().items()
         }
         assert scenario.expected_defaults == actual_defaults

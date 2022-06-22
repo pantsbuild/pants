@@ -16,21 +16,6 @@ SetDefaultsKeyT = Union[str, Tuple[str, ...]]
 SetDefaultsT = Mapping[SetDefaultsKeyT, SetDefaultsValueT]
 
 
-@dataclass
-class BuildFileDefaultsProvider:
-    registered_target_types: RegisteredTargetTypes
-    union_membership: UnionMembership
-
-    def get_parser_defaults(
-        self, path: str, defaults: BuildFileDefaults
-    ) -> BuildFileDefaultsParserState:
-        return BuildFileDefaultsParserState(
-            address=Address(path, generated_name="__defaults__"),
-            defaults=dict(defaults),
-            provider=self,
-        )
-
-
 class BuildFileDefaults(FrozenDict[str, FrozenDict[str, ImmutableValue]]):
     """Map target types to default field values."""
 
@@ -39,17 +24,25 @@ class BuildFileDefaults(FrozenDict[str, FrozenDict[str, ImmutableValue]]):
 class BuildFileDefaultsParserState:
     address: Address
     defaults: dict[str, Mapping[str, Any]]
-    provider: BuildFileDefaultsProvider
+    registered_target_types: RegisteredTargetTypes
+    union_membership: UnionMembership
 
-    @property
-    def registered_target_types(self) -> RegisteredTargetTypes:
-        return self.provider.registered_target_types
+    @classmethod
+    def create(
+        cls,
+        path: str,
+        defaults: BuildFileDefaults,
+        registered_target_types: RegisteredTargetTypes,
+        union_membership: UnionMembership,
+    ) -> BuildFileDefaultsParserState:
+        return cls(
+            address=Address(path, generated_name="__defaults__"),
+            defaults=dict(defaults),
+            registered_target_types=registered_target_types,
+            union_membership=union_membership,
+        )
 
-    @property
-    def union_membership(self) -> UnionMembership:
-        return self.provider.union_membership
-
-    def freezed_defaults(self) -> BuildFileDefaults:
+    def get_frozen_defaults(self) -> BuildFileDefaults:
         types = self.registered_target_types.aliases_to_types
         return BuildFileDefaults(
             {

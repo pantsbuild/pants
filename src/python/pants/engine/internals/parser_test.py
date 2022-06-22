@@ -6,11 +6,7 @@ from __future__ import annotations
 import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.internals.defaults import (
-    BuildFileDefaults,
-    BuildFileDefaultsParserState,
-    BuildFileDefaultsProvider,
-)
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.parser import BuildFilePreludeSymbols, ParseError, Parser
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -19,25 +15,25 @@ from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
-def buildfile_defaults() -> BuildFileDefaultsParserState:
-    return BuildFileDefaultsProvider(
-        RegisteredTargetTypes({}), UnionMembership({})
-    ).get_parser_defaults("", BuildFileDefaults({}))
+def defaults_parser_state() -> BuildFileDefaultsParserState:
+    return BuildFileDefaultsParserState.create(
+        "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
+    )
 
 
-def test_imports_banned(buildfile_defaults: BuildFileDefaultsParserState) -> None:
+def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> None:
     parser = Parser(build_root="", target_type_aliases=[], object_aliases=BuildFileAliases())
     with pytest.raises(ParseError) as exc:
         parser.parse(
             "dir/BUILD",
             "\nx = 'hello'\n\nimport os\n",
             BuildFilePreludeSymbols(FrozenDict()),
-            buildfile_defaults,
+            defaults_parser_state,
         )
     assert "Import used in dir/BUILD at line 4" in str(exc.value)
 
 
-def test_unrecognized_symbol(buildfile_defaults: BuildFileDefaultsParserState) -> None:
+def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState) -> None:
     def perform_test(extra_targets: list[str], dym: str) -> None:
 
         parser = Parser(
@@ -55,7 +51,7 @@ def test_unrecognized_symbol(buildfile_defaults: BuildFileDefaultsParserState) -
                 "dir/BUILD",
                 "fake",
                 prelude_symbols,
-                buildfile_defaults,
+                defaults_parser_state,
             )
         assert str(exc.value) == (
             f"Name 'fake' is not defined.\n\n{dym}"
