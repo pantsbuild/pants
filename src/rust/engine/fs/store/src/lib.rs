@@ -162,6 +162,7 @@ pub struct UploadSummary {
 struct RemoteStore {
   store: remote::ByteStore,
   in_flight_uploads: Arc<Mutex<HashMap<Digest, Weak<OnceCell<()>>>>>,
+  in_flight_downloads: Arc<Mutex<HashMap<Digest, Weak<OnceCell<()>>>>>,
 }
 
 impl RemoteStore {
@@ -169,6 +170,7 @@ impl RemoteStore {
     Self {
       store,
       in_flight_uploads: Arc::default(),
+      in_flight_downloads: Arc::default(),
     }
   }
 
@@ -200,6 +202,22 @@ impl RemoteStore {
     upload: impl Future<Output = Result<(), E>>,
   ) -> Result<(), E> {
     Self::cell_from(&self.in_flight_uploads, digest)
+      .get_or_try_init(upload)
+      .await
+      .map(|&()| ())
+  }
+
+  ///
+  /// Guards an attempt to download the given `Digest`, skipping the download if another attempt
+  /// has been successful. Will not return until either an attempt has succeed, or this attempt has
+  /// failed.
+  ///
+  async fn maybe_download<E>(
+    &self,
+    digest: Digest,
+    upload: impl Future<Output = Result<(), E>>,
+  ) -> Result<(), E> {
+    Self::cell_from(&self.in_flight_downloads, digest)
       .get_or_try_init(upload)
       .await
       .map(|&()| ())
@@ -412,23 +430,19 @@ impl Store {
   ///
   pub async fn load_file_bytes_with<
     T: Send + 'static,
-    F: Fn(&[u8]) -> T + Send + Sync + 'static,
+    F: Fn(&[u8]) -> T + Clone + Send + Sync + 'static,
   >(
     &self,
     digest: Digest,
     f: F,
   ) -> Result<T, StoreError> {
-    // No transformation or verification is needed for files, so we pass in a pair of functions
-    // which always succeed, whether the underlying bytes are coming from a local or remote store.
-    // Unfortunately, we need to be a little verbose to do this.
-    let f_local = Arc::new(f);
-    let f_remote = f_local.clone();
+    // No transformation or verification is needed for files.
     self
       .load_bytes_with(
         EntryType::File,
         digest,
-        move |v: &[u8]| Ok(f_local(v)),
-        move |v: Bytes| Ok(f_remote(&v)),
+        move |v: &[u8]| Ok(f(v)),
+        |_: Bytes| Ok(()),
       )
       .await
   }
@@ -597,7 +611,7 @@ impl Store {
             )
           })?;
           protos::verify_directory_canonical(digest, &directory)?;
-          Ok(directory)
+          Ok(())
         },
       )
       .await
@@ -625,8 +639,8 @@ impl Store {
   ///
   async fn load_bytes_with<
     T: Send + 'static,
-    FLocal: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
-    FRemote: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
+    FLocal: Fn(&[u8]) -> Result<T, String> + Clone + Send + Sync + 'static,
+    FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
   >(
     &self,
     entry_type: EntryType,
@@ -639,51 +653,64 @@ impl Store {
 
     if let Some(bytes_res) = self
       .local
-      .load_bytes_with(entry_type, digest, f_local)
+      .load_bytes_with(entry_type, digest, f_local.clone())
       .await?
     {
       return Ok(bytes_res?);
     }
 
-    let remote = maybe_remote
-      .ok_or_else(|| {
-        StoreError::MissingDigest("Was not present in the local store".to_owned(), digest)
-      })?
-      .store;
-
-    let bytes = retry_call(
-      remote,
-      |remote| async move { remote.load_bytes_with(digest, Ok).await },
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
-    )
-    .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
-    })?
-    .ok_or_else(|| {
-      StoreError::MissingDigest(
-        "Was not present in either the local or remote store".to_owned(),
-        digest,
-      )
+    let remote = maybe_remote.ok_or_else(|| {
+      StoreError::MissingDigest("Was not present in the local store".to_owned(), digest)
     })?;
+    let remote_store = remote.store.clone();
 
-    let value = f_remote(bytes.clone())?;
-    let stored_digest = local.store_bytes(entry_type, None, bytes, true).await?;
-    if digest == stored_digest {
-      Ok(value)
-    } else {
-      Err(
-        format!(
-          "CAS gave wrong digest: expected {:?}, got {:?}",
-          digest, stored_digest
+    remote
+      .maybe_download(digest, async move {
+        // TODO: Now that we always copy from the remote store to the local store before executing
+        // the caller's logic against the local store, `remote::ByteStore::load_bytes_with` no
+        // longer needs to accept a function.
+        let bytes = retry_call(
+          remote_store,
+          |remote_store| async move { remote_store.load_bytes_with(digest, Ok).await },
+          |err| match err {
+            ByteStoreError::Grpc(status) => status_is_retryable(status),
+            _ => false,
+          },
         )
-        .into(),
-      )
-    }
+        .await
+        .map_err(|err| match err {
+          ByteStoreError::Grpc(status) => status_to_str(status),
+          ByteStoreError::Other(msg) => msg,
+        })?
+        .ok_or_else(|| {
+          StoreError::MissingDigest(
+            "Was not present in either the local or remote store".to_owned(),
+            digest,
+          )
+        })?;
+
+        f_remote(bytes.clone())?;
+        let stored_digest = local.store_bytes(entry_type, None, bytes, true).await?;
+        if digest == stored_digest {
+          Ok(())
+        } else {
+          Err(StoreError::Unclassified(format!(
+            "CAS gave wrong digest: expected {:?}, got {:?}",
+            digest, stored_digest
+          )))
+        }
+      })
+      .await?;
+
+    Ok(
+      self
+        .local
+        .load_bytes_with(entry_type, digest, f_local)
+        .await?
+        .ok_or_else(|| {
+          format!("After downloading {digest:?}, the local store claimed that it was not present.")
+        })??,
+    )
   }
 
   ///
@@ -1372,7 +1399,10 @@ pub enum LocalMissingBehavior {
 impl SnapshotOps for Store {
   type Error = StoreError;
 
-  async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+  async fn load_file_bytes_with<
+    T: Send + 'static,
+    F: Fn(&[u8]) -> T + Clone + Send + Sync + 'static,
+  >(
     &self,
     digest: Digest,
     f: F,
