@@ -39,8 +39,7 @@ case class ProvidedSymbol(sawClass: Boolean, sawTrait: Boolean, sawObject: Boole
 
 class SourceAnalysisTraverser extends Traverser {
   val nameParts = ArrayBuffer[String]()
-  var skipProvidedNames = false
-  var visitInitArgs = false
+  var skipProvidedNames = false  
 
   val providedSymbolsByScope = HashMap[String, HashMap[String, ProvidedSymbol]]()
   val importsByScope = HashMap[String, ArrayBuffer[AnImport]]()
@@ -193,11 +192,8 @@ class SourceAnalysisTraverser extends Traverser {
 
   def visitMods(mods: List[Mod]): Unit = {
     mods.foreach({
-      case Mod.Annot(init) =>
-        val currentVisitInitArgs = visitInitArgs
-        visitInitArgs = true
-        apply(init) // rely on `Init` extraction in main parsing match code
-        visitInitArgs = currentVisitInitArgs
+      case Mod.Annot(init) =>        
+        apply(init) // rely on `Init` extraction in main parsing match code        
       case _               => ()
     })
   }
@@ -337,10 +333,8 @@ class SourceAnalysisTraverser extends Traverser {
     }
 
     case Init(tpe, _name, argss) => {
-      extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))
-
-      if (visitInitArgs)
-        argss.foreach(_.foreach(apply))
+      extractNamesFromTypeTree(tpe).foreach(recordConsumedSymbol(_))      
+      argss.foreach(_.foreach(apply))
     }
 
     case Term.Param(mods, _name, decltpe, _default) => {
