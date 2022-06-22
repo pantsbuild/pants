@@ -386,5 +386,10 @@ class PyTypes:
 class PyStdioDestination:
     pass
 
+class PyThreadLocals:
+    @classmethod
+    def get_for_current_thread(cls) -> PyThreadLocals: ...
+    def set_for_current_thread(self) -> None: ...
+
 class PollTimeout(Exception):
     pass
