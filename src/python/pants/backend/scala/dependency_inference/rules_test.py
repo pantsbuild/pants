@@ -354,3 +354,85 @@ def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
     assert deps == InferredDependencies(
         [Address("lib", relative_file_path="Library.scala", parameters={"resolve": "scala-2.12"})]
     )
+
+
+@maybe_skip_jdk_test
+def test_recursive_objects(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "A/BUILD": dedent(
+                """\
+                scala_sources(name = "a")
+                """
+            ),
+            "A/A.scala": dedent(
+                """\
+                package org.pantsbuild.a
+
+                object A {
+                    def funA(): Int = ???
+                }
+                """
+            ),
+            "B/BUILD": dedent(
+                """\
+                scala_sources(name = "b")
+                """
+            ),
+            "B/B.scala": dedent(
+                """\
+                package org.pantsbuild.b
+
+                import org.pantsbuild.a.A
+
+                object B extends A {
+                    def funB(): Int = ???
+                }
+                """
+            ),
+            "C/BUILD": dedent(
+                """\
+                scala_sources(name = "c")
+                """
+            ),
+            "C/C.scala": dedent(
+                """\
+                package org.pantsbuild.c
+
+                import org.pantsbuild.b.B.funA
+
+                class C {
+                    val x = funA()
+                }
+                """
+            ),
+            "D/BUILD": dedent(
+                """\
+                scala_sources(name = "d")
+                """
+            ),
+            "D/D.scala": dedent(
+                """\
+                package org.pantsbuild.d
+
+                import org.pantsbuild.b.B.funB
+
+                class D {
+                    val x = funB()
+                }
+                """
+            ),
+        }
+    )
+
+    target_b = rule_runner.get_target(Address("B", target_name="b", relative_file_path="B.scala"))
+    target_c = rule_runner.get_target(Address("C", target_name="c", relative_file_path="C.scala"))
+    target_d = rule_runner.get_target(Address("D", target_name="d", relative_file_path="D.scala"))
+
+    assert rule_runner.request(
+        InferredDependencies, [InferScalaSourceDependencies(target_c[ScalaSourceField])]
+    ) == InferredDependencies(dependencies=[target_b.address])
+
+    assert rule_runner.request(
+        InferredDependencies, [InferScalaSourceDependencies(target_d[ScalaSourceField])]
+    ) == InferredDependencies(dependencies=[target_b.address])
