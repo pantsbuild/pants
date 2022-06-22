@@ -212,6 +212,9 @@ scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_pa
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
+[scala-infer]
+force_add_siblings_as_dependencies = false
+
 [toolchain-setup]
 repo = "pants"
 org = "pantsbuild"
