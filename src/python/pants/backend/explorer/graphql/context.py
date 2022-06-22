@@ -21,4 +21,7 @@ class GraphQLContext:
 
     @staticmethod
     def request_state_from_info(info: Info) -> RequestState:
-        return cast(RequestState, info.context["pants_request_state"])
+        assert info.context is not None
+        request_state = cast("RequestState | None", info.context.get("pants_request_state"))
+        assert request_state is not None
+        return request_state

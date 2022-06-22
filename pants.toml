@@ -155,6 +155,7 @@ args = ["-i 2", "-ci", "-sr"]
 args = ["--no-header"]
 extra_requirements.add = [
   "ipdb",
+  "pytest-asyncio",
   "pytest-html",
   "pytest-icdiff",
   "pygments",
