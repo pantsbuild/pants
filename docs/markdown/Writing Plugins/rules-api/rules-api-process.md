@@ -7,11 +7,10 @@ createdAt: "2020-05-07T22:38:44.131Z"
 updatedAt: "2022-04-26T22:24:24.966Z"
 ---
 It is not safe to use `subprocess.run()` like you normally would because this can break caching and will not leverage Pants's parallelism. Instead, Pants has safe alternatives with `Process` and `InteractiveProcess`.
-[block:api-header]
-{
-  "title": "`Process`"
-}
-[/block]
+
+`Process`
+---------
+
 ### Overview
 
 `Process` is similar to Python's `subprocess.Popen()`. The process will run in the background, and you can run multiple processes in parallel.
@@ -36,13 +35,13 @@ async def demo(...) -> Foo:
 This will return a `ProcessResult` object, which has the fields `stdout: bytes`, `stderr: bytes`, and `output_digest: Digest`. 
 
 The process will run in a temporary directory and is hermetic, meaning that it cannot read any arbitrary file from your project and that it will be stripped of environment variables. This sandbox is important for reproducibility and to allow running your `Process` anywhere, such as through remote execution.
-[block:callout]
-{
-  "type": "info",
-  "title": "Debugging a `Process`",
-  "body": "Setting the [`--no-process-cleanup`](docs:rules-api-tips#debugging-look-inside-the-chroot) flag will cause the sandboxes of `Process`es to be preserved and logged to the console for inspection.\n\nIt can be very helpful while editing `Process` definitions!"
-}
-[/block]
+
+> 📘 Debugging a `Process`
+> 
+> Setting the [`--no-process-cleanup`](docs:rules-api-tips#debugging-look-inside-the-chroot) flag will cause the sandboxes of `Process`es to be preserved and logged to the console for inspection.
+> 
+> It can be very helpful while editing `Process` definitions!
+
 ### Input Files
 
 To populate the temporary directory with files, use the parameter `input_digest: Digest`. It's common to use [`MergeDigests`](docs:rules-api-file-system) to combine multiple `Digest`s into one single `input_digest`.
@@ -72,13 +71,28 @@ To capture output files from the process, set `output_files: Iterable[str]` and/
 ### Timeouts
 
 To use a timeout, set the `timeout_seconds: int` field. Otherwise, the process will never time out, unless the user cancels Pants.
-[block:callout]
-{
-  "type": "info",
-  "title": "`Process` caching",
-  "body": "By default, a `Process` will be cached to `~/.cache/pants/lmdb_store` if the `exit_code` is `0`.\n\nIf it not safe to cache your `Process`—usually the case when you know that a process accesses files outside of its sandbox—you can change the cacheability of your `Process` using the `ProcessCacheScope` parameter:\n\n```python\nfrom pants.engine.process import Process, ProcessCacheScope, ProcessResult\n\n@rule\nasync def demo(...) -> Foo:\n    process = Process(\n        argv=[\"/bin/echo\", \"hello world\"],\n        description=\"Not persisted between Pants runs ('sessions').\",\n        cache_scope=ProcessCacheScope.PER_SESSION,\n    )\n    ..\n```\n\n`ProcessCacheScope` supports other options as well, including `ALWAYS`."
-}
-[/block]
+
+> 📘 `Process` caching
+> 
+> By default, a `Process` will be cached to `~/.cache/pants/lmdb_store` if the `exit_code` is `0`.
+> 
+> If it not safe to cache your `Process`—usually the case when you know that a process accesses files outside of its sandbox—you can change the cacheability of your `Process` using the `ProcessCacheScope` parameter:
+> 
+> ```python
+> from pants.engine.process import Process, ProcessCacheScope, ProcessResult
+> 
+> @rule
+> async def demo(...) -> Foo:
+>     process = Process(
+>         argv=["/bin/echo", "hello world"],
+>         description="Not persisted between Pants runs ('sessions').",
+>         cache_scope=ProcessCacheScope.PER_SESSION,
+>     )
+>     ..
+> ```
+> 
+> `ProcessCacheScope` supports other options as well, including `ALWAYS`.
+
 ### FallibleProcessResult
 
 Normally, a `ProcessResult` will raise an exception if the return code is not `0`. Instead, a `FallibleProcessResult` allows for any return code.
@@ -86,11 +100,10 @@ Normally, a `ProcessResult` will raise an exception if the return code is not `0
 Use `Get(FallibleProcessResult, Process)` if you expect that the process may fail, such as when running a linter or tests.
 
 Like `ProcessResult`, `FallibleProcessResult` has the attributes `stdout: bytes`, `stderr: bytes`, and `output_digest: Digest`, and it adds `exit_code: int`.
-[block:api-header]
-{
-  "title": "`InteractiveProcess`"
-}
-[/block]
+
+`InteractiveProcess`
+--------------------
+
 `InteractiveProcess` is similar to Python's `subprocess.run()`. The process will run in the foreground, optionally with access to the workspace.
 
 Because the process is potentially side-effecting, you may only run an `InteractiveProcess` in an [`@goal_rule`](doc:rules-api-goal-rules) as an `Effect`.

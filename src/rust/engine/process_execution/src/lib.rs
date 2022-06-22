@@ -29,7 +29,7 @@ extern crate derivative;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::{TryFrom, TryInto};
-use std::fmt::{self, Display};
+use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -783,7 +783,7 @@ impl Context {
 }
 
 #[async_trait]
-pub trait CommandRunner: Send + Sync {
+pub trait CommandRunner: Send + Sync + Debug {
   ///
   /// Submit a request for execution on the underlying runtime, and return
   /// a future for it.

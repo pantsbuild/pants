@@ -52,13 +52,7 @@ from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTar
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
-from pants.testutil.rule_runner import (
-    MockGet,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
 
@@ -896,20 +890,20 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
         (
             "/",
             None,
-            engine_error(
+            pytest.raises(
                 InvalidFieldException,
-                contains=("Use '' for a path relative to the build root, or './' for"),
+                match=r"Use '' for a path relative to the build root, or '\./' for",
             ),
         ),
         (
             "/src",
             None,
-            engine_error(
+            pytest.raises(
                 InvalidFieldException,
-                contains=(
-                    "The `context_root` field in target src/docker:image must be a relative path, but was "
-                    "'/src'. Use 'src' for a path relative to the build root, or './src' for a path "
-                    "relative to the BUILD file (i.e. 'src/docker/src')."
+                match=(
+                    r"The `context_root` field in target src/docker:image must be a relative path, "
+                    r"but was '/src'\. Use 'src' for a path relative to the build root, or '\./src' "
+                    r"for a path relative to the BUILD file \(i\.e\. 'src/docker/src'\)\."
                 ),
             ),
         ),
@@ -931,7 +925,6 @@ def test_get_context_root(
         raises = cast("ContextManager", no_exception())
     else:
         raises = expected_context_root
-        expected_context_root = ""
 
     with raises:
         docker_options = create_subsystem(
@@ -942,8 +935,7 @@ def test_get_context_root(
         tgt = DockerImageTarget({"context_root": context_root}, address)
         fs = DockerFieldSet.create(tgt)
         actual_context_root = fs.get_context_root(docker_options.default_context_root)
-        if expected_context_root:
-            assert actual_context_root == expected_context_root
+        assert actual_context_root == expected_context_root
 
 
 @pytest.mark.parametrize(

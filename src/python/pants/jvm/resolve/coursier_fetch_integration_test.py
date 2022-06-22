@@ -155,6 +155,8 @@ def test_resolve_with_inexact_coord(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.skip(reason="TODO(#15824)")
+@pytest.mark.no_error_if_skipped
 @maybe_skip_jdk_test
 def test_resolve_conflicting(rule_runner: RuleRunner) -> None:
     with engine_error(
