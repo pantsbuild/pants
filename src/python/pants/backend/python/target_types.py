@@ -146,7 +146,6 @@ class PythonResolveField(StringField, AsyncFieldMixin):
 
 class PythonRunGoalUseSandboxField(BoolField):
     alias = "run_goal_use_sandbox"
-    # ...
     default = False
     help = softwrap(
         """
