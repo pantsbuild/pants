@@ -42,8 +42,11 @@ def test_run_sample_script(
             """
         ),
         "src_root1/project/BUILD": dedent(
-            """\
-            python_sources(name='lib')
+            f"""\
+            python_sources(
+                name='lib',
+                run_goal_use_sandbox={run_in_sandbox},
+            )
             """
         ),
         "src_root2/utils/strutil.py": dedent(

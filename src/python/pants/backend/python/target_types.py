@@ -144,6 +144,31 @@ class PythonResolveField(StringField, AsyncFieldMixin):
         return resolve
 
 
+class PythonRunGoalUseSandboxField(BoolField):
+    alias = "run_goal_use_sandbox"
+    # ...
+    default = False
+    help = softwrap(
+        """
+        If false, runs of this target with the `run` goal will use the in-repo sources
+        directly.
+
+        If true, runs of this target with the `run` goal will copy the needed first-party sources
+        into a temporary sandbox and run from there.
+
+        The former mode is similar to creating, activating, and using a virtual environment when
+        running your files. It may also be necessary if the source being run writes files into the
+        repo and computes their location relative to the executed files. Django's makemigrations
+        command is an example of such a process.
+
+        The latter mode is more hermetic, and is closer to building and running the source as it
+        were packaged in a `pex_binary`. Additionally, it may be necessary if your sources depend
+        transitively on "generated" files which will be materialized in the sandbox in a source
+        root, but are not in-repo.
+        """
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # Target generation support
 # -----------------------------------------------------------------------------------------------
@@ -810,6 +835,7 @@ class SkipPythonTestsField(BoolField):
 _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsDependenciesField,
     PythonResolveField,
+    PythonRunGoalUseSandboxField,
     PythonTestsTimeoutField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
@@ -907,6 +933,7 @@ class PythonSourceTarget(Target):
         InterpreterConstraintsField,
         Dependencies,
         PythonResolveField,
+        PythonRunGoalUseSandboxField,
         PythonSourceField,
     )
     help = "A single Python source file."
@@ -953,7 +980,7 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = PythonSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (PythonResolveField, Dependencies, InterpreterConstraintsField)
+    moved_fields = (Dependencies, InterpreterConstraintsField)
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = softwrap(
         """
@@ -979,7 +1006,12 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = PythonSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (PythonResolveField, Dependencies, InterpreterConstraintsField)
+    moved_fields = (
+        PythonResolveField,
+        PythonRunGoalUseSandboxField,
+        Dependencies,
+        InterpreterConstraintsField,
+    )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = softwrap(
         """

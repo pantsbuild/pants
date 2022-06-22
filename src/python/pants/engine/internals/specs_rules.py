@@ -507,7 +507,7 @@ def _handle_ambiguous_result(
 
                     Note that because of this change you are able to remove any `pex_binary` targets
                     you have declared just to support the `run` goal
-                    (usually these are developer scripts), as using `run` with the filename will
+                    (usually these are developer scripts), as using `run` on the `python_source` will
                     have the equivalent behavior.
 
                     To fix this deprecation, use the `pex_binary`'s address.
