@@ -10,7 +10,7 @@ path = "src/console_ui.rs"
 [dependencies]
 console = "0.15.0"
 futures = "0.3"
-indexmap = "1.8"
+indexmap = "1.9"
 indicatif = "0.16.2"
 logging = { path = "../logging" }
 parking_lot = "0.12"

@@ -125,7 +125,7 @@ graph = { path = "graph" }
 grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
 humansize = "1.1"
-indexmap = "1.8"
+indexmap = "1.9"
 internment = "0.6"
 itertools = "0.10"
 lazy_static = "1"
