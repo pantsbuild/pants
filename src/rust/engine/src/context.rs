@@ -340,10 +340,10 @@ impl Core {
     )?;
 
     // TODO: Until we can deprecate letting the flag default, we implicitly disable
-    // eager_fetch when remote execution is in use.
+    // eager_fetch when remote execution is in use. See the TODO in `global_options.py`.
     let eager_fetch = remoting_opts.cache_eager_fetch && !remoting_opts.execution_enable;
     // TODO: Until we can deprecate letting remote-cache-{read,write} default, we implicitly
-    // enable them when remote execution is in use.
+    // enable them when remote execution is in use. See the TODO in `global_options.py`.
     let remote_cache_read = exec_strategy_opts.remote_cache_read || remoting_opts.execution_enable;
     let remote_cache_write =
       exec_strategy_opts.remote_cache_write || remoting_opts.execution_enable;

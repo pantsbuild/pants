@@ -23,6 +23,7 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
+from pants.base.deprecated import deprecated_conditional
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -1747,17 +1748,40 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 )
             )
 
-        if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
-            raise OptionsError(
-                softwrap(
-                    """
-                    `--remote-execution` cannot be set at the same time as either
-                    `--remote-cache-read` or `--remote-cache-write`.
+        # TODO: When this deprecation triggers, the relevant TODO(s) in `context.rs` should be
+        # removed as well.
+        deprecated_conditional(
+            lambda: opts.remote_execution and opts.remote_cache_eager_fetch,
+            removal_version="2.15.0.dev0",
+            entity="Setting `--remote-execution` at the same time as `--remote-cache-eager-fetch`.",
+            hint=softwrap(
+                """
+                Use of `--remote-execution` currently implies use of
+                `--remote-cache-eager-fetch=false`, but in future versions, use of eager fetch with
+                remote execution will be optional. To preserve the current behavior in future
+                versions, `--remote-cache-eager-fetch` should be disabled.
+                """
+            ),
+        )
 
-                    If remote execution is enabled, it will already use remote caching.
-                    """
-                )
-            )
+        # TODO: When this deprecation triggers, the relevant TODO(s) in `context.rs` should be
+        # removed as well.
+        deprecated_conditional(
+            lambda: (
+                opts.remote_execution
+                and (not opts.remote_cache_read or not opts.remote_cache_write)
+            ),
+            removal_version="2.15.0.dev0",
+            entity="Using `--remote-execution` without setting `--remote-cache-read` and `--remote-cache-write`.",
+            hint=softwrap(
+                """
+                Use of `--remote-execution` currently implies use of a remote cache, but in future
+                versions, use of the remote cache with remote execution will be optional. To
+                preserve the current behavior in future versions, both `--remote-cache-read` and
+                `--remote-cache-write` should be enabled.
+                """
+            ),
+        )
 
         if opts.remote_execution and not opts.remote_execution_address:
             raise OptionsError(
