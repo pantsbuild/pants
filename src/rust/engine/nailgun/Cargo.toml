@@ -10,7 +10,8 @@ async_latch = { path = "../async_latch" }
 bytes = "1.0"
 futures = "0.3"
 log = "0.4"
-nails = "0.12"
+# TODO: Stabilize before landing.
+nails = { git = "https://github.com/stuhood/nails.git", rev = "aee6120e2688488bc519dfedb77cc05f704cbc89" }
 os_pipe = "1.0"
 task_executor = { path = "../task_executor" }
 tokio = { version = "1.16", features = ["fs", "io-std", "io-util", "net", "signal", "sync"] }
