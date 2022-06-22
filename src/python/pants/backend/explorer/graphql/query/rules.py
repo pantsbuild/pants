@@ -53,10 +53,10 @@ class RulesQuery:
         name_pattern = query.name_re and re.compile(query.name_re)
         count = 0
         for info in rules:
-            if name_pattern and not re.search(name_pattern, info.name):
-                continue
             if query.limit is not None and count >= query.limit:
                 return
+            if name_pattern and not re.search(name_pattern, info.name):
+                continue
             yield info
             count += 1
 

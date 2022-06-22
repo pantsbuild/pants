@@ -21,6 +21,7 @@ color_output = true
 known_first_party = ["internal_plugins", "pants", "pants_test"]
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 markers = ["platform_specific_behavior"]
 
 [tool.coverage.report]
@@ -67,6 +68,3 @@ module = [
     "setproctitle",
 ]
 ignore_missing_imports = true
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"

@@ -99,10 +99,10 @@ class TargetTypesQuery:
         alias_pattern = query.alias_re and re.compile(query.alias_re)
         count = 0
         for info in target_types:
-            if alias_pattern and not re.match(alias_pattern, info.alias):
-                continue
             if query.limit is not None and count >= query.limit:
                 return
+            if alias_pattern and not re.match(alias_pattern, info.alias):
+                continue
             yield info
             count += 1
 
@@ -134,10 +134,10 @@ class TargetsQuery:
 
         count = 0
         for data in targets:
-            if query.target_type and data.target.alias != query.target_type:
-                continue
             if query.limit is not None and count >= query.limit:
                 return
+            if query.target_type and data.target.alias != query.target_type:
+                continue
             yield data
             count += 1
 
