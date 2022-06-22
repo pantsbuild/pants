@@ -15,12 +15,11 @@ from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
-    AddressFamilyRequest,
     BuildFileOptions,
+    OptionalAddressFamily,
     evaluate_preludes,
     parse_address_family,
 )
-from pants.engine.internals.defaults import BuildFileDefaults
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
@@ -45,16 +44,13 @@ from pants.util.frozendict import FrozenDict
 
 def test_parse_address_family_empty() -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-    af = run_rule_with_mocks(
+    optional_af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
             Parser(build_root="", target_type_aliases=[], object_aliases=BuildFileAliases()),
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict()),
-            AddressFamilyRequest(
-                directory=AddressFamilyDir("/dev/null"),
-                defaults=BuildFileDefaults({}),
-            ),
+            AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
             UnionMembership({}),
         ],
@@ -64,8 +60,17 @@ def test_parse_address_family_empty() -> None:
                 input_type=PathGlobs,
                 mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
             ),
+            MockGet(
+                output_type=OptionalAddressFamily,
+                input_type=AddressFamilyDir,
+                mock=lambda _: OptionalAddressFamily("/dev"),
+            ),
         ],
     )
+    assert optional_af.path == "/dev/null"
+    assert optional_af.address_family is not None
+    af = optional_af.address_family
+    assert af.namespace == "/dev/null"
     assert len(af.name_to_target_adaptors) == 0
 
 
