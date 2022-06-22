@@ -22,8 +22,7 @@ futures = "0.3"
 hashing = { path = "../hashing" }
 libc = "0.2.126"
 log = "0.4"
-# TODO: Stabilize before landing.
-nails = { git = "https://github.com/stuhood/nails.git", rev = "aee6120e2688488bc519dfedb77cc05f704cbc89" }
+nails = "0.13"
 nix = "0.24"
 sha2 = "0.10"
 shell-quote = "0.3.0"
