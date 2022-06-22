@@ -1,6 +1,43 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+"""Default field values per target is set using the `__defaults__` BUILD file symbol, and apply to
+the current subtree.
 
+Default fields and values are validated against their target types, except when provided using the
+`all` keyword, in which case only values for fields applicable to each target is validated.
+
+This means, that it is legal to provide a default value for `all` targets, even if it is only a
+subset of targets that actually supports that particular field.
+
+Examples::
+
+    # src/example/BUILD
+
+    # Provide default `tags` to all targets in this subtree, and skip black, where applicable.
+    __defaults__(all=dict(tags=["example"], skip_black=True))
+
+
+Subdirectories may override defaults from a parent BUILD file:
+
+    # src/example/override/BUILD
+
+    # For `files` and `resources` targets, we to use some other defaults.
+    __defaults__({
+      (files, resources): dict(tags=["example", "overridden"], description="Our assets")
+    })
+
+Use the `extend=True` keyword to update defaults rather than replace them, for any given target.
+
+    # src/example/extend/BUILD
+
+    # Add a default description to all types, in addition to the inherited default tags.
+    __defaults__(extend=True, all=dict(description="Add default description to the defaults."))
+
+To cancel any defaults, simply override with the empty dict:
+
+    # src/example/nodefaults/BUILD
+    __defaults__(all={})
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

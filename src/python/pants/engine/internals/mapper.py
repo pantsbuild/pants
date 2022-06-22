@@ -78,6 +78,7 @@ class AddressFamily:
 
     :param namespace: The namespace path of this address family.
     :param name_to_target_adaptors: A dict mapping from name to the target adaptor.
+    :param defaults: The default target field values, per target type, applicable for this address family.
     """
 
     # The directory from which the adaptors were parsed.
