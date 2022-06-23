@@ -155,6 +155,7 @@ args = ["-i 2", "-ci", "-sr"]
 args = ["--no-header"]
 extra_requirements.add = [
   "ipdb",
+  "pytest-asyncio",
   "pytest-html",
   "pytest-icdiff",
   "pygments",
@@ -210,6 +211,9 @@ scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_pa
 
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
+
+[scala-infer]
+force_add_siblings_as_dependencies = false
 
 [toolchain-setup]
 repo = "pants"

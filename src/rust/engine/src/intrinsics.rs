@@ -179,7 +179,7 @@ fn process_request_to_process_result(
       .map_err(|e| e.enrich("Error lifting Process"))
       .await?;
 
-    let result = context.get(process_request).await?.0;
+    let result = context.get(process_request).await?.result;
 
     let store = context.core.store();
     let (stdout_bytes, stderr_bytes) = try_join!(
