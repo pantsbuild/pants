@@ -165,6 +165,15 @@ prone and hard to maintain. Enter `__defaults__`.
 Default field values per target are set using the `__defaults__` BUILD file symbol, and apply to the
 current subtree.
 
+The defaults are provided as a dictionary mapping targets to the default field values. Multiple
+targets may share the same set of default field values, when grouped together in parenthesis (as a
+Python tuple).
+
+Use the `all` keyword argument to provide default field values that should apply to all targets.
+
+The `extend=True` keyword argument allows to add to any existing default field values set by a
+previous `__defaults__` call rather than replacing them.
+
 Default fields and values are validated against their target types, except when provided using the
 `all` keyword, in which case only values for fields applicable to each target are validated.
 
@@ -194,7 +203,7 @@ Use the `extend=True` keyword to update defaults rather than replace them, for a
     __defaults__(extend=True, all=dict(description="Add default description to the defaults."))
 ```
 
-To cancel any defaults, simply override with the empty dict:
+To reset any modified defaults, simply override with the empty dict:
 
 ```python src/example/nodefaults/BUILD
     __defaults__(all={})
