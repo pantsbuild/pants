@@ -72,7 +72,7 @@ remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
 # See https://github.com/pantsbuild/pants/issues/11331.
-remote_cache_eager_fetch = false
+remote_cache_eager_fetch = true
 
 [anonymous-telemetry]
 enabled = true
