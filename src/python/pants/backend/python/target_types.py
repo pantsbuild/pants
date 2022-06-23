@@ -979,7 +979,12 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = PythonSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (Dependencies, InterpreterConstraintsField)
+    moved_fields = (
+        PythonResolveField,
+        PythonRunGoalUseSandboxField,
+        Dependencies,
+        InterpreterConstraintsField,
+    )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = softwrap(
         """
