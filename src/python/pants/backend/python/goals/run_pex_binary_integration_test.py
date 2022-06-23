@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from textwrap import dedent
 from typing import Optional
 
@@ -33,7 +32,7 @@ def test_run_sample_script(
     entry_point: str,
     execution_mode: Optional[PexExecutionMode],
     include_tools: bool,
-    package_firstparty_args: tuple[str],
+    package_firstparty_args: tuple[str, ...],
 ) -> None:
     """Test that we properly run a `pex_binary` target.
 
@@ -103,8 +102,11 @@ def test_run_sample_script(
     result = run()
     assert "Hola, mundo.\n" in result.stderr
     file = result.stdout.strip()
-    assert file.endswith("src_root2/utils/strutil.py")
-    assert ".pants.d/tmp" in file
+    if package_firstparty_args:
+        assert file.endswith("utils/strutil.py")
+    else:
+        assert file.endswith("src_root2/utils/strutil.py")
+        assert ".pants.d/tmp" in file
     assert result.exit_code == 23
 
     if include_tools:
@@ -115,7 +117,10 @@ def test_run_sample_script(
         assert ("prepend" if execution_mode is PexExecutionMode.VENV else "false") == pex_info[
             "venv_bin_path"
         ]
-        assert pex_info["strip_pex_env"] is False
+        if package_firstparty_args:
+            assert pex_info["strip_pex_env"]
+        else:
+            assert not pex_info["strip_pex_env"]
 
 
 @package_firstparty_args
@@ -155,44 +160,6 @@ def test_no_strip_pex_env_issues_12057(package_firstparty_args: tuple[str, ...])
         ]
         result = run_pants(args)
         assert result.exit_code == 42, result.stderr
-
-
-@package_firstparty_args
-def test_no_leak_pex_root_issues_12055(package_firstparty_args: tuple[str, ...]) -> None:
-    read_config_result = run_pants(["help-all"])
-    read_config_result.assert_success()
-    config_data = json.loads(read_config_result.stdout)
-    global_advanced_options = {
-        option["config_key"]: [
-            ranked_value["value"] for ranked_value in option["value_history"]["ranked_values"]
-        ][-1]
-        for option in config_data["scope_to_help_info"][""]["advanced"]
-    }
-    named_caches_dir = global_advanced_options["named_caches_dir"]
-
-    sources = {
-        "src/app.py": "import os; print(os.environ['PEX_ROOT'])",
-        "src/BUILD": dedent(
-            """\
-            python_sources(name="lib")
-            pex_binary(
-                name="binary",
-                entry_point="app.py"
-            )
-            """
-        ),
-    }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
-            "--backend-packages=pants.backend.python",
-            *package_firstparty_args,
-            f"--source-root-patterns=['/{tmpdir}/src']",
-            "run",
-            f"{tmpdir}/src:binary",
-        ]
-        result = run_pants(args)
-        result.assert_success()
-        assert os.path.join(named_caches_dir, "pex_root") == result.stdout.strip()
 
 
 @package_firstparty_args
