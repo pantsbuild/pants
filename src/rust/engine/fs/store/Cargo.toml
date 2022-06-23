@@ -21,7 +21,7 @@ grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
 http = "0.2"
 http-body = "0.4"
-indexmap = "1.8"
+indexmap = "1.9"
 itertools = "0.10"
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
 log = "0.4"
