@@ -150,8 +150,11 @@ class BuildFileDefaultsParserState:
                                 f"Unrecognized field `{field_alias}` for target {target_type.alias}. "
                                 f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
                             )
+
                 # TODO: moved fields for TargetGenerators ?  See: `Target._calculate_field_values()`.
-                # TODO: support parametrization ?
+
+                # TODO: support parametrization ? --needs special care due to Parametrize object not
+                # being hashable, and thus not acceptable in a FrozenDict instance.
 
                 # Merge all provided defaults for this call.
                 defaults.setdefault(target_type.alias, {}).update(raw_values)
