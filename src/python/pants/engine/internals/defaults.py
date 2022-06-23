@@ -1,42 +1,14 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-"""Default field values per target is set using the `__defaults__` BUILD file symbol, and apply to
-the current subtree.
+"""The `BuildFileDefaultsParserState.set_defaults` is used by the pants.engine.internals.Parser,
+exposed as the `__defaults__` BUILD file symbol.
 
-Default fields and values are validated against their target types, except when provided using the
-`all` keyword, in which case only values for fields applicable to each target is validated.
+When parsing a BUILD (from the rule `pants.engine.internals.build_files.parse_address_family`) the
+defaults from the closest parent BUILD file is passed as input to the parser, and the new defaults
+resulting after the BUILD file have been parsed is returned in the `AddressFamily`.
 
-This means, that it is legal to provide a default value for `all` targets, even if it is only a
-subset of targets that actually supports that particular field.
-
-Examples::
-
-    # src/example/BUILD
-
-    # Provide default `tags` to all targets in this subtree, and skip black, where applicable.
-    __defaults__(all=dict(tags=["example"], skip_black=True))
-
-
-Subdirectories may override defaults from a parent BUILD file:
-
-    # src/example/override/BUILD
-
-    # For `files` and `resources` targets, we want to use some other defaults.
-    __defaults__({
-      (files, resources): dict(tags=["example", "overridden"], description="Our assets")
-    })
-
-Use the `extend=True` keyword to update defaults rather than replace them, for any given target.
-
-    # src/example/extend/BUILD
-
-    # Add a default description to all types, in addition to the inherited default tags.
-    __defaults__(extend=True, all=dict(description="Add default description to the defaults."))
-
-To cancel any defaults, simply override with the empty dict:
-
-    # src/example/nodefaults/BUILD
-    __defaults__(all={})
+These defaults are then applied when creating the `TargetAdaptor` targets by the `Registrar` in the
+parser.
 """
 from __future__ import annotations
 

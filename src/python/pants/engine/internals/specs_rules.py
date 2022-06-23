@@ -118,18 +118,6 @@ async def _determine_literal_addresses_from_raw_specs(
     )
 
 
-def partition_build_file_paths(paths: Paths) -> tuple[set[str], ...]:
-    def path_depth(s: str) -> int:
-        return s.count(os.path.sep)
-
-    return tuple(
-        set(dirnames)  # type: ignore[arg-type]
-        for _, dirnames in itertools.groupby(
-            map(os.path.dirname, sorted(paths.files, key=path_depth)), key=path_depth  # type: ignore[arg-type]
-        )
-    )
-
-
 @rule
 async def addresses_from_raw_specs_without_file_owners(
     specs: RawSpecsWithoutFileOwners,
@@ -160,14 +148,8 @@ async def addresses_from_raw_specs_without_file_owners(
         Get(Paths, PathGlobs, validation_globs),
     )
 
-    # Parse all BUILD files in breadth first order, so all parent files are parsed first to ensure
-    # any `__defaults__(...)` are seen in a correct order for each subtree.
-    partitioned_dirnames = partition_build_file_paths(build_file_paths)
-    address_families: list[AddressFamily] = []
-    for dirnames in partitioned_dirnames:
-        address_families.extend(
-            await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
-        )
+    dirnames = {os.path.dirname(f) for f in build_file_paths.files}
+    address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
     base_addresses = Addresses(
         itertools.chain.from_iterable(
             address_family.addresses_to_target_adaptors for address_family in address_families
