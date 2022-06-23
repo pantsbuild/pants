@@ -42,6 +42,7 @@ use rule_graph::{self, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{
   ArtifactOutput, ObservationMetric, UserMetadataItem, Workunit, WorkunitState, WorkunitStore,
+  WorkunitStoreHandle,
 };
 
 use crate::externs::fs::PyFileDigest;
@@ -73,6 +74,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_class::<PySessionCancellationLatch>()?;
   m.add_class::<PyStdioDestination>()?;
   m.add_class::<PyTasks>()?;
+  m.add_class::<PyThreadLocals>()?;
   m.add_class::<PyTypes>()?;
 
   m.add_class::<externs::PyGeneratorResponseBreak>()?;
@@ -225,7 +227,7 @@ impl PyTypes {
 struct PyScheduler(Scheduler);
 
 #[pyclass]
-struct PyStdioDestination(Arc<stdio::Destination>);
+struct PyStdioDestination(PyThreadLocals);
 
 /// Represents configuration related to process execution strategies.
 ///
@@ -495,6 +497,30 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
         engine_traceback,
       }
     }
+  }
+}
+
+#[pyclass]
+struct PyThreadLocals(Arc<stdio::Destination>, Option<WorkunitStoreHandle>);
+
+impl PyThreadLocals {
+  fn get() -> Self {
+    let stdio_dest = stdio::get_destination();
+    let workunit_store_handle = workunit_store::get_workunit_store_handle();
+    Self(stdio_dest, workunit_store_handle)
+  }
+}
+
+#[pymethods]
+impl PyThreadLocals {
+  #[classmethod]
+  fn get_for_current_thread(_cls: &PyType) -> Self {
+    Self::get()
+  }
+
+  fn set_for_current_thread(&self) {
+    stdio::set_thread_destination(self.0.clone());
+    workunit_store::set_thread_workunit_store_handle(self.1.clone());
   }
 }
 
@@ -1643,15 +1669,18 @@ fn stdio_thread_console_clear() {
   stdio::get_destination().console_clear();
 }
 
+// TODO: Deprecated, but without easy access to the decorator. Use
+// `PyThreadLocals::get_for_current_thread` instead. Remove in Pants 2.17.0.dev0.
 #[pyfunction]
 fn stdio_thread_get_destination() -> PyStdioDestination {
-  let dest = stdio::get_destination();
-  PyStdioDestination(dest)
+  PyStdioDestination(PyThreadLocals::get())
 }
 
+// TODO: Deprecated, but without easy access to the decorator. Use
+// `PyThreadLocals::set_for_current_thread` instead. Remove in Pants 2.17.0.dev0.
 #[pyfunction]
 fn stdio_thread_set_destination(stdio_destination: &PyStdioDestination) {
-  stdio::set_thread_destination(stdio_destination.0.clone());
+  stdio_destination.0.set_for_current_thread();
 }
 
 // TODO: Needs to be thread-local / associated with the Console.

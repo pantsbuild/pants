@@ -12,7 +12,7 @@ from typing import Any, Callable, Iterable, Sequence, Tuple
 from pants.base.specs import Specs
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DigestContents, FileDigest, Snapshot
-from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import PyThreadLocals
 from pants.engine.internals.scheduler import SchedulerSession, Workunit
 from pants.engine.internals.selectors import Params
 from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
@@ -28,6 +28,24 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 # Streaming workunits plugin API
 # -----------------------------------------------------------------------------------------------
+
+
+def thread_locals_get_for_current_thread() -> PyThreadLocals:
+    """Gets the engine's thread local state for the current thread.
+
+    In order to safely use StreamingWorkunitContext methods from additional threads,
+    StreamingWorkunit plugins should propagate thread local state from the threads that they are
+    initialized on to any additional threads that they spawn.
+    """
+    return PyThreadLocals.get_for_current_thread()
+
+
+def thread_locals_set_for_current_thread(thread_locals: PyThreadLocals) -> None:
+    """Sets the engine's thread local state for the current thread.
+
+    See `thread_locals_get`.
+    """
+    thread_locals.set_for_current_thread()
 
 
 @dataclass(frozen=True)
@@ -246,9 +264,9 @@ class _InnerHandler(threading.Thread):
         self.block_until_complete = not allow_async_completion or any(
             callback.can_finish_async is False for callback in self.callbacks
         )
-        # Get the parent thread's logging destination. Note that this thread has not yet started
+        # Get the parent thread's thread locals. Note that this thread has not yet started
         # as we are only in the constructor.
-        self.logging_destination = native_engine.stdio_thread_get_destination()
+        self.thread_locals = PyThreadLocals.get_for_current_thread()
 
     def poll_workunits(self, *, finished: bool) -> None:
         workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
@@ -261,8 +279,9 @@ class _InnerHandler(threading.Thread):
             )
 
     def run(self) -> None:
-        # First, set the thread's logging destination to the parent thread's, meaning the console.
-        native_engine.stdio_thread_set_destination(self.logging_destination)
+        # First, set the thread's thread locals to the parent thread's in order to propagate the
+        # console, workunit stores, etc.
+        self.thread_locals.set_for_current_thread()
         while not self.stop_request.isSet():  # type: ignore[attr-defined]
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
