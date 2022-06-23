@@ -15,6 +15,7 @@ from typing import Any, Iterable
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -35,10 +36,12 @@ class UnaddressableObjectError(MappingError):
 
 class ParseState(threading.local):
     def __init__(self):
+        self._defaults: BuildFileDefaultsParserState | None = None
         self._rel_path: str | None = None
         self._target_adapters: list[TargetAdaptor] = []
 
-    def reset(self, rel_path: str) -> None:
+    def reset(self, rel_path: str, defaults: BuildFileDefaultsParserState) -> None:
+        self._defaults = defaults
         self._rel_path = rel_path
         self._target_adapters.clear()
 
@@ -56,6 +59,19 @@ class ParseState(threading.local):
 
     def parsed_targets(self) -> list[TargetAdaptor]:
         return list(self._target_adapters)
+
+    @property
+    def defaults(self) -> BuildFileDefaultsParserState:
+        if self._defaults is None:
+            raise AssertionError(
+                "The BUILD file __defaults__ was accessed before being set. This indicates a "
+                "programming error in Pants. Please file a bug report at "
+                "https://github.com/pantsbuild/pants/issues/new."
+            )
+        return self._defaults
+
+    def set_defaults(self, *args: SetDefaultsT, **kwargs) -> None:
+        self.defaults.set_defaults(*args, **kwargs)
 
 
 class Parser:
@@ -85,6 +101,14 @@ class Parser:
             def __init__(self, type_alias: str) -> None:
                 self._type_alias = type_alias
 
+            def __str__(self) -> str:
+                """The BuildFileDefaultsParserState.set_defaults() rely on string inputs.
+
+                This allows the use of the BUILD file symbols for the target types to be used un-
+                quoted for the defaults dictionary.
+                """
+                return self._type_alias
+
             def __call__(self, **kwargs: Any) -> TargetAdaptor:
                 # Target names default to the name of the directory their BUILD file is in
                 # (as long as it's not the root directory).
@@ -94,13 +118,17 @@ class Parser:
                             "Targets in root-level BUILD files must be named explicitly."
                         )
                     kwargs["name"] = None
-                target_adaptor = TargetAdaptor(self._type_alias, **kwargs)
+
+                raw_values = dict(parse_state.defaults.get(self._type_alias))
+                raw_values.update(kwargs)
+                target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
                 parse_state.add(target_adaptor)
                 return target_adaptor
 
         symbols: dict[str, Any] = {
             **object_aliases.objects,
             "build_file_dir": lambda: PurePath(parse_state.rel_path()),
+            "__defaults__": parse_state.set_defaults,
         }
         symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 
@@ -113,9 +141,13 @@ class Parser:
         return symbols, parse_state
 
     def parse(
-        self, filepath: str, build_file_content: str, extra_symbols: BuildFilePreludeSymbols
+        self,
+        filepath: str,
+        build_file_content: str,
+        extra_symbols: BuildFilePreludeSymbols,
+        defaults: BuildFileDefaultsParserState,
     ) -> list[TargetAdaptor]:
-        self._parse_state.reset(rel_path=os.path.dirname(filepath))
+        self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
 
         # We update the known symbols with Build File Preludes. This is subtle code; functions have
         # their own globals set on __globals__ which they derive from the environment where they
