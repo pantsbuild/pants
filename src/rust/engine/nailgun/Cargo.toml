@@ -10,7 +10,7 @@ async_latch = { path = "../async_latch" }
 bytes = "1.0"
 futures = "0.3"
 log = "0.4"
-nails = "0.12"
+nails = "0.13"
 os_pipe = "1.0"
 task_executor = { path = "../task_executor" }
 tokio = { version = "1.16", features = ["fs", "io-std", "io-util", "net", "signal", "sync"] }
