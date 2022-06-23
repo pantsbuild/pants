@@ -135,16 +135,11 @@ class BuildFileDefaultsParserState:
                 raw_values = dict(default) if ignore_unknown_fields else default
 
                 # Validate that field exists on target
-                target_fields = target_type.class_field_types(self.union_membership)
-                valid_field_aliases = set()
-
-                # TODO: this valid aliases calculation is done every time a target is instantiated
-                # as well. But it should be enough to do once, and re-use as it doesn't change
-                # during a run.
-                for fld in target_fields:
-                    valid_field_aliases.add(fld.alias)
-                    if fld.deprecated_alias is not None:
-                        valid_field_aliases.add(fld.deprecated_alias)
+                valid_field_aliases = set(
+                    target_type._get_field_aliases_to_field_types(
+                        target_type.class_field_types(self.union_membership)
+                    ).keys()
+                )
 
                 for field_alias in default.keys():
                     if field_alias not in valid_field_aliases:
