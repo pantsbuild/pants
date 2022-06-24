@@ -210,10 +210,11 @@ async def update_build_files(
 
                 In Pants 2.14, you must use CLI arguments. Use:
 
-                  * `::` to run on everything
-                  * `dir::` to run on `dir` and subdirs
-                  * `dir` to run on `dir`
-                  * `dir/BUILD` to run on that single BUILD file
+                  * `{bin_name()} update-build-files ::` to run on everything
+                  * `{bin_name()} update-build-files dir::` to run on `dir` and subdirs
+                  * `{bin_name()} update-build-files dir` to run on `dir`
+                  * `{bin_name()} update-build-files dir/BUILD` to run on that single BUILD file
+                  * `{bin_name()} --changed-since=HEAD update-build-files` to run only on changed BUILD files
                 """
             ),
         )

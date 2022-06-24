@@ -28,7 +28,7 @@ from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.testutil import (
     RenderedClasspath,
@@ -115,7 +115,7 @@ def test_compile_no_deps(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": "java_sources(name='lib')",
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
@@ -155,7 +155,7 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_SOURCE,
         }
     )
@@ -190,7 +190,7 @@ def test_compile_jdk_specified_in_build_file(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
         }
     )
@@ -219,7 +219,7 @@ def test_compile_jdk_12_file_fails_with_jdk_11(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_JDK12_SOURCE,
         }
     )
@@ -246,7 +246,7 @@ def test_compile_multiple_source_files(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "ExampleLib.java": JAVA_LIB_SOURCE,
             "OtherLib.java": dedent(
                 """\
@@ -324,7 +324,7 @@ def test_compile_with_cycle(rule_runner: RuleRunner) -> None:
                 """\
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "a/BUILD": dedent(
                 """\
                 java_sources(
@@ -410,7 +410,7 @@ def test_compile_with_transitive_cycle(rule_runner: RuleRunner) -> None:
                 public class Main implements A {}
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "a/BUILD": dedent(
                 """\
                 java_sources(
@@ -494,7 +494,7 @@ def test_compile_with_transitive_multiple_sources(rule_runner: RuleRunner) -> No
                 class Other implements B {}
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "lib/BUILD": dedent(
                 """\
                 java_sources(
@@ -553,7 +553,7 @@ def test_compile_with_deps(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "Example.java": JAVA_LIB_MAIN_SOURCE,
             "lib/BUILD": dedent(
                 """\
@@ -594,7 +594,7 @@ def test_compile_of_package_info(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "package-info.java": dedent(
                 """
                 package org.pantsbuild.example;
@@ -633,7 +633,7 @@ def test_compile_with_missing_dep_fails(rule_runner: RuleRunner) -> None:
                 """
             ),
             "Example.java": JAVA_LIB_MAIN_SOURCE,
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
         }
     )
     request = CompileJavaSourceRequest(
@@ -718,7 +718,7 @@ def test_compile_with_missing_maven_dep_fails(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(entries=()).serialize(),
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
             "Example.java": dedent(
                 """
                 package org.pantsbuild.example;
