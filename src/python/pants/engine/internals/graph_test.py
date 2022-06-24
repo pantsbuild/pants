@@ -1936,7 +1936,7 @@ def test_resolve_unparsed_address_inputs() -> None:
                     UnparsedAddressInputs(
                         addresses,
                         owning_address=Address("project", target_name="t3"),
-                        description_of_origin="tests",
+                        description_of_origin="from my tests",
                         skip_invalid_addresses=skip_invalid_addresses,
                     )
                 ],
@@ -1948,5 +1948,5 @@ def test_resolve_unparsed_address_inputs() -> None:
 
     invalid_addresses = ["project:t1", "bad::", "project/fake.txt:tgt"]
     assert resolve(invalid_addresses, skip_invalid_addresses=True) == {t1}
-    with engine_error(AddressParseException):
+    with engine_error(AddressParseException, contains="from my tests"):
         resolve(invalid_addresses)
