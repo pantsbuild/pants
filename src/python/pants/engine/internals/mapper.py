@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os.path
-import re
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
@@ -171,7 +170,6 @@ class SpecsFilter:
     is_specified: bool
     filter_subsystem_filter: TargetFilter
     tags_filter: TargetFilter
-    exclude_target_regexps_filter: TargetFilter
 
     @classmethod
     def create(
@@ -180,13 +178,7 @@ class SpecsFilter:
         registered_target_types: RegisteredTargetTypes,
         *,
         tags: Iterable[str],
-        exclude_target_regexps: Iterable[str],
     ) -> SpecsFilter:
-        exclude_patterns = tuple(re.compile(pattern) for pattern in exclude_target_regexps)
-
-        def exclude_target_regexps_filter(tgt: Target) -> bool:
-            return all(p.search(tgt.address.spec) is None for p in exclude_patterns)
-
         def tags_outer_filter(tag: str) -> TargetFilter:
             def tags_inner_filter(tgt: Target) -> bool:
                 return tag in (tgt.get(Tags).value or [])
@@ -196,17 +188,12 @@ class SpecsFilter:
         tags_filter = and_filters(create_filters(tags, tags_outer_filter))
 
         return SpecsFilter(
-            is_specified=bool(filter_subsystem.is_specified() or tags or exclude_target_regexps),
+            is_specified=bool(filter_subsystem.is_specified() or tags),
             filter_subsystem_filter=filter_subsystem.all_filters(registered_target_types),
             tags_filter=tags_filter,
-            exclude_target_regexps_filter=exclude_target_regexps_filter,
         )
 
     def matches(self, target: Target) -> bool:
         """Check that the target matches the provided `--tag` and `--exclude-target-regexp`
         options."""
-        return (
-            self.tags_filter(target)
-            and self.filter_subsystem_filter(target)
-            and self.exclude_target_regexps_filter(target)
-        )
+        return self.tags_filter(target) and self.filter_subsystem_filter(target)

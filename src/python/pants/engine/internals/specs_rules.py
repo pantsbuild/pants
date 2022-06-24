@@ -271,12 +271,7 @@ def setup_specs_filter(
     filter_subsystem: FilterSubsystem,
     registered_target_types: RegisteredTargetTypes,
 ) -> SpecsFilter:
-    return SpecsFilter.create(
-        filter_subsystem,
-        registered_target_types,
-        tags=global_options.tag,
-        exclude_target_regexps=global_options.exclude_target_regexp,
-    )
+    return SpecsFilter.create(filter_subsystem, registered_target_types, tags=global_options.tag)
 
 
 # -----------------------------------------------------------------------------------------------
