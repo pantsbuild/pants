@@ -613,6 +613,7 @@ def specs_to_dirs(specs: RawSpecs) -> tuple[str, ...]:
                   * `{bin_name()} tailor ::` to run on everything
                   * `{bin_name()} tailor dir::` to run on `dir` and subdirs
                   * `{bin_name()} tailor dir` to run on `dir`
+                  * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
                 """
             )
         )
@@ -654,6 +655,7 @@ async def tailor(
                   * `{bin_name()} tailor ::` to run on everything
                   * `{bin_name()} tailor dir::` to run on `dir` and subdirs
                   * `{bin_name()} tailor dir` to run on `dir`
+                  * `{bin_name()} --changed-since=HEAD tailor` to only run on changed and new files
                 """
             ),
         )
