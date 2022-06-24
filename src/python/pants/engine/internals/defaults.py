@@ -16,7 +16,14 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Tuple, Union
 
 from pants.engine.addresses import Address
-from pants.engine.target import ImmutableValue, InvalidFieldException, RegisteredTargetTypes
+from pants.engine.target import (
+    Field,
+    ImmutableValue,
+    InvalidFieldException,
+    RegisteredTargetTypes,
+    Target,
+    TargetGenerator,
+)
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
 
@@ -61,9 +68,7 @@ class BuildFileDefaultsParserState:
                             raw_value=default, address=self.address
                         )
                         for field_alias, default in fields.items()
-                        for field_type in types[target_alias].class_field_types(
-                            self.union_membership
-                        )
+                        for field_type in self._target_type_field_types(types[target_alias])
                         if field_alias in (field_type.alias, field_type.deprecated_alias)
                     }
                 )
@@ -103,6 +108,12 @@ class BuildFileDefaultsParserState:
             else:
                 self.defaults[tgt] = default
 
+    def _target_type_field_types(self, target_type: type[Target]) -> tuple[type[Field], ...]:
+        return (
+            *target_type.class_field_types(self.union_membership),
+            *(target_type.moved_fields if issubclass(target_type, TargetGenerator) else ()),
+        )
+
     def _process_defaults(
         self,
         defaults: dict[str, dict[str, Any]],
@@ -137,7 +148,7 @@ class BuildFileDefaultsParserState:
                 # Validate that field exists on target
                 valid_field_aliases = set(
                     target_type._get_field_aliases_to_field_types(
-                        target_type.class_field_types(self.union_membership)
+                        self._target_type_field_types(target_type)
                     ).keys()
                 )
 
@@ -150,8 +161,6 @@ class BuildFileDefaultsParserState:
                                 f"Unrecognized field `{field_alias}` for target {target_type.alias}. "
                                 f"Valid fields are: {', '.join(sorted(valid_field_aliases))}.",
                             )
-
-                # TODO: moved fields for TargetGenerators ?  See: `Target._calculate_field_values()`.
 
                 # TODO: support parametrization ? --needs special care due to Parametrize object not
                 # being hashable, and thus not acceptable in a FrozenDict instance.

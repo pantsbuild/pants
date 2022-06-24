@@ -9,7 +9,13 @@ import pytest
 
 from pants.core.target_types import GenericTarget
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
-from pants.engine.target import InvalidFieldException, RegisteredTargetTypes
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    Dependencies,
+    InvalidFieldException,
+    RegisteredTargetTypes,
+    TargetGenerator,
+)
 from pants.engine.unions import UnionMembership
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
@@ -23,10 +29,31 @@ class Test2Target(GenericTarget):
     alias = "test_type_2"
 
 
+class TestGenTarget(GenericTarget):
+    alias = "test_gen"
+
+
+class TestGenTargetGenerator(TargetGenerator):
+    alias = "test_gen_targets"
+    generated_target_cls = TestGenTarget
+    core_fields = COMMON_TARGET_FIELDS
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (Dependencies,)
+
+
 @pytest.fixture
 def registered_target_types() -> RegisteredTargetTypes:
     return RegisteredTargetTypes(
-        {tgt.alias: tgt for tgt in (GenericTarget, Test1Target, Test2Target)}
+        {
+            tgt.alias: tgt
+            for tgt in (
+                GenericTarget,
+                Test1Target,
+                Test2Target,
+                TestGenTarget,
+                TestGenTargetGenerator,
+            )
+        }
     )
 
 
@@ -78,6 +105,12 @@ Scenario = namedtuple(
                         "tags": ("tagged-2",),
                     },
                     "test_type_2": {
+                        "tags": ("tagged-2",),
+                    },
+                    "test_gen": {
+                        "tags": ("tagged-2",),
+                    },
+                    "test_gen_targets": {
                         "tags": ("tagged-2",),
                     },
                 },
@@ -183,6 +216,13 @@ Scenario = namedtuple(
                 expected_defaults={},
             ),
             id="reset default",
+        ),
+        pytest.param(
+            Scenario(
+                args=({TestGenTargetGenerator.alias: {Dependencies.alias: ["some/dep"]}},),
+                expected_defaults={"test_gen_targets": {"dependencies": ("some/dep",)}},
+            ),
+            id="default value for moved field",
         ),
     ],
 )
