@@ -204,11 +204,17 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
     )
     if not all_go_binary_paths.paths:
         raise BinaryNotFoundError(
-            "Cannot find any `go` binaries using the option "
-            f"`[golang].go_search_paths`: {list(search_paths)}\n\n"
-            "To fix, please install Go (https://golang.org/doc/install) with the version "
-            f"{golang_subsystem.expected_version} (set by `[golang].expected_version`) and ensure "
-            "that it is discoverable via `[golang].go_search_paths`."
+            softwrap(
+                f"""
+                Cannot find any `go` binaries using the option `[golang].go_search_paths`:
+                {list(search_paths)}
+
+                To fix, please install Go (https://golang.org/doc/install) with the version
+                {golang_subsystem.minimum_version} or newer (set by
+                `[golang].minimum_expected_version`). Then ensure that it is discoverable via
+                `[golang].go_search_paths`.
+                """
+            )
         )
 
     # `go env GOVERSION` does not work in earlier Go versions (like 1.15), so we must run
@@ -226,8 +232,6 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
         for binary_path in all_go_binary_paths.paths
     )
 
-    using_exact_match = not golang_subsystem.options.is_default("expected_version")
-
     invalid_versions = []
     for binary_path, version_result in zip(all_go_binary_paths.paths, version_results):
         try:
@@ -244,14 +248,9 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
                 f"{version_result}"
             )
 
-        is_match = (
-            golang_subsystem.expected_version == version
-            if using_exact_match
-            else compatible_go_version(
-                compiler_version=version, target_version=golang_subsystem.minimum_version
-            )
-        )
-        if is_match:
+        if compatible_go_version(
+            compiler_version=version, target_version=golang_subsystem.minimum_version
+        ):
             env_result = await Get(
                 ProcessResult,
                 Process(
@@ -267,41 +266,19 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
                 path=sdk_metadata["GOROOT"], version=version, _raw_metadata=FrozenDict(sdk_metadata)
             )
 
-        if using_exact_match:
-            logger.debug(
-                f"Go binary at {binary_path.path} has version {version}, but this "
-                f"project is using {golang_subsystem.expected_version} "
-                "(set by `[golang].expected_version`). Ignoring."
-            )
-        else:
-            logger.debug(
-                f"Go binary at {binary_path.path} has version {version}, but this "
-                f"repository expects at least {golang_subsystem.expected_version} "
-                "(set by `[golang].expected_minimum_version`). Ignoring."
-            )
+        logger.debug(
+            f"Go binary at {binary_path.path} has version {version}, but this "
+            f"repository expects at least {golang_subsystem.expected_version} "
+            "(set by `[golang].expected_minimum_version`). Ignoring."
+        )
 
         invalid_versions.append((binary_path.path, version))
 
     invalid_versions_str = bullet_list(
         f"{path}: {version}" for path, version in sorted(invalid_versions)
     )
-    if using_exact_match:
-        err = softwrap(
-            f"""
-            Cannot find a `go` binary with the expected version of
-            {golang_subsystem.expected_version} (set by `[golang].expected_version`).
-
-            Found these `go` binaries, but they had different versions:
-
-            {invalid_versions_str}
-
-            To fix, please install the expected version (https://golang.org/doc/install)
-            and ensure that it is discoverable via the option `[golang].go_search_paths`, or change
-            `[golang].expected_version`.
-            """
-        )
-    else:
-        err = softwrap(
+    raise BinaryNotFoundError(
+        softwrap(
             f"""
             Cannot find a `go` binary compatible with the minimum version of
             {golang_subsystem.minimum_version} (set by `[golang].minimum_expected_version`).
@@ -315,7 +292,7 @@ async def setup_goroot(golang_subsystem: GolangSubsystem) -> GoRoot:
             `[golang].expected_minimum_version`.
             """
         )
-    raise BinaryNotFoundError(err)
+    )
 
 
 def rules():
