@@ -606,13 +606,13 @@ def specs_to_dirs(specs: RawSpecs) -> tuple[str, ...]:
                 recursively on. You specified {', '.join(str(spec) for spec in other_specs)}
 
                 To fix, either set `use_deprecated_cli_args_semantics` to false, or rerun with
-                specifying only literal directories, e.g. `tailor dir1 dir2`. If changing
-                `use_deprecated_cli_args_semantics` to false, you should specify which directories
-                to run on when using `tailor`:
+                specifying only literal directories, e.g. `{bin_name()} tailor dir1 dir2`. If
+                changing `use_deprecated_cli_args_semantics` to false, you should specify which
+                directories to run on when using `tailor`:
 
-                  * `::` to run on everything
-                  * `dir::` to run on `dir` and subdirs
-                  * `dir` to run on `dir`
+                  * `{bin_name()} tailor ::` to run on everything
+                  * `{bin_name()} tailor dir::` to run on `dir` and subdirs
+                  * `{bin_name()} tailor dir` to run on `dir`
                 """
             )
         )
@@ -651,9 +651,9 @@ async def tailor(
 
                 In Pants 2.14, you must use CLI arguments. Use:
 
-                  * `::` to run on everything
-                  * `dir::` to run on `dir` and subdirs
-                  * `dir` to run on `dir`
+                  * `{bin_name()} tailor ::` to run on everything
+                  * `{bin_name()} tailor dir::` to run on `dir` and subdirs
+                  * `{bin_name()} tailor dir` to run on `dir`
                 """
             ),
         )
