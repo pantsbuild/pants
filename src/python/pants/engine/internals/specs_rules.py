@@ -8,7 +8,6 @@ import itertools
 import logging
 import os
 from collections import defaultdict
-from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
@@ -17,7 +16,6 @@ from pants.base.specs import (
     AncestorGlobSpec,
     DirGlobSpec,
     DirLiteralSpec,
-    FileLiteralSpec,
     RawSpecs,
     RawSpecsWithOnlyFileOwners,
     RawSpecsWithoutFileOwners,
@@ -27,7 +25,7 @@ from pants.base.specs import (
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.fs import PathGlobs, Paths, SpecsPaths
 from pants.engine.internals.build_files import AddressFamilyDir, BuildFileOptions
-from pants.engine.internals.graph import Owners, OwnersRequest, _log_or_raise_unmatched_owners
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.mapper import AddressFamily, SpecsFilter
 from pants.engine.internals.parametrize import (
     _TargetParametrizations,
@@ -54,7 +52,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
+from pants.option.global_options import GlobalOptions
 from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -196,40 +194,19 @@ async def addresses_from_raw_specs_without_file_owners(
 
 
 @rule
-def extract_owners_not_found_behavior(global_options: GlobalOptions) -> OwnersNotFoundBehavior:
-    return global_options.owners_not_found_behavior
-
-
-@rule
 async def addresses_from_raw_specs_with_only_file_owners(
-    specs: RawSpecsWithOnlyFileOwners, owners_not_found_behavior: OwnersNotFoundBehavior
+    specs: RawSpecsWithOnlyFileOwners,
 ) -> Addresses:
     """Find the owner(s) for each spec."""
     paths_per_include = await MultiGet(
         Get(Paths, PathGlobs, specs.path_globs_for_spec(spec)) for spec in specs.all_specs()
     )
-    owners_per_include = await MultiGet(
-        Get(
-            Owners,
-            OwnersRequest(paths.files, filter_by_global_options=specs.filter_by_global_options),
-        )
-        for paths in paths_per_include
+    all_files = tuple(itertools.chain.from_iterable(paths.files for paths in paths_per_include))
+    owners = await Get(
+        Owners,
+        OwnersRequest(all_files, filter_by_global_options=specs.filter_by_global_options),
     )
-    addresses: set[Address] = set()
-    for spec, owners in zip(specs.all_specs(), owners_per_include):
-        if (
-            not specs.from_change_detection
-            and owners_not_found_behavior != OwnersNotFoundBehavior.ignore
-            and isinstance(spec, FileLiteralSpec)
-            and not owners
-        ):
-            _log_or_raise_unmatched_owners(
-                [PurePath(str(spec))],
-                owners_not_found_behavior,
-                ignore_option="--owners-not-found-behavior=ignore",
-            )
-        addresses.update(owners)
-    return Addresses(sorted(addresses))
+    return Addresses(sorted(owners))
 
 
 # -----------------------------------------------------------------------------------------------
