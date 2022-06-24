@@ -22,7 +22,7 @@ use remexec::{
   ServerCapabilities,
 };
 use tonic::{Code, Request, Status};
-use workunit_store::{in_workunit, Metric, ObservationMetric};
+use workunit_store::{in_workunit, ObservationMetric};
 
 use crate::StoreError;
 
@@ -324,7 +324,7 @@ impl ByteStore {
       |workunit| async move {
         let result = result_future.await;
         if result.is_ok() {
-          workunit.increment_counter(Metric::RemoteStoreBlobBytesUploaded, len as u64);
+          workunit.record_observation(ObservationMetric::RemoteStoreBlobBytesUploaded, len as u64);
         }
         result
       },
@@ -356,7 +356,7 @@ impl ByteStore {
     let mut client = self.byte_stream_client.as_ref().clone();
 
     let result_future = async move {
-      let start_time = Instant::now();
+      let mut start_opt = Some(Instant::now());
 
       let stream_result = client
         .read({
@@ -380,22 +380,17 @@ impl ByteStore {
       };
 
       let read_result_closure = async {
-        let mut got_first_response = false;
         let mut buf = BytesMut::with_capacity(digest.size_bytes);
         while let Some(response) = stream.next().await {
           // Record the observed time to receive the first response for this read.
-          if !got_first_response {
-            got_first_response = true;
-
+          if let Some(start) = start_opt.take() {
             if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-              let timing: Result<u64, _> = Instant::now()
-                .duration_since(start_time)
-                .as_micros()
-                .try_into();
+              let timing: Result<u64, _> =
+                Instant::now().duration_since(start).as_micros().try_into();
               if let Ok(obs) = timing {
                 workunit_store_handle
                   .store
-                  .record_observation(ObservationMetric::RemoteStoreTimeToFirstByte, obs);
+                  .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
               }
             }
           }
@@ -429,14 +424,14 @@ impl ByteStore {
       Level::Trace,
       desc = Some(workunit_desc),
       |workunit| async move {
+        let result = result_future.await;
         workunit.record_observation(
           ObservationMetric::RemoteStoreReadBlobTimeMicros,
           start.elapsed().as_micros() as u64,
         );
-        let result = result_future.await;
         if result.is_ok() {
-          workunit.increment_counter(
-            Metric::RemoteStoreBlobBytesDownloaded,
+          workunit.record_observation(
+            ObservationMetric::RemoteStoreBlobBytesDownloaded,
             digest.size_bytes as u64,
           );
         }
