@@ -42,7 +42,8 @@ class DebugPy(PythonToolBase):
     def main_spec_args(self, value: EntryPoint | ConsoleScript) -> tuple[str, ...]:
         return (
             "-c",
-            # NB: Use PEX itself to execute the value
+            # NB: Use PEX itself to execute the value, since it already has code which can handle
+            # the possible cases
             (
                 "import os;"
                 + "from pex.pex import PEX;"
