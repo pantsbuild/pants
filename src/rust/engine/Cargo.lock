@@ -1677,9 +1677,9 @@ dependencies = [
 
 [[package]]
 name = "nails"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d51ec690ac20be76e55d6939fa43309c3a6e3d5dd1eb2200c8fe27a087d5c92"
+checksum = "3e5154dfd88b8bfac6aaee04a7063673c2e6da2a13ed18e8ce545ad7a847b82f"
 dependencies = [
  "byteorder",
  "bytes",
