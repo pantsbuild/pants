@@ -321,49 +321,6 @@ def test_raw_specs_without_file_owners_filter_by_tag(rule_runner: RuleRunner) ->
     assert literals_result == all_integration_tgts
 
 
-def test_raw_specs_without_file_owners_filter_by_exclude_pattern(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--exclude-target-regexp=exclude_me.*"])
-    rule_runner.write_files(
-        {
-            "demo/f.txt": "",
-            "demo/BUILD": dedent(
-                """\
-                file_generator(name="exclude_me_f", sources=["f.txt"])
-                file_generator(name="not_me_f", sources=["f.txt"])
-
-                nonfile_generator(name="exclude_me_nf")
-                nonfile_generator(name="not_me_nf")
-                """
-            ),
-        }
-    )
-    not_me_tgts = [
-        Address("demo", target_name="not_me_f"),
-        Address("demo", target_name="not_me_nf"),
-        Address("demo", target_name="not_me_nf", generated_name="gen"),
-        Address("demo", target_name="not_me_f", relative_file_path="f.txt"),
-    ]
-
-    assert resolve_raw_specs_without_file_owners(rule_runner, [DirGlobSpec("demo")]) == not_me_tgts
-
-    # The same filtering should work when given literal addresses, including generated targets and
-    # file addresses.
-    literals_result = resolve_raw_specs_without_file_owners(
-        rule_runner,
-        [
-            AddressLiteralSpec("demo", "exclude_me_f"),
-            AddressLiteralSpec("demo", "exclude_me_nf"),
-            AddressLiteralSpec("demo", "not_me_f"),
-            AddressLiteralSpec("demo", "not_me_nf"),
-            AddressLiteralSpec("demo", "exclude_me_nf", "gen"),
-            AddressLiteralSpec("demo", "not_me_nf", "gen"),
-            AddressLiteralSpec("demo/f.txt", "exclude_me_f"),
-            AddressLiteralSpec("demo/f.txt", "not_me_f"),
-        ],
-    )
-    assert literals_result == not_me_tgts
-
-
 def test_raw_specs_without_file_owners_do_not_exist(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {"real/f.txt": "", "real/BUILD": "target(sources=['f.txt'])", "empty/BUILD": "# empty"}
@@ -606,13 +563,12 @@ def test_raw_specs_with_only_file_owners_glob(rule_runner: RuleRunner) -> None:
                 file_generator(name='generator', sources=['*.txt'])
                 nonfile_generator(name='nonfile')
                 target(name='not-generator', sources=['*.txt'])
-                target(name='skip-me', sources=['*.txt'])
                 target(name='bad-tag', sources=['*.txt'], tags=['skip'])
                 """
             ),
         }
     )
-    rule_runner.set_options(["--tag=-skip", "--exclude-target-regexp=skip-me"])
+    rule_runner.set_options(["--tag=-skip"])
     all_unskipped_addresses = [
         Address("demo", target_name="not-generator"),
         Address("demo", target_name="generator", relative_file_path="f1.txt"),
@@ -639,20 +595,6 @@ def test_raw_specs_with_only_file_owners_nonexistent_file(rule_runner: RuleRunne
         resolve_raw_specs_with_only_file_owners(rule_runner, [spec])
 
     assert not resolve_raw_specs_with_only_file_owners(rule_runner, [spec], ignore_nonexistent=True)
-
-
-def test_raw_specs_with_only_file_owners_no_owner(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(["--owners-not-found-behavior=error"])
-    rule_runner.write_files({"no_owners/f.txt": ""})
-    # Error for literal specs.
-    with pytest.raises(ExecutionError) as exc:
-        resolve_raw_specs_with_only_file_owners(rule_runner, [FileLiteralSpec("no_owners/f.txt")])
-    assert "No owning targets could be found for the file `no_owners/f.txt`" in str(exc.value)
-
-    # Do not error for glob specs.
-    assert not resolve_raw_specs_with_only_file_owners(
-        rule_runner, [FileGlobSpec("no_owners/*.txt")]
-    )
 
 
 # -----------------------------------------------------------------------------------------------

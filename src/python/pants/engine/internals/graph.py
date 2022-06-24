@@ -9,9 +9,9 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence, cast
+from typing import Iterable, NamedTuple, Sequence
 
-from pants.base.deprecated import resolve_conflicting_options, warn_or_error
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
 from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.engine.addresses import (
@@ -830,17 +830,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 def extract_unmatched_build_file_globs(
     global_options: GlobalOptions,
 ) -> UnmatchedBuildFileGlobs:
-    return cast(
-        UnmatchedBuildFileGlobs,
-        resolve_conflicting_options(
-            old_option="files_not_found_behavior",
-            new_option="unmatched_build_file_globs",
-            old_scope=global_options.options_scope,
-            new_scope=global_options.options_scope,
-            old_container=global_options.options,
-            new_container=global_options.options,
-        ),
-    )
+    return global_options.unmatched_build_file_globs
 
 
 class AmbiguousCodegenImplementationsException(Exception):

@@ -161,7 +161,6 @@ def test_specs_filter() -> None:
         ),
         RegisteredTargetTypes({"tgt1": MockTgt1, "tgt2": MockTgt2}),
         tags=["-a", "+b"],
-        exclude_target_regexps=["skip-me"],
     )
 
     def make_tgt1(name: str, tags: list[str] | None = None) -> MockTgt1:
@@ -171,9 +170,7 @@ def test_specs_filter() -> None:
         return MockTgt2({Tags.alias: tags}, Address("", target_name=name))
 
     untagged_tgt = make_tgt1(name="untagged")
-    b_tagged_tgt = make_tgt1(name="b-tagged", tags=["b"])
-    b_tagged_exclude_regex_tgt = make_tgt1(name="skip-me", tags=["b"])
-    a_and_b_tagged_tgt = make_tgt1(name="a-and-b-tagged", tags=["a", "b"])
+    tagged_tgt = make_tgt1(name="tagged", tags=["b"])
 
     # Even though this has the tag `b`, it should be excluded because the target type.
     tgt2 = make_tgt2("tgt2", tags=["b"])
@@ -181,6 +178,6 @@ def test_specs_filter() -> None:
     def matches(tgt: Target) -> bool:
         return specs_filter.matches(tgt)
 
-    assert matches(b_tagged_tgt) is True
-    for t in (untagged_tgt, b_tagged_exclude_regex_tgt, a_and_b_tagged_tgt, tgt2):
-        assert matches(t) is False
+    assert matches(tagged_tgt) is True
+    assert matches(untagged_tgt) is False
+    assert matches(tgt2) is False

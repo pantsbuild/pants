@@ -1509,41 +1509,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
         metavar="[+-]tag1,tag2,...",
     )
-    exclude_target_regexp = StrListOption(
-        "--exclude-target-regexp",
-        help="Exclude targets that match these regexes. This does not impact file arguments.",
-        metavar="<regexp>",
-        removal_version="2.14.0.dev0",
-        removal_hint=softwrap(
-            """
-            Use the option `--filter-address-regex` instead, with `-` in front of the regex. For
-            example, `--exclude-target-regexp=dir/` should become `--filter-address-regex=-dir/`.
 
-            The `--filter` options can now be used with any goal, not only the `filter` goal,
-            so there is no need for this option anymore.
-            """
-        ),
-    )
-
-    files_not_found_behavior = EnumOption(
-        "--files-not-found-behavior",
-        default=UnmatchedBuildFileGlobs.warn,
-        help=softwrap(
-            """
-            What to do when files and globs specified in BUILD files, such as in the
-            `sources` field, cannot be found. This happens when the files do not exist on
-            your machine or when they are ignored by the `--pants-ignore` option.
-            """
-        ),
-        advanced=True,
-        removal_version="2.14.0.dev0",
-        removal_hint=softwrap(
-            """
-            Use `[GLOBAL].unmatched_build_file_globs` instead, which behaves the same. This
-            option was renamed for clarity with the new `[GLOBAL].unmatched_cli_globs` option.
-            """
-        ),
-    )
     unmatched_build_file_globs = EnumOption(
         "--unmatched-build-file-globs",
         default=UnmatchedBuildFileGlobs.warn,
@@ -1573,29 +1539,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
         advanced=True,
-    )
-
-    owners_not_found_behavior = EnumOption(
-        "--owners-not-found-behavior",
-        default=OwnersNotFoundBehavior.ignore,
-        help=softwrap(
-            """
-            What to do when file arguments do not have any owning target. This happens when
-            there are no targets whose `sources` fields include the file argument.
-            """
-        ),
-        advanced=True,
-        removal_version="2.14.0.dev0",
-        removal_hint=softwrap(
-            """
-            This option is no longer useful with Pants because we have goals that work without any
-            targets, e.g. the `count-loc` goal or the `regex-lint` linter from the `lint` goal. This
-            option caused us to error on valid use cases.
-
-            For goals that require targets, like `list`, the unowned file will simply be ignored. If
-            no owners are found at all, most goals will warn and some like `run` will error.
-            """
-        ),
     )
 
     build_patterns = StrListOption(
