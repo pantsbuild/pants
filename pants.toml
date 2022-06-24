@@ -63,8 +63,6 @@ build_ignore.add = [
   "testprojects/src/go/**",
 ]
 
-use_deprecated_directory_cli_args_semantics = false
-
 unmatched_build_file_globs = "error"
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
