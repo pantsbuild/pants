@@ -25,7 +25,7 @@ class IPython(PythonToolBase):
     options_scope = "ipython"
     help = "The IPython enhanced REPL (https://ipython.org/)."
 
-    default_version = "ipython==7.16.1"  # The last version to support Python 3.6.
+    default_version = "ipython>=7.34,<8"  # ipython 8 does not support Python 3.7.
     default_main = ConsoleScript("ipython")
 
     register_lockfile = True

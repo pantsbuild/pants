@@ -24,15 +24,11 @@ You can change IPython's version with `[ipython].version`. If you change it, Pan
 
 ```toml pants.toml
 [ipython]
-version = "ipython>=6.0.0"
+version = "ipython>=8.0.0"
 lockfile = "3rdparty/python/ipython_lock.txt"
 ```
 
 If you set the `version` lower than IPython 7, then you must set `[ipython].ignore_cwd = false` to avoid Pants setting an option that did not exist in earlier IPython releases.
-
-> ❗️ IPython does not yet work with Pantsd
-> 
-> When using IPython, use the option `--no-pantsd` to turn off the Pants daemon, e.g. `./pants --no-pantsd repl --shell=ipython`. We are working to [fix this](https://github.com/pantsbuild/pants/issues/9939).
 
 > 📘 Python 2 support
 > 
@@ -76,16 +72,10 @@ Type "help", "copyright", "credits" or "license" for more information.
 This will not load any of your code:
 
 ```text Shell
-$ ./pants --no-pantsd repl --shell=ipython
-
-Python 3.6.10 (default, Feb 26 2020, 08:26:13)
-Type "copyright", "credits" or "license" for more information.
-
-IPython 5.8.0 -- An enhanced Interactive Python.
-?         -> Introduction and overview of IPython's features.
-%quickref -> Quick reference.
-help      -> Python's own help system.
-object?   -> Details about 'object', use 'object??' for extra details.
+❯ ./pants repl --shell=ipython
+Python 3.9.12 (main, Mar 26 2022, 15:45:34)
+Type 'copyright', 'credits' or 'license' for more information
+IPython 7.34.0 -- An enhanced Interactive Python. Type '?' for help.
 
 In [1]: 21 * 4
 Out[1]: 84
