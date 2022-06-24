@@ -34,6 +34,7 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -405,6 +406,7 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
 async def debugpy_python_test(
     field_set: PythonTestFieldSet,
     debugpy: DebugPy,
+    debug_adapter: DebugAdapterSubsystem,
     pytest: PyTest,
 ) -> TestDebugAdapterRequest:
     debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
@@ -426,7 +428,7 @@ async def debugpy_python_test(
             main=debugpy.main,
             prepend_argv=(
                 "--listen",
-                f"{debugpy.host}:{debugpy.port}",
+                f"{debug_adapter.host}:{debug_adapter.port}",
                 "--wait-for-client",
                 # @TODO: Techincally we should use `pytest.main`, however `debugpy` doesn't support
                 # launching an entry_point.
