@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
+import dataclasses
+import logging
 import os
 
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -29,6 +31,9 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 def _in_chroot(relpath: str) -> str:
@@ -132,10 +137,20 @@ async def run_pex_debug_adapter_binary(
     debugpy: DebugPy,
 ) -> RunDebugAdapterRequest:
     if field_set.run_in_sandbox:
-        # @TODO: Impove error
-        raise ValueError(
-            "Cannot use --debug-adapter if `run_in_sandbox` is `True`. Your breakpoints won't be hit."
+        logger.warning(
+            softwrap(
+                """
+                Using --debug-adapter with `run_in_sandbox` set to `True` will likely cause your
+                breakpoints to not be hit, as your code will be run under the sandbox's path.
+                """
+            )
         )
+
+    debugpy_pex_request = debugpy.to_pex_request()
+    debugpy_pex_request = dataclasses.replace(
+        debugpy_pex_request,
+        additional_args=debugpy_pex_request.additional_args + ("--no-strip-pex-env",),
+    )
 
     entry_point, regular_run_request, debugpy_pex = await MultiGet(
         Get(
@@ -143,9 +158,11 @@ async def run_pex_debug_adapter_binary(
             ResolvePexEntryPointRequest(field_set.entry_point),
         ),
         Get(RunRequest, PexBinaryFieldSet, field_set),
-        Get(Pex, PexRequest, debugpy.to_pex_request()),
+        Get(Pex, PexRequest, debugpy_pex_request),
     )
 
+    entry_point_or_script = entry_point.val or field_set.script.value
+    assert entry_point_or_script is not None
     merged_digest = await Get(
         Digest, MergeDigests([regular_run_request.digest, debugpy_pex.digest])
     )
@@ -165,10 +182,7 @@ async def run_pex_debug_adapter_binary(
         "--listen",
         f"{debugpy.host}:{debugpy.port}",
         "--wait-for-client",
-        # @TODO: Only works for module, function support means we'll need to use -c.
-        # See https://github.com/microsoft/debugpy/issues/955
-        "-m",
-        entry_point.val.module,
+        *debugpy.main_spec_args(entry_point_or_script),
     ]
 
     return RunDebugAdapterRequest(digest=merged_digest, args=args, extra_env=extra_env)

@@ -7,7 +7,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import EntryPoint
+from pants.backend.python.target_types import ConsoleScript, EntryPoint
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -38,6 +38,25 @@ class DebugPy(PythonToolBase):
         default=5678,  # The canonical port
         help="The port to use when launching the debugpy server.",
     )
+
+    def main_spec_args(self, value: EntryPoint | ConsoleScript) -> tuple[str, ...]:
+        return (
+            "-c",
+            # NB: Use PEX itself to execute the value
+            (
+                "import os;"
+                + "from pex.pex import PEX;"
+                + "pex = PEX(pex=os.environ['PEX']);"
+                + (
+                    (
+                        "from pex.dist_metadata import EntryPoint;"
+                        + f"pex.execute_entry(EntryPoint.parse('run={value.spec}'));"
+                    )
+                    if isinstance(value, EntryPoint)
+                    else f"pex.execute_script('{value.name}');"
+                )
+            ),
+        )
 
 
 class DebugPyLockfileSentinel(GenerateToolLockfileSentinel):
