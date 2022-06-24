@@ -178,7 +178,8 @@ class PantsdClientException(Exception):
 # ------------------------------------------------------------------------------
 
 class PyStubCASBuilder:
-    def always_errors(self) -> PyStubCASBuilder: ...
+    def ac_always_errors(self) -> PyStubCASBuilder: ...
+    def cas_always_errors(self) -> PyStubCASBuilder: ...
     def build(self, executor: PyExecutor) -> PyStubCAS: ...
 
 class PyStubCAS:
@@ -186,6 +187,12 @@ class PyStubCAS:
     def builder(cls) -> PyStubCASBuilder: ...
     @property
     def address(self) -> str: ...
+    def remove(self, digest: FileDigest) -> bool: ...
+    def action_cache_len(self) -> int: ...
+
+# ------------------------------------------------------------------------------
+# (etc.)
+# ------------------------------------------------------------------------------
 
 class RawFdRunner(Protocol):
     def __call__(
@@ -378,6 +385,11 @@ class PyTypes:
 
 class PyStdioDestination:
     pass
+
+class PyThreadLocals:
+    @classmethod
+    def get_for_current_thread(cls) -> PyThreadLocals: ...
+    def set_for_current_thread(self) -> None: ...
 
 class PollTimeout(Exception):
     pass
