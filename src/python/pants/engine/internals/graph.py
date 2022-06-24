@@ -9,9 +9,9 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, NamedTuple, Sequence, cast
+from typing import Iterable, NamedTuple, Sequence
 
-from pants.base.deprecated import resolve_conflicting_options, warn_or_error
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
 from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.engine.addresses import (
