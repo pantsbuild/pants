@@ -208,6 +208,17 @@ async def addresses_from_raw_specs_with_only_file_owners(
     paths_per_include = await MultiGet(
         Get(Paths, PathGlobs, specs.path_globs_for_spec(spec)) for spec in specs.all_specs()
     )
+
+    # When possible, we batch `Owners` for better performance. See
+    # https://github.com/pantsbuild/pants/issues/15802.
+    if specs.from_change_detection or owners_not_found_behavior == OwnersNotFoundBehavior.ignore:
+        all_files = tuple(itertools.chain.from_iterable(paths.files for paths in paths_per_include))
+        owners = await Get(
+            Owners,
+            OwnersRequest(all_files, filter_by_global_options=specs.filter_by_global_options),
+        )
+        return Addresses(sorted(owners))
+
     owners_per_include = await MultiGet(
         Get(
             Owners,
@@ -217,12 +228,7 @@ async def addresses_from_raw_specs_with_only_file_owners(
     )
     addresses: set[Address] = set()
     for spec, owners in zip(specs.all_specs(), owners_per_include):
-        if (
-            not specs.from_change_detection
-            and owners_not_found_behavior != OwnersNotFoundBehavior.ignore
-            and isinstance(spec, FileLiteralSpec)
-            and not owners
-        ):
+        if isinstance(spec, FileLiteralSpec) and not owners:
             _log_or_raise_unmatched_owners(
                 [PurePath(str(spec))],
                 owners_not_found_behavior,
