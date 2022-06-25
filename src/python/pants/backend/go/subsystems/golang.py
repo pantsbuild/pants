@@ -58,7 +58,7 @@ class GolangSubsystem(Subsystem):
             Do not include the patch version.
             """
         ),
-        removal_version="2.14.0.dev0",
+        removal_version="2.14.0.dev1",
         removal_hint=(
             "Use `[golang].minimum_expected_version` instead, which is more flexible. Pants will "
             "now work if your local Go binary is newer than the expected minimum version; e.g. Go "

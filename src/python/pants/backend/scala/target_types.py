@@ -43,7 +43,7 @@ def scala_settings_request(
 ) -> TargetFilesGeneratorSettings:
     if scala_infer_subsystem.options.is_default("force_add_siblings_as_dependencies"):
         warn_or_error(
-            removal_version="2.14.0.dev0",
+            removal_version="2.14.0.dev1",
             entity="`force_add_siblings_as_dependencies` defaulting to True",
             hint=softwrap(
                 """
