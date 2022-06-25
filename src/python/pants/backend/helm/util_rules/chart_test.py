@@ -83,7 +83,7 @@ def test_collects_single_chart_sources(
 
     helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(tgt)])
     assert not helm_chart.artifact
-    assert helm_chart.metadata == expected_metadata
+    assert helm_chart.info == expected_metadata
     assert len(helm_chart.snapshot.files) == 4
     assert helm_chart.address == address
 
@@ -124,9 +124,9 @@ def test_gathers_local_subchart_sources_using_explicit_dependency(rule_runner: R
 
     assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
     assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
-    assert len(helm_chart.metadata.dependencies) == 1
-    assert helm_chart.metadata.dependencies[0].name == "chart1"
-    assert helm_chart.metadata.dependencies[0].alias == "foo"
+    assert len(helm_chart.info.dependencies) == 1
+    assert helm_chart.info.dependencies[0].name == "chart1"
+    assert helm_chart.info.dependencies[0].alias == "foo"
 
 
 def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRunner) -> None:
@@ -195,7 +195,7 @@ def test_gathers_all_subchart_sources_inferring_dependencies(rule_runner: RuleRu
     target = rule_runner.get_target(Address("src/chart2", target_name="chart2"))
     helm_chart = rule_runner.request(HelmChart, [HelmChartRequest.from_target(target)])
 
-    assert helm_chart.metadata == expected_metadata
+    assert helm_chart.info == expected_metadata
     assert "chart2/charts/chart1" in helm_chart.snapshot.dirs
     assert "chart2/charts/chart1/templates/service.yaml" in helm_chart.snapshot.files
     assert "chart2/charts/cert-manager" in helm_chart.snapshot.dirs
@@ -273,7 +273,7 @@ def test_chart_metadata_is_updated_with_explicit_dependencies(rule_runner: RuleR
         ],
     )
 
-    assert helm_chart.metadata == expected_metadata
+    assert helm_chart.info == expected_metadata
     assert new_metadata == expected_metadata
 
 
@@ -298,8 +298,8 @@ def test_obtain_chart_from_deployment(rule_runner: RuleRunner) -> None:
 
     chart = rule_runner.request(HelmChart, [FindHelmDeploymentChart(field_set)])
 
-    assert chart.metadata.name == "foo"
-    assert chart.metadata.version == "1.0.0"
+    assert chart.info.name == "foo"
+    assert chart.info.version == "1.0.0"
 
 
 def test_fail_when_no_chart_dependency_is_found(rule_runner: RuleRunner) -> None:

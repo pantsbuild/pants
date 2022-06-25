@@ -24,6 +24,7 @@ from pants.core.util_rules.external_tool import (
 )
 from pants.engine import process
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.environment import Environment, EnvironmentRequest
 from pants.engine.fs import (
     CreateDigest,
@@ -31,10 +32,11 @@ from pants.engine.fs import (
     DigestContents,
     DigestSubset,
     Directory,
+    FileDigest,
     PathGlobs,
     RemovePrefix,
 )
-from pants.engine.internals.native_engine import AddPrefix, MergeDigests
+from pants.engine.internals.native_engine import AddPrefix, MergeDigests, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -127,7 +129,7 @@ class HelmPluginPlatformCommand:
 
 
 @dataclass(frozen=True)
-class HelmPluginMetadata:
+class HelmPluginInfo:
     name: str
     version: str
     usage: str | None = None
@@ -140,7 +142,7 @@ class HelmPluginMetadata:
     hooks: FrozenDict[str, str] = dataclasses.field(default_factory=FrozenDict)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> HelmPluginMetadata:
+    def from_dict(cls, d: dict[str, Any]) -> HelmPluginInfo:
         platform_command = [
             HelmPluginPlatformCommand.from_dict(d) for d in d.pop("platformCommand", [])
         ]
@@ -150,8 +152,8 @@ class HelmPluginMetadata:
         return cls(platform_command=tuple(platform_command), hooks=FrozenDict(hooks), **attrs)
 
     @classmethod
-    def from_bytes(cls, content: bytes) -> HelmPluginMetadata:
-        return HelmPluginMetadata.from_dict(yaml.safe_load(content))
+    def from_bytes(cls, content: bytes) -> HelmPluginInfo:
+        return HelmPluginInfo.from_dict(yaml.safe_load(content))
 
 
 _ExternalHelmPlugin = TypeVar("_ExternalHelmPlugin", bound=ExternalHelmPlugin)
@@ -174,31 +176,58 @@ class ExternalHelmPluginBinding(Generic[_ExternalHelmPlugin], metaclass=ABCMeta)
 
 
 @dataclass(frozen=True)
-class ExternalHelmPluginRequest:
+class ExternalHelmPluginRequest(EngineAwareParameter):
     """Helper class to create a download request for an external Helm plugin."""
 
     plugin_name: str
-    tool_request: ExternalToolRequest
+    platform: Platform
+
+    _tool_request: ExternalToolRequest
 
     @classmethod
     def from_subsystem(cls, subsystem: ExternalHelmPlugin) -> ExternalHelmPluginRequest:
+        platform = Platform.current
         return cls(
-            plugin_name=subsystem.plugin_name, tool_request=subsystem.get_request(Platform.current)
+            plugin_name=subsystem.plugin_name,
+            platform=platform,
+            _tool_request=subsystem.get_request(platform),
         )
+
+    def debug_hint(self) -> str | None:
+        return self.plugin_name
+
+    def metadata(self) -> dict[str, Any] | None:
+        return {"platform": self.platform, "url": self._tool_request.download_file_request.url}
 
 
 @dataclass(frozen=True)
-class HelmPlugin:
-    metadata: HelmPluginMetadata
-    digest: Digest
+class HelmPlugin(EngineAwareReturnType):
+    info: HelmPluginInfo
+    platform: Platform
+    snapshot: Snapshot
 
     @property
     def name(self) -> str:
-        return self.metadata.name
+        return self.info.name
 
     @property
     def version(self) -> str:
-        return self.metadata.version
+        return self.info.version
+
+    def level(self) -> LogLevel | None:
+        return LogLevel.INFO
+
+    def message(self) -> str | None:
+        return f"Materialized Helm plugin {self.name} with version {self.version} for {self.platform} platform."
+
+    def metadata(self) -> dict[str, Any] | None:
+        return {"name": self.name, "version": self.version, "platform": self.platform}
+
+    def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
+        return {"content": self.snapshot}
+
+    def cacheable(self) -> bool:
+        return True
 
 
 class HelmPlugins(Collection[HelmPlugin]):
@@ -221,28 +250,29 @@ async def all_helm_plugins(union_membership: UnionMembership) -> HelmPlugins:
 
 @rule(desc="Download external Helm plugin", level=LogLevel.DEBUG)
 async def download_external_helm_plugin(request: ExternalHelmPluginRequest) -> HelmPlugin:
-    downloaded_tool = await Get(DownloadedExternalTool, ExternalToolRequest, request.tool_request)
+    downloaded_tool = await Get(DownloadedExternalTool, ExternalToolRequest, request._tool_request)
 
-    metadata_file = await Get(
+    plugin_info_file = await Get(
         Digest,
         DigestSubset(
             downloaded_tool.digest,
             PathGlobs(
-                ["plugin.yaml"],
+                ["plugin.yaml", "plugin.yml"],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"The Helm plugin `{request.plugin_name}`",
+                description_of_origin=request.plugin_name,
             ),
         ),
     )
-    metadata_content = await Get(DigestContents, Digest, metadata_file)
-    if len(metadata_content) == 0:
+    plugin_info_contents = await Get(DigestContents, Digest, plugin_info_file)
+    if len(plugin_info_contents) == 0:
         raise HelmPluginMetadataFileNotFound(request.plugin_name)
 
-    metadata = HelmPluginMetadata.from_bytes(metadata_content[0].content)
-    if not metadata.command and not metadata.platform_command:
+    plugin_info = HelmPluginInfo.from_bytes(plugin_info_contents[0].content)
+    if not plugin_info.command and not plugin_info.platform_command:
         raise HelmPluginMissingCommand(request.plugin_name)
 
-    return HelmPlugin(metadata=metadata, digest=downloaded_tool.digest)
+    plugin_snapshot = await Get(Snapshot, Digest, downloaded_tool.digest)
+    return HelmPlugin(info=plugin_info, platform=request.platform, snapshot=plugin_snapshot)
 
 
 # ---------------------------------------------
@@ -355,10 +385,13 @@ async def setup_helm(helm_subsytem: HelmSubsystem, global_plugins: HelmPlugins) 
 
     # Install all global Helm plugins
     if global_plugins:
+        logger.debug(f"Installing {pluralize(len(global_plugins), 'global Helm plugin')}.")
         prefixed_plugins_digests = await MultiGet(
             Get(
                 Digest,
-                AddPrefix(plugin.digest, os.path.join(_HELM_DATA_DIR, "plugins", plugin.name)),
+                AddPrefix(
+                    plugin.snapshot.digest, os.path.join(_HELM_DATA_DIR, "plugins", plugin.name)
+                ),
             )
             for plugin in global_plugins
         )

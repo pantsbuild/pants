@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from pants.backend.docker.goals.package_image import DockerFieldSet
@@ -28,22 +29,39 @@ from pants.backend.helm.subsystems.post_renderer import (
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.backend.helm.util_rules.yaml_utils import YamlElements
 from pants.engine.addresses import Address, Addresses
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets
+from pants.util.logging import LogLevel
+from pants.util.strutil import bullet_list, softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class HelmDeploymentPostRendererRequest:
+class HelmDeploymentPostRendererRequest(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 
+    def debug_hint(self) -> str | None:
+        return self.field_set.address.spec
 
-@rule
+
+@rule(desc="Prepare Helm deployment post-renderer", level=LogLevel.DEBUG)
 async def prepare_post_renderer_for_helm_deployment(
     request: HelmDeploymentPostRendererRequest,
     mappings: FirstPartyHelmDeploymentMappings,
     docker_options: DockerOptions,
 ) -> HelmPostRendererRunnable:
     docker_addresses = mappings.docker_images[request.field_set.address]
+    logger.debug(
+        softwrap(
+            f"""
+            Resolving Docker image references for targets:
+
+            {bullet_list([addr.spec for addr in docker_addresses.values()])}
+            """
+        )
+    )
     docker_contexts = await MultiGet(
         Get(
             DockerBuildContext,
@@ -63,21 +81,36 @@ async def prepare_post_renderer_for_helm_deployment(
         if not docker_field_sets:
             return None
 
-        result = None
         docker_field_set = docker_field_sets[0]
         image_refs = docker_field_set.image_refs(
             default_repository=docker_options.default_repository,
             registries=docker_options.registries(),
             interpolation_context=context.interpolation_context,
         )
-        if image_refs:
-            result = image_refs[0]
-        return result
+
+        # Choose first non-latest image reference found, or fallback to 'latest'.
+        found_ref: str | None = None
+        fallback_ref: str | None = None
+        for ref in image_refs:
+            if ref.endswith(":latest"):
+                fallback_ref = ref
+            else:
+                found_ref = ref
+                break
+
+        resolved_ref = found_ref or fallback_ref
+        if resolved_ref:
+            logger.debug(f"Resolved Docker image ref '{resolved_ref}' for address {address}.")
+        else:
+            logger.warning(f"Could not resolve a valid image ref for Docker target {address}.")
+
+        return resolved_ref
 
     docker_addr_ref_mapping = {
         addr: resolve_docker_image_ref(addr, ctx)
         for addr, ctx in zip(docker_addresses.values(), docker_contexts)
     }
+
     replacements = YamlElements(
         {
             manifest: {
@@ -89,7 +122,10 @@ async def prepare_post_renderer_for_helm_deployment(
         }
     )
 
-    return await Get(HelmPostRendererRunnable, SetupHelmPostRenderer(replacements))
+    return await Get(
+        HelmPostRendererRunnable,
+        SetupHelmPostRenderer(replacements, description_of_origin=request.field_set.address.spec),
+    )
 
 
 def rules():

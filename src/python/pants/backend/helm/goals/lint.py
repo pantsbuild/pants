@@ -55,7 +55,7 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
         return HelmProcess(
             argv,
             input_digest=chart.snapshot.digest,
-            description=f"Linting chart: {chart.metadata.name}",
+            description=f"Linting chart: {chart.info.name}",
         )
 
     process_results = await MultiGet(
@@ -68,7 +68,7 @@ async def run_helm_lint(request: HelmLintRequest, helm_subsystem: HelmSubsystem)
     )
     results = [
         LintResult.from_fallible_process_result(
-            process_result, partition_description=chart.metadata.name
+            process_result, partition_description=chart.info.name
         )
         for chart, process_result in zip(charts, process_results)
     ]

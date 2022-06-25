@@ -61,7 +61,7 @@ def _assert_build_package(rule_runner: RuleRunner, *, chart_name: str, chart_ver
     assert result.artifacts[0].relpath == os.path.join(
         dest_dir, f"{chart_name}-{chart_version}.tgz"
     )
-    assert result.artifacts[0].metadata
+    assert result.artifacts[0].info
 
 
 def test_helm_package(rule_runner: RuleRunner) -> None:

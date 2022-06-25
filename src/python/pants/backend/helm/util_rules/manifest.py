@@ -13,9 +13,11 @@ import yaml
 
 from pants.backend.helm.util_rules.yaml_utils import YamlElement, YamlPath
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, DigestContents, DigestSubset, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
-from pants.util.strutil import pluralize
+from pants.util.logging import LogLevel
+from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -162,13 +164,16 @@ class KubePodSpec(YamlElement):
 @dataclass(frozen=True)
 class KubeManifest:
     filename: PurePath
+    document_index: int
 
     api_version: str
     kind: StandardKind | CustomResourceKind
     pod_spec: KubePodSpec | None
 
     @classmethod
-    def from_dict(cls, filename: PurePath, d: dict[str, Any]) -> KubeManifest:
+    def from_dict(
+        cls, filename: PurePath, d: dict[str, Any], *, document_index: int = 0
+    ) -> KubeManifest:
         std_kind: StandardKind | None = None
         try:
             std_kind = StandardKind(d["kind"])
@@ -185,6 +190,7 @@ class KubeManifest:
             api_version=d["apiVersion"],
             kind=std_kind or custom_kind,
             pod_spec=spec,
+            document_index=document_index,
         )
 
     @property
@@ -199,12 +205,15 @@ class KubeManifests(Collection[KubeManifest]):
 
 
 @dataclass(frozen=True)
-class ParseKubeManifests:
+class ParseKubeManifests(EngineAwareParameter):
     digest: Digest
     description_of_origin: str
 
+    def debug_hint(self) -> str | None:
+        return self.description_of_origin
 
-@rule
+
+@rule(desc="Parsing Kubernetes manifests", level=LogLevel.DEBUG)
 async def parse_kubernetes_manifests(request: ParseKubeManifests) -> KubeManifests:
     yaml_subset = await Get(
         Digest, DigestSubset(request.digest, PathGlobs(["**/*.yaml", "**/*.yml"]))
@@ -212,13 +221,18 @@ async def parse_kubernetes_manifests(request: ParseKubeManifests) -> KubeManifes
     digest_contents = await Get(DigestContents, Digest, yaml_subset)
 
     manifests = [
-        KubeManifest.from_dict(PurePath(file.path), parsed_yaml)
+        KubeManifest.from_dict(PurePath(file.path), parsed_yaml, document_index=idx)
         for file in digest_contents
-        for parsed_yaml in yaml.safe_load_all(file.content)
+        for idx, parsed_yaml in enumerate(yaml.safe_load_all(file.content))
     ]
 
     logger.debug(
-        f"Found {pluralize(len(manifests), 'manifest')} in {request.description_of_origin}"
+        softwrap(
+            f"""
+            Found {pluralize(len(manifests), 'manifest')} in
+            {pluralize(len(digest_contents), 'file')} at {request.description_of_origin}.
+            """
+        )
     )
     return KubeManifests(manifests)
 

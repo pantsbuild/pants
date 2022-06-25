@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
 from pathlib import PurePath
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
 from pants.backend.helm.subsystems import post_renderer
 from pants.backend.helm.subsystems.post_renderer import HelmPostRendererRunnable
@@ -19,6 +21,8 @@ from pants.backend.helm.util_rules.chart import FindHelmDeploymentChart, HelmCha
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.engine.addresses import Address
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -30,10 +34,14 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap
+from pants.util.strutil import pluralize, softwrap
+
+logger = logging.getLogger(__name__)
 
 
 class HelmDeploymentRendererCmd(Enum):
@@ -45,7 +53,7 @@ class HelmDeploymentRendererCmd(Enum):
 
 @dataclass(unsafe_hash=True)
 @frozen_after_init
-class HelmDeploymentRendererRequest:
+class HelmDeploymentRendererRequest(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 
     cmd: HelmDeploymentRendererCmd
@@ -83,17 +91,77 @@ class HelmDeploymentRendererRequest:
                 )
             )
 
+    def debug_hint(self) -> str | None:
+        return self.field_set.address.spec
+
+    def metadata(self) -> dict[str, Any] | None:
+        return {
+            "cmd": self.cmd.value,
+            "description": self.description,
+            "extra_argv": self.extra_argv,
+            "output_directory": self.output_directory,
+            "post_renderer": True if self.post_renderer else False,
+        }
+
 
 @dataclass(frozen=True)
-class HelmDeploymentRenderer:
+class HelmDeploymentRenderer(EngineAwareParameter, EngineAwareReturnType):
+    address: Address
     chart: HelmChart
     process: HelmProcess
+    post_renderer: bool
     output_directory: str | None
+
+    def debug_hint(self) -> str | None:
+        return self.address.spec
+
+    def level(self) -> LogLevel | None:
+        return LogLevel.DEBUG
+
+    def message(self) -> str | None:
+        msg = softwrap(
+            f"""
+            Built renderer for {self.address} using chart {self.chart.address}
+            with{'out' if not self.post_renderer else ''} a post-renderer stage
+            """
+        )
+        if self.output_directory:
+            msg += f" and output directory: {self.output_directory}."
+        else:
+            msg += " and output to stdout."
+        return msg
+
+    def metadata(self) -> dict[str, Any] | None:
+        return {
+            "chart": self.chart.address,
+            "helm_argv": self.process.argv,
+            "post_renderer": self.post_renderer,
+            "output_directory": self.output_directory,
+        }
 
 
 @dataclass(frozen=True)
-class RenderedFiles:
+class RenderedFiles(EngineAwareReturnType):
+    address: Address
+    chart: HelmChart
     snapshot: Snapshot
+
+    def level(self) -> LogLevel | None:
+        return LogLevel.DEBUG
+
+    def message(self) -> str | None:
+        return softwrap(
+            f"""
+            Generated {pluralize(len(self.snapshot.files), 'file')} from deployment {self.address}
+            using chart {self.chart}.
+            """
+        )
+
+    def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
+        return {"content": self.snapshot}
+
+    def metadata(self) -> dict[str, Any] | None:
+        return {"deployment": self.address, "chart": self.chart.address}
 
 
 def _sort_value_file_names_for_evaluation(filenames: Iterable[str]) -> list[str]:
@@ -122,7 +190,7 @@ def _sort_value_file_names_for_evaluation(filenames: Iterable[str]) -> list[str]
     return [str(path) for path in [*non_overrides, *overrides]]
 
 
-@rule
+@rule(desc="Prepare Helm deployment renderer", level=LogLevel.DEBUG)
 async def setup_render_helm_deployment_process(
     request: HelmDeploymentRendererRequest,
 ) -> HelmDeploymentRenderer:
@@ -131,24 +199,28 @@ async def setup_render_helm_deployment_process(
         Get(StrippedSourceFiles, SourceFilesRequest([request.field_set.sources])),
     )
 
+    logger.debug(f"Using Helm chart {chart.address} in deployment {request.field_set.address}.")
+
     output_digest = EMPTY_DIGEST
     if request.output_directory:
         output_digest = await Get(Digest, CreateDigest([Directory(request.output_directory)]))
 
-    # Ordering the value file names needs to be consistent so overrides are respected
+    # Ordering the value file names needs to be consistent so overrides are respected.
     sorted_value_files = _sort_value_file_names_for_evaluation(value_files.snapshot.files)
 
-    # Digests to be used as an input into the renderer process
+    # Digests to be used as an input into the renderer process.
     input_digests = [
         chart.snapshot.digest,
         value_files.snapshot.digest,
         output_digest,
     ]
 
+    # Additional process values in case a post_renderer has been requested.
     env: Mapping[str, str] = {}
     immutable_input_digests: Mapping[str, Digest] = {}
     append_only_caches: Mapping[str, str] = {}
     if request.post_renderer:
+        logger.debug(f"Using post-renderer stage in deployment {request.field_set.address}")
         input_digests.append(request.post_renderer.digest)
         env = request.post_renderer.env
         immutable_input_digests = request.post_renderer.immutable_input_digests
@@ -200,14 +272,18 @@ async def setup_render_helm_deployment_process(
     )
 
     return HelmDeploymentRenderer(
-        chart=chart, process=process, output_directory=request.output_directory
+        address=request.field_set.address,
+        chart=chart,
+        process=process,
+        output_directory=request.output_directory,
+        post_renderer=True if request.post_renderer else False,
     )
 
 
 _HELM_OUTPUT_FILE_MARKER = "# Source: "
 
 
-@rule
+@rule(desc="Run Helm deployment renderer", level=LogLevel.DEBUG)
 async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
     def file_content(file_name: str, lines: Iterable[str]) -> FileContent:
         content = "\n".join(lines) + "\n"
@@ -217,10 +293,9 @@ async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
 
     def parse_renderer_output(result: ProcessResult) -> list[FileContent]:
         rendered_files_contents = result.stdout.decode("utf-8")
-        rendered_files: dict[str, list[str]] = {}
+        rendered_files: dict[str, list[str]] = defaultdict(list)
 
         curr_file_name = None
-        curr_file_lines: list[str] = []
         for line in rendered_files_contents.splitlines():
             if not line:
                 continue
@@ -231,25 +306,28 @@ async def run_renderer(renderer: HelmDeploymentRenderer) -> RenderedFiles:
             if not curr_file_name:
                 continue
 
-            curr_file_lines = rendered_files.get(curr_file_name, [])
-            if not curr_file_lines:
-                curr_file_lines = []
-                rendered_files[curr_file_name] = curr_file_lines
-            curr_file_lines.append(line)
+            rendered_files[curr_file_name].append(line)
 
         return [file_content(file_name, lines) for file_name, lines in rendered_files.items()]
 
+    logger.debug(f"Running Helm renderer process for deployment {renderer.address}")
     result = await Get(ProcessResult, HelmProcess, renderer.process)
 
     output_snapshot = EMPTY_SNAPSHOT
     if not renderer.output_directory:
+        logger.debug(
+            f"Parsing Helm renderer files from the process' output of deployment {renderer.address}."
+        )
         output_snapshot = await Get(Snapshot, CreateDigest(parse_renderer_output(result)))
     else:
+        logger.debug(
+            f"Obtaining Helm renderer files from the process' output directory of deployment {renderer.address}."
+        )
         output_snapshot = await Get(
             Snapshot, RemovePrefix(result.output_digest, renderer.output_directory)
         )
 
-    return RenderedFiles(output_snapshot)
+    return RenderedFiles(address=renderer.address, chart=renderer.chart, snapshot=output_snapshot)
 
 
 def rules():

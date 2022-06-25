@@ -49,7 +49,12 @@ def test_post_renderer_is_runnable(rule_runner: RuleRunner) -> None:
     )
 
     post_renderer_setup = rule_runner.request(
-        HelmPostRendererRunnable, [SetupHelmPostRenderer(replacements)]
+        HelmPostRendererRunnable,
+        [
+            SetupHelmPostRenderer(
+                replacements, description_of_origin="test_post_renderer_is_runnable"
+            )
+        ],
     )
     assert post_renderer_setup.exe == "post_renderer_wrapper.sh"
 

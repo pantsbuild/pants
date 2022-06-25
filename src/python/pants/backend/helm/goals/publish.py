@@ -57,10 +57,10 @@ async def publish_helm_chart(
 ) -> PublishProcesses:
     remotes = helm_subsystem.remotes()
     built_artifacts = [
-        (pkg, artifact, artifact.metadata)
+        (pkg, artifact, artifact.info)
         for pkg in request.packages
         for artifact in pkg.artifacts
-        if isinstance(artifact, BuiltHelmArtifact) and artifact.metadata
+        if isinstance(artifact, BuiltHelmArtifact) and artifact.info
     ]
 
     registries_to_push = list(remotes.get(*(request.field_set.registries.value or [])))

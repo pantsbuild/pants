@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import pkgutil
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.system_binaries import CatBinary
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.process import Process
@@ -27,6 +29,8 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+
+logger = logging.getLogger(__name__)
 
 _HELM_POSTRENDERER_SOURCE = "post_renderer_launcher.py"
 _HELM_POSTRENDERER_PACKAGE = "pants.backend.helm.subsystems"
@@ -38,7 +42,7 @@ class HelmPostRenderer(PythonToolRequirementsBase):
 
     default_version = "yamlpath>=3.6,<3.7"
     default_extra_requirements = [
-        "ruamel.yaml>=0.15.96,!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.17"
+        "ruamel.yaml>=0.15.96,!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21"
     ]
 
     register_interpreter_constraints = True
@@ -73,7 +77,7 @@ class HelmPostRendererTool:
     pex: VenvPex
 
 
-@rule(desc="Prepare Helm post renderer", level=LogLevel.DEBUG)
+@rule(desc="Setup Helm post renderer binaries", level=LogLevel.DEBUG)
 async def setup_internal_post_renderer(
     post_renderer: HelmPostRenderer,
 ) -> HelmPostRendererTool:
@@ -103,20 +107,31 @@ _HELM_POST_RENDERER_WRAPPER_SCRIPT = "post_renderer_wrapper.sh"
 
 
 @dataclass(frozen=True)
-class SetupHelmPostRenderer:
+class SetupHelmPostRenderer(EngineAwareParameter):
     replacements: YamlElements[str]
+    description_of_origin: str
+
+    def debug_hint(self) -> str | None:
+        return self.description_of_origin
 
 
 @dataclass(frozen=True)
-class HelmPostRendererRunnable:
+class HelmPostRendererRunnable(EngineAwareReturnType):
     exe: str
     digest: Digest
     immutable_input_digests: FrozenDict[str, Digest]
     env: FrozenDict[str, str]
     append_only_caches: FrozenDict[str, str]
+    description_of_origin: str
+
+    def level(self) -> LogLevel | None:
+        return LogLevel.DEBUG
+
+    def message(self) -> str | None:
+        return f"runnable {self.exe} for {self.description_of_origin} is ready."
 
 
-@rule(desc="Configure Helm Post Renderer", level=LogLevel.DEBUG)
+@rule(desc="Configure Helm post-renderer", level=LogLevel.DEBUG)
 async def setup_post_renderer_launcher(
     request: SetupHelmPostRenderer,
     post_renderer_tool: HelmPostRendererTool,
@@ -137,16 +152,20 @@ async def setup_post_renderer_launcher(
         ),
     )
 
+    post_renderer_cfg_file = os.path.join(".", HELM_POST_RENDERER_CFG_FILENAME)
     post_renderer_stdin_file = os.path.join(".", "__stdin.yaml")
     post_renderer_process = await Get(
         Process,
         VenvPexProcess(
             post_renderer_tool.pex,
-            argv=[os.path.join(".", HELM_POST_RENDERER_CFG_FILENAME), post_renderer_stdin_file],
+            argv=[post_renderer_cfg_file, post_renderer_stdin_file],
             input_digest=post_renderer_cfg_digest,
             description="",
         ),
     )
+
+    post_renderer_process_cli = " ".join(post_renderer_process.argv)
+    logger.debug(f"Built post-renderer process CLI: {post_renderer_process_cli}")
 
     postrenderer_wrapper_script = dedent(
         f"""\
@@ -155,7 +174,7 @@ async def setup_post_renderer_launcher(
         # Output stdin into a file in disk
         {cat_binary.path} <&0 > {post_renderer_stdin_file}
 
-        {' '.join(post_renderer_process.argv)}
+        {post_renderer_process_cli}
         """
     )
     wrapper_digest = await Get(
@@ -180,6 +199,7 @@ async def setup_post_renderer_launcher(
         env=post_renderer_process.env,
         append_only_caches=post_renderer_process.append_only_caches,
         immutable_input_digests=post_renderer_process.immutable_input_digests,
+        description_of_origin=request.description_of_origin,
     )
 
 
