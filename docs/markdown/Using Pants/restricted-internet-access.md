@@ -24,7 +24,9 @@ You may want to check the binary into version control so that everyone in your o
 Setting up a Certificate Authority
 ----------------------------------
 
-You may need to configure Pants to use a custom Certificate Authority (CA) bundle: 
+By default, Pants will respect and pass through the `SSL_CERT_DIR` and `SSL_CERT_FILE` environment variables.
+
+If you need to override those values, you can configure Pants to use a custom Certificate Authority (CA) bundle:
 
 ```toml pants.toml
 [GLOBAL]
