@@ -207,8 +207,10 @@ class DockerImageRepositoryField(StringField):
 
         {_interpolation_help.format(kind="repository")}
 
-        Additional placeholders for the repository field are: `name`, `directory` and
-        `parent_directory`.
+        Additional placeholders for the repository field are: `name`, `directory`,
+        `parent_directory`, and `default_repository`.
+
+        Registries may also configure the repository value for specific registries.
 
         See the documentation for `[docker].default_repository` for more information.
         """

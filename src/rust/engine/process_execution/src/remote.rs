@@ -216,9 +216,10 @@ impl CommandRunner {
           .as_micros()
           .try_into();
         if let Ok(obs) = timing {
-          context
-            .workunit_store
-            .record_observation(ObservationMetric::RemoteExecutionRPCFirstResponseTime, obs);
+          context.workunit_store.record_observation(
+            ObservationMetric::RemoteExecutionRPCFirstResponseTimeMicros,
+            obs,
+          );
         }
       }
 

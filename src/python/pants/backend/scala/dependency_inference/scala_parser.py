@@ -70,9 +70,25 @@ class ScalaImport:
 
 
 @dataclass(frozen=True)
+class ScalaProvidedSymbol:
+    name: str
+    recursive: bool
+
+    @classmethod
+    def from_json_dict(cls, data: Mapping[str, Any]):
+        return cls(name=data["name"], recursive=data["recursive"])
+
+    def to_debug_json_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "recursive": self.recursive,
+        }
+
+
+@dataclass(frozen=True)
 class ScalaSourceDependencyAnalysis:
-    provided_symbols: FrozenOrderedSet[str]
-    provided_symbols_encoded: FrozenOrderedSet[str]
+    provided_symbols: FrozenOrderedSet[ScalaProvidedSymbol]
+    provided_symbols_encoded: FrozenOrderedSet[ScalaProvidedSymbol]
     imports_by_scope: FrozenDict[str, tuple[ScalaImport, ...]]
     consumed_symbols_by_scope: FrozenDict[str, FrozenOrderedSet[str]]
     scopes: FrozenOrderedSet[str]
@@ -128,8 +144,12 @@ class ScalaSourceDependencyAnalysis:
     @classmethod
     def from_json_dict(cls, d: dict) -> ScalaSourceDependencyAnalysis:
         return cls(
-            provided_symbols=FrozenOrderedSet(d["providedSymbols"]),
-            provided_symbols_encoded=FrozenOrderedSet(d["providedSymbolsEncoded"]),
+            provided_symbols=FrozenOrderedSet(
+                ScalaProvidedSymbol.from_json_dict(v) for v in d["providedSymbols"]
+            ),
+            provided_symbols_encoded=FrozenOrderedSet(
+                ScalaProvidedSymbol.from_json_dict(v) for v in d["providedSymbolsEncoded"]
+            ),
             imports_by_scope=FrozenDict(
                 {
                     key: tuple(ScalaImport.from_json_dict(v) for v in values)
@@ -147,8 +167,10 @@ class ScalaSourceDependencyAnalysis:
 
     def to_debug_json_dict(self) -> dict[str, Any]:
         return {
-            "provided_symbols": list(self.provided_symbols),
-            "provided_symbols_encoded": list(self.provided_symbols_encoded),
+            "provided_symbols": [v.to_debug_json_dict() for v in self.provided_symbols],
+            "provided_symbols_encoded": [
+                v.to_debug_json_dict() for v in self.provided_symbols_encoded
+            ],
             "imports_by_scope": {
                 key: [v.to_debug_json_dict() for v in values]
                 for key, values in self.imports_by_scope.items()

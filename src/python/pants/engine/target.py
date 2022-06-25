@@ -406,8 +406,16 @@ class Target:
         # NB: We ensure that each Target subtype has its own `PluginField` class so that
         # registering a plugin field doesn't leak across target types.
 
+        baseclass = (
+            object
+            if cast("Type[Target]", cls) is Target
+            else next(
+                base for base in cast("Type[Target]", cls).__bases__ if issubclass(base, Target)
+            )._plugin_field_cls
+        )
+
         @union
-        class PluginField:
+        class PluginField(baseclass):  # type: ignore[misc, valid-type]
             pass
 
         return PluginField
