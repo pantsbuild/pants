@@ -13,6 +13,7 @@ from pants.backend.helm.target_types import (
     HelmChartTarget,
     HelmUnitTestDependenciesField,
     HelmUnitTestSourceField,
+    HelmUnitTestStrictField,
     HelmUnitTestTestsGeneratorTarget,
     HelmUnitTestTestTarget,
 )
@@ -62,6 +63,7 @@ class HelmUnitTestFieldSet(TestFieldSet):
 
     source: HelmUnitTestSourceField
     dependencies: HelmUnitTestDependenciesField
+    strict: HelmUnitTestStrictField
 
 
 @rule(desc="Run Helm Unittest", level=LogLevel.DEBUG)
@@ -115,12 +117,16 @@ async def run_helm_unittest(
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
 
+    strict = field_set.strict.value or unittest_subsystem.strict
+
     process_result = await Get(
         FallibleProcessResult,
         HelmProcess(
             argv=[
                 unittest_subsystem.plugin_name,
                 "--helm3",
+                *(("--color",) if unittest_subsystem.color else ()),
+                *(("--strict",) if strict else ()),
                 "--output-type",
                 unittest_subsystem.output_type.value,
                 "--output-file",
