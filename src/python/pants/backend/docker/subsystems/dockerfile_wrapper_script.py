@@ -102,6 +102,11 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                 if image_build_arg in build_args
             )
 
+        @staticmethod
+        def _get_image_ref_build_arg(image_ref: str) -> str | None:
+            build_arg = re.match(r"\$\{?([a-zA-Z0-9_]+)\}?$", image_ref)
+            return build_arg.group(1) if build_arg else None
+
         def from_image_build_arg_names(self) -> Iterator[str]:
             """Return build args used as the image ref in `FROM` instructions.
 
@@ -111,10 +116,9 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
                 FROM ${BASE_IMAGE}
             """
             for cmd in self.get_all("FROM"):
-                image_ref = cmd.value[0]
-                build_arg = re.match(r"\$\{?([a-zA-Z0-9_]+)\}?$", image_ref)
+                build_arg = self._get_image_ref_build_arg(cmd.value[0])
                 if build_arg:
-                    yield build_arg.group(1)
+                    yield build_arg
 
         def from_baseimages(self) -> Iterator[tuple[str, tuple[str, ...]]]:
             for idx, cmd in enumerate(self.get_all("FROM")):
@@ -128,11 +132,15 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
         def baseimage_tags(self) -> tuple[str, ...]:
             """Return all base image tags, prefix with the stage alias or index.
 
+            In case the base image is entirely made up of a build arg, use that with a `build-arg:`
+            prefix.
+
             Example:
 
                 FROM base:1.0 AS build
                 ...
                 FROM interim
+                FROM $argname as dynamic
                 ...
                 FROM final as out
 
@@ -140,12 +148,17 @@ def main(*dockerfile_names: str) -> Iterator[ParsedDockerfileInfo]:
 
                 build 1.0
                 stage1 latest
+                dynamic build-arg:argname
                 out latest
             """
 
             def _get_tag(image_ref: str) -> str | None:
                 """The image ref is in the form `registry/repo/name[/...][:tag][@digest]` and where
-                `digest` is `sha256:hex value`."""
+                `digest` is `sha256:hex value`, or a build arg reference with $ARG."""
+                if image_ref.startswith("$"):
+                    build_arg = self._get_image_ref_build_arg(image_ref)
+                    if build_arg:
+                        return f"build-arg:{build_arg}"
                 parsed = re.match(_image_ref_regexp, image_ref)
                 if not parsed:
                     return None

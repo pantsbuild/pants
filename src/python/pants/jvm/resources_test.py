@@ -11,14 +11,11 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Addresses
 from pants.jvm import classpath, resources, testutil
 from pants.jvm.goals import lockfile
-from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
+from pants.jvm.resolve.coursier_test_util import EMPTY_JVM_LOCKFILE
 from pants.jvm.testutil import RenderedClasspath, maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
-
-EMPTY_LOCKFILE = TestCoursierWrapper(CoursierResolvedLockfile(())).serialize([])
 
 
 @pytest.fixture
@@ -50,7 +47,7 @@ def test_resources(rule_runner: RuleRunner) -> None:
             "BUILD": "resources(name='root', sources=['*.txt'])",
             "one.txt": "",
             "two.txt": "",
-            "3rdparty/jvm/default.lock": EMPTY_LOCKFILE,
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
         }
     )
 

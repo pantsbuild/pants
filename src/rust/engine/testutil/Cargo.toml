@@ -7,9 +7,9 @@ publish = false
 
 [dependencies]
 async-stream = "0.3"
-protos = { path = "../protos" }
 bytes = "1.0"
-grpc_util = { path = "../grpc_util" }
 fs = { path = "../fs" }
+grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
 prost = "0.9" 
+protos = { path = "../protos" }

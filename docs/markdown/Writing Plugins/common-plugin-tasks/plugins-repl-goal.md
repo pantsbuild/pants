@@ -9,21 +9,19 @@ updatedAt: "2022-02-14T23:43:47.610Z"
 The `repl` goal opens up an interactive Read-Eval-Print Loop that runs in the foreground.
 
 Typically, the REPL is loaded with the transitive closure of the files and targets that the user provided, so that users may import their code and resources in the REPL.
-[block:api-header]
-{
-  "title": "1. Install your REPL"
-}
-[/block]
+
+1. Install your REPL
+--------------------
+
 There are several ways for Pants to install your REPL. See [Installing tools](doc:rules-api-installing-tools).
 
 In this example, we simply find the program `bash` on the user's machine, but often you will want to install a tool like Ammonite or iPython instead.
 
 You may want to also add options for your REPL implementation, such as allowing users to change the version of the tool. See [Options and subsystems](doc:rules-api-subsystems).
-[block:api-header]
-{
-  "title": "2. Set up a subclass of `ReplImplementation`"
-}
-[/block]
+
+2. Set up a subclass of `ReplImplementation`
+--------------------------------------------
+
 Subclass `ReplImplementation` and define the class property `name: str` with the name of your REPL, e.g. `"bash"` or `"ipython"`. Users can then set the option `--repl-shell` to this option to choose your REPL implementation.
 
 ```python
@@ -47,11 +45,10 @@ def rules():
         UnionRule(ReplImplementation, BashRepl),
     ]
 ```
-[block:api-header]
-{
-  "title": "3. Create a rule for your REPL logic"
-}
-[/block]
+
+3. Create a rule for your REPL logic
+------------------------------------
+
 Your rule should take as a parameter the `ReplImplementation ` from Step 2, which has a field `targets: Targets` containing the targets specified by the user. It also has a convenience property `addresses: Addresses` with the addresses of what was specified.
 
 Your rule should return `ReplRequest`, which has the fields `digest: Digest`, `args: Iterable[str]`, and `extra_env: Optional[Mapping[str, str]]`. 
@@ -101,15 +98,13 @@ async def create_bash_repl_request(repl: BashRepl) -> ReplRequest:
 If you use any relative paths in `args` or `extra_env`, you should call `repl.in_chroot("./example_relative_path")` on the values. This ensures that you run on the correct file in the temporary directory created by Pants.
 
 Finally, update your plugin's `register.py` to activate this file's rules.
-[block:code]
-{
-  "codes": [
-    {
-      "code": "from bash import repl\n\n\ndef rules():\n    return [*repl.rules()]",
-      "language": "python",
-      "name": "pants-plugins/bash/register.py"
-    }
-  ]
-}
-[/block]
+
+```python pants-plugins/bash/register.py
+from bash import repl
+
+
+def rules():
+    return [*repl.rules()]
+```
+
 Now, when you run `./pants repl --shell=bash ::`, your new REPL should be used.

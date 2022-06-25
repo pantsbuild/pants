@@ -7,6 +7,10 @@ from textwrap import dedent
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
 from pants.backend.codegen.protobuf.java.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
@@ -16,12 +20,8 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.internals.native_engine import FileDigest
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
 from pants.jvm.dependency_inference import artifact_mapper
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -47,34 +47,20 @@ message HelloReply {
 }
 """
 
-PROTOBUF_JAVA_RESOLVE = TestCoursierWrapper.new(
-    entries=(
-        CoursierLockfileEntry(
-            coord=Coordinate(
-                group="com.google.protobuf",
-                artifact="protobuf-java",
-                version="3.19.4",
-            ),
-            file_name="com.google.protobuf_protobuf-java_3.19.4.jar",
-            direct_dependencies=Coordinates([]),
-            dependencies=Coordinates([]),
-            file_digest=FileDigest(
-                "e8f524c2ad5965aae31b0527bf9d4e3bc19b0dfba8c05aef114fccc7f057c94d",
-                1681869,
-            ),
-        ),
-    ),
-).serialize(
-    [
-        ArtifactRequirement(
-            Coordinate(
-                group="com.google.protobuf",
-                artifact="protobuf-java",
-                version="3.19.4",
-            )
-        )
-    ]
-)
+
+@pytest.fixture
+def protobuf_java_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "protobuf-java.test.lock",
+        ["com.google.protobuf:protobuf-java:3.19.4"],
+    )
+
+
+@pytest.fixture
+def protobuf_java_lockfile(
+    protobuf_java_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return protobuf_java_lockfile_def.load(request)
 
 
 @pytest.fixture
@@ -113,7 +99,9 @@ def assert_files_generated(
     assert set(generated_sources.snapshot.files) == set(expected_files)
 
 
-def test_generates_java(rule_runner: RuleRunner) -> None:
+def test_generates_java(
+    rule_runner: RuleRunner, protobuf_java_lockfile: JVMLockfileFixture
+) -> None:
     # This tests a few things:
     #  * We generate the correct file names.
     #  * Protobuf files can import other protobuf files, and those can import others
@@ -165,18 +153,8 @@ def test_generates_java(rule_runner: RuleRunner) -> None:
             "tests/protobuf/test_protos/BUILD": (
                 "protobuf_sources(dependencies=['src/protobuf/dir2'])"
             ),
-            "3rdparty/jvm/default.lock": PROTOBUF_JAVA_RESOLVE,
-            "3rdparty/BUILD": dedent(
-                """\
-                    jvm_artifact(
-                        name="com.google.protobuf_protobuf-java_3.19.4",
-                        group="com.google.protobuf",
-                        artifact="protobuf-java",
-                        version="3.19.4",
-                        resolve="jvm-default",
-                    )
-                """
-            ),
+            "3rdparty/jvm/default.lock": protobuf_java_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": protobuf_java_lockfile.requirements_as_jvm_artifact_targets(),
         }
     )
 

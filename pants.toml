@@ -63,14 +63,14 @@ build_ignore.add = [
   "testprojects/src/go/**",
 ]
 
-use_deprecated_directory_cli_args_semantics = false
-
 unmatched_build_file_globs = "error"
 
 # NB: Users must still set `--remote-cache-{read,write}` to enable the remote cache.
 remote_store_address = "grpcs://cache.toolchain.com:443"
 remote_instance_name = "main"
 remote_auth_plugin = "toolchain.pants.auth.plugin:toolchain_auth_plugin"
+# See https://github.com/pantsbuild/pants/issues/11331.
+remote_cache_eager_fetch = false
 
 [anonymous-telemetry]
 enabled = true
@@ -153,6 +153,7 @@ args = ["-i 2", "-ci", "-sr"]
 args = ["--no-header"]
 extra_requirements.add = [
   "ipdb",
+  "pytest-asyncio",
   "pytest-html",
   "pytest-icdiff",
   "pygments",
@@ -208,6 +209,9 @@ scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_pa
 
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
+
+[scala-infer]
+force_add_siblings_as_dependencies = false
 
 [toolchain-setup]
 repo = "pants"

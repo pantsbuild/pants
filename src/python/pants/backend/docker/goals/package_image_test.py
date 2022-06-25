@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os.path
+from collections import namedtuple
 from textwrap import dedent
 from typing import Callable, ContextManager, cast
 
@@ -38,7 +39,10 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
-from pants.backend.docker.value_interpolation import DockerInterpolationContext
+from pants.backend.docker.value_interpolation import (
+    DockerInterpolationContext,
+    DockerInterpolationError,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.platform import Platform
@@ -52,13 +56,7 @@ from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTar
 from pants.option.global_options import GlobalOptions, ProcessCleanupOption
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
-from pants.testutil.rule_runner import (
-    MockGet,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
 
@@ -251,7 +249,8 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
     err1 = (
         r"Invalid value for the `repository` field of the `docker_image` target at "
         r"docker/test:err1: '{bad_template}'\.\n\nThe placeholder 'bad_template' is unknown\. "
-        r"Try with one of: build_args, directory, name, pants, parent_directory, tags\."
+        r"Try with one of: build_args, default_repository, directory, name, pants, "
+        r"parent_directory, tags, target_repository\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
         assert_build(
@@ -896,20 +895,20 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
         (
             "/",
             None,
-            engine_error(
+            pytest.raises(
                 InvalidFieldException,
-                contains=("Use '' for a path relative to the build root, or './' for"),
+                match=r"Use '' for a path relative to the build root, or '\./' for",
             ),
         ),
         (
             "/src",
             None,
-            engine_error(
+            pytest.raises(
                 InvalidFieldException,
-                contains=(
-                    "The `context_root` field in target src/docker:image must be a relative path, but was "
-                    "'/src'. Use 'src' for a path relative to the build root, or './src' for a path "
-                    "relative to the BUILD file (i.e. 'src/docker/src')."
+                match=(
+                    r"The `context_root` field in target src/docker:image must be a relative path, "
+                    r"but was '/src'\. Use 'src' for a path relative to the build root, or '\./src' "
+                    r"for a path relative to the BUILD file \(i\.e\. 'src/docker/src'\)\."
                 ),
             ),
         ),
@@ -931,7 +930,6 @@ def test_get_context_root(
         raises = cast("ContextManager", no_exception())
     else:
         raises = expected_context_root
-        expected_context_root = ""
 
     with raises:
         docker_options = create_subsystem(
@@ -942,8 +940,7 @@ def test_get_context_root(
         tgt = DockerImageTarget({"context_root": context_root}, address)
         fs = DockerFieldSet.create(tgt)
         actual_context_root = fs.get_context_root(docker_options.default_context_root)
-        if expected_context_root:
-            assert actual_context_root == expected_context_root
+        assert actual_context_root == expected_context_root
 
 
 @pytest.mark.parametrize(
@@ -995,26 +992,62 @@ def test_parse_image_id_from_docker_build_output(expected: str, stdout: str, std
     assert expected == parse_image_id_from_docker_build_output(stdout.encode(), stderr.encode())
 
 
+ImageRefTest = namedtuple(
+    "ImageRefTest",
+    "docker_image, registries, default_repository, expect_refs, expect_error",
+    defaults=({}, {}, "{name}", (), None),
+)
+
+
 @pytest.mark.parametrize(
-    "raw_values, expect_raises, image_refs",
+    "test",
     [
-        (dict(name="lowercase"), no_exception(), ("lowercase:latest",)),
-        (dict(name="CamelCase"), no_exception(), ("camelcase:latest",)),
-        (dict(image_tags=["CamelCase"]), no_exception(), ("image:CamelCase",)),
-        (dict(registries=["REG1.example.net"]), no_exception(), ("REG1.example.net/image:latest",)),
+        ImageRefTest(docker_image=dict(name="lowercase"), expect_refs=("lowercase:latest",)),
+        ImageRefTest(docker_image=dict(name="CamelCase"), expect_refs=("camelcase:latest",)),
+        ImageRefTest(docker_image=dict(image_tags=["CamelCase"]), expect_refs=("image:CamelCase",)),
+        ImageRefTest(
+            docker_image=dict(registries=["REG1.example.net"]),
+            expect_refs=("REG1.example.net/image:latest",),
+        ),
+        ImageRefTest(
+            docker_image=dict(registries=["docker.io", "@private"], repository="our-the/pkg"),
+            registries=dict(private={"address": "our.registry", "repository": "the/pkg"}),
+            expect_refs=("docker.io/our-the/pkg:latest", "our.registry/the/pkg:latest"),
+        ),
+        ImageRefTest(
+            docker_image=dict(
+                registries=["docker.io", "@private"],
+                repository="{parent_directory}/{default_repository}",
+            ),
+            registries=dict(
+                private={"address": "our.registry", "repository": "{target_repository}/the/pkg"}
+            ),
+            expect_refs=("docker.io/test/image:latest", "our.registry/test/image/the/pkg:latest"),
+        ),
+        ImageRefTest(
+            docker_image=dict(repository="{default_repository}/a"),
+            default_repository="{target_repository}/b",
+            expect_error=pytest.raises(
+                DockerInterpolationError,
+                match=(
+                    r"Invalid value for the `repository` field of the `docker_image` target at "
+                    r"src/test/docker:image: '\{default_repository\}/a'\.\n\n"
+                    r"The formatted placeholders recurse too deep\.\n"
+                    r"'\{default_repository\}/a' => '\{target_repository\}/b/a' => "
+                    r"'\{default_repository\}/a/b/a'"
+                ),
+            ),
+        ),
     ],
 )
-def test_image_ref_formatting(
-    raw_values: dict, expect_raises: ContextManager, image_refs: tuple[str, ...]
-) -> None:
-    address = Address("test", target_name=raw_values.pop("name", "image"))
-    tgt = DockerImageTarget(raw_values, address)
+def test_image_ref_formatting(test: ImageRefTest) -> None:
+    address = Address("src/test/docker", target_name=test.docker_image.pop("name", "image"))
+    tgt = DockerImageTarget(test.docker_image, address)
     field_set = DockerFieldSet.create(tgt)
-    default_repository = "{name}"
-    registries = DockerRegistries.from_dict({})
+    registries = DockerRegistries.from_dict(test.registries)
     interpolation_context = DockerInterpolationContext.from_dict({})
-    with expect_raises:
+    with test.expect_error or no_exception():
         assert (
-            field_set.image_refs(default_repository, registries, interpolation_context)
-            == image_refs
+            field_set.image_refs(test.default_repository, registries, interpolation_context)
+            == test.expect_refs
         )
