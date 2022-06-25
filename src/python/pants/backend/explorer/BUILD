@@ -1,6 +1,10 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# Avoid leakage of the explorer backend sources, in order to isolate the 3rdparty requirements
+# needed for the explorer within the `pantsbuild.pants.explorer-server` distribution.
+__defaults__(all=dict(visibility=[f"{build_file_dir()}::"]))
+
 python_sources()
 
 python_distribution(

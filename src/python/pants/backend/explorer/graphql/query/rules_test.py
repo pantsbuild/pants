@@ -13,7 +13,6 @@ import pytest
             {"name": r"\.explorer\."},
             {
                 "rules": [
-                    {"name": "pants.backend.explorer.rules.validate_explorer_dependencies"},
                     {"name": "pants.backend.explorer.graphql.rules.get_graphql_uvicorn_setup"},
                 ]
             },
@@ -30,7 +29,7 @@ import pytest
             {"limit": 1},
             {
                 "rules": [
-                    {"name": "pants.backend.explorer.rules.validate_explorer_dependencies"},
+                    {"name": "pants.backend.project_info.peek.get_target_data"},
                 ]
             },
         ),
