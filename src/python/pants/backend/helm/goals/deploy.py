@@ -116,6 +116,7 @@ async def run_helm_deploy(
             field_set=field_set,
             extra_argv=[
                 "--install",
+                *(("--timeout", f"{field_set.timeout.value}s") if field_set.timeout.value else ()),
                 *valid_args,
             ],
             post_renderer=post_renderer,
@@ -125,7 +126,7 @@ async def run_helm_deploy(
 
     process = await Get(Process, HelmProcess, renderer.process)
     interactive_process = await Get(InteractiveProcess, InteractiveProcessRequest(process))
-    
+
     return DeployProcesses(
         [DeployProcess(name=field_set.address.spec, process=interactive_process)]
     )

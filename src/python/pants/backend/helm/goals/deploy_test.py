@@ -50,7 +50,8 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
                 sources=["*.yaml", "subdir/*.yml"],
                 values={
                     "key": "foo"
-                }
+                },
+                timeout=150,
               )
               """
             ),
@@ -108,6 +109,8 @@ def test_run_helm_deploy(rule_runner: RuleRunner) -> None:
         "--post-renderer",
         "./post_renderer_wrapper.sh",
         "--install",
+        "--timeout",
+        "150s",
         "--kubeconfig",
         "./kubeconfig",
     )

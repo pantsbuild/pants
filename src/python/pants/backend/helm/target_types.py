@@ -17,6 +17,7 @@ from pants.engine.target import (
     DescriptionField,
     DictStringToStringField,
     FieldSet,
+    IntField,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
@@ -424,6 +425,12 @@ class HelmDeploymentNoHooksField(BoolField):
     help = "If true, none of the lifecycle hooks of the given chart will be included in the deployment."
 
 
+class HelmDeploymentTimeoutField(IntField):
+    alias = "timeout"
+    required = False
+    help = "Timeout in seconds when running a Helm deployment."
+
+
 class HelmDeploymentTarget(Target):
     alias = "helm_deployment"
     core_fields = (
@@ -436,6 +443,7 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentValuesField,
         HelmDeploymentCreateNamespaceField,
         HelmDeploymentNoHooksField,
+        HelmDeploymentTimeoutField,
     )
     help = "A Helm chart deployment."
 
@@ -456,6 +464,7 @@ class HelmDeploymentFieldSet(FieldSet):
     no_hooks: HelmDeploymentNoHooksField
     dependencies: HelmDeploymentDependenciesField
     values: HelmDeploymentValuesField
+    timeout: HelmDeploymentTimeoutField
 
 
 class AllHelmDeploymentTargets(Targets):
