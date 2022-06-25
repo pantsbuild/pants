@@ -644,7 +644,7 @@ async def tailor(
             dir_search_paths = tuple(sorted({os.path.dirname(f) for f in specs_paths.files}))
     else:
         warn_or_error(
-            "2.14.0.dev0",
+            "2.14.0.dev1",
             f"running `{bin_name()} tailor` without arguments",
             softwrap(
                 f"""
