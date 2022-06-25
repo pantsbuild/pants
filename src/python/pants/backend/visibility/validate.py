@@ -1,4 +1,4 @@
-# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
@@ -10,15 +10,29 @@ from pants.engine.addresses import Addresses
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSet,
+    StringSequenceField,
     ValidatedDependencies,
     ValidateDependenciesRequest,
-    VisibilityField,
-    VisibilityViolationError,
     WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.util.strutil import bullet_list, pluralize, softwrap
+
+
+class VisibilityViolationError(Exception):
+    pass
+
+
+class VisibilityField(StringSequenceField):
+    alias = "visibility"
+    default = ("::",)
+    help = softwrap(
+        """
+        The `visibility` value takes a list of target specs that indicate which targets may or may
+        not (using excludes) depend on this target.
+        """
+    )
 
 
 class ValidateVisibilityRulesFieldSet(FieldSet):

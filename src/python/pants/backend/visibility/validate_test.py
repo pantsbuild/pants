@@ -7,17 +7,16 @@ from typing import ContextManager
 
 import pytest
 
+from pants.backend.visibility.validate import VisibilityField, VisibilityViolationError, rules
 from pants.core.target_types import rules as core_target_types_rules
 from pants.core.util_rules import archive
 from pants.engine.addresses import Address
-from pants.engine.internals import visibility
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
     Target,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    VisibilityViolationError,
 )
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, logging
@@ -41,7 +40,8 @@ def rule_runner() -> RuleRunner:
         rules=(
             *archive.rules(),
             *core_target_types_rules(),
-            *visibility.rules(),
+            *rules(),
+            TestTarget.register_plugin_field(VisibilityField),
             QueryRule(TransitiveTargets, (TransitiveTargetsRequest,)),
         ),
         target_types=(TestTarget,),

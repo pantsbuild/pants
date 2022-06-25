@@ -1538,10 +1538,6 @@ class UnrecognizedTargetTypeException(Exception):
         )
 
 
-class VisibilityViolationError(Exception):
-    pass
-
-
 # -----------------------------------------------------------------------------------------------
 # Field templates
 # -----------------------------------------------------------------------------------------------
@@ -2693,18 +2689,7 @@ class DescriptionField(StringField):
     )
 
 
-class VisibilityField(StringSequenceField):
-    alias = "visibility"
-    default = ("::",)
-    help = softwrap(
-        """
-        The `visibility` value takes a list of target specs that indicate which targets may or may
-        not (using excludes) depend on this target.
-        """
-    )
-
-
-COMMON_TARGET_FIELDS = (Tags, DescriptionField, VisibilityField)
+COMMON_TARGET_FIELDS = (Tags, DescriptionField)
 
 
 class OverridesField(AsyncFieldMixin, Field):
