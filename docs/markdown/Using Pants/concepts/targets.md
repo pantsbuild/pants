@@ -378,3 +378,44 @@ shunit2_tests(
     },
 )
 ```
+
+
+Target visibility
+=================
+
+As a project grows, enforcing good relations between different modules can be difficult. The
+visibility feature of Pants allows to provide declarative rules as to which parts of the codebase a
+target should be visible (allowed to be used as a dependency).
+
+To enable, add the `pants.backend.experimental.visibility` backend to your configured backends.
+
+```toml pants.toml
+[GLOBAL]
+backend_packages.add = [
+  ...
+  "pants.backend.experimental.visibility",
+]
+```
+
+This registers a new `visibility` field on all target types. It takes a list of
+[specs](doc:goals#goal-arguments), using the same syntax as used for goal arguments and dependencies
+(i.e. target addresses, including glob syntax).
+
+By default, a target is visible to the entire project (i.e. using the `::` address spec). 
+
+Although visibility is specified on a per-target level, often you want the same visibility rules
+applied for all targets within a certain directory or tree. Using
+[`__defaults__`](doc:targets#field-default-values), the following example shows how to only allow
+targets within the same subtree to depend on each other:
+
+```python example/BUILD
+__defaults__(all=dict(visibility=[f"{build_file_dir()}::"]))
+```
+
+Visibility works from a dependency perspective. To limit relations between targets from a dependee
+perspective, using [transitive dependency excludes](doc:targets#dependencies-field) may work well
+when excluding explicit targets.
+
+```python example/BUILD
+target(dependencies=["!!other/target:banned"])
+```
