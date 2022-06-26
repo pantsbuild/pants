@@ -210,6 +210,15 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         )
 
     @classmethod
+    def decode_know_version(cls, known_version: str) -> ExternalToolVersion:
+        try:
+            return ExternalToolVersion.decode(known_version)
+        except ValueError:
+            raise ExternalToolError(
+                f"Bad value for [{cls.options_scope}].known_versions: {known_version}"
+            )
+
+    @classmethod
     def split_known_version_str(cls, known_version: str) -> tuple[str, str, str, int]:
         try:
             ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
