@@ -59,6 +59,22 @@ class DownloadedExternalTool:
     exe: str
 
 
+@dataclass(frozen=True)
+class ExternalToolVersion:
+    version: str
+    platform: str
+    sha256: str
+    filesize: int
+
+    def encode(self) -> str:
+        return "|".join([self.version, self.platform, self.sha256, str(self.filesize)])
+
+    @classmethod
+    def decode(cls, version_str: str) -> ExternalToolVersion:
+        version, platform, sha256, filesize = version_str.split("|")
+        return cls(version, platform, sha256, int(filesize))
+
+
 class ExternalTool(Subsystem, metaclass=ABCMeta):
     """Configuration for an invocable tool that we download from an external source.
 
