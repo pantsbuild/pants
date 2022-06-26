@@ -26,6 +26,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
@@ -135,6 +136,7 @@ async def create_pex_binary_run_request(
 async def run_pex_debug_adapter_binary(
     field_set: PexBinaryFieldSet,
     debugpy: DebugPy,
+    debug_adapter: DebugAdapterSubsystem,
 ) -> RunDebugAdapterRequest:
     if field_set.run_in_sandbox:
         logger.warning(
@@ -179,10 +181,7 @@ async def run_pex_debug_adapter_binary(
     args = [
         regular_run_request.args[0],  # python executable
         _in_chroot(debugpy_pex.name),
-        "--listen",
-        f"{debugpy.host}:{debugpy.port}",
-        "--wait-for-client",
-        *debugpy.main_spec_args(entry_point_or_script),
+        *debugpy.get_args(debug_adapter, entry_point_or_script),
     ]
 
     return RunDebugAdapterRequest(digest=merged_digest, args=args, extra_env=extra_env)
