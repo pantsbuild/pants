@@ -220,13 +220,8 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
 
     @classmethod
     def split_known_version_str(cls, known_version: str) -> tuple[str, str, str, int]:
-        try:
-            ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
-        except ValueError:
-            raise ExternalToolError(
-                f"Bad value for [{cls.options_scope}].known_versions: {known_version}"
-            )
-        return ver, plat_val, sha256, int(length)
+        version = cls.decode_known_version(known_version)
+        return version.version, version.platform, version.sha256, version.filesize
 
     def get_request_for(self, plat_val: str, sha256: str, length: int) -> ExternalToolRequest:
         """Generate a request for this tool from the given info."""
