@@ -201,16 +201,16 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
         for known_version in self.known_versions:
-            ver, plat_val, sha256, length = self.split_known_version_str(known_version)
-            if plat.value == plat_val and ver == self.version:
-                return self.get_request_for(plat_val, sha256, length)
+            version = self.decode_known_version(known_version)
+            if plat.value == version.platform and version.version == self.version:
+                return self.get_request_for(version.platform, version.sha256, version.filesize)
         raise UnknownVersion(
             f"No known version of {self.name} {self.version} for {plat.value} found in "
             f"{self.known_versions}"
         )
 
     @classmethod
-    def decode_know_version(cls, known_version: str) -> ExternalToolVersion:
+    def decode_known_version(cls, known_version: str) -> ExternalToolVersion:
         try:
             return ExternalToolVersion.decode(known_version)
         except ValueError:
