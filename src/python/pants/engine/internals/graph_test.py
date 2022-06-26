@@ -25,6 +25,7 @@ from pants.engine.internals.graph import (
     _DependencyMappingRequest,
     _TargetParametrizations,
 )
+from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, MultiGet, rule
@@ -1926,17 +1927,26 @@ def test_resolve_unparsed_address_inputs() -> None:
             )
         }
     )
-    addresses = rule_runner.request(
-        Addresses,
-        [
-            UnparsedAddressInputs(
-                ["project:t1", ":t2"],
-                owning_address=Address("project", target_name="t3"),
-                description_of_origin="tests",
+
+    def resolve(addresses: list[str], skip_invalid_addresses: bool = False) -> set[Address]:
+        return set(
+            rule_runner.request(
+                Addresses,
+                [
+                    UnparsedAddressInputs(
+                        addresses,
+                        owning_address=Address("project", target_name="t3"),
+                        description_of_origin="from my tests",
+                        skip_invalid_addresses=skip_invalid_addresses,
+                    )
+                ],
             )
-        ],
-    )
-    assert set(addresses) == {
-        Address("project", target_name="t1"),
-        Address("project", target_name="t2"),
-    }
+        )
+
+    t1 = Address("project", target_name="t1")
+    assert resolve(["project:t1", ":t2"]) == {t1, Address("project", target_name="t2")}
+
+    invalid_addresses = ["project:t1", "bad::", "project/fake.txt:tgt"]
+    assert resolve(invalid_addresses, skip_invalid_addresses=True) == {t1}
+    with engine_error(AddressParseException, contains="from my tests"):
+        resolve(invalid_addresses)

@@ -7,14 +7,23 @@ import os.path
 from dataclasses import dataclass
 from typing import Any
 
-from pants.build_graph.address import BuildFileAddressRequest, ResolveError
-from pants.engine.addresses import Address, AddressInput, BuildFileAddress
+from pants.build_graph.address import (
+    Address,
+    AddressInput,
+    BuildFileAddress,
+    BuildFileAddressRequest,
+    MaybeAddress,
+    ResolveError,
+)
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import RegisteredTargetTypes
+from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -62,7 +71,7 @@ async def evaluate_preludes(build_file_options: BuildFileOptions) -> BuildFilePr
 
 
 @rule
-async def resolve_address(address_input: AddressInput) -> Address:
+async def maybe_resolve_address(address_input: AddressInput) -> MaybeAddress:
     # Determine the type of the path_component of the input.
     if address_input.path_component:
         paths = await Get(Paths, PathGlobs(globs=(address_input.path_component,)))
@@ -72,14 +81,14 @@ async def resolve_address(address_input: AddressInput) -> Address:
         is_file, is_dir = False, True
 
     if is_file:
-        return address_input.file_to_address()
-    elif is_dir:
-        return address_input.dir_to_address()
-    else:
-        spec = address_input.path_component
-        if address_input.target_component:
-            spec += f":{address_input.target_component}"
-        raise ResolveError(
+        return MaybeAddress(address_input.file_to_address())
+    if is_dir:
+        return MaybeAddress(address_input.dir_to_address())
+    spec = address_input.path_component
+    if address_input.target_component:
+        spec += f":{address_input.target_component}"
+    return MaybeAddress(
+        ResolveError(
             softwrap(
                 f"""
                 The file or directory '{address_input.path_component}' does not exist on disk in
@@ -88,6 +97,14 @@ async def resolve_address(address_input: AddressInput) -> Address:
                 """
             )
         )
+    )
+
+
+@rule
+async def resolve_address(maybe_address: MaybeAddress) -> Address:
+    if isinstance(maybe_address.val, ResolveError):
+        raise maybe_address.val
+    return maybe_address.val
 
 
 @dataclass(frozen=True)
@@ -103,13 +120,28 @@ class AddressFamilyDir(EngineAwareParameter):
         return self.path
 
 
+@dataclass(frozen=True)
+class OptionalAddressFamily:
+    path: str
+    address_family: AddressFamily | None = None
+
+
+@rule
+async def ensure_address_family(request: OptionalAddressFamily) -> AddressFamily:
+    if request.address_family is None:
+        raise ResolveError(f"Directory '{request.path}' does not contain any BUILD files.")
+    return request.address_family
+
+
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
     build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
     directory: AddressFamilyDir,
-) -> AddressFamily:
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
+) -> OptionalAddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
     The AddressFamily may be empty, but it will not be None.
@@ -124,13 +156,30 @@ async def parse_address_family(
         ),
     )
     if not digest_contents:
-        raise ResolveError(f"Directory '{directory.path}' does not contain any BUILD files.")
+        return OptionalAddressFamily(directory.path)
 
+    defaults = BuildFileDefaults({})
+    parent_dir = os.path.dirname(directory.path)
+    if parent_dir != directory.path:
+        maybe_parent = await Get(OptionalAddressFamily, AddressFamilyDir(parent_dir))
+        if maybe_parent.address_family is not None:
+            defaults = maybe_parent.address_family.defaults
+
+    defaults_parser_state = BuildFileDefaultsParserState.create(
+        directory.path, defaults, registered_target_types, union_membership
+    )
     address_maps = [
-        AddressMap.parse(fc.path, fc.content.decode(), parser, prelude_symbols)
+        AddressMap.parse(
+            fc.path, fc.content.decode(), parser, prelude_symbols, defaults_parser_state
+        )
         for fc in digest_contents
     ]
-    return AddressFamily.create(directory.path, address_maps)
+    return OptionalAddressFamily(
+        directory.path,
+        AddressFamily.create(
+            directory.path, address_maps, defaults_parser_state.get_frozen_defaults()
+        ),
+    )
 
 
 @rule

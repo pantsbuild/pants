@@ -352,17 +352,11 @@ class Target:
         self, unhydrated_values: dict[str, Any], address: Address
     ) -> FrozenDict[type[Field], Field]:
         field_values = {}
-        valid_aliases = set()
-        aliases_to_field_types = {}
-        for field_type in self.field_types:
-            valid_aliases.add(field_type.alias)
-            aliases_to_field_types[field_type.alias] = field_type
-            if field_type.deprecated_alias is not None:
-                valid_aliases.add(field_type.deprecated_alias)
-                aliases_to_field_types[field_type.deprecated_alias] = field_type
+        aliases_to_field_types = self._get_field_aliases_to_field_types(self.field_types)
 
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
+                valid_aliases = set(aliases_to_field_types.keys())
                 if isinstance(self, TargetGenerator):
                     # Even though moved_fields don't live on the target generator, they are valid
                     # for users to specify. It's intentional that these are only used for
@@ -390,6 +384,18 @@ class Target:
         )
 
     @final
+    @classmethod
+    def _get_field_aliases_to_field_types(
+        cls, field_types: tuple[type[Field], ...]
+    ) -> dict[str, type[Field]]:
+        aliases_to_field_types = {}
+        for field_type in field_types:
+            aliases_to_field_types[field_type.alias] = field_type
+            if field_type.deprecated_alias is not None:
+                aliases_to_field_types[field_type.deprecated_alias] = field_type
+        return aliases_to_field_types
+
+    @final
     @property
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
@@ -400,8 +406,16 @@ class Target:
         # NB: We ensure that each Target subtype has its own `PluginField` class so that
         # registering a plugin field doesn't leak across target types.
 
+        baseclass = (
+            object
+            if cast("Type[Target]", cls) is Target
+            else next(
+                base for base in cast("Type[Target]", cls).__bases__ if issubclass(base, Target)
+            )._plugin_field_cls
+        )
+
         @union
-        class PluginField:
+        class PluginField(baseclass):  # type: ignore[misc, valid-type]
             pass
 
         return PluginField

@@ -30,6 +30,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter::{FromIterator, Iterator};
 use std::path::PathBuf;
 use std::process::exit;
+use std::sync::Arc;
 use std::time::Duration;
 
 use fs::{DirectoryDigest, Permissions, RelativePath};
@@ -289,24 +290,39 @@ async fn main() {
         );
       }
 
+      let remote_runner = process_execution::remote::CommandRunner::new(
+        &address,
+        process_metadata.clone(),
+        root_ca_certs.clone(),
+        headers.clone(),
+        store.clone(),
+        Platform::Linux_x86_64,
+        Duration::from_secs(args.overall_deadline_secs),
+        Duration::from_millis(100),
+        args.execution_rpc_concurrency,
+        None,
+      )
+      .expect("Failed to make remote command runner");
+
       let command_runner_box: Box<dyn process_execution::CommandRunner> = {
         Box::new(
-          process_execution::remote::CommandRunner::new(
-            &address,
-            &address,
+          process_execution::remote_cache::CommandRunner::new(
+            Arc::new(remote_runner),
             process_metadata,
+            executor,
+            store.clone(),
+            &address,
             root_ca_certs,
             headers,
-            store.clone(),
             Platform::Linux_x86_64,
-            Duration::from_secs(args.overall_deadline_secs),
-            Duration::from_millis(100),
-            args.execution_rpc_concurrency,
+            true,
+            true,
+            process_execution::remote_cache::RemoteCacheWarningsBehavior::Backoff,
+            false,
             args.cache_rpc_concurrency,
             Duration::from_secs(2),
-            None,
           )
-          .expect("Failed to make command runner"),
+          .expect("Failed to make remote cache command runner"),
         )
       };
 

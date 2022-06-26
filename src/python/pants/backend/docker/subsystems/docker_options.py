@@ -46,6 +46,7 @@ class DockerOptions(Subsystem):
                         "default": bool,
                         "extra_image_tags": [],
                         "skip_push": bool,
+                        "repository": str,
                     },
                     ...
                 }
@@ -67,6 +68,10 @@ class DockerOptions(Subsystem):
             `extra_image_tags` option. The tags may use value formatting the same as for the
             `image_tags` field of the `docker_image` target.
 
+            When a registry provides a `repository` value, it will be used instead of the
+            `docker_image.repository` or the default repository. Using the placeholders
+            `{target_repository}` or `{default_repository}` those overridden values may be
+            incorporated into the registry specific repository value.
             """
         ),
         fromfile=True,
@@ -80,7 +85,7 @@ class DockerOptions(Subsystem):
             The value is formatted and may reference these variables (in addition to the normal
             placeheolders derived from the Dockerfile and build args etc):
 
-            {bullet_list(["name", "directory", "parent_directory"])}
+            {bullet_list(["name", "directory", "parent_directory", "target_repository"])}
 
             Example: `--default-repository="{{directory}}/{{name}}"`.
 
@@ -89,6 +94,8 @@ class DockerOptions(Subsystem):
             target, and its parent directory respectively.
 
             Use the `repository` field to set this value directly on a `docker_image` target.
+
+            Registries may override the repository value for a specific registry.
 
             Any registries or tags are added to the image name as required, and should
             not be part of the repository name.

@@ -146,6 +146,7 @@ class StatsAggregatorCallback(WorkunitsCallback):
                 f"  mean: {histogram.get_mean_value():.3f}\n"
                 f"  std dev: {histogram.get_stddev():.3f}\n"
                 f"  total observations: {histogram.total_count}\n"
+                f"  sum: {int(histogram.get_mean_value() * histogram.total_count)}\n"
                 f"{percentile_to_vals}"
             )
 
