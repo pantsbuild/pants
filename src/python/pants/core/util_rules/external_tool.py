@@ -71,7 +71,7 @@ class ExternalToolVersion:
 
     @classmethod
     def decode(cls, version_str: str) -> ExternalToolVersion:
-        version, platform, sha256, filesize = version_str.split("|")
+        version, platform, sha256, filesize = [x.strip() for x in version_str.split("|")]
         return cls(version, platform, sha256, int(filesize))
 
 
