@@ -45,6 +45,7 @@ class DebugPy(PythonToolBase):
         # NB: This is only necessary while debugpy supports Py 3.7, as `importlib.metadata` was
         # added in Py 3.8 and would allow us to resolve the console_script using just the stdlib.
         return (
+            "-c",
             (
                 "from pex.third_party.pkg_resources import working_set;"
                 + f"(next(working_set.iter_entry_points('console_scripts', '{main.name}')).resolve())()"
