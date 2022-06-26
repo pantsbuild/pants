@@ -1,8 +1,9 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import csv
 import logging
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
@@ -52,6 +53,14 @@ def get_tf_links(page: BeautifulSoup) -> Links:
 
 
 @dataclass(frozen=True)
+class SignatureInfo:
+    sha256sums: List[
+        Tuple[str, ...]
+    ]  # TODO: should be List[Tuple[str, str]], but we need to provide evidence
+    signature: bytes
+
+
+@dataclass(frozen=True)
 class TFVersionInfo:
     signature_links: Links
     platform_links: Links
@@ -89,6 +98,26 @@ def make_tool_version(
     return ExternalToolVersion(version_number, pants_platform, hash, file_size)
 
 
+def sha256sums_from_info(info: SignatureInfo) -> Dict[str, str]:
+    return {filename: sha256sums for sha256sums, filename in info.sha256sums}
+
+
+def parse_signatures(links: Links) -> SignatureInfo:
+    def link_ends_with(what: str) -> str:
+        return next(filter(lambda s: s.endswith(what), links.values()))
+
+    sha256sums_link = link_ends_with("SHA256SUMS")
+    sha256sums_raw = requests.get(sha256sums_link).text
+    sha256sums = [
+        tuple(filter(None, x)) for x in csv.reader(StringIO(sha256sums_raw), delimiter=" ")
+    ]
+
+    signature_link = link_ends_with("SHA256SUMS.sig")
+    signature = requests.get(signature_link).content
+
+    return SignatureInfo(sha256sums, signature)
+
+
 def fetch_versions(url: str) -> List["ExternalToolVersion"]:
     version_page = get_tf_page(url)
     version_links = get_tf_links(version_page)
@@ -99,11 +128,15 @@ def fetch_versions(url: str) -> List["ExternalToolVersion"]:
     out = []
     for version_slug, version_infos in platform_version_links.items():
         logging.info(version_infos.platform_links)
-        for n, platform_link in version_infos.platform_links.items():
+        signatures_info = parse_signatures(version_infos.signature_links)
+        sha256sums = sha256sums_from_info(signatures_info)
+
+        for filename, platform_link in version_infos.platform_links.items():
             logging.info(f"platform {platform_link}")
             file_size = get_file_size(platform_link)
             version, platform = parse_download_url(platform_link)
-            tool_version = make_tool_version(version, platform, file_size, None)
+            sha256sum = sha256sums.get(filename)
+            tool_version = make_tool_version(version, platform, file_size, sha256sum)
             if tool_version:
                 out.append(tool_version)
     print(out)
