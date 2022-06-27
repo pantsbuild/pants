@@ -139,9 +139,9 @@ def fetch_versions(url: str) -> List["ExternalToolVersion"]:
             tool_version = make_tool_version(version, platform, file_size, sha256sum)
             if tool_version:
                 out.append(tool_version)
-    print(out)
     return out
 
 
 if __name__ == "__main__":
-    fetch_versions(versions_url)
+    versions = fetch_versions(versions_url)
+    print([v.encode() for v in versions])
