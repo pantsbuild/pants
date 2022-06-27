@@ -30,8 +30,8 @@ class PexRuntimeEnvironment(Subsystem):
     options_scope = "pex"
     help = "How Pants uses Pex to run Python subprocesses."
 
-    _run_packaged_firstparty_code = BoolOption(
-        "--run-packaged-firstparty-code",
+    _run_packaged_firstparty = BoolOption(
+        "--run-packaged-firstparty",
         default=False,
         help=softwrap(
             """
@@ -87,23 +87,23 @@ class PexRuntimeEnvironment(Subsystem):
     )
 
     @property
-    def run_packaged_firstparty_code(self) -> bool:
-        if self.options.is_default("run_packaged_firstparty_code"):
+    def run_packaged_firstparty(self) -> bool:
+        if self.options.is_default("run_packaged_firstparty"):
             warn_or_error(
-                "2.14.0.dev0",
-                "the option --pex-run-packaged-firstparty-code defaulting to false",
+                "2.15.0.dev0",
+                "the option --pex-run-packaged-firstparty defaulting to false",
                 softwrap(
                     """
-                    In Pants 2.14, by default, running a `pex_binary` will actually package the PEX
+                    In Pants 2.15, by default, running a `pex_binary` will actually package the PEX
                     and run it, as if you ran `package` followed by executing the built PEX.
 
-                    To fix this deprecation, explictly set `run_packaged_firstparty_code` in the
+                    To fix this deprecation, explictly set `run_packaged_firstparty` in the
                     `[pex]` section of `pants.toml`. Set it to `false` to use the "old" behavior.
                     Set it to `true` to use the "new" behavior.
                     """
                 ),
             )
-        return self._run_packaged_firstparty_code
+        return self._run_packaged_firstparty
 
     @memoized_method
     def path(self, env: Environment) -> tuple[str, ...]:

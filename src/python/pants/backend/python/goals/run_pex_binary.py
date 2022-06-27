@@ -21,7 +21,7 @@ async def create_pex_binary_run_request(
     pex_binary_defaults: PexBinaryDefaults,
     pex_env: PexEnvironment,
 ) -> RunRequest:
-    if pex.run_packaged_firstparty_code:
+    if pex.run_packaged_firstparty:
         built_pex = await Get(BuiltPackage, PexBinaryFieldSet, field_set)
         relpath = built_pex.artifacts[0].relpath
         assert relpath is not None
@@ -34,7 +34,7 @@ async def create_pex_binary_run_request(
         field_set.address,
         entry_point_field=field_set.entry_point,
         pex_env=pex_env,
-        run_in_sandbox=True,
+        run_in_sandbox=field_set.run_in_sandbox.value,
         console_script=field_set.script.value,
         additional_pex_args=field_set.generate_additional_args(pex_binary_defaults),
     )

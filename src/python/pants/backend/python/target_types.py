@@ -282,7 +282,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-# @TODO: Remove the SecondaryOwnerMixin in Pants 2.14.0
+# @TODO: Remove the SecondaryOwnerMixin in Pants 2.15.0
 class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
@@ -593,6 +593,33 @@ class PexIncludeToolsField(BoolField):
     )
 
 
+class PexRunInSandboxField(BoolField):
+    alias = "run_in_sandbox"
+    default = True
+    removal_version = "2.15.0.dev0"
+    removal_hint = softwrap(
+        """
+        In Pants 2.15, running a `pex_binary` will package-and-run the PEX instead of the loose
+        sources. Additionally, support was added to allow running a `python_source` directly, which
+        by-default runs in-repo (and not in the sandbox).
+        """
+    )
+    help = softwrap(
+        """
+        If true, runs of this target with the `run` goal will copy the needed first-party sources
+        into a temporary chroot and run from there.
+        If false, runs of this target with the `run` goal will use the in-repo sources directly.
+
+        The former mode is more hermetic, and is closer to building and running a standalone binary.
+
+        The latter mode may be necessary if the binary being run writes files into the repo and
+        computes their location relative to the executed files. Django's makemigrations command
+        is an example of such a process.  It may also have lower latency, since no files need
+        to be copied into a chroot.
+        """
+    )
+
+
 _PEX_BINARY_COMMON_FIELDS = (
     InterpreterConstraintsField,
     PythonResolveField,
@@ -609,6 +636,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexExecutionModeField,
     PexIncludeRequirementsField,
     PexIncludeToolsField,
+    PexRunInSandboxField,
     RestartableField,
 )
 
