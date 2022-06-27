@@ -7,6 +7,7 @@ from pathlib import PurePath
 from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -137,6 +138,7 @@ class Run(Goal):
 @goal_rule
 async def run(
     run_subsystem: RunSubsystem,
+    debug_adapter: DebugAdapterSubsystem,
     global_options: GlobalOptions,
     workspace: Workspace,
     build_root: BuildRoot,
@@ -178,7 +180,14 @@ async def run(
         args = (arg.format(chroot=tmpdir) for arg in request.args)
         env = {**complete_env, **{k: v.format(chroot=tmpdir) for k, v in request.extra_env.items()}}
         if run_subsystem.debug_adapter:
-            logger.info("Launching debug adapter, which will wait for a client connection...")
+            logger.info(
+                softwrap(
+                    f"""
+                    Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
+                    which will wait for a client connection...
+                    """
+                )
+            )
 
         result = await Effect(
             InteractiveProcessResult,
