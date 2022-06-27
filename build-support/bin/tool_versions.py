@@ -29,7 +29,17 @@ def partition(predicate: Callable[[Any], bool], items: Iterable) -> Tuple[List, 
     return where_true, where_false
 
 
-versions_url = "https://releases.hashicorp.com/terraform/"
+class GPGVerifier:
+    def __init__(self, keydata):
+        self.gpg = gnupg.GPG(gnupghome=".")
+        self.gpg.import_keys(keydata)  # TODO: handle import error
+
+    def validate_signature(self, signatures: bytes, content: bytes) -> gnupg.Verify:
+        with tempfile.NamedTemporaryFile() as signature_file:
+            signature_file.write(signatures)
+            signature_file.flush()
+            verify = self.gpg.verify_data(signature_file.name, content)
+        return verify
 
 
 @dataclass(frozen=True)
@@ -53,34 +63,6 @@ def get_tf_links(page: BeautifulSoup) -> Links:
         if not li.a.get("href").startswith("..")
     ]
     return links
-
-
-class GPGVerifier:
-    def __init__(self, keydata):
-        self.gpg = gnupg.GPG(gnupghome=".")
-        self.gpg.import_keys(keydata)  # TODO: handle import error
-
-    def validate_signature(self, signatures: bytes, content: bytes) -> gnupg.Verify:
-        with tempfile.NamedTemporaryFile() as signature_file:
-            signature_file.write(signatures)
-            signature_file.flush()
-            verify = self.gpg.verify_data(signature_file.name, content)
-        return verify
-
-
-@dataclass(frozen=True)
-class VersionHash:
-    filename: str
-    sha256sum: str
-
-
-@dataclass(frozen=True)
-class VersionHashes:
-    sha256sums: List[VersionHash]
-    signature: bytes
-
-    def by_file(self) -> Dict[str, str]:
-        return {x.filename: x.sha256sum for x in self.sha256sums}
 
 
 @dataclass(frozen=True)
@@ -108,15 +90,19 @@ def parse_download_url(url: str) -> Tuple[str, str]:
     return version, platform_name + "_" + platform_arch
 
 
-def make_tool_version(
-    version_number, tf_platform, file_size, hash=None
-) -> Optional[ExternalToolVersion]:
-    inverse_platform_mapping = {v: k for k, v in TerraformTool.default_url_platform_mapping.items()}
-    if tf_platform not in inverse_platform_mapping:
-        return None
-    pants_platform = inverse_platform_mapping[tf_platform]
+@dataclass(frozen=True)
+class VersionHash:
+    filename: str
+    sha256sum: str
 
-    return ExternalToolVersion(version_number, pants_platform, hash, file_size)
+
+@dataclass(frozen=True)
+class VersionHashes:
+    sha256sums: List[VersionHash]
+    signature: bytes
+
+    def by_file(self) -> Dict[str, str]:
+        return {x.filename: x.sha256sum for x in self.sha256sums}
 
 
 def parse_signatures(links: Links, verifier: GPGVerifier) -> VersionHashes:
@@ -146,14 +132,23 @@ def parse_signatures(links: Links, verifier: GPGVerifier) -> VersionHashes:
     return VersionHashes(sha256sums, signature)
 
 
-def fetch_versions(url: str) -> List["ExternalToolVersion"]:
+def make_tool_version(
+    version_number, tf_platform, file_size, hash=None
+) -> Optional[ExternalToolVersion]:
+    inverse_platform_mapping = {v: k for k, v in TerraformTool.default_url_platform_mapping.items()}
+    if tf_platform not in inverse_platform_mapping:
+        return None
+    pants_platform = inverse_platform_mapping[tf_platform]
+
+    return ExternalToolVersion(version_number, pants_platform, hash, file_size)
+
+
+def fetch_versions(url: str, verifier: GPGVerifier) -> List[ExternalToolVersion]:
     version_page = get_tf_page(url)
     version_links = get_tf_links(version_page)
     platform_version_links = {
         x.text: get_platform_info(urljoin(url, x.link)) for x in version_links[:5]
     }
-    keydata = requests.get("https://keybase.io/hashicorp/pgp_keys.asc").content
-    verifier = GPGVerifier(keydata)
 
     out = []
     for version_slug, version_infos in platform_version_links.items():
@@ -173,5 +168,10 @@ def fetch_versions(url: str) -> List["ExternalToolVersion"]:
 
 
 if __name__ == "__main__":
-    versions = fetch_versions(versions_url)
+    versions_url = "https://releases.hashicorp.com/terraform/"
+
+    keydata = requests.get("https://keybase.io/hashicorp/pgp_keys.asc").content
+    verifier = GPGVerifier(keydata)
+
+    versions = fetch_versions(versions_url, verifier)
     print([v.encode() for v in versions])
