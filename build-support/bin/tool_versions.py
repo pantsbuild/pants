@@ -68,8 +68,7 @@ class TFVersionInfo:
     platform_links: Links
 
 
-def get_platform_info(base_url: str, slug: str) -> TFVersionInfo:
-    url = urljoin(base_url, slug)
+def get_platform_info(url) -> TFVersionInfo:
     logging.info(f"get {url}")
     all_links = get_tf_links(get_tf_page(url))
     s, p = partition(lambda i: "SHA" in i.link, all_links)
@@ -107,14 +106,12 @@ def parse_signatures(links: Links) -> SignatureInfo:
     def link_ends_with(what: str) -> Link:
         return next(filter(lambda s: s.link.endswith(what), links))
 
-    sha256sums_link = link_ends_with("SHA256SUMS").link
-    sha256sums_raw = requests.get(sha256sums_link).text
+    sha256sums_raw = requests.get(link_ends_with("SHA256SUMS").link).text
     sha256sums = [
         tuple(filter(None, x)) for x in csv.reader(StringIO(sha256sums_raw), delimiter=" ")
     ]
 
-    signature_link = link_ends_with("SHA256SUMS.sig").link
-    signature = requests.get(signature_link).content
+    signature = requests.get(link_ends_with("SHA256SUMS.sig").link).content
 
     return SignatureInfo(sha256sums, signature)
 
@@ -122,7 +119,9 @@ def parse_signatures(links: Links) -> SignatureInfo:
 def fetch_versions(url: str) -> List["ExternalToolVersion"]:
     version_page = get_tf_page(url)
     version_links = get_tf_links(version_page)
-    platform_version_links = {x.text: get_platform_info(url, x.link) for x in version_links[:5]}
+    platform_version_links = {
+        x.text: get_platform_info(urljoin(url, x.link)) for x in version_links[:5]
+    }
     out = []
     for version_slug, version_infos in platform_version_links.items():
         logging.info(version_infos.platform_links)
