@@ -229,7 +229,7 @@ If you use multiple files with `test --debug`, they will run sequentially rather
 > ❯ ./pants test --debug  <target>   -- -s
 > ```
 
-> 📘 Tip: using the VS Code (or any debug adatper-compliant editor) remote debugger in tests
+> 📘 Tip: using the VS Code (or any DAP-compliant editor) remote debugger in tests
 >
 >
 > 1. Configure your editor's breakpoints and exception settings
