@@ -319,6 +319,7 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
+    # See also `run.py`'s same option
     debug_adapter = BoolOption(
         "--debug-adapter",
         default=False,
