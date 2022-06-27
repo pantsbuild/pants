@@ -23,7 +23,7 @@ class PyUpgrade(PythonToolBase):
         "Upgrade syntax for newer versions of the language (https://github.com/asottile/pyupgrade)."
     )
 
-    default_version = "pyupgrade>=2.31.0,<2.32"
+    default_version = "pyupgrade>=2.33.0,<2.35"
     default_main = ConsoleScript("pyupgrade")
 
     register_interpreter_constraints = True
