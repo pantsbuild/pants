@@ -6,7 +6,7 @@ import tempfile
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Tuple
 from urllib.parse import urljoin, urlparse
 
 import gnupg  # type: ignore
@@ -132,23 +132,14 @@ def parse_signatures(links: Links, verifier: GPGVerifier) -> VersionHashes:
     return VersionHashes(sha256sums, signature)
 
 
-def make_tool_version(
-    version_number, tf_platform, file_size, hash=None
-) -> Optional[ExternalToolVersion]:
-    inverse_platform_mapping = {v: k for k, v in TerraformTool.default_url_platform_mapping.items()}
-    if tf_platform not in inverse_platform_mapping:
-        return None
-    pants_platform = inverse_platform_mapping[tf_platform]
-
-    return ExternalToolVersion(version_number, pants_platform, hash, file_size)
-
-
 def fetch_versions(url: str, verifier: GPGVerifier) -> List[ExternalToolVersion]:
     version_page = get_tf_page(url)
     version_links = get_tf_links(version_page)
     platform_version_links = {
         x.text: get_platform_info(urljoin(url, x.link)) for x in version_links[:5]
     }
+
+    inverse_platform_mapping = {v: k for k, v in TerraformTool.default_url_platform_mapping.items()}
 
     out = []
     for version_slug, version_infos in platform_version_links.items():
@@ -157,11 +148,22 @@ def fetch_versions(url: str, verifier: GPGVerifier) -> List[ExternalToolVersion]
         sha256sums = signatures_info.by_file()
 
         for platform_link in version_infos.platform_links:
-            logging.info(f"platform {platform_link.link}")
-            file_size = get_file_size(platform_link.link)
             version, platform = parse_download_url(platform_link.link)
+
+            if platform not in inverse_platform_mapping:
+                continue
+            pants_platform = inverse_platform_mapping[platform]
+
+            file_size = get_file_size(platform_link.link)
             sha256sum = sha256sums.get(platform_link.text)
-            tool_version = make_tool_version(version, platform, file_size, sha256sum)
+            if not sha256sum:
+                logging.warning(
+                    f"did not find sha256 sum for version={version} platform={platform}"
+                )
+                continue
+
+            tool_version = ExternalToolVersion(version, pants_platform, sha256sum, file_size)
+
             if tool_version:
                 out.append(tool_version)
     return out
