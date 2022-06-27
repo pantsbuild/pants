@@ -1,8 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
-import dataclasses
 import logging
 import os
 
@@ -148,19 +146,13 @@ async def run_pex_debug_adapter_binary(
             )
         )
 
-    debugpy_pex_request = debugpy.to_pex_request()
-    debugpy_pex_request = dataclasses.replace(
-        debugpy_pex_request,
-        additional_args=debugpy_pex_request.additional_args + ("--no-strip-pex-env",),
-    )
-
     entry_point, regular_run_request, debugpy_pex = await MultiGet(
         Get(
             ResolvedPexEntryPoint,
             ResolvePexEntryPointRequest(field_set.entry_point),
         ),
         Get(RunRequest, PexBinaryFieldSet, field_set),
-        Get(Pex, PexRequest, debugpy_pex_request),
+        Get(Pex, PexRequest, debugpy.to_pex_request()),
     )
 
     entry_point_or_script = entry_point.val or field_set.script.value
