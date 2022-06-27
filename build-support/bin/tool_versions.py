@@ -2,16 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import csv
 import logging
+import tempfile
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
+import gnupg  # type: ignore
 import requests
 from bs4 import BeautifulSoup
 
-# from pants.core.util_rules.external_tool import ExternalToolVersion
 from pants.backend.terraform.tool import TerraformTool
 from pants.core.util_rules.external_tool import ExternalToolVersion
 
@@ -52,6 +53,19 @@ def get_tf_links(page: BeautifulSoup) -> Links:
         if not li.a.get("href").startswith("..")
     ]
     return links
+
+
+class GPGVerifier:
+    def __init__(self, keydata):
+        self.gpg = gnupg.GPG(gnupghome=".")
+        self.gpg.import_keys(keydata)  # TODO: handle import error
+
+    def validate_signature(self, signatures: bytes, content: bytes) -> gnupg.Verify:
+        with tempfile.NamedTemporaryFile() as signature_file:
+            signature_file.write(signatures)
+            signature_file.flush()
+            verify = self.gpg.verify_data(signature_file.name, content)
+        return verify
 
 
 @dataclass(frozen=True)
@@ -105,15 +119,15 @@ def make_tool_version(
     return ExternalToolVersion(version_number, pants_platform, hash, file_size)
 
 
-def parse_signatures(links: Links) -> VersionHashes:
+def parse_signatures(links: Links, verifier: GPGVerifier) -> VersionHashes:
     def link_ends_with(what: str) -> Link:
         return next(filter(lambda s: s.link.endswith(what), links))
 
-    sha256sums_raw = requests.get(link_ends_with("SHA256SUMS").link).text
+    sha256sums_raw = requests.get(link_ends_with("SHA256SUMS").link)
     sha256sums = [
         VersionHash(**x)
         for x in csv.DictReader(
-            StringIO(sha256sums_raw),
+            StringIO(sha256sums_raw.text),
             delimiter=" ",
             skipinitialspace=True,
             fieldnames=["sha256sum", "filename"],
@@ -121,6 +135,13 @@ def parse_signatures(links: Links) -> VersionHashes:
     ]
 
     signature = requests.get(link_ends_with("SHA256SUMS.sig").link).content
+
+    vr = verifier.validate_signature(signature, sha256sums_raw.content)
+    if not vr.valid:
+        logging.error(vr.status)
+        raise RuntimeError("signature is not valid :(")
+    else:
+        logging.info("signature is valid :)")
 
     return VersionHashes(sha256sums, signature)
 
@@ -131,10 +152,13 @@ def fetch_versions(url: str) -> List["ExternalToolVersion"]:
     platform_version_links = {
         x.text: get_platform_info(urljoin(url, x.link)) for x in version_links[:5]
     }
+    keydata = requests.get("https://keybase.io/hashicorp/pgp_keys.asc").content
+    verifier = GPGVerifier(keydata)
+
     out = []
     for version_slug, version_infos in platform_version_links.items():
         logging.info(version_infos.platform_links)
-        signatures_info = parse_signatures(version_infos.signature_links)
+        signatures_info = parse_signatures(version_infos.signature_links, verifier)
         sha256sums = signatures_info.by_file()
 
         for platform_link in version_infos.platform_links:
