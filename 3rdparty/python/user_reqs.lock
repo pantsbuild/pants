@@ -12,6 +12,7 @@
 //     "PyYAML<7.0,>=6.0",
 //     "ansicolors==1.1.8",
 //     "chevron==0.14.0",
+//     "debugpy==1.6.0",
 //     "fastapi==0.78.0",
 //     "fasteners==0.16.3",
 //     "freezegun==1.1.0",
@@ -203,13 +204,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "687b5fe14be40aadcf547cae91337a1fdb84026046a39370274e54d3fe4fb4f9",
-              "url": "https://files.pythonhosted.org/packages/d8/32/77a2792d80c00083626e0d6ce41ba8254b632c960235d3a5a731c185d936/backports.cached_property-1.0.1-py3-none-any.whl"
+              "hash": "baeb28e1cd619a3c9ab8941431fe34e8490861fb998c6c4590693d50171db0cc",
+              "url": "https://files.pythonhosted.org/packages/eb/ae/69e52acdcf381b108b36d989ea58656de4a9ab8863aba6176d80d01041df/backports.cached_property-1.0.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1a5ef1e750f8bc7d0204c807aae8e0f450c655be0cf4b30407a35fd4bb27186c",
-              "url": "https://files.pythonhosted.org/packages/4f/d8/fd7b8e24a207023e39b9c0cd607a9b3ba757552ec0d81b4328183961af2e/backports.cached-property-1.0.1.tar.gz"
+              "hash": "9306f9eed6ec55fd156ace6bc1094e2c86fae5fb2bf07b6a9c00745c656e75dd",
+              "url": "https://files.pythonhosted.org/packages/08/83/4cea5c665d2af765c02f7d8e8560b5918405c1d7d11ccfc60c4919c1cfd0/backports.cached-property-1.0.2.tar.gz"
             }
           ],
           "project_name": "backports-cached-property",
@@ -217,25 +218,25 @@
             "typing>=3.6; python_version < \"3.7\""
           ],
           "requires_python": ">=3.6.0",
-          "version": "1.0.1"
+          "version": "1.0.2"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f1d53542ee8cbedbe2118b5686372fb33c297fcd6379b050cca0ef13a597382a",
-              "url": "https://files.pythonhosted.org/packages/11/dd/e015f3780f42dd9af62cf0107b44ea1298926627ecd70c17b0e484e95bcd/certifi-2022.5.18.1-py3-none-any.whl"
+              "hash": "fe86415d55e84719d75f8b69414f6438ac3547d2078ab91b67e779ef69378412",
+              "url": "https://files.pythonhosted.org/packages/e9/06/d3d367b7af6305b16f0d28ae2aaeb86154fa91f144f036c2d5002a5a202b/certifi-2022.6.15-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9c5705e395cd70084351dd8ad5c41e65655e08ce46f2ec9cf6c2c08390f71eb7",
-              "url": "https://files.pythonhosted.org/packages/07/10/75277f313d13a2b74fc56e29239d5c840c2bf09f17bf25c02b35558812c6/certifi-2022.5.18.1.tar.gz"
+              "hash": "84c85a9078b11105f04f3036a9482ae10e4621616db313fe045dd24743a0820d",
+              "url": "https://files.pythonhosted.org/packages/cc/85/319a8a684e8ac6d87a1193090e06b6bbb302717496380e225ee10487c888/certifi-2022.6.15.tar.gz"
             }
           ],
           "project_name": "certifi",
           "requires_dists": [],
           "requires_python": ">=3.6",
-          "version": "2022.5.18.1"
+          "version": "2022.6.15"
         },
         {
           "artifacts": [
@@ -300,19 +301,97 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2",
-              "url": "https://files.pythonhosted.org/packages/44/98/5b86278fbbf250d239ae0ecb724f8572af1c91f4a11edf4d36a206189440/colorama-0.4.4-py2.py3-none-any.whl"
+              "hash": "854bf444933e37f5824ae7bfc1e98d5bce2ebe4160d46b5edf346a89358e99da",
+              "url": "https://files.pythonhosted.org/packages/77/8b/7550e87b2d308a1b711725dfaddc19c695f8c5fa413c640b2be01662f4e6/colorama-0.4.5-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b",
-              "url": "https://files.pythonhosted.org/packages/1f/bb/5d3246097ab77fa083a61bd8d3d527b7ae063c7d8e8671b1cf8c4ec10cbe/colorama-0.4.4.tar.gz"
+              "hash": "e6c6b4334fc50988a639d9b98aa429a0b57da6e17b9a44f0451f930b6967b7a4",
+              "url": "https://files.pythonhosted.org/packages/2b/65/24d033a9325ce42ccbfa3ca2d0866c7e89cc68e5b9d92ecaba9feef631df/colorama-0.4.5.tar.gz"
             }
           ],
           "project_name": "colorama",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "0.4.4"
+          "version": "0.4.5"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "4de7777842da7e08652f2776c552070bbdd758557fdec73a15d7be0e4aab95ce",
+              "url": "https://files.pythonhosted.org/packages/e3/9c/0920139b8ccce7565e1e5ba1ccdeeba281bbab37392689aa00dfb6b55a6d/debugpy-1.6.0-py2.py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "8ee75844242b4537beb5899f3e60a578454d1f136b99e8d57ac424573797b94a",
+              "url": "https://files.pythonhosted.org/packages/0e/21/eaac4b6ff2503e2ad86b3cdd7fe2875cbcd11af2b648eef8285346290196/debugpy-1.6.0-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "a65a2499761d47df3e9ea9567109be6e73d412e00ac3ffcf74839f3ddfcdf028",
+              "url": "https://files.pythonhosted.org/packages/1b/b5/eabd458d90029c480069c59c9dc17ae46bc52201b4c11e6d13d046295836/debugpy-1.6.0-cp38-cp38-win32.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "132defb585b518955358321d0f42f6aa815aa15b432be27db654807707c70b2f",
+              "url": "https://files.pythonhosted.org/packages/29/14/37d8721384550a40d766634a0aa6ecdcd1967c462f9c1ef38e1ad4d87bb1/debugpy-1.6.0-cp38-cp38-macosx_10_15_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "bd980d533d0ddfc451e03a3bb32acb2900049fec39afc3425b944ebf0889be62",
+              "url": "https://files.pythonhosted.org/packages/2f/e0/535f9a5e4e0c0b5ad79a5ec6820b1409b3d9faa516898ab9206bf0a9807c/debugpy-1.6.0-cp38-cp38-win_amd64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "0e3aa2368883e83e7b689ddff3cafb595f7b711f6a065886b46a96a7fef874e7",
+              "url": "https://files.pythonhosted.org/packages/31/c4/7da0696f7f07dc30d474d06cf087c788d1dad12d6fdb39b0ba8cbece1f72/debugpy-1.6.0-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "245c7789a012f86210847ec7ee9f38c30a30d4c2223c3e111829a76c9006a5d0",
+              "url": "https://files.pythonhosted.org/packages/45/a7/0bf4729aa497cc8837e9b525f34e6bad69f2191cfc14d63b36214add7a5c/debugpy-1.6.0-cp39-cp39-macosx_10_15_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "72bcfa97f3afa0064afc77ab811f48ad4a06ac330f290b675082c24437730366",
+              "url": "https://files.pythonhosted.org/packages/56/a4/45ec0767478544d64610fd587be8532705dcc84e8cdf56cbd7f427d76f3c/debugpy-1.6.0-cp39-cp39-win32.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "7b79c40852991f7b6c3ea65845ed0f5f6b731c37f4f9ad9c61e2ab4bd48a9275",
+              "url": "https://files.pythonhosted.org/packages/9c/45/8e3384e99b8bf79f8ba937aa3e726331789bdfb65ab03aedaedda9e2d30b/debugpy-1.6.0.zip"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "1ff853e60e77e1c16f85a31adb8360bb2d98ca588d7ed645b7f0985b240bdb5e",
+              "url": "https://files.pythonhosted.org/packages/9d/70/f05a8ba35d5b75045c7fbbd268fe3b4d721b4013df42c30b00aed5bfda54/debugpy-1.6.0-cp37-cp37m-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "0d383b91efee57dbb923ba20801130cf60450a0eda60bce25bccd937de8e323a",
+              "url": "https://files.pythonhosted.org/packages/a2/4f/b194a30eadabe0b578a4e9cf2ac9b1e387f0f5d2d6333d9bca18b69de689/debugpy-1.6.0-cp37-cp37m-macosx_10_15_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "a8aaeb53e87225141fda7b9081bd87155c1debc13e2f5a532d341112d1983b65",
+              "url": "https://files.pythonhosted.org/packages/b5/af/160a2ab46f9ff4061b6e1e47cfe4fb23f04cf262f75d7c49324f12368d31/debugpy-1.6.0-cp37-cp37m-win_amd64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "8e972c717d95f56b6a3a7a29a5ede1ee8f2c3802f6f0e678203b0778eb322bf1",
+              "url": "https://files.pythonhosted.org/packages/d7/d4/abdb31e438dd07bc4f358ac3fef2f2e4abb4d00af9b808dfbe71250be5ef/debugpy-1.6.0-cp37-cp37m-win32.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "30abefefd2ff5a5481162d613cb70e60e2fa80a5eb4c994717c0f008ed25d2e1",
+              "url": "https://files.pythonhosted.org/packages/f8/45/177e6a7623ebe40c1ae732c79011491809c76f758d98dc826098fbe1dd47/debugpy-1.6.0-cp39-cp39-win_amd64.whl"
+            }
+          ],
+          "project_name": "debugpy",
+          "requires_dists": [],
+          "requires_python": ">=3.7",
+          "version": "1.6"
         },
         {
           "artifacts": [
@@ -776,13 +855,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c58c8eb8a762858f49e18436ff552e83914778e50e9d2f1660535ffb364552ec",
-              "url": "https://files.pythonhosted.org/packages/ab/b5/1bd220dd470b0b912fc31499e0d9c652007a60caf137995867ccc4b98cb6/importlib_metadata-4.11.4-py3-none-any.whl"
+              "hash": "7401a975809ea1fdc658c3aa4f78cc2195a0e019c5cbc4c06122884e9ae80c23",
+              "url": "https://files.pythonhosted.org/packages/d2/a2/8c239dc898138f208dd14b441b196e7b3032b94d3137d9d8453e186967fc/importlib_metadata-4.12.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5d26852efe48c0a32b0509ffbc583fda1a2266545a78d104a6f4aff3db17d700",
-              "url": "https://files.pythonhosted.org/packages/35/a8/f2bd0d488c2bf932b4dda0fb91cbb687c0b1132b33130d1cfad4e2b4b963/importlib_metadata-4.11.4.tar.gz"
+              "hash": "637245b8bab2b6502fcbc752cc4b7a6f6243bb02b31c5c26156ad103d3d45670",
+              "url": "https://files.pythonhosted.org/packages/1a/16/441080c907df829016729e71d8bdd42d99b9bdde48b01492ed08912c0aa9/importlib_metadata-4.12.0.tar.gz"
             }
           ],
           "project_name": "importlib-metadata",
@@ -796,7 +875,7 @@
             "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-checkdocs>=2.4; extra == \"testing\"",
             "pytest-cov; extra == \"testing\"",
-            "pytest-enabler>=1.0.1; extra == \"testing\"",
+            "pytest-enabler>=1.3; extra == \"testing\"",
             "pytest-flake8; extra == \"testing\"",
             "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-perf>=0.9.2; extra == \"testing\"",
@@ -807,7 +886,7 @@
             "zipp>=0.5"
           ],
           "requires_python": ">=3.7",
-          "version": "4.11.4"
+          "version": "4.12"
         },
         {
           "artifacts": [
@@ -1425,13 +1504,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f22fa1e554c9ddfd16e6e41ac79759e17be9e492b3587efa038054674760e72d",
-              "url": "https://files.pythonhosted.org/packages/2d/61/08076519c80041bc0ffa1a8af0cbd3bf3e2b62af10435d269a9d0f40564d/requests-2.27.1-py2.py3-none-any.whl"
+              "hash": "bc7861137fbce630f17b03d3ad02ad0bf978c844f3536d0edda6499dafce2b6f",
+              "url": "https://files.pythonhosted.org/packages/41/5b/2209eba8133fc081d3ffff02e1f6376e3117e52bb16f674721a83e67e68e/requests-2.28.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "68d7c56fd5a8999887728ef304a6d12edc7be74f1cfa47714fc8b414525c9a61",
-              "url": "https://files.pythonhosted.org/packages/60/f3/26ff3767f099b73e0efa138a9998da67890793bfa475d8278f84a30fec77/requests-2.27.1.tar.gz"
+              "hash": "d568723a7ebd25875d8d1eaf5dfa068cd2fc8194b2e483d7b1f7c81918dbec6b",
+              "url": "https://files.pythonhosted.org/packages/e9/23/384d9953bb968731212dc37af87cb75a885dc48e0615bd6a303577c4dc4b/requests-2.28.0.tar.gz"
             }
           ],
           "project_name": "requests",
@@ -1439,15 +1518,12 @@
             "PySocks!=1.5.7,>=1.5.6; extra == \"socks\"",
             "certifi>=2017.4.17",
             "chardet<5,>=3.0.2; extra == \"use_chardet_on_py3\"",
-            "chardet<5,>=3.0.2; python_version < \"3\"",
-            "charset-normalizer~=2.0.0; python_version >= \"3\"",
-            "idna<3,>=2.5; python_version < \"3\"",
-            "idna<4,>=2.5; python_version >= \"3\"",
-            "urllib3<1.27,>=1.21.1",
-            "win-inet-pton; (sys_platform == \"win32\" and python_version == \"2.7\") and extra == \"socks\""
+            "charset-normalizer~=2.0.0",
+            "idna<4,>=2.5",
+            "urllib3<1.27,>=1.21.1"
           ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "2.27.1"
+          "requires_python": "<4,>=3.7",
+          "version": "2.28"
         },
         {
           "artifacts": [
@@ -2454,7 +2530,7 @@
       "platform_tag": [
         "cp38",
         "cp38",
-        "macosx_12_0_x86_64"
+        "manylinux_2_31_x86_64"
       ]
     }
   ],
@@ -2465,6 +2541,7 @@
     "PyYAML<7.0,>=6.0",
     "ansicolors==1.1.8",
     "chevron==0.14.0",
+    "debugpy==1.6.0",
     "fastapi==0.78.0",
     "fasteners==0.16.3",
     "freezegun==1.1.0",

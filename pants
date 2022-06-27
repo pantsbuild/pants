@@ -52,9 +52,18 @@ function exec_pants_bare() {
     set -e
   fi
 
+  if [ -n "${PANTS_DEBUG}" ]; then
+    if [[ "$*" != *"--no-pantsd"* ]]; then
+      echo "Error! Must pass '--no-pantsd' when using PANTS_DEBUG"
+      exit 1
+    fi
+    DEBUG_ARGS="-m debugpy --listen 127.0.0.1:5678 --wait-for-client"
+    echo "Will launch debugpy server at '127.0.0.1:5678' waiting for client connection."
+  fi
+
   # shellcheck disable=SC2086
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
-    exec ${PANTS_PREPEND_ARGS:-} "$(venv_dir)/bin/python" "${PANTS_PY_EXE}" "$@"
+    exec ${PANTS_PREPEND_ARGS:-} "$(venv_dir)/bin/python" ${DEBUG_ARGS} "${PANTS_PY_EXE}" "$@"
 }
 
 exec_pants_bare "$@"

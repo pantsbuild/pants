@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import itertools
+import os
 from abc import ABCMeta
 from dataclasses import dataclass
 from functools import partial
@@ -701,6 +702,15 @@ class Params:
 def native_engine_generator_send(
     func, arg
 ) -> PyGeneratorResponseGet | PyGeneratorResponseGetMulti | PyGeneratorResponseBreak:
+    try:
+        import debugpy  # type: ignore  # pants: no-infer-dep
+
+    except ImportError:
+        pass
+    else:
+        if "PANTS_DEBUG" in os.environ:
+            debugpy.debug_this_thread()
+
     try:
         res = func.send(arg)
         # TODO: It isn't currently necessary to differentiate between `Get` and `Effect` here, as
