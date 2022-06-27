@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import logging
+import re
 from abc import ABC
 from dataclasses import dataclass
+from typing import Mapping
 
 from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -46,6 +48,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -116,51 +119,10 @@ class DockerBuildContext:
     ) -> DockerBuildContext:
         interpolation_context: dict[str, dict[str, str] | DockerInterpolationValue] = {}
 
-        # Go over all FROM tags and names for all stages.
-        stage_names: set[str] = set()
-        stage_tags = (tag.split(maxsplit=1) for tag in dockerfile_info.version_tags)
-        tags_values: dict[str, str] = {}
-        for idx, (stage, tag) in enumerate(stage_tags):
-            if stage != f"stage{idx}":
-                stage_names.add(stage)
-            if idx == 0:
-                # Expose the first (stage0) FROM directive as the "baseimage".
-                tags_values["baseimage"] = tag
-            tags_values[stage] = tag
-
         if build_args:
-            # Extract default arg values from the parsed Dockerfile.
-            build_arg_defaults = {
-                def_name: def_value
-                for def_name, has_default, def_value in [
-                    def_arg.partition("=") for def_arg in dockerfile_info.build_args
-                ]
-                if has_default
-            }
-            try:
-                # Create build args context value, based on defined build_args and
-                # extra_build_args. We do _not_ auto "magically" pick up all ARG names from the
-                # Dockerfile as first class args to use as placeholders, to make it more explicit
-                # which args are actually being used by Pants. We do pick up any defined default ARG
-                # values from the Dockerfile however, in order to not having to duplicate them in
-                # the BUILD files.
-                interpolation_context["build_args"] = {
-                    arg_name: arg_value
-                    if has_value
-                    else build_env.get(arg_name, build_arg_defaults.get(arg_name))
-                    for arg_name, has_value, arg_value in [
-                        build_arg.partition("=") for build_arg in build_args
-                    ]
-                }
-            except DockerBuildEnvironmentError as e:
-                raise DockerBuildContextError(
-                    f"Undefined value for build arg on the {dockerfile_info.address} target: {e}"
-                    "\n\nIf you did not intend to inherit the value for this build arg from the "
-                    "environment, provide a default value with the option `[docker].build_args` "
-                    "or in the `extra_build_args` field on the target definition. Alternatively, "
-                    "you may also provide a default value on the `ARG` instruction directly in "
-                    "the `Dockerfile`."
-                ) from e
+            interpolation_context["build_args"] = cls._merge_build_args(
+                dockerfile_info, build_args, build_env
+            )
 
         # Override default value type for the `build_args` context to get helpful error messages.
         interpolation_context["build_args"] = DockerBuildArgsInterpolationValue(
@@ -174,6 +136,9 @@ class DockerBuildContext:
         }
 
         # Base image tags values for all stages (as parsed from the Dockerfile instructions).
+        stage_names, tags_values = cls._get_stages_and_tags(
+            dockerfile_info, interpolation_context["build_args"]
+        )
         interpolation_context["tags"] = tags_values
 
         return cls(
@@ -195,6 +160,99 @@ class DockerBuildContext:
             ),
             stages=tuple(sorted(stage_names)),
         )
+
+    @classproperty
+    def _image_ref_regexp(cls):
+        return re.compile(
+            r"""
+            ^
+            # Optional registry.
+            ((?P<registry>[^/:_ ]+:?[^/:_ ]*)/)?
+            # Repository.
+            (?P<repository>[^:@ \t\n\r\f\v]+)
+            # Optionally with `:tag`.
+            (:(?P<tag>[^@ ]+))?
+            # Optionally with `@digest`.
+            (@(?P<digest>\S+))?
+            $
+            """,
+            re.VERBOSE,
+        )
+
+    @classmethod
+    def _get_stages_and_tags(
+        cls, dockerfile_info: DockerfileInfo, build_args: Mapping[str, str]
+    ) -> tuple[set[str], dict[str, str]]:
+        # Go over all FROM tags and names for all stages.
+        stage_names: set[str] = set()
+        stage_tags = (tag.split(maxsplit=1) for tag in dockerfile_info.version_tags)
+        tags_values: dict[str, str] = {}
+        for idx, (stage, tag) in enumerate(stage_tags):
+            if tag.startswith("build-arg:"):
+                build_arg = tag[10:]
+                image_ref = build_args.get(build_arg) or dockerfile_info.build_args.to_dict().get(
+                    build_arg
+                )
+                if not image_ref:
+                    raise DockerBuildContextError(
+                        f"Failed to parse Dockerfile baseimage tag for stage {stage} in "
+                        f"{dockerfile_info.address} target, unknown build ARG: {build_arg!r}."
+                    )
+                parsed = re.match(cls._image_ref_regexp, image_ref.strip("\"'"))
+                tag = parsed.group("tag") or (parsed.group("digest") and "latest") if parsed else ""
+                if not tag:
+                    raise DockerBuildContextError(
+                        f"Failed to parse Dockerfile baseimage tag for stage {stage} in "
+                        f"{dockerfile_info.address} target, from image ref: {image_ref}."
+                    )
+
+            if stage != f"stage{idx}":
+                stage_names.add(stage)
+            if idx == 0:
+                # Expose the first (stage0) FROM directive as the "baseimage".
+                tags_values["baseimage"] = tag
+            tags_values[stage] = tag
+
+        return stage_names, tags_values
+
+    @staticmethod
+    def _merge_build_args(
+        dockerfile_info: DockerfileInfo,
+        build_args: DockerBuildArgs,
+        build_env: DockerBuildEnvironment,
+    ) -> dict[str, str]:
+        # Extract default arg values from the parsed Dockerfile.
+        build_arg_defaults = {
+            def_name: def_value
+            for def_name, has_default, def_value in [
+                def_arg.partition("=") for def_arg in dockerfile_info.build_args
+            ]
+            if has_default
+        }
+        try:
+            # Create build args context value, based on defined build_args and
+            # extra_build_args. We do _not_ auto "magically" pick up all ARG names from the
+            # Dockerfile as first class args to use as placeholders, to make it more explicit
+            # which args are actually being used by Pants. We do pick up any defined default ARG
+            # values from the Dockerfile however, in order to not having to duplicate them in
+            # the BUILD files.
+            return {
+                arg_name: arg_value
+                if has_value
+                else build_env.get(arg_name, build_arg_defaults.get(arg_name))
+                for arg_name, has_value, arg_value in [
+                    build_arg.partition("=") for build_arg in build_args
+                ]
+            }
+        except DockerBuildEnvironmentError as e:
+            raise DockerBuildContextError(
+                f"Undefined value for build arg on the {dockerfile_info.address} target: {e}"
+                "\n\nIf you did not intend to inherit the value for this build arg from the "
+                "environment, provide a default value with the option `[docker].build_args` "
+                "or in the `extra_build_args` field on the target definition. Alternatively, "
+                "you may also provide a default value on the `ARG` instruction directly in "
+                "the `Dockerfile`."
+            ) from e
 
 
 @rule
@@ -292,6 +350,7 @@ async def create_docker_build_context(
                     from the target {dockerfile_info.address}
                     """
                 ),
+                skip_invalid_addresses=True,
             ),
         )
         # Map those addresses to the corresponding built image ref (tag).

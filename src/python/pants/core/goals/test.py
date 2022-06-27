@@ -12,6 +12,7 @@ from pathlib import PurePath
 from typing import Any, ClassVar, TypeVar, cast
 
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection
@@ -413,6 +414,7 @@ class Test(Goal):
 @rule_helper
 async def _run_debug_tests(
     test_subsystem: TestSubsystem,
+    debug_adapter: DebugAdapterSubsystem,
 ) -> Test:
     targets_to_valid_field_sets = await Get(
         TargetRootsToFieldSets,
@@ -435,7 +437,14 @@ async def _run_debug_tests(
     exit_code = 0
     for debug_request in debug_requests:
         if test_subsystem.debug_adapter:
-            logger.info("Launching debug adapter, which will wait for a client connection...")
+            logger.info(
+                softwrap(
+                    f"""
+                    Launching debug adapter at '{debug_adapter.host}:{debug_adapter.port}',
+                    which will wait for a client connection...
+                    """
+                )
+            )
 
         debug_result = await Effect(
             InteractiveProcessResult, InteractiveProcess, debug_request.process
@@ -449,13 +458,14 @@ async def _run_debug_tests(
 async def run_tests(
     console: Console,
     test_subsystem: TestSubsystem,
+    debug_adapter: DebugAdapterSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
     distdir: DistDir,
     run_id: RunId,
 ) -> Test:
     if test_subsystem.debug or test_subsystem.debug_adapter:
-        return await _run_debug_tests(test_subsystem)
+        return await _run_debug_tests(test_subsystem, debug_adapter)
 
     shard, num_shards = parse_shard_spec(test_subsystem.shard, "the [test].shard option")
     targets_to_valid_field_sets = await Get(

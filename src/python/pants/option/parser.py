@@ -501,12 +501,13 @@ class Parser:
         except ValueError as error:
             raise ParseError(str(error))
 
-    def to_value_type(self, val_str, type_arg, member_type, dest):
+    @classmethod
+    def to_value_type(cls, val_str, type_arg, member_type, dest):
         """Convert a string to a value of the option's type."""
         if val_str is None:
             return None
         if type_arg == bool:
-            return self.ensure_bool(val_str)
+            return cls.ensure_bool(val_str)
         try:
             if type_arg == list:
                 return ListValueComponent.create(val_str, member_type=member_type)

@@ -30,18 +30,21 @@ class ExplorerJSONResponse(JSONResponse):
         ).encode("utf-8")
 
 
+def create_schema() -> strawberry.Schema:
+    # Monkey patch, due to limitations in configurability.
+    strawberry.fastapi.router.JSONResponse = ExplorerJSONResponse  # type: ignore[attr-defined]
+
+    return strawberry.Schema(query=Query)
+
+
 def graphql_uvicorn_setup(
     browser: Browser,
     graphql: GraphQLSubsystem,
     route: str = "/graphql",
 ) -> Callable[[UvicornServer], None]:
     def setup(uvicorn: UvicornServer) -> None:
-        # Monkey patch, due to limitations in configurability.
-        strawberry.fastapi.router.JSONResponse = ExplorerJSONResponse  # type: ignore[attr-defined]
-
-        schema = strawberry.Schema(query=Query)
         graphql_app = GraphQLRouter(
-            schema, context_getter=GraphQLContext(uvicorn).create_request_context
+            create_schema(), context_getter=GraphQLContext(uvicorn).create_request_context
         )
 
         uvicorn.app.include_router(graphql_app, prefix=route)

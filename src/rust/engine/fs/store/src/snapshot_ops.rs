@@ -165,7 +165,10 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
 pub trait SnapshotOps: Clone + Send + Sync + 'static {
   type Error: Debug + Display + From<String>;
 
-  async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+  async fn load_file_bytes_with<
+    T: Send + 'static,
+    F: Fn(&[u8]) -> T + Clone + Send + Sync + 'static,
+  >(
     &self,
     digest: Digest,
     f: F,

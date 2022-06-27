@@ -43,7 +43,12 @@ def process_fixtures(item):
         # of what failed:
         #   lockfile_definition = fixture_request.getfixturevalue(fixture_name)
         #   lockfile_definition = fixture_def.execute(request=request)
-        lockfile_definition = func()
+        try:
+            lockfile_definition = func()
+        except Exception as err:
+            raise ValueError(
+                f"Exception while getting lockfile definition (file {item.path}): {err}"
+            )
         if lockfile_definition.__class__.__name__ != "JVMLockfileFixtureDefinition":
             continue
 

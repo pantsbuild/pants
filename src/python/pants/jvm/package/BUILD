@@ -5,4 +5,6 @@ python_sources()
 python_tests(
     name="tests",
     timeout=120,
+    dependencies=[":test_resources"],
 )
+resources(name="test_resources", sources=["*.test.lock"])

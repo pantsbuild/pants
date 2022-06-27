@@ -1,11 +1,17 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import textwrap
 import zipfile
 from io import BytesIO
 
 import pytest
 
+from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
+    JVMLockfileFixture,
+    JVMLockfileFixtureDefinition,
+)
 from pants.backend.java.compile.javac import rules as javac_rules
 from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_rules
 from pants.backend.java.target_types import rules as target_types_rules
@@ -15,19 +21,31 @@ from pants.core.target_types import FilesGeneratorTarget, FileTarget, RelocatedF
 from pants.core.target_types import rules as core_target_types_rules
 from pants.core.util_rules import archive
 from pants.engine.fs import DigestContents
-from pants.engine.internals.native_engine import EMPTY_DIGEST, FileDigest
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.rules import QueryRule
 from pants.jvm import classpath, jdk_rules
 from pants.jvm.package import war
 from pants.jvm.package.war import PackageWarFileFieldSet
 from pants.jvm.resolve import jvm_tool
-from pants.jvm.resolve.common import ArtifactRequirement, Coordinate, Coordinates
-from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry
-from pants.jvm.resolve.coursier_test_util import TestCoursierWrapper
 from pants.jvm.target_types import JvmArtifactTarget, JvmWarTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+
+
+@pytest.fixture
+def servlet_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "servlet.test.lock",
+        ["javax.servlet:servlet-api:2.5"],
+    )
+
+
+@pytest.fixture
+def servlet_lockfile(
+    servlet_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return servlet_lockfile_def.load(request)
 
 
 @pytest.fixture
@@ -59,22 +77,14 @@ def rule_runner():
 
 
 @maybe_skip_jdk_test
-def test_basic_war_packaging(rule_runner: RuleRunner) -> None:
-    servlet_coordinate = Coordinate(group="javax.servlet", artifact="servlet-api", version="2.5")
+def test_basic_war_packaging(rule_runner: RuleRunner, servlet_lockfile: JVMLockfileFixture) -> None:
     rule_runner.write_files(
         {
             "war-test/BUILD": textwrap.dedent(
                 """\
-            jvm_artifact(
-              name="javax.servlet_servlet-api",
-              group="javax.servlet",
-              artifact="servlet-api",
-              version="2.5",
-            )
-
             jvm_war(
               name="war",
-              dependencies=[":javax.servlet_servlet-api"],
+              dependencies=["3rdparty/jvm:javax.servlet_servlet-api"],
               descriptor="web.xml",
               content=[":html"],
             )
@@ -102,20 +112,8 @@ def test_basic_war_packaging(rule_runner: RuleRunner) -> None:
             </html>
             """
             ),
-            "3rdparty/jvm/default.lock": TestCoursierWrapper.new(
-                (
-                    CoursierLockfileEntry(
-                        coord=servlet_coordinate,
-                        file_name="javax.servlet_servlet-api_2.5.jar",
-                        direct_dependencies=Coordinates(),
-                        dependencies=Coordinates(),
-                        file_digest=FileDigest(
-                            "c658ea360a70faeeadb66fb3c90a702e4142a0ab7768f9ae9828678e0d9ad4dc",
-                            105112,
-                        ),
-                    ),
-                ),
-            ).serialize([ArtifactRequirement(servlet_coordinate)]),
+            "3rdparty/jvm/default.lock": servlet_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": servlet_lockfile.requirements_as_jvm_artifact_targets(),
         }
     )
 

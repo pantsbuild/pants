@@ -1,6 +1,7 @@
 Active Maintainers
 ==================
 
+* A. Alonso Dominguez
 * Alexey Tereshenkov
 * Andreas Stenius
 * Benjy Weinberger

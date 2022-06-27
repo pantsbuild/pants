@@ -179,7 +179,7 @@ async def parse_dockerfile(request: DockerfileInfoRequest) -> DockerfileInfo:
     except Exception as e:
         raise DockerfileInfoError(
             f"Unexpected failure to parse Dockerfiles: {', '.join(dockerfiles)}, "
-            f"for the {request.address} target: {e}"
+            f"for the {request.address} target: {e}\nDockerfile parser output:\n{raw_output}"
         ) from e
 
     info = outputs[0]

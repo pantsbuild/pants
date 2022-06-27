@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import re
+import unittest.mock
 from textwrap import dedent
 
 import pytest
@@ -610,7 +611,7 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         "--listen",
         "127.0.0.1:5678",
         "--wait-for-client",
-        "-m",
-        "pytest",
+        "-c",
+        unittest.mock.ANY,
         "tests/python/pants_test/test_foo.py",
     )

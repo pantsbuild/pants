@@ -3,4 +3,5 @@
 
 python_sources()
 
-python_tests(name="tests")
+python_tests(name="tests", dependencies=[":test_resources"])
+resources(name="test_resources", sources=["*.test.lock"])
