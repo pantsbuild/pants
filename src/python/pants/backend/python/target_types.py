@@ -282,7 +282,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-# @TODO: Remove the SecondaryOwnerMixin in Pants 2.15.0
+# @TODO: Remove the SecondaryOwnerMixin in Pants 2.14.0
 class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
@@ -596,10 +596,10 @@ class PexIncludeToolsField(BoolField):
 class PexRunInSandboxField(BoolField):
     alias = "run_in_sandbox"
     default = True
-    removal_version = "2.15.0.dev0"
+    removal_version = "2.14.0.dev0"
     removal_hint = softwrap(
         """
-        In Pants 2.15, running a `pex_binary` will package-and-run the PEX instead of the loose
+        In Pants 2.14, running a `pex_binary` will package-and-run the PEX instead of the loose
         sources. Additionally, support was added to allow running a `python_source` directly, which
         by-default runs in-repo (and not in the sandbox).
         """

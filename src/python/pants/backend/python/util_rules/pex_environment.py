@@ -90,11 +90,11 @@ class PexRuntimeEnvironment(Subsystem):
     def run_packaged_firstparty(self) -> bool:
         if self.options.is_default("run_packaged_firstparty"):
             warn_or_error(
-                "2.15.0.dev0",
+                "2.14.0.dev0",
                 "the option --pex-run-packaged-firstparty defaulting to false",
                 softwrap(
                     """
-                    In Pants 2.15, by default, running a `pex_binary` will actually package the PEX
+                    In Pants 2.14, by default, running a `pex_binary` will actually package the PEX
                     and run it, as if you ran `package` followed by executing the built PEX.
 
                     To fix this deprecation, explictly set `run_packaged_firstparty` in the

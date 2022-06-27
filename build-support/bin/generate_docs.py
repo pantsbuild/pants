@@ -29,7 +29,7 @@ import textwrap
 from html.parser import HTMLParser
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, cast
-
+import time
 import chevron
 import requests
 from common import die
@@ -41,6 +41,7 @@ from pants.util.strutil import softwrap
 from pants.version import MAJOR_MINOR
 
 logger = logging.getLogger(__name__)
+
 
 DOC_URL_RE = re.compile(
     r"https://www.pantsbuild.org/v(\d+\.[^/]+)/docs/(?P<slug>[a-zA-Z0-9_-]+)(?P<anchor>#[a-zA-Z0-9_-]+)?"
@@ -633,4 +634,5 @@ class ReferenceGenerator:
 
 
 if __name__ == "__main__":
-    main()
+    time.sleep(30)
+    print("bye")

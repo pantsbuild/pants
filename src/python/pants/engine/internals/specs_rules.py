@@ -493,11 +493,11 @@ def _handle_ambiguous_result(
         and PythonSourceFieldSet in field_set_types
     ):
         warn_or_error(
-            "2.15.0dev0",
+            "2.14.0dev0",
             "referring to a `pex_binary` by using the filename specified in `entry_point`",
             softwrap(
                 """
-                    In Pants 2.15, a `pex_binary` can no longer be referred to by the filename that
+                    In Pants 2.14, a `pex_binary` can no longer be referred to by the filename that
                     the `entry_point` field uses.
 
                     This is due to a change in Pants 2.14, which allows you to use the `run` goal
