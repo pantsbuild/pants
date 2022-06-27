@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.core.goals.package import BuiltPackage
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.native_engine import AddPrefix
 from pants.engine.process import Process, ProcessResult
@@ -103,6 +103,15 @@ async def create_deploy_jar_run_request(
         digest=request_digest,
         args=args,
         extra_env=env,
+    )
+
+
+@rule
+async def run_deploy_jar_debug_adapter_binary(
+    field_set: DeployJarFieldSet,
+) -> RunDebugAdapterRequest:
+    raise NotImplementedError(
+        "Debugging a deploy JAR using a debug adapter has not yet been implemented."
     )
 
 
