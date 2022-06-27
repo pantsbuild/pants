@@ -46,13 +46,12 @@ On the other hand, if your app is short lived (like a script) and you'd like to 
 Debugging
 ---------
 
-> 📘 Tip: using the VS Code (or any DAP-compliant editor) remote debugger
+> 📘 Tip: using the VS Code (or any [DAP](https://microsoft.github.io/debug-adapter-protocol/)-compliant editor) remote debugger
 >
 >
-> 1. Configure your editor's breakpoints and exception settings
-> 2. Run your code with `./pants run --debug-adapter`
-> 3. Connect your editor to the server (the server host and port are logged, and can be configured
->    using the `[debug-adapter]` subsystem).
+> 1. In your editor, set your breakpoints and any other debug settings (like break-on-exception).
+> 2. Run your code with `./pants run --debug-adapter`.
+> 3. Connect your editor to the server. The server host and port are logged by Pants when executing `run --debug-adaptor`. (They can also be configured using the `[debug-adapter]` subsystem).
 
 > 📘 Tip: Using the IntelliJ/PyCharm remote debugger
 >

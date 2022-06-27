@@ -139,9 +139,10 @@ async def run_pex_debug_adapter_binary(
     if field_set.run_in_sandbox:
         logger.warning(
             softwrap(
-                """
-                Using --debug-adapter with `run_in_sandbox` set to `True` will likely cause your
-                breakpoints to not be hit, as your code will be run under the sandbox's path.
+                f"""
+                Using `run --debug-adapter` on the target {field_set.address}, which sets the field
+                `run_in_sandbox` set to `True` will likely cause your breakpoints to not be hit, as
+                your code will be run under the sandbox's path.
                 """
             )
         )
