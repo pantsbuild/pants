@@ -68,7 +68,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
 
 logger = logging.getLogger()
 
@@ -410,15 +409,6 @@ async def debugpy_python_test(
     pytest: PyTest,
 ) -> TestDebugAdapterRequest:
     debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
-    if pytest.main.spec != "pytest":
-        logger.warning(
-            softwrap(
-                """
-                Ignoring custom [pytest].console_script/entry_point when using the debug adapter.
-                `debugpy` (Python's Debug Adapter) doesn't support this use-case yet.
-                """
-            )
-        )
 
     setup = await Get(
         TestSetup,
@@ -426,16 +416,7 @@ async def debugpy_python_test(
             field_set,
             is_debug=True,
             main=debugpy.main,
-            prepend_argv=(
-                "--listen",
-                f"{debug_adapter.host}:{debug_adapter.port}",
-                "--wait-for-client",
-                # @TODO: Techincally we should use `pytest.main`, however `debugpy` doesn't support
-                # launching an entry_point.
-                # https://github.com/microsoft/debugpy/issues/955
-                "-m",
-                "pytest",
-            ),
+            prepend_argv=debugpy.get_args(debug_adapter, pytest.main),
             additional_pexes=(debugpy_pex,),
         ),
     )
