@@ -55,11 +55,18 @@ def get_tf_links(page: BeautifulSoup) -> Links:
 
 
 @dataclass(frozen=True)
-class SignatureInfo:
-    sha256sums: List[
-        Tuple[str, ...]
-    ]  # TODO: should be List[Tuple[str, str]], but we need to provide evidence
+class VersionHash:
+    filename: str
+    sha256sum: str
+
+
+@dataclass(frozen=True)
+class VersionHashes:
+    sha256sums: List[VersionHash]
     signature: bytes
+
+    def by_file(self) -> Dict[str, str]:
+        return {x.filename: x.sha256sum for x in self.sha256sums}
 
 
 @dataclass(frozen=True)
@@ -98,22 +105,24 @@ def make_tool_version(
     return ExternalToolVersion(version_number, pants_platform, hash, file_size)
 
 
-def sha256sums_from_info(info: SignatureInfo) -> Dict[str, str]:
-    return {filename: sha256sums for sha256sums, filename in info.sha256sums}
-
-
-def parse_signatures(links: Links) -> SignatureInfo:
+def parse_signatures(links: Links) -> VersionHashes:
     def link_ends_with(what: str) -> Link:
         return next(filter(lambda s: s.link.endswith(what), links))
 
     sha256sums_raw = requests.get(link_ends_with("SHA256SUMS").link).text
     sha256sums = [
-        tuple(filter(None, x)) for x in csv.reader(StringIO(sha256sums_raw), delimiter=" ")
+        VersionHash(**x)
+        for x in csv.DictReader(
+            StringIO(sha256sums_raw),
+            delimiter=" ",
+            skipinitialspace=True,
+            fieldnames=["sha256sum", "filename"],
+        )
     ]
 
     signature = requests.get(link_ends_with("SHA256SUMS.sig").link).content
 
-    return SignatureInfo(sha256sums, signature)
+    return VersionHashes(sha256sums, signature)
 
 
 def fetch_versions(url: str) -> List["ExternalToolVersion"]:
@@ -126,7 +135,7 @@ def fetch_versions(url: str) -> List["ExternalToolVersion"]:
     for version_slug, version_infos in platform_version_links.items():
         logging.info(version_infos.platform_links)
         signatures_info = parse_signatures(version_infos.signature_links)
-        sha256sums = sha256sums_from_info(signatures_info)
+        sha256sums = signatures_info.by_file()
 
         for platform_link in version_infos.platform_links:
             logging.info(f"platform {platform_link.link}")
