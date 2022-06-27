@@ -46,7 +46,7 @@ On the other hand, if your app is short lived (like a script) and you'd like to 
 Debugging
 ---------
 
-> 📘 Tip: using the VS Code (or any DAP-compliant editor) remote debugger in tests
+> 📘 Tip: using the VS Code (or any DAP-compliant editor) remote debugger
 >
 >
 > 1. Configure your editor's breakpoints and exception settings
