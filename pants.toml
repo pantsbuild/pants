@@ -216,6 +216,7 @@ force_add_siblings_as_dependencies = false
 [toolchain-setup]
 repo = "pants"
 org = "pantsbuild"
+base_url = "https://staging.app.toolchain.com"
 
 [buildsense]
 enable = false
