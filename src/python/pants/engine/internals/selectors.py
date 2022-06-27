@@ -20,6 +20,14 @@ from pants.engine.internals.native_engine import (
 from pants.engine.unions import is_union
 from pants.util.meta import frozen_after_init
 
+try:
+    import debugpy  # type: ignore  # pants: no-infer-dep
+
+except ImportError:
+    _ENABLE_DEBUGPY = False
+else:
+    _ENABLE_DEBUGPY = "PANTS_DEBUG" in os.environ
+
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
@@ -702,14 +710,8 @@ class Params:
 def native_engine_generator_send(
     func, arg
 ) -> PyGeneratorResponseGet | PyGeneratorResponseGetMulti | PyGeneratorResponseBreak:
-    try:
-        import debugpy  # type: ignore  # pants: no-infer-dep
-
-    except ImportError:
-        pass
-    else:
-        if "PANTS_DEBUG" in os.environ:
-            debugpy.debug_this_thread()
+    if _ENABLE_DEBUGPY:
+        debugpy.debug_this_thread()
 
     try:
         res = func.send(arg)
