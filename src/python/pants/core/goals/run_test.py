@@ -16,6 +16,7 @@ from pants.core.goals.run import (
     RunSubsystem,
     run,
 )
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -79,6 +80,11 @@ def single_target_run(
             run,
             rule_args=[
                 create_goal_subsystem(RunSubsystem, args=[], cleanup=True, debug_adapter=False),
+                create_subsystem(
+                    DebugAdapterSubsystem,
+                    host="127.0.0.1",
+                    port="5678",
+                ),
                 create_subsystem(
                     GlobalOptions, pants_workdir=rule_runner.pants_workdir, process_cleanup=True
                 ),
