@@ -49,10 +49,6 @@ pub enum Metric {
   RemoteExecutionSuccess,
   RemoteExecutionTimeouts,
   RemoteStoreMissingDigest,
-  /// Total number of bytes of blobs downloaded from a remote CAS.
-  RemoteStoreBlobBytesDownloaded,
-  /// Total number of bytes of blobs uploaded to a remote CAS.
-  RemoteStoreBlobBytesUploaded,
   /// Number of times that we backtracked due to missing digests.
   BacktrackAttempts,
 }
@@ -71,9 +67,13 @@ pub enum ObservationMetric {
   LocalStoreReadBlobSize,
   LocalStoreReadBlobTimeMicros,
   RemoteProcessTimeRunMs,
-  RemoteExecutionRPCFirstResponseTime,
-  RemoteStoreTimeToFirstByte,
+  RemoteExecutionRPCFirstResponseTimeMicros,
+  RemoteStoreTimeToFirstByteMicros,
   RemoteStoreReadBlobTimeMicros,
+  /// Total number of bytes of blobs downloaded from a remote CAS.
+  RemoteStoreBlobBytesDownloaded,
+  /// Total number of bytes of blobs uploaded to a remote CAS.
+  RemoteStoreBlobBytesUploaded,
   /// The time saved (in milliseconds) thanks to a local cache hit instead of running the process
   /// directly.
   LocalCacheTimeSavedMs,
