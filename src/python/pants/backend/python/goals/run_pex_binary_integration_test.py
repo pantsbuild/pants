@@ -11,9 +11,12 @@ import pytest
 from pants.backend.python.target_types import PexExecutionMode
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
-run_semantics_args = pytest.mark.parametrize(
-    "run_semantics_args",
-    [("--use-deprecated-pex-binary-run-semantics",), ()],
+use_new_semantics_args = pytest.mark.parametrize(
+    "use_new_semantics_args",
+    [
+        (),
+        ("--no-use-deprecated-pex-binary-run-semantics",),
+    ],
 )
 
 
@@ -27,12 +30,12 @@ run_semantics_args = pytest.mark.parametrize(
         ("app.py:main", None, False),
     ],
 )
-@run_semantics_args
+@use_new_semantics_args
 def test_run_sample_script(
     entry_point: str,
     execution_mode: Optional[PexExecutionMode],
     include_tools: bool,
-    run_semantics_args: tuple[str, ...],
+    use_new_semantics_args: tuple[str, ...],
 ) -> None:
     """Test that we properly run a `pex_binary` target.
 
@@ -89,7 +92,7 @@ def test_run_sample_script(
             args = [
                 "--backend-packages=pants.backend.python",
                 "--backend-packages=pants.backend.codegen.protobuf.python",
-                *run_semantics_args,
+                *use_new_semantics_args,
                 f"--source-root-patterns=['/{tmpdir}/src_root1', '/{tmpdir}/src_root2']",
                 "--pants-ignore=__pycache__",
                 "--pants-ignore=/src/python",
@@ -102,8 +105,9 @@ def test_run_sample_script(
     result = run()
     assert "Hola, mundo.\n" in result.stderr
     file = result.stdout.strip()
-    if run_semantics_args:
+    if use_new_semantics_args:
         assert file.endswith("utils/strutil.py")
+        assert ".pants.d/tmp" not in file
     else:
         assert file.endswith("src_root2/utils/strutil.py")
         assert ".pants.d/tmp" in file
@@ -117,14 +121,14 @@ def test_run_sample_script(
         assert ("prepend" if execution_mode is PexExecutionMode.VENV else "false") == pex_info[
             "venv_bin_path"
         ]
-        if run_semantics_args:
+        if use_new_semantics_args:
             assert pex_info["strip_pex_env"]
         else:
             assert not pex_info["strip_pex_env"]
 
 
-@run_semantics_args
-def test_no_strip_pex_env_issues_12057(run_semantics_args: tuple[str, ...]) -> None:
+@use_new_semantics_args
+def test_no_strip_pex_env_issues_12057(use_new_semantics_args: tuple[str, ...]) -> None:
     sources = {
         "src/app.py": dedent(
             """\
@@ -153,7 +157,7 @@ def test_no_strip_pex_env_issues_12057(run_semantics_args: tuple[str, ...]) -> N
     with setup_tmpdir(sources) as tmpdir:
         args = [
             "--backend-packages=pants.backend.python",
-            *run_semantics_args,
+            *use_new_semantics_args,
             f"--source-root-patterns=['/{tmpdir}/src']",
             "run",
             f"{tmpdir}/src:binary",
@@ -162,8 +166,8 @@ def test_no_strip_pex_env_issues_12057(run_semantics_args: tuple[str, ...]) -> N
         assert result.exit_code == 42, result.stderr
 
 
-@run_semantics_args
-def test_local_dist(run_semantics_args: tuple[str, ...]) -> None:
+@use_new_semantics_args
+def test_local_dist(use_new_semantics_args: tuple[str, ...]) -> None:
     sources = {
         "foo/bar.py": "BAR = 'LOCAL DIST'",
         "foo/setup.py": dedent(
@@ -200,7 +204,7 @@ def test_local_dist(run_semantics_args: tuple[str, ...]) -> None:
     with setup_tmpdir(sources) as tmpdir:
         args = [
             "--backend-packages=pants.backend.python",
-            *run_semantics_args,
+            *use_new_semantics_args,
             f"--source-root-patterns=['/{tmpdir}']",
             "run",
             f"{tmpdir}/foo:bin",
@@ -209,8 +213,8 @@ def test_local_dist(run_semantics_args: tuple[str, ...]) -> None:
         assert result.stdout == "LOCAL DIST\n"
 
 
-@run_semantics_args
-def test_run_script_from_3rdparty_dist_issue_13747(run_semantics_args) -> None:
+@use_new_semantics_args
+def test_run_script_from_3rdparty_dist_issue_13747(use_new_semantics_args) -> None:
     sources = {
         "src/BUILD": dedent(
             """\
@@ -223,7 +227,7 @@ def test_run_script_from_3rdparty_dist_issue_13747(run_semantics_args) -> None:
         SAY = "moooo"
         args = [
             "--backend-packages=pants.backend.python",
-            *run_semantics_args,
+            *use_new_semantics_args,
             f"--source-root-patterns=['/{tmpdir}/src']",
             "run",
             f"{tmpdir}/src:test",
@@ -233,3 +237,43 @@ def test_run_script_from_3rdparty_dist_issue_13747(run_semantics_args) -> None:
         result = run_pants(args)
         result.assert_success()
         assert SAY in result.stdout.strip()
+
+
+# NB: Can be removed in 2.15
+@use_new_semantics_args
+def test_filename_spec_ambiutity(use_new_semantics_args) -> None:
+    sources = {
+        "src/app.py": dedent(
+            """\
+            if __name__ == "__main__":
+                print(__file__)
+            """
+        ),
+        "src/BUILD": dedent(
+            """\
+            python_sources(name="lib")
+            pex_binary(
+                name="binary",
+                entry_point="app.py"
+            )
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            *use_new_semantics_args,
+            f"--source-root-patterns=['/{tmpdir}/src']",
+            "run",
+            f"{tmpdir}/src/app.py",
+        ]
+        result = run_pants(args)
+        file = result.stdout.strip()
+        if use_new_semantics_args:
+            # The python_source was chosen
+            assert file.endswith("src_root/app.py")
+            assert ".pants.d/tmp" in file
+        else:
+            # The pex_binary was chosen
+            assert file.endswith("app.py")
+            assert ".pants.d/tmp" not in file

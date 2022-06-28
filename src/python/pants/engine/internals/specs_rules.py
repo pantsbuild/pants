@@ -567,7 +567,7 @@ async def find_valid_field_sets_for_target_roots(
             request,
             result,
             cast(
-                type[FieldSet],
+                "type[FieldSet]",
                 PexBinaryFieldSet
                 if use_deprecated_pex_binary_run_semantics.val
                 else PythonSourceFieldSet,

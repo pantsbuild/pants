@@ -20,10 +20,6 @@ from pants.option.global_options import UseDeprecatedPexBinaryRunSemanticsOption
 from pants.util.logging import LogLevel
 
 
-def _in_chroot(relpath: str) -> str:
-    return os.path.join("{chroot}", relpath)
-
-
 @rule(level=LogLevel.DEBUG)
 async def create_pex_binary_run_request(
     field_set: PexBinaryFieldSet,
@@ -44,7 +40,7 @@ async def create_pex_binary_run_request(
         field_set.address,
         entry_point_field=field_set.entry_point,
         pex_env=pex_env,
-        run_in_sandbox=False,
+        run_in_sandbox=True,
         console_script=field_set.script.value,
         additional_pex_args=field_set.generate_additional_args(pex_binary_defaults),
     )
