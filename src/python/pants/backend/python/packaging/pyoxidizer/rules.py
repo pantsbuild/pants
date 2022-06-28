@@ -23,7 +23,7 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import (
     AddPrefix,
@@ -230,6 +230,15 @@ async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
     artifact = executable_binaries[0]
     assert artifact.relpath is not None
     return RunRequest(digest=binary.digest, args=(os.path.join("{chroot}", artifact.relpath),))
+
+
+@rule
+async def run_pyoxidizer_debug_adapter_binary(
+    field_set: PyOxidizerFieldSet,
+) -> RunDebugAdapterRequest:
+    raise NotImplementedError(
+        "Debugging a PyOxidizer binary using a debug adapter has not yet been implemented."
+    )
 
 
 def rules():
