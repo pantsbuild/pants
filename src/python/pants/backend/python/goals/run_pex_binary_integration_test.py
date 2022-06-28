@@ -13,7 +13,7 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 
 package_firstparty_args = pytest.mark.parametrize(
     "package_firstparty_args",
-    [("--pex-run-packaged-firstparty-code",), ()],
+    [("--pex-run-packaged-firstparty",), ()],
 )
 
 
