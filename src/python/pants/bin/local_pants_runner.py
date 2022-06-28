@@ -11,10 +11,12 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import PySessionCancellationLatch
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.streaming_workunit_handler import (
     StreamingWorkunitHandler,
@@ -33,6 +35,7 @@ from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import maybe_profiled
 from pants.util.logging import LogLevel
+from pants.vcs.git import GitWorktreeRequest, MaybeGitWorktree
 
 logger = logging.getLogger(__name__)
 
@@ -156,10 +159,18 @@ class LocalPantsRunner:
             cancellation_latch,
         )
 
+        (git_binary,) = graph_session.scheduler_session.product_request(
+            GitBinary, [Params(GitBinaryRequest())]
+        )
+        (maybe_git_worktree,) = graph_session.scheduler_session.product_request(
+            MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary)]
+        )
+
         specs = calculate_specs(
             options_bootstrapper=options_bootstrapper,
             options=options,
             session=graph_session.scheduler_session,
+            maybe_git_worktree=maybe_git_worktree,
         )
 
         profile_path = env.get("PANTS_PROFILE")
