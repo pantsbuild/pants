@@ -6,7 +6,7 @@ import tempfile
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Sequence, Tuple
 from urllib.parse import urljoin, urlparse
 
 import gnupg
@@ -27,6 +27,10 @@ def partition(predicate: Callable[[Any], bool], items: Iterable) -> Tuple[List, 
         else:
             where_false.append(item)
     return where_true, where_false
+
+
+def flatten(list_of_lists: Sequence[Sequence[Any]]) -> List[Any]:
+    return [item for sublist in list_of_lists for item in sublist]
 
 
 class GPGVerifier:
@@ -144,6 +148,52 @@ def is_prerelease(version_slug: str) -> bool:
     return any((x in version_slug for x in {"alpha", "beta", "rc"}))
 
 
+def fetch_platforms_for_version(
+    verifier: GPGVerifier,
+    inverse_platform_mapping: Dict[str, str],
+    version_slug: str,
+    version_infos: TFVersionInfo,
+):
+    logging.info(
+        f"processiong version {version_slug} with {len(version_infos.platform_links)} binaries"
+    )
+
+    if is_prerelease(version_slug):
+        logging.info(f"discarding unsupported prerelease slug={version_slug}")
+        return None
+
+    signatures_info = parse_signatures(version_infos.signature_links, verifier)
+    sha256sums = signatures_info.by_file()
+
+    out = []
+
+    for platform_link in version_infos.platform_links:
+        version, platform = parse_download_url(platform_link.link)
+
+        if platform not in inverse_platform_mapping:
+            logging.info(f"discarding unsupported platform version={version} platform={platform}")
+            continue
+        pants_platform = inverse_platform_mapping[platform]
+
+        file_size = get_file_size(platform_link.link)
+        sha256sum = sha256sums.get(platform_link.text)
+        if not sha256sum:
+            logging.warning(f"did not find sha256 sum for version={version} platform={platform}")
+            continue
+
+        tool_version = ExternalToolVersion(version, pants_platform, sha256sum, file_size)
+
+        if tool_version:
+            logging.info(f"created tool version for version={version} platform={platform}")
+            out.append(tool_version)
+        else:
+            logging.warning(
+                f"could not create tool version for version={version} platform={platform}"
+            )
+
+    return out
+
+
 def fetch_versions(url: str, verifier: GPGVerifier) -> List[ExternalToolVersion]:
     """Crawl the Terraform version site and identify all supported Terraform binaries."""
     version_page = get_tf_page(url)
@@ -156,45 +206,13 @@ def fetch_versions(url: str, verifier: GPGVerifier) -> List[ExternalToolVersion]
 
     out = []
     for version_slug, version_infos in platform_version_links.items():
-        logging.info(
-            f"processiong version {version_slug} with {len(version_infos.platform_links)} binaries"
+        found_versions = fetch_platforms_for_version(
+            verifier, inverse_platform_mapping, version_slug, version_infos
         )
+        if found_versions:
+            out.append(found_versions)
 
-        if is_prerelease(version_slug):
-            logging.info(f"discarding unsupported prerelease slug={version_slug}")
-            continue
-
-        signatures_info = parse_signatures(version_infos.signature_links, verifier)
-        sha256sums = signatures_info.by_file()
-
-        for platform_link in version_infos.platform_links:
-            version, platform = parse_download_url(platform_link.link)
-
-            if platform not in inverse_platform_mapping:
-                logging.info(
-                    f"discarding unsupported platform version={version} platform={platform}"
-                )
-                continue
-            pants_platform = inverse_platform_mapping[platform]
-
-            file_size = get_file_size(platform_link.link)
-            sha256sum = sha256sums.get(platform_link.text)
-            if not sha256sum:
-                logging.warning(
-                    f"did not find sha256 sum for version={version} platform={platform}"
-                )
-                continue
-
-            tool_version = ExternalToolVersion(version, pants_platform, sha256sum, file_size)
-
-            if tool_version:
-                logging.info(f"created tool version for version={version} platform={platform}")
-                out.append(tool_version)
-            else:
-                logging.warning(
-                    f"could not create tool version for version={version} platform={platform}"
-                )
-    return out
+    return flatten(out)
 
 
 if __name__ == "__main__":
