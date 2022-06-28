@@ -146,24 +146,24 @@ class PythonResolveField(StringField, AsyncFieldMixin):
 
 class PythonRunGoalUseSandboxField(BoolField):
     alias = "run_goal_use_sandbox"
-    default = False
+    default = True
     help = softwrap(
         """
-        If false, runs of this target with the `run` goal will use the in-repo sources
-        directly.
-
         If true, runs of this target with the `run` goal will copy the needed first-party sources
         into a temporary sandbox and run from there.
 
-        The former mode is similar to creating, activating, and using a virtual environment when
-        running your files. It may also be necessary if the source being run writes files into the
-        repo and computes their location relative to the executed files. Django's makemigrations
-        command is an example of such a process.
+        If false, runs of this target with the `run` goal will use the in-repo sources
+        directly.
 
-        The latter mode is more hermetic, and is closer to building and running the source as it
+        The former mode is more hermetic, and is closer to building and running the source as it
         were packaged in a `pex_binary`. Additionally, it may be necessary if your sources depend
         transitively on "generated" files which will be materialized in the sandbox in a source
         root, but are not in-repo.
+
+        The latter mode is similar to creating, activating, and using a virtual environment when
+        running your files. It may also be necessary if the source being run writes files into the
+        repo and computes their location relative to the executed files. Django's makemigrations
+        command is an example of such a process.
         """
     )
 
