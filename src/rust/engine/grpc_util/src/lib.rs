@@ -42,6 +42,7 @@ use tower::ServiceBuilder;
 
 pub mod headers;
 pub mod hyper;
+pub mod metrics;
 pub mod prost;
 pub mod retry;
 pub mod tls;
