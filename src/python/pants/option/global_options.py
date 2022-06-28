@@ -23,6 +23,7 @@ from pants.base.build_environment import (
     is_in_container,
     pants_version,
 )
+from pants.base.deprecated import deprecated_conditional
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.environment import CompleteEnvironment
 from pants.engine.internals.native_engine import PyExecutor
@@ -1508,41 +1509,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
         metavar="[+-]tag1,tag2,...",
     )
-    exclude_target_regexp = StrListOption(
-        "--exclude-target-regexp",
-        help="Exclude targets that match these regexes. This does not impact file arguments.",
-        metavar="<regexp>",
-        removal_version="2.14.0.dev0",
-        removal_hint=softwrap(
-            """
-            Use the option `--filter-address-regex` instead, with `-` in front of the regex. For
-            example, `--exclude-target-regexp=dir/` should become `--filter-address-regex=-dir/`.
 
-            The `--filter` options can now be used with any goal, not only the `filter` goal,
-            so there is no need for this option anymore.
-            """
-        ),
-    )
-
-    files_not_found_behavior = EnumOption(
-        "--files-not-found-behavior",
-        default=UnmatchedBuildFileGlobs.warn,
-        help=softwrap(
-            """
-            What to do when files and globs specified in BUILD files, such as in the
-            `sources` field, cannot be found. This happens when the files do not exist on
-            your machine or when they are ignored by the `--pants-ignore` option.
-            """
-        ),
-        advanced=True,
-        removal_version="2.14.0.dev0",
-        removal_hint=softwrap(
-            """
-            Use `[GLOBAL].unmatched_build_file_globs` instead, which behaves the same. This
-            option was renamed for clarity with the new `[GLOBAL].unmatched_cli_globs` option.
-            """
-        ),
-    )
     unmatched_build_file_globs = EnumOption(
         "--unmatched-build-file-globs",
         default=UnmatchedBuildFileGlobs.warn,
@@ -1572,29 +1539,6 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             """
         ),
         advanced=True,
-    )
-
-    owners_not_found_behavior = EnumOption(
-        "--owners-not-found-behavior",
-        default=OwnersNotFoundBehavior.ignore,
-        help=softwrap(
-            """
-            What to do when file arguments do not have any owning target. This happens when
-            there are no targets whose `sources` fields include the file argument.
-            """
-        ),
-        advanced=True,
-        removal_version="2.14.0.dev0",
-        removal_hint=softwrap(
-            """
-            This option is no longer useful with Pants because we have goals that work without any
-            targets, e.g. the `count-loc` goal or the `regex-lint` linter from the `lint` goal. This
-            option caused us to error on valid use cases.
-
-            For goals that require targets, like `list`, the unowned file will simply be ignored. If
-            no owners are found at all, most goals will warn and some like `run` will error.
-            """
-        ),
     )
 
     build_patterns = StrListOption(
@@ -1689,7 +1633,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     use_deprecated_directory_cli_args_semantics = BoolOption(
         "--use-deprecated-directory-cli-args-semantics",
-        default=True,
+        default=False,
         help=softwrap(
             f"""
             If true, Pants will use the old, deprecated semantics for directory arguments like
@@ -1699,14 +1643,21 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             If false, Pants will use the new semantics: directory arguments will match all files
             and targets in the directory, e.g. `{bin_name()} test dir` will run all tests in `dir`.
 
-            The new semantics will become the default in Pants 2.14, and the old semantics will be
-            removed in 2.15.
-
             This also impacts the behavior of the `tailor` goal. If this option is true,
-            `{bin_name()} tailor` without additional arguments will run over the whole project, and
             `{bin_name()} tailor dir` will run over `dir` and all recursive sub-directories. If
-            false, you must specify arguments, like `{bin_name()} tailor ::` to run over the
-            whole project; specifying a directory will only add targets for that directory.
+            false, specifying a directory will only add targets for that directory.
+            """
+        ),
+        removal_version="2.15.0.dev0",
+        removal_hint=softwrap(
+            f"""
+            If `use_deprecated_directory_cli_args_semantics` is already set explicitly to `false`,
+            simply delete the option from `pants.toml` because `false` is now the default.
+
+            If set to true, removing the option will cause directory arguments like `{bin_name()}
+            test project/dir` to now match all files and targets in the directory, whereas before
+            it matched the target `project/dir:dir`. To keep the old semantics, use the explicit
+            address syntax.
             """
         ),
     )
@@ -1747,17 +1698,40 @@ class GlobalOptions(BootstrapOptions, Subsystem):
                 )
             )
 
-        if opts.remote_execution and (opts.remote_cache_read or opts.remote_cache_write):
-            raise OptionsError(
-                softwrap(
-                    """
-                    `--remote-execution` cannot be set at the same time as either
-                    `--remote-cache-read` or `--remote-cache-write`.
+        # TODO: When this deprecation triggers, the relevant TODO(s) in `context.rs` should be
+        # removed as well.
+        deprecated_conditional(
+            lambda: opts.remote_execution and opts.remote_cache_eager_fetch,
+            removal_version="2.15.0.dev0",
+            entity="Setting `--remote-execution` at the same time as `--remote-cache-eager-fetch`.",
+            hint=softwrap(
+                """
+                Use of `--remote-execution` currently implies use of
+                `--remote-cache-eager-fetch=false`, but in future versions, use of eager fetch with
+                remote execution will be optional. To preserve the current behavior in future
+                versions, `--remote-cache-eager-fetch` should be disabled.
+                """
+            ),
+        )
 
-                    If remote execution is enabled, it will already use remote caching.
-                    """
-                )
-            )
+        # TODO: When this deprecation triggers, the relevant TODO(s) in `context.rs` should be
+        # removed as well.
+        deprecated_conditional(
+            lambda: (
+                opts.remote_execution
+                and (not opts.remote_cache_read or not opts.remote_cache_write)
+            ),
+            removal_version="2.15.0.dev0",
+            entity="Using `--remote-execution` without setting `--remote-cache-read` and `--remote-cache-write`.",
+            hint=softwrap(
+                """
+                Use of `--remote-execution` currently implies use of a remote cache, but in future
+                versions, use of the remote cache with remote execution will be optional. To
+                preserve the current behavior in future versions, both `--remote-cache-read` and
+                `--remote-cache-write` should be enabled.
+                """
+            ),
+        )
 
         if opts.remote_execution and not opts.remote_execution_address:
             raise OptionsError(

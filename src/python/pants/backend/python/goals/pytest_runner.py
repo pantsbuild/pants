@@ -34,6 +34,7 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -67,7 +68,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
 
 logger = logging.getLogger()
 
@@ -405,18 +405,10 @@ async def debug_python_test(field_set: PythonTestFieldSet) -> TestDebugRequest:
 async def debugpy_python_test(
     field_set: PythonTestFieldSet,
     debugpy: DebugPy,
+    debug_adapter: DebugAdapterSubsystem,
     pytest: PyTest,
 ) -> TestDebugAdapterRequest:
     debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
-    if pytest.main.spec != "pytest":
-        logger.warning(
-            softwrap(
-                """
-                Ignoring custom [pytest].console_script/entry_point when using the debug adapter.
-                `debugpy` (Python's Debug Adapter) doesn't support this use-case yet.
-                """
-            )
-        )
 
     setup = await Get(
         TestSetup,
@@ -424,16 +416,7 @@ async def debugpy_python_test(
             field_set,
             is_debug=True,
             main=debugpy.main,
-            prepend_argv=(
-                "--listen",
-                f"{debugpy.host}:{debugpy.port}",
-                "--wait-for-client",
-                # @TODO: Techincally we should use `pytest.main`, however `debugpy` doesn't support
-                # launching an entry_point.
-                # https://github.com/microsoft/debugpy/issues/955
-                "-m",
-                "pytest",
-            ),
+            prepend_argv=debugpy.get_args(debug_adapter, pytest.main),
             additional_pexes=(debugpy_pex,),
         ),
     )

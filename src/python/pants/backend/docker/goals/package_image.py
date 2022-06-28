@@ -7,13 +7,12 @@ import os
 import re
 from dataclasses import dataclass
 from functools import partial
-from itertools import chain
 from typing import Iterator, cast
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
 from pants.backend.docker.package_types import BuiltDockerImage as BuiltDockerImage
-from pants.backend.docker.registries import DockerRegistries
+from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMixin,
@@ -81,17 +80,27 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         return interpolation_context.format(tag, source=source, error_cls=DockerImageTagValueError)
 
     def format_repository(
-        self, default_repository: str, interpolation_context: DockerInterpolationContext
+        self,
+        default_repository: str,
+        interpolation_context: DockerInterpolationContext,
+        registry: DockerRegistryOptions | None = None,
     ) -> str:
         repository_context = DockerInterpolationContext.from_dict(
             {
                 "directory": os.path.basename(self.address.spec_path),
                 "name": self.address.target_name,
                 "parent_directory": os.path.basename(os.path.dirname(self.address.spec_path)),
+                "default_repository": default_repository,
+                "target_repository": self.repository.value or default_repository,
                 **interpolation_context,
             }
         )
-        if self.repository.value:
+        if registry and registry.repository:
+            repository_text = registry.repository
+            source = DockerInterpolationContext.TextSource(
+                options_scope=f"[docker.registries.{registry.alias or registry.address}].repository"
+            )
+        elif self.repository.value:
             repository_text = self.repository.value
             source = DockerInterpolationContext.TextSource(
                 address=self.address, target_alias="docker_image", field_alias=self.repository.alias
@@ -139,21 +148,20 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
 
         This method will always return a non-empty tuple.
         """
-        repository = self.format_repository(default_repository, interpolation_context)
-        image_names = tuple(
-            self.format_names(repository, self.tags.value or (), interpolation_context)
-        )
+        image_tags = self.tags.value or ()
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
             # The image name is also valid as image ref without registry.
-            return image_names
+            repository = self.format_repository(default_repository, interpolation_context)
+            return tuple(self.format_names(repository, image_tags, interpolation_context))
 
         return tuple(
             "/".join([registry.address, image_name])
             for registry in registries_options
-            for image_name in chain(
-                image_names,
-                self.format_names(repository, registry.extra_image_tags, interpolation_context),
+            for image_name in self.format_names(
+                self.format_repository(default_repository, interpolation_context, registry),
+                image_tags + registry.extra_image_tags,
+                interpolation_context,
             )
         )
 

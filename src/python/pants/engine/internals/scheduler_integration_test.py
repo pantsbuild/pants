@@ -31,7 +31,7 @@ def test_graceful_termination(use_pantsd: bool) -> None:
         [
             "--backend-packages=['pants.backend.python', 'internal_plugins.rules_for_testing']",
             "list-and-die-for-testing",
-            "testprojects/src/python/hello/greet",
+            "testprojects/src/python/hello/greet:greet",
         ],
         use_pantsd=use_pantsd,
     )

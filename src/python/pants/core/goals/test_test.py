@@ -34,6 +34,7 @@ from pants.core.goals.test import (
     build_runtime_package_dependencies,
     run_tests,
 )
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address
 from pants.engine.console import Console
@@ -55,7 +56,7 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.testutil.option_util import create_goal_subsystem
+from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.rule_runner import (
     MockEffect,
     MockGet,
@@ -167,6 +168,11 @@ def run_test_rule(
         extra_env_vars=[],
         shard="",
     )
+    debug_adapter_subsystem = create_subsystem(
+        DebugAdapterSubsystem,
+        host="127.0.0.1",
+        port="5678",
+    )
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     union_membership = UnionMembership(
         {
@@ -207,6 +213,7 @@ def run_test_rule(
             rule_args=[
                 console,
                 test_subsystem,
+                debug_adapter_subsystem,
                 workspace,
                 union_membership,
                 DistDir(relpath=Path("dist")),

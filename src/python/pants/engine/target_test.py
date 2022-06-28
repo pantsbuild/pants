@@ -296,6 +296,28 @@ def test_add_custom_fields() -> None:
     assert other_tgt.has_field(CustomField) is False
 
 
+def test_subclassed_target_inherits_plugin_fields() -> None:
+    class CustomFortranTarget(FortranTarget):
+        alias = "custom_fortran"
+
+    # Ensure that any `PluginField` is not lost on subclasses.
+    assert issubclass(CustomFortranTarget._plugin_field_cls, FortranTarget._plugin_field_cls)
+    assert issubclass(FortranTarget._plugin_field_cls, Target._plugin_field_cls)
+
+    class CustomField(BoolField):
+        alias = "custom_field"
+        default = False
+
+    union_membership = UnionMembership.from_rules(
+        [FortranTarget.register_plugin_field(CustomField)]
+    )
+
+    custom_tgt = CustomFortranTarget(
+        {}, Address("", target_name="custom"), union_membership=union_membership
+    )
+    assert custom_tgt.has_field(CustomField) is True
+
+
 def test_override_preexisting_field_via_new_target() -> None:
     # To change the behavior of a pre-existing field, you must create a new target as it would not
     # be safe to allow plugin authors to change the behavior of core target types.
