@@ -454,11 +454,11 @@ JUnit XML results
 
 Pytest can generate [JUnit XML result files](https://docs.pytest.org/en/6.2.x/usage.html#creating-junitxml-format-files). This allows you to hook up your results, for example, to dashboards.
 
-To save JUnit XML result files, set the option `[test].xml_dir`, like this:
+To save JUnit XML result files, set the option `[test].report`, like this:
 
 ```toml pants.toml
 [test]
-xml_dir = "dist/test_results"
+report = true
 ```
 
-You may also want to set the option `[pytest].junit_family` to change the format. Run `./pants help-advanced pytest` for more information.
+This will default to writing test reports to `dist/test/reports`. You may also want to set the option `[pytest].junit_family` to change the format. Run `./pants help-advanced pytest` for more information.
