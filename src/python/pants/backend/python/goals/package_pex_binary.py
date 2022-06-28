@@ -20,7 +20,6 @@ from pants.backend.python.target_types import (
     PexLayoutField,
     PexPlatformsField,
     PexResolveLocalPlatformsField,
-    PexRunInSandboxField,
     PexScriptField,
     PexShebangField,
     PexStripEnvField,
@@ -71,7 +70,6 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     execution_mode: PexExecutionModeField
     include_requirements: PexIncludeRequirementsField
     include_tools: PexIncludeToolsField
-    run_in_sandbox: PexRunInSandboxField
 
     @property
     def _execution_mode(self) -> PexExecutionMode:
