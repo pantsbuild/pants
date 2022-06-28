@@ -136,29 +136,14 @@ async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
         ),
     )
 
-    source_files_get= Get(
-        SourceFiles,
-        SourceFilesRequest(
-            field_set.source for field_set in request.field_sets
-        ),
-    )
-
-    downloaded_shfmt, source_files = await MultiGet(
-        download_shfmt_get, source_files_get
-    )
-
-    # If we were given an input digest from a previous formatter for the source files, then we
-    # should use that input digest instead of the one we read from the filesystem.
-    source_files_snapshot = (
-        source_files.snapshot
-        if request.prior_formatter_result is None
-        else request.prior_formatter_result
+    downloaded_shfmt, config_digest = await MultiGet(
+        download_shfmt_get, config_digest_get
     )
 
     input_digest = await Get(
         Digest,
         MergeDigests(
-            (source_files_snapshot.digest, downloaded_shfmt.digest)
+            (request.snapshot.digest, downloaded_shfmt.digest, config_digest)
         ),
     )
 
@@ -166,32 +151,24 @@ async def shfmt_fmt(request: ShfmtRequest, shfmt: Shfmt) -> FmtResult:
         downloaded_shfmt.exe,
         "-w",
         *shfmt.args,
-        *source_files_snapshot.files,
+        *request.snapshot.files,
     ]
     process = Process(
         argv=argv,
         input_digest=input_digest,
-        output_files=source_files_snapshot.files,
+        output_files=request.snapshot.files,
         description=f"Run shfmt on {pluralize(len(request.field_sets), 'file')}.",
         level=LogLevel.DEBUG,
     )
 
     result = await Get(ProcessResult, Process, process)
     output_snapshot = await Get(Snapshot, result.output_digest)
-    return FmtResult(
-        source_files_snapshot,
-        output_snapshot,
-        stdout=strip_v2_chroot_path(result.stdout),
-        stderr=strip_v2_chroot_path(result.stderr),
-        formatter_name=request.name
-    )
+    return FmtResult.create(request, result, output_snapshot)
 ```
 
-The `FmtRequest` has a property called `.field_sets`, which stores a collection of the `FieldSet`s defined in step 2. Each `FieldSet` corresponds to a single target. Pants will have already validated that there is at least one valid `FieldSet`, so you can expect `ShfmtRequest.field_sets` to have 1-n `FieldSet` instances. 
+The `FmtRequest` has properties `.field_sets` and `.snapshot`, which store collections of the `FieldSet`s defined in step 2, and their sources. Each `FieldSet` corresponds to a single target. Pants will have already validated that there is at least one valid `FieldSet`, so you can expect `ShfmtRequest.field_sets` to have 1-n `FieldSet` instances.
 
 If you have a `--skip` option, you should check if it was used at the beginning of your `fmt` and `lint` rules and, if so, to early return an empty `LintResults()` and return `FmtResult.skip()`.
-
-Use `Get(SourceFiles, SourceFilesRequest)` to get all the sources you want to run your linter on. However, you should check if the `FmtRequest.prior_formatter_result` is set, and if so, use that value instead. This ensures that the result of any previous formatters is used, rather than the original source files. 
 
 If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to ensure that the tool is fetched.
 
