@@ -50,7 +50,7 @@ from the repo root.
 
 Running a `python_source` is equivalent to running the source directly (a la `python ...`) with the
 set of third-party dependencies exposed to the interpreter. This is comparable to using a virtual
-environment or Poetry to run your script (E.g. `ve/bin/python ...` or `poetry run python ...`).
+environment or Poetry to run your script (E.g. `venv/bin/python ...` or `poetry run python ...`).
 
 If your `python_source` depends on Pants-generated files (such as a `relocated_files` or `archive`)
 you might consider setting the `run_goal_use_sandbox` field on your `python_source` to `True`.

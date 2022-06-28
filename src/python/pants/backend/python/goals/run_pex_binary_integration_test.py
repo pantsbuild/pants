@@ -11,9 +11,9 @@ import pytest
 from pants.backend.python.target_types import PexExecutionMode
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 
-package_firstparty_args = pytest.mark.parametrize(
-    "package_firstparty_args",
-    [("--pex-run-packaged-firstparty",), ()],
+run_semantics_args = pytest.mark.parametrize(
+    "run_semantics_args",
+    [("--use-deprecated-pex-binary-run-semantics",), ()],
 )
 
 
@@ -27,12 +27,12 @@ package_firstparty_args = pytest.mark.parametrize(
         ("app.py:main", None, False),
     ],
 )
-@package_firstparty_args
+@run_semantics_args
 def test_run_sample_script(
     entry_point: str,
     execution_mode: Optional[PexExecutionMode],
     include_tools: bool,
-    package_firstparty_args: tuple[str, ...],
+    run_semantics_args: tuple[str, ...],
 ) -> None:
     """Test that we properly run a `pex_binary` target.
 
@@ -89,7 +89,7 @@ def test_run_sample_script(
             args = [
                 "--backend-packages=pants.backend.python",
                 "--backend-packages=pants.backend.codegen.protobuf.python",
-                *package_firstparty_args,
+                *run_semantics_args,
                 f"--source-root-patterns=['/{tmpdir}/src_root1', '/{tmpdir}/src_root2']",
                 "--pants-ignore=__pycache__",
                 "--pants-ignore=/src/python",
@@ -102,7 +102,7 @@ def test_run_sample_script(
     result = run()
     assert "Hola, mundo.\n" in result.stderr
     file = result.stdout.strip()
-    if package_firstparty_args:
+    if run_semantics_args:
         assert file.endswith("utils/strutil.py")
     else:
         assert file.endswith("src_root2/utils/strutil.py")
@@ -117,14 +117,14 @@ def test_run_sample_script(
         assert ("prepend" if execution_mode is PexExecutionMode.VENV else "false") == pex_info[
             "venv_bin_path"
         ]
-        if package_firstparty_args:
+        if run_semantics_args:
             assert pex_info["strip_pex_env"]
         else:
             assert not pex_info["strip_pex_env"]
 
 
-@package_firstparty_args
-def test_no_strip_pex_env_issues_12057(package_firstparty_args: tuple[str, ...]) -> None:
+@run_semantics_args
+def test_no_strip_pex_env_issues_12057(run_semantics_args: tuple[str, ...]) -> None:
     sources = {
         "src/app.py": dedent(
             """\
@@ -153,7 +153,7 @@ def test_no_strip_pex_env_issues_12057(package_firstparty_args: tuple[str, ...])
     with setup_tmpdir(sources) as tmpdir:
         args = [
             "--backend-packages=pants.backend.python",
-            *package_firstparty_args,
+            *run_semantics_args,
             f"--source-root-patterns=['/{tmpdir}/src']",
             "run",
             f"{tmpdir}/src:binary",
@@ -162,8 +162,8 @@ def test_no_strip_pex_env_issues_12057(package_firstparty_args: tuple[str, ...])
         assert result.exit_code == 42, result.stderr
 
 
-@package_firstparty_args
-def test_local_dist(package_firstparty_args: tuple[str, ...]) -> None:
+@run_semantics_args
+def test_local_dist(run_semantics_args: tuple[str, ...]) -> None:
     sources = {
         "foo/bar.py": "BAR = 'LOCAL DIST'",
         "foo/setup.py": dedent(
@@ -200,7 +200,7 @@ def test_local_dist(package_firstparty_args: tuple[str, ...]) -> None:
     with setup_tmpdir(sources) as tmpdir:
         args = [
             "--backend-packages=pants.backend.python",
-            *package_firstparty_args,
+            *run_semantics_args,
             f"--source-root-patterns=['/{tmpdir}']",
             "run",
             f"{tmpdir}/foo:bin",
@@ -209,8 +209,8 @@ def test_local_dist(package_firstparty_args: tuple[str, ...]) -> None:
         assert result.stdout == "LOCAL DIST\n"
 
 
-@package_firstparty_args
-def test_run_script_from_3rdparty_dist_issue_13747(package_firstparty_args) -> None:
+@run_semantics_args
+def test_run_script_from_3rdparty_dist_issue_13747(run_semantics_args) -> None:
     sources = {
         "src/BUILD": dedent(
             """\
@@ -223,7 +223,7 @@ def test_run_script_from_3rdparty_dist_issue_13747(package_firstparty_args) -> N
         SAY = "moooo"
         args = [
             "--backend-packages=pants.backend.python",
-            *package_firstparty_args,
+            *run_semantics_args,
             f"--source-root-patterns=['/{tmpdir}/src']",
             "run",
             f"{tmpdir}/src:test",

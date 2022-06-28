@@ -8,7 +8,7 @@ import itertools
 import logging
 import os
 from collections import defaultdict
-from typing import Iterable
+from typing import Iterable, cast
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
@@ -55,7 +55,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, UseDeprecatedPexBinaryRunSemanticsOption
 from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -452,6 +452,7 @@ class AmbiguousImplementationsException(Exception):
 def _handle_ambiguous_result(
     request: TargetRootsToFieldSetsRequest,
     result: TargetRootsToFieldSets,
+    field_set_to_default_to: type[FieldSet],
 ) -> TargetRootsToFieldSets:
     assert len(result.targets) > 1
     field_set_types = [type(field_set) for field_set in result.field_sets]
@@ -464,33 +465,37 @@ def _handle_ambiguous_result(
         and PexBinaryFieldSet in field_set_types
         and PythonSourceFieldSet in field_set_types
     ):
-        warn_or_error(
-            "2.14.0dev0",
-            "referring to a `pex_binary` by using the filename specified in `entry_point`",
-            softwrap(
-                """
-                    In Pants 2.14, a `pex_binary` can no longer be referred to by the filename that
-                    the `entry_point` field uses.
-
-                    This is due to a change in Pants 2.14, which allows you to use the `run` goal
-                    directly on a `python_source` target without requiring a `pex_binary`. As a
-                    consequence Pants removed the ability to refer to the `pex_binary` via its
-                    `entry_point`, as otherwise it would be ambiguous which target to use.
-
-                    Note that because of this change you are able to remove any `pex_binary` targets
-                    you have declared just to support the `run` goal
-                    (usually these are developer scripts), as using `run` on the `python_source` will
-                    have the equivalent behavior.
-
-                    To fix this deprecation, use the `pex_binary`'s address.
+        if field_set_to_default_to is PexBinaryFieldSet:
+            warn_or_error(
+                "2.14.0dev1",
+                "referring to a `pex_binary` by using the filename specified in `entry_point`",
+                softwrap(
                     """
-            ),
-        )
+                        In Pants 2.14, a `pex_binary` can no longer be referred to by the filename that
+                        the `entry_point` field uses.
+
+                        This is due to a change in Pants 2.13, which allows you to use the `run` goal
+                        directly on a `python_source` target without requiring a `pex_binary`. As a
+                        consequence the ability to refer to the `pex_binary` via its `entry_point` is
+                        being removed, as otherwise it would be ambiguous which target to use.
+
+                        Note that because of this change you are able to remove any `pex_binary` targets
+                        you have declared just to support the `run` goal
+                        (usually these are developer scripts), as using `run` on the `python_source` will
+                        have the equivalent behavior.
+
+                        To fix this deprecation, you can use the `pex_binary`'s address to refer to
+                        the `pex_binary`, or set the `[GLOBAL].use_deprecated_pex_binary_run_semantics`
+                        option to `false` (which, among other things, will have `run` on a Python
+                        filename run the `python_source`).
+                        """
+                ),
+            )
         return TargetRootsToFieldSets(
             {
                 target: field_sets
                 for target, field_sets in result.mapping.items()
-                if PexBinaryFieldSet in {type(field_set) for field_set in field_sets}
+                if field_set_to_default_to in {type(field_set) for field_set in field_sets}
             }
         )
     raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
@@ -499,6 +504,7 @@ def _handle_ambiguous_result(
 @rule
 async def find_valid_field_sets_for_target_roots(
     request: TargetRootsToFieldSetsRequest,
+    use_deprecated_pex_binary_run_semantics: UseDeprecatedPexBinaryRunSemanticsOption,
     specs: Specs,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
@@ -557,7 +563,16 @@ async def find_valid_field_sets_for_target_roots(
     if not request.expect_single_field_set:
         return result
     if len(result.targets) > 1:
-        return _handle_ambiguous_result(request, result)
+        return _handle_ambiguous_result(
+            request,
+            result,
+            cast(
+                type[FieldSet],
+                PexBinaryFieldSet
+                if use_deprecated_pex_binary_run_semantics.val
+                else PythonSourceFieldSet,
+            ),
+        )
     if len(result.field_sets) > 1:
         raise AmbiguousImplementationsException(
             result.targets[0], result.field_sets, goal_description=request.goal_description

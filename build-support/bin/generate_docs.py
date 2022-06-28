@@ -26,10 +26,11 @@ import pkgutil
 import re
 import subprocess
 import textwrap
+import time
 from html.parser import HTMLParser
 from pathlib import Path, PosixPath
 from typing import Any, Dict, Iterable, cast
-import time
+
 import chevron
 import requests
 from common import die

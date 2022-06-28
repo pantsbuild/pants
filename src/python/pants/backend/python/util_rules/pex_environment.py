@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Mapping
 
-from pants.base.deprecated import warn_or_error
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
 from pants.core.util_rules import subprocess_environment, system_binaries
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
@@ -29,24 +28,6 @@ from pants.util.strutil import create_path_env_var, softwrap
 class PexRuntimeEnvironment(Subsystem):
     options_scope = "pex"
     help = "How Pants uses Pex to run Python subprocesses."
-
-    _run_packaged_firstparty = BoolOption(
-        "--run-packaged-firstparty",
-        default=False,
-        help=softwrap(
-            """
-            If `True`, `run`ning a `pex_binary` will build the PEX via `package` and run it directly.
-            This makes `run` equivalent to running `package` and running the artifact.
-
-            If `False`, `run`ning a `pex_binary` will run your firstparty code by copying sources to
-            a sandbox (while still using a PEX for thirdparty dependencies).
-
-            Note that support has been added to Pants to allow you to `run` any `python_source`,
-            so setting this to `False` should be reserved for maintaining backwards-compatibility
-            with previous versions of Pants.
-            """
-        ),
-    )
 
     # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
     #  per-process override.
@@ -85,25 +66,6 @@ class PexRuntimeEnvironment(Subsystem):
         ),
         advanced=True,
     )
-
-    @property
-    def run_packaged_firstparty(self) -> bool:
-        if self.options.is_default("run_packaged_firstparty"):
-            warn_or_error(
-                "2.14.0.dev0",
-                "the option --pex-run-packaged-firstparty defaulting to false",
-                softwrap(
-                    """
-                    In Pants 2.14, by default, running a `pex_binary` will actually package the PEX
-                    and run it, as if you ran `package` followed by executing the built PEX.
-
-                    To fix this deprecation, explictly set `run_packaged_firstparty` in the
-                    `[pex]` section of `pants.toml`. Set it to `false` to use the "old" behavior.
-                    Set it to `true` to use the "new" behavior.
-                    """
-                ),
-            )
-        return self._run_packaged_firstparty
 
     @memoized_method
     def path(self, env: Environment) -> tuple[str, ...]:

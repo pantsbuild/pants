@@ -1,9 +1,11 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import os
 from typing import Iterable, Optional
 
+from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.target_types import (
     ConsoleScript,
     PexEntryPointField,
@@ -12,7 +14,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import Pex
+from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
@@ -22,11 +24,16 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.run import RunRequest
+from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, rule_helper
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+
+
+def _in_chroot(relpath: str) -> str:
+    return os.path.join("{chroot}", relpath)
 
 
 @rule_helper
@@ -101,13 +108,10 @@ async def _create_python_source_run_request(
     ]
     merged_digest = await Get(Digest, MergeDigests(input_digests))
 
-    def in_chroot(relpath: str) -> str:
-        return os.path.join("{chroot}", relpath)
-
     complete_pex_env = pex_env.in_workspace()
-    args = complete_pex_env.create_argv(in_chroot(pex.name), python=pex.python)
+    args = complete_pex_env.create_argv(_in_chroot(pex.name), python=pex.python)
 
-    chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
+    chrooted_source_roots = [_in_chroot(sr) for sr in sources.source_roots]
     # The order here is important: we want the in-repo sources to take precedence over their
     # copies in the sandbox (see above for why those copies exist even in non-sandboxed mode).
     source_roots = [
@@ -116,7 +120,7 @@ async def _create_python_source_run_request(
     ]
     extra_env = {
         **pex_env.in_workspace().environment_dict(python_configured=pex.python is not None),
-        "PEX_PATH": in_chroot(local_dists.pex.name),
+        "PEX_PATH": _in_chroot(local_dists.pex.name),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
 
@@ -125,3 +129,44 @@ async def _create_python_source_run_request(
         args=args,
         extra_env=extra_env,
     )
+
+
+@rule_helper
+async def _create_python_source_run_dap_request(
+    regular_run_request: RunRequest,
+    *,
+    entry_point_field: PexEntryPointField,
+    debugpy: DebugPy,
+    debug_adapter: DebugAdapterSubsystem,
+    console_script: Optional[ConsoleScript] = None,
+) -> RunDebugAdapterRequest:
+    entry_point, debugpy_pex = await MultiGet(
+        Get(
+            ResolvedPexEntryPoint,
+            ResolvePexEntryPointRequest(entry_point_field),
+        ),
+        Get(Pex, PexRequest, debugpy.to_pex_request()),
+    )
+
+    merged_digest = await Get(
+        Digest, MergeDigests([regular_run_request.digest, debugpy_pex.digest])
+    )
+    extra_env = dict(regular_run_request.extra_env)
+    extra_env["PEX_PATH"] = os.pathsep.join(
+        [
+            extra_env["PEX_PATH"],
+            # For debugpy to work properly, we need to have just one "environment" for our
+            # command to run in. Therefore, we cobble one together by exeucting debugpy's PEX, and
+            # shoehorning in the original PEX through PEX_PATH.
+            _in_chroot(os.path.basename(regular_run_request.args[1])),
+        ]
+    )
+    main = console_script or entry_point.val
+    assert main is not None
+    args = [
+        regular_run_request.args[0],  # python executable
+        _in_chroot(debugpy_pex.name),
+        *debugpy.get_args(debug_adapter, main),
+    ]
+
+    return RunDebugAdapterRequest(digest=merged_digest, args=args, extra_env=extra_env)
