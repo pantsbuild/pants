@@ -42,7 +42,7 @@ pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
 pub struct PyFailure(pub Failure);
 
 // TODO: We import this exception type because `pyo3` doesn't support declaring exceptions with
-// additional fields.
+// additional fields. See https://github.com/PyO3/pyo3/issues/295
 import_exception!(pants.base.exceptions, NativeEngineFailure);
 
 pub fn equals(h1: &PyAny, h2: &PyAny) -> bool {

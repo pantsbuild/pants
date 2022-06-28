@@ -39,7 +39,7 @@ class NativeEngineFailure(Exception):
     """A wrapper around a `Failure` instance.
 
     TODO: This type is defined in Python because pyo3 doesn't support declaring Exceptions with
-    additional fields.
+    additional fields. See https://github.com/PyO3/pyo3/issues/295
     """
 
     def __init__(self, msg: str, failure: PyFailure) -> None:
