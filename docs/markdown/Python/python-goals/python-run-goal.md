@@ -48,14 +48,19 @@ Execution Semantics
 Running a `pex_binary` is equivalent to `package`-ing the target followed by executing the built PEX
 from the repo root.
 
-Running a `python_source` is equivalent to running the source directly (a la `python ...`) with the
-set of third-party dependencies exposed to the interpreter. This is comparable to using a virtual
-environment or Poetry to run your script (E.g. `venv/bin/python ...` or `poetry run python ...`).
+Running a `python_source` with the `run_goal_use_sandbox` field set to `True` (the default) runs your
+code in an ephemeral sandbox (sometimes referred to as the "chroot") with your firstparty code and
+Pants-generated files (such as a `relocated_files` or `archive`) copied inside.
 
-If your `python_source` depends on Pants-generated files (such as a `relocated_files` or `archive`)
-you might consider setting the `run_goal_use_sandbox` field on your `python_source` to `True`.
-Pants only materializes those files in the sandbox and not in your repo, so your code might have
-trouble locating them.
+Running a `python_source` with the `run_goal_use_sandbox` field set to `False` is equivalent to
+running the source directly (a la `python ...`) with the set of third-party dependencies exposed to
+the interpreter. This is comparable to using a virtual environment or Poetry to run your script
+(E.g. `venv/bin/python ...` or `poetry run python ...`).
+
+The main tradeoff between the two values is if you need to load Pants-generated files
+(set the field to `True`) or want to write to in-repo files such as using Django's
+`manage.py makemigrations` (set the field to `False`).
+
 
 Watching the filesystem
 -----------------------
