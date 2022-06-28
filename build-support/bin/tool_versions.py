@@ -140,6 +140,10 @@ def parse_download_url(url: str) -> Tuple[str, str]:
     return version, platform_name + "_" + platform_arch
 
 
+def is_prerelease(version_slug: str) -> bool:
+    return any((x in version_slug for x in {"alpha", "beta", "rc"}))
+
+
 def fetch_versions(url: str, verifier: GPGVerifier) -> List[ExternalToolVersion]:
     """Crawl the Terraform version site and identify all supported Terraform binaries."""
     version_page = get_tf_page(url)
@@ -155,6 +159,11 @@ def fetch_versions(url: str, verifier: GPGVerifier) -> List[ExternalToolVersion]
         logging.info(
             f"processiong version {version_slug} with {len(version_infos.platform_links)} binaries"
         )
+
+        if is_prerelease(version_slug):
+            logging.info(f"discarding unsupported prerelease slug={version_slug}")
+            continue
+
         signatures_info = parse_signatures(version_infos.signature_links, verifier)
         sha256sums = signatures_info.by_file()
 
