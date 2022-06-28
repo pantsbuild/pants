@@ -19,6 +19,8 @@ use fs::{
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use store::Snapshot;
 
+use crate::Failure;
+
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyDigest>()?;
   m.add_class::<PyFileDigest>()?;
@@ -40,7 +42,8 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 // Exception type out of `@rule` bodies and back into `Failure::MissingDigest`, to allow for retry
 // via #11331.
 pub fn todo_possible_store_missing_digest(e: store::StoreError) -> PyErr {
-  PyException::new_err(e.to_string())
+  let failure: Failure = e.into();
+  failure.into()
 }
 
 #[pyclass(name = "Digest")]

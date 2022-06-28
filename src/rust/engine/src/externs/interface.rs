@@ -54,6 +54,7 @@ use crate::{
 
 #[pymodule]
 fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
+  externs::register(py, m)?;
   externs::address::register(py, m)?;
   externs::fs::register(m)?;
   externs::nailgun::register(py, m)?;
@@ -65,9 +66,9 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_class::<PyExecutionRequest>()?;
   m.add_class::<PyExecutionStrategyOptions>()?;
+  m.add_class::<PyLocalStoreOptions>()?;
   m.add_class::<PyNailgunServer>()?;
   m.add_class::<PyRemotingOptions>()?;
-  m.add_class::<PyLocalStoreOptions>()?;
   m.add_class::<PyResult>()?;
   m.add_class::<PyScheduler>()?;
   m.add_class::<PySession>()?;
