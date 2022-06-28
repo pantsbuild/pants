@@ -30,7 +30,7 @@ class Black(PythonToolBase):
     name = "Black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==22.1.0"
+    default_version = "black==22.6.0"
     default_main = ConsoleScript("black")
 
     register_interpreter_constraints = True
