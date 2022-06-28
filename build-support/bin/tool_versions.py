@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Tuple
 from urllib.parse import urljoin, urlparse
 
-import gnupg  # type: ignore
+import gnupg
 import requests
 from bs4 import BeautifulSoup
 

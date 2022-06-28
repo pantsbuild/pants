@@ -60,6 +60,7 @@ module = [
     "dockerfile",
     "fasteners",
     "freezegun",
+    "gnupg",
     "hdrh",
     "hdrh.histogram",
     "ijson",
