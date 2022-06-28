@@ -544,10 +544,6 @@ fn interactive_process(
 
     let session = context.session;
 
-    if !restartable {
-        task_side_effected()?;
-    }
-
     let maybe_tempdir = if run_in_workspace {
       None
     } else {
@@ -646,6 +642,10 @@ fn interactive_process(
 
     command.env_clear();
     command.envs(env);
+
+    if !restartable {
+        task_side_effected()?;
+    }
 
     let exit_status = session.clone()
       .with_console_ui_disabled(async move {
